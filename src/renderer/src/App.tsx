@@ -186,9 +186,8 @@ export function App() {
   };
 
   // The hive: god-agent bootstrap, hook-driven avatars, idle-agent waking. Held
-  // off until the user opens a hive in the launch picker (passing null no-ops the
-  // hook) so Michael doesn't boot against the current home while the user may be
-  // about to switch to a different one.
+  // off (passing null no-ops the hook) until the office folder check passes
+  // (homeState 'ok'), so Michael never boots against a missing office.
   useEffect(() => {
     if (!config?.onboardingComplete || homeState !== 'checking') return;
     let alive = true;
@@ -264,7 +263,7 @@ export function App() {
   }
 
   if (!config.onboardingComplete) {
-    // Just-onboarded users go straight into the hive they set up — skip the picker.
+    // Just-onboarded users go straight into the office they set up (homeState 'ok').
     return <OnboardingWizard onComplete={(next) => { setConfig(next); setHomeState('ok'); }} />;
   }
 
@@ -436,7 +435,7 @@ export function App() {
               display: 'flex', flexDirection: 'column',
               // Room for the OFFICE | TASKS toggle in the bottom left corner, so
               // it never sits on top of the last cards in a column.
-              paddingBottom: 44,
+              paddingBottom: 52,
               background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 2px var(--cth-ink-900)'
             }}>
               <FloorViewIntro view={floorView} />

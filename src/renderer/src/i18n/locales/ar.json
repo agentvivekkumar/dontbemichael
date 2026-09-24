@@ -294,7 +294,13 @@
       "adding": "جارٍ الإضافة…",
       "addFiles": "أضف ملفات…",
       "docCount": "{{count}} مستند مفهرَس",
-      "docCountPlural": "{{count}} مستندات مفهرَسة"
+      "docCountPlural": "{{count}} مستندات مفهرَسة",
+      "couldNotRead": "تعذّرت قراءة {{file}}: {{reason}}",
+      "docsAdded": "المستندات المضافة: {{count}}",
+      "errUnknown": "حدث خطأ أثناء قراءته",
+      "errNotFound": "الملف لم يعد موجودًا",
+      "errNoPermission": "لم يسمح جهاز Mac هذا بقراءته",
+      "errIsFolder": "هذا مجلد وليس ملفًا"
     },
     "connections": {
       "slack": "Slack",
@@ -340,7 +346,9 @@
       "orgKeyDesc": "كيف تُخاطِب نسخةُ زميلك نسختَك.",
       "apiKey": "مفتاح API",
       "orgKeyPlaceholder": "الصق مفتاح مؤسستك",
-      "orgConfigOnly": "إعداد فقط في الوقت الحالي. خدمة مراسلة المؤسسة غير موجودة بعد، لذا لا يبدأ المفتاح هنا أي نقل، بل يُحفَظ ويُعرَض في تبويب المشغّلات وينتظر."
+      "orgConfigOnly": "إعداد فقط في الوقت الحالي. خدمة مراسلة المؤسسة غير موجودة بعد، لذا لا يبدأ المفتاح هنا أي نقل، بل يُحفَظ ويُعرَض في تبويب المشغّلات وينتظر.",
+      "newSecret": "تم إنشاء سرّ جديد. انسخه الآن.",
+      "secretFailed": "تعذّر إنشاء سرّ جديد. حاول مجددًا."
     },
     "voice": {
       "freeFlow": "التدفّق الحر",
@@ -999,8 +1007,8 @@
     "secretHint": "يعيد المتصلون هذا في ترويسة x-md-webhook-secret.",
     "trust": "الثقة",
     "bodySchema": "مخطّط الجسم",
-    "editSchema": "حرّر المخطّط",
-    "schemaDesc": "كيف يجب أن يبدو الجسم الوارد",
+    "editSchema": "تعديل الصيغة",
+    "schemaDesc": "ما يجب أن تحتويه كل رسالة تُرسل إلى هنا.",
     "notValidJson": "ليس JSON صالحًا: {{error}}. لم يُحفَظ شيء.",
     "saved": "حُفِظ",
     "saveSchema": "احفظ المخطّط",
@@ -1211,7 +1219,8 @@
     "legendPropose": "اقتراح",
     "legendAgreeDone": "موافقة/إنجاز",
     "legendRefuse": "رفض",
-    "legendInformTopic": "إخبار/موضوع"
+    "legendInformTopic": "إخبار/موضوع",
+    "noMessages": "لا توجد رسائل بين فريقك بعد. الجميع ظاهرون أدناه."
   },
   "integrations": {
     "errLabel": "أعطِه تسمية.",

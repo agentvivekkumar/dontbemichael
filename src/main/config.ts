@@ -200,8 +200,8 @@ export interface HarnessConfig {
   businessTeamStarted?: boolean;
   /** Folder where the harness keeps its own state (agent metadata, logs). */
   harnessHome: string | null;
-  /** Recently-opened hive home folders (most-recent first), surfaced by the
-   *  launch-time hive picker. Maintained by writeConfig whenever harnessHome is
+  /** Recently-opened office folders (most-recent first), offered by the missing
+   *  office screen and Settings → General's other offices. Maintained by writeConfig whenever harnessHome is
    *  set (onboarding finish, changeHome). Capped to a handful. */
   recentHives?: string[];
   /** Folders the user registered during onboarding (used as quick-picks). */

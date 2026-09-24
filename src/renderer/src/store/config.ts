@@ -74,7 +74,8 @@ export interface HarnessConfig {
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
   harnessHome: string | null;
-  /** Recently-opened hive home folders (most-recent first) for the launch picker.
+  /** Recently-opened office folders (most-recent first), for the missing office
+   *  screen and Settings → General.
    *  Mirrors src/main/config.ts. */
   recentHives?: string[];
   registeredRepos: string[];

@@ -60,7 +60,10 @@ test('fetched content comes from this repo', () => {
 test('the app registers its own URL scheme, not the one upstream\'s website links to', () => {
   const main = read('src/main/index.ts');
   assert.doesNotMatch(main, /setAsDefaultProtocolClient\('munderdifflin'/);
-  assert.match(main, /setAsDefaultProtocolClient\('dontbemichael'/);
+  // One constant, used everywhere the scheme appears.
+  assert.equal(loadTs('src/shared/appName.ts').APP_URL_SCHEME, 'dontbemichael');
+  assert.match(main, /setAsDefaultProtocolClient\(APP_URL_SCHEME/);
+  assert.doesNotMatch(main + read('src/shared/hire.ts'), /'dontbemichael(:|:\/\/)?'/);
   assert.match(read('electron-builder.yml'), /schemes:\n\s+- dontbemichael\n/);
   const { parseHireDeepLink } = loadTs('src/shared/hire.ts');
   assert.equal(parseHireDeepLink('munderdifflin://hire?src=https://example.com/a.hire.json'), null);

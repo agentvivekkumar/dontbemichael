@@ -11,24 +11,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const loadTs = require('./load-ts.cjs');
 
 const read = (rel) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
 
-function freshStore(saved) {
-  const mem = { ...saved };
-  const storage = { getItem: (k) => mem[k] ?? null, setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
-  globalThis.window = { localStorage: storage, addEventListener() {}, removeEventListener() {}, dispatchEvent() {} };
-  globalThis.localStorage = storage;
-  return { store: loadTs('src/renderer/src/store/store.ts').useStore, mem };
-}
-
 test('the office shows by default, and the choice is remembered', () => {
-  const { store, mem } = freshStore({});
-  assert.equal(store.getState().floorView, 'office');
-  store.getState().setFloorView('tasks');
-  assert.equal(store.getState().floorView, 'tasks');
-  assert.equal(mem['cth.floorView'], 'tasks');
+  // freshRun (below) loads the store in its own process, so it really starts
+  // from this saved state rather than a module cached by an earlier test.
+  const r = freshRun({}, `
+    const first = store.getState().floorView;
+    store.getState().setFloorView('tasks');
+    return { first, now: store.getState().floorView, saved: mem['cth.floorView'] };`);
+  assert.deepEqual(r, { first: 'office', now: 'tasks', saved: 'tasks' });
 });
 
 test('the toggle sits in the floor\'s bottom left corner, over the board, which leaves it room', () => {
@@ -37,7 +30,7 @@ test('the toggle sits in the floor\'s bottom left corner, over the board, which 
   const board = app.indexOf("{floorView !== 'office' && (");
   const toggle = app.indexOf('<FloorViewToggle />');
   assert.ok(office > 0 && board > office && toggle > board, 'office, then the board over it, then the toggle over both');
-  assert.match(app.slice(board, board + 700), /position: 'absolute', inset: 0, zIndex: 50,[\s\S]*paddingBottom: 44,[\s\S]*\{floorView === 'tasks' && <TasksKanban \/>\}/);
+  assert.match(app.slice(board, board + 700), /position: 'absolute', inset: 0, zIndex: 50,[\s\S]*paddingBottom: 52,[\s\S]*\{floorView === 'tasks' && <TasksKanban \/>\}/);
   assert.match(app.slice(toggle - 200, toggle), /position: 'absolute', left: 12, bottom: 12, zIndex: 60/);
   // No header strip above the floor any more.
   assert.doesNotMatch(app, /flexDirection: 'column', gap: 8 \}\}>\s*\{\/\* OFFICE \| TASKS/);

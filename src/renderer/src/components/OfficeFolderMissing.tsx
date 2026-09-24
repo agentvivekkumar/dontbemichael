@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { Icon } from './Icon';
-import { clearLocalState } from './SettingsModal';
+import { clearLocalState, restoreLocalState, snapshotLocalState } from './SettingsModal';
 import type { HarnessConfig } from '@/store/config';
 
 function folderName(path: string): string {
@@ -64,13 +64,15 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
   const startOver = async () => {
     setError(undefined);
     setBusy(true);
-    // An empty office: the old team's cards must not come back with it.
+    // An empty office: the old team's cards must not come back with it. Kept
+    // aside first, so a start over that fails leaves things as they were.
+    const snap = snapshotLocalState();
     clearLocalState();
     const res = await window.cth.startOverHere().catch((e) => ({ ok: false, error: String(e) }));
-    if (!res.ok) { setError(res.error ?? t('officeMissing.couldNotOpen')); setBusy(false); }
+    if (!res.ok) { restoreLocalState(snap); setError(res.error ?? t('officeMissing.couldNotOpen')); setBusy(false); }
   };
 
-  const sectionLabel = { fontFamily: 'var(--cth-font-display)', fontSize: 9, color: 'var(--cth-ink-500)', marginBottom: 4 } as const;
+  const sectionLabel = { fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-500)', marginBottom: 4 } as const;
 
   return (
     <div style={{
@@ -83,15 +85,15 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
       <div style={{ width: 560, maxWidth: '94vw' }}>
         <PixelPanel variant="dialog" title={t('officeMissing.title')} noPadding>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
               {t('officeMissing.body')}
             </p>
             <div style={{
-              padding: '8px 12px', fontFamily: 'var(--cth-font-mono)', fontSize: 11, color: 'var(--cth-ink-700)',
+              padding: '8px 12px', fontFamily: 'var(--cth-font-mono)', fontSize: 14, color: 'var(--cth-ink-700)',
               background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
               wordBreak: 'break-all'
             }}>{missing}</div>
-            <p style={{ margin: 0, fontSize: 12, lineHeight: '18px', color: 'var(--cth-ink-700)' }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
               {t('officeMissing.whyItMatters')}
             </p>
 
@@ -101,7 +103,7 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
                   <Icon name="folder" /> {t('officeMissing.find')}
                 </span>
               </PixelButton>
-              <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('officeMissing.findHint')}</span>
+              <span style={{ fontSize: 14, color: 'var(--cth-ink-500)' }}>{t('officeMissing.findHint')}</span>
             </div>
 
             {recents.length > 0 && (
@@ -121,11 +123,11 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
                     >
                       <Icon name="folder" />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-900)' }}>
+                        <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)' }}>
                           {folderName(h)}
                         </div>
                         <div style={{
-                          fontFamily: 'var(--cth-font-mono)', fontSize: 11, color: 'var(--cth-ink-500)',
+                          fontFamily: 'var(--cth-font-mono)', fontSize: 14, color: 'var(--cth-ink-500)',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', direction: 'rtl', textAlign: 'left'
                         }}>{h}</div>
                       </div>
@@ -141,11 +143,11 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
                   <PixelButton variant="secondary" size="sm" onClick={() => setConfirmStartOver(true)} disabled={busy}>
                     {t('officeMissing.startOver')}
                   </PixelButton>
-                  <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('officeMissing.startOverHint')}</span>
+                  <span style={{ fontSize: 14, color: 'var(--cth-ink-500)' }}>{t('officeMissing.startOverHint')}</span>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: 'var(--cth-ink-900)', fontWeight: 600 }}>{t('officeMissing.startOverConfirm')}</span>
+                  <span style={{ fontSize: 14, color: 'var(--cth-ink-900)' }}>{t('officeMissing.startOverConfirm')}</span>
                   <PixelButton variant="primary" size="sm" onClick={() => { void startOver(); }} disabled={busy}>
                     {t('officeMissing.startOverYes')}
                   </PixelButton>
@@ -156,7 +158,7 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
               )}
             </div>
 
-            {error && <div style={{ fontSize: 12, lineHeight: '18px', color: '#6E1423' }}>{error}</div>}
+            {error && <div style={{ fontSize: 14, lineHeight: '20px', color: '#6E1423' }}>{error}</div>}
           </div>
         </PixelPanel>
       </div>

@@ -15,8 +15,8 @@
  * use to read Word/Excel/PowerPoint files in their own folders.
  */
 
-import { readFileSync, statSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { extname } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 import { macOcr, MAX_OCR_PAGES } from './macOcr';
@@ -83,7 +83,7 @@ export async function extractDocumentText(srcPath: string): Promise<DocExtractio
   if (SLIDES.has(ext)) return fromOoxml(srcPath, 'pptx', readSlides);
   if (SHEETS.has(ext)) return fromOoxml(srcPath, 'xlsx', readSheets);
   if (ext === 'pdf') return readPdf(srcPath);
-  if (TEXTUTIL.has(ext)) return readWithTextutil(srcPath, ext);
+  if (TEXTUTIL.has(ext)) return await readWithTextutil(srcPath, ext);
   if (IMAGES.has(ext)) return readImage(srcPath, ext);
 
   // Everything else kg-core reads as UTF-8. Only safe if it really is text: a
@@ -338,19 +338,23 @@ async function readImage(srcPath: string, ext: string): Promise<DocExtraction> {
 
 // ─── Older formats, via macOS's built-in converter ───────────────────────────
 
-function readWithTextutil(srcPath: string, ext: string): DocExtraction {
+async function readWithTextutil(srcPath: string, ext: string): Promise<DocExtraction> {
   if (process.platform !== 'darwin') {
     return {
       kind: 'unreadable',
       reason: `.${ext} files can only be read on a Mac for now. Save it as Word (.docx) or PDF, and add that instead.`
     };
   }
+  // Async: this runs in the main process during knowledge ingest, and a sync
+  // call would freeze every window for as long as textutil takes (up to 30s).
   let out: string;
   try {
-    out = execFileSync('/usr/bin/textutil', ['-convert', 'txt', '-stdout', srcPath], {
-      encoding: 'utf8',
-      timeout: 30_000,
-      maxBuffer: 64 * 1024 * 1024
+    out = await new Promise<string>((resolve, reject) => {
+      execFile('/usr/bin/textutil', ['-convert', 'txt', '-stdout', srcPath], {
+        encoding: 'utf8',
+        timeout: 30_000,
+        maxBuffer: 64 * 1024 * 1024
+      }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
     });
   } catch {
     return { kind: 'unreadable', reason: 'This file could not be read. It may be damaged or protected by a password.' };
@@ -365,8 +369,15 @@ function readWithTextutil(srcPath: string, ext: string): DocExtraction {
 /** A NUL byte in the first 8 KB means binary. Real text files never contain one. */
 function looksBinary(srcPath: string): boolean {
   try {
-    const head = readFileSync(srcPath).subarray(0, 8192);
-    return head.includes(0);
+    // Read only the first 8 KB: a text file here can be up to 100 MB.
+    const fd = openSync(srcPath, 'r');
+    try {
+      const head = Buffer.alloc(8192);
+      const n = readSync(fd, head, 0, 8192, 0);
+      return head.subarray(0, n).includes(0);
+    } finally {
+      closeSync(fd);
+    }
   } catch {
     return true;
   }

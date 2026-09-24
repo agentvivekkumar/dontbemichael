@@ -49,7 +49,8 @@ test('Michael is never told he can start one, even with an old config that allow
 test('instead, a job no one fits goes to the ASK ME board with suggestions', async (t) => {
   const { home, hive } = setup(t);
   const p = promptOf(await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true }));
-  assert.match(p, /WHEN NO ONE FITS:/);
+  // Says outright that it overrides the older spawn wording above it.
+  assert.match(p, /WHEN NO ONE FITS \(this overrides anything above about spawning a fresh agent: you cannot start one\):/);
   assert.match(p, /do NOT do it yourself and do NOT start a new agent/);
   assert.match(p, /"status": "blocked" and one humanQA ask/);
   for (const option of ['1. add a team member', '2. hand it to the closest team member', '3. you do it yourself this once', '4. drop it']) {

@@ -27,7 +27,7 @@ import {
 import { linkWorktreeDeps, unlinkWorktreeDeps } from './worktreeDeps';
 import { HiveManager, type AgentMeta, type HiveMessage, type HiveTask } from './hive';
 import { HookServer } from './hooks';
-import { loadBundledPacks } from './packs';
+import { loadBundledPacks, packsResourceDir } from './packs';
 import { businessFolderRoot, defaultAgentFolder, ensureFolder, OFFICE_FOLDER } from './agentFolders';
 import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
@@ -89,7 +89,7 @@ import { loadHero } from './hero';
 import { loadModelCatalog } from './modelCatalog';
 import { claudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
-import { APP_NAME, APP_DATA_DIR } from '../shared/appName';
+import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
@@ -1448,21 +1448,19 @@ function skillsResourceDir(): string {
  *  packaged/dev resolution as `skillsResourceDir()` above — see the
  *  `resources/packs` entry in electron-builder.yml. */
 function packsDir(): string {
-  return app.isPackaged
-    ? join(process.resourcesPath, 'packs')
-    : join(app.getAppPath(), 'resources', 'packs');
+  return packsResourceDir(app, process.resourcesPath);
 }
 
-/** The shared Office folder (Decision 44): Michael's working directory, and
- *  writable by every agent. Created at onboarding; recreated here (empty) if the
- *  owner deleted it, rather than failing every spawn that depends on it.
- *  Undefined on installs that predate agent folders, which keep today's layout. */
 /** The agent-facing `doc-text` CLI, built beside index.js (inside the asar when
  *  packaged). Agents run it with the bundled Node to read Word/Excel/PowerPoint. */
 function docTextCliPath(): string {
   return join(app.getAppPath(), 'out', 'main', 'docTextCli.js');
 }
 
+/** The shared Office folder (Decision 44): Michael's working directory, and
+ *  writable by every agent. Created at onboarding; recreated here (empty) if the
+ *  owner deleted it, rather than failing every spawn that depends on it.
+ *  Undefined on installs that predate agent folders, which keep today's layout. */
 function officeFolderReady(): string | undefined {
   const office = readConfig().officeFolder;
   if (!office) return undefined;
@@ -2251,10 +2249,10 @@ async function handleHireLink(link: string): Promise<void> {
 // exe+args form or the registration points at electron.exe with no entry.
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('dontbemichael', process.execPath, [resolve(process.argv[1])]);
+    app.setAsDefaultProtocolClient(APP_URL_SCHEME, process.execPath, [resolve(process.argv[1])]);
   }
 } else {
-  app.setAsDefaultProtocolClient('dontbemichael');
+  app.setAsDefaultProtocolClient(APP_URL_SCHEME);
 }
 
 // Deep links on Windows/Linux arrive as the argv of a SECOND process — take the
@@ -2271,7 +2269,7 @@ if (!gotInstanceLock) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    const link = argv.find((a) => a.startsWith('dontbemichael://'));
+    const link = argv.find((a) => a.startsWith(`${APP_URL_SCHEME}://`));
     if (link) void handleHireLink(link);
   });
 }
@@ -5428,7 +5426,7 @@ app.whenReady().then(() => {
   void loadModelCatalog(MODEL_CATALOG_CACHE()).catch(() => { /* never fatal */ });
 
   // A cold-start deep link (Windows/Linux) rides in on OUR argv.
-  const startupHireLink = process.argv.find((a) => a.startsWith('dontbemichael://'));
+  const startupHireLink = process.argv.find((a) => a.startsWith(`${APP_URL_SCHEME}://`));
   if (startupHireLink) void handleHireLink(startupHireLink);
 
   // Hand every spawned agent the path to the Slack reply discovery file via the

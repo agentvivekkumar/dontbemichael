@@ -83,9 +83,9 @@ const CAPABILITY_RE = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/;
 /** Agent id: one path-safe token; it names a folder under the hive root. */
 const AGENT_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
-/** Connection id: matches the integration registry's slug shape. */
 /** One safe folder name, 1–40 characters. See the `folder` check in the validator. */
 export const FOLDER_NAME_RE = /^(?![.\s])[^\\/:*?"<>|\x00-\x1f]{1,40}(?<![.\s])$/;
+/** Connection id: matches the integration registry's slug shape. */
 const CONNECTION_ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
 export interface ToolGrant {

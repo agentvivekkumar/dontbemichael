@@ -341,6 +341,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setError(t('onboarding.errEngineNotInstalled', { label: providerPreset(godProvider).label }));
       setBusy(false); setStep('orchestrator'); return;
     }
+    // Every await below can reject (IPC down, disk error). Without a catch the
+    // button stayed on "Saving" forever with nothing on screen.
+    try {
     const ensure = await window.cth.ensureHarnessHome(harnessHome);
     if (!ensure.ok) {
       setError(ensure.error ?? t('onboarding.errCreateHome'));
@@ -376,6 +379,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     });
     setBusy(false);
     onComplete(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
   };
 
   return (
@@ -631,7 +638,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div style={{
                   display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10,
                   background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-                  fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)'
+                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
                 }}>
                   <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="sparkle" /></span>
                   <span>
@@ -793,7 +800,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div style={{
                   display: 'flex', flexDirection: 'column', gap: 8, padding: 10,
                   background: 'var(--cth-peach-light)', boxShadow: 'inset 0 0 0 2px var(--cth-peach)',
-                  fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-900)'
+                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)'
                 }}>
                   <span>
                     <Trans i18nKey="onboarding.orchestrator.maxPlan" components={{ strong: <strong /> }}>

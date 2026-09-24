@@ -14,7 +14,7 @@ import {
 import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
-import { WebhookSchemaEditor } from './triggers/WebhooksSection';
+import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
@@ -154,7 +154,26 @@ authorizes new work, the token only reads one task's status. Keep both private.
 Each webhook checks bodies against its own JSON schema; edit it in that
 webhook's Format row, above.`;
 
-/** Clear every renderer-side persisted key so a relaunch starts truly empty. */
+/** Every renderer-side persisted key, so a switch that fails can put them back. */
+export function snapshotLocalState(): Record<string, string> {
+  const snap: Record<string, string> = {};
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith('cth.')) snap[k] = window.localStorage.getItem(k) ?? '';
+    }
+  } catch { /* noop */ }
+  return snap;
+}
+
+/** Put back a snapshot taken before clearLocalState(), after a switch failed. */
+export function restoreLocalState(snap: Record<string, string>): void {
+  try { for (const [k, v] of Object.entries(snap)) window.localStorage.setItem(k, v); } catch { /* noop */ }
+}
+
+/** Clear every renderer-side persisted key so a relaunch starts truly empty.
+ *  A switch that can still fail takes a snapshotLocalState() first and restores
+ *  it on failure: the app keeps running on the current office in that case. */
 export function clearLocalState(): void {
   try {
     const keys: string[] = [];
@@ -497,11 +516,20 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
       // Name each file that couldn't be read, with the reason. A bare "1 failed"
       // leaves an owner guessing which file, and why, and whether to retry.
       const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
+      // Raw system codes (ENOENT, EACCES) mean nothing to an owner; say what
+      // happened instead. The reader's own reasons are already plain words.
+      const plainReason = (err?: string): string => {
+        if (!err) return t('settings.memory.errUnknown');
+        if (/ENOENT/.test(err)) return t('settings.memory.errNotFound');
+        if (/EACCES|EPERM/.test(err)) return t('settings.memory.errNoPermission');
+        if (/EISDIR/.test(err)) return t('settings.memory.errIsFolder');
+        return err;
+      };
       const failures = res.results
         .filter((r) => !r.ok)
-        .map((r) => `couldn't read ${fileName(r.srcPath)}: ${r.error ?? 'unknown error'}`);
+        .map((r) => t('settings.memory.couldNotRead', { file: fileName(r.srcPath), reason: plainReason(r.error) }));
       setKgNote([
-        added ? `added ${added} document${added === 1 ? '' : 's'}` : '',
+        added ? t('settings.memory.docsAdded', { count: added }) : '',
         ...failures
       ].filter(Boolean).join(' · '));
       await refreshKgStatus();
@@ -717,7 +745,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     } catch (e) {
       setWebhookNote(e instanceof Error ? e.message : String(e));
     } finally { setWebhookBusy(false); }
-    if (!secret) { setWebhookNote('could not generate a secret'); return; }
+    if (!secret) { setWebhookNote(t('settings.connections.secretFailed')); return; }
     const entry: WebhookTrigger = {
       id: newWebhookId(),
       name: `Webhook ${webhookTriggers.length + 1}`,
@@ -745,7 +773,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     if (!secret) { setWebhookNote('could not generate a secret'); return; }
     setShownSecrets((s) => ({ ...s, [id]: true }));
     await patchWebhook(id, { secret });
-    setWebhookNote('new secret: copy it now');
+    setWebhookNote(t('settings.connections.newSecret'));
   };
 
   const removeWebhook = async (id: string) => {
@@ -838,9 +866,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
    *  renderer's saved state goes (its own roster comes back from its folder). */
   const openOtherOffice = async (path: string) => {
     setChangeErr('');
+    const snap = snapshotLocalState();
     clearLocalState();
     const res = await window.cth.changeHome(path, 'fresh').catch((e) => ({ ok: false, error: String(e) }));
-    if (!res.ok) setChangeErr(res.error ?? t('settings.changeHome.couldNotOpen'));
+    if (!res.ok) { restoreLocalState(snap); setChangeErr(res.error ?? t('settings.changeHome.couldNotOpen')); }
   };
 
   /** Apply the home-folder change. On success the app relaunches (never resolves);
@@ -849,14 +878,18 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     if (!changeHome) return;
     setChangeBusy(true); setChangeErr('');
     // Moving copies the hive (incl. its .git) + palace, so the new home owns the
-    // same renderer-side roster - keep localStorage. A 'fresh' home starts empty,
-    // so clear the renderer cache to match.
-    if (changeMode === 'fresh') clearLocalState();
+    // same renderer-side roster - keep localStorage. 'fresh' either starts an
+    // empty office or opens one already in that folder; both bring their own
+    // roster, so clear the renderer cache to match, and put it back if the
+    // switch fails and this office keeps running.
+    const snap = changeMode === 'fresh' ? snapshotLocalState() : null;
+    if (snap) clearLocalState();
     try {
       const res = await window.cth.changeHome(changeHome, changeMode);
-      if (!res.ok) { setChangeErr(res.error ?? 'Could not change the home folder.'); setChangeBusy(false); }
+      if (!res.ok) { if (snap) restoreLocalState(snap); setChangeErr(res.error ?? 'Could not change the home folder.'); setChangeBusy(false); }
       // ok === true never returns (the process relaunches).
     } catch (e) {
+      if (snap) restoreLocalState(snap);
       setChangeErr(e instanceof Error ? e.message : String(e));
       setChangeBusy(false);
     }
@@ -903,7 +936,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                 }}>{changeHome}</code>
               </div>
 
-              {/* Move vs. fresh - two selectable option rows; move is preselected. */}
+              {/* Move vs. fresh: two option rows with move preselected. When the
+                  picked folder already holds an office, only the 'open' row shows
+                  (mode 'fresh'), since a move would copy over that office. */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(changeTargetHasOffice
                   ? [['fresh', t('settings.changeHome.openTitle'), t('settings.changeHome.openDesc')] as const]
@@ -1065,11 +1100,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </span>
                         {otherOffices.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-                            <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>{t('settings.general.otherOffices')}</span>
+                            <span style={{ fontSize: 14, color: 'var(--cth-ink-700)' }}>{t('settings.general.otherOffices')}</span>
                             {otherOffices.map((h) => (
                               <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{
-                                  flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-mono, monospace)', fontSize: 12,
+                                  flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-mono, monospace)', fontSize: 14,
                                   color: 'var(--cth-ink-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                                 }}>{h}</span>
                                 <PixelButton variant="secondary" size="sm" onClick={() => { void openOtherOffice(h); }}>
@@ -1284,7 +1319,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
                       <div>
                         <div style={sectionHeadTight}>{t('settings.skills.title')}</div>
-                        <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                        <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)' }}>
                           {t('settings.skills.desc', { godName })}
                         </span>
                       </div>
@@ -1511,8 +1546,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 ? { dot: 'var(--cth-mint)', label: t('memoryPanel.onReady') }
                                 : { dot: 'var(--cth-lemon)', label: t('memoryPanel.onGettingReady') };
                           return (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--cth-ink-900)', marginTop: 8 }}>
-                              <span style={{ width: 9, height: 9, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--cth-ink-900)', marginTop: 8 }}>
+                              <span style={{ width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
                               {st.label}
                             </span>
                           );
@@ -1537,7 +1572,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         {/* Search language: a benefit framed choice, not a model codename. */}
                         {memStatus?.available && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('memoryPanel.searchLanguage')}</span>
+                            <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('memoryPanel.searchLanguage')}</span>
                             <div style={{ display: 'flex', gap: 8 }}>
                               {([
                                 ['minilm', t('memoryPanel.modelFast'), t('memoryPanel.modelFastDetail')],
@@ -1550,13 +1585,14 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     type="button"
                                     onClick={() => pickEmbeddingModel(id)}
                                     style={{
-                                      flex: 1, textAlign: 'left', cursor: 'pointer', border: 'none', padding: '7px 9px 6px',
+                                      flex: 1, textAlign: 'left', cursor: 'pointer', border: 'none', padding: '8px 8px',
                                       background: sel ? 'var(--cth-lemon-light)' : 'var(--cth-cream-100)',
-                                      boxShadow: sel ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-300)'
+                                      boxShadow: sel ? 'inset 0 0 0 2px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-300)'
                                     }}
+                                    aria-pressed={sel}
                                   >
-                                    <div style={{ fontSize: 12, color: 'var(--cth-ink-900)' }}>{sel ? '◉ ' : '○ '}{title}</div>
-                                    <div style={{ fontSize: 11, color: 'var(--cth-ink-500)', marginTop: 3 }}>{detail}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--cth-ink-900)' }}>{sel ? '◉ ' : '○ '}{title}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--cth-ink-500)', marginTop: 4 }}>{detail}</div>
                                   </button>
                                 );
                               })}
@@ -1980,7 +2016,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       here with the rest of webhooks from Michael's Triggers tab:
                                       a webhook serves the whole office, not one agent. */}
                                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                                    <span style={{ ...slackLabelStyle, width: 56, flexShrink: 0 }}>{t('settings.connections.format')}</span>
+                                    <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-700)', width: 72, flexShrink: 0 }}>{t('settings.connections.format')}</span>
                                     <WebhookSchemaEditor schema={w.schema} onSave={(schema) => { void patchWebhook(w.id, { schema }); }} />
                                   </div>
                                 </div>

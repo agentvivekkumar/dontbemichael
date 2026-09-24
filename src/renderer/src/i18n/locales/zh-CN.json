@@ -294,7 +294,13 @@
       "adding": "添加中…",
       "addFiles": "添加文件…",
       "docCount": "已索引 {{count}} 个文档",
-      "docCountPlural": "已索引 {{count}} 个文档"
+      "docCountPlural": "已索引 {{count}} 个文档",
+      "couldNotRead": "无法读取 {{file}}：{{reason}}",
+      "docsAdded": "已添加文档：{{count}}",
+      "errUnknown": "读取时出了问题",
+      "errNotFound": "文件已经不在了",
+      "errNoPermission": "这台 Mac 不允许读取它",
+      "errIsFolder": "这是文件夹，不是文件"
     },
     "connections": {
       "slack": "Slack",
@@ -340,7 +346,9 @@
       "orgKeyDesc": "队友的安装如何找到你的实例。",
       "apiKey": "API 密钥",
       "orgKeyPlaceholder": "粘贴你的组织密钥",
-      "orgConfigOnly": "目前仅限配置。组织消息服务尚不存在，所以这里的密钥不会启动任何传输，它会被保存、显示在触发器标签页中，然后等待。"
+      "orgConfigOnly": "目前仅限配置。组织消息服务尚不存在，所以这里的密钥不会启动任何传输，它会被保存、显示在触发器标签页中，然后等待。",
+      "newSecret": "已生成新密钥，请立即复制。",
+      "secretFailed": "无法生成新密钥，请重试。"
     },
     "voice": {
       "freeFlow": "自由输入",
@@ -999,8 +1007,8 @@
     "secretHint": "调用方在 x-md-webhook-secret 请求头中回显此值。",
     "trust": "信任",
     "bodySchema": "请求体 Schema",
-    "editSchema": "编辑 schema",
-    "schemaDesc": "入站请求体必须符合的样子",
+    "editSchema": "编辑格式",
+    "schemaDesc": "发送到这里的每条消息必须包含的内容。",
     "notValidJson": "不是有效的 JSON：{{error}}。未保存任何内容。",
     "saved": "已保存",
     "saveSchema": "保存 schema",
@@ -1211,7 +1219,8 @@
     "legendPropose": "提议",
     "legendAgreeDone": "同意/完成",
     "legendRefuse": "拒绝",
-    "legendInformTopic": "告知/主题"
+    "legendInformTopic": "告知/主题",
+    "noMessages": "团队之间还没有消息。所有人都显示在下方。"
   },
   "integrations": {
     "errLabel": "请给它一个名称。",

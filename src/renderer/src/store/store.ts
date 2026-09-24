@@ -184,8 +184,9 @@ interface State {
   feeds: Record<string, string[]>;
   addAgentOpen: boolean;
   fullscreenAgentId: string | null;
-  /** What the big floor area shows: the animated office, or the task board
-   *  (who is doing what, what is blocked, what is done). Remembered per Mac. */
+  /** What the big floor area shows: the animated office, the task board (who
+   *  is doing what, what is blocked, what is done), or the GRAPH of who talks
+   *  to whom. Remembered per Mac. */
   floorView: FloorView;
   /** Does the user work in focus mode by default? Persisted as a boolean, and
    *  written ONLY by an explicit toggle. Kept in the store rather than read once
@@ -247,8 +248,9 @@ interface State {
   /** Drop one agent from the restorable list (it was respawned or dismissed). */
   removeRestorableAgent: (id: string) => void;
   reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (AgentStrip drag-reorder) and persist the new order
-  /** One-shot request to open a Command-Center tab (e.g. clicking the office
-   *  task board → 'tasks'). `seq` makes repeated identical requests distinct. */
+  /** One-shot request to open a Command-Center tab (e.g. the boss-room calendar
+   *  → 'triggers'; 'tasks' and 'graph' switch the floor view instead). `seq`
+   *  makes repeated identical requests distinct. */
   ccTabRequest: { tab: string; seq: number } | null;
   requestCommandCenterTab: (tab: string) => void;
   /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
@@ -737,7 +739,7 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
-  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null }; }),
+  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null }; }),
   updateAgent: (id, patch) =>
     set((s) => {
       const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);

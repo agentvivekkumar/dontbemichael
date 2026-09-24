@@ -24,6 +24,7 @@ export function FloorViewToggle() {
   useEffect(() => {
     let alive = true;
     const poll = () => {
+      if (document.hidden) return; // nobody is looking; the next visible tick catches up
       void window.cth.hiveTasks()
         .then((raw) => { if (alive) setBlocked(parseTasks(raw).filter((x) => x.status === 'blocked').length); })
         .catch(() => { /* keep the last count */ });
@@ -43,7 +44,8 @@ export function FloorViewToggle() {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '4px 12px', border: 'none', cursor: 'pointer',
-          fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px',
+          // 14px floor (owner rule): the UI font, since the pixel font is too wide at 14.
+          fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',
           background: on ? 'var(--cth-ink-900)' : 'transparent',
           color: on ? 'var(--cth-cream-50)' : 'var(--cth-ink-700)'
         }}
@@ -54,7 +56,7 @@ export function FloorViewToggle() {
             title={t('floorView.blockedTitle', { count: badge })}
             style={{
               minWidth: 16, padding: '0 4px', textAlign: 'center',
-              fontFamily: 'var(--cth-font-ui)', fontSize: 10, lineHeight: '14px',
+              fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',
               background: 'var(--cth-coral)', color: 'var(--cth-ink-900)',
               boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
             }}
@@ -87,11 +89,12 @@ export function FloorViewIntro({ view }: { view: Exclude<FloorView, 'office'> })
     <div style={{
       flexShrink: 0, padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap',
       background: 'var(--cth-cream-100)', borderBottom: '1px solid var(--cth-ink-300)',
-      fontSize: 12, lineHeight: '18px', color: 'var(--cth-ink-700)'
+      fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
     }}>
-      <strong style={{ color: 'var(--cth-ink-900)' }}>
+      {/* Colour, not bold, carries the emphasis (DESIGN.md 4.2: never bold). */}
+      <span style={{ color: 'var(--cth-ink-900)' }}>
         {view === 'tasks' ? t('floorView.tasksIntroTitle') : t('floorView.graphIntroTitle')}
-      </strong>
+      </span>
       <span>{view === 'tasks' ? t('floorView.tasksIntro') : t('floorView.graphIntro', { godName })}</span>
     </div>
   );

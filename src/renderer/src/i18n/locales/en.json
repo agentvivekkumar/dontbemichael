@@ -294,7 +294,13 @@
       "adding": "adding…",
       "addFiles": "add files…",
       "docCount": "{{count}} document indexed",
-      "docCountPlural": "{{count}} documents indexed"
+      "docCountPlural": "{{count}} documents indexed",
+      "couldNotRead": "Couldn't read {{file}}: {{reason}}",
+      "docsAdded": "Documents added: {{count}}",
+      "errUnknown": "something went wrong reading it",
+      "errNotFound": "the file is no longer there",
+      "errNoPermission": "this Mac did not allow reading it",
+      "errIsFolder": "that is a folder, not a file"
     },
     "connections": {
       "slack": "Slack",
@@ -340,7 +346,9 @@
       "orgKeyDesc": "How a teammate's install addresses yours.",
       "apiKey": "API key",
       "orgKeyPlaceholder": "paste your organisation key",
-      "orgConfigOnly": "Configuration only for now. The organisation messaging service does not exist yet, so a key here starts no transport. It is saved, shown in the Triggers tab, and waits."
+      "orgConfigOnly": "Configuration only for now. The organisation messaging service does not exist yet, so a key here starts no transport. It is saved, shown in the Triggers tab, and waits.",
+      "newSecret": "New secret made. Copy it now.",
+      "secretFailed": "Couldn't make a new secret. Try again."
     },
     "voice": {
       "freeFlow": "Free Flow",
@@ -999,8 +1007,8 @@
     "secretHint": "Callers echo this in the x-md-webhook-secret header.",
     "trust": "TRUST",
     "bodySchema": "BODY SCHEMA",
-    "editSchema": "edit schema",
-    "schemaDesc": "what an inbound body must look like",
+    "editSchema": "edit format",
+    "schemaDesc": "What each message sent here must contain.",
     "notValidJson": "Not valid JSON: {{error}}. Nothing was saved.",
     "saved": "saved",
     "saveSchema": "save schema",
@@ -1211,7 +1219,8 @@
     "legendPropose": "propose",
     "legendAgreeDone": "agree/done",
     "legendRefuse": "refuse",
-    "legendInformTopic": "inform/topic"
+    "legendInformTopic": "inform/topic",
+    "noMessages": "No messages between your team yet. Everyone is shown below."
   },
   "integrations": {
     "errLabel": "Give it a label.",

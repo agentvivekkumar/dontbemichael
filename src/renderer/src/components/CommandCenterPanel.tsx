@@ -369,7 +369,7 @@ type AdvancedCard = 'monitor' | 'activity';
  */
 function AdvancedTab({ focus, seed }: { focus: AdvancedCard; seed: { text: string; seq: number } }) {
   const { t } = useTranslation();
-  const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'the orchestrator';
+  const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'Michael';
   return (
     <Scroll>
       <Muted>{t('commandCenter.advanced.intro')}</Muted>

@@ -181,10 +181,10 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, childr
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
-            display: 'block', fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '13px',
+            display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',
             color: 'var(--cth-ink-900)'
           }}>{title}</span>
-          <span style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)', marginTop: 2 }}>
+          <span style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)', marginTop: 2 }}>
             {blurb}
           </span>
         </span>

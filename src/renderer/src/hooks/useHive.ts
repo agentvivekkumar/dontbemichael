@@ -271,13 +271,6 @@ function passesContextPressure(a: Agent, rule: ContextRule): boolean {
 }
 
 /**
- * The renderer-side glue for the hive:
- *   1. spawns the god agent into Michael's room when none is running,
- *   2. drives avatar state from real Claude Code hook events, and
- *   3. wakes idle agents that have unread inbox messages so collaboration
- *      doesn't stall while an agent sits at its prompt.
- */
-/**
  * Start the team the owner picked during onboarding (Decisions 44, 47), ONCE.
  *
  * Each member is spawned exactly as the hire dialog spawns an agent — same
@@ -352,6 +345,13 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
 }
 
+/**
+ * The renderer-side glue for the hive:
+ *   1. spawns the god agent into Michael's room when none is running,
+ *   2. drives avatar state from real Claude Code hook events, and
+ *   3. wakes idle agents that have unread inbox messages so collaboration
+ *      doesn't stall while an agent sits at its prompt.
+ */
 export function useHive(config: HarnessConfig | null): void {
   // Per-agent dedup for the inbox-wake nudge: every inbox message id we have
   // already nudged this agent about. A SET, not a high-water mark.
