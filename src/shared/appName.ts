@@ -5,10 +5,11 @@
  */
 export const APP_NAME = "Don't Be Michael";
 
-/** The data folder under Application Support. It keeps the name it has always
- *  had, so renaming the app never looks like a fresh install (Electron would
- *  otherwise derive the folder from the new name and start empty). */
-export const APP_DATA_DIR = 'munder-difflin';
+/** The data folder under Application Support. Pinned explicitly so a future
+ *  rename of the app never moves it (Electron would otherwise derive the folder
+ *  from the name and start empty). Was `munder-difflin`; the owner chose a clean
+ *  folder over carrying old data forward (2026-09-24). */
+export const APP_DATA_DIR = 'dontbemichael';
 
 /** The URL scheme the app registers for shareable hires
  *  (`dontbemichael://hire?src=<https-url>`). Was `munderdifflin://`, which the

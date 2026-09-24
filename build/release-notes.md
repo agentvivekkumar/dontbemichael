@@ -1,5 +1,3 @@
-- **Set up by business.** Pick your business and your team.
-- **A folder for every team member.** Plus a shared Office.
-- **Reads your documents.** Word, Excel, PDF and scans.
-- **See the floor at a glance.** Office, tasks, or who talks to whom.
-- **Runs on Claude Code.** Opus 5.5 recommended.
+- **Setup runs again.** Settings from 0.0.1 are not carried over.
+- **Your folders are kept.** Use the same business name to find them.
+- **Its own name and copyright.** Shown in the About panel.

@@ -87,6 +87,7 @@ landed.sort((a, b) => a.pr - b.pr);
 
 const day = (iso) => iso.slice(0, 10);
 const plural = (n) => (n === 1 ? '1 pull request' : `${n} pull requests`);
+const peopleCount = (n) => (n === 1 ? '1 person' : `${n} people`);
 const commitLink = (sha) => `[\`${sha}\`](https://github.com/${REPO}/commit/${sha})`;
 
 const row = (p) => {
@@ -94,15 +95,33 @@ const row = (p) => {
   return `| ${name} | ${total(p)} | ${day(p.first)} | ${day(p.last)} |`;
 };
 
+// Only rendered when .github/contributors-extra.json lists something.
+const unbadgedSection = `## † Contributions that never got the merged badge
+
+${landed.length === 1
+  ? 'The pull request below is in main and its author is a contributor, but GitHub shows it'
+  : `The ${landed.length} pull requests below are in main and their authors are contributors, but GitHub shows them`}
+as closed rather than merged. GitHub records the badge when a pull request closes and will not let
+it be changed afterwards, so the record lives here instead.
+
+Every commit listed here was checked to be in \`main\` before it was added.
+
+| Pull request | Contributor | In main |
+|---|---|---|
+${landed.map((e) => `| [#${e.pr}](https://github.com/${REPO}/pull/${e.pr}) | [@${e.login}](${e.url}) | ${e.commits.map(commitLink).join(', ')} |`).join('\n')}
+
+${landed.filter((e) => e.note).map((e) => `**#${e.pr}** ${e.note}\n\n`).join('')}`;
+
 const body = `# Contributors
 
-Everyone on this list has code in Don't Be Michael. If that is you, this file is yours to point at.
+Everyone on this list has had a pull request merged into Don't Be Michael. If that is you, this
+file is yours to point at.
 
 It is generated from the pull requests themselves rather than from commit metadata, so nobody is
 dropped because their git email does not happen to match their GitHub account. It is regenerated
 from merged pull requests, so you appear without having to ask.
 
-**${list.length} people** have contributed so far.
+**${peopleCount(list.length)}** ${list.length === 1 ? 'has' : 'have'} contributed so far.
 
 <a href="https://github.com/${REPO}/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=${REPO}" alt="Contributor avatars">
@@ -119,26 +138,9 @@ requests, and a pull request always has a real account behind it.
 |---|---:|---|---|
 ${list.map(row).join('\n')}
 
-_${plural(list.reduce((n, p) => n + total(p), 0))} from ${list.length} people._
+_${plural(list.reduce((n, p) => n + total(p), 0))} from ${peopleCount(list.length)}._
 
-## † Contributions that never got the merged badge
-
-${landed.length} pull requests below are in main and their authors are contributors, but GitHub
-shows them as closed rather than merged. On release night the pull requests were closed before the
-release branch merged into main, so at the moment they closed, main did not contain their commits
-yet. GitHub records the badge at that instant and will not let it be changed afterwards. It was our
-sequencing mistake and it is not recoverable, so the record lives here instead. The full account is
-in [discussion #353](https://github.com/${REPO}/discussions/353).
-
-Every commit listed here was checked to be in \`main\` before it was added.
-
-| Pull request | Contributor | In main |
-|---|---|---|
-${landed.map((e) => `| [#${e.pr}](https://github.com/${REPO}/pull/${e.pr}) | [@${e.login}](${e.url}) | ${e.commits.map(commitLink).join(', ')} |`).join('\n')}
-
-${landed.filter((e) => e.note).map((e) => `**#${e.pr}** ${e.note}`).join('\n\n')}
-
----
+${landed.length ? unbadgedSection : ''}---
 
 **Not on this list yet?** [\`good first issue\`](https://github.com/${REPO}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 is kept stocked with small, self contained work, and [\`CONTRIBUTING.md\`](./CONTRIBUTING.md) has

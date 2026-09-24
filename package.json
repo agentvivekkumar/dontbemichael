@@ -1,10 +1,10 @@
 {
-  "name": "munder-difflin",
-  "version": "0.0.1",
+  "name": "dontbemichael",
+  "version": "0.0.2",
   "private": true,
-  "description": "Clones for you and your team, working 24/7 — a free, local-first multi-agent harness that turns the CLI coding agent you already run into a clone of you, coordinating an office of agents on your machine.",
+  "description": "An AI office for small business owners: Michael, your office manager, runs a team of AI agents on your own Mac.",
   "main": "out/main/index.js",
-  "author": "Chaitanya Giri",
+  "author": "Vivek Kumar",
   "homepage": "https://github.com/agentvivekkumar/dontbemichael",
   "repository": {
     "type": "git",

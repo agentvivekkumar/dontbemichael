@@ -242,6 +242,22 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Priority:** P1
 **Depends on:** Apple Developer Program membership
 
+## Repo
+
+### Remove or rewrite the old project's website files in docs/
+
+**What:** `docs/index.html`, `docs/blog/`, `docs/CNAME` and friends are the old project's website. (`docs/llms.txt` and `docs/llms-full.txt` were removed in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
+
+**Why:** They describe the other product.
+
+**Context:** The website for this app lives in its own repo; keep only files the app reads at runtime (`docs/model-catalog.json`, `docs/hero.json`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+## Completed
+
 ### Point the contributors workflow at this fork's credit, or turn it off
 
 **What:** `.github/workflows/contributors.yml` regenerates CONTRIBUTORS.md from this repo's merged pull requests and opens a bot pull request.
@@ -253,19 +269,4 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
-
-## Repo
-
-### Remove or rewrite the old project's website files in docs/
-
-**What:** `docs/index.html`, `docs/blog/`, `docs/CNAME` and friends are Munder Difflin's website. (`docs/llms.txt` and `docs/llms-full.txt` were removed in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
-
-**Why:** They describe the other product.
-
-**Context:** The website for this app lives in its own repo; keep only files the app reads at runtime (`docs/model-catalog.json`, `docs/hero.json`).
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-## Completed
+**Completed:** 2026-09-24 (the workflow stays on; CONTRIBUTORS.md now lists this repo's contributors only, and the README no longer credits the upstream list there)
