@@ -41,7 +41,8 @@ much cheaper than finding out in review.
 - **Nothing points at the upstream project.** Updates, fetched content, links
   and the URL scheme all belong to this repo; `test/no-upstream.test.cjs`
   scans `src/`, `resources/`, `scripts/`, `tools/`, `.github/`, this file and
-  `SECURITY.md`. Credit for Munder Difflin stays in `README.md`.
+  `SECURITY.md`. Credit for the upstream project stays in the
+  Acknowledgements section of `README.md`.
 - **Do not assume the local machine.** Agents run against their own working
   directories and their own environments; a process, file, credential or shell
   that exists on yours may not exist on theirs.

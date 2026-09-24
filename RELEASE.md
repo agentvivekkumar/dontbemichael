@@ -35,5 +35,3 @@ You only do this once. macOS asks because this early build is not yet signed wit
 You also need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed and signed in.
 
 When a new version comes out, the app tells you and links to the download. Install it the same way.
-
-Don't Be Michael is built on [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors.

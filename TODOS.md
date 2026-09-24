@@ -258,7 +258,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ### Remove or rewrite the old project's website files in docs/
 
-**What:** `docs/index.html`, `docs/blog/`, `docs/CNAME` and friends are Munder Difflin's website. (`docs/llms.txt` and `docs/llms-full.txt` were removed in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
+**What:** `docs/index.html`, `docs/blog/`, `docs/CNAME` and friends are the old project's website. (`docs/llms.txt` and `docs/llms-full.txt` were removed in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
 
 **Why:** They describe the other product.
 

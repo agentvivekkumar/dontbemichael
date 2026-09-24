@@ -368,7 +368,7 @@ schedules, and there's a built-in Monaco IDE with git panels. Also shipped: an i
 registry with a secret broker, Slack-spawned workers, shareable hires, observability and the
 circuit breaker, durable persistence, session resume, multi-window floors, one-click updates, a
 Skills browser, a live Prerequisites check, cost reporting from the ledger, and a Simplified
-Chinese and Arabic interface. Full history is in [`CHANGELOG.md`](./CHANGELOG.md).
+Chinese and Arabic interface. Changes since 0.0.1 are in [`CHANGELOG.md`](./CHANGELOG.md).
 
 Don't Be Michael 0.0.1 adds business setup with Office Packs, a folder for every team member, the
 OFFICE, TASKS and GRAPH floor views, and reading of Word, Excel, PowerPoint, PDF and scanned
@@ -402,8 +402,7 @@ Contributions are welcome. This is pre-release software with a lot of surface ar
 
 Found a bug or have an idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 
-[`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone whose code is in this project, including the
-upstream Munder Difflin contributors whose work it builds on.
+[`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone whose code is in this project.
 
 ## Telemetry
 
@@ -415,9 +414,9 @@ compile without an analytics key and send nothing.
 
 ## License
 
-The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). Don't Be
-Michael is based on [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin), which is
-also MIT-licensed. The original copyright notice is kept in `LICENSE`, as that license requires.
+The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). The
+original copyright notice of the project this is forked from is kept in `LICENSE`, as the MIT
+license requires.
 
 > [!IMPORTANT]
 > **Asset licensing.** The bundled pixel art (tilesets and maps) is **Modern Interiors - RPG Tileset
