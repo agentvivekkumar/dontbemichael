@@ -402,7 +402,7 @@ Contributions are welcome. This is pre-release software with a lot of surface ar
 
 Found a bug or have an idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 
-[`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone whose code is in this project.
+[`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone who has had a pull request merged into this project.
 
 ## Telemetry
 
