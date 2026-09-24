@@ -406,11 +406,11 @@ Found a bug or have an idea? [Open an issue](https://github.com/agentvivekkumar/
 
 ## Telemetry
 
-Official release builds send a **small set of anonymous usage events** (app opened, agent spawned,
-feature used). They never send prompts, code, file paths, or agent output.
-[`TELEMETRY.md`](./TELEMETRY.md) documents the complete event list, the anonymity guarantees, and
-three ways to opt out: the Settings toggle, `DO_NOT_TRACK`, or building from source. Local builds
-compile without an analytics key and send nothing.
+Don't Be Michael sends **no usage data**. The anonymous usage stats code from the original project
+is still in the source, but it is switched off (`COLLECT_USAGE_STATS` in
+[`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts)): the app neither asks nor sends. If
+that changes, it will be announced in the release notes, and
+[`TELEMETRY.md`](./TELEMETRY.md) will list exactly what is collected before anything is.
 
 ## License
 

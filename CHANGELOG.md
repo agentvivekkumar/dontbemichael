@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Removed
+
+- **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
+  asks about it.
+
 ## [0.0.2] (2026-09-24)
 
 ### Changed

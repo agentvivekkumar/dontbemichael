@@ -20,6 +20,7 @@ import {
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { missingBusinessFields, type BusinessField } from '@shared/businessProfile';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { COLLECT_USAGE_STATS } from '@shared/buildFeatures';
 
 export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
@@ -379,7 +380,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         autoMode,
         godProvider,
         godModel,
-        telemetryEnabled: shareStats
+        // Only written when the choice was shown (buildFeatures.ts).
+        ...(COLLECT_USAGE_STATS ? { telemetryEnabled: shareStats } : {})
       });
       setBusy(false);
       onComplete(next);
@@ -958,15 +960,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   onChange={toggleOpenAtLogin}
                 />
 
-                <ToggleRow
-                  icon="info"
-                  label={t('onboarding.permissions.shareStats')}
-                  desc={t('onboarding.permissions.shareStatsDesc')}
-                  on={shareStats}
-                  tint="var(--cth-lemon-light)"
-                  edge="var(--cth-lemon)"
-                  onChange={() => setShareStats(!shareStats)}
-                />
+                {COLLECT_USAGE_STATS && (
+                  <ToggleRow
+                    icon="info"
+                    label={t('onboarding.permissions.shareStats')}
+                    desc={t('onboarding.permissions.shareStatsDesc')}
+                    on={shareStats}
+                    tint="var(--cth-lemon-light)"
+                    edge="var(--cth-lemon)"
+                    onChange={() => setShareStats(!shareStats)}
+                  />
+                )}
 
                 {/* Instruction-only: the OS won't let the app flip its sleep setting
                     itself, so we deep-link the pane where one exists (macOS/Windows)
