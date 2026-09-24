@@ -25,3 +25,221 @@
 **Effort:** S
 **Priority:** P2
 **Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
+
+## Business mode (deferred from plan, v0.0.1 ship)
+
+Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "ship, defer as P1 TODOs" on 2026-09-24).
+
+### Enforcement compiler and the default-deny hook
+
+**What:** Compile each agent's levels into real permissions: `dontAsk`, compiled allow/deny rules, a default-deny PreToolUse hook (Decision 4, tests T2/T3).
+
+**Why:** Today only the prompt layer (`teamMemberGoal`) limits agents, `bypassPermissions` is still the default, and the hook fails open. "Asks before sending" is instructed, not enforced.
+
+**Context:** `src/shared/agentDefinition.ts` already carries levels and outward capabilities; `src/main/harnessGuard.ts` shows the PreToolUse pattern. Start by compiling one agent's levels into its per-session settings.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** None
+
+### Regression test: nothing writes skip-permission flags into ~/.claude/settings.json
+
+**What:** The mandatory regression test from Decision 18.
+
+**Why:** The app writes per-session Claude settings; a regression that touched the owner's global settings would silently change every Claude Code session on the Mac.
+
+**Context:** Point HOME at a temp dir, spawn through `spawnAgentCore` paths, assert `~/.claude/settings.json` is untouched.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+### Approvals inbox (with the two-zone panel and draft-to-post flow)
+
+**What:** Approval action payloads, an executor, and the approvals UI (Decisions 31 and Ryan's "copy to clipboard and mark posted").
+
+**Why:** Outward actions (emails, posts, spending) need a place for the owner to say yes; Ask me covers questions only.
+
+**Context:** Ask me is the first tab on Michael's panel now; approvals likely sit beside it.
+
+**Effort:** XL
+**Priority:** P1
+**Depends on:** Enforcement compiler
+
+### Office schedule (officeHours)
+
+**What:** Honour each pack's `officeHours`: soft pause outside hours, office state, wired to `weeklySchedule`.
+
+**Why:** Validated in the pack schema but never used, so the office runs around the clock regardless.
+
+**Context:** `src/shared/officePack.ts` (officeWindow), `src/shared/weeklySchedule.ts`.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Plan-limit handling
+
+**What:** Detect Claude usage limits (StopFailure `rate_limit`, quota hooks), show an office break state and a banner.
+
+**Why:** On smaller Claude plans the office stops mid-day with no explanation; setup now tells owners a Max plan is needed, but nothing handles hitting the limit.
+
+**Context:** Hooks arrive in `src/main/hooks.ts`.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Attention strip
+
+### Attention strip and owner floor layout (Decisions 25, 27)
+
+**What:** The minimal attention strip, plain-language agent cards, approvals in the right panel.
+
+**Why:** Owners need one place that says what needs them now.
+
+**Context:** The floor now has OFFICE, TASKS and GRAPH views and a blocked-count badge; the strip is the next layer.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Close dialog and tray (Decisions 1, 39)
+
+**What:** A close dialog with a safe default and keyboard contract, and a tray so the office keeps running.
+
+**Why:** Closing the window stops every agent without warning today.
+
+**Context:** `src/renderer/src/components/QuitWarningModal.tsx` exists for quit; the close path does not use it.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Per-agent levels screen (Decision 33)
+
+**What:** A screen per agent in the order job, limits, connect.
+
+**Why:** Autonomy is one global checkbox; owners cannot give Oscar less freedom than Pam.
+
+**Context:** Pairs with the enforcement compiler.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** Enforcement compiler
+
+### First-success confirmation and morning report (Decision 32)
+
+**What:** Confirm the first finished job to the owner, and a morning summary.
+
+**Why:** New owners need proof the office works while they were away.
+
+**Context:** Packs declare `firstAction` (Decision 29), used only in agent goals today.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Owner floor narrow layout (Decision 38)
+
+**What:** A layout for narrow windows.
+
+**Why:** The floor and side panel crowd each other on small laptop screens.
+
+**Context:** `src/renderer/src/App.tsx` floor area and SidebarSplitter.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### 14px text floor on the remaining setup screens (Decision 36)
+
+**What:** Raise the business and team setup screens' 10 to 13px text to 14px or more.
+
+**Why:** The owner's standing rule; the surfaces added later in the branch were already fixed.
+
+**Context:** `src/renderer/src/components/OnboardingWizard.tsx` (business, team steps; TeamCard, PackTile).
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+## Documents and security (review items skipped for v0.0.1)
+
+### Cap the total size of an Office file's zip entries
+
+**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
+
+**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
+
+**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+### Refuse a "move" onto a folder that already holds an office, in main
+
+**What:** `config:changeHome` in `src/main/index.ts` refuses mode `move` when the target has `hive/registry.json`.
+
+**Why:** Only the Settings screen prevents copying one office over another today. Owner skipped this at ship review 2026-09-24.
+
+**Context:** Reuse `homeFolderStatus` from `src/main/homeFolder.ts`.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+### Parse documents off the main thread
+
+**What:** Run PDF and OOXML extraction in a worker thread or utility process, with a time and page limit.
+
+**Why:** Large or crafted files block every window while they parse.
+
+**Context:** `src/main/docText.ts`; `docTextCli.ts` already runs the same code as a separate entry.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+## Onboarding
+
+### Retry team members that failed their first start
+
+**What:** Mark `businessTeamStarted` only once every picked member is running; tell the owner who did not start.
+
+**Why:** A member that fails at first launch is never retried and the owner is not told. Owner chose to leave it at ship review 2026-09-24.
+
+**Context:** `startBusinessTeam` in `src/renderer/src/hooks/useHive.ts`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+## Settings
+
+### Log the webhook format editor's parse error
+
+**What:** `console.error` the raw JSON parse message in `src/renderer/src/components/triggers/WebhookSchemaEditor.tsx`, and make `error` a boolean.
+
+**Why:** The owner now sees plain words, but nobody can see where the mistake was.
+
+**Context:** Third review pass, 2026-09-24.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+## Repo
+
+### Remove or rewrite the old project's website files in docs/
+
+**What:** `docs/index.html`, `docs/llms.txt`, `docs/blog/` and friends are Munder Difflin's website.
+
+**Why:** They describe the other product, and `npm run check:links` fails on `docs/llms.txt`'s version.
+
+**Context:** The website for this app lives in its own repo; keep only files the app reads at runtime (`docs/model-catalog.json`, `docs/hero.json`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+## Completed

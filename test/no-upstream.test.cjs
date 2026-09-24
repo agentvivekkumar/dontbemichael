@@ -27,7 +27,7 @@ function files(dir) {
 
 test('no file the app ships or builds from points upstream', () => {
   const scanned = [
-    ...files('src'), ...files('resources'), ...files('scripts'), ...files('.github'),
+    ...files('src'), ...files('resources'), ...files('scripts'), ...files('tools'), ...files('.github'),
     'electron-builder.yml', 'electron.vite.config.ts', 'package.json', 'SECURITY.md', 'CONTRIBUTING.md'
   ];
   assert.ok(scanned.length > 300, `sanity: ${scanned.length} files`);
