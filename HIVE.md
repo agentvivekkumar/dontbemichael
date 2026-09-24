@@ -1,6 +1,6 @@
 # The Hive — autonomous multi-agent layer
 
-> How Munder Difflin turns a room full of independent `claude`
+> How Don't Be Michael turns a room full of independent `claude`
 > processes into a collaborating, self-coordinating team with persistent memory,
 > a shared blackboard, and a "god" orchestrator that runs the floor.
 
@@ -188,7 +188,7 @@ is the primary control surface — tune the prompt, not the code.
   each agent's `memory.md` into its own wing (mtime-gated), and agents recall via
   `mempalace search` / `wake-up`. Detect-and-degrade: a no-op when `mempalace`
   isn't installed (markdown memory still works). Default model `minilm` (light,
-  for low-RAM Macs); `embeddinggemma` is the multilingual opt-in. A `MemoryPanel`
+  for low-RAM Macs); `embeddinggemma` is the multilingual opt-in. Michael's **Memory** tab
   lets the human search the same palace.
   - *Still open*: reflection/summarization to bound `memory.md`; needs a live
     `mempalace` install to validate retrieval end-to-end.

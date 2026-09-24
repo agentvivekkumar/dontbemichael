@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="./docs/logo.png" alt="Dont Be Michael" width="180">
+<img src="./docs/logo.png" alt="Don't Be Michael" width="180">
 
-# Dont Be Michael
+# Don't Be Michael
 
 ### Run an office of AI agents on your own machine
 
@@ -15,11 +15,13 @@ pay for, on their hourly limits. It turns the terminal CLI you already run into 
 Your clone keeps working while you're away and coordinates a whole office of agents on your
 machine.
 
-Wraps [Claude Code](https://claude.com/claude-code), Antigravity (Gemini), OpenAI Codex,
-**xAI Grok**, **Kimi Code**, **Gemini CLI**, **Qwen**, **OpenCode**, **Crush**,
-**pi.dev**, **GitHub Copilot CLI**, and **Cursor**. You can also bring your own keys and local
-LLMs. Agents message each other, route work, and remember what they learn. **Your clone**
-(Michael) coordinates them, and each agent shows up as an avatar on a shared office floor.
+This release runs on [Claude Code](https://claude.com/claude-code), with Opus 5.5 recommended.
+The code also carries Antigravity (Gemini), OpenAI Codex, **xAI Grok**, **Kimi Code**,
+**Gemini CLI**, **Qwen**, **OpenCode**, **Crush**, **pi.dev**, **GitHub Copilot CLI**, and
+**Cursor**, but setup offers only Claude Code in this build (see
+[Supported agents](#supported-agents)). Agents message each other, route work, and remember what
+they learn. **Your clone** (Michael) coordinates them, and each agent shows up as an avatar on a
+shared office floor.
 
 <p>
   <em>Electron · React · TypeScript · Pixi.js · xterm.js · node-pty</em>
@@ -42,7 +44,7 @@ LLMs. Agents message each other, route work, and remember what they learn. **You
 
 <br><br>
 
-**[Get Dont Be Michael at dontbemichael.com](https://dontbemichael.com)**
+**[Get Don't Be Michael at dontbemichael.com](https://dontbemichael.com)**
 
 </div>
 
@@ -50,7 +52,7 @@ LLMs. Agents message each other, route work, and remember what they learn. **You
 
 > [!NOTE]
 > **Brief one agent. Let the office do the rest.**
-> Dont Be Michael takes the terminal-agent CLIs you already run (`claude`, `agy`, `codex`, `grok`,
+> Don't Be Michael takes the terminal-agent CLIs you already run (`claude`, `agy`, `codex`, `grok`,
 > `kimi`, `qwen`, `opencode`, `crush`, `pi`, and `copilot`) and turns them into a
 > self-coordinating team. Each agent gets long-term memory, a mailbox, and a desk on a 2D office
 > floor. **Your clone** (Michael) routes work between them while you watch. He runs the floor,
@@ -75,6 +77,12 @@ LLMs. Agents message each other, route work, and remember what they learn. **You
 **Bring the CLI you already pay for.** Each one runs as a real process in its own terminal, using
 your existing subscription and its hourly limits. If it runs in a terminal, it can run here.
 
+**This release supports Claude Code.** Setup offers Claude Code with a choice of Claude model and
+recommends Opus 5.5. On a Claude Code older than 2.1.280, agents fall back to Opus 5. A Claude Max
+plan keeps the office running all day; smaller plans reach their usage limit during the day, and
+the office pauses until the limit resets. The other engines below are still wired in the code, but
+setup does not offer them and they are not supported in this build.
+
 <p>
   <a href="https://docs.claude.com/en/docs/claude-code"><kbd>Claude Code</kbd></a>
   <a href="https://github.com/openai/codex"><kbd>Codex · GPT</kbd></a>
@@ -95,7 +103,7 @@ You can also **bring your own keys** or run **local models** through Ollama, LM 
 
 ## What it is
 
-Dont Be Michael is a desktop app that wraps **real terminal-agent CLIs** as fully capable agents.
+Don't Be Michael is a desktop app that wraps **real terminal-agent CLIs** as fully capable agents.
 It connects them through a shared **hive** and puts **your clone** in charge. That clone is
 Michael, the one agent *you* talk to in order to get things done. A fast memory layer lets every
 agent remember what it learns and recall it almost instantly.
@@ -140,7 +148,9 @@ agent remember what it learns and recall it almost instantly.
    the office keeps running on its own. Only *critical* items (spend, destructive operations,
    scope changes) go to an approvals queue for you.
 4. **Everything is visible.** You can watch avatars move, envelopes fly, and terminal output
-   stream live. You can type into any session, browse its files, and read its git history.
+   stream live. You can type into any session, and a file link in a terminal shows that file in
+   your file browser. (The code editor and git history are hidden in this build; see
+   [Features](#features).)
 
 See [`HIVE.md`](./HIVE.md) for the full multi-agent design, [`SPEC.md`](./SPEC.md) for the
 terminal and event plane, and [`DESIGN.md`](./DESIGN.md) for the visual system.
@@ -219,8 +229,10 @@ other. Click any desk to watch that terminal live and type into it.
 
 ### Set up once
 
-The onboarding wizard checks what you already have installed and offers to install anything
-missing, so you don't have to follow a docs page.
+Setup asks for your business name, where you are, and your kind of business, explains that
+Michael is your office manager, then suggests a team for that business and you pick who joins. It
+checks what you already have installed and offers to install anything missing, so you don't have
+to follow a docs page.
 
 </td>
 <td width="50%">
@@ -229,8 +241,21 @@ missing, so you don't have to follow a docs page.
 </tr>
 </table>
 
+> [!NOTE]
+> **Hidden in this build.** Git views, the built in code editor, temporary helper agents that
+> Michael starts on his own, and the organisation trigger are switched off, because business owners
+> don't use them. The code stays in place, and each one has a single switch in
+> [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
+
+**For your business**
+- **Set up by business.** Setup asks for your business name and City, State, then your kind of business: restaurant, retail, professional services, home services, or SaaS and consulting. An Office Pack for that business suggests the team, and you pick who joins. Every character keeps the job they had in the show.
+- **A folder for every team member.** Each works in their own folder under `Documents/<your business>`, next to a shared `Office` folder where Michael works.
+- **OFFICE, TASKS and GRAPH views.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
+- **Michael asks when no one fits.** A big job outside everyone's role goes on the Ask me board with suggestions, instead of Michael starting a new agent on his own.
+- **"We can't find your office."** If the office folder is moved or deleted, launch asks where it went instead of quietly starting an empty office.
+
 **The floor**
-- **Every terminal is a real agent.** Claude Code, Antigravity (Gemini), OpenAI Codex, xAI Grok, Kimi Code, Gemini CLI, Qwen, OpenCode, Crush, pi.dev, GitHub Copilot CLI, Cursor, or a custom command. Each runs in its own `node-pty` PTY, rendered with xterm.js.
+- **Every terminal is a real agent.** Claude Code in this release (the other engines stay in the code; see [Supported agents](#supported-agents)). Each runs in its own `node-pty` PTY, rendered with xterm.js.
 - **Every agent is an avatar.** On a Pixi.js office floor, agents walk to stations, envelopes fly between desks, and each avatar's state reflects its real work.
 - **A GOD orchestrator you talk to.** It routes tasks, decides between competing requests, and escalates only what needs a human. You can also press **Talk** and run the floor by voice.
 - **Per-agent git worktrees.** Optional isolation, so parallel agents never collide on branches.
@@ -238,7 +263,7 @@ missing, so you don't have to follow a docs page.
 **Memory & coordination**
 - **The hive:** per-agent memory, atomic-file mailboxes, a shared blackboard, an append-only event log, and a single git committer.
 - **Semantic recall:** markdown memory indexed into a shared palace that you can search from the UI. Condensation keeps it from growing forever.
-- **Enterprise Knowledge Graph:** your own documents and policies, which any agent can query.
+- **Enterprise Knowledge Graph:** your own documents and policies, which any agent can query. Memory & Knowledge reads Word, Excel, PowerPoint, PDF and scanned documents (scans and photos through the Mac's own text recognition), and says in plain words when a file can't be read.
 
 **Control & safety**
 - **Human gates:** spend, scope, and destructive operations escalate to you. You can steer an agent mid-run or stop it gracefully.
@@ -246,13 +271,13 @@ missing, so you don't have to follow a docs page.
 - **Budgets & telemetry:** per-agent token budgets, real cost read from transcripts, a durable ledger, OTel spans, and a tool waterfall.
 
 **Command Center**
-- Kanban tasks with dependencies, scheduled missions with a heartbeat, live fleet monitoring, memory search, an activity log, and a CI watcher.
-- **Skills:** see what every agent can already do across Claude Code, OpenCode, and Codex, and browse a catalog of 227 more skills with search, filters, and one-click install and uninstall.
-- **Built-in Monaco IDE:** file tree, editor tabs, and save, plus CHANGES · HISTORY · COMPARE git panels with a commit graph, diffs, branch compare, and guarded checkout. All filesystem and git access goes through the main process.
+- Every launch opens on Michael's **Ask me** tab. Kanban tasks with dependencies (the floor's TASKS view), scheduled missions with a heartbeat, memory search, and a CI watcher. Live fleet monitoring and the activity log sit under **Advanced**.
+- **Skills (in Settings):** see what every agent can already do across Claude Code, OpenCode, and Codex, and browse a catalog of 227 more skills with search, filters, and one-click install and uninstall. Webhooks, memory settings and agent upkeep live in Settings too, since each applies to the whole office.
+- **Built-in Monaco IDE (hidden in this build):** file tree, editor tabs, and save, plus CHANGES · HISTORY · COMPARE git panels with a commit graph, diffs, branch compare, and guarded checkout. All filesystem and git access goes through the main process.
 
 **Getting work in and out**
-- **Slack & webhooks:** message a channel or POST to a webhook. Michael can spawn a temporary worker, reply in the thread, and shut the worker down afterwards.
-- **Shareable hires:** import a role from a hire link. Importing only pre-fills the form, and a human still spawns the agent.
+- **Slack & webhooks:** message a channel or POST to a webhook, and Michael picks it up and replies in the thread. (Starting a temporary worker for the job is hidden in this build.)
+- **Shareable hires:** import a role from a hire link (`dontbemichael://hire`). Importing only pre-fills the form, and a human still spawns the agent.
 - **BYOK keys + local LLMs:** per-provider keys kept in a write-only secret broker, plus base URLs for Ollama, LM Studio, and vLLM.
 - **One-click updates:** the title-bar badge downloads the build for your machine, then restarts and installs it.
 - **Your language:** English, Simplified Chinese, and Arabic, with right-to-left layout for Arabic. English is the default, and you pick another language in Settings. All app fonts ship inside the bundle, so nothing is fetched at startup.
@@ -270,8 +295,9 @@ also published on the
 it, and the setup wizard walks you through the rest. You don't need Node, a toolchain, or this
 repository.
 
-You do need at least one agent CLI on your machine. The app can install missing CLIs for you from
-**Settings → Prerequisites**.
+You do need [Claude Code](https://claude.com/claude-code) and a Claude plan. A Claude Max plan
+keeps the office running all day; smaller plans reach their usage limit during the day. The app
+can install Claude Code for you from **Settings → Prerequisites**.
 
 ### Build from source
 
@@ -285,10 +311,12 @@ The rest of this section is for contributors and anyone who wants to run an unre
   ```bash
   xcode-select --install
   ```
-- At least one supported agent CLI on your `PATH`: **[Claude Code](https://claude.com/claude-code)**
-  (`claude`, the default), **Antigravity** (`agy`), **OpenAI Codex** (`codex`), **xAI Grok** (`grok`),
-  **Kimi Code** (`kimi`), **Gemini CLI** (`gemini`), **Qwen** (`qwen`), **OpenCode** (`opencode`),
-  **Crush** (`crush`), **pi.dev** (`pi`), **GitHub Copilot** (`copilot`), or **Cursor** (`cursor-agent`).
+- **[Claude Code](https://claude.com/claude-code)** (`claude`) on your `PATH`, the engine this
+  release supports. Setup offers only the engines in `BUILD_ENGINES`
+  (`src/shared/agentProvider.ts`), which is Claude Code today. The other presets stay wired:
+  **Antigravity** (`agy`), **OpenAI Codex** (`codex`), **xAI Grok** (`grok`), **Kimi Code** (`kimi`),
+  **Gemini CLI** (`gemini`), **Qwen** (`qwen`), **OpenCode** (`opencode`), **Crush** (`crush`),
+  **pi.dev** (`pi`), **GitHub Copilot** (`copilot`), and **Cursor** (`cursor-agent`).
   If a CLI is missing, the harness can usually install it in the terminal and then start it.
 - *Optional:* **your own API keys and local LLMs** in **Settings → AI Engines** (Ollama / LM Studio / vLLM).
 - *Optional:* the semantic memory index for fast cross-session recall. Markdown memory works without it.
@@ -302,9 +330,10 @@ npm install        # postinstall rebuilds node-pty against Electron's ABI
 npm run dev        # launches the Electron app with hot reload
 ```
 
-On first launch you'll go through the onboarding wizard, then land on the office floor. Use
-**Add agent** to spawn your first session. The GOD agent takes its seat in Michael's office
-automatically.
+On first launch, setup asks about your business, suggests a team, and picks where the office
+folder lives and which model runs Michael. Your team starts on its own, the GOD agent takes its
+seat in Michael's office, and every launch after that opens on Michael's **Ask me** tab. Use
+**Add agent** to hire more.
 
 #### Other scripts
 
@@ -312,6 +341,7 @@ automatically.
 npm run build      # production build via electron-vite
 npm run preview    # preview the production build
 npm run typecheck  # type-check the node (main/preload) and web (renderer) projects
+npm run test:focused  # run the node:test suite in test/
 ```
 
 > If `node-pty` fails to load after an Electron upgrade, re-run `npm install`. The `postinstall`
@@ -339,6 +369,13 @@ registry with a secret broker, Slack-spawned workers, shareable hires, observabi
 circuit breaker, durable persistence, session resume, multi-window floors, one-click updates, a
 Skills browser, a live Prerequisites check, cost reporting from the ledger, and a Simplified
 Chinese and Arabic interface. Full history is in [`CHANGELOG.md`](./CHANGELOG.md).
+
+Don't Be Michael 0.0.1 adds business setup with Office Packs, a folder for every team member, the
+OFFICE, TASKS and GRAPH floor views, and reading of Word, Excel, PowerPoint, PDF and scanned
+documents. The same release narrows setup to Claude Code and hides the IDE, the git panels and
+Slack spawned workers (see the note under [Features](#features)). The business mode work deferred
+from that release is tracked in [`TODOS.md`](./TODOS.md), and the design behind it is in
+[`docs/designs/business-mode-office-packs.md`](./docs/designs/business-mode-office-packs.md).
 
 Next up:
 
@@ -378,7 +415,7 @@ compile without an analytics key and send nothing.
 
 ## License
 
-The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). Dont Be
+The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). Don't Be
 Michael is based on [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin), which is
 also MIT-licensed. The original copyright notice is kept in `LICENSE`, as that license requires.
 
@@ -391,7 +428,7 @@ also MIT-licensed. The original copyright notice is kept in `LICENSE`, as that l
 > [`src/renderer/src/assets/ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md).
 
 The MIT license covers only the code. The bundled pixel art is licensed separately by LimeZu and is
-excluded in [`LICENSE-ASSETS`](./LICENSE-ASSETS). *Dont Be Michael* is not affiliated with NBC,
+excluded in [`LICENSE-ASSETS`](./LICENSE-ASSETS). *Don't Be Michael* is not affiliated with NBC,
 *The Office*, or Dunder Mifflin.
 
 ## Acknowledgements
