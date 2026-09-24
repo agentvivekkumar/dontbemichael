@@ -139,3 +139,14 @@ test('nothing is sent while usage stats are hidden, whatever the saved setting',
   assert.match(main, /enabled: COLLECT_USAGE_STATS && readConfig\(\)\.telemetryEnabled !== false/);
   assert.match(main, /analytics\.setEnabled\(COLLECT_USAGE_STATS && patch\.telemetryEnabled\)/);
 });
+
+/**
+ * The header's "auto mode on / off" text is hidden (owner, 2026-09-24). The
+ * setting itself still works and stays in Settings → Autonomy & Budgets.
+ */
+test('the header hides the auto mode text', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
+  const app = read('src/renderer/src/App.tsx');
+  const label = app.indexOf("'auto mode on' : 'auto mode off'");
+  assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
+});

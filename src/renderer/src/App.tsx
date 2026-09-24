@@ -32,7 +32,7 @@ import { acquireTerminal, notifyThemeChangeAll } from '@/components/terminalPool
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
-import { SHOW_IDE } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_AUTO_MODE_LABEL } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import brandLogo from '@brand/logo.png?url';
 
@@ -309,13 +309,15 @@ export function App() {
         {/* v0.3.7: the version is no longer inert text — it doubles as the
             update control (check / download / restart to update). */}
         <UpdateBadge />
-        <span style={{
-          fontFamily: 'var(--cth-font-ui)',
-          fontSize: 13,
-          color: 'var(--cth-ink-500)'
-        }}>
-          {config.autoMode ? 'auto mode on' : 'auto mode off'}
-        </span>
+        {SHOW_AUTO_MODE_LABEL && (
+          <span style={{
+            fontFamily: 'var(--cth-font-ui)',
+            fontSize: 13,
+            color: 'var(--cth-ink-500)'
+          }}>
+            {config.autoMode ? 'auto mode on' : 'auto mode off'}
+          </span>
+        )}
         {/* v0.3.4: theme + fullscreen live HERE (top right), not buried in the
             terminal header — and the theme darkens the whole app, terminals
             included (design/theme.ts + tokens.css dark block). */}

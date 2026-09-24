@@ -33,3 +33,9 @@ export const SHOW_ORG_TRIGGER = false;
  *  nothing is sent even if a release is built with a PostHog key, so the app
  *  never sends without having shown the choice (owner, 2026-09-24). */
 export const COLLECT_USAGE_STATS = false;
+
+/** The "auto mode on / off" text in the header bar. It named a developer
+ *  setting in words owners don't use, and it wasn't clickable. The setting
+ *  itself is unchanged and stays in Settings → Autonomy & Budgets
+ *  (owner, 2026-09-24). */
+export const SHOW_AUTO_MODE_LABEL = false;
