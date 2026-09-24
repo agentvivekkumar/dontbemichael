@@ -3,8 +3,8 @@
 /**
  * The app is "Don't Be Michael" everywhere people see its name (owner,
  * 2026-09-24): the macOS menu and its About / Hide / Quit items, window titles,
- * the packaged app, and the privacy prompts macOS shows. Its data folder keeps
- * its old name, so the rename never looks like a fresh install.
+ * the packaged app, and the privacy prompts macOS shows. Its data folder is
+ * pinned to its own name, so a later rename never moves it.
  */
 
 const test = require('node:test');
@@ -26,8 +26,16 @@ test('the packaged app carries the same name', () => {
   assert.match(builder, /^productName: "Don't Be Michael"$/m);
 });
 
+test('the packaged app ships LICENSE, keeping the original MIT notice beside the owner\'s', () => {
+  assert.match(builder, /^extraResources:\n(?:\s+#.*\n)*\s+- from: LICENSE\n\s+to: LICENSE$/m);
+  const license = read('LICENSE');
+  assert.match(license, /^Copyright \(c\) 2026 Vivek Kumar$/m);
+  assert.match(license, /^Copyright \(c\) 2026 Chaitanya Giri$/m, 'MIT requires the original notice to stay');
+  assert.match(builder, /^copyright: Copyright © 2026 Vivek Kumar$/m);
+});
+
 test('the data folder is pinned before the app is renamed, and before anything else runs', () => {
-  assert.equal(APP_DATA_DIR, 'munder-difflin');
+  assert.equal(APP_DATA_DIR, 'dontbemichael');
   const pin = main.indexOf("app.setPath('userData', join(app.getPath('appData'), APP_DATA_DIR));");
   const rename = main.indexOf('app.setName(APP_NAME);');
   assert.ok(pin > 0 && rename > pin, 'pin first, then rename');

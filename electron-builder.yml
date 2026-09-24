@@ -1,7 +1,7 @@
 # Reverse DNS of this project's own home (was the upstream project's domain).
 appId: io.github.agentvivekkumar.dontbemichael
 productName: "Don't Be Michael"
-copyright: Copyright © 2026 Chaitanya Giri
+copyright: Copyright © 2026 Vivek Kumar
 
 # Where electron-updater looks for new versions (latest*.yml + assets on GitHub
 # releases). The release workflow still uploads assets itself (--publish never);
@@ -61,6 +61,10 @@ files:
 # resources dir (process.resourcesPath). It runs under `node`, NOT inside the
 # asar, so the office worker can invoke `node <resources>/md-slack-reply.cjs`.
 extraResources:
+  # MIT requires the copyright and permission notice in every copy, including
+  # the packaged app, so LICENSE ships in Contents/Resources.
+  - from: LICENSE
+    to: LICENSE
   - from: resources/md-slack-reply.cjs
     to: md-slack-reply.cjs
   # Knowledge Graph agent CLI + its pure-JS core. Agents invoke `node
