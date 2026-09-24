@@ -33,16 +33,19 @@ export type UpdateStatus =
 
 export type UpdateAction = 'none' | 'check' | 'download' | 'restart' | 'open-release' | 'manual';
 
-export const REPO = 'chaitanyagiri/munder-difflin';
+/** This app's own GitHub repo: releases (updates) and the links the app opens.
+ *  Never the upstream munder-difflin project (owner, 2026-09-24). */
+export const REPO = 'agentvivekkumar/dontbemichael';
+export const REPO_URL = `https://github.com/${REPO}`;
 
 /** The installer for THIS machine in the release tagged v{version}, by the
  *  names electron-builder.yml produces. Used when a status carries no
  *  `downloadUrl` of its own (the native updater path never does). */
 export function installerUrl(version: string, platform: string, arch: string): string {
   const v = version.replace(/^v/, '');
-  const file = platform === 'darwin' ? `Munder-Difflin-${v}-mac-${arch}.dmg`
-    : platform === 'win32' ? `Munder-Difflin-${v}-win-x64-setup.exe`
-    : `Munder-Difflin-${v}-linux-x86_64.AppImage`;
+  const file = platform === 'darwin' ? `Dont-Be-Michael-${v}-mac-${arch}.dmg`
+    : platform === 'win32' ? `Dont-Be-Michael-${v}-win-x64-setup.exe`
+    : `Dont-Be-Michael-${v}-linux-x86_64.AppImage`;
   return `https://github.com/${REPO}/releases/download/v${v}/${file}`;
 }
 
@@ -218,15 +221,15 @@ export function describeUpdate(status: UpdateStatus | null, currentVersion: stri
     case 'error':
       return {
         label: 'update check failed', action: 'check', tone: 'warn', busy: false,
-        title: `${status.message} — click to try again`
+        title: `${status.message}. Click to try again`
       };
     case 'not-available':
     case 'just-updated':
       // A check has confirmed it, so say so. Idle (no check yet) stays bare.
-      return { label: 'latest', action: 'check', tone: 'idle', busy: false, title: `v${v} is the latest version — click to check again` };
+      return { label: 'latest', action: 'check', tone: 'idle', busy: false, title: `v${v} is the latest version. Click to check again` };
     case 'idle':
     default:
-      return { label: null, action: 'check', tone: 'idle', busy: false, title: `v${v} — click to check for updates` };
+      return { label: null, action: 'check', tone: 'idle', busy: false, title: `v${v}: click to check for updates` };
   }
 }
 
@@ -268,7 +271,7 @@ export function describeUpdateSettings(
     case 'available':
       return {
         headline: `v${status.version} is available`,
-        detail: `You're on v${v}. Download it now — you'll be asked to restart once it's ready.`,
+        detail: `You're on v${v}. Download it now, and you'll be asked to restart once it's ready.`,
         button: `Download v${status.version}`, action: 'download', busy: false, tone: 'ready'
       };
     case 'downloading':
@@ -280,15 +283,15 @@ export function describeUpdateSettings(
     case 'downloaded':
       return {
         headline: `v${status.version} is ready to install`,
-        detail: `Restart Munder Difflin to finish updating from v${v}.`,
+        detail: `Restart Don't Be Michael to finish updating from v${v}.`,
         button: 'Restart to update', action: 'restart', busy: false, tone: 'ready'
       };
     case 'available-manual':
       return {
         headline: `v${status.version} is available`,
         detail: status.reason
-          ? `This install can't update itself (${status.reason}) — download it from the release page.`
-          : `This install can't update itself — download it from the release page.`,
+          ? `This install can't update itself (${status.reason}). Download it from the release page.`
+          : `This install can't update itself. Download it from the release page.`,
         button: status.downloadUrl ? `Download v${status.version}` : 'Open release page',
         action: 'open-release', busy: false, tone: 'warn'
       };
@@ -307,7 +310,7 @@ export function describeUpdateSettings(
     case 'not-available':
       return {
         headline: `v${v} is the latest version`,
-        detail: "You're already up to date — nothing to install.",
+        detail: "You're already up to date. Nothing to install.",
         button: 'Check again', action: 'check', busy: false, tone: 'idle'
       };
     case 'idle':
@@ -327,8 +330,8 @@ export function manualInstallSteps(platform: string): { os: string; steps: strin
     return {
       os: 'macOS',
       steps: [
-        'Open the .dmg and drag Munder Difflin onto Applications. Choose Replace when asked.',
-        'Quit this app, open the new one from Applications, and pick the same project.'
+        "Open the .dmg and drag Don't Be Michael onto Applications. Choose Replace when asked.",
+        'Quit this app, then open the new one from Applications. Your team and files are still there.'
       ]
     };
   }
@@ -337,7 +340,7 @@ export function manualInstallSteps(platform: string): { os: string; steps: strin
       os: 'Windows',
       steps: [
         'Quit this app, then run the downloaded setup .exe. It replaces the installed version.',
-        'Open Munder Difflin again and pick the same project.'
+        "Open Don't Be Michael again. Your team and files are still there."
       ]
     };
   }
@@ -345,7 +348,7 @@ export function manualInstallSteps(platform: string): { os: string; steps: strin
     os: 'Linux',
     steps: [
       'Make the downloaded .AppImage executable (chmod +x) and move it over the one you run now.',
-      'Quit this app, launch the new AppImage, and pick the same project.'
+      'Quit this app, then launch the new AppImage. Your team and files are still there.'
     ]
   };
 }

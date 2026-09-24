@@ -1,0 +1,293 @@
+<title>Business Mode onboarding sketch</title>
+<!--
+  Wireframe for Approach A + Office Packs (office-hours 2026-09-15), revision 2.
+  Deliberately reproduces the REAL product look from DESIGN.md instead of a grey sketch:
+  SNES three-layer panel border (ink-900 / cream-200 / ink-700), cream + ink palette,
+  no border-radius, no blur, hard 4/4 shadow, 4px grid. Same 640px dialog on a hatched
+  cream-200 backdrop that OnboardingWizard.tsx uses today, so this reads as "the wizard,
+  re-plumbed for owners" rather than a new app.
+  Fonts: the app bundles Press Start 2P / Pixelify Sans / VT323. This file is
+  self-contained (no CDN), so it falls back to monospace where those aren't installed.
+  Portraits are placeholder squares in each cast member's real shirt colour from cast.ts.
+  Rev 2 (founder feedback): no "won't" tags on team cards (limits are the owner's call and
+  live on the per-agent setup screen); Oscar (finance) added as a core agent in every pack.
+-->
+<style>
+  :root{
+    --cream-50:#FFFDF5;--cream-100:#FFF8E7;--cream-200:#F4E9C7;--cream-300:#E8D9A0;--paper-100:#FCFAF0;
+    --ink-900:#1A1320;--ink-700:#3D2E4A;--ink-500:#6B5878;--ink-300:#A899B5;--ink-100:#D9CFE0;
+    --coral:#FF6B6B;--coral-light:#FFB4B4;--mint:#6BCF7F;--mint-light:#B4E5BD;--sky:#4ECDC4;--sky-light:#A8E6E0;
+    --lemon:#FFD93D;--lemon-light:#FFEC99;--lilac-light:#D6C5FF;--peach-light:#FFD0B5;
+    --display:'Press Start 2P',ui-monospace,Menlo,monospace;
+    --ui:'Pixelify Sans',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--ui);color:var(--ink-900);font-size:14px;line-height:20px;
+    background:var(--cream-200);
+    background-image:repeating-linear-gradient(45deg,rgba(232,217,160,.55) 0 1px,transparent 1px 8px);
+    padding:32px 16px}
+  .row{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;align-items:flex-start;max-width:1400px;margin:0 auto}
+  .step-label{font-family:var(--display);font-size:10px;color:var(--ink-700);margin:0 0 8px}
+  .col{width:640px;max-width:100%}
+  /* PixelPanel variant=dialog: nested inset box-shadows, 5px total border */
+  .panel{background:var(--cream-50);
+    box-shadow:inset 0 0 0 2px var(--ink-900),inset 0 0 0 4px var(--cream-200),inset 0 0 0 5px var(--ink-700);
+    filter:drop-shadow(4px 4px 0 rgba(26,19,32,.25))}
+  .titlebar{margin:5px 5px 0;padding:8px 12px;font-family:var(--display);font-size:12px;
+    background:linear-gradient(var(--cream-100),var(--cream-200));border-bottom:2px solid var(--ink-900);
+    display:flex;justify-content:space-between;align-items:center}
+  .titlebar small{font-family:var(--ui);font-size:12px;color:var(--ink-500)}
+  .body{padding:20px;display:flex;flex-direction:column;gap:16px}
+  .say{display:flex;gap:12px;align-items:flex-start}
+  .portrait{width:56px;height:56px;flex-shrink:0;background:var(--sky-light);box-shadow:inset 0 0 0 2px var(--ink-500);
+    display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+  .portrait i{display:block;width:28px;height:36px;margin-bottom:0;box-shadow:inset 0 0 0 2px var(--ink-900)}
+  .portrait.sm{width:40px;height:40px}.portrait.sm i{width:20px;height:26px}
+  .h{font-family:var(--display);font-size:12px;line-height:18px}
+  .muted{color:var(--ink-500);font-size:12px;line-height:18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .tile{padding:10px;background:var(--cream-100);box-shadow:inset 0 0 0 2px var(--ink-300);display:flex;gap:8px;align-items:center;min-height:52px}
+  .tile.sel{background:var(--lemon-light);box-shadow:inset 0 0 0 2px var(--ink-900),inset 0 0 0 4px var(--lemon)}
+  .tile b{font-weight:normal;font-family:var(--display);font-size:9px;line-height:14px}
+  .ico{width:28px;height:28px;flex-shrink:0;background:var(--paper-100);box-shadow:inset 0 0 0 1px var(--ink-300);
+    display:flex;align-items:center;justify-content:center;font-size:14px}
+  label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-700)}
+  .input{padding:6px 8px;background:var(--paper-100);box-shadow:inset 0 0 0 2px var(--ink-700);font-size:14px;min-height:32px}
+  .btnrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .btn{padding:0 14px;height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;white-space:nowrap;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.35);border:none;cursor:pointer;font-family:var(--ui)}
+  .btn.primary{background:var(--ink-900);color:var(--cream-50)}
+  .btn.secondary{background:var(--cream-100);color:var(--ink-900);box-shadow:inset 0 0 0 2px var(--ink-900),inset 0 -3px 0 var(--cream-300)}
+  .btn.ghost{background:transparent;color:var(--ink-700);box-shadow:inset 0 0 0 2px var(--ink-500)}
+  .dots{display:flex;gap:4px}.dots span{width:8px;height:8px;background:var(--ink-100)}.dots span.on{background:var(--ink-900)}
+  /* agent pick cards */
+  .agent{display:flex;gap:10px;padding:10px;background:var(--cream-100);box-shadow:inset 0 0 0 2px var(--ink-300)}
+  .agent.sel{box-shadow:inset 0 0 0 2px var(--ink-900),inset 0 0 0 4px var(--accent)}
+  .agent.locked{background:var(--paper-100)}
+  .agent .meta{flex:1;min-width:0}
+  .agent .name{display:flex;gap:6px;align-items:center;font-family:var(--display);font-size:10px}
+  .check{width:16px;height:16px;flex-shrink:0;box-shadow:inset 0 0 0 2px var(--ink-900);background:var(--paper-100);
+    display:flex;align-items:center;justify-content:center;font-size:12px;line-height:12px}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:0 6px;height:18px;font-size:11px;
+    background:var(--cream-200);box-shadow:inset 0 0 0 1px var(--ink-500);margin:4px 4px 0 0;white-space:nowrap}
+  .chip.need{background:var(--peach-light)} .chip.ok{background:var(--mint-light)} .chip.no{background:var(--ink-100);color:var(--ink-500)}
+  .chip.core{background:var(--lilac-light)} .chip.draft{background:var(--lemon-light)}
+  .note{padding:10px;background:var(--lemon-light);box-shadow:inset 0 0 0 1px var(--ink-300);font-size:12px;line-height:17px;color:var(--ink-700)}
+  .warn{padding:10px;background:var(--coral-light);box-shadow:inset 0 0 0 1px var(--ink-700);font-size:12px;line-height:17px}
+  .section{font-family:var(--display);font-size:9px;color:var(--ink-700);border-bottom:2px solid var(--ink-900);padding-bottom:4px}
+  ul.l{margin:0;padding-left:16px;font-size:13px;line-height:19px}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t td{padding:5px 6px;border-bottom:1px solid var(--ink-100)}
+  table.t td:last-child{text-align:right;white-space:nowrap}
+  .seg{display:inline-flex;box-shadow:inset 0 0 0 2px var(--ink-700)}
+  .seg span{padding:0 8px;height:22px;display:inline-flex;align-items:center;font-size:12px}
+  .seg span.on{background:var(--ink-900);color:var(--cream-50)}
+  .inset{padding:10px;background:var(--cream-200);box-shadow:inset 0 0 0 2px var(--ink-700),inset 0 0 0 3px var(--cream-100)}
+</style>
+
+<div class="row">
+
+  <!-- ─────────────── SCREEN 1: business type ─────────────── -->
+  <!-- Replaces today's persona → welcome → home folder → orchestrator engine → repos steps.
+       No folder picker, no engine list, no model ID: business mode picks Claude Code and
+       creates the office folder silently. The ONE question that shapes everything else is
+       asked first. Name + city personalise Michael's voice and the Office Pack defaults
+       (hours, tone) and prove the app is about *their* shop. -->
+  <div class="col">
+    <p class="step-label">1 / 3 · What kind of business</p>
+    <div class="panel">
+      <div class="titlebar">Set Up Your Office <small>step 1 of 4</small></div>
+      <div class="body">
+        <div class="say">
+          <div class="portrait"><i style="background:#5a6b8c"></i></div>
+          <div>
+            <div class="h">Hi, I'm Michael.</div>
+            <div class="muted" style="color:var(--ink-700)">I run your office. Tell me about your business and I'll suggest a starter team. You pick who joins.</div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <label class="f">Business name
+            <!-- Edge: 40+ char names truncate with ellipsis in the title bar, never wrap the dialog. -->
+            <div class="input">Pho Saigon Kitchen &amp; Catering</div>
+          </label>
+          <label class="f">City
+            <div class="input">Austin, TX</div>
+          </label>
+        </div>
+
+        <div class="section">What kind of business do you run?</div>
+        <!-- Each tile maps 1:1 to a bundled Office Pack. Tiles come from the pack registry,
+             so a community-contributed pack appears here without a code change. -->
+        <div class="grid3">
+          <div class="tile sel"><div class="ico">🍜</div><div><b>Restaurant &amp; Food</b><div class="muted">cafe, catering, food truck</div></div></div>
+          <div class="tile"><div class="ico">🛍</div><div><b>Retail Shop</b><div class="muted">store, online seller</div></div></div>
+          <div class="tile"><div class="ico">📋</div><div><b>Pro Services</b><div class="muted">CPA, realtor, insurance</div></div></div>
+          <div class="tile"><div class="ico">✂</div><div><b>Salon &amp; Wellness</b><div class="muted">salon, spa, fitness</div></div></div>
+          <div class="tile"><div class="ico">🔧</div><div><b>Home Services</b><div class="muted">cleaning, repair, HVAC</div></div></div>
+          <!-- Empty/unknown state: no pack matches → Michael asks 3 plain questions and
+               builds a starter team from the generic pack. Never a dead end. -->
+          <div class="tile"><div class="ico">?</div><div><b>Something Else</b><div class="muted">Michael will ask a few questions</div></div></div>
+        </div>
+
+        <div class="note">You'll need <b>Claude</b> on this computer. A Max plan is recommended. ✓ Found and signed in.</div>
+        <!-- Error state (not shown): "Claude isn't signed in yet" + [Sign in to Claude] button
+             that opens the login in a hidden session. Owner never sees a terminal. The app
+             cannot verify the plan tier, so it recommends Max rather than checking it. -->
+
+        <div class="btnrow">
+          <div class="dots"><span class="on"></span><span></span><span></span><span></span></div>
+          <button class="btn primary">Suggest my team →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────── SCREEN 2: pick your starter team ─────────────── -->
+  <!-- Founder premise #2: Michael + recommended cast, owner picks any subset. Cards show the
+       role in one sentence and what each pick costs to set up ("needs" chips). No "won't"
+       tags here: limits are the owner's call and live on each agent's setup screen.
+       Oscar (finance) comes from the core pack every business pack inherits, pre-checked
+       but un-pickable like any other agent. Michael is the only always-on agent. -->
+  <div class="col">
+    <p class="step-label">2 / 3 · Pick your starter team</p>
+    <div class="panel">
+      <div class="titlebar">Your Starter Team <small>Restaurant &amp; Food pack</small></div>
+      <div class="body">
+        <div class="muted" style="color:var(--ink-700)">These are the roles restaurants usually start with. Pick whoever you want. You can hire more later.</div>
+
+        <div class="agent locked" style="--accent:#5a6b8c">
+          <div class="portrait sm"><i style="background:#5a6b8c"></i></div>
+          <div class="meta">
+            <div class="name">Michael <span class="chip no">always on</span></div>
+            <div class="muted" style="color:var(--ink-700)">Runs the office. Hands out work, checks in with you when something needs a yes.</div>
+          </div>
+        </div>
+
+        <div class="agent sel" style="--accent:#7a4b6b">
+          <div class="check">✓</div>
+          <div class="portrait sm"><i style="background:#7a4b6b"></i></div>
+          <div class="meta">
+            <div class="name">Oscar · Finance <span class="chip core">in every pack</span></div>
+            <div class="muted" style="color:var(--ink-700)">Tracks sales, bills and receipts, reminds you what's due, and sends a weekly money summary.</div>
+            <span class="chip need">optional: QuickBooks</span>
+          </div>
+        </div>
+
+        <div class="agent sel" style="--accent:#9caf88">
+          <div class="check">✓</div>
+          <div class="portrait sm"><i style="background:#9caf88"></i></div>
+          <div class="meta">
+            <div class="name">Pam · Admin</div>
+            <div class="muted" style="color:var(--ink-700)">Reads your inbox, sorts orders, invoices and junk, flags what needs you.</div>
+            <span class="chip need">needs: Email</span>
+          </div>
+        </div>
+
+        <div class="agent sel" style="--accent:#d16ba5">
+          <div class="check">✓</div>
+          <div class="portrait sm"><i style="background:#d16ba5"></i></div>
+          <div class="meta">
+            <div class="name">Kelly · Customer Care</div>
+            <div class="muted" style="color:var(--ink-700)">Answers catering inquiries and complaints in your voice.</div>
+            <span class="chip need">needs: Email</span><span class="chip need">needs: Google reviews</span>
+          </div>
+        </div>
+
+        <div class="agent sel" style="--accent:#3a3a44">
+          <div class="check">✓</div>
+          <div class="portrait sm"><i style="background:#3a3a44"></i></div>
+          <div class="meta">
+            <div class="name">Ryan · Marketing</div>
+            <div class="muted" style="color:var(--ink-700)">Drafts daily specials and promotions, posts on your schedule.</div>
+            <span class="chip need">needs: Instagram / Facebook</span><span class="chip draft">starts in draft mode</span>
+          </div>
+        </div>
+
+        <div class="agent" style="--accent:#6b7a4b">
+          <div class="check"></div>
+          <div class="portrait sm"><i style="background:#6b7a4b"></i></div>
+          <div class="meta">
+            <div class="name">Creed · Quality</div>
+            <div class="muted" style="color:var(--ink-700)">Keeps your opening/closing checklists and temperature logs, nags when one is missed.</div>
+            <span class="chip ok">needs: nothing to connect</span>
+          </div>
+        </div>
+
+        <!-- Office schedule lives on the team screen (founder premise #6) because it applies
+             to everyone. Defaults come from the pack; restaurant = quiet during rushes. -->
+        <div class="inset">
+          <div class="btnrow"><span style="font-size:13px">Office hours</span><span class="seg"><span class="on">Mon–Sun</span><span>Custom</span></span></div>
+          <div class="muted" style="margin-top:4px;color:var(--ink-700)">Work 9:00 am – 10:00 pm · pause 11:30 am – 1:30 pm and 5:30 – 8:00 pm (rush hours)</div>
+        </div>
+
+        <div class="btnrow">
+          <span class="muted">4 picked · 3 accounts to connect, 1 optional</span>
+          <span><button class="btn ghost">← Back</button> <button class="btn primary">Set up my team →</button></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────── SCREEN 3: set up one agent ─────────────── -->
+  <!-- One agent at a time, in pick order. Top: connect the account the agent needs (OAuth
+       broker, in-product, never Claude Code's MCP config). Middle: the job description,
+       "does" and "won't" as STARTING rules the owner edits freely (an agent can do anything
+       the owner turns on). Bottom: tool access = the per-agent allowlist, compiled to
+       per-session settings + control.ts gating, so an Off is enforced, not just asked.
+       Each tool row has three honest levels: Off / Ask me / On its own. -->
+  <div class="col">
+    <p class="step-label">3 / 3 · Set up Pam</p>
+    <div class="panel">
+      <div class="titlebar">Set Up Pam · Admin <small>2 of 4</small></div>
+      <div class="body">
+        <div class="section">1. Connect your email</div>
+        <div class="muted" style="margin-top:-8px">Sign in with:</div>
+        <div class="grid3">
+          <button class="btn secondary">Google</button>
+          <button class="btn secondary">Microsoft</button>
+          <button class="btn ghost">Other email</button>
+        </div>
+        <!-- Failure state shown: the owner must see what happened and a single next action. -->
+        <div class="warn">Google sign-in was closed before it finished. <u>Try again</u></div>
+
+        <div class="section">2. Pam's job</div>
+        <div class="grid2">
+          <div>
+            <div style="font-size:12px;color:var(--ink-700)">Pam does</div>
+            <ul class="l">
+              <li>Sort new mail: orders, invoices, catering, junk</li>
+              <li>Flag anything from the health dept or landlord</li>
+              <li>Hand catering inquiries to Kelly</li>
+              <li>Pass bills and receipts to Oscar</li>
+            </ul>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--ink-700)">Pam won't</div>
+            <ul class="l">
+              <li>Pay or approve invoices</li>
+              <li>Delete any email</li>
+            </ul>
+          </div>
+        </div>
+        <div class="muted">These are starting rules. Change any of them in plain words. <u>+ Add a rule</u></div>
+
+        <div class="section">3. What Pam can use</div>
+        <table class="t">
+          <tr><td>Read email</td><td><span class="seg"><span>Off</span><span>Ask me</span><span class="on">On its own</span></span></td></tr>
+          <tr><td>Label &amp; move email</td><td><span class="seg"><span>Off</span><span>Ask me</span><span class="on">On its own</span></span></td></tr>
+          <tr><td>Send email</td><td><span class="seg"><span>Off</span><span class="on">Ask me</span><span>On its own</span></span></td></tr>
+          <tr><td>Post on social</td><td><span class="chip no">not connected for Pam</span></td></tr>
+          <tr><td>Customer list (CRM)</td><td><span class="chip no">not connected for Pam</span></td></tr>
+        </table>
+
+        <div class="btnrow">
+          <span class="muted">Next: Kelly · Customer Care</span>
+          <span><button class="btn ghost">Skip for now</button> <button class="btn primary">Save Pam →</button></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

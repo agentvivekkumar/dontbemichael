@@ -2,15 +2,18 @@ import { useTranslation } from 'react-i18next';
 import { type SidebarTab } from '@/store/store';
 import { type AccentColorName } from '@/design/tokens';
 import { Icon, type IconName } from './Icon';
+import { SHOW_GIT } from '@shared/buildFeatures';
 
 // v0.3.4: the files tab is gone — the per-agent IDE button (header) opens the
 // full Monaco editor + file tree, which superseded the read-only browser.
-const TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
+const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
   { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },
   { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
   { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
   { key: 'traces',   labelKey: 'sidebar.traces',   icon: 'web' }
 ];
+/** GIT is hidden in this build (src/shared/buildFeatures.ts). */
+const TABS = ALL_TABS.filter((tab) => tab.key !== 'git' || SHOW_GIT);
 
 export interface SidebarTabsProps {
   current: SidebarTab;

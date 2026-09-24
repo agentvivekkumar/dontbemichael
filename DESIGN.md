@@ -372,6 +372,35 @@ Position: centered. Snap-in (200 ms ease-out scale 0.92 → 1.0).
 Always has close button top-right and at least one action button bottom-right.
 ```
 
+### 7.11 `<PackTile>` (business type, onboarding step 1)
+
+```
+Props:
+  glyph     string   emoji from the pack (see 10.3 — NOT an IconName)
+  title     string   pack displayName, e.g. "Restaurant & Food"
+  subtitle  string   pack tagline, e.g. "cafe, catering, food truck"
+  selected  boolean
+  onClick   () => void
+
+Grid: 3 columns at ≥ 560 px, 2 below. Gap: space-2.
+Anatomy: 28 px glyph tile (paper-100, 1 px ink-300 inset) + space-2 +
+         title (display 11 px) over subtitle (body 12 px, ink-700).
+Unselected: paper-100 fill, inset 0 0 0 1px ink-300.
+Selected:   mint-light fill, inset 0 0 0 2px mint.
+Height: content-driven, never fixed — titles wrap to 2 lines in ar/zh-CN.
+```
+
+Selection is 1-of-N and always resolves: the last tile is **"Something else"**,
+which is not a fallback for a bug but a real pack path — Michael asks a few
+questions and builds from the core pack. There is no empty state and no dead end,
+because this grid is the first choice the owner ever makes and it decides their
+entire starting cast.
+
+Titles and subtitles come from pack JSON, not i18n, so they render in the pack
+author's language while the chrome around them translates. That asymmetry is
+accepted: a pack is data, and translating arbitrary third-party packs is not
+something the app can promise.
+
 ---
 
 ## 8. Avatar sprites
@@ -543,6 +572,28 @@ Room min size: 480 × 320 px. Room grows to fit number of agents (extra desk row
 ### 10.2 Implementation
 
 Icons live as inline SVG `<svg viewBox="0 0 16 16">` components, all paths drawn at integer coordinates. `image-rendering: pixelated`. Scale via `transform: scale(N)` integer only.
+
+### 10.3 Pack glyphs are NOT icons
+
+The set above is closed and hand-drawn: each name is a *system* concept with a path
+someone authored. An Office Pack's `glyph` is the opposite — arbitrary data from a
+JSON file, and an imported pack can name a glyph that shipped with no art at all.
+Those two things cannot share a pipeline.
+
+So pack glyphs render as **emoji**, not `<Icon>`, and they are the only emoji in the
+product. The rule:
+
+- A pack declares `glyph` as an emoji character or a short name we map to one.
+- An unknown or missing glyph falls back to `?` in a `cream-200` tile — never a
+  broken image, never a blank square.
+- Emoji appear ONLY inside a `<PackTile>`. Anywhere else in the app, use `<Icon>`.
+
+This is a deliberate compromise and it shows: emoji are full-color and vendor-drawn,
+so they sit slightly apart from the hand-drawn pixel set. The alternative was
+authoring six-plus pixel glyphs up front and still having nothing to draw for a
+community pack. If the bundled set ever stabilises, promoting those specific
+business types to real `IconName` entries is the upgrade path — the tile's API does
+not change.
 
 ---
 

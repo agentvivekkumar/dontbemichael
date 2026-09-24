@@ -77,7 +77,7 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                       marginBottom: 4
                     }}>
                       {closing!.phase === 'complete'
-                        ? 'FLOOR SAVED — SEE YOU TOMORROW'
+                        ? 'FLOOR SAVED. SEE YOU TOMORROW'
                         : closing!.phase === 'timeout'
                           ? 'STILL WRAPPING UP…'
                           : 'WRAPPING UP THE FLOOR'}
@@ -88,7 +88,7 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                         shutdown. The harness closes itself in a moment.</>
                       ) : (
                         <>The orchestrator broadcast closing time. Every worker parks its
-                        work, saves its memory, and reports back — the app closes only
+                        work, saves its memory, and reports back. The app closes only
                         after the orchestrator confirms nothing will be lost.</>
                       )}
                     </div>
@@ -105,11 +105,11 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                   fontFamily: 'var(--cth-font-display)'
                 }}>
                   {closing!.total > 0
-                    ? `${closing!.acked} / ${closing!.total} WORKERS CONFIRMED${closing!.acked >= closing!.total ? ' — WAITING FOR THE ORCHESTRATOR' : ''}`
-                    : 'NO WORKERS ON THE FLOOR — WAITING FOR THE ORCHESTRATOR'}
+                    ? `${closing!.acked} / ${closing!.total} WORKERS CONFIRMED${closing!.acked >= closing!.total ? '. WAITING FOR THE ORCHESTRATOR' : ''}`
+                    : 'NO WORKERS ON THE FLOOR. WAITING FOR THE ORCHESTRATOR'}
                   {closing!.phase === 'timeout' && (
                     <div style={{ marginTop: 6, fontFamily: 'var(--cth-font-body, inherit)' }}>
-                      This is taking a while (an agent may be mid-compaction or deep in a
+                      This is taking a while (an agent may be in the middle of compacting or deep in a
                       tool call). Keep waiting, or force quit and accept the data loss.
                     </div>
                   )}
@@ -119,7 +119,7 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                   {closing!.phase !== 'complete' && (
                     <>
                       <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>
-                        cancel — back to work
+                        cancel and go back to work
                       </PixelButton>
                       <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>
                         {busy ? 'killing...' : 'force quit now'}
@@ -166,7 +166,7 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                   fontSize: 12, lineHeight: '18px',
                   color: 'var(--cth-ink-700)'
                 }}>
-                  Tip: <strong>closing time</strong> is the safe way out — the orchestrator has
+                  Tip: <strong>closing time</strong> is the safe way out. The orchestrator has
                   every agent commit its work and save its memory, and the app closes itself
                   once the whole floor has confirmed. No data loss.
                 </div>

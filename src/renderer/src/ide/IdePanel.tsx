@@ -9,6 +9,7 @@ import { ImagePreview } from './ImagePreview';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { HistoryPane, ComparePane } from './GitPanes';
 import { isImagePath, isSvgPath } from '@shared/imageTypes';
+import { SHOW_GIT } from '@shared/buildFeatures';
 import { ideBarStyle, ideIconBtn as iconBtn, ideTextBtn as textBtn } from './chrome';
 
 // v0.3.4 markdown preview: per-md-tab view mode, defaulted from the last choice.
@@ -285,6 +286,8 @@ export function IdePanel() {
 
   // ─── Git status (changed files) ───────────────────────────────────────────
   const refreshStatus = useCallback(async () => {
+    // Hidden git rail: nothing shows the result, so don't run git every 4s.
+    if (!SHOW_GIT) return;
     if (!root) { setIsRepo(false); return; }
     const repo = await window.cth.gitIsRepo(root);
     setIsRepo(repo);
@@ -375,7 +378,7 @@ export function IdePanel() {
         <span style={{
           fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', color: 'var(--cth-ink-900)'
         }}>
-          MUNDER DIFFLIN · IDE
+          DON&apos;T BE MICHAEL · IDE
         </span>
         {/* WHOSE workspace this is. The folder name alone was ambiguous the
             moment two agents shared a repo (worktrees named for the branch, not
@@ -444,7 +447,7 @@ export function IdePanel() {
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
           textAlign: 'center', color: 'var(--cth-ink-500)', fontFamily: 'var(--cth-font-ui)', fontSize: 16
         }}>
-          No workspace available.<br />Spawn an agent first — the IDE opens on its working directory.
+          No workspace available.<br />Spawn an agent first. The IDE opens on its working directory.
         </div>
       ) : (
         <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
@@ -455,7 +458,9 @@ export function IdePanel() {
             borderRight: '1px solid var(--cth-ink-700)', background: 'var(--cth-cream-50)'
           }}>
             {/* Git rail: CHANGES · HISTORY · COMPARE (v0.3.4). History/compare
-                run at the repo's MAIN root so worktree branches all appear. */}
+                run at the repo's MAIN root so worktree branches all appear.
+                Hidden in this build (SHOW_GIT); the files tree takes the space. */}
+            {SHOW_GIT && (<>
             <div style={{
               flexShrink: 0, display: 'flex', gap: 2, padding: '6px 10px 4px',
               background: 'var(--cth-cream-50)', borderBottom: '1px solid var(--cth-ink-100)'
@@ -551,6 +556,7 @@ export function IdePanel() {
             {railTab === 'compare' && gitRoot && !gitCollapsed && (
               <ComparePane key={gitRoot} gitRoot={gitRoot} onOpenRevDiff={openRevDiff} />
             )}
+            </>)}
             {/* FILES */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--cth-ink-300)' }}>
               <SectionHeader title={t('idePanel.files')} />

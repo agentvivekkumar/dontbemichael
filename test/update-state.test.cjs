@@ -201,7 +201,8 @@ test('manual update with a direct installer reads as a download, not a page to h
   for (const p of ['darwin', 'win32', 'linux']) {
     const s = manualInstallSteps(p);
     assert.equal(s.steps.length, 2);
-    assert.match(s.steps.join(' '), /same project/);
+    // Every platform says the update keeps their work.
+    assert.match(s.steps.join(' '), /Your team and files are still there\./);
   }
 });
 

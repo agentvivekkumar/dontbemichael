@@ -16,8 +16,12 @@ import { dirname } from 'node:path';
 import { getText } from './fetchText';
 import { parseModelCatalog, type ModelCatalog } from '../shared/modelCatalogPayload';
 
-const CATALOG_URL =
-  'https://raw.githubusercontent.com/chaitanyagiri/munder-difflin/main/docs/model-catalog.json';
+/** THIS repo's catalog. It used to be the upstream munder-difflin file, which
+ *  meant another project decided which models our owners could pick: its list
+ *  replaced ours on every refresh, and it had no Opus 5.5. A change here only
+ *  goes live once docs/model-catalog.json is pushed to this repo's main. */
+export const CATALOG_URL =
+  'https://raw.githubusercontent.com/agentvivekkumar/dontbemichael/main/docs/model-catalog.json';
 
 /** Models ship on a human timescale, and a stale list costs the user nothing —
  *  every command field in the app stays editable. Six hours matches the hero
@@ -35,7 +39,7 @@ export interface RemoteCatalogResult {
 
 export async function loadModelCatalog(
   cachePath: string,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; fetch?: (url: string) => Promise<string> } = {}
 ): Promise<RemoteCatalogResult> {
   let cached: { catalog: ModelCatalog; fetchedAt: number } | null = null;
   try {
@@ -45,7 +49,11 @@ export async function loadModelCatalog(
       // a previous build wrote; a schema bump or a hand-edit must not reach the
       // pickers unchecked just because it once passed.
       const catalog = parseModelCatalog(read?.catalog);
-      if (catalog && typeof read.fetchedAt === 'number') {
+      // A copy fetched from a different address is not this catalog. Without
+      // this, moving CATALOG_URL kept serving the old source's list for up to
+      // a TTL after the update, and offline for as long as the network stayed
+      // down. Caches written before the url was recorded count as foreign too.
+      if (catalog && typeof read.fetchedAt === 'number' && read.url === CATALOG_URL) {
         cached = { catalog, fetchedAt: read.fetchedAt };
       }
     }
@@ -56,7 +64,7 @@ export async function loadModelCatalog(
   }
 
   try {
-    const body = await getText(CATALOG_URL, { timeoutMs: 8000 });
+    const body = await (opts.fetch ?? ((u: string) => getText(u, { timeoutMs: 8000 })))(CATALOG_URL);
     // Parse the JSON and the SHAPE separately: valid JSON that is not a catalog
     // must fall back, not reach a picker as undefined rows.
     const catalog = parseModelCatalog(JSON.parse(body));
@@ -64,7 +72,7 @@ export async function loadModelCatalog(
     const payload = { catalog, fetchedAt: Date.now() };
     try {
       mkdirSync(dirname(cachePath), { recursive: true });
-      writeFileSync(cachePath, JSON.stringify(payload));
+      writeFileSync(cachePath, JSON.stringify({ ...payload, url: CATALOG_URL }));
     } catch { /* the cache is an optimisation, not the feature */ }
     return { ...payload, stale: false };
   } catch {

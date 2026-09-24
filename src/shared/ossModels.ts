@@ -38,7 +38,7 @@ export const OSS_LOCAL_PICKS: OssLocalPick[] = [
   { label: 'Qwen3 30B-A3B', tag: 'qwen3:30b-a3b', minRam: '32 GB' },
   { label: 'Qwen3-Coder 30B', tag: 'qwen3-coder:30b', minRam: '32 GB' },
   { label: 'DeepSeek-R1 32B', tag: 'deepseek-r1:32b', minRam: '32 GB' },
-  { label: 'Mistral Small 24B', tag: 'mistral-small:24b', minRam: '16–32 GB' },
+  { label: 'Mistral Small 24B', tag: 'mistral-small:24b', minRam: '16 to 32 GB' },
   { label: 'GLM-4.7-Flash', tag: 'glm-4.7-flash', minRam: '32 GB' },
   { label: 'Llama 3.3 70B', tag: 'llama3.3:70b', minRam: '64 GB' },
   { label: 'gpt-oss 120B', tag: 'gpt-oss:120b', minRam: '96 GB' }
@@ -69,8 +69,5 @@ export function hasOssQuickPicks(provider: AgentProvider): boolean {
   return provider === 'opencode' || provider === 'crush' || provider === 'pi';
 }
 
-/** Canonical blog URLs the local-setup UI hyperlinks to (ondev-c part-3). */
-export const OSS_BLOG_LINKS = {
-  openModels: 'https://munderdiffl.in/blog/run-munder-difflin-on-open-models/',
-  macMini: 'https://munderdiffl.in/blog/run-munder-difflin-on-a-mac-mini/'
-} as const;
+// The local-setup blog links (OSS_BLOG_LINKS) pointed at the upstream
+// munder-difflin website and were removed (owner, 2026-09-24).

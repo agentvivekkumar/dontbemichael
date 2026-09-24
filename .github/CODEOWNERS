@@ -3,23 +3,23 @@
 #
 # Last match wins, so the specific rules below override the catch-all.
 
-* @chaitanyagiri
+* @agentvivekkumar
 
 # Release, signing and CI plumbing. Breaking these breaks shipping for everyone.
-/.github/workflows/    @chaitanyagiri
-/electron-builder.yml  @chaitanyagiri
-/RELEASE.md            @chaitanyagiri
-/RELEASE-CHECKLIST.md  @chaitanyagiri
+/.github/workflows/    @agentvivekkumar
+/electron-builder.yml  @agentvivekkumar
+/RELEASE.md            @agentvivekkumar
+/RELEASE-CHECKLIST.md  @agentvivekkumar
 
 # Licensing and attribution. Changes here have legal weight.
-/LICENSE                                  @chaitanyagiri
-/LICENSE-ASSETS                           @chaitanyagiri
-/src/renderer/src/assets/ATTRIBUTION.md    @chaitanyagiri
+/LICENSE                                  @agentvivekkumar
+/LICENSE-ASSETS                           @agentvivekkumar
+/src/renderer/src/assets/ATTRIBUTION.md    @agentvivekkumar
 
 # Security and privacy surface.
-/SECURITY.md   @chaitanyagiri
-/TELEMETRY.md  @chaitanyagiri
+/SECURITY.md   @agentvivekkumar
+/TELEMETRY.md  @agentvivekkumar
 
 # Public credit for contributors. Adding a name here is a public claim about someone's work.
-/.github/contributors-extra.json  @chaitanyagiri
-/CONTRIBUTORS.md                  @chaitanyagiri
+/.github/contributors-extra.json  @agentvivekkumar
+/CONTRIBUTORS.md                  @agentvivekkumar

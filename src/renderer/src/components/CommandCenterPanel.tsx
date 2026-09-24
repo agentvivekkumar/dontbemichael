@@ -6,16 +6,15 @@ import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
-import { TasksKanban } from './TasksKanban';
 import { AskMeTab } from './AskMeTab';
+import { SHOW_IDE, ALLOW_TEMP_WORKERS } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
+import { TriggerCard } from './triggers/ui';
 import { WorkersTab } from './WorkersTab';
-import { SkillsTab } from './SkillsTab';
 import { acquireTerminal, disposeTerminal, resetTerminal } from './terminalPool';
 import { terminalInstanceKey } from './terminalRecovery';
 import { Icon } from './Icon';
-import { MemoryGraphPanel } from './MemoryGraphPanel';
 import { useFleetTelemetry } from '@/hooks/useTelemetry';
 import { COMMAND_GROUPS } from '@shared/claudeCommands';
 import { roleForHiveSpawn } from '@shared/agentRole';
@@ -46,8 +45,13 @@ import { useRtl } from '@/i18n/useDirection';
 // Both the AskMe (#human) tab and the Triggers tab live here. Triggers replaced
 // the old Schedules tab: schedules are now one of four trigger types, and the
 // whole surface lives in ./triggers (see src/shared/triggers.ts for the contract).
-type CCTab = 'terminal' | 'floor' | 'tasks' | 'human' | 'triggers' | 'trigger-history'
-  | 'memory' | 'graph' | 'activity' | 'skills' | 'workers';
+// MONITOR and ACTIVITY are no longer tabs: they are the two cards inside
+// ADVANCED. A request for 'floor' or 'activity' still works; it opens ADVANCED
+// with that card expanded (see the ccTabRequest effect).
+// TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
+// (App.tsx), and a request for either switches the floor to it.
+type CCTab = 'terminal' | 'human' | 'triggers' | 'trigger-history'
+  | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
  *  is configured — so the bar reads as a budget estimate (filled + remaining)
@@ -64,19 +68,18 @@ interface GHIssue {
   assignees: string[];
 }
 
-/** Canonical tab order. Not every entry is always shown — see `visibleTabs`. */
+/** Canonical tab order. Not every entry is always shown — see `visibleTabs`.
+ *  ASK ME leads: it is what the team needs from the owner, and a business owner
+ *  opening Michael should land there, not on a raw terminal. */
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
-  { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
-  { key: 'floor', labelKey: 'commandCenter.tabs.floor', icon: 'mcp' },
-  { key: 'tasks', labelKey: 'commandCenter.tabs.tasks', icon: 'check' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
+  { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
   { key: 'triggers', labelKey: 'commandCenter.tabs.triggers', icon: 'clock' },
   { key: 'trigger-history', labelKey: 'commandCenter.tabs.history', icon: 'ledger' },
   { key: 'memory', labelKey: 'commandCenter.tabs.memory', icon: 'sparkle' },
-  { key: 'graph', labelKey: 'commandCenter.tabs.graph', icon: 'web' },
-  { key: 'activity', labelKey: 'commandCenter.tabs.activity', icon: 'bell' },
-  { key: 'skills', labelKey: 'commandCenter.tabs.skills', icon: 'sparkle' },
-  { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' }
+  { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' },
+  // Last on purpose: the floor's inner workings, which an owner rarely needs.
+  { key: 'advanced', labelKey: 'commandCenter.tabs.advanced', icon: 'mcp' }
 ];
 
 /** @param fullscreen this instance IS the fullscreen overlay, so it owns the pty
@@ -85,7 +88,11 @@ const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['na
  *  cols/rows and corrupt the display. */
 export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent; fullscreen?: boolean }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<CCTab>('terminal');
+  // The docked panel opens on ASK ME: a terminal is the least friendly thing a
+  // business owner can meet first. Focus mode is the one place that opens on
+  // the terminal, because reaching it means asking for the terminal full screen.
+  const defaultTab: CCTab = fullscreen ? 'terminal' : 'human';
+  const [tab, setTab] = useState<CCTab>(defaultTab);
   // The trigger-history ledger has nothing to say until an outside party can
   // reach us, so its tab appears only once an org key or a webhook exists. This
   // is the first config-gated tab in the panel: TABS stays the canonical order
@@ -95,21 +102,34 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
   const showHistory = useStore(triggerHistoryVisible);
   // Never leave the panel parked on a tab that has just been hidden.
   useEffect(() => {
-    if (!showHistory && tab === 'trigger-history') setTab('terminal');
-  }, [showHistory, tab]);
-  const visibleTabs = TABS.filter((t) => t.key !== 'trigger-history' || showHistory);
+    if (!showHistory && tab === 'trigger-history') setTab(defaultTab);
+  }, [showHistory, tab, defaultTab]);
+  // WORKERS lists Michael's temporary helpers, which this build does not have
+  // (ALLOW_TEMP_WORKERS in buildFeatures.ts).
+  const visibleTabs = TABS.filter((t) =>
+    (t.key !== 'trigger-history' || showHistory) && (t.key !== 'workers' || ALLOW_TEMP_WORKERS));
 
-  // External tab requests (the office task board → 'tasks', the boss-room
-  // calendar → 'triggers'). seq-keyed so clicking again re-opens the tab even
+  // External tab requests (the boss-room calendar → 'triggers'; a 'tasks'
+  // request switches the floor to its TASKS view). seq-keyed so clicking again re-opens the tab even
   // if it was already requested.
   const ccTabRequest = useStore((s) => s.ccTabRequest);
+  // Which ADVANCED card a request asked for. seq doubles as the tab's key, so a
+  // request made while ADVANCED is already showing still opens that card.
+  const [advancedFocus, setAdvancedFocus] = useState<{ card: AdvancedCard; seq: number }>({ card: 'monitor', seq: 0 });
   useEffect(() => {
     if (!ccTabRequest) return;
+    if (ccTabRequest.tab === 'tasks' || ccTabRequest.tab === 'graph') { useStore.getState().setFloorView(ccTabRequest.tab); return; }
+    if (ccTabRequest.tab === 'floor' || ccTabRequest.tab === 'activity') {
+      setAdvancedFocus({ card: ccTabRequest.tab === 'floor' ? 'monitor' : 'activity', seq: ccTabRequest.seq });
+      setTab('advanced');
+      return;
+    }
     const key = ccTabRequest.tab as CCTab;
     if (!TABS.some((t) => t.key === key)) return;
     // Read the gate live rather than depending on it — as a dependency it would
     // re-fire a stale request the moment the tab appeared.
     if (key === 'trigger-history' && !triggerHistoryVisible(useStore.getState())) return;
+    if (key === 'workers' && !ALLOW_TEMP_WORKERS) return;
     setTab(key);
   }, [ccTabRequest]);
   // A task-detail "assign" pre-fills the Floor dispatch box and jumps to it.
@@ -121,8 +141,12 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
     if (!dispatchSeedRequest) return;
     setDispatchSeed({ text: dispatchSeedRequest.text, seq: dispatchSeedRequest.seq });
   }, [dispatchSeedRequest]);
-  // Lifted so the memory-graph tab can jump to a specific agent's memory file.
+  // Lifted so the floor's GRAPH view can open a specific agent's memory here.
   const [selectedMemoryAgent, setSelectedMemoryAgent] = useState<string | null>(null);
+  const memoryFocusRequest = useStore((s) => s.memoryFocusRequest);
+  useEffect(() => {
+    if (memoryFocusRequest) setSelectedMemoryAgent(memoryFocusRequest.agentId);
+  }, [memoryFocusRequest]);
   const updateAgent = useStore((s) => s.updateAgent);
   const setFullscreen = useStore((s) => s.setFullscreen);
   const fullscreenAgentId = useStore((s) => s.fullscreenAgentId);
@@ -210,6 +234,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
           {/* Floor-level surface with no agent of its own: the honest target is
               whoever is selected, stated explicitly rather than left to the
               IDE's fallback so the intent is visible at the call site. */}
+          {SHOW_IDE && (
           <PixelButton variant="secondary" size="sm" onClick={() => {
             const s = useStore.getState();
             s.setIdeOpen(true, s.selectedId);
@@ -223,6 +248,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
               <Icon name="code" /> {t('commandCenter.ide')}
             </span>
           </PixelButton>
+          )}
         </div>
       </div>
 
@@ -319,23 +345,14 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
             <Centered>{t('commandCenter.noTerminal', { name: agent.name })}</Centered>
           )
         )}
-        {tab === 'floor' && <FloorTab seed={dispatchSeed} />}
-        {tab === 'tasks' && <TasksKanban />}
         {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}
         {tab === 'memory' && (
           <MemoryTab godId={agent.id} who={selectedMemoryAgent ?? undefined} onWho={setSelectedMemoryAgent} />
         )}
-        {tab === 'graph' && (
-          <MemoryGraphPanel
-            godId={agent.id}
-            onJumpToMemory={(id) => { setSelectedMemoryAgent(id); setTab('memory'); }}
-          />
-        )}
-        {tab === 'activity' && <ActivityTab />}
-        {tab === 'skills' && <SkillsTab agentCwd={agent.cwd} />}
-        {tab === 'workers' && <WorkersTab />}
+        {tab === 'advanced' && <AdvancedTab key={advancedFocus.seq} focus={advancedFocus.card} seed={dispatchSeed} />}
+        {ALLOW_TEMP_WORKERS && tab === 'workers' && <WorkersTab />}
       </div>
     </PixelPanel>
   );
@@ -343,7 +360,46 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
 
 // ─── Floor tab — roster, model, dispatch, dirs, assistant ────────────────────
 
-function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
+type AdvancedCard = 'monitor' | 'activity';
+
+/**
+ * ADVANCED: the floor's inner workings, as collapsible cards in the TRIGGERS
+ * tab's style. MONITOR opens by default (it holds the box for sending Michael
+ * a task, which "assign" and setup deep link to); ACTIVITY starts closed.
+ */
+function AdvancedTab({ focus, seed }: { focus: AdvancedCard; seed: { text: string; seq: number } }) {
+  const { t } = useTranslation();
+  const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'the orchestrator';
+  return (
+    <Scroll>
+      <Muted>{t('commandCenter.advanced.intro')}</Muted>
+      <div style={{ height: 8 }} />
+      <TriggerCard
+        title={t('commandCenter.advanced.monitor')}
+        blurb={t('commandCenter.advanced.monitorBlurb', { godName })}
+        defaultOpen={focus === 'monitor'}
+      >
+        <FloorTab seed={seed} embedded />
+      </TriggerCard>
+      <TriggerCard
+        title={t('commandCenter.advanced.activity')}
+        blurb={t('commandCenter.advanced.activityBlurb')}
+        defaultOpen={focus === 'activity'}
+      >
+        <ActivityTab embedded />
+      </TriggerCard>
+    </Scroll>
+  );
+}
+
+/** Children only: an ADVANCED card already scrolls and pads, so an embedded
+ *  view skips its own `Scroll` rather than nesting a second one. */
+function Bare({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: number }; embedded?: boolean }) {
+  const Wrap = embedded ? Bare : Scroll;
   const { t } = useTranslation();
   const rtl = useRtl();
   const agents = useStore((s) => s.agents);
@@ -637,7 +693,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
   const fleetCachePct = sumInput > 0 ? Math.round((sumCacheRead / sumInput) * 100) : 0;
 
   return (
-    <Scroll>
+    <Wrap>
       <Section title={t('commandCenter.dispatchViaMichael', { godName: godName.toUpperCase() })}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, color: 'var(--cth-ink-500)', flexShrink: 0 }}>
@@ -1015,7 +1071,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
           </>
         )}
       </Section>
-    </Scroll>
+    </Wrap>
   );
 }
 
@@ -1071,7 +1127,7 @@ function ArchivedSection() {
 function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: string; onWho?: (id: string) => void }) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
-  // Selection is controllable from the graph tab; falls back to local state.
+  // Selection is controllable from the floor's GRAPH view (openAgentMemory); falls back to local state.
   const [internalWho, setInternalWho] = useState<string>(godId);
   const who = controlledWho ?? internalWho;
   const setWho = onWho ?? setInternalWho;
@@ -1246,7 +1302,8 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
 
 interface LogEntry { ts?: number; kind?: string; [k: string]: unknown }
 
-function ActivityTab() {
+function ActivityTab({ embedded = false }: { embedded?: boolean }) {
+  const Wrap = embedded ? Bare : Scroll;
   const { t } = useTranslation();
   const [log, setLog] = useState<LogEntry[]>([]);
   const [board, setBoard] = useState('');
@@ -1274,7 +1331,7 @@ function ActivityTab() {
   };
 
   return (
-    <Scroll>
+    <Wrap>
       <Section title={t('commandCenter.activity')}>
         {log.length === 0 && <Muted>{t('commandCenter.nothingYet')}</Muted>}
         {[...log].reverse().map((e, i) => (
@@ -1288,7 +1345,7 @@ function ActivityTab() {
       <Section title={t('commandCenter.board')}>
         <Pre>{board || t('commandCenter.boardEmpty')}</Pre>
       </Section>
-    </Scroll>
+    </Wrap>
   );
 }
 

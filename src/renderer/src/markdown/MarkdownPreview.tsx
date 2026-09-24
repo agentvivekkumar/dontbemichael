@@ -119,7 +119,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({
 function ImageChip({ alt, src, note }: { alt?: string; src?: string; note?: string }) {
   return (
     <span className="cth-md-img" title={src}>
-      🖼 {alt || 'image'}{note ? ` — ${note}` : ''}
+      🖼 {alt || 'image'}{note ? ` (${note})` : ''}
     </span>
   );
 }

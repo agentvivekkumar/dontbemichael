@@ -167,6 +167,11 @@ export interface AgentProviderPreset {
   resumeSubcommand?: string; // CLIs that resume via a subcommand instead of a flag (Codex: `codex resume [OPTIONS] [SESSION_ID]`)
 }
 
+/** The engines this build offers the owner. Only Claude Code is supported for
+ *  now; every other preset stays below, fully wired, so bringing one back means
+ *  adding its id here and nothing else. Setup's manager step reads this. */
+export const BUILD_ENGINES: readonly AgentProvider[] = ['claude'];
+
 export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
   {
     id: 'claude',
@@ -179,9 +184,11 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     autoFlag: '--permission-mode bypassPermissions',
     hiveAware: true,
     canReceiveInbox: true,
-    // Longest-context Claude variant — matches the "give Michael a bigger model"
-    // advisory and the Recommended tag on the orchestrator picker.
-    recommendedOrchestratorModel: 'claude-opus-4-8[1m]',
+    // The newest Opus, and Claude Code's own default on every paid plan. It has
+    // a native 1M window, so no [1m] variant is needed. Was Opus 4.8 [1m] from
+    // June 2026 until 2026-09-23, never bumped when newer models shipped. Needs
+    // Claude Code 2.1.280+; an older CLI runs Opus 5 instead (modelCliFloor.ts).
+    recommendedOrchestratorModel: 'claude-opus-5-5',
     resumeFlag: '--resume',
     // Official Claude Code install (npm global). Used by the missing-CLI auto-install.
     installCommand: 'npm install -g @anthropic-ai/claude-code',

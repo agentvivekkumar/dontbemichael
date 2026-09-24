@@ -4,18 +4,20 @@ import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
 import { OfficeFloor } from '@/scene/office/OfficeFloor';
+import { FloorViewToggle, FloorViewIntro } from '@/components/FloorViewToggle';
+import { TasksKanban } from '@/components/TasksKanban';
+import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
 import { useHive } from '@/hooks/useHive';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useGodNameSync } from '@/i18n/useGodNameSync';
 import { useDirectionSync } from '@/i18n/useDirection';
 import { useArabicTerminalSync } from '@/terminal/useArabicTerminalSync';
-import { MemoryPanel } from '@/components/MemoryPanel';
 import { AgentDetailPanel } from '@/components/AgentDetailPanel';
 import { AgentStrip } from '@/components/AgentStrip';
 import { AddAgentModal } from '@/components/AddAgentModal';
 import { MichaelBooting } from '@/components/MichaelBooting';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
-import { HivePicker } from '@/components/HivePicker';
+import { OfficeFolderMissing } from '@/components/OfficeFolderMissing';
 import { QuitWarningModal, type ClosingTimeState } from '@/components/QuitWarningModal';
 import { CompletionToast } from '@/realtime/CompletionToast';
 import { UpdateToast } from '@/components/UpdateToast';
@@ -30,6 +32,7 @@ import { acquireTerminal, notifyThemeChangeAll } from '@/components/terminalPool
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
+import { SHOW_IDE } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import brandLogo from '@brand/logo.png?url';
 
@@ -57,21 +60,16 @@ export function App() {
   const setSidebarWidth = useStore(s => s.setSidebarWidth);
   const ideOpen = useStore(s => s.ideOpen);
   const setIdeOpen = useStore(s => s.setIdeOpen);
+  const floorView = useStore(s => s.floorView);
+  const godId = useStore(s => s.agents.find((a) => a.isGod)?.id) ?? 'god';
 
   const [config, setConfig] = useState<HarnessConfig | null>(null);
-  // Whether the user has passed the launch-time hive picker this session. Starts
-  // true (skip the picker) right after a hive SWITCH — changeHome relaunches and
-  // leaves a one-shot localStorage flag so we don't bounce back onto the picker for
-  // the hive we just chose. Also set true on onboarding completion (below).
-  const [hiveOpened, setHiveOpened] = useState<boolean>(() => {
-    try {
-      if (window.localStorage.getItem('cth.skipHivePickerOnce')) {
-        window.localStorage.removeItem('cth.skipHivePickerOnce');
-        return true;
-      }
-    } catch { /* localStorage unavailable — show the picker */ }
-    return false;
-  });
+  // Is the office folder there? Checked once per launch. 'ok' goes straight to
+  // the floor; 'missing' (moved, renamed or deleted) shows OfficeFolderMissing.
+  // There is no picker on a normal launch any more: switching folders on
+  // purpose lives in Settings → General (owner, 2026-09-24).
+  const [homeState, setHomeState] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const hiveOpened = homeState === 'ok';
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Which tab Settings opens on. Set by a `cth:open-settings` deep link, reset
    *  to undefined (→ General) whenever the modal is opened the normal way. */
@@ -143,7 +141,7 @@ export function App() {
   // Quit warning subscription
   useEffect(() => window.cth.onCloseRequested((info) => setQuitWarn(info)), []);
 
-  // Shareable hires: a validated manifest arriving via the munderdifflin://
+  // Shareable hires: a validated manifest arriving via the dontbemichael://
   // deep link (or file import) pre-fills the Add-Agent modal. Never spawns by itself.
   const enqueuePendingHires = useStore(s => s.enqueuePendingHires);
   const closeAddAgentReview = () => {
@@ -191,6 +189,15 @@ export function App() {
   // off until the user opens a hive in the launch picker (passing null no-ops the
   // hook) so Michael doesn't boot against the current home while the user may be
   // about to switch to a different one.
+  useEffect(() => {
+    if (!config?.onboardingComplete || homeState !== 'checking') return;
+    let alive = true;
+    window.cth.homeStatus()
+      .then((st) => { if (alive) setHomeState(st.hasOffice ? 'ok' : 'missing'); })
+      // A failed check must not lock the owner out of a healthy office.
+      .catch(() => { if (alive) setHomeState('ok'); });
+    return () => { alive = false; };
+  }, [config?.onboardingComplete, homeState]);
   useHive(hiveOpened ? config : null);
 
   // Pre-warm a persistent terminal for every live agent so its output is
@@ -258,14 +265,14 @@ export function App() {
 
   if (!config.onboardingComplete) {
     // Just-onboarded users go straight into the hive they set up — skip the picker.
-    return <OnboardingWizard onComplete={(next) => { setConfig(next); setHiveOpened(true); }} />;
+    return <OnboardingWizard onComplete={(next) => { setConfig(next); setHomeState('ok'); }} />;
   }
 
-  // Launch-time hive picker: on reopen, let the user open their current hive,
-  // switch to a recent one, or open/create another. Skipped right after onboarding
-  // and right after a switch-relaunch (see hiveOpened init).
-  if (!hiveOpened) {
-    return <HivePicker config={config} onOpenCurrent={() => setHiveOpened(true)} />;
+  if (homeState === 'checking') {
+    return <div style={{ width: '100vw', height: '100vh', background: 'var(--cth-cream-100)' }} />;
+  }
+  if (homeState === 'missing') {
+    return <OfficeFolderMissing config={config} />;
   }
 
   return (
@@ -297,7 +304,7 @@ export function App() {
       >
         <img
           src={brandLogo}
-          alt="Munder Difflin"
+          alt="Don't Be Michael"
           style={{ height: 20, width: 'auto', display: 'block' }}
         />
         {/* v0.3.7: the version is no longer inert text — it doubles as the
@@ -400,7 +407,6 @@ export function App() {
       }}>
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
           <OfficeFloor />
-          <MemoryPanel />
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
           {agentCount === 0 && godStatus !== 'booting' && (
             <div style={{
@@ -424,6 +430,29 @@ export function App() {
               </div>
             </div>
           )}
+          {floorView !== 'office' && (
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 50,
+              display: 'flex', flexDirection: 'column',
+              // Room for the OFFICE | TASKS toggle in the bottom left corner, so
+              // it never sits on top of the last cards in a column.
+              paddingBottom: 44,
+              background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 2px var(--cth-ink-900)'
+            }}>
+              <FloorViewIntro view={floorView} />
+              {floorView === 'tasks' && <TasksKanban />}
+              {floorView === 'graph' && (
+                <MemoryGraphPanel godId={godId} onJumpToMemory={(id) => useStore.getState().openAgentMemory(id)} />
+              )}
+            </div>
+          )}
+          {/* OFFICE | TASKS, in the floor's bottom left corner (where the old
+              memory pill sat): no header strip taking height from the scene,
+              and above the board (zIndex 60 > 50) so it works from either view.
+              The office stays mounted (paused) under the board. */}
+          <div style={{ position: 'absolute', left: 12, bottom: 12, zIndex: 60 }}>
+            <FloorViewToggle />
+          </div>
         </div>
 
         <SidebarSplitter
@@ -510,7 +539,7 @@ export function App() {
       )}
 
       {fullscreenAgentId && <FullscreenTerminal config={config} />}
-      {ideOpen && <IdePanel />}
+      {SHOW_IDE && ideOpen && <IdePanel />}
       <TaskDetailOverlay />
     </div>
   );

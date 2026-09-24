@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path';
 import { readConfig } from './config';
 import { DEFAULT_DROP_HTML } from '../shared/releaseDrop';
-import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDrop, type UpdateStatus } from '../shared/updateState';
+import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDrop, REPO, type UpdateStatus } from '../shared/updateState';
 
 /**
  * Auto-update from GitHub releases.
@@ -44,7 +44,6 @@ import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDro
  *      downgrade is per-check, not a permanent latch.
  */
 
-const REPO = 'chaitanyagiri/munder-difflin';
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const FALLBACK_CACHE_MS = 60 * 60 * 1000;     // 1h between releases/latest polls
 
@@ -194,7 +193,7 @@ function fetchReleaseBody(version: string, done: (notes: string | undefined) => 
         hostname: 'api.github.com',
         path: `/repos/${REPO}/releases/tags/v${version}`,
         method: 'GET',
-        headers: { 'User-Agent': 'munder-difflin-updater', Accept: 'application/vnd.github+json' },
+        headers: { 'User-Agent': 'dontbemichael-updater', Accept: 'application/vnd.github+json' },
         timeout: 10_000
       },
       (res) => {
@@ -226,7 +225,7 @@ function fallbackCheck(reason: string | undefined, force = false): void {
         hostname: 'api.github.com',
         path: `/repos/${REPO}/releases/latest`,
         method: 'GET',
-        headers: { 'User-Agent': 'munder-difflin-updater', Accept: 'application/vnd.github+json' },
+        headers: { 'User-Agent': 'dontbemichael-updater', Accept: 'application/vnd.github+json' },
         timeout: 10_000
       },
       (res) => {
@@ -343,10 +342,10 @@ async function runDownload(): Promise<{ ok: boolean; error?: string }> {
  *  shape instead (bold lead paragraph, then `### Fixed`) it returns ONE bullet —
  *  the lead paragraph, clipped mid-sentence. Verified against the published
  *  v0.4.4-rc.1 body: this shape yields the same 3 bullets the real toast shows. */
-const SIMULATED_NOTES = `# Munder Difflin v9.9.9
+const SIMULATED_NOTES = `# Don't Be Michael v9.9.9
 
 **A local hive of Claude Code, Antigravity, Codex, Grok & Copilot agents that run themselves** —
-messaging, routing, and remembering, coordinated by your clone, Michael, who you talk to.
+messaging, routing, and remembering, coordinated by Michael, your office manager, who you talk to.
 
 ---
 
@@ -393,11 +392,11 @@ export function initAutoUpdater(getWebContents: () => WebContents | null): void 
     }
   });
   ipcMain.handle('update:checkNow', async () => {
-    if (!app.isPackaged) return { ok: false, error: 'dev build — updates are only checked in packaged apps' };
+    if (!app.isPackaged) return { ok: false, error: 'dev build: updates are only checked in packaged apps' };
     return runCheck();
   });
   ipcMain.handle('update:download', async () => {
-    if (!app.isPackaged) return { ok: false, error: 'dev build — updates are only downloaded in packaged apps' };
+    if (!app.isPackaged) return { ok: false, error: 'dev build: updates are only downloaded in packaged apps' };
     return runDownload();
   });
   /** Re-serve the last known status to a freshly loaded window. */

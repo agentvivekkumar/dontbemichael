@@ -39,7 +39,7 @@ import { Icon } from '@/components/Icon';
 import { summarizeReleaseNotes } from '@shared/releaseNotes';
 import { extractDropHtml } from '@shared/releaseDrop';
 import { ReleaseDrop } from '@/components/ReleaseDrop';
-import type { UpdateStatus } from '@shared/updateState';
+import { REPO_URL, type UpdateStatus } from '@shared/updateState';
 
 /** The toast is the LOUD half — it only interrupts for the two states a user has
  *  to act on. Everything else (checking, available, download progress, errors)
@@ -50,13 +50,13 @@ function toastable(s: UpdateStatus): ToastStatus | null {
   return s.state === 'downloaded' || s.state === 'available-manual' || s.state === 'just-updated' ? s : null;
 }
 
-const GITHUB_REPO_URL = 'https://github.com/chaitanyagiri/munder-difflin';
+const GITHUB_REPO_URL = REPO_URL;
 /** Only ever the `href` — the click is handled by `updateOpenRelease`, which
  *  resolves `undefined` to this same page in main. */
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`;
 
 /** One-time flag for the star ask. `cth.`-prefixed localStorage is this app's
- *  convention for renderer-only UI memory (see App.tsx's skipHivePickerOnce and
+ *  convention for renderer-only UI memory (see the cth.* keys in store.ts and
  *  design/theme.ts) — and SettingsModal's "reset & start over" clears every
  *  `cth.` key, which is right: a wiped install is a new user who has not been
  *  asked yet. It is deliberately NOT a HarnessConfig key; that file is the
@@ -237,8 +237,8 @@ export function UpdateToast() {
       </div>
       <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
         {status.state === 'downloaded'
-          ? 'Restart Munder Difflin whenever you like to apply it — nothing restarts on its own.'
-          : 'This install can’t update itself — grab the new build from the releases page.'}
+          ? 'Restart Don\'t Be Michael whenever you like to apply it. Nothing restarts on its own.'
+          : 'This install can’t update itself. Grab the new build from the releases page.'}
       </span>
 
       {notes.length > 0 && (

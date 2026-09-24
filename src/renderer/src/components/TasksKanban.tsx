@@ -199,7 +199,7 @@ export function TasksKanban() {
               </div>
               <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {cards.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--cth-ink-300)', textAlign: 'center', padding: '8px 0' }}>—</div>
+                  <div style={{ fontSize: 12, color: 'var(--cth-ink-300)', textAlign: 'center', padding: '8px 0' }}>·</div>
                 )}
                 {cards.map((t) => (
                   <TaskCard

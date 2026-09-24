@@ -36,7 +36,7 @@ export const COMMAND_GROUPS: CmdGroup[] = [
       { cmd: '/rewind', kind: 'slash', desc: 'Roll code AND conversation back to an earlier checkpoint.' },
       { cmd: '/compact', kind: 'slash', desc: 'Summarize the conversation so far to free context without losing the thread.', usage: '/compact keep the auth decisions' },
       { cmd: 'claude -c', kind: 'cli', desc: 'Continue the most recent session in this directory.' },
-      { cmd: 'claude -r', kind: 'cli', desc: 'Resume — pick or search a past session.', usage: 'claude -r auth' },
+      { cmd: 'claude -r', kind: 'cli', desc: 'Resume: pick or search a past session.', usage: 'claude -r auth' },
       { cmd: 'claude --fork-session', kind: 'cli', desc: 'When resuming, branch into a new session id instead of reusing the original.' }
     ]
   },
@@ -55,7 +55,7 @@ export const COMMAND_GROUPS: CmdGroup[] = [
     items: [
       { cmd: '/model', kind: 'slash', desc: 'Switch the model for this session (saved as default); arrows tune effort.', usage: '/model opus' },
       { cmd: '/effort', kind: 'slash', desc: 'Set reasoning effort: low / medium / high / xhigh / max.', usage: '/effort high' },
-      { cmd: '/fast', kind: 'slash', desc: 'Toggle fast mode — Opus with faster output, no model downgrade.' },
+      { cmd: '/fast', kind: 'slash', desc: 'Toggle fast mode: Opus with faster output, no model downgrade.' },
       { cmd: 'claude --model claude-sonnet-4-6[1m]', kind: 'cli', desc: 'Launch on a specific model. The [1m] suffix selects the 1M-token window (Dwight).' },
       { cmd: 'claude --fallback-model sonnet', kind: 'cli', desc: 'Auto-fall back to another model when the primary is unavailable.' }
     ]
@@ -63,7 +63,7 @@ export const COMMAND_GROUPS: CmdGroup[] = [
   {
     title: 'PLAN & EXECUTE',
     items: [
-      { cmd: '/plan', kind: 'slash', desc: 'Enter plan mode — design the change before any edits.', usage: '/plan refactor the auth module' },
+      { cmd: '/plan', kind: 'slash', desc: 'Enter plan mode: design the change before any edits.', usage: '/plan refactor the auth module' },
       { cmd: '/goal', kind: 'slash', desc: 'Set a goal condition; Claude keeps working across turns until it is met.', usage: '/goal all tests pass' },
       { cmd: '/batch', kind: 'slash', desc: 'Decompose a large change into parallel units in git worktrees.', usage: '/batch migrate components to v2' },
       { cmd: '/diff', kind: 'slash', desc: 'Open the interactive diff viewer for the current changes.' },
@@ -76,7 +76,7 @@ export const COMMAND_GROUPS: CmdGroup[] = [
     title: 'REVIEW & GIT',
     items: [
       { cmd: '/code-review', kind: 'slash', desc: 'Hunt correctness bugs in the diff. --fix applies them, --comment posts inline; "ultra" runs a cloud deep review.', usage: '/code-review high --fix' },
-      { cmd: '/simplify', kind: 'slash', desc: 'Cleanup-only pass over changed code (reuse/simplify) — no bug hunt.' },
+      { cmd: '/simplify', kind: 'slash', desc: 'A cleanup pass over changed code (reuse, simplify), with no bug hunt.' },
       { cmd: '/review', kind: 'slash', desc: 'Review a pull request in this session.', usage: '/review 123' },
       { cmd: '/security-review', kind: 'slash', desc: 'Scan pending changes for security vulnerabilities.' },
       { cmd: '/ultrareview', kind: 'slash', desc: 'Multi-agent cloud review of the current branch / a PR.' }
@@ -86,7 +86,7 @@ export const COMMAND_GROUPS: CmdGroup[] = [
     title: 'SUBAGENTS & BACKGROUND',
     items: [
       { cmd: 'claude agents', kind: 'cli', desc: 'Open the agent view across your live + background Claude sessions.' },
-      { cmd: 'claude agents --json', kind: 'cli', desc: 'Print live sessions as JSON — scriptable fleet status.' },
+      { cmd: 'claude agents --json', kind: 'cli', desc: 'Print live sessions as JSON: fleet status you can script.' },
       { cmd: '/agents', kind: 'slash', desc: 'Create and manage custom subagents for delegated work.' },
       { cmd: '/fork', kind: 'slash', desc: 'Spawn a background subagent that inherits the full conversation.', usage: '/fork implement the perf fix' },
       { cmd: '/background', kind: 'slash', desc: 'Detach the current session so it keeps running in the background.' },

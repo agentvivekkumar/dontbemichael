@@ -19,6 +19,7 @@ import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
 import { validateHookEvent } from '../shared/hookEvents';
+import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -262,7 +263,7 @@ export class HookServer {
       // path bypassed terminal-draft/HITL safety and could spend credits while a
       // user was answering a question. Inbox files remain durable; the renderer
       // wakes the agent later through its guarded idle-only delivery path.
-      this.notify(agentId ?? 'Agent', 'finished — idle');
+      this.notify(agentId ?? 'Agent', 'finished and idle');
       this.emit(agentId, event, p);
       return {};
     }
@@ -283,6 +284,38 @@ export class HookServer {
             permissionDecisionReason: d.reason ?? 'Denied by operator.'
           }
         };
+      }
+    }
+
+    // Decision 48 — the harness folder is plumbing only. On a business install
+    // (one with an Office folder), a file write into it is refused unless it's a
+    // protocol file; the reason tells the agent where the work belongs instead.
+    // The tool check comes first so ordinary tool calls never read config.
+    if (event === 'PreToolUse' && agentId && GUARDED_TOOLS.has(p.tool_name ?? '')) {
+      const cfg = this.getConfig();
+      const hiveRoot = this.hive.root();
+      if (cfg.officeFolder && cfg.harnessHome && hiveRoot) {
+        const d = harnessWriteDecision({
+          tool: p.tool_name ?? '',
+          toolInput: p.tool_input,
+          cwd: p.cwd,
+          agentId,
+          isGod: agentId === 'god',
+          harnessHome: cfg.harnessHome,
+          hiveRoot,
+          caseInsensitive: process.platform !== 'linux'
+        });
+        if (d.deny) {
+          this.emitControl(agentId, p.tool_name, d.reason);
+          this.emit(agentId, event, p);
+          return {
+            hookSpecificOutput: {
+              hookEventName: 'PreToolUse',
+              permissionDecision: 'deny',
+              permissionDecisionReason: d.reason
+            }
+          };
+        }
       }
     }
 

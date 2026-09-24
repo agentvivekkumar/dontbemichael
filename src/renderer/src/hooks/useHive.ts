@@ -22,7 +22,8 @@ import { inboxNudgeText } from '../../../shared/hiveNudge';
 import { resolveGodName } from '../../../shared/godIdentity';
 import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
-import { OFFICE_CAST, DEFAULT_CHARACTER } from '@/scene/office/cast';
+import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
+import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent } from '../../../shared/teamPlan';
 
 const GOD_ID = 'god';
 /** Accent palette for MAIN-spawned (voice-hired) agents — picked deterministically
@@ -276,6 +277,81 @@ function passesContextPressure(a: Agent, rule: ContextRule): boolean {
  *   3. wakes idle agents that have unread inbox messages so collaboration
  *      doesn't stall while an agent sits at its prompt.
  */
+/**
+ * Start the team the owner picked during onboarding (Decisions 44, 47), ONCE.
+ *
+ * Each member is spawned exactly as the hire dialog spawns an agent — same
+ * engine command, same hive provisioning — but inside its own folder and with
+ * its pack's job description as its standing goal. `businessTeamStarted` stops
+ * a second run; the registry check stops duplicates if the app died midway,
+ * since registry.json survives a restart. A member that fails to start is
+ * skipped rather than blocking the rest.
+ */
+async function startBusinessTeam(config: HarnessConfig): Promise<void> {
+  const team = config.businessTeam ?? [];
+  if (team.length === 0 || config.businessTeamStarted) return;
+
+  const { packs, core } = await window.cth.packsList();
+  const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? core;
+  const defs = new Map((pack?.agents ?? []).map((a) => [a.id, a]));
+  const reg = await window.cth.hiveRegistry().catch(() => null);
+
+  const provider = inferAgentProvider(config.defaultCommand);
+  const model = isClaudeProvider(provider) ? config.defaultModel : undefined;
+  const command = buildSpawnCommand(config, model, provider);
+  const [exe, ...args] = tokenizeCommand(command.trim());
+  const castName = (c?: string): OfficeCharacterName =>
+    OFFICE_CAST.some((m) => m.name === c) ? (c as OfficeCharacterName) : DEFAULT_CHARACTER;
+
+  for (const [index, member] of team.entries()) {
+    const def = defs.get(member.agentId);
+    if (!def) continue;
+    const id = member.agentId;
+    if (reg?.agents?.[id]) continue; // already started; the roster restores it
+    const ptyId = `pty-${id}`;
+    const name = teamMemberName(def);
+    const role = teamMemberRole(def);
+    const res = await window.cth.spawnPty({
+      id: ptyId,
+      cwd: member.folder,
+      command: exe,
+      provider,
+      args,
+      cols: 100,
+      rows: 30,
+      hive: { id, name, provider, cwd: member.folder, role }
+    });
+    if (!res.ok) {
+      console.warn(`[team] ${name} did not start: ${res.error ?? 'unknown error'}`);
+      continue;
+    }
+    const folder = res.cwd || member.folder;
+    // A new team's first start: the cards appear, the focus stays on Michael.
+    useStore.getState().addAgent({
+      id,
+      name,
+      character: castName(def.character),
+      accent: teamAccent(index),
+      description: role,
+      project: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder,
+      tmuxTarget: '',
+      cwd: folder,
+      goal: teamMemberGoal(def, { name: config.businessName, city: config.businessCity }),
+      status: 'idle',
+      action: 'starting up',
+      progress: 0,
+      currentStation: 'desk',
+      ptyId,
+      command: command.trim(),
+      provider,
+      model,
+      seedPrompt: res.seedPrompt,
+      recentTextTs: Date.now()
+    }, { select: false });
+  }
+  await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
+}
+
 export function useHive(config: HarnessConfig | null): void {
   // Per-agent dedup for the inbox-wake nudge: every inbox message id we have
   // already nudged this agent about. A SET, not a high-water mark.
@@ -400,9 +476,13 @@ export function useHive(config: HarnessConfig | null): void {
       const godModel = config.godModel;
       const command = buildSpawnCommand(config, godModel, godProvider);
       const [exe, ...args] = tokenizeCommand(command.trim());
+      // Decision 44: on a business install Michael works in the shared Office
+      // folder, not among the hive's plumbing. Older installs have no Office and
+      // keep the harness folder, exactly as before.
+      const godCwd = config.officeFolder || config.harnessHome!;
       const res = await window.cth.spawnPty({
         id: GOD_PTY,
-        cwd: config.harnessHome!,
+        cwd: godCwd,
         command: exe,
         provider: godProvider,
         args,
@@ -414,7 +494,7 @@ export function useHive(config: HarnessConfig | null): void {
         // fresh session. Without this the most important context on the floor —
         // the orchestrator's — was lost on every restart.
         resume: true,
-        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: config.harnessHome!, isGod: true, role: 'orchestrator (god)' }
+        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: godCwd, isGod: true, role: 'orchestrator (god)' }
       });
       if (cancelled) { godSpawning.current = false; return; }
       if (!res.ok) { godSpawning.current = false; useStore.getState().setGodStatus('failed'); return; }
@@ -423,10 +503,10 @@ export function useHive(config: HarnessConfig | null): void {
         name: godName,
         character: 'michael',
         accent: 'lemon',
-        description: 'god — runs the floor, triages requests, escalates only critical calls to you',
+        description: 'office manager: runs the floor, triages requests, and brings you only the critical calls',
         project: 'hive',
         tmuxTarget: '',
-        cwd: config.harnessHome!,
+        cwd: godCwd,
         status: 'idle',
         action: 'running the floor',
         progress: 0,
@@ -440,6 +520,9 @@ export function useHive(config: HarnessConfig | null): void {
       };
       useStore.getState().addAgent(god);
       useStore.getState().setGodStatus('ready');
+      // The team picked during onboarding starts once Michael is up, each member
+      // inside its own folder. After this they restore like any hired agent.
+      void startBusinessTeam(config);
 
       // Kick Michael off once his TUI is up. Always re-enable remote control so
       // the human can approve permission prompts from their phone (best-effort — a
@@ -984,7 +1067,7 @@ export function useHive(config: HarnessConfig | null): void {
       void window.cth.slackReply({
         channel: msg.channel,
         thread_ts: msg.thread_ts,
-        text: ':hourglass_flowing_sand: *Received.* Your request has been queued — the team is on it and will reply here when done.'
+        text: ':hourglass_flowing_sand: *Received.* Your request has been queued. The team is on it and will reply here when done.'
       });
     });
   }, [config?.onboardingComplete]);

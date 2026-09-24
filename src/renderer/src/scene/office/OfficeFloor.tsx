@@ -214,7 +214,9 @@ export function OfficeFloor() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
-  const paused = !!fullscreenAgentId || ideOpen || docHidden;
+  // The task board and the graph cover the whole floor, so nothing animates behind them.
+  const floorView = useStore((s) => s.floorView);
+  const paused = !!fullscreenAgentId || ideOpen || docHidden || floorView !== 'office';
   // Read inside init(), which finishes asynchronously and would otherwise start a
   // ticker the effect below had already been asked to stop.
   const pausedRef = useRef(paused);
@@ -1035,10 +1037,8 @@ export function OfficeFloor() {
       boardG.zIndex = (BOARD_TILE.y + 1) * tsB;
       boardG.on('pointertap', (ev) => {
         ev.stopPropagation();
-        const st = useStore.getState();
-        const god = st.agents.find((a) => a.isGod);
-        if (god) st.select(god.id);
-        st.requestCommandCenterTab('tasks');
+        // The whiteboard opens the full task board in place of the office.
+        useStore.getState().setFloorView('tasks');
       });
       charLayer.addChild(boardG);
       // One small Graphics per desk currently holding a taken note.

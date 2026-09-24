@@ -51,7 +51,6 @@ jobs:
 
           if [ -z "$USER_ID" ]; then
             echo "'$HANDLE' is not a member of the server yet — skipping."
-            echo "They can join at https://discord.gg/SEDzP5ZPk5 and we'll grant it on their next PR."
             exit 0
           fi
 

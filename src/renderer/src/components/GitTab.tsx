@@ -121,7 +121,7 @@ export function GitTab({ cwd }: GitTabProps) {
           boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
           color: 'var(--cth-ink-900)'
         }}>
-          {detached ? t('gitTab.detachedHead') : (branch ?? '—')}
+          {detached ? t('gitTab.detachedHead') : (branch ?? '·')}
         </span>
         {upstream && (
           <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>

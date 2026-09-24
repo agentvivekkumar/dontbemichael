@@ -28,7 +28,7 @@ export interface AgentCardProps {
   /** Context-window limit (tokens) assumed for the agent's model. */
   contextLimit?: number;
   selected?: boolean;
-  /** Your clone — gets a persistent accent frame + BOSS tag so it stands out.
+  /** Your office manager — gets a persistent accent frame + BOSS tag so he stands out.
    *  (`isGod` / the `god` agent id stay as-is internally; this is display only.) */
   isGod?: boolean;
   onClick?: () => void;
@@ -232,7 +232,7 @@ export function AgentCard({
 
             {/* Context line: action while working, repo while idle. */}
             <div
-              title={`${project}${action && status !== 'idle' ? ` — ${action}` : ''}`}
+              title={`${project}${action && status !== 'idle' ? ` · ${action}` : ''}`}
               style={{
                 fontSize: 11, lineHeight: '14px',
                 color: 'var(--cth-ink-500)',

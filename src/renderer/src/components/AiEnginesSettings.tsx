@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import type { HarnessConfig, AgentProvider } from '@/store/config';
 import { PixelButton } from './PixelButton';
 import { ProviderLogo } from './ProviderLogo';
-import { OSS_BLOG_LINKS } from '@shared/ossModels';
 import { useStore } from '@/store/store';
 
 /**
@@ -30,10 +29,10 @@ const BACKENDS: Array<{ id: string; label: string; envVar: string }> = [
 /** CLI engines that take a per-provider local base-URL + default model. `hint`
  *  values are technical endpoint descriptions — kept English (technical data). */
 const CLIS: Array<{ id: AgentProvider; label: string; hint: string }> = [
-  { id: 'opencode', label: 'OpenCode', hint: 'http://localhost:11434/v1 (Ollama) — injected as a local provider' },
-  { id: 'crush', label: 'Crush', hint: 'OpenAI-compatible endpoint — used as the proxy upstream' },
-  { id: 'pi', label: 'Pi', hint: 'local models are file-based (models.json); base-URL reserved' },
-  { id: 'qwen', label: 'Qwen', hint: 'OpenAI-compatible endpoint — used as the proxy upstream' }
+  { id: 'opencode', label: 'OpenCode', hint: 'http://localhost:11434/v1 (Ollama), added as a local provider' },
+  { id: 'crush', label: 'Crush', hint: 'an endpoint compatible with OpenAI, used as the proxy upstream' },
+  { id: 'pi', label: 'Pi', hint: 'local models come from a file (models.json); base URL reserved' },
+  { id: 'qwen', label: 'Qwen', hint: 'an endpoint compatible with OpenAI, used as the proxy upstream' }
 ];
 
 const inputStyle: CSSProperties = {
@@ -58,7 +57,6 @@ const headStyle: CSSProperties = {
   fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
   color: 'var(--cth-ink-500)', textTransform: 'uppercase', marginBottom: 2
 };
-const linkStyle: CSSProperties = { color: 'var(--cth-ink-900)', textDecoration: 'underline', cursor: 'pointer' };
 
 export function AiEnginesSettings({ config }: { config: HarnessConfig }) {
   const { t } = useTranslation();
@@ -173,7 +171,7 @@ export function AiEnginesSettings({ config }: { config: HarnessConfig }) {
             </label>
             <div style={{ display: 'flex', gap: 6 }}>
               <input
-                placeholder={`base-URL — ${c.hint}`}
+                placeholder={`base URL: ${c.hint}`}
                 defaultValue={baseUrls[c.id] ?? ''}
                 onBlur={(e) => saveBaseUrl(c.id, e.target.value)}
                 style={inputStyle}
@@ -187,21 +185,6 @@ export function AiEnginesSettings({ config }: { config: HarnessConfig }) {
             </div>
           </div>
         ))}
-        {/* Local-setup guides (ondev-c part-3) — link the two how-to blogs. */}
-        <div style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px' }}>
-          {t('aiEngines.runningOpenModels')}{' '}
-          <a
-            href={OSS_BLOG_LINKS.openModels}
-            onClick={(e) => { e.preventDefault(); void window.cth.openExternal(OSS_BLOG_LINKS.openModels); }}
-            style={linkStyle}
-          >{t('aiEngines.runOnOpenModels')}</a>
-          {' '}·{' '}
-          <a
-            href={OSS_BLOG_LINKS.macMini}
-            onClick={(e) => { e.preventDefault(); void window.cth.openExternal(OSS_BLOG_LINKS.macMini); }}
-            style={linkStyle}
-          >{t('aiEngines.setUpMacMini')}</a>.
-        </div>
       </div>
 
       {/* Unsandboxed-in-auto caveat (Pam guardrail #6) */}

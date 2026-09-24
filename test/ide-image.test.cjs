@@ -77,7 +77,7 @@ test('formatBytes reads like a status line', () => {
   assert.equal(formatBytes(864), '864 B');
   assert.equal(formatBytes(1536), '1.5 KB');
   assert.equal(formatBytes(3 * 1024 * 1024), '3.0 MB');
-  assert.equal(formatBytes(-1), '—');
+  assert.equal(formatBytes(-1), '·');
 });
 
 // ─── markdown <img src> resolution ──────────────────────────────────────────

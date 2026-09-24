@@ -372,7 +372,7 @@ export async function resolveRepoRootSkillDir(
   }
   return {
     unsupported: true,
-    error: "couldn't find the skill's SKILL.md in that repository — open Learn more to install it by hand"
+    error: "couldn't find the skill's SKILL.md in that repository. Open Learn more to install it by hand"
   };
 }
 
@@ -401,7 +401,7 @@ export async function installSkill(
 ): Promise<{ ok: true; path: string } | { ok: false; error: string; unsupported?: boolean }> {
   const source = await resolveSourceUrl(entryUrl);
   if (!source) {
-    return { ok: false, unsupported: true, error: 'No downloadable source — open Learn more to install it by hand.' };
+    return { ok: false, unsupported: true, error: 'No downloadable source. Open Learn more to install it by hand.' };
   }
   const gh = parseGitHubSourceUrl(source);
   if (!gh) return { ok: false, unsupported: true, error: 'Source is not a GitHub folder.' };
@@ -521,7 +521,7 @@ export function uninstallSkill(
     const st = statSync(target);
     if (st.isDirectory()) {
       if (!existsSync(join(target, 'SKILL.md'))) {
-        return { ok: false, error: 'That folder has no SKILL.md — refusing to delete it.' };
+        return { ok: false, error: "That folder has no SKILL.md, so it won't be deleted." };
       }
     } else if (!st.isFile()) {
       return { ok: false, error: 'Not a file or folder this app will remove.' };

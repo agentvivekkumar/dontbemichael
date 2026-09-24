@@ -46,7 +46,7 @@ const BASE_TOOLS: ToolSpec[] = [
     bin: 'uv',
     label: 'uv',
     kind: 'prerequisite',
-    why: 'Installs and runs mempalace. A self-contained Python toolchain — it does not touch any Python you already have.',
+    why: 'Installs and runs mempalace. A standalone Python toolchain that does not touch any Python you already have.',
     essential: true,
     install: {
       posix: 'curl -LsSf https://astral.sh/uv/install.sh | sh',
@@ -59,7 +59,7 @@ const BASE_TOOLS: ToolSpec[] = [
   {
     id: 'mempalace',
     bin: null, // presence comes from MemoryStatus.available, not a PATH probe
-    label: 'MemPalace — semantic memory',
+    label: 'MemPalace: semantic memory',
     kind: 'memory',
     why: 'Meaning-based recall across everything your agents have learned. Without it they still keep plain markdown notes, but cannot search them by meaning.',
     essential: true,
@@ -93,7 +93,7 @@ const BASE_TOOLS: ToolSpec[] = [
     // Node installer (nodeInstall.ts) that runs automatically when an engine needs
     // one. Printing a rival curl|sh here would compete with it.
     install: { posix: '', win32: '' },
-    note: 'The app installs this for you when an engine needs it — nothing to do by hand.',
+    note: 'The app installs this for you when an engine needs it. Nothing to do by hand.',
     docsUrl: 'https://nodejs.org'
   }
 ];
@@ -111,7 +111,7 @@ export function toolCatalog(): ToolSpec[] {
       bin: p.defaultCommand,
       label: p.label,
       kind: 'engine' as const,
-      why: `Agent engine — ${p.defaultCommand}.`,
+      why: `Agent engine: ${p.defaultCommand}.`,
       // Claude Code is the recommended engine and the only one the floor assumes
       // by default, so it is the one engine "set up everything" will install.
       essential: p.id === 'claude',
@@ -156,7 +156,7 @@ export function setupPrompt(missing: ToolStatus[]): string {
     ...lines,
     '',
     'For each one: run the install command in your own terminal, then VERIFY it actually resolves',
-    '(`which <bin>`, or `where <bin>` on Windows) before moving on — do not assume an installer that',
+    '(`which <bin>`, or `where <bin>` on Windows) before moving on. Do not assume an installer that',
     'printed no error succeeded. Install uv BEFORE mempalace; mempalace is installed BY uv and will',
     'fail outright without it.',
     '',

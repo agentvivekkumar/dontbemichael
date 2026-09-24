@@ -110,7 +110,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
   const title = noKey
     ? t('realtimeToggle.noKeyTitle')
     : error
-      ? `${t(view.helpKey)} — ${error}`
+      ? `${t(view.helpKey)}: ${error}`
       : t(view.helpKey);
 
   const onClick = () => {

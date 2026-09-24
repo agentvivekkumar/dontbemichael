@@ -1,0 +1,28 @@
+/**
+ * Surfaces this build hides from the owner. The code behind each stays wired,
+ * so bringing one back is flipping its switch here and nothing else.
+ */
+
+/** Git: the agents' GIT sidebar tab, and the IDE's CHANGES / HISTORY / COMPARE
+ *  rail (the only git view Michael had). Business owners never use version
+ *  control, and a diff view reads as something broken (owner, 2026-09-23). */
+export const SHOW_GIT = false;
+
+/** The IDE: the full window code editor with a file tree, opened from the IDE
+ *  button on every agent (Michael's panel, the agent panel, focus mode) and
+ *  from file links in a terminal. Owners don't edit code; a file link now shows
+ *  the file in Finder instead (owner, 2026-09-23). */
+export const SHOW_IDE = false;
+
+/** Temporary helpers Michael starts on his own (spawn requests → ephemeral
+ *  workers), plus the Settings toggle that allowed it and the WORKERS tab that
+ *  listed them. Off in this build: starting an agent is a spend the owner never
+ *  saw. When a job fits no one on the team and is too big for Michael, he puts
+ *  it on the ASK ME board with suggestions instead (owner, 2026-09-24). */
+export const ALLOW_TEMP_WORKERS = false;
+
+/** ORGANISATION: an org key that would let teammates' offices message this
+ *  one. Configuration only (no transport reads the key yet), so it is hidden
+ *  from the Triggers tab and Settings → Connections, and a leftover key no
+ *  longer surfaces the History tab (owner, 2026-09-24). */
+export const SHOW_ORG_TRIGGER = false;

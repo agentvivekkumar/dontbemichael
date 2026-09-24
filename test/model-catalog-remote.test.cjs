@@ -153,7 +153,8 @@ test('a remote provider replaces that list; the others keep the baked one', () =
   assert.ok(applyRemoteModelCatalog(parseModelCatalog(ok({
     claude: [{ id: 'claude-next-9', label: 'Next 9' }]
   }))));
-  assert.deepEqual(modelsForProvider('claude'), [{ id: 'claude-next-9', label: 'Next 9' }]);
+  // Replaced, except the build's recommended manager model, which is always kept.
+  assert.deepEqual(modelsForProvider('claude'), [{ id: 'claude-opus-5-5', label: 'Opus 5.5 · 1M' }, { id: 'claude-next-9', label: 'Next 9' }]);
   assert.deepEqual(modelsForProvider('codex'), before, 'codex was not in the remote copy');
 });
 
@@ -163,7 +164,7 @@ test('the Claude-only surfaces read the overlay, not a snapshot', () => {
   applyRemoteModelCatalog(parseModelCatalog(ok({
     claude: [{ id: 'claude-next-9', label: 'Next 9' }]
   })));
-  assert.deepEqual(agentModels(), [{ id: 'claude-next-9', label: 'Next 9' }]);
+  assert.deepEqual(agentModels(), [{ id: 'claude-opus-5-5', label: 'Opus 5.5 · 1M' }, { id: 'claude-next-9', label: 'Next 9' }]);
 });
 
 test('clearing the overlay restores the models the build shipped with', () => {
@@ -190,11 +191,26 @@ test('the version filter still runs over remote entries', () => {
   })));
   // No __APP_VERSION__ define outside a build, so the filter fails open and
   // offers both — the deliberate "never hide every model" behaviour.
-  assert.deepEqual(modelsForProvider('claude').map((m) => m.id), ['always', 'later']);
+  assert.deepEqual(modelsForProvider('claude').map((m) => m.id), ['claude-opus-5-5', 'always', 'later']);
   globalThis.__APP_VERSION__ = '0.4.6';
   try {
-    assert.deepEqual(modelsForProvider('claude').map((m) => m.id), ['always']);
+    assert.deepEqual(modelsForProvider('claude').map((m) => m.id), ['claude-opus-5-5', 'always']);
   } finally {
     delete globalThis.__APP_VERSION__;
   }
+});
+
+test('a remote list without the recommended manager model cannot hide it', () => {
+  // Seen live: a list published before Opus 5.5 replaced the Claude list, and
+  // setup's picker showed Fable 5.1 while Opus 5.5 was the saved choice.
+  const beforeOpus55 = baked.providers.claude.filter((m) => m.id !== 'claude-opus-5-5');
+  applyRemoteModelCatalog(parseModelCatalog(ok({ claude: beforeOpus55 })));
+  const ids = modelsForProvider('claude').map((m) => m.id);
+  assert.equal(ids[0], 'claude-opus-5-5', 'kept, and first');
+  assert.equal(ids.filter((id) => id === 'claude-opus-5-5').length, 1);
+  assert.equal(ids.length, baked.providers.claude.length);
+  // A list that already has it is left exactly as published.
+  const reordered = [...baked.providers.claude].reverse();
+  applyRemoteModelCatalog(parseModelCatalog(ok({ claude: reordered })));
+  assert.deepEqual(modelsForProvider('claude').map((m) => m.id), reordered.map((m) => m.id));
 });

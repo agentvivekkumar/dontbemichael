@@ -74,7 +74,6 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
     restoring = true;
     note = null;
     emit();
-    const prevSel = useStore.getState().selectedId;
     const restorableAgents = useStore.getState().restorableAgents;
     // Tally every agent's outcome so the run ALWAYS leaves a visible trace — the
     // original bug was that every failure path was console-only, so a click that
@@ -158,7 +157,7 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
                 archived: false,
                 status: 'idle',
                 // Surface the worktree fallback on the floor card; otherwise normal.
-                action: worktreeGone ? 'worktree gone — using base repo' : 'starting up',
+                action: worktreeGone ? 'worktree gone, using base repo' : 'starting up',
                 // The worktree is no longer on disk — drop it so this agent is treated
                 // as a plain base-cwd agent going forward (a future restore won't keep
                 // re-probing a dead path).
@@ -191,18 +190,16 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
       }));
       // Add in the ORIGINAL roster order, not completion order.
       for (const restoredAgent of restoredInOrder) {
-        if (restoredAgent) useStore.getState().addAgent(restoredAgent);
+        // select:false: restoring must not move the focus (it stays on Michael).
+        if (restoredAgent) useStore.getState().addAgent(restoredAgent, { select: false });
       }
     } finally {
-      // addAgent auto-selects each spawn; put the user back where they were.
-      const sel = useStore.getState();
-      if (prevSel && sel.agents.some((x) => x.id === prevSel)) sel.select(prevSel);
       restoring = false;
       // ALWAYS surface a result so the button can never look inert.
       const parts: string[] = [];
       if (restored) parts.push(`restored ${restored}`);
       if (alreadyLive) parts.push(`${alreadyLive} already live`);
-      if (failures.length) parts.push(`${failures.length} failed — ${failures.join('; ')}`);
+      if (failures.length) parts.push(`${failures.length} failed: ${failures.join('; ')}`);
       note = parts.length ? parts.join(' · ') : 'nothing to restore';
       emit();
     }

@@ -55,7 +55,11 @@ export default defineConfig({
     define: defineMain,
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // Agent-facing `doc-text` CLI (F6): same converter, same bundled libraries.
+          docTextCli: resolve(__dirname, 'src/main/docTextCli.ts')
+        }
       }
     }
   },

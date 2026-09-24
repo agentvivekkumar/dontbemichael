@@ -334,10 +334,10 @@ export const DEFAULT_DROP_HTML = `<style>
 
   <section class="page p1">
     <div class="content center">
-      <p class="kicker">Munder Difflin</p>
+      <p class="kicker">Don't Be Michael</p>
       <h1 class="big">0.4.4</h1>
       <p class="lede" style="font-size:clamp(1.05rem,2.1vw,1.3rem);margin-top:.5em">
-        The release where Windows finally joined the floor — and the first run
+        The release where Windows finally joined the floor, and the first run
         stopped quietly failing.
       </p>
       <div class="stat">
@@ -367,7 +367,7 @@ export const DEFAULT_DROP_HTML = `<style>
       None of them had been told they had an inbox.</p>
       <p style="margin-top:16px;color:var(--ink-soft);font-size:14px">Any CLI that is
       not an .exe was launched through cmd.exe, which cuts a multi-line argument at
-      its first newline — taking the protocol block with it. Spawns now launch the
+      its first newline, taking the protocol block with it. Spawns now launch the
       real interpreter with an argument array, so the whole prompt survives.</p>
     </div>
     <div class="nav">
@@ -389,13 +389,13 @@ export const DEFAULT_DROP_HTML = `<style>
       <ul class="rows">
         <li><i>Wizard</i><div><b>The suggested folder works</b>
           <p>Accepting ~/HarnessAgents stored a literal tilde and died on ENOENT.
-          It now resolves to a real path — and the field actually suggests it.</p></div></li>
+          It now resolves to a real path, and the field actually suggests it.</p></div></li>
         <li><i>Wizard</i><div><b>It tells you at step one</b>
           <p>An empty folder used to walk you through all four steps before bouncing
           you back. The panel no longer overflows a short screen either.</p></div></li>
         <li><i>Hive</i><div><b>Services start at setup, not next launch</b>
           <p>On a fresh install the message router, hooks and telemetry stayed dead
-          until you restarted — so mail never moved and agents never reported.</p></div></li>
+          until you restarted, so mail never moved and agents never reported.</p></div></li>
         <li><i>Agents</i><div><b>Restart &amp; Continue has something to resume</b>
           <p>The live session id is recorded from a second source, so continuing
           works even when a hook never lands.</p></div></li>
@@ -420,7 +420,7 @@ export const DEFAULT_DROP_HTML = `<style>
         <div class="card">
           <span class="tag">Skills</span>
           <h2>Every skill your agents can use</h2>
-          <p>What is installed across Claude Code, OpenCode and Codex — and a
+          <p>What is installed across Claude Code, OpenCode and Codex, and a
           browsable catalog of 227 more, with search, filters, install and
           uninstall.</p>
         </div>

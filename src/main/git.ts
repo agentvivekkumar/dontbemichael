@@ -484,7 +484,7 @@ export async function checkoutRef(cwd: string, ref: string, detach: boolean): Pr
   if ('error' in st) return { ok: false, error: `could not verify a clean tree: ${st.error}` };
   const dirty = st.staged.length + st.unstaged.length;
   if (dirty > 0) {
-    return { ok: false, error: `working tree has ${dirty} uncommitted change${dirty === 1 ? '' : 's'} — commit or stash first` };
+    return { ok: false, error: `working tree has ${dirty} uncommitted change${dirty === 1 ? '' : 's'}. Commit or stash first` };
   }
   const res = await runGit(cwd, detach ? ['switch', '--detach', ref] : ['switch', ref], 15000);
   if (!res.ok) {

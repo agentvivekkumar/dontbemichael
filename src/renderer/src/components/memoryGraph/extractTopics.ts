@@ -37,7 +37,7 @@ const STOP = new Set([
 
 /** Strip a leading `YYYY-MM-DD —`/`-`/`:` date prefix from a heading tail. */
 function stripDatePrefix(s: string): string {
-  return s.replace(/^\s*\d{4}-\d{2}-\d{2}\s*[—\-:·]*\s*/, '');
+  return s.replace(/^\s*\d{4}-\d{2}-\d{2}\s*[\u2014\-:·]*\s*/, '');
 }
 
 /** Lowercase, collapse whitespace, drop surrounding markup/punctuation. */
@@ -65,7 +65,7 @@ function candidatesFrom(markdown: string): string[] {
 function isUsable(norm: string): boolean {
   if (norm.length < 3 || norm.length > 40) return false;
   if (STOP.has(norm)) return false;
-  if (/^[\d\s\-—.]+$/.test(norm)) return false;   // pure numbers/dates
+  if (/^[\d\s\-\u2014.]+$/.test(norm)) return false;   // pure numbers/dates
   if (!/[a-z]/.test(norm)) return false;          // must contain letters
   return true;
 }
