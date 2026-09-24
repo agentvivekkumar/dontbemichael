@@ -682,7 +682,7 @@
       "openBatteryWindows": "افتح إعدادات الطاقة"
     },
     "errPickHome": "اختر مجلد منزل للمنصّة أولًا.",
-    "errCreateHome": "تعذّر إنشاء منزل المنصّة",
+    "errCreateHome": "تعذّر إنشاء مجلد لمكتبك. اختر مكانًا آخر وحاول مجددًا.",
     "errEngineNotInstalled": "{{label}} غير مثبَّت. ثبّته ثم اضغط \"تحقّق مجددًا\".",
     "business": {
       "headline": "مرحبًا، أنا {{godName}}.",

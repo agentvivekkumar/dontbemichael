@@ -682,7 +682,7 @@
       "openBatteryWindows": "open Power settings"
     },
     "errPickHome": "Pick a harness home folder first.",
-    "errCreateHome": "could not create harness home",
+    "errCreateHome": "Couldn't create the folder for your office. Pick another place and try again.",
     "errEngineNotInstalled": "{{label}} is not installed. Install it, then press \"check again\".",
     "business": {
       "headline": "HI, I'M {{godName}}.",

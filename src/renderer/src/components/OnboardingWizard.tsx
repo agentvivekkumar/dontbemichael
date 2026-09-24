@@ -346,7 +346,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     try {
       const ensure = await window.cth.ensureHarnessHome(harnessHome);
       if (!ensure.ok) {
-        setError(ensure.error ?? t('onboarding.errCreateHome'));
+        // Plain words for the owner (EACCES and the like mean nothing to them;
+        // the reading-file reasons in plainReason.ts do not fit a folder that
+        // could not be made). The raw reason goes to the log.
+        if (ensure.error) console.error('[onboarding] could not create the home folder:', ensure.error);
+        setError(t('onboarding.errCreateHome'));
         setBusy(false);
         return;
       }
@@ -802,7 +806,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div style={{
                   display: 'flex', flexDirection: 'column', gap: 8, padding: 10,
                   background: 'var(--cth-peach-light)', boxShadow: 'inset 0 0 0 2px var(--cth-peach)',
-                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)'
+                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
                 }}>
                   <span>
                     <Trans i18nKey="onboarding.orchestrator.maxPlan" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>

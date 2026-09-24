@@ -682,7 +682,7 @@
       "openBatteryWindows": "打开电源设置"
     },
     "errPickHome": "请先选择 harness 主文件夹。",
-    "errCreateHome": "无法创建 harness 主文件夹",
+    "errCreateHome": "无法为你的办公室创建文件夹。请换一个位置再试。",
     "errEngineNotInstalled": "{{label}} 尚未安装。请先安装它，然后点击“重新检查”。",
     "business": {
       "headline": "你好，我是 {{godName}}。",
