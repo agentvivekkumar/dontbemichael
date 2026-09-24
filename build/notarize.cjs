@@ -12,9 +12,39 @@
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
+/**
+ * Without a Developer ID cert electron-builder skips signing entirely, which
+ * leaves only the Mach-O linker signatures: the bundle itself is not sealed
+ * (`codesign --verify` says "code object is not signed at all"). A copy of that
+ * downloaded from GitHub gets macOS's "damaged, move to Trash" dialog, with no
+ * way to open it. Sealing it ad hoc turns that into the ordinary "could not
+ * verify the developer" dialog, which Privacy & Security > Open Anyway clears
+ * (RELEASE.md walks owners through it).
+ *
+ * Runs only when the bundle does not already verify, so a real Developer ID
+ * signature is never touched. electron-builder 25 has no ad-hoc identity of its
+ * own (`identity: "-"` is looked up in the keychain and skipped), hence here.
+ */
+function sealAdHocIfUnsigned(appPath) {
+  try {
+    execFileSync('codesign', ['--verify', '--strict', appPath], { stdio: 'ignore' });
+    return; // properly signed already
+  } catch { /* not sealed: fall through */ }
+  const entitlements = path.join(__dirname, 'entitlements.mac.plist');
+  console.log('[sign] no Developer ID signature: sealing the app ad hoc so a downloaded copy can be opened.');
+  execFileSync('codesign', [
+    '--force', '--deep', '--sign', '-',
+    '--options', 'runtime', '--entitlements', entitlements,
+    appPath
+  ], { stdio: 'inherit' });
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'inherit' });
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
   if (electronPlatformName !== 'darwin') return; // mac only
+
+  sealAdHocIfUnsigned(path.join(appOutDir, `${context.packager.appInfo.productFilename}.app`));
 
   const {
     APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID,

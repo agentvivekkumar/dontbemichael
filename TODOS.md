@@ -228,13 +228,39 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Priority:** P2
 **Depends on:** None
 
+## Release
+
+### Sign and notarize the Mac build with an Apple Developer ID
+
+**What:** Add the Developer ID Application cert and notarization credentials as repo secrets (`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`). `release.yml` and `build/notarize.cjs` already use them when present.
+
+**Why:** 0.0.1 ships ad-hoc signed. Owners must clear a "could not verify" dialog through Privacy & Security on first open, and Squirrel.Mac cannot update an ad-hoc app in place, so every update falls back to "download the new version" instead of restart to install. macOS also forgets folder grants between versions without a stable signature.
+
+**Context:** Needs an Apple Developer Program membership (paid, per organization). Once the secrets exist, the ad-hoc fallback in `release.yml` switches off by itself; update RELEASE.md's install steps then.
+
+**Effort:** S (after the Apple account exists)
+**Priority:** P1
+**Depends on:** Apple Developer Program membership
+
+### Point the contributors workflow at this fork's credit, or turn it off
+
+**What:** `.github/workflows/contributors.yml` regenerates CONTRIBUTORS.md from this repo's merged pull requests and opens a bot pull request.
+
+**Why:** On this fork that list would drop the original project's contributors, which the README credits.
+
+**Context:** Found in the 0.0.1 land audit. A bot pull request is harmless until someone merges it.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Repo
 
 ### Remove or rewrite the old project's website files in docs/
 
-**What:** `docs/index.html`, `docs/llms.txt`, `docs/blog/` and friends are Munder Difflin's website.
+**What:** `docs/index.html`, `docs/blog/`, `docs/CNAME` and friends are Munder Difflin's website. (`docs/llms.txt` and `docs/llms-full.txt` were removed in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
 
-**Why:** They describe the other product, and `npm run check:links` fails on `docs/llms.txt`'s version.
+**Why:** They describe the other product.
 
 **Context:** The website for this app lives in its own repo; keep only files the app reads at runtime (`docs/model-catalog.json`, `docs/hero.json`).
 

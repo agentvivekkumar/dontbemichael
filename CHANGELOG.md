@@ -50,6 +50,14 @@ The first release of Don't Be Michael: an AI office for small business owners.
 - Git views, the code editor, temporary helper agents and the organisation trigger are hidden in
   this build. The floating memory panel on the office floor is gone; its settings are in Settings.
 - The original project's promotions, community links and update source.
+- Windows and Linux builds. This release ships a Mac installer only; the other platforms stay
+  configured for later.
+
+### Security
+
+- The Mac app is sealed ad hoc until it can be signed with an Apple Developer ID, so a downloaded
+  copy opens through Privacy & Security > Open Anyway instead of being reported as damaged. Updates
+  arrive as a download link rather than installing in place until the app is signed.
 
 ### Fixed
 

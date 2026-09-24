@@ -19,10 +19,21 @@ This is the first release of Don't Be Michael.
 | Platform | Download |
 |---|---|
 | Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.1-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.1-mac-universal.dmg) |
-| Windows installer (x64) | [`Dont-Be-Michael-0.0.1-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.1-win-x64-setup.exe) |
-| Windows portable (x64, no install) | [`Dont-Be-Michael-0.0.1-win-x64-portable.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.1-win-x64-portable.exe) |
-| Linux AppImage (x86_64) | [`Dont-Be-Michael-0.0.1-linux-x86_64.AppImage`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.1-linux-x86_64.AppImage) |
+
+This release is for Mac only. Windows and Linux will follow.
 
 [Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.1.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.1.tar.gz)
+
+## Installing on your Mac
+
+1. Open the downloaded `.dmg` and drag **Don't Be Michael** into your Applications folder.
+2. Open it from Applications. The first time, macOS says it could not verify the app. Click **Done**.
+3. Open **System Settings**, then **Privacy & Security**. Scroll down to the message about Don't Be Michael and click **Open Anyway**, then confirm.
+
+You only do this once. macOS asks because this early build is not yet signed with an Apple Developer ID. A signed build is on the way.
+
+You also need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed and signed in.
+
+When a new version comes out, the app tells you and links to the download. Install it the same way.
 
 Don't Be Michael is built on [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors.

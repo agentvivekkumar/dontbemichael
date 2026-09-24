@@ -1,8 +1,9 @@
 name: Release
 
-# Build installers for every platform and publish them to a GitHub Release
-# whenever a v* tag is pushed. Run manually (workflow_dispatch) to dry-build
-# without publishing.
+# Build the Mac installer and publish it to a GitHub Release whenever a v* tag
+# is pushed. Run manually (workflow_dispatch) to dry-build without publishing.
+# Mac only for now (owner, 2026-09-24). Windows and Linux stay configured in
+# electron-builder.yml; restore their matrix rows below to ship them again.
 on:
   push:
     tags:
@@ -22,10 +23,10 @@ jobs:
         include:
           - os: macos-latest
             args: --mac
-          - os: windows-2022
-            args: --win
-          - os: ubuntu-latest
-            args: --linux
+          # - os: windows-2022
+          #   args: --win
+          # - os: ubuntu-latest
+          #   args: --linux
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +60,10 @@ jobs:
       - name: Package installers
         # GH_TOKEN lets electron-builder skip its own publish; we upload via the
         # release step below for full control over the asset set.
+        #
+        # Without a Developer ID cert (APPLE_CERTIFICATE_P12 unset) the Mac app is
+        # sealed ad hoc by build/notarize.cjs, so a downloaded copy can still be
+        # opened through Privacy & Security > Open Anyway (RELEASE.md says how).
         run: npx electron-builder ${{ matrix.args }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
