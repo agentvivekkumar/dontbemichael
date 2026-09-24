@@ -242,18 +242,6 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Priority:** P1
 **Depends on:** Apple Developer Program membership
 
-### Point the contributors workflow at this fork's credit, or turn it off
-
-**What:** `.github/workflows/contributors.yml` regenerates CONTRIBUTORS.md from this repo's merged pull requests and opens a bot pull request.
-
-**Why:** On this fork that list would drop the original project's contributors, which the README credits.
-
-**Context:** Found in the 0.0.1 land audit. A bot pull request is harmless until someone merges it.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ## Repo
 
 ### Remove or rewrite the old project's website files in docs/
@@ -269,3 +257,16 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Depends on:** None
 
 ## Completed
+
+### Point the contributors workflow at this fork's credit, or turn it off
+
+**What:** `.github/workflows/contributors.yml` regenerates CONTRIBUTORS.md from this repo's merged pull requests and opens a bot pull request.
+
+**Why:** On this fork that list would drop the original project's contributors, which the README credits.
+
+**Context:** Found in the 0.0.1 land audit. A bot pull request is harmless until someone merges it.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+**Completed:** 2026-09-24 (the workflow stays on; CONTRIBUTORS.md now lists this repo's contributors only, and the README no longer credits the upstream list there)
