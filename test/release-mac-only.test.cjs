@@ -19,6 +19,13 @@ test('the release workflow builds the Mac installer only', () => {
   assert.deepEqual(oses, ['macos-latest']);
 });
 
+test('the release workflow unsets an empty signing cert before packaging', () => {
+  // An empty CSC_LINK is read as a path to the repo folder ("not a file").
+  const yml = read('.github/workflows/release.yml');
+  const step = yml.slice(yml.indexOf('- name: Package installers'), yml.indexOf('- name: Generate checksums'));
+  assert.match(step, /if \[ -z "\$CSC_LINK" \]; then unset CSC_LINK CSC_KEY_PASSWORD; fi\n\s*npx electron-builder/);
+});
+
 test('RELEASE.md advertises the Mac DMG and nothing else', () => {
   const md = read('RELEASE.md');
   const assets = [...md.matchAll(/`(Dont-Be-Michael-[^`]+)`/g)].map((m) => m[1]);
