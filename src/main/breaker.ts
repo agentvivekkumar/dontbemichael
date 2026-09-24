@@ -313,7 +313,7 @@ export class CircuitBreaker {
       const changed = target !== s.level;
       const escalated = rank(target) > rank(s.level);
       s.level = target;
-      s.reason = trip.tripping ? trip.reason : (changed ? 'recovering — signals cleared' : s.reason);
+      s.reason = trip.tripping ? trip.reason : (changed ? 'recovering: signals cleared' : s.reason);
 
       decisions.push({
         state: { agentId: input.agentId, level: target, reason: s.reason, ts: nowMs },

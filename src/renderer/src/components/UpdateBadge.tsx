@@ -105,7 +105,7 @@ export function UpdateBadge() {
       onClick={() => { void onClick(); }}
       disabled={!interactive}
       title={view.title}
-      aria-label={view.label ? `${view.title}` : `Version ${__APP_VERSION__} — check for updates`}
+      aria-label={view.label ? `${view.title}` : `Version ${__APP_VERSION__}: check for updates`}
       aria-busy={view.busy || busy}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,

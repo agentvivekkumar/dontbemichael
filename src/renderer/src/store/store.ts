@@ -16,6 +16,7 @@ import { DEFAULT_ORG_TRIGGER, type OrgTriggerConfig, type WebhookTrigger } from 
 import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
+import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
 
@@ -183,6 +184,10 @@ interface State {
   feeds: Record<string, string[]>;
   addAgentOpen: boolean;
   fullscreenAgentId: string | null;
+  /** What the big floor area shows: the animated office, the task board (who
+   *  is doing what, what is blocked, what is done), or the GRAPH of who talks
+   *  to whom. Remembered per Mac. */
+  floorView: FloorView;
   /** Does the user work in focus mode by default? Persisted as a boolean, and
    *  written ONLY by an explicit toggle. Kept in the store rather than read once
    *  at construction because the roster arrives after the store does. */
@@ -228,7 +233,11 @@ interface State {
   renameAgent: (id: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   setAgentNote: (id: string, note: string) => void;
   pushFeed: (id: string, line: string) => void;
-  addAgent: (agent: Agent) => void;
+  /** Adds an agent's card. It also takes the focus unless `select: false`: a
+   *  hire the owner just made should open, but agents the app starts on its own
+   *  (restoring the team, a new business team's first start) must leave the
+   *  focus where it is, which at launch is Michael. */
+  addAgent: (agent: Agent, opts?: { select?: boolean }) => void;
   removeAgent: (id: string) => void;
   /** Archive an agent (its terminal was closed): move it from the active roster
    *  into `archivedAgents` with its PTY cleared. Retained + flagged, NOT deleted. */
@@ -239,10 +248,16 @@ interface State {
   /** Drop one agent from the restorable list (it was respawned or dismissed). */
   removeRestorableAgent: (id: string) => void;
   reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (AgentStrip drag-reorder) and persist the new order
-  /** One-shot request to open a Command-Center tab (e.g. clicking the office
-   *  task board → 'tasks'). `seq` makes repeated identical requests distinct. */
+  /** One-shot request to open a Command-Center tab (e.g. the boss-room calendar
+   *  → 'triggers'; 'tasks' and 'graph' switch the floor view instead). `seq`
+   *  makes repeated identical requests distinct. */
   ccTabRequest: { tab: string; seq: number } | null;
   requestCommandCenterTab: (tab: string) => void;
+  /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
+   *  the tab, and names the agent. The floor's GRAPH view uses it, since the
+   *  graph no longer sits next to that tab. seq-keyed like ccTabRequest. */
+  memoryFocusRequest: { agentId: string; seq: number } | null;
+  openAgentMemory: (agentId: string) => void;
   /** The task whose detail overlay is open (rendered app-wide over the office
    *  floor — the card content grows: contracts, deps, the human Q&A trail). */
   taskDetailId: string | null;
@@ -315,6 +330,7 @@ interface State {
   finishPendingHire: () => void;
   clearPendingHires: () => void;
   setFullscreen: (id: string | null) => void;
+  setFloorView: (view: FloorView) => void;
   /** Move focus mode WITHOUT touching the preference. For the paths that re-home
    *  a focused agent that went away: the app is following the user, not being
    *  told what the user wants. `setFullscreen` is the explicit toggle. */
@@ -352,6 +368,15 @@ const LS_QUEUES = 'cth.messageQueues';
 /** Which hive this origin's roster keys were last written for. See rosterSource.ts. */
 const LS_ROSTER_HOME = 'cth.rosterHome';
 const LS_FOCUS_MODE = 'cth.prefersFocusMode';
+const LS_FLOOR_VIEW = 'cth.floorView';
+
+export type FloorView = 'office' | 'tasks' | 'graph';
+const initialFloorView: FloorView = (() => {
+  try {
+    const v = window.localStorage.getItem(LS_FLOOR_VIEW);
+    return v === 'tasks' || v === 'graph' ? v : 'office';
+  } catch { return 'office'; }
+})();
 
 // Fields that are large or transient — not worth persisting across reloads.
 // contextTokens/contextLimit describe a LIVE session; persisting them showed a
@@ -607,9 +632,13 @@ function loadPersistedSelectedId(agents: Agent[]): string | null {
     const id = useFileRoster
       ? fileRoster?.selectedId
       : useLocalFallback ? window.localStorage.getItem(LS_SELECTED) : null;
+    // Every launch opens on Michael (owner, 2026-09-24). The saved selection
+    // was usually just the last agent to start, since each start took focus.
+    const god = agents.find((a) => a.isGod);
+    if (god) return god.id;
     return id && agents.some((a) => a.id === id) ? id : (agents[0]?.id ?? null);
   } catch {
-    return agents[0]?.id ?? null;
+    return agents.find((a) => a.isGod)?.id ?? agents[0]?.id ?? null;
   }
 }
 const initialSidebarWidth = (() => {
@@ -623,7 +652,9 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'terminal' || v === 'messages' || v === 'traces' || v === 'git') return v;
+    if (v === 'terminal' || v === 'messages' || v === 'traces') return v;
+    // A saved GIT tab opens on the terminal while this build hides git.
+    if (v === 'git') return SHOW_GIT ? v : 'terminal';
   } catch { /* noop */ }
   return 'terminal';
 })();
@@ -680,10 +711,23 @@ export const useStore = create<State>((set, get) => ({
   feeds: {},
   addAgentOpen: false,
   ccTabRequest: null,
+  memoryFocusRequest: null,
+  openAgentMemory: (agentId) => set((s) => {
+    const god = s.agents.find((a) => a.isGod);
+    const seq = (s.ccTabRequest?.seq ?? 0) + 1;
+    const selectedId = god?.id ?? s.selectedId;
+    persistAgents(s.agents, selectedId);
+    return {
+      selectedId,
+      ccTabRequest: { tab: 'memory', seq },
+      memoryFocusRequest: { agentId, seq }
+    };
+  }),
   requestCommandCenterTab: (tab) =>
     set((s) => ({ ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 } })),
   fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
   prefersFocusMode: initialPrefersFocusMode,
+  floorView: initialFloorView,
   ideInitialFile: null,
   ideOpen: false,
   ideAgentId: null,
@@ -695,7 +739,7 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
-  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null }; }),
+  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null }; }),
   updateAgent: (id, patch) =>
     set((s) => {
       const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);
@@ -761,7 +805,7 @@ export const useStore = create<State>((set, get) => ({
     }),
   pushFeed: (id, line) =>
     set((s) => ({ feeds: { ...s.feeds, [id]: [...(s.feeds[id] ?? []), line] } })),
-  addAgent: (agent) =>
+  addAgent: (agent, opts) =>
     set((s) => {
       // Idempotent by id: a MAIN-initiated spawn broadcast (hive:agentSpawned, e.g.
       // a voice hire) and a renderer-initiated hire (AddAgentModal) can both call
@@ -787,14 +831,15 @@ export const useStore = create<State>((set, get) => ({
       const archivedAgents = s.archivedAgents.filter((a) => a.id !== agent.id);
       // A live (re)spawn also consumes any restorable entry for the same id.
       const restorableAgents = s.restorableAgents.filter((a) => a.id !== agent.id);
-      persistAgents(agents, agent.id);
+      const selectedId = opts?.select === false ? s.selectedId : agent.id;
+      persistAgents(agents, selectedId);
       persistArchived(archivedAgents);
       if (restorableAgents.length !== s.restorableAgents.length) persistRestorable(restorableAgents);
       return {
         agents,
         archivedAgents,
         restorableAgents,
-        selectedId: agent.id,
+        selectedId,
         feeds: { ...s.feeds, [agent.id]: s.feeds[agent.id] ?? [] }
       };
     }),
@@ -997,6 +1042,10 @@ export const useStore = create<State>((set, get) => ({
   clearPendingHires: () => set((s) => ({
     hireQueue: clearHireQueue(s.hireQueue)
   })),
+  setFloorView: (view) => {
+    try { window.localStorage.setItem(LS_FLOOR_VIEW, view); } catch { /* per-Mac nicety only */ }
+    set({ floorView: view });
+  },
   setFullscreen: (id) => {
     // Entering focus mode makes it the default view; leaving it clears that.
     // Only an explicit toggle writes the preference, so an agent closing under
@@ -1012,6 +1061,7 @@ export const useStore = create<State>((set, get) => ({
       return id === s.fullscreenAgentId ? s : { fullscreenAgentId: id };
     }),
   openFileInIde: (absPath) => {
+    if (!SHOW_IDE) return; // hidden in this build; callers show the file in Finder instead
     const s = get();
     // Resolve the OWNING agent here rather than in each caller: a terminal link
     // or a Files-tab click often has nothing selected, and the IDE would
@@ -1022,7 +1072,8 @@ export const useStore = create<State>((set, get) => ({
   // Closing CLEARS the target: the id is scoped to one IDE session, and a stale
   // one left behind would silently win over the selection on the next open from
   // a caller that passes nothing.
-  setIdeOpen: (open, agentId) => set({ ideOpen: open, ideAgentId: open ? (agentId ?? null) : null }),
+  // With the IDE hidden (SHOW_IDE) nothing can open it, whichever caller asks.
+  setIdeOpen: (open, agentId) => set({ ideOpen: open && SHOW_IDE, ideAgentId: open && SHOW_IDE ? (agentId ?? null) : null }),
   setIdeInitialFile: (path) => set({ ideInitialFile: path }),
   setSidebarWidth: (px) => {
     const clamped = Math.min(1200, Math.max(320, Math.round(px)));
@@ -1044,5 +1095,5 @@ export function selectedAgent(s: State): Agent | undefined {
  *  the two mirrors rather than stored beside them, so it cannot fall out of step
  *  with the thing it describes. Use as `useStore(triggerHistoryVisible)`. */
 export function triggerHistoryVisible(s: State): boolean {
-  return s.webhookTriggers.length > 0 || s.orgTrigger.apiKey.trim() !== '';
+  return s.webhookTriggers.length > 0 || (SHOW_ORG_TRIGGER && s.orgTrigger.apiKey.trim() !== '');
 }

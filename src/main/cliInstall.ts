@@ -152,10 +152,10 @@ export function buildMissingCliScript(
   if (cmd) {
     lines.push(
       ...(rung.kind === 'native'
-        ? [`echo '  Using the self-contained ${label} installer instead (no Node needed) —'`,
-           `echo '  finish any sign-in it prompts for, then come back to this terminal.'`]
-        : [`echo '  Installing the ${label} CLI now so you can watch — finish any'`,
-           `echo '  sign-in it prompts for, then come back to this terminal.'`]),
+        ? [`echo '  Using the standalone ${label} installer instead (no Node needed).'`,
+           `echo '  Finish any sign in it asks for, then come back to this terminal.'`]
+        : [`echo '  Installing the ${label} CLI now so you can watch. Finish any'`,
+           `echo '  sign in it asks for, then come back to this terminal.'`]),
       `echo ''`,
       `echo '    ${cmd}'`,
       `echo '${rule}'`,
@@ -164,9 +164,9 @@ export function buildMissingCliScript(
       `__clirc=$?`,
       `echo ''`,
       `if [ $__clirc -eq 0 ]; then`,
-      `  echo '  [done] Installed — launching the agent…'`,
+      `  echo '  [done] Installed. Launching the agent…'`,
       `else`,
-      `  echo "  [x] Install exited with code $__clirc — finish it manually:"`,
+      `  echo "  [x] Install exited with code $__clirc. Finish it manually:"`,
       `  echo '    ${cmd}'`,
       ...(docs ? [`  echo '    Docs: ${docs}'`] : []),
       `  echo '  Then restart the agent to launch it.'`,

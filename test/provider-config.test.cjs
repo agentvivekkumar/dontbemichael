@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
 const {
+  AGENT_PROVIDER_PRESETS,
+  BUILD_ENGINES,
   inferAgentProvider,
   isAgentProvider,
   providerPreset
@@ -129,7 +131,9 @@ test('onboarding lists every engine — orchestrator-capable first, workers-only
   // workers-only rows instead of omitting them, so the split must be exact:
   // selectable = the god-eligible set, workersOnly = everything a worker can
   // run but Michael cannot (custom stays hidden — it is not a preset engine).
-  const { eligible, workersOnly } = onboardingEngineChoices();
+  // Checked with every engine offered: that is the layout when BUILD_ENGINES
+  // brings the others back.
+  const { eligible, workersOnly } = onboardingEngineChoices(AGENT_PROVIDER_PRESETS.map((p) => p.id));
   assert.deepEqual(
     eligible.map((preset) => preset.id),
     modelProvidersForAgent(true).map((preset) => preset.id),
@@ -151,4 +155,20 @@ test('God only sees providers that can drain hive inbox messages', () => {
     modelProvidersForAgent(false).map((preset) => preset.id),
     ['claude', 'codex', 'grok', 'kimi', 'gemini', 'antigravity', 'qwen', 'opencode', 'crush', 'pi', 'copilot', 'cursor']
   );
+});
+
+test('this build offers only Claude Code at setup, and keeps every other engine in the code', () => {
+  // The owner's call (2026-09-23): the current build supports Claude Code only.
+  // The other presets stay wired so each can come back by adding its id to
+  // BUILD_ENGINES, with no other change.
+  assert.deepEqual([...BUILD_ENGINES], ['claude']);
+  const { eligible, workersOnly } = onboardingEngineChoices();
+  assert.deepEqual(eligible.map((preset) => preset.id), ['claude']);
+  assert.deepEqual(workersOnly, [], 'engines this build does not offer are not shown, not even disabled');
+  for (const id of ['codex', 'gemini', 'antigravity', 'kimi', 'copilot', 'cursor']) {
+    assert.ok(AGENT_PROVIDER_PRESETS.some((p) => p.id === id), `${id} preset must stay in the code`);
+  }
+  assert.ok(modelsForProvider('claude').length > 1, 'the owner still picks between Claude models');
+  assert.ok(modelsForProvider('claude').some((m) => m.id === providerPreset('claude').recommendedOrchestratorModel),
+    'the recommended manager model is one of the choices');
 });

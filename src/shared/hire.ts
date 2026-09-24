@@ -4,7 +4,7 @@
  * A hire manifest is a small JSON document that describes a role-configured
  * agent (name, provider, model, flags, goal, budget) so it can be shared as a
  * file or hosted in a community gallery and imported with one click via the
- * `munderdifflin://hire?src=<https-url>` deep link or an in-app file picker.
+ * `dontbemichael://hire?src=<https-url>` deep link or an in-app file picker.
  *
  * SECURITY MODEL — a manifest is untrusted input:
  *   - It can NEVER auto-spawn an agent. Importing only pre-fills the Add-Agent
@@ -22,6 +22,7 @@
  */
 
 import { mcpCatalogEntry } from './mcpCatalog';
+import { APP_URL_SCHEME } from './appName';
 import { MAX_AGENT_TOKEN_CAP } from './tokenCaps';
 
 export const HIRE_SPEC_V1 = 'munder-difflin/hire@1';
@@ -222,7 +223,7 @@ export function validateHireManifest(raw: unknown): HireValidation {
         }
         if (f.startsWith('-')) {
           if (!isSafeFlag(f)) {
-            errors.push(`commandFlags entry ${JSON.stringify(f)} is not in the shared-hire safe-flag list — for safety a shared hire may only embed known-harmless flags (${[...SAFE_FLAG_NAMES].join(', ')}). If you need this flag, add it by hand in the command field after importing.`);
+            errors.push(`commandFlags entry ${JSON.stringify(f)} is not on the list of flags a shared hire may use. For safety, a shared hire may only include flags known to be harmless (${[...SAFE_FLAG_NAMES].join(', ')}). If you need this flag, add it by hand in the command field after importing.`);
             valueAllowed = false;
             continue;
           }
@@ -274,7 +275,7 @@ export function validateHireManifest(raw: unknown): HireValidation {
         if (!str(s) || !s.trim()) { errors.push('"skills" entries must be non-empty strings'); continue; }
         const id = s.trim();
         if (!BUNDLED_SKILL_IDS.has(id)) {
-          errors.push(`"skills" entry ${JSON.stringify(id)} is not a bundled skill id — a hire may only reference the built-in safe skills (${[...BUNDLED_SKILL_IDS].join(', ')})`);
+          errors.push(`"skills" entry ${JSON.stringify(id)} is not a bundled skill id. A hire may only reference the safe skills built into the app (${[...BUNDLED_SKILL_IDS].join(', ')})`);
         } else {
           skills.push(id);
         }
@@ -296,7 +297,7 @@ export function validateHireManifest(raw: unknown): HireValidation {
         const id = s.trim();
         const entry = mcpCatalogEntry(id);
         if (!entry) {
-          errors.push(`"mcpServers" entry ${JSON.stringify(id)} is not a known catalog id — a hire may only reference built-in MCP servers`);
+          errors.push(`"mcpServers" entry ${JSON.stringify(id)} is not a known catalog id. A hire may only reference MCP servers built into the app`);
         } else {
           mcpServers.push(id);
           if (entry.tier !== 'safe-readonly') consentRequired.push(id);
@@ -317,13 +318,13 @@ export function validateHireManifest(raw: unknown): HireValidation {
   };
 }
 
-/** Parse a `munderdifflin://hire?src=<https-url>` deep link. Returns the https
+/** Parse a `dontbemichael://hire?src=<https-url>` deep link. Returns the https
  *  manifest URL, or null if the link is not a well-formed hire link. */
 export function parseHireDeepLink(link: string): string | null {
   let u: URL;
   try { u = new URL(link); } catch { return null; }
-  if (u.protocol !== 'munderdifflin:') return null;
-  // Both munderdifflin://hire?src= (host) and munderdifflin:hire?src= (path).
+  if (u.protocol !== `${APP_URL_SCHEME}:`) return null;
+  // Both dontbemichael://hire?src= (host) and dontbemichael:hire?src= (path).
   const action = (u.host || u.pathname.replace(/^\/+/, '')).toLowerCase();
   if (action !== 'hire') return null;
   const src = u.searchParams.get('src');

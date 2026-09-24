@@ -100,7 +100,7 @@ export function AgentNameEditor({
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, minWidth: 0, flex: 1 }}>
       <span
         onDoubleClick={(event) => { event.stopPropagation(); beginEditing(); }}
-        title={`${name} — double-click to rename`}
+        title={`${name} (double click to rename)`}
         style={{
           fontFamily: 'var(--cth-font-display)', fontSize,
           color: 'var(--cth-ink-900)',

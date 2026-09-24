@@ -14,6 +14,7 @@
  * visible immediately, no repaint required.
  */
 import { useEffect, useState } from 'react';
+import { SHOW_IDE } from '@shared/buildFeatures';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -108,7 +109,7 @@ export function notifyThemeChangeAll(theme: 'light' | 'dark'): void {
   const all = [...pool.keys()];
   const told = all.filter((id) => pool.get(id)?.themeNotify);
   console.log(`[theme] -> ${theme}: notified ${told.length}/${all.length} terminal(s)`
-    + (told.length ? ` (${told.join(', ')})` : ' — none opted into DEC 2031'));
+    + (told.length ? ` (${told.join(', ')})` : ': none opted into DEC 2031'));
   for (const ptyId of all) notifyThemeChange(ptyId, theme);
 }
 
@@ -957,7 +958,8 @@ async function activatePath(abs: string, action: PathAction): Promise<void> {
     if (mdStatCache.size > 500) mdStatCache.clear();
     mdStatCache.set(abs, hit);
   }
-  if (action === 'reveal' || !hit.isFile) {
+  // With the IDE hidden (SHOW_IDE), a file link shows the file in Finder too.
+  if (action === 'reveal' || !hit.isFile || !SHOW_IDE) {
     void window.cth.revealPath(hit.path).catch(() => { /* file browser refused */ });
     return;
   }

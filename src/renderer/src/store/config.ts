@@ -2,6 +2,7 @@
 // so we don't have to reach into the preload package to type-check.
 import {
   AGENT_PROVIDER_PRESETS,
+  BUILD_ENGINES,
   providerPreset,
   inferAgentProvider,
   isClaudeProvider,
@@ -56,12 +57,25 @@ export interface KnowledgeGraphConfig {
 
 export interface HarnessConfig {
   onboardingComplete: boolean;
-  /** Self-identified audience from the first onboarding screen ('technical' vs
-   *  'non-technical') — drives the copy register across onboarding. Mirrors
-   *  src/main/config.ts. */
+  /** Self-identified audience. No longer asked during onboarding; still exposed
+   *  in Settings as "simple mode". Mirrors src/main/config.ts. */
   audience?: 'technical' | 'non-technical';
+  /** The Office Pack picked on the first onboarding screen (a pack's
+   *  `businessType`). Mirrors src/main/config.ts. */
+  businessType?: string;
+  /** The business's name and city as the owner typed them. Mirrors src/main/config.ts. */
+  businessName?: string;
+  businessCity?: string;
+  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  officeFolder?: string;
+  /** The starter team picked during onboarding, each with the ABSOLUTE folder it
+   *  works in (Decisions 44, 47). The running office starts agents from this. */
+  businessTeam?: Array<{ agentId: string; folder: string }>;
+  /** Set once the onboarding team has been started, so it is started once. */
+  businessTeamStarted?: boolean;
   harnessHome: string | null;
-  /** Recently-opened hive home folders (most-recent first) for the launch picker.
+  /** Recently-opened office folders (most-recent first), for the missing office
+   *  screen and Settings → General.
    *  Mirrors src/main/config.ts. */
   recentHives?: string[];
   registeredRepos: string[];
@@ -73,7 +87,7 @@ export interface HarnessConfig {
   /** Default model for newly spawned agents (e.g. 'claude-sonnet-4-6[1m]'); unset = CLI default. */
   defaultModel?: string;
   /** Which provider+model powers the GOD orchestrator ("Michael"). Default
-   *  'claude' / 'claude-opus-4-8'. Mirrors src/main/config.ts. */
+   *  'claude' / 'claude-opus-5-5'. Mirrors src/main/config.ts. */
   godProvider?: AgentProvider;
   godModel?: string;
   /** Per-server consent for the default MCP bundle, keyed by catalog id (mirrors
@@ -250,15 +264,33 @@ let CATALOG: ModelCatalog = BAKED;
  *  .json can carry only the providers being changed, and a provider dropped from
  *  it degrades to the built-in list rather than to an empty picker.
  *
+ *  One exception to "replaces outright": the model this build RECOMMENDS for
+ *  Michael is always kept. Setup preselects it, so a remote list without it
+ *  left the picker showing its first row while a different model was saved
+ *  (seen live: Fable 5.1 on screen, Opus 5.5 saved, from a list published
+ *  before Opus 5.5 existed). It goes back at the top, as the build ships it.
+ *
  *  Returns whether anything actually changed, so the caller can skip a pointless
  *  event on the overwhelmingly common "nothing new" path. */
 export function applyRemoteModelCatalog(remote: ModelCatalog | null): boolean {
   const next: ModelCatalog = remote
-    ? { version: BAKED.version, providers: { ...BAKED.providers, ...remote.providers } }
+    ? { version: BAKED.version, providers: keepRecommended({ ...BAKED.providers, ...remote.providers }) }
     : BAKED;
   if (JSON.stringify(next) === JSON.stringify(CATALOG)) return false;
   CATALOG = next;
   return true;
+}
+
+function keepRecommended(providers: ModelCatalog['providers']): ModelCatalog['providers'] {
+  const out = { ...providers };
+  for (const preset of AGENT_PROVIDER_PRESETS) {
+    const id = preset.recommendedOrchestratorModel;
+    const list = out[preset.id];
+    if (!id || !list || list.some((m) => m.id === id)) continue;
+    const baked = BAKED.providers[preset.id]?.find((m) => m.id === id);
+    if (baked) out[preset.id] = [baked, ...list];
+  }
+  return out;
 }
 
 /** Fired on `window` after the catalog changes, so a surface holding a rendered
@@ -367,14 +399,18 @@ export function modelProvidersForAgent(isGod = false) {
  *  shows those engines too, as disabled workers-only rows — same god-eligible
  *  set as `modelProvidersForAgent(true)` for the selectable group, and every
  *  other preset except `custom` (bring-your-own command, not an engine) in the
- *  disabled group. */
-export function onboardingEngineChoices(): {
+ *  disabled group.
+ *
+ *  Both groups are limited to `offered`, the engines this build supports
+ *  (`BUILD_ENGINES`, only Claude Code today). An engine left out is not shown
+ *  at all, not even disabled: the owner can't use it in this build. */
+export function onboardingEngineChoices(offered: readonly AgentProvider[] = BUILD_ENGINES): {
   eligible: AgentProviderPreset[];
   workersOnly: AgentProviderPreset[];
 } {
-  const eligible = modelProvidersForAgent(true);
+  const eligible = modelProvidersForAgent(true).filter((preset) => offered.includes(preset.id));
   const workersOnly = AGENT_PROVIDER_PRESETS.filter(
-    (preset) => preset.id !== 'custom' && !eligible.includes(preset)
+    (preset) => preset.id !== 'custom' && offered.includes(preset.id) && !modelProvidersForAgent(true).includes(preset)
   );
   return { eligible, workersOnly };
 }

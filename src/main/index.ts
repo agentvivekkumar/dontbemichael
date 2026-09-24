@@ -27,6 +27,8 @@ import {
 import { linkWorktreeDeps, unlinkWorktreeDeps } from './worktreeDeps';
 import { HiveManager, type AgentMeta, type HiveMessage, type HiveTask } from './hive';
 import { HookServer } from './hooks';
+import { loadBundledPacks, packsResourceDir } from './packs';
+import { businessFolderRoot, defaultAgentFolder, ensureFolder, OFFICE_FOLDER } from './agentFolders';
 import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
@@ -85,6 +87,11 @@ import { toolCatalog, type ToolStatus } from '../shared/toolCatalog';
 import { listLocalSkills, loadCatalog, installSkill, uninstallSkill, type LocalSkill } from './skills';
 import { loadHero } from './hero';
 import { loadModelCatalog } from './modelCatalog';
+import { claudeCliVersion } from './claudeCliVersion';
+import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
+import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
+import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
+import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
   codexRemoteAliasPath,
@@ -94,6 +101,12 @@ import {
 } from '../shared/codexRemote';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
+
+// The name in the menu bar (and About / Hide / Quit) is the app's name. Pin the
+// data folder FIRST: Electron derives userData from the app name, so renaming
+// without the pin would open on an empty folder, as if freshly installed.
+app.setPath('userData', join(app.getPath('appData'), APP_DATA_DIR));
+app.setName(APP_NAME);
 
 // Keep the main process alive on an unexpected throw/rejection. The harness is a
 // multi-agent supervisor — a single stray throw (e.g. node-pty's ConPTY console
@@ -1431,6 +1444,30 @@ function skillsResourceDir(): string {
     : join(app.getAppPath(), 'resources', 'skills');
 }
 
+/** The bundled Office Packs (the business types onboarding offers). Same
+ *  packaged/dev resolution as `skillsResourceDir()` above — see the
+ *  `resources/packs` entry in electron-builder.yml. */
+function packsDir(): string {
+  return packsResourceDir(app, process.resourcesPath);
+}
+
+/** The agent-facing `doc-text` CLI, built beside index.js (inside the asar when
+ *  packaged). Agents run it with the bundled Node to read Word/Excel/PowerPoint. */
+function docTextCliPath(): string {
+  return join(app.getAppPath(), 'out', 'main', 'docTextCli.js');
+}
+
+/** The shared Office folder (Decision 44): Michael's working directory, and
+ *  writable by every agent. Created at onboarding; recreated here (empty) if the
+ *  owner deleted it, rather than failing every spawn that depends on it.
+ *  Undefined on installs that predate agent folders, which keep today's layout. */
+function officeFolderReady(): string | undefined {
+  const office = readConfig().officeFolder;
+  if (!office) return undefined;
+  const r = ensureFolder(expandTilde(office));
+  return r.ok ? r.path : undefined;
+}
+
 /** Where the helper discovers `{ port, token }` for the loopback endpoint. Kept
  *  under userData (NOT the git repo, NOT mined into MemPalace). */
 function slackReplyConfigPath(): string {
@@ -2167,7 +2204,7 @@ function floorCascade(): WindowBounds | null {
   return clampBounds({ x: b.x + OFFSET, y: b.y + OFFSET, width: b.width, height: b.height });
 }
 
-// ─── Shareable hires: munderdifflin:// deep link + file import ──────────────
+// ─── Shareable hires: dontbemichael:// deep link + file import ──────────────
 // A hire manifest NEVER auto-spawns: it is validated, then handed to the
 // renderer, which pre-fills the Add-Agent modal for human review. See
 // src/shared/hire.ts for the spec + security model.
@@ -2212,10 +2249,10 @@ async function handleHireLink(link: string): Promise<void> {
 // exe+args form or the registration points at electron.exe with no entry.
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('munderdifflin', process.execPath, [resolve(process.argv[1])]);
+    app.setAsDefaultProtocolClient(APP_URL_SCHEME, process.execPath, [resolve(process.argv[1])]);
   }
 } else {
-  app.setAsDefaultProtocolClient('munderdifflin');
+  app.setAsDefaultProtocolClient(APP_URL_SCHEME);
 }
 
 // Deep links on Windows/Linux arrive as the argv of a SECOND process — take the
@@ -2232,7 +2269,7 @@ if (!gotInstanceLock) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    const link = argv.find((a) => a.startsWith('munderdifflin://'));
+    const link = argv.find((a) => a.startsWith(`${APP_URL_SCHEME}://`));
     if (link) void handleHireLink(link);
   });
 }
@@ -2292,7 +2329,7 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
     ...(geom && geom.x !== undefined && geom.y !== undefined ? { x: geom.x, y: geom.y } : {}),
     minWidth: MIN_WIN.width,
     minHeight: MIN_WIN.height,
-    title: isFloor ? 'Munder Difflin — Floor' : 'Munder Difflin',
+    title: isFloor ? `${APP_NAME} · Floor` : APP_NAME,
     backgroundColor: '#FFF8E7',
     titleBarStyle: 'hiddenInset',
     show: false,
@@ -2609,6 +2646,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // returned to the caller so the renderer records the same absolute path.
   opts.cwd = expandTilde(opts.cwd);
   if (opts.hive) opts.hive = { ...opts.hive, cwd: expandTilde(opts.hive.cwd) };
+  // Before anything checks the working folder: Michael's IS the Office folder.
+  const officeFolder = officeFolderReady();
   // Which CLI is this? Explicit wins; else inferred from the binary
   // (claude/codex/grok/agy). Non-Claude providers skip every Claude-only spawn step
   // below. Persist the resolved provider onto opts (+ hive meta) so the registry
@@ -2767,7 +2806,10 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           skillsDir: skillsResourceDir(),
           // The shared palace is mutated by the agent's own `mempalace` calls, so
           // the OS sandbox must let it through (empty when memory is off).
-          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH].filter((p): p is string => !!p)
+          // …and the shared Office folder, which every agent reads and writes.
+          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH, officeFolder].filter((p): p is string => !!p),
+          officeFolder,
+          docTextCliPath: docTextCliPath()
         }
       );
       opts.args = [...(opts.args ?? []), ...inj.args];
@@ -2819,6 +2861,22 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
         ? modelForRole(opts.hive, cfg)
         : cfg.defaultModel ?? modelForRole(opts.hive, cfg);
       if (m) args.push('--model', m);
+    }
+    // A model newer than the installed Claude Code (Opus 5.5 needs 2.1.280+)
+    // would be rejected and the agent would never start. Swap it for the
+    // newest model this CLI knows. Applies to every Claude agent, whichever
+    // picker chose the model, since this is the one door all spawns use.
+    {
+      const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
+      const requested = at < 0 ? undefined : args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);
+      if (requested && CLAUDE_MODEL_CLI_FLOOR[requested]) {
+        const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+        const pick = modelForCli(requested, await claudeCliVersion(ptyManager.commandPath(bin)));
+        if (pick.downgraded) {
+          if (args[at] === '--model') args[at + 1] = pick.model; else args[at] = `--model=${pick.model}`;
+          console.warn(`[spawn] ${opts.hive.id}: ${pick.downgraded.from} needs Claude Code ${pick.downgraded.need}+, found ${pick.downgraded.have}; running ${pick.model}`);
+        }
+      }
     }
     // Name the Remote Control session after the agent (Michael, Jim, Dev1…) so it
     // is identifiable in claude.ai / the mobile app. Otherwise Claude defaults the
@@ -3298,6 +3356,32 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   return { ok: true as const }; // unreachable (process exits) — typed for the renderer
 });
 
+/** Is an office folder there? No path = the current home. The launch screen
+ *  uses it to decide between the floor and "we can't find your office", and
+ *  Settings uses it to tell an existing office from an empty folder. */
+ipcMain.handle('config:homeStatus', (_evt, path: unknown) =>
+  homeFolderStatus(typeof path === 'string' && path ? resolve(expandTilde(path)) : readConfig().harnessHome ?? null)
+);
+
+/** Start an empty office in the CURRENT home path, after the old one went
+ *  missing. The owner asked for it on the "we can't find your office" screen,
+ *  so rebuilding is now deliberate. Relaunches, like every home change. */
+ipcMain.handle('config:startOverHere', () => {
+  const home = readConfig().harnessHome;
+  if (!home) return { ok: false, error: 'No office folder is set.' };
+  const ensured = ensureHarnessHome(home);
+  if (!ensured.ok) return ensured;
+  // Create the empty office itself (hive/registry.json), not just the folder:
+  // launch only trusts a folder that holds an office, so a bare folder would
+  // bring the owner straight back to the "can't find your office" screen.
+  try { hive.ensureHive(); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  allowQuit = true;
+  try { ptyManager.killAll(); } catch (e) { console.error('[startOverHere] killAll:', e); }
+  app.relaunch();
+  app.exit(0);
+  return { ok: true as const }; // unreachable (process exits)
+});
+
 // ─── IPC: filesystem (sandboxed to a root) ──────────────────────────────────
 ipcMain.handle('fs:listDir', (_evt, root: unknown, rel: unknown) => {
   if (typeof root !== 'string' || typeof rel !== 'string') return { ok: false, error: 'invalid args' };
@@ -3433,7 +3517,7 @@ ipcMain.handle('git:checkout', async (_evt, cwd: unknown, ref: unknown, detach: 
     Date.now() - p.lastOutputAt < 10_000
   );
   if (busy) {
-    return { ok: false, error: `an agent is actively working in this repo (${busy.id}) — try again when it goes quiet` };
+    return { ok: false, error: `an agent is actively working in this repo (${busy.id}). Try again when it goes quiet` };
   }
   return checkoutRef(cwd, ref, detach === true);
 });
@@ -3548,6 +3632,49 @@ ipcMain.handle('skills:local', (_evt, cwd: unknown): LocalSkill[] => {
     return [];
   }
 });
+/** The business types onboarding offers, each with its core agents merged in.
+ *  A pack that fails to load is reported rather than thrown: onboarding's first
+ *  screen is this list, and one bad file must not leave an owner with an empty
+ *  grid and nothing to click. */
+ipcMain.handle('packs:list', () => {
+  try {
+    return loadBundledPacks({ packsDir });
+  } catch (e) {
+    console.error('[packs] load failed:', e);
+    return { packs: [], problems: [{ file: packsDir(), reason: String(e) }] };
+  }
+});
+
+/** Default folders for the onboarding team screen (Decisions 44, 45):
+ *  `~/Documents/<Business>/<Folder>` for each folder name, plus the shared Office.
+ *  Nothing is created here. The owner can still change any of them. */
+ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { businessName?: unknown; folders?: unknown };
+  const businessName = typeof p.businessName === 'string' ? p.businessName : '';
+  const names = Array.isArray(p.folders)
+    ? p.folders.filter((x): x is string => typeof x === 'string').slice(0, 50)
+    : [];
+  const docs = app.getPath('documents');
+  const byFolder: Record<string, string> = {};
+  for (const n of names) byFolder[n] = defaultAgentFolder(docs, businessName, n);
+  return {
+    // For display only: the screen shows ~/Documents/… rather than /Users/<name>/…
+    home: app.getPath('home'),
+    root: businessFolderRoot(docs, businessName),
+    office: defaultAgentFolder(docs, businessName, OFFICE_FOLDER),
+    byFolder
+  };
+});
+
+/** Create the team's folders when onboarding finishes. Only ever ADDS a missing
+ *  folder: an existing one, and everything in it, is left exactly as it is. */
+ipcMain.handle('folders:ensure', (_evt, paths: unknown) => {
+  const list = Array.isArray(paths)
+    ? paths.filter((x): x is string => typeof x === 'string').slice(0, 50)
+    : [];
+  return list.map((p) => ensureFolder(expandTilde(p)));
+});
+
 /** The skills catalog, parsed from its README and cached in userData.
  *  `force` is the explicit refresh button; everything else is served from a
  *  day-old cache so opening the tab never waits on the network. */
@@ -3611,7 +3738,7 @@ ipcMain.handle('tools:status', (): ToolStatus[] => {
         found: !!mem?.available,
         path: mem?.bin ?? null,
         detail: mem?.available
-          ? (mem.initialized ? 'palace initialised' : 'installed — palace not built yet')
+          ? (mem.initialized ? 'palace initialised' : 'installed; palace not built yet')
           : undefined
       };
     }
@@ -3656,19 +3783,11 @@ ipcMain.handle('kg:remove', (_evt, id: unknown) =>
   ({ ok: typeof id === 'string' && id ? knowledge.remove(id) : false }));
 // Ingest one or more files from disk. Best-effort per file; returns per-file
 // results so the UI can report partial success.
-ipcMain.handle('kg:ingestFiles', (_evt, payload: unknown) => {
+ipcMain.handle('kg:ingestFiles', async (_evt, payload: unknown) => {
   const p = (payload ?? {}) as { paths?: unknown; tags?: unknown };
   const paths = Array.isArray(p.paths) ? p.paths.filter((x): x is string => typeof x === 'string') : [];
   const tags = Array.isArray(p.tags) ? p.tags.filter((x): x is string => typeof x === 'string') : undefined;
-  const results = paths.map((srcPath) => {
-    try {
-      const r = knowledge.ingestFile(srcPath, { tags });
-      return { ok: true as const, srcPath, docId: r.docId, chunkCount: r.chunkCount };
-    } catch (e) {
-      return { ok: false as const, srcPath, error: e instanceof Error ? e.message : String(e) };
-    }
-  });
-  return { results };
+  return { results: await ingestSequentially(paths, tags) };
 });
 // Open a multi-file picker and ingest the chosen artifacts in one round-trip.
 ipcMain.handle('kg:addFiles', async (evt) => {
@@ -3679,16 +3798,28 @@ ipcMain.handle('kg:addFiles', async (evt) => {
     title: 'Add documents to the Knowledge Graph'
   });
   if (res.canceled || res.filePaths.length === 0) return { ok: false as const, error: 'cancelled' };
-  const results = res.filePaths.map((srcPath) => {
-    try {
-      const r = knowledge.ingestFile(srcPath);
-      return { ok: true as const, srcPath, docId: r.docId, chunkCount: r.chunkCount };
-    } catch (e) {
-      return { ok: false as const, srcPath, error: e instanceof Error ? e.message : String(e) };
-    }
-  });
-  return { ok: true as const, results };
+  return { ok: true as const, results: await ingestSequentially(res.filePaths) };
 });
+
+/** Ingest files one at a time. Sequential on purpose: kg-core appends every
+ *  document to a single index.jsonl, and parallel ingests would interleave
+ *  those appends. A file that can't be read comes back as ok:false with the
+ *  reason, which the UI shows the owner by name. */
+async function ingestSequentially(paths: string[], tags?: string[]) {
+  const results: Array<
+    | { ok: true; srcPath: string; docId: string; chunkCount: number }
+    | { ok: false; srcPath: string; error: string }
+  > = [];
+  for (const srcPath of paths) {
+    try {
+      const r = await knowledge.ingestFile(srcPath, tags ? { tags } : {});
+      results.push({ ok: true, srcPath, docId: r.docId, chunkCount: r.chunkCount });
+    } catch (e) {
+      results.push({ ok: false, srcPath, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return results;
+}
 
 // ─── IPC: composer attachments (images + arbitrary files, attached by PATH) ──
 // The message queue pipes raw text into a Claude CLI PTY, so attachments travel
@@ -4933,7 +5064,9 @@ async function ephemeralWorkerTick(): Promise<void> {
     //     Declining also means declining to CONSUME. A request dropped in while
     //     this is off stays in the queue and runs when it is turned on, rather
     //     than being eaten and failed for a reason god never asked about.
-    const dir = readConfig().orchestratorMaySpawn ? spawnRequestsDir() : null;
+    // ALLOW_TEMP_WORKERS (buildFeatures.ts) switches the whole route off in this
+    // build, whatever an older config file says.
+    const dir = ALLOW_TEMP_WORKERS && readConfig().orchestratorMaySpawn ? spawnRequestsDir() : null;
     if (dir && existsSync(dir)) {
       let files: string[] = [];
       try { files = readdirSync(dir).filter(f => f.endsWith('.json')).sort(); } catch { /* dir vanished */ }
@@ -5215,7 +5348,7 @@ function healthCheckPtys(reason: string, awayMs: number | null): void {
   const away = awayMs != null ? ` (away ~${Math.round(awayMs / 1000)}s)` : '';
   if (dead.length) {
     console.warn(`[power] ${reason}${away}: ${dead.length}/${ptys.length} PTY(s) look wedged (process gone):`, dead.join(', '));
-    breakerToast('Agents need a restart', `${dead.length} agent terminal(s) didn't survive sleep — re-open them to resume.`);
+    breakerToast('Agents need a restart', `${dead.length} agent terminal(s) didn't survive sleep. Open them again to resume.`);
   } else {
     console.log(`[power] ${reason}${away}: ${ptys.length} PTY(s) healthy`);
   }
@@ -5293,7 +5426,7 @@ app.whenReady().then(() => {
   void loadModelCatalog(MODEL_CATALOG_CACHE()).catch(() => { /* never fatal */ });
 
   // A cold-start deep link (Windows/Linux) rides in on OUR argv.
-  const startupHireLink = process.argv.find((a) => a.startsWith('munderdifflin://'));
+  const startupHireLink = process.argv.find((a) => a.startsWith(`${APP_URL_SCHEME}://`));
   if (startupHireLink) void handleHireLink(startupHireLink);
 
   // Hand every spawned agent the path to the Slack reply discovery file via the
@@ -5310,8 +5443,13 @@ app.whenReady().then(() => {
   // never restarts on its own. Falls back to a notify-only releases/latest
   // check where native updating isn't possible (win-portable, dev-ish builds).
   initAutoUpdater(() => liveWebContents());
-  // Bootstrap the hive (if harnessHome is configured) and start the message router.
-  bootstrapHiveServices();
+  // Bootstrap the hive (if harnessHome is configured) and start the message router,
+  // but only when the office is really there. If the owner moved or deleted the
+  // folder, bootstrapping would quietly rebuild an EMPTY office at the old path;
+  // instead nothing touches it and the renderer asks where it went (homeFolder.ts).
+  const homeReady = homeReadyAtLaunch(readConfig());
+  if (homeReady) bootstrapHiveServices();
+  else console.warn('[home] office folder missing, waiting for the owner:', readConfig().harnessHome);
   // Survive sleep/lock. macOS freezes libuv timers during true system sleep, so a
   // locked/idle/slept Mac stops firing schedules and can wedge PTYs. On wake we
   // re-arm the scheduler (catching up missed missions ONCE) + beats + keep-awake,
@@ -5329,7 +5467,8 @@ app.whenReady().then(() => {
   // failure (offline) is logged, not fatal. The tunnel URL is ephemeral and
   // changes per restart, so the user re-pastes it via Settings → Start.
   const slackCfg = readConfig();
-  if (slackCfg.slackEnabled && slackCfg.slackSigningSecret) {
+  // Slack and webhooks hand work to the hive, so they wait for the office too.
+  if (homeReady && slackCfg.slackEnabled && slackCfg.slackSigningSecret) {
     void startSlackServer().then((r) => {
       if (!r.ok) console.error('[slack] auto-start failed:', r.error);
       else console.log('[slack] webhook listening', r.url ? `(tunnel: ${r.url})` : '(no tunnel)');
@@ -5338,7 +5477,7 @@ app.whenReady().then(() => {
   // Auto-start the generic webhook only for endpoints the user has explicitly
   // enabled (each with its own secret) — never a default-on public surface.
   // Opt-in, like Slack; an install with no enabled endpoint opens no tunnel.
-  if (enabledWebhookEndpoints().length > 0) {
+  if (homeReady && enabledWebhookEndpoints().length > 0) {
     void startWebhookServer().then((r) => {
       if (!r.ok) console.error('[webhook] auto-start failed:', r.error);
       else console.log('[webhook] listening', r.url ? `(tunnel: ${r.url})` : '(no tunnel)');

@@ -506,6 +506,9 @@ const RECIPES: Record<OfficeCharacterName, Recipe> = {
   toby:     { skin: 'light', hairc: [106, 90, 66],  hair: 'styleShort',  hairargs: { part: 'L', recede: 1 }, cloth: 'dressshirt', c1: [150, 150, 120], facial: 'mustacheSm', brow: 'soft', mouth: 'frown' },
   creed:    { skin: 'light', hairc: [170, 166, 156], hair: 'styleBald',   cloth: 'dressshirt', c1: [126, 130, 96], facial: 'stubble', brow: 'flat', mouth: 'neutral' },
   meredith: { skin: 'light', hairc: [154, 82, 46],  hair: 'styleMessy',  hairargs: { length: 15 }, cloth: 'blouse', c1: [176, 86, 74], brow: 'raised', mouth: 'smile', lashes: true },
+  nick:     { skin: 'light', hairc: [46, 34, 26],   hair: 'styleCurly',  cloth: 'polo', c1: [96, 128, 106], c2: [80, 110, 90], brow: 'raised', mouth: 'neutral' },
+  sadiq:    { skin: 'brown', hairc: [22, 18, 16],   hair: 'styleShort',  hairargs: { part: 'R' }, cloth: 'dressshirt', c1: [120, 150, 186], glasses: true, brow: 'flat', mouth: 'neutral' },
+  darryl:   { skin: 'dark',  hairc: [28, 24, 22],   hair: 'styleBald',   cloth: 'polo', c1: [74, 98, 128], c2: [60, 82, 110], facial: 'goatee', brow: 'flat', mouth: 'smile' },
 };
 
 /** The face/hair group (head → face → facial hair → hair → glasses), no clothing. */

@@ -11,73 +11,92 @@ import {
   classifyEngineAvailability, engineAvailabilityBadge, engineAvailabilityMessage, engineBlocksOnboarding
 } from '@shared/engineAvailability';
 import type { ToolStatus } from '@shared/toolCatalog';
+import type { OfficePack } from '@shared/officePack';
+import type { AgentDefinitionV2 } from '@shared/agentDefinition';
+import {
+  OFFICE_KEY, folderNames, initialPicks, folderFor, officeFolderFor, connectionsNeeded, teamPlan,
+  type FolderSuggestions
+} from '@shared/teamPlan';
+import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
+import { missingBusinessFields, type BusinessField } from '@shared/businessProfile';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
 }
 
-type Audience = 'technical' | 'non-technical';
-type Step = 'persona' | 'welcome' | 'home' | 'orchestrator' | 'repos' | 'permissions' | 'done';
+type Step = 'business' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
 
-// First-run showcase "— the highest-value features a brand-new user should grasp
-// before any setup. Labels and copy live in i18n (two registers: `desc` for the
-// technical audience, `descPlain` for the plain-language one "— item 1).
+/** The "no pack fits" tile. Not an error path: Michael asks a few questions and
+ *  builds from the core pack, so the grid always resolves to something. */
+const OTHER_BUSINESS = '__other__';
+
+/** Pack `glyph` names → the emoji we draw in the tile. Pack glyphs are data, not
+ *  icons (DESIGN.md 10.3), so an unrecognised one falls back rather than breaking. */
+const GLYPH_EMOJI: Record<string, string> = {
+  bowl: '🍜',
+  bag: '🛍',
+  clipboard: '📋',
+  laptop: '💻',
+  scissors: '✂',
+  wrench: '🔧',
+  sparkles: '✨'
+};
+const glyphFor = (glyph?: string): string =>
+  (glyph && (GLYPH_EMOJI[glyph] ?? (/\p{Extended_Pictographic}/u.test(glyph) ? glyph : undefined))) ?? '?';
+
+// First-run showcase — the highest-value features a brand-new owner should grasp
+// before any setup.
 interface Feature {
   icon: IconName;
   labelKey: string;
-  descKey: string;       // technical register
-  descPlainKey: string;  // non-technical register
+  descKey: string;
   tint: string;          // tile background token
   edge: string;          // tile border token
 }
 const FEATURES: Feature[] = [
   {
-    icon: 'mcp',
-    labelKey: 'onboarding.welcome.features.engines.label',
-    descKey: 'onboarding.welcome.features.engines.desc',
-    descPlainKey: 'onboarding.welcome.features.engines.descPlain',
+    icon: 'sparkle',
+    labelKey: 'onboarding.welcome.features.team.label',
+    descKey: 'onboarding.welcome.features.team.desc',
     tint: 'var(--cth-lilac-light)', edge: 'var(--cth-lilac)'
   },
   {
     icon: 'gear',
-    labelKey: 'onboarding.welcome.features.clone.label',
-    descKey: 'onboarding.welcome.features.clone.desc',
-    descPlainKey: 'onboarding.welcome.features.clone.descPlain',
+    labelKey: 'onboarding.welcome.features.manager.label',
+    descKey: 'onboarding.welcome.features.manager.desc',
     tint: 'var(--cth-sky-light)', edge: 'var(--cth-sky)'
   },
   {
-    icon: 'web',
+    icon: 'ledger',
     labelKey: 'onboarding.welcome.features.memory.label',
     descKey: 'onboarding.welcome.features.memory.desc',
-    descPlainKey: 'onboarding.welcome.features.memory.descPlain',
     tint: 'var(--cth-mint-light)', edge: 'var(--cth-mint)'
   },
   {
-    icon: 'terminal',
+    icon: 'expand',
     labelKey: 'onboarding.welcome.features.commandCenter.label',
     descKey: 'onboarding.welcome.features.commandCenter.desc',
-    descPlainKey: 'onboarding.welcome.features.commandCenter.descPlain',
     tint: 'var(--cth-lemon-light)', edge: 'var(--cth-lemon)'
   },
   {
-    icon: 'pause',
+    icon: 'check',
     labelKey: 'onboarding.welcome.features.guardrails.label',
     descKey: 'onboarding.welcome.features.guardrails.desc',
-    descPlainKey: 'onboarding.welcome.features.guardrails.descPlain',
     tint: 'var(--cth-coral-light)', edge: 'var(--cth-coral)'
   },
   {
-    icon: 'sparkle',
+    icon: 'plus',
     labelKey: 'onboarding.welcome.features.hires.label',
     descKey: 'onboarding.welcome.features.hires.desc',
-    descPlainKey: 'onboarding.welcome.features.hires.descPlain',
     tint: 'var(--cth-peach-light)', edge: 'var(--cth-peach)'
   }
 ];
 
-// One-liner of what each engine is, shown under its row on the orchestrator step
-// so a non-technical user knows what they're picking (item 3).
+/** Anthropic's plan comparison, linked from the manager step's Max plan note. */
+const CLAUDE_PLANS_URL = 'https://claude.com/pricing';
+
+// One-liner of what each engine is, shown under its row on the orchestrator step.
 const PROVIDER_BLURB_KEYS: Partial<Record<AgentProvider, string>> = {
   gemini: 'onboarding.providerBlurb.gemini',
   claude: 'onboarding.providerBlurb.claude',
@@ -91,14 +110,132 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { t } = useTranslation();
   // Onboarding runs before god exists in the store, so read the persisted name.
   const godName = useResolvedGodName();
-  const [step, setStep] = useState<Step>('persona');
-  // Self-identified audience (item 1). Undefined until chosen on the first screen;
-  // the rest of the wizard reads `plain` to swap copy registers.
-  const [audience, setAudience] = useState<Audience | undefined>();
-  const plain = audience === 'non-technical';
+  const [step, setStep] = useState<Step>('business');
+
+  // WHAT BUSINESS THIS IS — the first and most consequential question, because it
+  // decides the suggested cast, the office hours, and every agent's starting tool
+  // levels. It replaced "are you technical or non-technical?": that question asked
+  // the owner to classify themselves before the app had earned anything, and it
+  // forked every subsequent string into two registers. There is one register now,
+  // and it is the plain one.
+  const [businessType, setBusinessType] = useState<string | undefined>();
+  const [businessName, setBusinessName] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  // Name, location and type are all required (see businessProfile.ts). Gaps are
+  // only SHOWN after the owner has tried to continue: flagging empty fields the
+  // moment the screen opens reads as scolding before they've typed anything.
+  // After that the message is live, shrinking as each field is filled in.
+  const [triedBusiness, setTriedBusiness] = useState(false);
+  const businessGaps = missingBusinessFields({ name: businessName, location: businessCity, type: businessType });
+  const gapShown = (field: BusinessField) => triedBusiness && businessGaps.includes(field);
+  const gapMessage: Record<BusinessField, string> = {
+    name: t('onboarding.business.errName'),
+    location: t('onboarding.business.errLocation'),
+    type: t('onboarding.business.errType')
+  };
+
+  // The bundled Office Packs, each already merged with core. `undefined` = not
+  // back yet; `problems` names any pack that could not be read. A pack that fails
+  // to load is reported beside the grid, never allowed to empty it.
+  const [packs, setPacks] = useState<OfficePack[] | undefined>();
+  const [packProblems, setPackProblems] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await window.cth.packsList();
+        if (cancelled) return;
+        setPacks(res.packs.map((p) => p.pack));
+        setCorePack(res.core);
+        setPackProblems(res.problems.length);
+      } catch {
+        if (!cancelled) { setPacks([]); setPackProblems(1); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ─── Your team (Decisions 44, 47) ─────────────────────────────────────────
+  // The picked business's suggested cast, each agent with the folder it will work
+  // in. "Something else" starts from the core pack alone. The rules live in
+  // shared/teamPlan.ts; this is just the state they read.
+  const [corePack, setCorePack] = useState<OfficePack | undefined>();
+  const teamPack: OfficePack | undefined =
+    businessType === OTHER_BUSINESS ? corePack : packs?.find((p) => p.businessType === businessType);
+  const teamAgents = teamPack?.agents ?? [];
+  const coreIds = new Set((corePack?.agents ?? []).map((a) => a.id));
+  const [teamPicked, setTeamPicked] = useState<Record<string, boolean>>({});
+  /** Folders the owner pointed somewhere other than the suggestion, keyed by agent id (or OFFICE_KEY). */
+  const [folderOverrides, setFolderOverrides] = useState<Record<string, string>>({});
+  const [folderSuggestions, setFolderSuggestions] = useState<(FolderSuggestions & { home: string }) | undefined>();
+
+  // A different business is a different cast: start over from its suggested picks.
+  useEffect(() => {
+    setTeamPicked(teamPack ? initialPicks(teamPack) : {});
+    setFolderOverrides({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamPack?.businessType]);
+
+  // Where each folder goes by default, which depends on the business name. Asked
+  // only while the team step is showing; nothing is created until finish.
+  const teamFolderKey = folderNames(teamAgents).join('|');
+  useEffect(() => {
+    if (step !== 'team' || !teamPack) return;
+    let cancelled = false;
+    window.cth.foldersSuggest(businessName, folderNames(teamAgents))
+      .then((sug) => { if (!cancelled) setFolderSuggestions(sug); })
+      .catch(() => { if (!cancelled) setFolderSuggestions(undefined); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, businessName, teamFolderKey]);
+
+  const plan = teamPlan(teamAgents, teamPicked, folderSuggestions, folderOverrides);
+  const needed = connectionsNeeded(teamAgents, teamPicked);
+  const pickedCount = teamAgents.filter((a) => teamPicked[a.id]).length;
+  /** `/Users/me/Documents/Pho` → `~/Documents/Pho`: shorter, and what an owner recognises. */
+  const tildePath = (p: string) => {
+    const h = folderSuggestions?.home;
+    return h && (p === h || p.startsWith(h + '/')) ? '~' + p.slice(h.length) : p;
+  };
+  const chooseTeamFolder = async (key: string) => {
+    setError(undefined);
+    const res = await window.cth.chooseFolder();
+    if (res.ok) setFolderOverrides((o) => ({ ...o, [key]: res.path }));
+    else if (res.error !== 'cancelled') setError(res.error);
+  };
+  const resetTeamFolder = (key: string) =>
+    setFolderOverrides((o) => { const n = { ...o }; delete n[key]; return n; });
+  const connLabel: Record<string, string> = {
+    email: t('onboarding.team.conn.email'),
+    quickbooks: t('onboarding.team.conn.quickbooks'),
+    'google-business': t('onboarding.team.conn.google-business'),
+    meta: t('onboarding.team.conn.meta'),
+    calendar: t('onboarding.team.conn.calendar'),
+    shopify: t('onboarding.team.conn.shopify'),
+    website: t('onboarding.team.conn.website'),
+    mailchimp: t('onboarding.team.conn.mailchimp'),
+    crm: t('onboarding.team.conn.crm'),
+    github: t('onboarding.team.conn.github')
+  };
+  const agentChips = (a: AgentDefinitionV2): TeamChip[] => {
+    const chips: TeamChip[] = [];
+    if (businessType !== OTHER_BUSINESS && coreIds.has(a.id)) chips.push({ tone: 'core', label: t('onboarding.team.inEveryPack') });
+    for (const c of a.connections) {
+      const what = connLabel[c.id] ?? c.id;
+      chips.push(c.required
+        ? { tone: 'need', label: t('onboarding.team.needs', { what }) }
+        : { tone: 'optional', label: t('onboarding.team.optional', { what }) });
+    }
+    if (a.connections.length === 0) chips.push({ tone: 'ok', label: t('onboarding.team.nothingToConnect') });
+    return chips;
+  };
+  const folderLabels = {
+    worksIn: t('onboarding.team.worksIn'),
+    change: t('onboarding.team.change'),
+    useSuggested: t('onboarding.team.useSuggested')
+  };
 
   const [home, setHome] = useState<string>('');
-  const [repos, setRepos] = useState<string[]>([]);
   const [autoMode, setAutoMode] = useState<boolean>(true);
   // Anonymous usage stats (TELEMETRY.md). Default ON (opt-out); persisted by
   // finish() so unchecking before finishing means nothing is ever sent.
@@ -128,7 +265,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const engineBlocked = engineBlocksOnboarding(selectedEngine);
 
   // Permissions & reliability toggles. These apply IMMEDIATELY on change (their
-  // own IPC / OS state) "— they are NOT part of finish()'s config write. First-run
+  // own IPC / OS state) — they are NOT part of finish()'s config write. First-run
   // defaults: notifications off (config default), login-item off (fresh install);
   // each reconciles to the real state the IPC returns.
   const [strongKeepalive, setStrongKeepalive] = useState(false);
@@ -170,7 +307,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // the window runs with `contextIsolation: true` / `nodeIntegration: false` and
   // the preload bridges exactly one object (`cth`), so the renderer's main world
   // has no `process`. The suggestion therefore always collapsed to '' and the
-  // field rendered empty "— leaving the copy above promising a default the user
+  // field rendered empty — leaving the copy above promising a default the user
   // could not accept, and Finish failing with "Pick a harness home folder first."
   //
   // Suggest the literal `~/HarnessAgents` instead. That is exactly the string
@@ -189,18 +326,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     else if (res.error !== 'cancelled') setError(res.error);
   };
 
-  const pickRepo = async () => {
-    setError(undefined);
-    const res = await window.cth.chooseFolder();
-    if (res.ok && !repos.includes(res.path)) setRepos([...repos, res.path]);
-    else if (!res.ok && res.error !== 'cancelled') setError(res.error);
-  };
-
-  const removeRepo = (path: string) => setRepos(repos.filter(r => r !== path));
 
   const finish = async () => {
     setBusy(true);
     setError(undefined);
+    // The team's folders must be resolvable before anything is created.
+    if (!plan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
     const harnessHome = home.trim(); // whitespace-only is not a folder
     if (!harnessHome) { setError(t('onboarding.errPickHome')); setBusy(false); setStep('home'); return; }
     // The orchestrator step already refuses to advance on this, but a late probe
@@ -210,24 +341,54 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setError(t('onboarding.errEngineNotInstalled', { label: providerPreset(godProvider).label }));
       setBusy(false); setStep('orchestrator'); return;
     }
-    const ensure = await window.cth.ensureHarnessHome(harnessHome);
-    if (!ensure.ok) {
-      setError(ensure.error ?? t('onboarding.errCreateHome'));
+    // Every await below can reject (IPC down, disk error). Without a catch the
+    // button stayed on "Saving" forever with nothing on screen.
+    try {
+      const ensure = await window.cth.ensureHarnessHome(harnessHome);
+      if (!ensure.ok) {
+        // Plain words for the owner (EACCES and the like mean nothing to them;
+        // the reading-file reasons in plainReason.ts do not fit a folder that
+        // could not be made). The raw reason goes to the log.
+        if (ensure.error) console.error('[onboarding] could not create the home folder:', ensure.error);
+        setError(t('onboarding.errCreateHome'));
+        setBusy(false);
+        return;
+      }
+      // Make each agent's folder, and the shared Office. Only missing folders are
+      // created; one the owner picked (or already had) is left exactly as it is.
+      const made = await window.cth.foldersEnsure(plan.folders);
+      const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
+      if (failed) {
+        setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
+        setBusy(false); setStep('team'); return;
+      }
+      const next = await window.cth.updateConfig({
+        onboardingComplete: true,
+        // The pack drives the starter cast. '__other__' is recorded as unset: no
+        // pack applies, so Michael asks rather than silently picking one.
+        businessType: businessType === OTHER_BUSINESS ? undefined : businessType,
+        businessName: businessName.trim() || undefined,
+        businessCity: businessCity.trim() || undefined,
+        harnessHome, // the same trimmed value we just mkdir'd, not the raw field
+        // Where the office works (Decision 44). The running office starts each
+        // agent inside its folder; the folders also become the hire dialog's
+        // quick-picks, which is what registeredRepos has always fed.
+        officeFolder: plan.office,
+        businessTeam: plan.team,
+        registeredRepos: plan.folders,
+        autoMode,
+        godProvider,
+        godModel,
+        telemetryEnabled: shareStats
+      });
       setBusy(false);
-      return;
+      onComplete(next);
+    } catch (e) {
+      // Plain words for the owner; the raw IPC error is for the log.
+      console.error('[onboarding] finish failed:', e);
+      setError(t('onboarding.errSaveSetup'));
+      setBusy(false);
     }
-    const next = await window.cth.updateConfig({
-      onboardingComplete: true,
-      audience: audience ?? 'technical',
-      harnessHome, // the same trimmed value we just mkdir'd, not the raw field
-      registeredRepos: repos,
-      autoMode,
-      godProvider,
-      godModel,
-      telemetryEnabled: shareStats
-    });
-    setBusy(false);
-    onComplete(next);
   };
 
   return (
@@ -236,9 +397,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       background: 'var(--cth-cream-200)',
       backgroundImage:
         `repeating-linear-gradient(45deg, rgba(232, 217, 160, 0.4) 0 1px, transparent 1px 8px)`,
-      // Scroll the overlay rather than clip the wizard. Step 2 lists every
+      // Scroll the overlay rather than clip the wizard. The manager step lists every
       // installed CLI engine (8 rows + a model select), which is taller than a
-      // 1080p-class window once the OS chrome is subtracted "— the panel was
+      // 1080p-class window once the OS chrome is subtracted — the panel was
       // being cut off at BOTH edges with no way to reach the buttons.
       display: 'flex',
       overflowY: 'auto',
@@ -253,11 +414,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <PixelPanel
           variant="dialog"
           title={
-            step === 'persona' ? t('onboarding.titles.persona')
+            step === 'business' ? t('onboarding.titles.business')
             : step === 'welcome' ? t('onboarding.titles.welcome')
-            : step === 'home' ? (plain ? t('onboarding.titles.homePlain') : t('onboarding.titles.home'))
-            : step === 'orchestrator' ? (plain ? t('onboarding.titles.orchestratorPlain') : t('onboarding.titles.orchestrator'))
-            : step === 'repos' ? (plain ? t('onboarding.titles.reposPlain') : t('onboarding.titles.repos'))
+            : step === 'home' ? t('onboarding.titles.home')
+            : step === 'orchestrator' ? t('onboarding.titles.orchestrator')
+            : step === 'team' ? t('onboarding.titles.team')
             : step === 'permissions' ? t('onboarding.titles.permissions')
             : t('onboarding.titles.done')
           }
@@ -265,7 +426,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         >
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '86vh', overflowY: 'auto' }}>
 
-            {step === 'persona' && (
+            {step === 'business' && (
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{
@@ -278,34 +439,90 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   </div>
                   <div>
                     <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '18px' }}>
-                      {t('onboarding.persona.headline')}
+                      {t('onboarding.business.headline', { godName: godName.toUpperCase() })}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '19px' }}>
-                      {t('onboarding.persona.body')}
-                      <span style={{ color: 'var(--cth-ink-500)' }}>{t('onboarding.persona.bodyLocal')}</span>
+                      {t('onboarding.business.body')}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
-                  {t('onboarding.persona.ask')}
-                </div>
+                {/* Name and location are required: agents write as this business, so
+                    they need to know what it's called and where it is. Neither is
+                    ever used as an id or a path. */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <PersonaCard
-                    icon="code"
-                    title={t('onboarding.persona.technicalTitle')}
-                    desc={t('onboarding.persona.technicalDesc')}
-                    selected={audience === 'technical'}
-                    onClick={() => { setAudience('technical'); setError(undefined); }}
-                  />
-                  <PersonaCard
-                    icon="sparkle"
-                    title={t('onboarding.persona.nonTechnicalTitle')}
-                    desc={t('onboarding.persona.nonTechnicalDesc')}
-                    selected={audience === 'non-technical'}
-                    onClick={() => { setAudience('non-technical'); setError(undefined); }}
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
+                      {t('onboarding.business.nameLabel')}
+                    </span>
+                    <input
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      placeholder={t('onboarding.business.namePlaceholder')}
+                      aria-required
+                      aria-invalid={gapShown('name')}
+                      style={fieldStyle(gapShown('name'))}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
+                      {t('onboarding.business.cityLabel')}
+                    </span>
+                    <input
+                      value={businessCity}
+                      onChange={(e) => setBusinessCity(e.target.value)}
+                      placeholder={t('onboarding.business.cityPlaceholder')}
+                      aria-required
+                      aria-invalid={gapShown('location')}
+                      style={fieldStyle(gapShown('location'))}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                  {t('onboarding.business.ask')}
+                </div>
+
+                {/* Tiles come from the pack registry, so a community pack appears
+                    here without a code change. Titles/taglines are pack data and
+                    are NOT translated (DESIGN.md 7.11). */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+                  {packs?.map((p) => (
+                    <PackTile
+                      key={p.businessType}
+                      glyph={glyphFor(p.glyph)}
+                      title={p.displayName}
+                      subtitle={p.tagline}
+                      selected={businessType === p.businessType}
+                      onClick={() => { setBusinessType(p.businessType); setError(undefined); }}
+                    />
+                  ))}
+                  {/* Always last, always present: the grid must never dead-end. */}
+                  <PackTile
+                    glyph="?"
+                    title={t('onboarding.business.otherTitle')}
+                    subtitle={t('onboarding.business.otherDesc', { godName })}
+                    selected={businessType === OTHER_BUSINESS}
+                    onClick={() => { setBusinessType(OTHER_BUSINESS); setError(undefined); }}
                   />
                 </div>
+
+                {packProblems > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
+                    {t('onboarding.business.packsProblem')}
+                  </div>
+                )}
+
+                {triedBusiness && businessGaps.length > 0 && (
+                  <div role="alert" style={{
+                    padding: '6px 10px',
+                    background: 'var(--cth-coral-light)',
+                    boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
+                    fontSize: 13, color: 'var(--cth-ink-900)'
+                  }}>
+                    {businessGaps.map((g) => gapMessage[g]).join(' ')}
+                  </div>
+                )}
               </>
             )}
 
@@ -326,7 +543,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       fontSize: 12, lineHeight: '18px'
                     }}>{t('onboarding.welcome.headline')}</div>
                     <div style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '18px' }}>
-                      {plain ? t('onboarding.welcome.descPlain') : t('onboarding.welcome.desc')}
+                      {t('onboarding.welcome.desc')}
                     </div>
                   </div>
                 </div>
@@ -355,7 +572,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                           // the orchestrator's name has to arrive upper-cased too.
                         }}>{t(f.labelKey, { godName: godName.toUpperCase() })}</div>
                         <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
-                          {plain ? t(f.descPlainKey) : t(f.descKey)}
+                          {t(f.descKey)}
                         </div>
                       </div>
                     </div>
@@ -367,7 +584,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {step === 'home' && (
               <>
                 <p style={{ margin: 0, lineHeight: '22px' }}>
-                  {plain ? t('onboarding.home.descPlain') : t('onboarding.home.desc')}
+                  {t('onboarding.home.desc')}
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
@@ -378,12 +595,42 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   />
                   <PixelButton variant="secondary" size="md" onClick={pickHome}>
                     <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                      <Icon name="folder" /> {plain ? t('onboarding.home.createPick') : t('onboarding.home.pick')}
+                      <Icon name="folder" /> {t('onboarding.home.createPick')}
                     </span>
                   </PixelButton>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
-                  {plain ? t('onboarding.home.notePlain') : t('onboarding.home.note')}
+                  {t('onboarding.home.note')}
+                </div>
+
+                {/* This folder holds the app's live machinery, and cloud sync breaks
+                    all of it: the hive is a git repo committed thousands of times,
+                    agents' permission hooks connect through a Unix socket here
+                    (hooks.sock), and team memory is a SQLite database (palace/).
+                    Sync clients fight git's lock files, cannot carry a socket, and
+                    corrupt a database copied mid-write. Warned about up front
+                    because an owner's instinct is to keep business things in
+                    Dropbox or Drive, and the damage shows up much later. */}
+                <div role="note" style={{
+                  display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
+                  background: 'var(--cth-lemon-light)',
+                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                }}>
+                  <span style={{
+                    width: 28, height: 28, flexShrink: 0, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                  }}>
+                    <Icon name="info" />
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', marginBottom: 3 }}>
+                      {t('onboarding.home.syncWarningTitle')}
+                    </div>
+                    <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
+                      {t('onboarding.home.syncWarning')}
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -391,36 +638,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {step === 'orchestrator' && (
               <>
                 <p style={{ margin: 0, lineHeight: '22px' }}>
-                  {plain ? t('onboarding.orchestrator.descPlain') : t('onboarding.orchestrator.desc')}
+                  {t('onboarding.orchestrator.desc')}
                 </p>
 
-                {/* What is a CLI agent / your clone "— item 3 */}
                 <div style={{
                   display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10,
                   background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-                  fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)'
+                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
                 }}>
                   <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="sparkle" /></span>
                   <span>
-                    {plain ? (
-                      <Trans i18nKey="onboarding.orchestrator.cliAgentPlain" components={{ strong: <strong /> }}>
-                        A <strong>CLI agent</strong> is an AI coding assistant that runs on your
-                        computer — popular ones are Claude Code (Anthropic), Codex (OpenAI) and
-                        Antigravity (Google Gemini). <strong>Your clone</strong> is the always-on
-                        one that runs your whole office. We recommend Claude Code on Opus 4.8 (1M).
-                        You can add or switch the others later.
-                      </Trans>
-                    ) : (
-                      <Trans i18nKey="onboarding.orchestrator.cliAgent" components={{ strong: <strong /> }}>
-                        Each option is a <strong>CLI engine</strong> (Claude Code, Codex,
-                        Antigravity/Gemini, or a local proxy like Qwen). Engines marked
-                        INSTALLED are already on this machine; INSTALLS ON FIRST RUN means the app
-                        sets it up when Michael first starts.
-                        <strong> Your clone</strong> (Michael) is the engine that orchestrates the whole
-                        hive. Recommended: Claude Code · Opus 4.8 · 1M. Other providers can be wired
-                        per agent later.
-                      </Trans>
-                    )}
+                    <Trans i18nKey="onboarding.orchestrator.cliAgent" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>
+                      <strong>Claude Code</strong>, made by Anthropic, is the AI that powers
+                      your office. It runs right here on this Mac. <strong>Your manager</strong> is
+                      always on and runs your whole office. We recommend Opus 5.5, the newest model.
+                    </Trans>
                   </span>
                 </div>
 
@@ -552,70 +784,111 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     onChange={(e) => setGodModel(e.target.value || undefined)}
                     style={inputStyle}
                   >
-                    {modelsForProvider(godProvider).map((m) => (
-                      <option key={m.label} value={m.id ?? ''}>{m.label}</option>
-                    ))}
+                    {/* A <select> whose value matches no option shows its FIRST
+                        row while the state keeps the other model, so the screen
+                        and the saved choice disagree. Always list the selection. */}
+                    {(() => {
+                      const options = modelsForProvider(godProvider);
+                      const listed = options.some((m) => (m.id ?? '') === (godModel ?? ''));
+                      return (listed ? options : [{ id: godModel, label: godModel ?? '' }, ...options]).map((m) => (
+                        <option key={m.id ?? m.label} value={m.id ?? ''}>{m.label}</option>
+                      ));
+                    })()}
                   </select>
                   <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
                     {t('onboarding.orchestrator.modelNote')}
                   </div>
                 </div>
+
+                {/* The plan the office needs to run all day. Said here, before
+                    finish, so a smaller plan's usage limit isn't a surprise on
+                    the first busy afternoon. */}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 8, padding: 10,
+                  background: 'var(--cth-peach-light)', boxShadow: 'inset 0 0 0 2px var(--cth-peach)',
+                  fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
+                }}>
+                  <span>
+                    <Trans i18nKey="onboarding.orchestrator.maxPlan" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>
+                      <strong>You&apos;ll need a Claude Max plan</strong> to keep your office running
+                      full time. Smaller plans reach their usage limit during the day, and the
+                      office pauses until the limit resets.
+                    </Trans>
+                  </span>
+                  <div>
+                    <PixelButton variant="ghost" size="sm" onClick={() => { void window.cth.openExternal(CLAUDE_PLANS_URL); }}>
+                      {t('onboarding.orchestrator.seePlans')}
+                    </PixelButton>
+                  </div>
+                </div>
               </>
             )}
 
-            {step === 'repos' && (
+            {step === 'team' && (
               <>
-                <p style={{ margin: 0, lineHeight: '22px' }}>
-                  {plain ? t('onboarding.repos.descPlain') : t('onboarding.repos.desc')}
+                <p style={{ margin: 0, lineHeight: '20px', fontSize: 13, color: 'var(--cth-ink-700)' }}>
+                  {businessType === OTHER_BUSINESS
+                    ? t('onboarding.team.introOther')
+                    : t('onboarding.team.intro', { pack: teamPack?.displayName ?? '' })}
                 </p>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                  maxHeight: 200, overflowY: 'auto'
-                }}>
-                  {repos.length === 0 && (
-                    <div style={{
-                      padding: 12,
-                      fontSize: 13,
-                      color: 'var(--cth-ink-500)',
-                      background: 'var(--cth-paper-200)',
-                      textAlign: 'center'
-                    }}>
-                      {plain ? t('onboarding.repos.emptyPlain') : t('onboarding.repos.empty')}
-                    </div>
-                  )}
-                  {repos.map((r) => (
-                    <div key={r} style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 10px',
-                      background: 'var(--cth-paper-100)',
-                      boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
-                    }}>
-                      <Icon name="folder" />
-                      <span style={{
-                        flex: 1,
-                        fontFamily: 'var(--cth-font-mono)', fontSize: 13,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>{r}</span>
-                      <PixelButton variant="ghost" size="sm" onClick={() => removeRepo(r)}>
-                        <Icon name="x" />
-                      </PixelButton>
-                    </div>
+
+                {/* The folder idea, said once, in plain words: each person has a
+                    folder; put their documents there; they save their work there. */}
+                {folderSuggestions && (
+                  <div style={{
+                    display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
+                    background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                    fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)'
+                  }}>
+                    <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="folder" /></span>
+                    <span>{t('onboarding.team.folderNote', { root: tildePath(folderSuggestions.root) })}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <TeamCard
+                    character="michael"
+                    name={t('onboarding.team.managerName')}
+                    summary={t('onboarding.team.managerSummary')}
+                    chips={[{ tone: 'muted', label: t('onboarding.team.alwaysOn') }]}
+                    folder={officeFolderFor(folderSuggestions, folderOverrides)}
+                    folderNote={t('onboarding.team.sharedFolder')}
+                    displayPath={tildePath}
+                    overridden={folderOverrides[OFFICE_KEY] !== undefined}
+                    onChangeFolder={() => { void chooseTeamFolder(OFFICE_KEY); }}
+                    onUseSuggested={() => resetTeamFolder(OFFICE_KEY)}
+                    labels={folderLabels}
+                  />
+                  {teamAgents.map((a) => (
+                    <TeamCard
+                      key={a.id}
+                      character={a.character}
+                      name={`${a.character ? a.character[0].toUpperCase() + a.character.slice(1) : a.id} · ${a.role}`}
+                      summary={a.summary}
+                      chips={agentChips(a)}
+                      picked={!!teamPicked[a.id]}
+                      onTogglePicked={() => { setError(undefined); setTeamPicked((p) => ({ ...p, [a.id]: !p[a.id] })); }}
+                      folder={folderFor(a, folderSuggestions, folderOverrides)}
+                      displayPath={tildePath}
+                      overridden={folderOverrides[a.id] !== undefined}
+                      onChangeFolder={() => { void chooseTeamFolder(a.id); }}
+                      onUseSuggested={() => resetTeamFolder(a.id)}
+                      labels={folderLabels}
+                    />
                   ))}
                 </div>
-                <PixelButton variant="secondary" size="md" onClick={pickRepo}>
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <Icon name="plus" /> {plain ? t('onboarding.repos.addProject') : t('onboarding.repos.addRepo')}
-                  </span>
-                </PixelButton>
+
+                <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
+                  {t('onboarding.team.summary', { picked: pickedCount, connect: needed.required.length })}
+                </div>
               </>
             )}
 
             {step === 'permissions' && (
               <>
-                {/* AUTONOMY — merged from the old "auto mode" step (item 5). One choice
-                    that maps to each engine's flag (item 6): autoMode → claude
-                    bypassPermissions / codex -a never -s workspace-write (sandbox kept),
-                    etc.; off → each engine's ask-first default. */}
+                {/* AUTONOMY — one choice that maps to each engine's flag: autoMode →
+                    claude bypassPermissions / codex -a never -s workspace-write
+                    (sandbox kept), etc.; off → each engine's ask-first default. */}
                 <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
                   {t('onboarding.permissions.autonomyHead')}
                 </div>
@@ -634,27 +907,25 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   />
                   <div>
                     <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px' }}>
-                      {plain ? t('onboarding.permissions.autoLabelPlain') : t('onboarding.permissions.autoLabel')}
+                      {t('onboarding.permissions.autoLabel')}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--cth-ink-700)' }}>
-                      {plain
-                        ? (autoMode ? t('onboarding.permissions.autoOnPlain') : t('onboarding.permissions.autoOffPlain'))
-                        : (autoMode ? t('onboarding.permissions.autoOn') : t('onboarding.permissions.autoOff'))}
+                      {autoMode ? t('onboarding.permissions.autoOn') : t('onboarding.permissions.autoOff')}
                     </div>
                   </div>
                 </label>
                 <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
-                  {plain ? t('onboarding.permissions.autoNotePlain') : t('onboarding.permissions.autoNote')}
+                  {t('onboarding.permissions.autoNote')}
                 </div>
 
                 <div style={{ height: 1, background: 'var(--cth-ink-300)', margin: '2px 0' }} />
 
-                {/* RELIABILITY "— keeping work firing while you're away. */}
+                {/* RELIABILITY — keeping work firing while you're away. */}
                 <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
                   {t('onboarding.permissions.reliabilityHead')}
                 </div>
                 <p style={{ margin: 0, lineHeight: '20px', fontSize: 12, color: 'var(--cth-ink-700)' }}>
-                  {plain ? t('onboarding.permissions.reliabilityDescPlain') : t('onboarding.permissions.reliabilityDesc')}
+                  {t('onboarding.permissions.reliabilityDesc')}
                 </p>
 
                 <ToggleRow
@@ -697,7 +968,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   onChange={() => setShareStats(!shareStats)}
                 />
 
-                {/* LEVER 4 "— instruction-only: the OS won't let the app flip its sleep setting itself, so we deep-link the pane where one exists (macOS/Windows) and fall back to text-only guidance on Linux. */}
+                {/* Instruction-only: the OS won't let the app flip its sleep setting
+                    itself, so we deep-link the pane where one exists (macOS/Windows)
+                    and fall back to text-only guidance on Linux. */}
                 <div style={{
                   display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
                   background: 'var(--cth-lemon-light)',
@@ -747,13 +1020,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
               <Dots step={step} />
               <div style={{ display: 'flex', gap: 8 }}>
-                {step !== 'persona' && step !== 'welcome' && (
+                {step !== 'business' && (
                   <PixelButton variant="ghost" size="md" onClick={() => setStep(prevStep(step))} disabled={busy}>
-                    {t('common.back')}
-                  </PixelButton>
-                )}
-                {step === 'welcome' && (
-                  <PixelButton variant="ghost" size="md" onClick={() => setStep('persona')} disabled={busy}>
                     {t('common.back')}
                   </PixelButton>
                 )}
@@ -762,6 +1030,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     variant="primary"
                     size="md"
                     onClick={() => {
+                      // Step 1 needs a name, a location and a business type before
+                      // anything else. The button stays clickable so the owner is
+                      // TOLD what's missing, rather than facing a grey button.
+                      if (step === 'business' && businessGaps.length > 0) {
+                        setTriedBusiness(true);
+                        return;
+                      }
+                      if (step === 'team' && !plan.ok) {
+                        setError(t('onboarding.team.errNoFolders'));
+                        return;
+                      }
                       // Validate the home step HERE. Without this the only check
                       // lives in finish(), so an empty field walks you through all
                       // four steps and then bounces you back to step 1 to be told.
@@ -773,15 +1052,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       // screen, instead of letting a pick that cannot boot through
                       // to a Michael that never starts.
                       if (step === 'orchestrator' && engineBlocked) {
-                        setError(`${providerPreset(godProvider).label} is not installed. Install it and press "check again", or pick another engine.`);
+                        setError(t('onboarding.errEngineNotInstalled', { label: providerPreset(godProvider).label }));
                         return;
                       }
                       setError(undefined);
                       setStep(nextStep(step));
                     }}
-                    disabled={(step === 'persona' && !audience) || (step === 'orchestrator' && engineBlocked)}
+                    disabled={step === 'orchestrator' && engineBlocked}
                   >
-                    {step === 'welcome' ? t('onboarding.permissions.setItUp') : t('common.next')}
+                    {step === 'welcome' ? t('onboarding.team.suggestCta') : t('common.next')}
                   </PixelButton>
                 )}
                 {step === 'permissions' && (
@@ -798,36 +1077,157 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   );
 }
 
-function PersonaCard({ icon, title, desc, selected, onClick }: {
-  icon: IconName;
+/** One business type on the first onboarding screen (DESIGN.md 7.11). The glyph
+ *  is emoji from the pack, NOT an `<Icon>` — see DESIGN.md 10.3 for why. */
+function PackTile({ glyph, title, subtitle, selected, onClick }: {
+  glyph: string;
   title: string;
-  desc: string;
+  subtitle: string;
   selected: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={selected}
       style={{
         textAlign: 'left', cursor: 'pointer', border: 'none',
-        padding: 12, display: 'flex', flexDirection: 'column', gap: 6,
+        padding: 10, display: 'flex', gap: 10, alignItems: 'flex-start',
         background: selected ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
         boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
       }}
     >
       <span style={{
-        width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
-      }}>
-        <Icon name={icon} />
-      </span>
-      <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)' }}>
-        {title}
-      </span>
-      <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
-        {desc}
+        width: 28, height: 28, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+        fontSize: 16, lineHeight: '28px'
+      }}>{glyph}</span>
+      {/* minWidth:0 lets this flex child shrink below its content width;
+          without it the text column refuses to narrow and pushes past the tile. */}
+      <span style={{ minWidth: 0, flex: 1 }}>
+        <span style={{
+          display: 'block', fontFamily: 'var(--cth-font-display)',
+          fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)',
+          // Pack names are DATA, not copy we control: a bundled or community pack
+          // can supply a long token with no space in it ("SaaS/Consulting"), and
+          // no browser breaks a line at a slash. Break anywhere rather than let a
+          // name overflow the tile — the grid is the first screen an owner sees.
+          overflowWrap: 'anywhere'
+        }}>{title}</span>
+        <span style={{
+          display: 'block', fontSize: 12, lineHeight: '16px',
+          color: 'var(--cth-ink-700)', overflowWrap: 'anywhere'
+        }}>
+          {subtitle}
+        </span>
       </span>
     </button>
+  );
+}
+
+type TeamChip = { tone: 'muted' | 'core' | 'need' | 'optional' | 'ok'; label: string };
+
+const CHIP_BG: Record<TeamChip['tone'], string> = {
+  muted: 'var(--cth-paper-100)',
+  core: 'var(--cth-lemon-light)',
+  need: 'var(--cth-peach-light)',
+  optional: 'var(--cth-cream-200)',
+  ok: 'var(--cth-mint-light)'
+};
+
+/** A portrait we know how to draw; anything else from a pack falls back rather than breaking. */
+const castName = (c?: string): OfficeCharacterName =>
+  OFFICE_CAST.some((m) => m.name === c) ? (c as OfficeCharacterName) : DEFAULT_CHARACTER;
+
+/**
+ * One member of the starter team (wireframe screen 2, plus the folder they work
+ * in — Decision 47). `picked` undefined means not pickable: Michael, always on.
+ * The folder row sits OUTSIDE the label so its buttons aren't nested inside
+ * the checkbox's click target.
+ */
+function TeamCard({
+  character, name, summary, chips, picked, onTogglePicked,
+  folder, folderNote, displayPath, overridden, onChangeFolder, onUseSuggested, labels
+}: {
+  character?: string;
+  name: string;
+  summary: string;
+  chips: TeamChip[];
+  picked?: boolean;
+  onTogglePicked?: () => void;
+  folder?: string;
+  folderNote?: string;
+  displayPath: (p: string) => string;
+  overridden: boolean;
+  onChangeFolder: () => void;
+  onUseSuggested: () => void;
+  labels: { worksIn: string; change: string; useSuggested: string };
+}) {
+  const pickable = picked !== undefined;
+  const active = !pickable || picked;
+  // The folder row lines up under the text: checkbox + gap + portrait + gap.
+  const textIndent = (pickable ? 16 + 10 : 0) + 44 + 10;
+  return (
+    <div style={{
+      padding: 10,
+      background: pickable ? (picked ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)') : 'var(--cth-cream-100)',
+      boxShadow: `inset 0 0 0 ${pickable && picked ? 2 : 1}px ${pickable && picked ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
+    }}>
+      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: pickable ? 'pointer' : 'default' }}>
+        {pickable && (
+          <input
+            type="checkbox"
+            checked={picked}
+            onChange={onTogglePicked}
+            style={{ width: 16, height: 16, flexShrink: 0, marginTop: 14 }}
+          />
+        )}
+        <span style={{
+          width: 44, height: 44, flexShrink: 0, overflow: 'hidden',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+        }}>
+          <SpritePortrait character={castName(character)} scale={1.5} />
+        </span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 3 }}>
+            <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)' }}>
+              {name}
+            </span>
+          </span>
+          <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>{summary}</span>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {chips.map((c) => (
+              <span key={c.label} style={{
+                fontSize: 11, lineHeight: '16px', padding: '0 6px',
+                background: CHIP_BG[c.tone], color: 'var(--cth-ink-700)',
+                boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+              }}>{c.label}</span>
+            ))}
+          </span>
+        </span>
+      </label>
+
+      {active && folder && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          marginTop: 8, marginLeft: textIndent, fontSize: 11, color: 'var(--cth-ink-700)', minWidth: 0
+        }}>
+          <Icon name="folder" />
+          <span style={{ color: 'var(--cth-ink-500)' }}>{labels.worksIn}</span>
+          <span title={folder} style={{
+            fontFamily: 'var(--cth-font-mono)', minWidth: 0, maxWidth: '100%',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>{displayPath(folder)}</span>
+          {folderNote && <span style={{ color: 'var(--cth-ink-500)' }}>· {folderNote}</span>}
+          <PixelButton variant="ghost" size="sm" onClick={onChangeFolder}>{labels.change}</PixelButton>
+          {overridden && (
+            <PixelButton variant="ghost" size="sm" onClick={onUseSuggested}>{labels.useSuggested}</PixelButton>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -873,7 +1273,7 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
 }
 
 function Dots({ step }: { step: Step }) {
-  const order: Step[] = ['persona', 'welcome', 'home', 'orchestrator', 'repos', 'permissions'];
+  const order: Step[] = ['business', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {order.map((s) => (
@@ -888,21 +1288,24 @@ function Dots({ step }: { step: Step }) {
 }
 
 function nextStep(s: Step): Step {
-  return s === 'persona' ? 'welcome'
-    : s === 'welcome' ? 'home'
+  return s === 'business' ? 'welcome'
+    : s === 'welcome' ? 'team'
+    : s === 'team' ? 'home'
     : s === 'home' ? 'orchestrator'
-    : s === 'orchestrator' ? 'repos'
-    : s === 'repos' ? 'permissions'
+    : s === 'orchestrator' ? 'permissions'
     : 'done';
 }
 function prevStep(s: Step): Step {
-  return s === 'permissions' ? 'repos'
-    : s === 'repos' ? 'orchestrator'
+  return s === 'permissions' ? 'orchestrator'
     : s === 'orchestrator' ? 'home'
-    : s === 'home' ? 'welcome'
-    : s === 'welcome' ? 'persona'
-    : 'persona';
+    : s === 'home' ? 'team'
+    : s === 'team' ? 'welcome'
+    : 'business';
 }
+
+/** An input that is flagged as missing gets a coral ring, matching the error box. */
+const fieldStyle = (missing: boolean): React.CSSProperties =>
+  missing ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral)' } : inputStyle;
 
 const inputStyle: React.CSSProperties = {
   flex: 1,

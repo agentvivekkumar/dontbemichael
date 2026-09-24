@@ -12,6 +12,12 @@ import {
   type WebhookTrigger
 } from '@shared/triggers';
 import { PixelPanel } from './PixelPanel';
+import { SkillsTab } from './SkillsTab';
+import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
+import { plainReasonKey } from '@/store/plainReason';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
+import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
+import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
@@ -90,10 +96,10 @@ const slackLabelStyle: CSSProperties = {
 /** The exact connect walkthrough shown behind the i icon. Steps 6 & 7 spell out
  *  the both-lists requirement: subscribe to message.channels / message.groups in
  *  BOTH "Subscribe to bot events" AND "Subscribe to events on behalf of users". */
-const SLACK_CONNECT_STEPS = `Connect Munder Difflin to Slack
+const SLACK_CONNECT_STEPS = `Connect Don't Be Michael to Slack
 
 1. api.slack.com/apps -> Create New App -> From scratch. Name it
-   "Munder Difflin" and pick your workspace.
+   "Don't Be Michael" and pick your workspace.
 2. Basic Information -> Signing Secret -> copy it into the
    "Signing secret" field here.
 3. OAuth & Permissions -> Bot Token Scopes: add
@@ -115,7 +121,7 @@ const SLACK_CONNECT_STEPS = `Connect Munder Difflin to Slack
      message.channels
      message.groups
 8. Save Changes, reinstall if Slack prompts, then invite the bot
-   to your channel:  /invite @MunderDifflin`;
+   to your channel: /invite the app by the name you gave it in step 1.`;
 
 /** The request/response contract shown behind the webhook i icon. Every webhook
  *  shares one server and one tunnel and is told apart by its id in the path, so
@@ -147,20 +153,12 @@ A 202 means the message is parked in Trigger History until you approve it; the
 token you were handed still reads that task once it is routed. The secret
 authorizes new work, the token only reads one task's status. Keep both private.
 
-Each webhook checks bodies against its own JSON schema — edit that in the
-Triggers tab of ${godName}'s Command Center.`;
+Each webhook checks bodies against its own JSON schema; edit it in that
+webhook's Format row, above.`;
 
-/** Clear every renderer-side persisted key so a relaunch starts truly empty. */
-function clearLocalState(): void {
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && k.startsWith('cth.')) keys.push(k);
-    }
-    for (const k of keys) window.localStorage.removeItem(k);
-  } catch { /* noop */ }
-}
+// snapshotLocalState / restoreLocalState / clearLocalState live in
+// store/localState.ts (re-exported here for existing importers).
+export { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 
 // v0.3.4 redesign: six tabs, one topic each. 'AI Engines' folded into
 // Agents & Models; MCP + Slack + webhook + REST live together in Connections;
@@ -179,14 +177,15 @@ const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
 /** The 2px rule between Settings sections. */
 const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
 
-export type Section = 'General' | 'Prerequisites' | 'Agents & Models' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
-const NAV_SECTIONS: Section[] = ['General', 'Prerequisites', 'Agents & Models', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+export type Section = 'General' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
+const NAV_SECTIONS: Section[] = ['General', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
 /** i18n key for each nav section's label — the Section values themselves stay
  *  as stable identifiers (tab state, deep links). */
 const NAV_SECTION_KEYS: Record<Section, string> = {
   'General': 'settings.nav.general',
   'Prerequisites': 'settings.nav.prerequisites',
   'Agents & Models': 'settings.nav.agentsModels',
+  'Skills': 'settings.nav.skills',
   'Autonomy & Budgets': 'settings.nav.autonomyBudgets',
   'Connections': 'settings.nav.connections',
   'Voice': 'settings.nav.voice',
@@ -206,6 +205,20 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   const [changeMode, setChangeMode] = useState<'move' | 'fresh'>('move');
   const [changeBusy, setChangeBusy] = useState(false);
   const [changeErr, setChangeErr] = useState('');
+  // The picked folder already holds an office. Then the only offer is to OPEN
+  // it: "move" would copy this office over that one (cpSync with force).
+  const [changeTargetHasOffice, setChangeTargetHasOffice] = useState(false);
+  // Other offices this install has used and that still exist, for one-click
+  // switching. Took over from the launch picker, which no longer shows on a
+  // normal launch (owner, 2026-09-24).
+  const [otherOffices, setOtherOffices] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const candidates = (config.recentHives ?? []).filter((h) => h && h !== config.harnessHome);
+    void Promise.all(candidates.map((h) => window.cth.homeStatus(h).then((st) => (st.hasOffice ? h : null)).catch(() => null)))
+      .then((ok) => { if (alive) setOtherOffices(ok.filter((h): h is string => !!h)); });
+    return () => { alive = false; };
+  }, [config.recentHives, config.harnessHome]);
 
   // `notifications` is an optional field on the main-process config; the renderer
   // mirror type may not declare it yet, so read it defensively.
@@ -311,6 +324,22 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     setSemMemOn(next);
     stage({ semanticMemory: next } as Partial<HarnessConfig>);
   };
+  // Search language + live status. Moved here from the floating "hive memory"
+  // panel that sat on the office floor: nothing in it was about the floor, its
+  // on/off duplicated the switch above, and searching memory is already on
+  // Michael's Memory tab (owner, 2026-09-24).
+  const [embeddingModel, setEmbeddingModel] = useState<'minilm' | 'embeddinggemma'>(cfgX.embeddingModel ?? 'minilm');
+  const pickEmbeddingModel = (m: 'minilm' | 'embeddinggemma') => {
+    setEmbeddingModel(m);
+    stage({ embeddingModel: m } as Partial<HarnessConfig>);
+  };
+  const [memStatus, setMemStatus] = useState<{ available: boolean; enabled: boolean; initialized: boolean } | null>(null);
+  useEffect(() => {
+    if (activeSection !== 'Memory & Knowledge') return;
+    let alive = true;
+    void window.cth.memoryStatus().then((st) => { if (alive) setMemStatus(st); }).catch(() => { /* leave unknown */ });
+    return () => { alive = false; };
+  }, [activeSection]);
 
   // --- circuit-breaker config (Lane A #6 canonical fields, widened view) ---
   // Drives Jim's real breaker: floor-wide TOKEN budget (costCapTokens) + output-
@@ -459,8 +488,22 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
       const res = await window.cth.kgAddFiles();
       if (!res.ok) { setKgNote(res.error === 'cancelled' ? '' : (res.error ?? 'failed')); return; }
       const added = res.results.filter((r) => r.ok).length;
-      const failed = res.results.length - added;
-      setKgNote(`added ${added} document${added === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}`);
+      // Name each file that couldn't be read, with the reason. A bare "1 failed"
+      // leaves an owner guessing which file, and why, and whether to retry.
+      const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
+      // Raw system codes (ENOENT, EACCES) mean nothing to an owner; say what
+      // happened instead. The reader's own reasons are already plain words.
+      const plainReason = (err?: string): string => {
+        const key = plainReasonKey(err);
+        return key ? t(key) : (err as string);
+      };
+      const failures = res.results
+        .filter((r) => !r.ok)
+        .map((r) => t('settings.memory.couldNotRead', { file: fileName(r.srcPath), reason: plainReason(r.error) }));
+      setKgNote([
+        added ? t('settings.memory.docsAdded', { count: added }) : '',
+        ...failures
+      ].filter(Boolean).join(' · '));
       await refreshKgStatus();
     } catch (e) { setKgNote(e instanceof Error ? e.message : String(e)); }
     finally { setKgBusy(false); }
@@ -674,7 +717,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     } catch (e) {
       setWebhookNote(e instanceof Error ? e.message : String(e));
     } finally { setWebhookBusy(false); }
-    if (!secret) { setWebhookNote('could not generate a secret'); return; }
+    if (!secret) { setWebhookNote(t('settings.connections.secretFailed')); return; }
     const entry: WebhookTrigger = {
       id: newWebhookId(),
       name: `Webhook ${webhookTriggers.length + 1}`,
@@ -699,10 +742,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     } catch (e) {
       setWebhookNote(e instanceof Error ? e.message : String(e));
     } finally { setWebhookBusy(false); }
-    if (!secret) { setWebhookNote('could not generate a secret'); return; }
+    if (!secret) { setWebhookNote(t('settings.connections.secretFailed')); return; }
     setShownSecrets((s) => ({ ...s, [id]: true }));
     await patchWebhook(id, { secret });
-    setWebhookNote('new secret — copy it now');
+    setWebhookNote(t('settings.connections.newSecret'));
   };
 
   const removeWebhook = async (id: string) => {
@@ -784,8 +827,21 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     setChangeErr('');
     const res = await window.cth.chooseFolder();
     if (!res.ok) return; // cancelled - no-op
-    setChangeMode('move'); // recommended default
+    const st = await window.cth.homeStatus(res.path).catch(() => null);
+    const hasOffice = !!st?.hasOffice;
+    setChangeTargetHasOffice(hasOffice);
+    setChangeMode(hasOffice ? 'fresh' : 'move'); // open it, or move (recommended) into an empty one
     setChangeHome(res.path);
+  };
+
+  /** Switch to another office this install has used. A different office, so the
+   *  renderer's saved state goes (its own roster comes back from its folder). */
+  const openOtherOffice = async (path: string) => {
+    setChangeErr('');
+    const snap = snapshotLocalState();
+    clearLocalState();
+    const res = await window.cth.changeHome(path, 'fresh').catch((e) => ({ ok: false, error: String(e) }));
+    if (!res.ok) { restoreLocalState(snap); setChangeErr(res.error ?? t('settings.changeHome.couldNotOpen')); }
   };
 
   /** Apply the home-folder change. On success the app relaunches (never resolves);
@@ -794,14 +850,18 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     if (!changeHome) return;
     setChangeBusy(true); setChangeErr('');
     // Moving copies the hive (incl. its .git) + palace, so the new home owns the
-    // same renderer-side roster - keep localStorage. A 'fresh' home starts empty,
-    // so clear the renderer cache to match.
-    if (changeMode === 'fresh') clearLocalState();
+    // same renderer-side roster - keep localStorage. 'fresh' either starts an
+    // empty office or opens one already in that folder; both bring their own
+    // roster, so clear the renderer cache to match, and put it back if the
+    // switch fails and this office keeps running.
+    const snap = changeMode === 'fresh' ? snapshotLocalState() : null;
+    if (snap) clearLocalState();
     try {
       const res = await window.cth.changeHome(changeHome, changeMode);
-      if (!res.ok) { setChangeErr(res.error ?? 'Could not change the home folder.'); setChangeBusy(false); }
+      if (!res.ok) { if (snap) restoreLocalState(snap); setChangeErr(res.error ?? 'Could not change the home folder.'); setChangeBusy(false); }
       // ok === true never returns (the process relaunches).
     } catch (e) {
+      if (snap) restoreLocalState(snap);
       setChangeErr(e instanceof Error ? e.message : String(e));
       setChangeBusy(false);
     }
@@ -848,12 +908,17 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                 }}>{changeHome}</code>
               </div>
 
-              {/* Move vs. fresh - two selectable option rows; move is preselected. */}
+              {/* Move vs. fresh: two option rows with move preselected. When the
+                  picked folder already holds an office, only the 'open' row shows
+                  (mode 'fresh'), since a move would copy over that office. */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {([
-                  ['move', t('settings.changeHome.moveTitle'), t('settings.changeHome.moveDesc')],
-                  ['fresh', t('settings.changeHome.freshTitle'), t('settings.changeHome.freshDesc')]
-                ] as const).map(([value, title, desc]) => {
+                {(changeTargetHasOffice
+                  ? [['fresh', t('settings.changeHome.openTitle'), t('settings.changeHome.openDesc')] as const]
+                  : [
+                    ['move', t('settings.changeHome.moveTitle'), t('settings.changeHome.moveDesc')] as const,
+                    ['fresh', t('settings.changeHome.freshTitle'), t('settings.changeHome.freshDesc')] as const
+                  ]
+                ).map(([value, title, desc]) => {
                   const selected = changeMode === value;
                   return (
                     <button
@@ -999,9 +1064,31 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <span style={{
                             flex: 1, color: 'var(--cth-ink-900)', wordBreak: 'break-all',
                             fontFamily: 'var(--cth-font-mono, monospace)'
-                          }}>{config.harnessHome ?? '—'}</span>
+                          }}>{config.harnessHome ?? '·'}</span>
                           <PixelButton variant="secondary" size="sm" onClick={pickNewHome}>{t('settings.change')}</PixelButton>
                         </div>
+                        <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                          {t('settings.general.homeFolderDesc')}
+                        </span>
+                        {otherOffices.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                            <span style={{ fontSize: 14, color: 'var(--cth-ink-700)' }}>{t('settings.general.otherOffices')}</span>
+                            {otherOffices.map((h) => (
+                              <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{
+                                  flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-mono, monospace)', fontSize: 14,
+                                  color: 'var(--cth-ink-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                }}>{h}</span>
+                                <PixelButton variant="secondary" size="sm" onClick={() => { void openOtherOffice(h); }}>
+                                  {t('settings.general.openOffice')}
+                                </PixelButton>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {changeErr && !changeHome && (
+                          <div style={{ fontSize: 12, lineHeight: '18px', color: '#6E1423', marginTop: 6 }}>{changeErr}</div>
+                        )}
                       </div>
 
                       <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
@@ -1194,6 +1281,26 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       something about the agent whose terminal you are reading. */}
                   {activeSection === 'Prerequisites' && <SetupPanel onDone={onClose} />}
 
+                  {/* SKILLS. Lived as a tab on Michael's panel, which read as
+                      "Michael's skills". They are the whole team's: a catalog
+                      install lands in ~/.claude/skills, which every Claude Code
+                      session on this Mac reads, and the bundled skills are
+                      copied into every agent at spawn. No agent is passed, so
+                      the installed list scans every team folder. */}
+                  {activeSection === 'Skills' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
+                      <div>
+                        <div style={sectionHeadTight}>{t('settings.skills.title')}</div>
+                        <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)' }}>
+                          {t('settings.skills.desc', { godName })}
+                        </span>
+                      </div>
+                      <div style={{ flex: 1, minHeight: 420, display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+                        <SkillsTab />
+                      </div>
+                    </div>
+                  )}
+
                   {activeSection === 'Agents & Models' && (
                     <>
                       <div>
@@ -1243,6 +1350,20 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('settings.agentsModels.blankUnlimited')}</span>
                         </div>
                       </div>
+
+                      <div style={sectionRule} />
+
+                      {/* Context upkeep: compact / clear rules. Lived in Michael's
+                          Triggers tab, but each run goes through EVERY live agent
+                          (useHive's context trigger), so it is a setting for how all
+                          agents run, not a trigger of Michael's. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={sectionHeadTight}>{t('settings.agentsModels.contextUpkeep')}</div>
+                        <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                          {t('settings.agentsModels.contextUpkeepDesc')}
+                        </span>
+                        <ContextSection />
+                      </div>
                     </>
                   )}
 
@@ -1268,6 +1389,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
+                      {/* "Who can add agents": the switch that let Michael start
+                          temporary workers. Gone with the feature in this build
+                          (ALLOW_TEMP_WORKERS); he asks on the ASK ME board instead. */}
+                      {ALLOW_TEMP_WORKERS && (<>
                       <div style={{ height: 1, background: 'var(--cth-ink-300)', margin: '12px 0' }} />
 
                       <div>
@@ -1287,6 +1412,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           </PixelButton>
                         </div>
                       </div>
+                      </>)}
 
                       <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
 
@@ -1374,13 +1500,77 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('settings.memory.crossSession')}</span>
                             <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.memory.crossSessionDesc')}
+                              {t('settings.memory.crossSessionDesc', { godName })}
                             </span>
                           </div>
                           <PixelButton variant={semMemOn ? 'primary' : 'secondary'} size="sm" onClick={toggleSemMem}>
                             {semMemOn ? t('common.on') : t('common.off')}
                           </PixelButton>
                         </div>
+
+                        {/* Is it working? One state line, as the floor panel had. */}
+                        {memStatus && (() => {
+                          const st = !memStatus.available
+                            ? { dot: 'var(--cth-coral)', label: t('memoryPanel.notSetUp') }
+                            : !semMemOn
+                              ? { dot: 'var(--cth-ink-500)', label: t('common.off') }
+                              : memStatus.initialized
+                                ? { dot: 'var(--cth-mint)', label: t('memoryPanel.onReady') }
+                                : { dot: 'var(--cth-lemon)', label: t('memoryPanel.onGettingReady') };
+                          return (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--cth-ink-900)', marginTop: 8 }}>
+                              <span style={{ width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
+                              {st.label}
+                            </span>
+                          );
+                        })()}
+
+                        {/* Not installed: send them to the setup that installs it. */}
+                        {memStatus && !memStatus.available && (
+                          <div style={{
+                            marginTop: 8, fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: 1.6,
+                            background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', padding: 10
+                          }}>
+                            {t('memoryPanel.notInstalled')}
+                            <div style={{ marginTop: 8 }}>
+                              <PixelButton variant="primary" size="sm" onClick={() => setActiveSection('Prerequisites')}>
+                                {t('memoryPanel.setUpInPrereqs')}
+                              </PixelButton>
+                            </div>
+                            <div style={{ marginTop: 8, color: 'var(--cth-ink-500)' }}>{t('memoryPanel.plainNotesStill')}</div>
+                          </div>
+                        )}
+
+                        {/* Search language: a benefit framed choice, not a model codename. */}
+                        {memStatus?.available && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                            <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('memoryPanel.searchLanguage')}</span>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {([
+                                ['minilm', t('memoryPanel.modelFast'), t('memoryPanel.modelFastDetail')],
+                                ['embeddinggemma', t('memoryPanel.modelMultilingual'), t('memoryPanel.modelMultilingualDetail')]
+                              ] as const).map(([id, title, detail]) => {
+                                const sel = embeddingModel === id;
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => pickEmbeddingModel(id)}
+                                    style={{
+                                      flex: 1, textAlign: 'left', cursor: 'pointer', border: 'none', padding: '8px 8px',
+                                      background: sel ? 'var(--cth-lemon-light)' : 'var(--cth-cream-100)',
+                                      boxShadow: sel ? 'inset 0 0 0 2px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-300)'
+                                    }}
+                                    aria-pressed={sel}
+                                  >
+                                    <div style={{ fontSize: 14, color: 'var(--cth-ink-900)' }}>{sel ? '◉ ' : '○ '}{title}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--cth-ink-500)', marginTop: 4 }}>{detail}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
@@ -1794,6 +1984,13 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       {modeBlurb}
                                     </span>
                                   </div>
+                                  {/* The body format each request is checked against. Moved
+                                      here with the rest of webhooks from Michael's Triggers tab:
+                                      a webhook serves the whole office, not one agent. */}
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                                    <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-700)', width: 72, flexShrink: 0 }}>{t('settings.connections.format')}</span>
+                                    <WebhookSchemaEditor schema={w.schema} onSave={(schema) => { void patchWebhook(w.id, { schema }); }} />
+                                  </div>
                                 </div>
                               );
                             })}
@@ -1809,10 +2006,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         )}
                       </div>
 
+                      {/* Organisation trigger — teammates messaging this office.
+                          Persisted + mirrored; no transport reads the key yet.
+                          Hidden in this build (SHOW_ORG_TRIGGER). */}
+                      {SHOW_ORG_TRIGGER && (<>
                       <div style={sectionRule} />
-
-                      {/* Organisation trigger — teammates messaging this clone node.
-                          Persisted + mirrored; no transport reads the key yet. */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <div style={sectionHeadTight}>
                           {t('settings.connections.organisation')}
@@ -1891,6 +2089,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.connections.orgConfigOnly')}
                         </span>
                       </div>
+                      </>)}
 
                     </>
                   )}

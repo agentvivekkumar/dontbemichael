@@ -346,8 +346,8 @@ export function MemoryGraphPanel({
         {messageEdgeCount === 0 && !showTopics && (
           <div style={{
             position: 'absolute', top: 10, left: 0, right: 0, textAlign: 'center',
-            fontSize: 12, color: 'var(--cth-ink-500)', pointerEvents: 'none'
-          }}>No messages logged yet — the hive is quiet. Agents shown as roster.</div>
+            fontSize: 14, color: 'var(--cth-ink-500)', pointerEvents: 'none'
+          }}>{t('memoryGraph.noMessages')}</div>
         )}
 
         {/* tooltip */}
@@ -412,7 +412,7 @@ function EdgeTip({ edge, nodeById }: { edge: GraphEdge; nodeById: Map<string, Gr
     <>
       <div style={tipTitle}>{a} {arrow} {b}</div>
       <div style={{ fontSize: 11, color: 'var(--cth-ink-500)', margin: '2px 0' }}>
-        {t('memoryGraph.messagesLast', { count: edge.weight, act: edge.lastAct ?? '—' })}
+        {t('memoryGraph.messagesLast', { count: edge.weight, act: edge.lastAct ?? '·' })}
       </div>
       {edge.lastSubject && <div style={tipBody}>{truncate(edge.lastSubject, 80)}</div>}
     </>
@@ -523,7 +523,7 @@ function memorySnippet(text: string, t: TFunction): string {
   const lines = text
     .split('\n')
     .map((l) => l.replace(/^[#>\-*\s]+/, '').trim())
-    .filter((l) => l && !/^_.*_$/.test(l) && !/^memory —/i.test(l));
+    .filter((l) => l && !/^_.*_$/.test(l) && !/^memory \u2014/i.test(l));
   return truncate(lines.slice(0, 3).join(' '), 200) || t('memoryGraph.noMemory');
 }
 

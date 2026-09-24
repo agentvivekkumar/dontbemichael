@@ -58,32 +58,50 @@ src/
     github.ts                GitHub issue + CI run ingestion via the gh CLI
     shellEnv.ts              resolve PATH and shell env for child processes
     fs.ts / git.ts           sandboxed filesystem + git bridges
+    packs.ts                 loads and validates the bundled Office Packs (resources/packs/)
+    agentFolders.ts          each agent's folder under ~/Documents/<Business>, plus the shared Office folder
+    homeFolder.ts            office (harness home) folder checks behind the "can't find your office" screen
+    harnessGuard.ts          PreToolUse guard that keeps agents from saving work in the harness folder
+    docText.ts / docTextCli.ts / macOcr.ts   Word, Excel, PowerPoint, PDF and scan reading (OCR via macOS Vision)
+    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor
+  shared/                    code both processes use
+    buildFeatures.ts         switches for surfaces hidden in this build (git, IDE, temp workers, org trigger)
+    agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
+    officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles, business profile, team plan
+    agentDefinition.ts       each agent's levels and outward capabilities
+    appName.ts               app name, data folder name, dontbemichael:// URL scheme
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring
     design/                  tokens.css / tokens.ts / global.css (design source of truth)
-    components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, MemoryPanel, …
-    CommandCenterPanel,      Michael's control surface (Terminal/Floor/Memory/Activity/Tasks/Triggers/Handbook tabs)
+    components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, OnboardingWizard, …
+    CommandCenterPanel,      Michael's control surface (Ask me/Terminal/Triggers/History/Memory/Advanced tabs;
+                             Advanced holds Monitor and Activity)
+    FloorViewToggle,         the floor's OFFICE / TASKS / GRAPH switch
+    OfficeFolderMissing,     launch screen shown only when the office folder is missing
     ToolWaterfall,           per-agent tool-span waterfall for the observability view
-    TasksKanban,             dependency-aware kanban board (Tasks tab)
+    TasksKanban,             dependency-aware kanban board (the floor's TASKS view)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
     MessageQueueComposer,    park messages for a busy agent
     scene/office/            Pixi office floor: OfficeFloor, Character, Camera, cast, pathfinding, …
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
     assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
-docs/                        `logo.png`, `banner.png`, landing page (GitHub Pages → munderdiffl.in)
+resources/packs/             bundled Office Packs (core + one per business type)
+docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime), `logo.png`, `banner.png`
+docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
+                             (the old project's website files still here are tracked for removal in TODOS.md)
 docs/media/                  `og.png` (social previews) + rendered Remotion clips
 landing-remotion/            Remotion project that renders the landing page's "how it works" clips
 HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 docs/message-queue.md        who may type into an agent's terminal, and when
 ```
 
-<div align="right">(<a href="#munder-difflin">↑ back to top</a>)</div>
+<div align="right">(<a href="#architecture-project-structure-and-design-system">↑ back to top</a>)</div>
 
 ## Design system
 
 The aesthetic is **Animal Crossing × Earthbound × SNES menu UI** — pixel-snapped, chunky, friendly.
-[`DESIGN.md`](../DESIGN.md) is canonical; every component derives from its tokens. The Munder Difflin
+[`DESIGN.md`](../DESIGN.md) is canonical; every component derives from its tokens. The Don't Be Michael
 brand layers a **Dunder-Mifflin maroon** (`#6E1423`) and **gold** (`#F4D35E`) on top for logo and
 chrome. The 15 avatars are the cast of *The Office*, differentiated by hair/skin/shirt recipes.
 

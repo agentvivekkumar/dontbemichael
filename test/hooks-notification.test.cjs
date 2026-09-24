@@ -3,7 +3,7 @@
  * HookServer's Notification/Stop branches are what tell the harness an agent is
  * idle and safe to deliver queued mail to. Both branches call notify() but
  * neither had test coverage:
- *   - Stop/SubagentStop always notifies "finished — idle" (unless stop_hook_active)
+ *   - Stop/SubagentStop always notifies "finished and idle" (unless stop_hook_active)
  *   - Notification only notifies when notification_type === 'idle' OR the message
  *     text contains "waiting for your input" (case-insensitive) — this string
  *     fallback exists for CLI versions/locales that don't send the structured
@@ -80,11 +80,11 @@ test('Notification with neither field set does NOT fire', async (t) => {
   assert.equal(notifications.length, 0);
 });
 
-test('Stop fires "finished — idle"', async (t) => {
+test('Stop fires "finished and idle"', async (t) => {
   const { fire } = await floor(t);
   await fire({ hook_event_name: 'Stop' });
   assert.equal(notifications.length, 1);
-  assert.equal(notifications[0].body, 'finished — idle');
+  assert.equal(notifications[0].body, 'finished and idle');
 });
 
 test('Stop with stop_hook_active does NOT re-notify', async (t) => {
@@ -98,7 +98,7 @@ test('SubagentStop behaves the same as Stop', async (t) => {
   const { fire } = await floor(t);
   await fire({ hook_event_name: 'SubagentStop' });
   assert.equal(notifications.length, 1);
-  assert.equal(notifications[0].body, 'finished — idle');
+  assert.equal(notifications[0].body, 'finished and idle');
 });
 
 test('notifications setting off suppresses the OS toast but the hook still resolves', async (t) => {

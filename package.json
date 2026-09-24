@@ -1,14 +1,14 @@
 {
   "name": "munder-difflin",
-  "version": "0.4.6",
+  "version": "0.0.1",
   "private": true,
   "description": "Clones for you and your team, working 24/7 — a free, local-first multi-agent harness that turns the CLI coding agent you already run into a clone of you, coordinating an office of agents on your machine.",
   "main": "out/main/index.js",
   "author": "Chaitanya Giri",
-  "homepage": "https://munderdiffl.in/",
+  "homepage": "https://github.com/agentvivekkumar/dontbemichael",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chaitanyagiri/munder-difflin.git"
+    "url": "https://github.com/agentvivekkumar/dontbemichael.git"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -48,6 +48,7 @@
     "better-sqlite3": "^11.10.0",
     "commit-graph": "^2.4.0",
     "electron-updater": "^6.8.9",
+    "fflate": "^0.8.3",
     "i18next": "^26.3.6",
     "localtunnel": "^2.0.2",
     "monaco-editor": "^0.52.2",
@@ -60,6 +61,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tunnelmole": "^2.4.0",
+    "unpdf": "^1.8.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

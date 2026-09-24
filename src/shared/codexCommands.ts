@@ -15,7 +15,7 @@ export const CODEX_COMMAND_GROUPS: CmdGroup[] = [
   {
     title: 'SESSION',
     items: [
-      { cmd: '/clear', kind: 'slash', desc: 'Start a fresh chat without quitting — clears the conversation context.' },
+      { cmd: '/clear', kind: 'slash', desc: 'Start a fresh chat without quitting. Clears the conversation context.' },
       // Verified present in the codex 0.137.0 binary's own command table. It was
       // missing here while providerAutomation sent it, so the two disagreed.
       // Unlike Claude's, this one ignores any trailing focus text.
@@ -45,17 +45,17 @@ export const CODEX_COMMAND_GROUPS: CmdGroup[] = [
   {
     title: 'APPROVALS & PERMISSIONS',
     items: [
-      { cmd: 'codex --dangerously-bypass-approvals-and-sandbox', kind: 'cli', desc: 'Skip ALL approval prompts AND drop the OS sandbox (full filesystem access). Munder Difflin no longer uses this for auto mode; it keeps the sandbox and adds the hive agent folder via --add-dir.' },
-      { cmd: 'codex -a never -s workspace-write', kind: 'cli', desc: 'Never prompt for approval (-a never) but keep the sandbox scoped to the project workspace (-s workspace-write). What Munder Difflin uses for auto mode; the hive agent folder is added with --add-dir <dir>.' },
+      { cmd: 'codex --dangerously-bypass-approvals-and-sandbox', kind: 'cli', desc: 'Skip ALL approval prompts AND drop the OS sandbox (full filesystem access). Don\'t Be Michael no longer uses this for auto mode; it keeps the sandbox and adds the hive agent folder via --add-dir.' },
+      { cmd: 'codex -a never -s workspace-write', kind: 'cli', desc: 'Never prompt for approval (-a never) but keep the sandbox scoped to the project workspace (-s workspace-write). What Don\'t Be Michael uses for auto mode; the hive agent folder is added with --add-dir <dir>.' },
       { cmd: 'codex -a untrusted', kind: 'cli', desc: 'Only run trusted commands without asking; escalate to the user for anything else.' },
-      { cmd: 'codex -s danger-full-access', kind: 'cli', desc: 'Remove all sandbox restrictions (fine-grained flag — pair with -a for full control).' }
+      { cmd: 'codex -s danger-full-access', kind: 'cli', desc: 'Remove all sandbox restrictions (a detailed flag; pair it with -a for full control).' }
     ]
   },
   {
     title: 'AUTOMATION (HEADLESS)',
     items: [
       { cmd: 'codex -p "your prompt"', kind: 'cli', desc: 'Non-interactive print mode: run one prompt and exit.', usage: 'codex -p "summarise this file"' },
-      { cmd: 'CODEX_NON_INTERACTIVE=1 codex', kind: 'cli', desc: 'Suppress all interactive installer / first-run prompts. Set automatically by Munder Difflin in auto mode.' }
+      { cmd: 'CODEX_NON_INTERACTIVE=1 codex', kind: 'cli', desc: 'Suppress all interactive installer / first-run prompts. Set automatically by Don\'t Be Michael in auto mode.' }
     ]
   },
   {

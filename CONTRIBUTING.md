@@ -1,4 +1,4 @@
-# Contributing to Munder Difflin
+# Contributing to Don't Be Michael
 
 Thanks for your interest! This is an early prototype, so there's a lot of surface
 area and plenty of room to help. This guide covers setup, the gotchas, and the
@@ -17,15 +17,31 @@ much cheaper than finding out in review.
 - **Keep the change scoped to one clear improvement, fix, or refactor.** A fix
   plus a rename plus a refactor is three pull requests, and all three merge
   faster than the one.
-- **Munder Difflin targets macOS, Windows and Linux.** Every change has to work
+- **Don't Be Michael targets macOS, Windows and Linux.** Every change has to work
   on all three unless it sits behind an explicit runtime platform check. Most
   of our cross-platform bugs are paths: use `path.join` and the Node path
   helpers, never a hand-built `"a/b"` string.
 - **Paths with spaces are real.** Several shipped bugs came from a hive folder
   living under a directory with a space in its name. Quote, and test one.
-- **We support twelve agent CLIs and counting.** Keep shared behaviour provider
-  neutral and put provider specific logic behind an explicit check. Anything
-  that assumes Claude Code specifically will break the other eleven.
+- **The code carries twelve agent CLIs; this build offers one.** Setup offers
+  only the engines in `BUILD_ENGINES` (`src/shared/agentProvider.ts`), which is
+  Claude Code today, but every other preset stays wired so it can come back by
+  adding its id there. Keep shared behaviour provider neutral and put provider
+  specific logic behind an explicit check. Anything that assumes Claude Code
+  specifically will break the other eleven when they return.
+- **Hidden surfaces have one switch each.** Git views, the IDE, temporary
+  workers and the organisation trigger are off in this build through
+  `src/shared/buildFeatures.ts`. Gate new code for those surfaces on the same
+  constant instead of deleting or forking it.
+- **Owner facing text is plain words with no dashes.** The product is for small
+  business owners. No em dash, en dash, or hyphen used as punctuation in UI
+  strings, Office Packs, or reasons shown in the app; `test/no-dashes.test.cjs`
+  enforces it. Strings that name the manager use `{{godName}}`, never a literal
+  "Michael" (`test/i18n-god-name.test.cjs`), because the owner can rename him.
+- **Nothing points at the upstream project.** Updates, fetched content, links
+  and the URL scheme all belong to this repo; `test/no-upstream.test.cjs`
+  scans `src/`, `resources/`, `scripts/`, `tools/`, `.github/`, this file and
+  `SECURITY.md`. Credit for Munder Difflin stays in `README.md`.
 - **Do not assume the local machine.** Agents run against their own working
   directories and their own environments; a process, file, credential or shell
   that exists on yours may not exist on theirs.
@@ -37,7 +53,7 @@ much cheaper than finding out in review.
 ### Prerequisites
 
 - **macOS, Windows, or Linux** — signed/notarized macOS builds, plus Windows and
-  Linux builds, ship from the [releases page](https://github.com/chaitanyagiri/munder-difflin/releases/latest).
+  Linux builds, ship from the [releases page](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
   Cross-platform smoke-testing and fixes are still very welcome (see
   [Good first areas](#good-first-areas)).
 - **Node.js 18+** and npm.
@@ -52,8 +68,8 @@ much cheaper than finding out in review.
 ### Install & run
 
 ```bash
-git clone <your-fork-url> munder-difflin
-cd munder-difflin
+git clone <your-fork-url> dontbemichael
+cd dontbemichael
 npm install        # postinstall rebuilds node-pty against Electron's ABI
 npm run dev        # live-reloading Electron build
 ```
@@ -133,7 +149,7 @@ negotiate, and every one of them is cheaper to avoid than to fix in review:
 - **Wholesale reformatting** of files, or a diff where the real change is buried
   in whitespace and import reordering.
 - **A rewrite nobody asked for.** Large architectural changes need an issue or a
-  [discussion](https://github.com/chaitanyagiri/munder-difflin/discussions) with
+  [discussion](https://github.com/agentvivekkumar/dontbemichael/discussions) with
   agreement **before** you write the code. We would rather say no to a paragraph
   than to a week of your work.
 - **Generated or unattributed content** — art that isn't yours or compatibly
@@ -154,6 +170,9 @@ someone who has.
 | `src/main/` | Electron main process — PTYs (`pty.ts`), fs/git bridges, the hive (`hive.ts`, `hooks.ts`, `memory.ts`), config. |
 | `src/preload/` | Context-bridge IPC surface. |
 | `src/renderer/` | React UI, Pixi.js office scene (`scene/office/`), components, design system, stores. |
+| `src/shared/` | Code both processes use: engine presets, Office Pack schema (`officePack.ts`), business profile, team plan, build switches (`buildFeatures.ts`), app name and URL scheme (`appName.ts`). |
+| `resources/packs/` | The bundled Office Packs, one JSON file per business type plus `core.json`. |
+| `test/` | The `node:test` suite that `npm run test:focused` runs. |
 | `tools/mapgen/` | Python helpers for building/rendering the Tiled office map. |
 
 See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the data-flow overview,
@@ -171,7 +190,7 @@ the module by module layout, and the design system.
 ## Commit & PR conventions
 
 - Branch off `main`. One change per PR — see
-  [What gets a PR closed](#what-gets-a-pr-closed).
+  [Where the bar is](#where-the-bar-is).
 - Write a clear description of *what* changed and *why*. We can read the diff;
   we cannot read your reasoning.
 - Say how you tested it, and on which OS. "Tested locally" tells us nothing.

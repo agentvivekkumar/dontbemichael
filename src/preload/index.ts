@@ -16,6 +16,8 @@ import type { HookEvent } from '../shared/hookEvents';
 export type { HookEvent } from '../shared/hookEvents';
 import type { LocalSkill, CatalogSkill } from '../main/skills';
 export type { LocalSkill, CatalogSkill } from '../main/skills';
+import type { OfficePack, PackOrigin } from '../shared/officePack';
+export type { OfficePack, PackOrigin } from '../shared/officePack';
 import type {
   ContextRule, ContextTriggerConfig, OrgTriggerConfig, TriggerHistoryEntry, WebhookTrigger
 } from '../shared/triggers';
@@ -259,9 +261,21 @@ export interface CircuitBreakerConfig {
 
 export interface HarnessConfig {
   onboardingComplete: boolean;
-  /** Onboarding audience ('technical' | 'non-technical'); drives onboarding copy.
-   *  Mirrors src/main/config.ts. */
+  /** Onboarding audience ('technical' | 'non-technical'). No longer asked during
+   *  onboarding; still read by Settings. Mirrors src/main/config.ts. */
   audience?: 'technical' | 'non-technical';
+  /** The Office Pack picked on the first onboarding screen, plus the business's
+   *  own name and city. Mirrors src/main/config.ts. */
+  businessType?: string;
+  businessName?: string;
+  businessCity?: string;
+  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  officeFolder?: string;
+  /** The starter team picked during onboarding, each with the ABSOLUTE folder it
+   *  works in (Decisions 44, 47). The running office starts agents from this. */
+  businessTeam?: Array<{ agentId: string; folder: string }>;
+  /** Set once the onboarding team has been started, so it is started once. */
+  businessTeamStarted?: boolean;
   harnessHome: string | null;
   /** Recently-opened hive home folders (most-recent first). Mirrors src/main/config.ts. */
   recentHives?: string[];
@@ -270,7 +284,7 @@ export interface HarnessConfig {
   defaultCommand: string;
   defaultModel?: string;
   /** Which provider+model powers the GOD orchestrator ("Michael"). Default
-   *  'claude' / 'claude-opus-4-8'. Mirrors src/main/config.ts. */
+   *  'claude' / 'claude-opus-5-5'. Mirrors src/main/config.ts. */
   godProvider?: AgentProvider;
   godModel?: string;
   /** Per-server consent for the default MCP bundle, keyed by catalog id. Mirrors
@@ -576,6 +590,27 @@ const api = {
   trackMessageSent: (surface: 'terminal' | 'composer'): Promise<void> =>
     ipcRenderer.invoke('analytics:messageSent', surface).then(() => undefined, () => undefined),
 
+  // ─── Office Packs ────────────────────────────────────────────────────────
+  /** The business types onboarding offers, each with its core agents already
+   *  merged in. `problems` names any pack that could not be read — the list is
+   *  never empty because of one bad file, so the first screen always has
+   *  something to click. */
+  packsList: (): Promise<{
+    packs: Array<{ pack: OfficePack; origin: PackOrigin }>;
+    problems: Array<{ file: string; reason: string }>;
+    core?: OfficePack;
+  }> => ipcRenderer.invoke('packs:list'),
+
+  // ─── Agent folders (Decisions 44, 45) ───────────────────────────────────
+  /** Default `~/Documents/<Business>/<Folder>` paths for the team screen. Creates nothing. */
+  foldersSuggest: (businessName: string, folders: string[]): Promise<{
+    home: string; root: string; office: string; byFolder: Record<string, string>;
+  }> => ipcRenderer.invoke('folders:suggest', { businessName, folders }),
+  /** Create each folder if it's missing. Never touches an existing folder's contents. */
+  foldersEnsure: (paths: string[]): Promise<Array<
+    { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }
+  >> => ipcRenderer.invoke('folders:ensure', paths),
+
   // ─── PTY ─────────────────────────────────────────────────────────────────
   /** `cwd` in the result is the TILDE-EXPANDED absolute path main actually spawned
    *  into — the renderer stores that, not the raw `~/…` the user typed. */
@@ -670,6 +705,13 @@ const api = {
    *  on failure (e.g. copy error) returns { ok: false, error }. */
   changeHome: (newHome: string, mode: 'move' | 'fresh'): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('config:changeHome', { newHome, mode }),
+  /** Whether a folder (default: the current home) exists and holds an office. */
+  homeStatus: (path?: string): Promise<{ path: string | null; exists: boolean; hasOffice: boolean }> =>
+    ipcRenderer.invoke('config:homeStatus', path),
+  /** Start an empty office at the current home path after it went missing.
+   *  Relaunches on success (never resolves); returns { ok: false } on failure. */
+  startOverHere: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('config:startOverHere'),
 
   // ─── Filesystem (sandboxed to cwd) ───────────────────────────────────────
   listDir: (root: string, rel: string): Promise<
@@ -922,7 +964,7 @@ const api = {
   },
 
   // ─── Shareable hires (deep link / file import) ────────────────────────────
-  /** Fired when a validated hire manifest arrives via the munderdifflin://
+  /** Fired when a validated hire manifest arrives via the dontbemichael://
    *  deep link. The renderer opens the Add-Agent modal pre-filled — import
    *  never spawns anything by itself. */
   onHireImport: (cb: (manifest: HireManifest) => void): (() => void) => {

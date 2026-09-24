@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to Munder Difflin.
+<!-- Thanks for contributing to Don't Be Michael.
 
      Read this line before you go further: a PR without a BEFORE and an AFTER
      is not reviewable and will not be merged. The `PR evidence` check runs the
@@ -50,15 +50,9 @@
 
 ## Credit (optional)
 
-<!-- Both are optional and neither affects whether this merges.
-
-     Discord gets you the `employee of the month` role when this lands. Join
-     first so we can find you: https://discord.gg/SEDzP5ZPk5
-
-     X is so we can credit you by name when we post about what shipped. Leave it
-     blank if you would rather we did not. -->
-
-Discord:
+<!-- Optional, and it does not affect whether this merges. X is so we can
+     credit you by name when we post about what shipped. Leave it blank if you
+     would rather we did not. -->
 
 X:
 

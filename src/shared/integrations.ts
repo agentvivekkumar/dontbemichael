@@ -111,7 +111,7 @@ export function validateIntegrationRecord(
 
   const id = typeof r.id === 'string' ? r.id.trim() : '';
   if (!INTEGRATION_SLUG_RE.test(id)) {
-    return { ok: false, error: 'id must be a lowercase slug (2–40 chars, a–z 0–9 -, no leading/trailing hyphen)' };
+    return { ok: false, error: 'id must be a lowercase slug: 2 to 40 characters, letters a to z, digits 0 to 9 and hyphens, not starting or ending with a hyphen' };
   }
   const label = typeof r.label === 'string' ? r.label.trim() : '';
   if (!label || label.length > 60) return { ok: false, error: 'label is required and must be <= 60 chars' };

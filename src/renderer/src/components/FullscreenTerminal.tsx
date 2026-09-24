@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { SHOW_IDE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
@@ -308,7 +309,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
         <span style={{
           fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px',
           color: 'var(--cth-ink-900)'
-        }}>MUNDER DIFFLIN · FOCUS MODE</span>
+        }}>DON&apos;T BE MICHAEL · FOCUS MODE</span>
         {/* Same top-right controls as the main title bar — fullscreen covers
             it, so theme / exit-fullscreen / IDE must live here too. */}
         <div className="cth-titlebar-nodrag" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -529,7 +530,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                   {restorableAgents.map((a: Agent) => (
                     <span
                       key={a.id}
-                      title={`${a.name} — restorable from last session`}
+                      title={`${a.name}: restorable from last session`}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 2,
                         height: 20, padding: '0 2px 0 6px',
@@ -541,7 +542,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                       {a.name}
                       <button
                         onClick={() => useStore.getState().removeRestorableAgent(a.id)}
-                        title={`Dismiss ${a.name} — remove permanently from the restore list`}
+                        title={`Dismiss ${a.name} and remove them permanently from the restore list`}
                         aria-label={`Dismiss ${a.name}`}
                         style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -994,6 +995,7 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
             fullscreen does not change the selection, so leaving the IDE to infer
             its agent would open whichever agent happens to be selected in the
             sidebar rather than the one filling the screen. */}
+        {SHOW_IDE && (
         <PixelButton variant="secondary" size="sm" onClick={() => useStore.getState().setIdeOpen(true, agent.id)}>
           <span
             className="cth-tip cth-tip-wrap"
@@ -1004,6 +1006,7 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
             <Icon name="code" /> {t('commandCenter.ide')}
           </span>
         </PixelButton>
+        )}
         {/* Voice toggle is ALWAYS reachable in fullscreen — it controls Michael (the
             god orchestrator) globally, not the agent in view, so users can start a
             voice session even while a worker's terminal fills the screen. The cost

@@ -43,6 +43,9 @@ import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
 import { expandTilde } from './fs';
 import { resolveGodName } from '../shared/godIdentity';
+import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
+import { OFFICE_ROLES } from '../shared/officeRoles';
+import { APP_NAME } from '../shared/appName';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
  *  Kept as a local shape so hive.ts never imports the foundation-owned config
@@ -400,7 +403,8 @@ export class HiveManager {
    *  the config module. */
   private _maySpawn = false;
   setOrchestratorMaySpawn(on: boolean): void {
-    this._maySpawn = on;
+    // Never on in a build without temporary workers, whatever config says.
+    this._maySpawn = on && ALLOW_TEMP_WORKERS;
   }
   orchestratorMaySpawn(): boolean {
     return this._maySpawn;
@@ -695,6 +699,11 @@ export class HiveManager {
        *  MemPalace dir, which `mempalace` mutates). Absolute paths; ignored
        *  for providers without a sandbox. */
       extraWritableDirs?: string[];
+      /** The shared Office folder (Decision 44). When set, every agent is told
+       *  where its own work belongs and that the hive is coordination only. */
+      officeFolder?: string;
+      /** Absolute path of the agent-facing `doc-text` CLI (F6). */
+      docTextCliPath?: string;
     } = {}
   ): Promise<SpawnInjection> {
     const root = this.root();
@@ -809,7 +818,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -953,7 +962,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1434,7 +1443,9 @@ export class HiveManager {
     root: string,
     semanticMemory: boolean,
     knowledgeGraph: boolean,
-    kgCliPath?: string
+    kgCliPath?: string,
+    officeFolder?: string,
+    docTextCliPath?: string
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
     const inDir = (...parts: string[]): string => join(dir, ...parts);
@@ -1470,7 +1481,7 @@ export class HiveManager {
     // us) was invisible to every investigation.
     const rt = this.runtimeInfo();
     const runtimeLine = rt
-      ? `RUNNING BUILD: Munder Difflin v${rt.version}, ${rt.packaged ? 'packaged app' : 'local dev build'}${rt.appPath ? `, from ${rt.appPath}` : ''}. Say this version if asked which one is running, and do not assume behaviour from an older one. A local dev build inherits the launching shell's environment (umask included) where a packaged app does not, so file modes and inherited env can legitimately differ between the two. \`log.jsonl\` records an \`app-start\` event on every launch, which is how you spot a restart or a build switch.`
+      ? `RUNNING BUILD: ${APP_NAME} v${rt.version}, ${rt.packaged ? 'packaged app' : 'local dev build'}${rt.appPath ? `, from ${rt.appPath}` : ''}. Say this version if asked which one is running, and do not assume behaviour from an older one. A local dev build inherits the launching shell's environment (umask included) where a packaged app does not, so file modes and inherited env can legitimately differ between the two. \`log.jsonl\` records an \`app-start\` event on every launch, which is how you spot a restart or a build switch.`
       : '';
     // Item 11: god could not find the spawn queue. The mechanism has worked since
     // v0.4.4, but nothing told him it existed — the prompt said "spawn" without
@@ -1489,6 +1500,17 @@ export class HiveManager {
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
+    // WHERE WORK LIVES (Decisions 44, 48). Only on installs with an Office folder:
+    // an older install's Michael still runs inside the harness folder, and telling
+    // him never to write there would contradict where he actually is. Both paths
+    // are stable for the agent's lifetime, so the prompt-cache invariant holds.
+    const folderLine = officeFolder
+      ? (meta.cwd === officeFolder
+        ? `YOUR FOLDERS: you work in ${meta.cwd}, the Office folder shared by the whole team. Company-wide documents live there: read them for context before searching the internet, and save anything meant for the whole team there. Each team member also has a folder of their own, which is where their work goes.`
+        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner puts the documents you need there, so read it for context before searching the internet, and save everything you produce there — drafts, reports, spreadsheets. ${officeFolder} is the Office folder shared by the whole team: company-wide documents live there, and anything meant for everyone goes there.`)
+        + ` The hive (${root}) is ONLY for coordination — your memory.md, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
+        + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
+      : '';
     const guardrailsLine = 'Guardrails: a circuit breaker watches the floor — a "Circuit breaker: steer/constrain" message means you are looping or overspending, so STOP repeating, summarize what you tried, and follow it. Be token-frugal (a floor-wide or per-agent token budget can pause you). The shared plan has two parts: board.md (freeform; god is the sole scribe) and tasks.json (structured kanban — todo/doing/blocked/done).';
     const slackLine = meta.isGod
       ? 'SLACK REPLIES: When composing a Slack reply (or writing the `result` field of a Slack-origin kanban card), you MUST: (1) directly address what the user asked — never a bare "done"; (2) include the relevant specifics, outcome, and details; (3) format for Slack mrkdwn — open with a short *bold* headline, use bullet points for multiple items, wrap code/paths in `backtick` blocks, keep it concise (no walls of text). When finishing a Slack-origin task, always write a complete, user-facing, well-formatted `result` on the kanban card — the system posts it verbatim to Slack as the done reply.'
@@ -1502,11 +1524,13 @@ export class HiveManager {
       `2. Record durable facts, decisions, and context by appending to ${inDir('memory.md')}.`,
       `3. To ask another agent for something or share information, write ONE message JSON into ${inDir('outbox')} (schema in PROTOCOL.md). NEVER write into another agent's folder — the orchestrator delivers your outbox.`,
       '4. At the END of a task, append what you learned to memory.md so future-you remembers.',
+      folderLine,
       guardrailsLine,
       memoryLine,
       knowledgeLine,
       godLine,
       spawnQueueLine,
+      meta.isGod && !this.orchestratorMaySpawn() ? NO_FIT_LINE : '',
       runtimeLine,
       slackLine,
       ctxLine,
@@ -2804,6 +2828,57 @@ function renderCommandsMd(): string {
 }
 const COMMANDS_MD = renderCommandsMd();
 
+/** Every cast member and their fixed job, for Michael's "who could do this"
+ *  suggestion. Built once from OFFICE_ROLES, so the prompt stays byte-stable. */
+const NO_FIT_CAST = Object.entries(OFFICE_ROLES)
+  .map(([c, r]) => `${c[0].toUpperCase()}${c.slice(1)} (${r.role})`)
+  .join(', ');
+
+/** Michael's rule for a job nobody on the team covers (owner, 2026-09-24).
+ *  Replaces starting a temporary worker: the owner decides, on the ASK ME board. */
+const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask, written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
+
+/** PROTOCOL.md's section on starting a temporary worker. Included only in a
+ *  build that allows them (ALLOW_TEMP_WORKERS); otherwise the protocol never
+ *  mentions the route, so Michael has nothing to try. */
+const SPAWN_WORKER_MD = `## Spawning a worker (orchestrator)
+You can start an ephemeral worker yourself. Write ONE JSON file into \`spawn-requests/<id>.json\` in
+the hive root:
+
+\`\`\`json
+{
+  "objective": "what the worker must do (required)",
+  "cwd": "/absolute/path/to/the/repo (required)",
+  "name": "display name (optional)",
+  "command": "engine CLI (optional; defaults to the configured one)",
+  "provider": "claude | codex | cursor | antigravity | … (optional)",
+  "model": "model override (optional)",
+  "isolate": true,
+  "tokenCap": 0,
+  "slack": { "channel": "C…", "thread_ts": "…" },
+  "character": "meredith",
+  "accent": "coral"
+}
+\`\`\`
+
+The harness polls that directory, spawns \`worker-<id>\`, and moves the request to
+\`spawn-requests/.done/\` once it starts or to \`spawn-requests/.failed/\` with a reason. \`isolate\`
+defaults to true, giving the worker its own git worktree. \`slack\` routes its failures back to a
+thread. This is the ONLY spawn route you can complete on your own: a hire manifest under
+\`research/hires/\` needs the human to confirm it in the UI.
+
+\`character\` and \`accent\` set how the worker looks on the office floor, and both are optional.
+Naming a worker after a cast member already gets you that avatar, so you only need \`character\` when
+the name and the face should differ. An unrecognised value falls back rather than failing the spawn.
+
+**It can be switched off.** The operator controls this under Settings → Autonomy & Budgets, and it is
+OFF by default, because every worker you start spends tokens nobody approved. While it is off your
+request is NOT failed or deleted, it waits in \`spawn-requests/\` and runs if the operator turns it on.
+If a request of yours has sat there without moving, that is why, and it is a decision to raise with the
+human rather than retry. Route work to an agent already on the floor first either way.
+
+`;
+
 const PROTOCOL_MD = `# Hive protocol
 
 You are one of several Claude agents sharing this hive. Coordination is entirely
@@ -2901,43 +2976,7 @@ look at one agent, read its \`agents/<id>/memory.md\` and \`inbox/\`, or send it
 Claude Code command reference (slash = your own session only; CLI = your shell, can target the fleet)
 is in \`COMMANDS.md\` in the hive root.
 
-## Spawning a worker (orchestrator)
-You can start an ephemeral worker yourself. Write ONE JSON file into \`spawn-requests/<id>.json\` in
-the hive root:
-
-\`\`\`json
-{
-  "objective": "what the worker must do (required)",
-  "cwd": "/absolute/path/to/the/repo (required)",
-  "name": "display name (optional)",
-  "command": "engine CLI (optional; defaults to the configured one)",
-  "provider": "claude | codex | cursor | antigravity | … (optional)",
-  "model": "model override (optional)",
-  "isolate": true,
-  "tokenCap": 0,
-  "slack": { "channel": "C…", "thread_ts": "…" },
-  "character": "meredith",
-  "accent": "coral"
-}
-\`\`\`
-
-The harness polls that directory, spawns \`worker-<id>\`, and moves the request to
-\`spawn-requests/.done/\` once it starts or to \`spawn-requests/.failed/\` with a reason. \`isolate\`
-defaults to true, giving the worker its own git worktree. \`slack\` routes its failures back to a
-thread. This is the ONLY spawn route you can complete on your own: a hire manifest under
-\`research/hires/\` needs the human to confirm it in the UI.
-
-\`character\` and \`accent\` set how the worker looks on the office floor, and both are optional.
-Naming a worker after a cast member already gets you that avatar, so you only need \`character\` when
-the name and the face should differ. An unrecognised value falls back rather than failing the spawn.
-
-**It can be switched off.** The operator controls this under Settings → Autonomy & Budgets, and it is
-OFF by default, because every worker you start spends tokens nobody approved. While it is off your
-request is NOT failed or deleted, it waits in \`spawn-requests/\` and runs if the operator turns it on.
-If a request of yours has sat there without moving, that is why, and it is a decision to raise with the
-human rather than retry. Route work to an agent already on the floor first either way.
-
-## Semantic memory (optional — when \`mempalace\` is installed)
+${ALLOW_TEMP_WORKERS ? SPAWN_WORKER_MD : ''}## Semantic memory (optional — when \`mempalace\` is installed)
 When \`MEMPALACE_PALACE_PATH\` is set in your environment, the hive shares a
 searchable MemPalace and you have the \`mempalace\` CLI:
 - \`mempalace search "<query>"\` — recall relevant past knowledge across the whole

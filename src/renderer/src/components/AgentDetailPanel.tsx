@@ -15,6 +15,7 @@ import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
 import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
+import { SHOW_GIT, SHOW_IDE } from '@shared/buildFeatures';
 import { Icon } from './Icon';
 import { AgentNameEditor } from './AgentNameEditor';
 import { useStore, type Agent } from '@/store/store';
@@ -184,6 +185,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
         </PixelButton>
         {/* v0.3.4: the IDE lives at agent level (replaces the old files tab) —
             opens the full-window Monaco editor rooted at this agent's workspace. */}
+        {SHOW_IDE && (
         <PixelButton variant="secondary" size="sm" onClick={() => useStore.getState().setIdeOpen(true, agent.id)}>
           <span
             className="cth-tip cth-tip-wrap"
@@ -194,6 +196,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
             <Icon name="code" />{!compactHeader && t('agentDetail.ide')}
           </span>
         </PixelButton>
+        )}
         <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openTerminalState === 'opening'}>
           {/* "open" said nothing about WHAT opens, sitting in a row where IDE
               and Talk both also open something. The label names the thing you
@@ -273,7 +276,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           )
         )}
 
-        {sidebarTab === 'git' && (
+        {SHOW_GIT && sidebarTab === 'git' && (
           <GitTab cwd={agent.cwd} />
         )}
 

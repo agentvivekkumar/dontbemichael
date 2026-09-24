@@ -175,15 +175,33 @@ export interface KnowledgeGraphConfig {
 export interface HarnessConfig {
   /** Has the user completed the first-run onboarding? */
   onboardingComplete: boolean;
-  /** Self-identified audience picked on the first onboarding screen. Drives the
-   *  copy register everywhere onboarding explains itself: 'technical' shows CLI /
-   *  flag lingo, 'non-technical' explains each concept in plain language. Unset =
-   *  not yet chosen (treated as technical for any incidental copy). */
+  /** Self-identified audience. NO LONGER ASKED during onboarding — the first
+   *  screen now asks what business the owner runs, and onboarding speaks one
+   *  plain register to everyone. Kept because Settings still exposes it as
+   *  "simple mode" and existing installs have it persisted; unset = never chosen. */
   audience?: 'technical' | 'non-technical';
+  /** Which Office Pack the owner picked on the first onboarding screen (a pack's
+   *  `businessType`, e.g. 'restaurant-food'). Decides the suggested starter cast,
+   *  the office hours and each agent's starting tool levels. Unset = an install
+   *  that predates business mode. */
+  businessType?: string;
+  /** The business's own name and city, as the owner typed them. They personalise
+   *  the office (title bar, Michael's voice) and give agents something concrete
+   *  to write with — a draft that says "Pho Saigon Kitchen, Austin" rather than
+   *  "your business". Never used as a path or an id. */
+  businessName?: string;
+  businessCity?: string;
+  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  officeFolder?: string;
+  /** The starter team picked during onboarding, each with the ABSOLUTE folder it
+   *  works in (Decisions 44, 47). The running office starts agents from this. */
+  businessTeam?: Array<{ agentId: string; folder: string }>;
+  /** Set once the onboarding team has been started, so it is started once. */
+  businessTeamStarted?: boolean;
   /** Folder where the harness keeps its own state (agent metadata, logs). */
   harnessHome: string | null;
-  /** Recently-opened hive home folders (most-recent first), surfaced by the
-   *  launch-time hive picker. Maintained by writeConfig whenever harnessHome is
+  /** Recently-opened office folders (most-recent first), offered by the missing
+   *  office screen and Settings → General's other offices. Maintained by writeConfig whenever harnessHome is
    *  set (onboarding finish, changeHome). Capped to a handful. */
   recentHives?: string[];
   /** Folders the user registered during onboarding (used as quick-picks). */
@@ -209,7 +227,7 @@ export interface HarnessConfig {
    *  are those that can receive inbox (claude/codex/antigravity/qwen). */
   godProvider?: AgentProvider;
   /** The model GOD runs on. Unset falls back to the provider preset's
-   *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-4-8'. */
+   *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-5-5'. */
   godModel?: string;
   /** Per-server consent state for the default MCP bundle, keyed by catalog id.
    *  Seeded from MCP_CATALOG (safe-readonly ON, write/secret OFF); the user flips
@@ -428,7 +446,7 @@ const DEFAULTS: HarnessConfig = {
   orchestratorMaySpawn: false,
   defaultCommand: 'claude',
   godProvider: 'claude',
-  godModel: 'claude-opus-4-8',
+  godModel: 'claude-opus-5-5',
   // Global default model for every agent that hasn't picked one explicitly — wins
   // over the role-based tiers (modelForRole) in the spawn handler, so all agents
   // (incl. god) default to Fable 5. A per-agent model choice still overrides it.
@@ -730,7 +748,7 @@ export function resetConfig(): HarnessConfig {
 /** Model ids by tier (Lane A #6.4). Kept in sync with the claude list in
  *  src/shared/modelCatalog.json, which `agentModels()` in
  *  src/renderer/src/store/config.ts reads. */
-const MODEL_GOD = 'claude-opus-4-8';                  // orchestration — highest capability
+const MODEL_GOD = 'claude-opus-5-5';                  // orchestration — highest capability
 const MODEL_WORKER = 'claude-sonnet-4-6';             // general execution
 const MODEL_HELPER = 'claude-haiku-4-5-20251001';     // narrow, cheap helpers
 
