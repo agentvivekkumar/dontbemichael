@@ -1,5 +1,5 @@
-- **The interface speaks Chinese and Arabic.** Set it in Settings.
-- **Updates install themselves.** Download, restart, done.
-- **Fonts ship inside the app.** No Google Fonts fetch on launch.
-- **Hardened how engine commands launch.**
-- **Settings has one Save button.** Connections get their own tab.
+- **Set up by business.** Pick your kind of business and your team.
+- **A folder for every team member.** Plus a shared Office folder.
+- **Reads your documents.** Word, Excel, PDF and scans.
+- **See the floor at a glance.** Office, tasks, or who talks to whom.
+- **Runs on Claude Code.** Opus 5.5 recommended, Max plan for all day.
