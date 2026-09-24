@@ -64,7 +64,14 @@ jobs:
         # Without a Developer ID cert (APPLE_CERTIFICATE_P12 unset) the Mac app is
         # sealed ad hoc by build/notarize.cjs, so a downloaded copy can still be
         # opened through Privacy & Security > Open Anyway (RELEASE.md says how).
-        run: npx electron-builder ${{ matrix.args }} --publish never
+        #
+        # Unset the signing variables when their secrets are missing. The env
+        # block below still defines them, as empty strings, and electron-builder
+        # reads an empty CSC_LINK as a path: it resolves to the repo folder and
+        # fails with "not a file" (the first v0.0.1 run).
+        run: |
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD; fi
+          npx electron-builder ${{ matrix.args }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # macOS code signing + notarization — MUST be macOS-only. CSC_LINK is the
@@ -75,7 +82,8 @@ jobs:
           #   APPLE_CERTIFICATE_PASSWORD  = that .p12's export password (REQUIRED if P12 set,
           #                                 else electron-builder imports with an empty
           #                                 password and fails "MAC verification failed")
-          # All optional: with the secrets unset every runner builds unsigned and stays green.
+          # All optional: with the secrets unset the run step unsets these, and the Mac
+          # build is sealed ad hoc instead (build/notarize.cjs).
           CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_P12 || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
