@@ -344,43 +344,45 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // Every await below can reject (IPC down, disk error). Without a catch the
     // button stayed on "Saving" forever with nothing on screen.
     try {
-    const ensure = await window.cth.ensureHarnessHome(harnessHome);
-    if (!ensure.ok) {
-      setError(ensure.error ?? t('onboarding.errCreateHome'));
+      const ensure = await window.cth.ensureHarnessHome(harnessHome);
+      if (!ensure.ok) {
+        setError(ensure.error ?? t('onboarding.errCreateHome'));
+        setBusy(false);
+        return;
+      }
+      // Make each agent's folder, and the shared Office. Only missing folders are
+      // created; one the owner picked (or already had) is left exactly as it is.
+      const made = await window.cth.foldersEnsure(plan.folders);
+      const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
+      if (failed) {
+        setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
+        setBusy(false); setStep('team'); return;
+      }
+      const next = await window.cth.updateConfig({
+        onboardingComplete: true,
+        // The pack drives the starter cast. '__other__' is recorded as unset: no
+        // pack applies, so Michael asks rather than silently picking one.
+        businessType: businessType === OTHER_BUSINESS ? undefined : businessType,
+        businessName: businessName.trim() || undefined,
+        businessCity: businessCity.trim() || undefined,
+        harnessHome, // the same trimmed value we just mkdir'd, not the raw field
+        // Where the office works (Decision 44). The running office starts each
+        // agent inside its folder; the folders also become the hire dialog's
+        // quick-picks, which is what registeredRepos has always fed.
+        officeFolder: plan.office,
+        businessTeam: plan.team,
+        registeredRepos: plan.folders,
+        autoMode,
+        godProvider,
+        godModel,
+        telemetryEnabled: shareStats
+      });
       setBusy(false);
-      return;
-    }
-    // Make each agent's folder, and the shared Office. Only missing folders are
-    // created; one the owner picked (or already had) is left exactly as it is.
-    const made = await window.cth.foldersEnsure(plan.folders);
-    const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
-    if (failed) {
-      setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
-      setBusy(false); setStep('team'); return;
-    }
-    const next = await window.cth.updateConfig({
-      onboardingComplete: true,
-      // The pack drives the starter cast. '__other__' is recorded as unset: no
-      // pack applies, so Michael asks rather than silently picking one.
-      businessType: businessType === OTHER_BUSINESS ? undefined : businessType,
-      businessName: businessName.trim() || undefined,
-      businessCity: businessCity.trim() || undefined,
-      harnessHome, // the same trimmed value we just mkdir'd, not the raw field
-      // Where the office works (Decision 44). The running office starts each
-      // agent inside its folder; the folders also become the hire dialog's
-      // quick-picks, which is what registeredRepos has always fed.
-      officeFolder: plan.office,
-      businessTeam: plan.team,
-      registeredRepos: plan.folders,
-      autoMode,
-      godProvider,
-      godModel,
-      telemetryEnabled: shareStats
-    });
-    setBusy(false);
-    onComplete(next);
+      onComplete(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      // Plain words for the owner; the raw IPC error is for the log.
+      console.error('[onboarding] finish failed:', e);
+      setError(t('onboarding.errSaveSetup'));
       setBusy(false);
     }
   };
@@ -642,7 +644,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 }}>
                   <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="sparkle" /></span>
                   <span>
-                    <Trans i18nKey="onboarding.orchestrator.cliAgent" components={{ strong: <strong /> }}>
+                    <Trans i18nKey="onboarding.orchestrator.cliAgent" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>
                       <strong>Claude Code</strong>, made by Anthropic, is the AI that powers
                       your office. It runs right here on this Mac. <strong>Your manager</strong> is
                       always on and runs your whole office. We recommend Opus 5.5, the newest model.
@@ -803,7 +805,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)'
                 }}>
                   <span>
-                    <Trans i18nKey="onboarding.orchestrator.maxPlan" components={{ strong: <strong /> }}>
+                    <Trans i18nKey="onboarding.orchestrator.maxPlan" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>
                       <strong>You&apos;ll need a Claude Max plan</strong> to keep your office running
                       full time. Smaller plans reach their usage limit during the day, and the
                       office pauses until the limit resets.

@@ -54,7 +54,7 @@ export function WebhookSchemaEditor({ schema, onSave }: { schema: string; onSave
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <JsonEditor value={text} onChange={(v) => { setText(v); setError(null); }} />
-      {error && <Callout>{t('webhooksSection.notValidJson', { error })}</Callout>}
+      {error && <Callout>{t('webhooksSection.notValidJson')}</Callout>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
         <PixelButton variant="primary" size="sm" onClick={save}>
           {saved ? t('webhooksSection.saved') : t('webhooksSection.saveSchema')}

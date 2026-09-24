@@ -730,7 +730,8 @@
         "crm": "您的 CRM",
         "github": "GitHub"
       }
-    }
+    },
+    "errSaveSetup": "无法保存你的设置，请重试。"
   },
   "office": {
     "gpuError": "办公楼层丢失了 GPU 上下文。\n\n同时使用 GPU 的终端太多了。\n关闭几个智能体终端，或重启应用，即可恢复。",
@@ -1009,9 +1010,9 @@
     "bodySchema": "请求体 Schema",
     "editSchema": "编辑格式",
     "schemaDesc": "发送到这里的每条消息必须包含的内容。",
-    "notValidJson": "不是有效的 JSON：{{error}}。未保存任何内容。",
+    "notValidJson": "这个格式有错误，所以没有保存任何内容。",
     "saved": "已保存",
-    "saveSchema": "保存 schema",
+    "saveSchema": "保存格式",
     "sure": "确定？",
     "deleteIt": "删除",
     "keep": "保留"

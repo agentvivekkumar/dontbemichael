@@ -70,3 +70,14 @@ test('with no Michael on the roster, launch keeps the saved agent and a memory j
     return { first, after: s.selectedId, tab: s.ccTabRequest.tab, focus: s.memoryFocusRequest.agentId };`);
   assert.deepEqual(r, { first: 'pam', after: 'pam', tab: 'memory', focus: 'oscar' });
 });
+
+test('selecting another agent drops a pending "open this agent\'s memory" jump', () => {
+  // Otherwise Michael's Memory tab reopened on an agent picked from the graph
+  // long ago, every time his panel remounted.
+  const r = freshRun({ 'cth.agents': JSON.stringify([{ id: 'god', name: 'Michael', isGod: true }, { id: 'oscar', name: 'Oscar' }]) }, `
+    store.getState().openAgentMemory('oscar');
+    const before = store.getState().memoryFocusRequest && store.getState().memoryFocusRequest.agentId;
+    store.getState().select('oscar');
+    return { before, after: store.getState().memoryFocusRequest };`);
+  assert.deepEqual(r, { before: 'oscar', after: null });
+});

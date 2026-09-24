@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { Icon } from './Icon';
-import { clearLocalState, restoreLocalState, snapshotLocalState } from './SettingsModal';
+import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import type { HarnessConfig } from '@/store/config';
 
 function folderName(path: string): string {

@@ -71,7 +71,7 @@ export function Callout({ children, tone = 'warn' }: { children: ReactNode; tone
   return (
     <div style={{
       marginTop: 6, padding: '6px 8px',
-      fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)',
+      fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)',
       background: warn ? 'var(--cth-coral-light)' : 'var(--cth-cream-200)',
       boxShadow: `inset 0 0 0 1px ${warn ? 'var(--cth-coral)' : 'var(--cth-ink-100)'}`
     }}>{children}</div>
@@ -109,7 +109,7 @@ export function MiniButton({ children, onClick, tone = 'plain', disabled }: {
         cursor: disabled ? 'default' : 'pointer',
         background: tone === 'good' ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
         boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-        fontFamily: 'var(--cth-font-ui)', fontSize: 11,
+        fontFamily: 'var(--cth-font-ui)', fontSize: 14,
         color: disabled ? 'var(--cth-ink-300)' : tone === 'danger' ? 'var(--cth-coral)' : 'var(--cth-ink-900)'
       }}
     >{children}</button>

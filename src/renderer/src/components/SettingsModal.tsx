@@ -13,6 +13,8 @@ import {
 } from '@shared/triggers';
 import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
+import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
+import { plainReasonKey } from '@/store/plainReason';
 import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { ContextSection } from './triggers/ContextSection';
@@ -154,36 +156,9 @@ authorizes new work, the token only reads one task's status. Keep both private.
 Each webhook checks bodies against its own JSON schema; edit it in that
 webhook's Format row, above.`;
 
-/** Every renderer-side persisted key, so a switch that fails can put them back. */
-export function snapshotLocalState(): Record<string, string> {
-  const snap: Record<string, string> = {};
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && k.startsWith('cth.')) snap[k] = window.localStorage.getItem(k) ?? '';
-    }
-  } catch { /* noop */ }
-  return snap;
-}
-
-/** Put back a snapshot taken before clearLocalState(), after a switch failed. */
-export function restoreLocalState(snap: Record<string, string>): void {
-  try { for (const [k, v] of Object.entries(snap)) window.localStorage.setItem(k, v); } catch { /* noop */ }
-}
-
-/** Clear every renderer-side persisted key so a relaunch starts truly empty.
- *  A switch that can still fail takes a snapshotLocalState() first and restores
- *  it on failure: the app keeps running on the current office in that case. */
-export function clearLocalState(): void {
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && k.startsWith('cth.')) keys.push(k);
-    }
-    for (const k of keys) window.localStorage.removeItem(k);
-  } catch { /* noop */ }
-}
+// snapshotLocalState / restoreLocalState / clearLocalState live in
+// store/localState.ts (re-exported here for existing importers).
+export { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 
 // v0.3.4 redesign: six tabs, one topic each. 'AI Engines' folded into
 // Agents & Models; MCP + Slack + webhook + REST live together in Connections;
@@ -519,11 +494,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
       // Raw system codes (ENOENT, EACCES) mean nothing to an owner; say what
       // happened instead. The reader's own reasons are already plain words.
       const plainReason = (err?: string): string => {
-        if (!err) return t('settings.memory.errUnknown');
-        if (/ENOENT/.test(err)) return t('settings.memory.errNotFound');
-        if (/EACCES|EPERM/.test(err)) return t('settings.memory.errNoPermission');
-        if (/EISDIR/.test(err)) return t('settings.memory.errIsFolder');
-        return err;
+        const key = plainReasonKey(err);
+        return key ? t(key) : (err as string);
       };
       const failures = res.results
         .filter((r) => !r.ok)
@@ -770,7 +742,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     } catch (e) {
       setWebhookNote(e instanceof Error ? e.message : String(e));
     } finally { setWebhookBusy(false); }
-    if (!secret) { setWebhookNote('could not generate a secret'); return; }
+    if (!secret) { setWebhookNote(t('settings.connections.secretFailed')); return; }
     setShownSecrets((s) => ({ ...s, [id]: true }));
     await patchWebhook(id, { secret });
     setWebhookNote(t('settings.connections.newSecret'));

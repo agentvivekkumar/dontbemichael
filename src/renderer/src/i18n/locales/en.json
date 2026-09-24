@@ -730,7 +730,8 @@
         "crm": "your CRM",
         "github": "GitHub"
       }
-    }
+    },
+    "errSaveSetup": "Couldn't save your setup. Try again."
   },
   "office": {
     "gpuError": "The office floor lost its GPU context.\n\nToo many terminals are using the GPU at once.\nClose a few agent terminals, or restart the app, to bring it back.",
@@ -1009,9 +1010,9 @@
     "bodySchema": "BODY SCHEMA",
     "editSchema": "edit format",
     "schemaDesc": "What each message sent here must contain.",
-    "notValidJson": "Not valid JSON: {{error}}. Nothing was saved.",
+    "notValidJson": "This format has a mistake in it, so nothing was saved.",
     "saved": "saved",
-    "saveSchema": "save schema",
+    "saveSchema": "save format",
     "sure": "Sure?",
     "deleteIt": "delete it",
     "keep": "keep"
