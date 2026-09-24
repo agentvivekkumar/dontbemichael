@@ -20,7 +20,13 @@ const loadTs = require('./load-ts.cjs');
 const { CATALOG_URL, loadModelCatalog } = loadTs('src/main/modelCatalog.ts');
 const shipped = fs.readFileSync(path.resolve(__dirname, '../docs/model-catalog.json'), 'utf8');
 
-const tmpCache = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dbm-catalog-')), 'catalog.json');
+const tmpDirs = [];
+test.after(() => { for (const d of tmpDirs) fs.rmSync(d, { recursive: true, force: true }); });
+const tmpCache = () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'dbm-catalog-'));
+  tmpDirs.push(d);
+  return path.join(d, 'catalog.json');
+};
 const claudeIds = (r) => r.catalog.providers.claude.map((m) => m.id);
 
 test('the model list is fetched from this repo, not upstream', () => {

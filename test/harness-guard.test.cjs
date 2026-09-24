@@ -119,3 +119,18 @@ test('a tool call with no path, or a relative path with no known folder, is left
   }).deny, false);
   assert.equal(decide('notes.md', { cwd: undefined }).deny, false);
 });
+
+test('a refusal names the agent\'s folder only when that folder is outside the harness', () => {
+  // Michael on an older layout runs inside the harness folder: pointing him
+  // back at it as "your own folder" would send the work right back in.
+  const legacy = decide(`${HIVE}/shared/brand-voice.md`, { cwd: HOME, agentId: 'god', isGod: true });
+  assert.equal(legacy.deny, true);
+  // Stronger than matching one format: the reason has no business naming the
+  // harness folder at all.
+  assert.ok(!legacy.reason.includes(HOME), legacy.reason);
+  // A tool input that is not an object names no file, so there is nothing to judge.
+  assert.equal(harnessWriteDecision({
+    tool: 'Write', toolInput: 'oops', cwd: FOLDER, agentId: 'oscar', isGod: false,
+    harnessHome: HOME, hiveRoot: HIVE, caseInsensitive: true
+  }).deny, false);
+});

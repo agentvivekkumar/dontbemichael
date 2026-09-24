@@ -20,7 +20,9 @@ const loadTs = require('./load-ts.cjs');
 const { safeFolderName, businessFolderRoot, defaultAgentFolder, ensureFolder, OFFICE_FOLDER } =
   loadTs('src/main/agentFolders.ts');
 
-const docs = path.join(os.tmpdir(), 'agent-folders-docs');
+// Unique per run: a shared fixed path collides across parallel checkouts and
+// with a killed run's leftovers.
+const docs = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-folders-docs-'));
 test.after(() => fs.rmSync(docs, { recursive: true, force: true }));
 
 test('ordinary names pass through untouched', () => {
@@ -105,4 +107,21 @@ test('ensureFolder refuses when a file already sits where the folder would go', 
 
 test('ensureFolder refuses a relative path rather than guessing where it goes', () => {
   assert.equal(ensureFolder('Finance').ok, false);
+});
+
+test('ensureFolder says plainly when the app may not create a folder there', {
+  skip: process.platform === 'win32' || process.getuid?.() === 0 ? 'needs POSIX permissions and a non-root user' : false
+}, () => {
+  // A parent the owner can't write to (a shared drive, someone else's folder).
+  const locked = path.join(docs, 'Locked');
+  fs.mkdirSync(locked, { recursive: true });
+  fs.chmodSync(locked, 0o555);
+  try {
+    const r = ensureFolder(path.join(locked, 'Finance'));
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /isn't allowed to create a folder there/);
+    assert.ok(!fs.existsSync(path.join(locked, 'Finance')));
+  } finally {
+    fs.chmodSync(locked, 0o755);
+  }
 });
