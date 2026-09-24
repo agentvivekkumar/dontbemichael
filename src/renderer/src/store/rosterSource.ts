@@ -58,3 +58,19 @@ export function chooseRosterSource({
   const belongsHere = storedHome === null || currentHome === null || storedHome === currentHome;
   return { useFileRoster: false, useLocalFallback: belongsHere };
 }
+
+/** Whether finishing setup has to reload the window so the store reads the
+ *  roster of the office setup chose.
+ *
+ *  The store picks its roster once, at module load (see store.ts). On a fresh
+ *  data folder that happens BEFORE setup has chosen an office, so the store
+ *  starts empty; if setup then lands on an office that already has a team, the
+ *  first save would write that empty floor (plus Michael) over the real roster.
+ *  That is what happened on 2026-09-24 when setup ran again after the data
+ *  folder was renamed. Switching offices avoids it by relaunching; setup does
+ *  the same by reloading whenever the office differs from the one the store
+ *  was built for. */
+export function rosterNeedsReload(bootHome: string | null, nextHome: string | null | undefined): boolean {
+  const next = typeof nextHome === 'string' ? nextHome.trim() : '';
+  return next !== '' && next !== bootHome;
+}

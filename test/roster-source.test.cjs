@@ -99,3 +99,40 @@ test('no hive selected yet falls back rather than dropping the roster', () => {
   });
   assert.equal(src.useLocalFallback, true);
 });
+
+// --- finishing setup on an office that already has a team -------------------
+//
+// 2026-09-24: setup ran again on a fresh data folder (0.0.1 → 0.0.2), the owner
+// picked the office that already held a 9-person team, and the floor came up
+// with Michael alone. The store is built once, at module load, and on a fresh
+// data folder that happens before setup has chosen an office, so it held no
+// roster. The first write after setup then saved Michael over the real roster
+// (the empty-write guard only refuses EMPTY writes). Reloading when setup lands
+// on a different office than the one the store was built for makes the store
+// read that office's roster, the same way switching offices already does.
+
+const { rosterNeedsReload } = loadTs('src/renderer/src/store/rosterSource.ts');
+
+test('setup that lands on an office the store was not built for reloads it', () => {
+  assert.equal(rosterNeedsReload(null, HIVE_A), true, 'fresh data folder, office chosen in setup');
+  assert.equal(rosterNeedsReload(HIVE_B, HIVE_A), true, 'setup picked a different office');
+});
+
+test('no reload when the store already reads this office, or no office was chosen', () => {
+  assert.equal(rosterNeedsReload(HIVE_A, HIVE_A), false);
+  assert.equal(rosterNeedsReload(HIVE_A, null), false);
+  assert.equal(rosterNeedsReload(null, undefined), false);
+  assert.equal(rosterNeedsReload(null, '   '), false, 'whitespace is not an office');
+});
+
+test('finishing setup checks the office before showing the floor', () => {
+  const app = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '..', 'src/renderer/src/App.tsx'), 'utf8');
+  const at = app.indexOf('<OnboardingWizard onComplete=');
+  assert.ok(at > 0, 'onboarding is still mounted from App');
+  const handler = app.slice(at, app.indexOf('/>', at));
+  const reload = handler.indexOf('rosterNeedsReload(ROSTER_BOOT_HOME, next.harnessHome)');
+  const show = handler.indexOf('setConfig(next)');
+  assert.ok(reload > 0, 'onComplete asks whether the roster must be reloaded');
+  assert.ok(show > reload, 'and asks before the floor is shown');
+  assert.match(handler, /window\.location\.reload\(\)/);
+});

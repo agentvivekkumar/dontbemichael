@@ -406,6 +406,9 @@ const fileRoster = (() => {
 const currentHome = (() => {
   try { return window.cth?.harnessHomeSync?.() ?? null; } catch { return null; }
 })();
+/** The office this store's roster was loaded for (null: none was set yet).
+ *  App compares it with the office setup chooses; see rosterNeedsReload. */
+export const ROSTER_BOOT_HOME: string | null = currentHome;
 const storedHome = (() => {
   try { return window.localStorage.getItem(LS_ROSTER_HOME); } catch { return null; }
 })();

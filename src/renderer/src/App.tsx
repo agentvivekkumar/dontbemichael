@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useStore, selectedAgent } from '@/store/store';
+import { useStore, selectedAgent, ROSTER_BOOT_HOME } from '@/store/store';
+import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
@@ -264,7 +265,13 @@ export function App() {
 
   if (!config.onboardingComplete) {
     // Just-onboarded users go straight into the office they set up (homeState 'ok').
-    return <OnboardingWizard onComplete={(next) => { setConfig(next); setHomeState('ok'); }} />;
+    // If setup chose an office the store was not built for, reload first so the
+    // floor reads that office's roster instead of saving an empty one over it
+    // (rosterSource.ts, rosterNeedsReload).
+    return <OnboardingWizard onComplete={(next) => {
+      if (rosterNeedsReload(ROSTER_BOOT_HOME, next.harnessHome)) { window.location.reload(); return; }
+      setConfig(next); setHomeState('ok');
+    }} />;
   }
 
   if (homeState === 'checking') {
