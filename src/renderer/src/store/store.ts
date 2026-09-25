@@ -228,6 +228,9 @@ interface State {
   /** Copy durable hive roles onto roster descriptions (and the reverse is a
    *  no-op when the roster already has a real job string). */
   syncDescriptionsFromRoles: (roles: Record<string, string>) => void;
+  /** Replace the Role description and Work style of these agents, wherever they
+   *  are on the floor (active, archived or waiting to be restored). */
+  rewriteInstructions: (patches: Array<{ id: string; description: string; goal: string }>) => void;
   /** Persist a display-name change to both the hive registry and renderer roster.
    *  The agent id and all id-derived paths remain unchanged. */
   renameAgent: (id: string, name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -774,6 +777,22 @@ export const useStore = create<State>((set, get) => ({
         return s;
       }
       persistAgents(agents, s.selectedId);
+      if (archivedAgents !== s.archivedAgents) persistArchived(archivedAgents);
+      if (restorableAgents !== s.restorableAgents) persistRestorable(restorableAgents);
+      return { agents, archivedAgents, restorableAgents };
+    }),
+  rewriteInstructions: (patches) =>
+    set((s) => {
+      const byId = new Map(patches.map((p) => [p.id, p]));
+      if (byId.size === 0) return s;
+      const apply = (list: Agent[]): Agent[] =>
+        list.some((a) => byId.has(a.id))
+          ? list.map((a) => { const p = byId.get(a.id); return p ? { ...a, description: p.description, goal: p.goal } : a; })
+          : list;
+      const agents = apply(s.agents);
+      const archivedAgents = apply(s.archivedAgents);
+      const restorableAgents = apply(s.restorableAgents);
+      if (agents !== s.agents) persistAgents(agents, s.selectedId);
       if (archivedAgents !== s.archivedAgents) persistArchived(archivedAgents);
       if (restorableAgents !== s.restorableAgents) persistRestorable(restorableAgents);
       return { agents, archivedAgents, restorableAgents };

@@ -281,6 +281,9 @@ export interface HarnessConfig {
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Set once existing team members got today's Role description and Work
+   *  style (the one-time rewrite, 2026-09-25). */
+  instructionsRewritten?: boolean;
   harnessHome: string | null;
   /** Recently-opened hive home folders (most-recent first). Mirrors src/main/config.ts. */
   recentHives?: string[];
@@ -1438,6 +1441,10 @@ const api = {
    *  contents as a backup and refuses a first write that would empty a full file. */
   rosterWrite: (snap: RosterSnapshot): Promise<{ ok: boolean; skipped?: string; error?: string }> =>
     ipcRenderer.invoke('roster:write', snap),
+  /** Copy roster.json into roster-backups/ now, before a change the app makes
+   *  on its own (the instructions rewrite). */
+  rosterBackup: (reason: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('roster:backup', reason),
 
   // ─── Auto-update (v0.3.4; full state model v0.3.7) ──────────────────────────
   /** Push channel from main's updater — every stage of the pipeline, so the

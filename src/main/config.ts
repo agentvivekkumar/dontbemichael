@@ -221,6 +221,9 @@ export interface HarnessConfig {
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Set once existing team members got today's Role description and Work
+   *  style (the one-time rewrite, 2026-09-25). */
+  instructionsRewritten?: boolean;
   /** Folder where the harness keeps its own state (agent metadata, logs). */
   harnessHome: string | null;
   /** Recently-opened office folders (most-recent first), offered by the missing

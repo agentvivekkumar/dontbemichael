@@ -17,7 +17,7 @@ import { resolveGodName } from '../../../shared/godIdentity';
 import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
-import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart } from '../../../shared/teamPlan';
+import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart, rewrittenInstructions } from '../../../shared/teamPlan';
 import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
 
 const GOD_ID = 'god';
@@ -207,6 +207,37 @@ function stationForTool(tool: string): { station: StationKind; carry?: ToolKind 
   if (/write|edit|create|patch|replace|apply/.test(t)) return { station: 'desk', carry: 'Write' };
   if (/read|list|view|dir|glob|grep|search|find|file|cat|\bls\b/.test(t)) return { station: 'shelf', carry: 'Read' };
   return { station: 'desk' };
+}
+
+/**
+ * Give every existing team member today's Role description and Work style,
+ * ONCE (owner, 2026-09-25: "rewrite all"). roster.json is copied into
+ * roster-backups/ first; if that copy fails, nothing is changed and the rewrite
+ * is tried again next launch. The business's own pack wins for an id that more
+ * than one pack holds. The Work style reaches a running agent on its next
+ * prompt; the role in the registry reaches it at its next start.
+ */
+async function rewriteTeamInstructions(config: HarnessConfig): Promise<void> {
+  if (config.instructionsRewritten) return;
+  const { packs, core } = await window.cth.packsList();
+  const own = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType);
+  const defs = new Map<string, AgentDefinitionV2>();
+  for (const p of [own, ...packs.map((x) => x.pack), core]) {
+    for (const a of p?.agents ?? []) if (!defs.has(a.id)) defs.set(a.id, a);
+  }
+  const floor = useStore.getState();
+  const patches = rewrittenInstructions(
+    [...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents],
+    defs,
+    { name: config.businessName, city: config.businessCity }
+  );
+  if (patches.length > 0) {
+    const backup = await window.cth.rosterBackup('instructions-rewrite').catch(() => ({ ok: false }));
+    if (!backup.ok) return;
+    useStore.getState().rewriteInstructions(patches);
+    for (const p of patches) await window.cth.hivePatchAgentRole(p.id, p.description).catch(() => undefined);
+  }
+  await window.cth.updateConfig({ instructionsRewritten: true }).catch(() => undefined);
 }
 
 /**
@@ -481,7 +512,7 @@ export function useHive(config: HarnessConfig | null): void {
       useStore.getState().setGodStatus('ready');
       // The team picked during onboarding starts once Michael is up, each member
       // inside its own folder. After this they restore like any hired agent.
-      void startBusinessTeam(config);
+      void rewriteTeamInstructions(config).catch(() => undefined).then(() => startBusinessTeam(config));
 
       // Nothing is typed into Michael's terminal at start (owner cleanup,
       // 2026-09-25): his startup instructions cover orientation, and the standup

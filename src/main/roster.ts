@@ -28,7 +28,7 @@
  *      into place, so a crash mid-write leaves the previous file untouched.
  *   3. Never let an empty renderer erase a full roster. See `write`.
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** What the renderer mirrors to disk. The inner agent shape is deliberately
@@ -186,6 +186,20 @@ export class RosterStore {
       this.backup(home, p, 'reset');
       rmSync(p, { force: true });
     } catch { /* a reset must never fail on this */ }
+  }
+
+  /** Back up the roster as it is now, before a change the app makes on its own
+   *  (the instructions rewrite). True when a copy was made or there was nothing
+   *  to copy. */
+  backupNow(reason: string): boolean {
+    const home = this.home();
+    if (!home) return false;
+    const p = rosterPath(home);
+    if (!existsSync(p)) return true;
+    const dir = rosterBackupDir(home);
+    const before = existsSync(dir) ? readdirSync(dir).length : 0;
+    this.backup(home, p, reason);
+    return existsSync(dir) && readdirSync(dir).length > before;
   }
 
   /** Copy the current roster into the append-only backup folder. Never prunes:

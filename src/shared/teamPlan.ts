@@ -179,6 +179,31 @@ export function teamMemberGoal(
   ].filter(Boolean).join('\n');
 }
 
+/**
+ * The one-time rewrite of existing team members (owner, 2026-09-25: "rewrite
+ * all"). Every agent whose id is a pack member gets its Role description and
+ * Work style replaced with today's pack text, the same text a new hire gets.
+ * Michael and agents that match no pack are left alone. Returns only the agents
+ * whose text actually changes. The roster is backed up before this is applied.
+ */
+export function rewrittenInstructions(
+  agents: Array<{ id: string; description?: string; goal?: string; isGod?: boolean; isAssistant?: boolean }>,
+  defs: Map<string, AgentDefinitionV2>,
+  business: { name?: string; city?: string }
+): Array<{ id: string; description: string; goal: string }> {
+  const out: Array<{ id: string; description: string; goal: string }> = [];
+  for (const a of agents) {
+    if (a.isGod || a.isAssistant) continue;
+    const def = defs.get(a.id);
+    if (!def) continue;
+    const description = teamMemberRole(def);
+    const goal = teamMemberGoal(def, business);
+    if (description === a.description && goal === a.goal) continue;
+    out.push({ id: a.id, description, goal });
+  }
+  return out;
+}
+
 /** Card colours for the team, in pick order. Lemon is Michael's, so it goes last. */
 const TEAM_ACCENTS = ['mint', 'sky', 'coral', 'lilac', 'peach', 'lemon'] as const;
 export function teamAccent(index: number): (typeof TEAM_ACCENTS)[number] {

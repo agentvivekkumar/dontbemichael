@@ -47,7 +47,7 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   assert.match(hive, /const godCwd = res\.cwd \|\| requestedCwd;/);
   // The team starts only after Michael is up.
   // (The other 'ready' is the already-running path, which starts nothing.)
-  const start = hive.indexOf('void startBusinessTeam(config);');
+  const start = hive.indexOf('void rewriteTeamInstructions(config).catch(() => undefined).then(() => startBusinessTeam(config));');
   const ready = hive.lastIndexOf("useStore.getState().setGodStatus('ready');", start);
   assert.ok(ready > 0 && start > ready && start - ready < 400, 'started right after Michael is ready');
 });

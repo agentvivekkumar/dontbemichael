@@ -3641,6 +3641,8 @@ ipcMain.on('roster:readSync', (evt) => { evt.returnValue = roster.read(); });
 ipcMain.on('config:homeSync', (evt) => { evt.returnValue = readConfig().harnessHome ?? null; });
 ipcMain.handle('roster:read', () => roster.read());
 ipcMain.handle('roster:write', (_evt, snap: unknown) => roster.write(snap));
+ipcMain.handle('roster:backup', (_evt, reason: unknown) =>
+  ({ ok: roster.backupNow(typeof reason === 'string' && /^[a-z0-9-]{1,40}$/.test(reason) ? reason : 'manual') }));
 
 // ─── IPC: hive (multi-agent coordination) ───────────────────────────────────
 ipcMain.handle('hive:registry', () => hive.registry());
