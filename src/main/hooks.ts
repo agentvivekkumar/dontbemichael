@@ -273,6 +273,11 @@ export class HookServer {
     // since a fresh session makes in-flight compaction state moot — closes it
     // down to the trailing grace (a no-op when nothing was compacting).
     if (event === 'PreCompact' && agentId) this.breaker?.recordCompactStart(agentId);
+    // Logged so compaction can be measured (tools/agent-metrics.cjs).
+    if (event === 'PreCompact' && agentId) {
+      const trigger = (p as { trigger?: unknown }).trigger;
+      try { this.hive.appendLog({ kind: 'compact', agentId, trigger: typeof trigger === 'string' ? trigger : 'unknown' }); } catch { /* best-effort */ }
+    }
     if ((event === 'PostCompact' || event === 'SessionStart') && agentId) {
       this.breaker?.recordCompactEnd(agentId);
     }

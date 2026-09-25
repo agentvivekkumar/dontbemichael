@@ -228,7 +228,9 @@ export class MemoryTidy {
     });
     if (!result.ok || !result.text) throw new Error(result.error ?? 'no response');
     const json = extractJson(result.text);
-    if (json === undefined) throw new Error('no JSON in the response');
+    // Keep the start of the reply: an expired sign-in or a refusal answers in
+    // plain text, and the abort log should say which.
+    if (json === undefined) throw new Error(`no JSON in the response: ${result.text.trim().slice(0, 160)}`);
     return json;
   }
 }
