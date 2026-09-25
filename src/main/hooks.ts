@@ -515,13 +515,28 @@ export class HookServer {
 
   /** Fire a native desktop notification — gated on the user's `notifications`
    *  setting. Only the OS toast is gated; the hive:hookEvent emit is always sent
-   *  so avatars/UI stay live regardless. Best-effort: never throw into the hook. */
+   *  so avatars/UI stay live regardless. Best-effort: never throw into the hook.
+   *
+   *  Only Michael notifies (owner, 2026-09-25): team members talk to Michael and
+   *  at most wait on him, so their stops and idles never reach the desktop.
+   *  Michael raises anything the owner must decide on ASK ME
+   *  (docs/designs/michael-only-notifications.md). */
   private notify(agentId: string | undefined, body: string): void {
     if (!this.getConfig().notifications) return;
+    if (!agentId || !this.isGod(agentId)) return;
     try {
       if (!Notification.isSupported()) return;
       new Notification({ title: this.displayName(agentId), body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  private isGod(agentId: string): boolean {
+    try {
+      const reg = this.hive.registry();
+      return agentId === (reg.godId ?? 'god') || !!reg.agents?.[agentId]?.isGod;
+    } catch {
+      return false;
+    }
   }
 
   /** The name the owner knows an agent by, for a notification title. Never the

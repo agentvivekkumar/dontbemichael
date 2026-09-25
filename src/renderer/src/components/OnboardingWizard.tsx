@@ -1083,7 +1083,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <ToggleRow
                   icon="bell"
                   label={t('onboarding.permissions.notifications')}
-                  desc={t('onboarding.permissions.notificationsDesc')}
+                  desc={t('onboarding.permissions.notificationsDesc', { godName })}
                   on={notifications}
                   tint="var(--cth-peach-light)"
                   edge="var(--cth-peach)"

@@ -134,3 +134,16 @@ test('agents are told how to ask, in both protocols', () => {
   assert.equal((hive.match(/## Your schedules/g) ?? []).length, 2);
   assert.match(hive, /You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME\./);
 });
+
+test('only Michael notifies: every desktop toast in main is his, or one of the app\'s own warnings', () => {
+  // docs/designs/michael-only-notifications.md. Team members never toast.
+  const main = read('src/main/index.ts');
+  const titles = [...main.matchAll(/new Notification\(\{ title: ([^,]+),/g)].map((m) => m[1].trim());
+  for (const t of titles) assert.ok(['michaelName()', 'title'].includes(t), `unexpected toast title ${t}`);
+  const toasts = [...main.matchAll(/breakerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
+  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()'].sort());
+  assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
+  assert.match(main, /breakerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
+  assert.match(main, /title: michaelName\(\), body: `\$\{name\} asked to change a schedule\. It's waiting for you in ASK ME\.`/);
+  assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return;/);
+});

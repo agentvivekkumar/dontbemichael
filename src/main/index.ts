@@ -949,11 +949,12 @@ function receiveScheduleRequest(actor: string, payload: unknown): string {
   if (!built.ok) return `Schedule request not sent: ${built.reason}`;
   writeConfig({ scheduleRequests: [...(cfg.scheduleRequests ?? []), built.request] });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
-  // ASK ME has no badge, so tell the owner there is something to decide.
+  // ASK ME has no badge, so Michael tells the owner there is something to
+  // decide. Only Michael notifies (docs/designs/michael-only-notifications.md).
   if (readConfig().notifications) {
     try {
       const name = hive.registry().agents[actor]?.name?.trim() || 'A team member';
-      if (Notification.isSupported()) new Notification({ title: name, body: `${name} asked to change a schedule. Approve or decline it in ASK ME.` }).show();
+      if (Notification.isSupported()) new Notification({ title: michaelName(), body: `${name} asked to change a schedule. It's waiting for you in ASK ME.` }).show();
     } catch { /* best-effort */ }
   }
   return 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
@@ -1270,7 +1271,17 @@ function reengageGod(digest: string): void {
   hive.send({ to: 'god', act: 'request', subject: 'Heartbeat', body: digest }, 'heartbeat');
 }
 
-/** A native toast for breaker constrain/stop, gated on the notifications setting. */
+/** Michael's name as the owner knows it (he can be renamed), for toast titles. */
+function michaelName(): string {
+  try {
+    const reg = hive.registry();
+    return resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
+  } catch {
+    return resolveGodName(undefined);
+  }
+}
+
+/** A native toast for a breaker stop or an app warning, gated on the notifications setting. */
 function breakerToast(title: string, body: string): void {
   if (!readConfig().notifications) return;
   try { if (Notification.isSupported()) new Notification({ title, body }).show(); }
@@ -1346,11 +1357,13 @@ function runBreakerBeat(progressWindowMs: number): void {
     } else if (d.action === 'constrain') {
       hive.send({ to: d.state.agentId, act: 'request', subject: 'Circuit breaker: constrain',
         body: `The app paused this task (${reason}). Before running more tools, send Michael a short plan of your next step and wait for his go ahead.` }, 'breaker');
-      breakerToast(`${name} constrained`, reason);
+      // No toast: a constrain is a soft pause Michael handles (only Michael
+      // notifies, docs/designs/michael-only-notifications.md).
     } else if (d.action === 'stop') {
       const ptyId = ptyForAgent(d.state.agentId);
       if (ptyId) { try { ptyManager.kill(ptyId); } catch { /* already gone */ } teardownPty(ptyId); }
-      breakerToast(`${name} stopped by circuit breaker`, reason);
+      // A stop halts that agent's work, so the owner hears it, from Michael.
+      breakerToast(michaelName(), `I stopped ${name}: ${reason}`);
     }
   }
 }

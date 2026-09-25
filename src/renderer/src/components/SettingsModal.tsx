@@ -1198,7 +1198,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               {t('settings.general.desktopNotifications')}
                             </span>
                             <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.general.desktopNotificationsDesc')}
+                              {t('settings.general.desktopNotificationsDesc', { godName })}
                             </span>
                           </div>
                           <PixelButton
