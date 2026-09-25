@@ -393,6 +393,12 @@ const initialFloorView: FloorView = (() => {
 // Fields that are large or transient — not worth persisting across reloads.
 // contextTokens/contextLimit describe a LIVE session; persisting them showed a
 // dead session's context gauge after a restart until the poll caught up.
+/** A team member's `action` while its terminal shows a prompt only a person can
+ *  answer (a permission or a question). Team members read as "waiting", never
+ *  "blocked", so this marker is what tells the panel to offer Talk 1:1
+ *  (docs/designs/owner-talks-via-michael.md). */
+export const ACTION_AT_PROMPT = 'waiting at a prompt';
+
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt'>;
 
 // ─── The roster mirror ──────────────────────────────────────────────────────

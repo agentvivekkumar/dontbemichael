@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
-import { useStore, type Agent } from '@/store/store';
+import { ACTION_AT_PROMPT, useStore, type Agent } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 /**
@@ -75,7 +75,9 @@ export function OwnerViaMichaelBar({ agent }: { agent: Agent }) {
   const godId = useStore((s) => s.agents.find((a) => a.isGod)?.id);
   useSyncedHold(agent.id);
   const { busy, err, setHold } = useSetHold(agent.id);
-  const stuck = agent.status === 'blocked';
+  // Team members read as "waiting" at a prompt, never "blocked" (usePtyParser,
+  // useHive); the prompt marker is what says a person is needed in the terminal.
+  const stuck = agent.status === 'waiting' && agent.action === ACTION_AT_PROMPT;
 
   const messageMichael = () => {
     if (!godId) return;
@@ -83,7 +85,10 @@ export function OwnerViaMichaelBar({ agent }: { agent: Agent }) {
     const prefix = t('ownerVia.aboutPrefix', { name: agent.name });
     const current = s.drafts[godId] ?? '';
     // Start the message; keep anything already drafted to Michael.
-    s.setDraft(godId, current.trim() ? `${current.trimEnd()}\n\n${prefix}` : prefix);
+    // Don't stack the prefix on repeat clicks (adversarial review, 2026-09-25).
+    if (!current.trimEnd().endsWith(prefix.trimEnd())) {
+      s.setDraft(godId, current.trim() ? `${current.trimEnd()}\n\n${prefix}` : prefix);
+    }
     s.select(godId);
     s.requestCommandCenterTab('terminal');
   };

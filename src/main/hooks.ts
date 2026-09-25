@@ -35,10 +35,10 @@ export const ASK_TOOL_REFUSAL =
 /** A Notification that means the session is stopped on a prompt a person must
  *  answer in the terminal: a permission request or a question dialog, never the
  *  plain idle "waiting for your input". */
+const TERMINAL_PROMPT_TYPES = new Set(['permission_prompt', 'elicitation_dialog']);
 export function isTerminalPrompt(p: { notification_type?: string; message?: string }): boolean {
   const type = (p.notification_type ?? '').toLowerCase();
-  if (type.includes('idle')) return false;
-  if (type.includes('permission') || type.includes('elicitation')) return true;
+  if (type) return TERMINAL_PROMPT_TYPES.has(type);
   return /needs your permission|needs your approval/i.test(p.message ?? '');
 }
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
@@ -574,7 +574,6 @@ export class HookServer {
   private relayPromptToMichael(agentId: string, text: string): void {
     const last = this.relayedPrompts.get(agentId);
     if (last && last.text === text && Date.now() - last.at < 10 * 60_000) return;
-    this.relayedPrompts.set(agentId, { text, at: Date.now() });
     try {
       const name = this.displayName(agentId);
       this.hive.send({
@@ -583,7 +582,10 @@ export class HookServer {
         subject: `${name} is waiting on something in their terminal`,
         body: `${name}'s session stopped on a prompt only the owner can answer in that terminal${text ? `: "${text}"` : '.'} You can't answer it there. Put it on the owner's ASK ME board (a card for ${agentId}, status "blocked", one humanQA ask with "raisedBy": "${agentId}") saying what it is waiting on and to talk 1:1 with ${name} to answer it.`
       }, 'system');
-    } catch { /* best-effort: the panel still shows "needs you" */ }
+      // Stamped only once it went out, so a failed send is retried on the
+      // next prompt event (adversarial review, 2026-09-25).
+      this.relayedPrompts.set(agentId, { text, at: Date.now() });
+    } catch { /* best-effort: the panel offers Talk 1:1 meanwhile */ }
   }
 
   private isGod(agentId: string): boolean {

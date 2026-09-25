@@ -110,3 +110,27 @@ test('new strings exist in every language, Michael by godName', () => {
     assert.match(d.message, /\{\{godName\}\}/);
   }
 });
+
+test('a relay that failed to send is retried on the next prompt event', async (t) => {
+  const { hive, server } = await office(t);
+  const realSend = hive.send.bind(hive);
+  let fail = true;
+  hive.send = (...a) => { if (fail) { fail = false; throw new Error('inbox locked'); } return realSend(...a); };
+  const prompt = { agent_id: 'pam', session_id: 's', hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'needs your permission to use Bash' };
+  await server.handle(prompt);
+  assert.equal(hive.inbox('god').length, 0);
+  await server.handle(prompt);
+  assert.equal(hive.inbox('god').length, 1, 'not suppressed by the failed attempt');
+});
+
+test('unknown notification types are not treated as prompts', () => {
+  assert.equal(isTerminalPrompt({ notification_type: 'permission_granted_info', message: 'fine' }), false);
+});
+
+test('the stuck bar keys on the team member prompt marker, and the Michael prefix never stacks', () => {
+  const bar = read('src/renderer/src/components/OwnerViaMichaelBar.tsx');
+  assert.match(bar, /const stuck = agent\.status === 'waiting' && agent\.action === ACTION_AT_PROMPT;/);
+  assert.match(bar, /if \(!current\.trimEnd\(\)\.endsWith\(prefix\.trimEnd\(\)\)\)/);
+  assert.match(read('src/renderer/src/hooks/usePtyParser.ts'), /action: ACTION_AT_PROMPT,/);
+  assert.match(read('src/renderer/src/hooks/useHive.ts'), /\{ status: 'waiting', action: ACTION_AT_PROMPT \}/);
+});
