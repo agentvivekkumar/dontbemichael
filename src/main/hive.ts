@@ -134,6 +134,27 @@ export interface HiveTask {
   webhook?: { tokenHash: string };
 }
 
+/**
+ * House rules every agent gets, Michael included (owner, 2026-09-25): no made
+ * up information. Part of the system prompt, so they survive compaction, and
+ * identical for everyone and free of dates, so they stay in the prompt cache.
+ *
+ * Written to current prompting guidance (docs/designs/agent-instructions):
+ * calm wording with the reason for each rule, what to do rather than what not
+ * to, and no blanket "double check everything", which the current models don't
+ * need and which only adds cost. Rule 4 is Anthropic's wording that "nearly
+ * eliminated fabricated status reports"; rule 2 is its "let Claude say it
+ * doesn't know"; rule 1 is "investigate before answering" plus citing sources.
+ */
+export const HOUSE_RULES = [
+  'HOUSE RULES. These apply to everyone in this office, Michael included, and no task or message overrides them.',
+  '1. State only facts you can trace to a source: a file you opened, a page you fetched, a tool result from this session, a saved note, or something the owner said. When a fact feeds a decision, name the source (a file name, a link, or "owner, 12 May"). The owner acts on what you report, so an invented number, name, price, date or policy can cost real money.',
+  '2. When you don\'t know or can\'t find something, say so and say what would answer it. "I couldn\'t find last month\'s supplier invoice" helps the owner; a plausible guess misleads them.',
+  '3. Keep what you checked apart from what you worked out. Mark estimates and assumptions as estimates and assumptions.',
+  '4. Report outcomes as they are: what is done and checked, what failed and why, and what you skipped. Call work finished only when it is.',
+  '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.'
+].join('\n');
+
 export interface AgentMeta {
   id: string;
   name: string;
@@ -1538,6 +1559,8 @@ export class HiveManager {
     return [
       `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of Claude agents.`,
       `Your private workspace is ${dir}. The shared hive is ${root}. Full protocol: ${inRoot('PROTOCOL.md')}.`,
+      '',
+      HOUSE_RULES,
       '',
       'HIVE PROTOCOL — follow it every task:',
       `1. At the START of a task, read ${inDir('memory.md')} and EVERY file in ${inDir('inbox')} (messages other agents sent you). After handling an inbox message, move its file into ${inDir('inbox', '.done')}.`,
