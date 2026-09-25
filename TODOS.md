@@ -200,6 +200,29 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Priority:** P2
 **Depends on:** None
 
+## Engines
+
+### Make a second engine (Codex first) ready for an office
+
+**What:** Close the gaps that keep engines other than Claude Code out of `BUILD_ENGINES`, starting with Codex, then add it to the list.
+
+**Why:** An audit on 2026-09-24 found that the code for Codex, Gemini CLI and Antigravity exists, but none is ready for an office without Claude. Only Codex has live history (hooks, idle, messaging and resume were debugged on real workers). Every picker and voice hiring now offer only `BUILD_ENGINES`, so nothing half-working can be chosen until this is done.
+
+**Context:** In order of impact:
+1. The team always starts on the default engine: `startBusinessTeam` uses `inferAgentProvider(config.defaultCommand)` (`src/renderer/src/hooks/useHive.ts:310`), which is `claude` (`src/main/config.ts:449`), because setup saves `godProvider` but not `defaultCommand`. Ephemeral workers fall back the same way (`src/main/workerLaunch.ts:31`).
+2. No cost or token data: the telemetry env is added only for Claude (`src/main/hive.ts:951`); the transcript fallback reads `~/.claude/projects` (`src/main/transcript.ts:44`); `src/main/pricing.ts` knows only Claude models. Cost views, caps, token caps and the context gauge are empty.
+3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`), and bundled skills only into `.claude/skills` (`src/main/hive.ts:733`).
+4. Gemini and Antigravity get no extra writable directories (`--add-dir` exists for Codex only, `src/main/hive.ts:859`), so hive file writes may be refused.
+5. Antigravity agents never get their standing goal, and an Antigravity Michael never gets the roster (no SessionStart/UserPromptSubmit event).
+6. Memory condensing runs a hidden Claude session (`src/main/reflect.ts:279`); without Claude it does nothing.
+7. Michael's prompts are written for Claude ("hive of Claude agents", `src/main/hive.ts:1519`; `INITIAL_GOD_PROMPT` in `src/renderer/src/hooks/useHive.ts:77`).
+8. No permission-prompt detection for these engines (no Notification event), which matters only with auto mode off.
+A live end-to-end run is required before adding an engine: Gemini has never been run for real, and Codex needs an OpenAI account with credits.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** A decision to offer a second engine.
+
 ## Onboarding
 
 ### Retry team members that failed their first start

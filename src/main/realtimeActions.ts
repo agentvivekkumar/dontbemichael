@@ -37,7 +37,7 @@
 import { ipcMain } from 'electron';
 import type { HiveMessage, HiveTask, Registry } from './hive';
 import type { ScheduledMission } from './config';
-import { inferAgentProvider } from '../shared/agentProvider';
+import { inferAgentProvider, BUILD_ENGINES, type AgentProvider } from '../shared/agentProvider';
 import { clearCommandForProvider } from '../shared/providerAutomation';
 import { resolveGodName } from '../shared/godIdentity';
 
@@ -645,6 +645,11 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
   // spawn / hire — expensive; stubbed $ estimate (rt-9 wires the real number).
   if (verb === 'spawn') {
     const provider = (str(a.provider) || 'claude').toLowerCase();
+    // Only the engines this build offers (BUILD_ENGINES), the same list the
+    // hire dialog shows: the others are not ready to run an office member.
+    if (!BUILD_ENGINES.includes(provider as AgentProvider)) {
+      return { ok: false, spoken: `I can only hire on Claude Code in this version, not ${provider}. Say the word and I'll hire them on Claude Code.` };
+    }
     const role = str(a.role) || str(a.job);
     const name = str(a.name) || (role ? role.replace(/\b\w/g, (c) => c.toUpperCase()) : provider) || 'Worker';
     const godCwd = reg.godId ? reg.agents[reg.godId]?.cwd : undefined;

@@ -33,7 +33,7 @@ import {
   AGENT_PROVIDER_PRESETS,
   type AgentProvider
 } from '@/store/config';
-import { canReceiveInbox } from '@shared/agentProvider';
+import { BUILD_ENGINES, canReceiveInbox } from '@shared/agentProvider';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 
@@ -878,7 +878,11 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                     {agentPreset.label} · {a.model ?? 'current'}
                   </option>
                 )}
-                {modelProvidersForAgent(a.isGod).map((preset) => (
+                {/* This build's engines only (BUILD_ENGINES), plus the one the
+                    agent runs on now so its current model stays listed. */}
+                {modelProvidersForAgent(a.isGod)
+                  .filter((preset) => BUILD_ENGINES.includes(preset.id) || preset.id === agentProvider)
+                  .map((preset) => (
                   <optgroup key={preset.id} label={preset.label}>
                     {modelsForProvider(preset.id).map((model) => {
                       // `defaultModel` is a Claude model id, so it can only mark
@@ -939,7 +943,11 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                     setEngineModel(preset?.recommendedOrchestratorModel);
                   }}
                 >
-                  {AGENT_PROVIDER_PRESETS.filter((p) => canReceiveInbox(p.id)).map((p) => (
+                  {/* This build's engines only, plus Michael's current one. */}
+                  {AGENT_PROVIDER_PRESETS
+                    .filter((p) => canReceiveInbox(p.id)
+                      && (BUILD_ENGINES.includes(p.id) || p.id === agentProvider || p.id === engineProvider))
+                    .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}{p.id === 'claude' ? ' ★' : ''}
                     </option>

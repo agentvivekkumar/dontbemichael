@@ -28,6 +28,7 @@ import {
   providerPreset,
   isClaudeProvider
 } from '@/store/config';
+import { BUILD_ENGINES } from '@shared/agentProvider';
 import { useRtl } from '@/i18n/useDirection';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
@@ -873,7 +874,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   <>
                     <Row label={tr('addAgent.provider')}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {AGENT_PROVIDER_PRESETS.map((p) => {
+                        {/* This build's engines only (BUILD_ENGINES, like setup),
+                            plus one an imported hire already chose. */}
+                        {AGENT_PROVIDER_PRESETS
+                          .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
+                          .map((p) => {
                           const active = provider === p.id;
                           return (
                             <button
