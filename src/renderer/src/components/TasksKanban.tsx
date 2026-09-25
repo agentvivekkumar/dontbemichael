@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { useStore } from '@/store/store';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useRtl } from '@/i18n/useDirection';
+import { isReplacedAsk, openAskIndex } from '@shared/askMeRouting';
 
 /** A card on the task kanban. Mirrors HiveTask in the main/preload process —
  *  re-declared locally so the renderer doesn't reach into the preload package
@@ -42,12 +43,10 @@ export interface HiveTask {
 /** The card's currently open question for the human, if any. An entry the human
  *  dismissed (dismissedAt) counts as resolved, same as an answered one. */
 export function openQuestion(t: HiveTask): HumanQA | undefined {
-  if (!Array.isArray(t.humanQA)) return undefined;
-  for (let i = t.humanQA.length - 1; i >= 0; i--) {
-    const e = t.humanQA[i];
-    if (e && typeof e.q === 'string' && !e.a && !e.dismissedAt) return e;
-  }
-  return undefined;
+  // Only the newest ask can be open; an older unanswered one was replaced by it
+  // (askMeRouting.ts openAskIndex, owner 2026-09-25).
+  const i = openAskIndex(t.humanQA);
+  return i >= 0 ? t.humanQA![i] : undefined;
 }
 
 /** Waiting on the human = blocked with an unanswered question on the card. */
@@ -408,6 +407,10 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <MarkdownPreview source={e.a} variant="card" />
                         </div>
+                      </div>
+                    ) : isReplacedAsk(task.humanQA, i) ? (
+                      <div style={{ fontSize: 13, color: 'var(--cth-ink-500)' }}>
+                        {t('kanban.askReplaced')}
                       </div>
                     ) : (
                       <div style={{ fontSize: 11, color: 'var(--cth-coral)', fontFamily: 'var(--cth-font-display)' }}>
