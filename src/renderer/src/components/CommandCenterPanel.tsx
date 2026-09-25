@@ -1176,8 +1176,14 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
     finally { setTextBusy(false); setTextSearched(true); }
   };
 
+  // A flex column rather than the shared Scroll wrapper, so the memory file can take all the
+  // height the searches leave (owner, 2026-09-25). It keeps a floor, and the
+  // tab still scrolls when search results push it down.
   return (
-    <Scroll>
+    <div style={{
+      flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 10,
+      background: 'var(--cth-paper-200)', display: 'flex', flexDirection: 'column'
+    }}>
       <Section title={t('commandCenter.textSearch')}>
         <div style={{ display: 'flex', gap: 6 }}>
           <input
@@ -1220,13 +1226,14 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
         {searchOut && <Pre>{searchOut}</Pre>}
       </Section>
 
-      <Section title={t('commandCenter.memoryFile')}>
-        <Select value={who} onChange={setWho}>
+      <div style={{ flex: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', color: 'var(--cth-ink-500)', marginBottom: 6 }}>{t('commandCenter.memoryFile')}</div>
+        <div><Select value={who} onChange={setWho}>
           {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-        </Select>
-        <Pre>{mem || t('commandCenter.noMemory')}</Pre>
-      </Section>
-    </Scroll>
+        </Select></div>
+        <Pre fill>{mem || t('commandCenter.noMemory')}</Pre>
+      </div>
+    </div>
   );
 }
 
@@ -1392,11 +1399,14 @@ function Muted({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{children}</div>;
 }
 
-function Pre({ children }: { children: React.ReactNode }) {
+/** `fill`: grow into the space its flex parent has left, instead of stopping at
+ *  200px. The memory file uses it; search results keep the cap. */
+function Pre({ children, fill = false }: { children: React.ReactNode; fill?: boolean }) {
   const rtl = useRtl();
   return (
     <pre style={{
-      margin: '6px 0 0', padding: 8, maxHeight: 200, overflow: 'auto',
+      margin: '6px 0 0', padding: 8, overflow: 'auto',
+      ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 200 }),
       background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
       fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px',
       color: 'var(--cth-ink-900)', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
