@@ -23,3 +23,16 @@ test('the header uses the brand kit lockup, one per theme', () => {
   assert.match(css, /:root\[data-cth-theme='dark'\] \.cth-lockup-dark \{ display: block; \}/);
   assert.match(read('electron.vite.config.ts'), /'@brandkit': resolve\(__dirname, 'branding'\)/);
 });
+
+test('the window icon, loading screen and app icon come from the brand kit', () => {
+  const main = read('src/renderer/src/main.tsx');
+  assert.match(main, /import brandMark from '@brandkit\/logo\/mark\/struck-m-light\.svg\?url';/);
+  assert.match(main, /favicon\.href = brandMark;/);
+  assert.match(main, /img\.src = brandMark;/);
+  assert.doesNotMatch(main, /@brand\/logo\.png/);
+  assert.doesNotMatch(read('src/renderer/index.html'), /DBM|#6E1423/);
+  for (const f of ['icon.icns', 'icon.ico', 'icon.svg']) {
+    assert.ok(fs.readFileSync(path.resolve(__dirname, '../build', f)).equals(fs.readFileSync(path.resolve(__dirname, '../branding/app-icon', f))), f);
+  }
+  assert.ok(fs.readFileSync(path.resolve(__dirname, '../build/icon.png')).equals(fs.readFileSync(path.resolve(__dirname, '../branding/app-icon/icon-1024.png'))));
+});
