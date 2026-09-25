@@ -8,11 +8,13 @@ import { SHOW_GIT } from '@shared/buildFeatures';
 // v0.3.4: the files tab is gone — the per-agent IDE button (header) opens the
 // full Monaco editor + file tree, which superseded the read-only browser.
 const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
-  { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },
-  { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
+  // Owner-facing tabs first; the technical ones (terminal, git, traces) last
+  // (owner, 2026-09-25).
   { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
   // The agent's own jobs on a clock (docs/designs/per-agent-schedules.md).
   { key: 'schedules', labelKey: 'sidebar.schedules', icon: 'clock' },
+  { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },
+  { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
   { key: 'traces',   labelKey: 'sidebar.traces',   icon: 'web' }
 ];
 /** GIT is hidden in this build (src/shared/buildFeatures.ts). */

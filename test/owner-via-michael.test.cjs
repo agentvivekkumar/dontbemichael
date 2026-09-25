@@ -134,3 +134,9 @@ test('the stuck bar keys on the team member prompt marker, and the Michael prefi
   assert.match(read('src/renderer/src/hooks/usePtyParser.ts'), /action: ACTION_AT_PROMPT,/);
   assert.match(read('src/renderer/src/hooks/useHive.ts'), /\{ status: 'waiting', action: ACTION_AT_PROMPT \}/);
 });
+
+test('agent panel tabs: messages, schedules, then the technical ones', () => {
+  const tabs = read('src/renderer/src/components/SidebarTabs.tsx');
+  const order = [...tabs.matchAll(/\{ key: '(\w+)',/g)].map((m) => m[1]);
+  assert.deepEqual(order, ['messages', 'schedules', 'terminal', 'git', 'traces']);
+});
