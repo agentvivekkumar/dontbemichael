@@ -396,13 +396,6 @@ Contributions are welcome. This is pre-release software with a lot of surface ar
 `npm install && npm run dev`, keep `npm run typecheck` passing, and **base any new UI on the
 [`DESIGN.md`](./DESIGN.md) tokens**.
 
-> [!IMPORTANT]
-> **Every pull request must include a before and an after.** Use screenshots, or a recording if
-> the change involves motion, under the `### Before` and `### After` headings in the PR template.
-> A check enforces this, and a PR without them cannot merge. Changes with no UI still need
-> evidence, just in a different form. See
-> [Evidence is mandatory](./CONTRIBUTING.md#evidence-is-mandatory).
-
 Found a bug or have an idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 
 [`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone who has had a pull request merged into this project.

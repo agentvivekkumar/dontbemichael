@@ -1,9 +1,4 @@
-<!-- Thanks for contributing to Don't Be Michael.
-
-     Read this line before you go further: a PR without a BEFORE and an AFTER
-     is not reviewable and will not be merged. The `PR evidence` check runs the
-     moment you open this and will tell you if it is missing. Keep the `Before`
-     and `After` headings below exactly as they are — the check reads them. -->
+<!-- Thanks for contributing to Don't Be Michael. -->
 
 ## What & why
 
@@ -19,17 +14,10 @@
 - [ ] Docs
 - [ ] Build / CI
 
-## Evidence
+## Before and after (optional)
 
-<!-- REQUIRED. Drag images or a screen recording directly under each heading —
-     GitHub uploads them inline. Both headings must have something under them.
-
-     No visible UI? You still owe evidence. Record the failing behaviour and
-     then the same steps passing: a terminal capture, a log diff, a test that
-     goes from red to green. "It has no UI" is not an exemption.
-
-     Truly nothing observable, like a CI tweak or a typo? Say so in
-     "What & why" and ask a maintainer for the `no-visual-change` label. -->
+<!-- Screenshots or a short recording help a reviewer see the change. Leave
+     these empty if there is nothing to show. -->
 
 ### Before
 
@@ -58,7 +46,6 @@ X:
 
 ## Checklist
 
-- [ ] **Before and after evidence is attached above**, under both headings.
 - [ ] `npm run typecheck` passes.
 - [ ] `npm run test:focused` passes.
 - [ ] `npm run build` succeeds.
