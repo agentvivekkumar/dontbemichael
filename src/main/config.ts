@@ -59,9 +59,11 @@ export interface ScheduledMission {
   quietThresholdMs?: number;
 }
 
-/** The built-in hourly ops standup: god reviews who's doing what + whether tasks
- *  are on track and agents are running, and every terminal's context is compacted.
- *  Shipped enabled by default; users can toggle it off in the Command Center. */
+/** The built-in hourly ops standup: god reviews who's doing what, whether tasks
+ *  are on track, and whether agents are running. Shipped enabled by default;
+ *  users can toggle it off in the Command Center. It says nothing about
+ *  compaction: keeping contexts small is the app's job, not an instruction to
+ *  an agent (owner, 2026-09-25). */
 export const OPS_STANDUP_MISSION: ScheduledMission = {
   id: 'ops-standup',
   label: 'Hourly ops standup',
@@ -69,21 +71,26 @@ export const OPS_STANDUP_MISSION: ScheduledMission = {
   to: 'god',
   body:
     'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
-    'is still running (not stalled or idle-stale). Check the task board — are ' +
+    'is still running (not stalled or idle-stale). Check the task board: are ' +
     'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
-    'agents and at-risk tasks, and keep the board accurate. (As part of this ' +
-    "standup each working agent is asked to summarise its current task and the " +
-    'next step, then compact and resume from the same point — so terminal ' +
-    'contexts stay bounded without losing work. The compaction is queued and ' +
-    'runs when an agent is idle, so it never interrupts work mid-step.)',
+    'agents and at-risk tasks, and keep the board accurate.',
   enabled: true
   // NO autoCompact. Compaction belongs to contextTrigger.compact and nothing else.
-  // This flag used to live here as well, which meant a default install asked for
-  // compaction on TWO cadences — hourly from this standup and 2-hourly from the
-  // trigger — the exact "two controls that disagree" the maint-1 retirement below
-  // was written to end. The standup's own prose still describes compaction, and
-  // that stays true: the trigger does it, just not on this mission's clock.
 };
+
+/** The standup text shipped before 2026-09-25, which told Michael each agent
+ *  would be asked to summarise and compact. Kept only so an office still
+ *  carrying it word for word is moved to the current text; an owner's own
+ *  wording is never touched. */
+export const OPS_STANDUP_BODY_BEFORE_2026_09_25 =
+  'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
+  'is still running (not stalled or idle-stale). Check the task board \u2014 are ' +
+  'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
+  'agents and at-risk tasks, and keep the board accurate. (As part of this ' +
+  "standup each working agent is asked to summarise its current task and the " +
+  'next step, then compact and resume from the same point \u2014 so terminal ' +
+  'contexts stay bounded without losing work. The compaction is queued and ' +
+  'runs when an agent is idle, so it never interrupts work mid-step.)';
 
 /** The built-in heartbeat (Lane A #1). A context-aware beat that, each tick,
  *  observes live floor state and — only when the floor has gone quiet — drops a

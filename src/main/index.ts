@@ -15,7 +15,7 @@ import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
   readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
-  modelForRole, OPS_STANDUP_MISSION, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
+  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BODY_BEFORE_2026_09_25, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
@@ -1049,6 +1049,19 @@ function ensureDefaultMissions(): void {
     });
     console.log('[triggers] dropped the legacy per-mission autoCompact flag —',
       'contextTrigger.compact is now the only schedule that compacts');
+  }
+
+  // The standup used to tell Michael each agent would be asked to summarise and
+  // compact. Agents get no instructions about compaction (owner, 2026-09-25), so
+  // an office still carrying that exact text gets the current one. Text the
+  // owner edited is theirs and stays. Idempotent.
+  const cfg5 = readConfig();
+  const missions5 = cfg5.missions ?? [];
+  if (missions5.some((m) => m.id === OPS_STANDUP_MISSION.id && m.body === OPS_STANDUP_BODY_BEFORE_2026_09_25)) {
+    writeConfig({
+      missions: missions5.map((m) =>
+        m.id === OPS_STANDUP_MISSION.id && m.body === OPS_STANDUP_BODY_BEFORE_2026_09_25 ? { ...m, body: OPS_STANDUP_MISSION.body } : m)
+    });
   }
 }
 
