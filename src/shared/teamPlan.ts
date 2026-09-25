@@ -141,30 +141,41 @@ export function teamMemberName(def: Pick<AgentDefinitionV2, 'id' | 'character'>)
 }
 
 /**
- * The role an agent carries in the hive and on its roster card. The same string
- * at spawn and on restore (restore rebuilds the hive role from the card's
- * description), and specific enough for Michael to route work by.
+ * The role an agent carries in the hive and on its roster card: its title and
+ * the Role description Michael routes by (agent instructions audit,
+ * 2026-09-25). A pack agent without one (an imported pack) falls back to its
+ * card summary.
  */
-export function teamMemberRole(def: Pick<AgentDefinitionV2, 'role' | 'summary'>): string {
-  return `${def.role}: ${def.summary}`;
+export function teamMemberRole(def: Pick<AgentDefinitionV2, 'role' | 'summary' | 'routing'>): string {
+  return `${def.role}: ${def.routing ?? def.summary}`;
+}
+
+/** `{Business}` and `{City}` filled in; a missing city drops cleanly. */
+export function fillBusiness(text: string, business: { name?: string; city?: string }): string {
+  const name = business.name?.trim() || 'the business';
+  const city = business.city?.trim();
+  return (city ? text.replace(/\{City\}/g, city) : text.replace(/,? ?\{City\}/g, ''))
+    .replace(/\{Business\}/g, name);
 }
 
 /**
- * The standing goal: the pack's job description, written to the agent. It rides
- * the same `goal` channel as a hired agent's, injected on every prompt, so an
- * owner's later edit to it takes effect without a restart. The do/won't lists
- * are starting rules the owner can change, not enforcement.
+ * The standing goal (Work style): how this team member does its jobs, written
+ * to it, from the pack's `workStyle` with the business filled in. It rides the
+ * hook's goal channel, delivered at session start and when it changes, so an
+ * owner's later edit takes effect without a restart. A pack agent without a
+ * Work style (an imported pack) gets one built from its card fields.
  */
 export function teamMemberGoal(
-  def: Pick<AgentDefinitionV2, 'role' | 'summary' | 'does' | 'wontDo' | 'firstAction'>,
+  def: Pick<AgentDefinitionV2, 'role' | 'summary' | 'does' | 'wontDo' | 'firstAction' | 'workStyle'>,
   business: { name?: string; city?: string }
 ): string {
+  if (def.workStyle) return fillBusiness(def.workStyle, business);
   const where = business.name ? `${business.name}${business.city ? `, ${business.city}` : ''}` : 'the business';
   return [
-    `You are the ${def.role} for ${where}. ${def.summary}`,
+    `The owner set this work style for your role at ${where}.`,
+    `\nThe job: ${def.summary}`,
     def.does.length ? `\nWhat you do:\n${def.does.map((d) => `• ${d}`).join('\n')}` : '',
-    def.wontDo.length ? `\nLeave these alone and ask the owner first:\n${def.wontDo.map((d) => `• ${d}`).join('\n')}` : '',
-    def.firstAction ? `\nYour first job: ${def.firstAction}` : ''
+    def.wontDo.length ? `\nNeeds the owner's approval (send it to Michael first):\n${def.wontDo.map((d) => `• ${d}`).join('\n')}` : ''
   ].filter(Boolean).join('\n');
 }
 

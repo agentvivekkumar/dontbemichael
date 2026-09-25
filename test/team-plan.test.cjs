@@ -127,27 +127,33 @@ test('the role is the job title plus the plain-language summary, so Michael can 
   assert.equal(teamMemberRole({ role: 'Finance', summary: 'Tracks food cost.' }), 'Finance: Tracks food cost.');
 });
 
-test('the standing goal carries the whole job description, addressed to the business', () => {
+test('the Work style comes from the pack, with the business filled in', () => {
+  const ws = 'The owner set this work style for your role at {Business}, {City}.\n\n### The job\nTrack food cost.';
+  assert.equal(
+    teamMemberGoal({ role: 'Finance', summary: 's', does: [], wontDo: [], workStyle: ws }, { name: 'Pho Saigon Kitchen', city: 'Austin, TX' }),
+    'The owner set this work style for your role at Pho Saigon Kitchen, Austin, TX.\n\n### The job\nTrack food cost.'
+  );
+  assert.match(teamMemberGoal({ role: 'F', summary: 's', does: [], wontDo: [], workStyle: ws }, {}), /^The owner set this work style for your role at the business\./, 'no name, no city');
+  assert.equal(teamMemberRole({ role: 'Finance', summary: 'owner card text', routing: 'Oscar keeps the books.' }), 'Finance: Oscar keeps the books.');
+});
+
+test('an imported pack agent without a Work style gets one from its card fields, written to it', () => {
   const goal = teamMemberGoal(
-    { role: 'Finance', summary: 'Tracks food cost.', does: ['Watch invoices'], wontDo: ['Move money'], firstAction: 'Send a money summary Monday' },
+    { role: 'Finance', summary: 'Tracks food cost.', does: ['Watch invoices'], wontDo: ['Move money'] },
     { name: 'Pho Saigon Kitchen', city: 'Austin, TX' }
   );
   assert.equal(goal, [
-    'You are the Finance for Pho Saigon Kitchen, Austin, TX. Tracks food cost.',
+    'The owner set this work style for your role at Pho Saigon Kitchen, Austin, TX.',
+    '',
+    'The job: Tracks food cost.',
     '',
     'What you do:',
     '• Watch invoices',
     '',
-    'Leave these alone and ask the owner first:',
-    '• Move money',
-    '',
-    'Your first job: Send a money summary Monday'
+    "Needs the owner's approval (send it to Michael first):",
+    '• Move money'
   ].join('\n'));
-});
-
-test('a goal still reads well with no business name and no rules', () => {
-  const goal = teamMemberGoal({ role: 'Quality', summary: 'Keeps checklists.', does: [], wontDo: [] }, {});
-  assert.equal(goal, 'You are the Quality for the business. Keeps checklists.');
+  assert.doesNotMatch(goal, /You are the/);
 });
 
 test('team colours cycle, with Michael\'s lemon last', () => {

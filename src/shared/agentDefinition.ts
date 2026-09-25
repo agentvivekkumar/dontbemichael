@@ -136,6 +136,18 @@ export interface AgentDefinitionV2 {
    * Agents that name the same folder share it.
    */
   folder?: string;
+  /**
+   * The Role description Michael routes by (agent instructions audit,
+   * 2026-09-25): third person, what to send here and what goes to a named
+   * teammate instead. Stored with the role as "Role: description".
+   */
+  routing?: string;
+  /**
+   * The agent's Work style: the job, how to work (with reasons), what needs the
+   * owner's approval, and a first task with a recipient. Written to the agent;
+   * `{Business}` and `{City}` are filled at setup.
+   */
+  workStyle?: string;
 }
 
 export interface AgentDefinitionValidation {
@@ -157,7 +169,9 @@ const KNOWN_KEYS: readonly string[] = [
   'modelTier',
   'tokenCap',
   'firstAction',
-  'folder'
+  'folder',
+  'routing',
+  'workStyle'
 ];
 
 /** The level an agent has for a capability. Absent means `'off'` — default deny. */
@@ -238,6 +252,8 @@ export function validateAgentDefinition(
   const modelTier = enumField(o.modelTier, ['best', 'fast'] as const, 'modelTier', out);
   const tokenCap = intInRange(o.tokenCap, 1, MAX_AGENT_TOKEN_CAP, 'tokenCap', out);
   const firstAction = cappedString(o.firstAction, 200, 'firstAction', out);
+  const routing = cappedString(o.routing, 500, 'routing', out);
+  const workStyle = cappedString(o.workStyle, 3000, 'workStyle', out);
   // A folder name becomes a real path on the owner's disk, and packs can be
   // imported from anywhere: one plain name only. No slashes (so no `../`
   // escape), no leading dot (no hidden folders), none of the characters
@@ -301,7 +317,9 @@ export function validateAgentDefinition(
       ...(modelTier ? { modelTier } : {}),
       ...(tokenCap ? { tokenCap } : {}),
       ...(firstAction ? { firstAction } : {}),
-      ...(folder ? { folder } : {})
+      ...(folder ? { folder } : {}),
+      ...(routing ? { routing } : {}),
+      ...(workStyle ? { workStyle } : {})
     }
   };
 }
