@@ -22,6 +22,12 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Michael included, is told to search. There is no shared Office folder any more: an existing one
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
+- **A schedule says when and which job, not how.** Schedules no longer have a Prompt: the label
+  names the job (for example "Weekly money summary"), and the agent does it the way its Work style
+  says. Every run sends the same short message, including a way to stop quietly when there is
+  nothing to do. The hourly standup's instructions moved into Michael's own. A schedule that already
+  had its own instructions keeps sending them, and its card offers to move them into that team
+  member's Work style or remove them.
 - **Ask me answers go back to whoever asked, and are remembered.** Each question on an Ask me
   card now records the team member whose work needs the answer (or Michael, for his own). Your
   answer goes straight to that agent, into its memory notes as your words, and Michael is told so he

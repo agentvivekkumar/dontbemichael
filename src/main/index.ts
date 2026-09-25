@@ -15,7 +15,7 @@ import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
   readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
-  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BODY_BEFORE_2026_09_25, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
+  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
@@ -96,6 +96,7 @@ import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, 
 import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
 import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
+import { scheduledRunBody } from '../shared/scheduleMessage';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -746,7 +747,7 @@ function syncMissions(): void {
         // we deliberately do NOT add `&& m.body`, so other (dispatch) missions keep
         // their prior behaviour, including the historical empty-body send (Pam N1).
         if (m.kind !== 'compact' && hive.enabled()) {
-          hive.send({ to: m.to, act: 'request', subject: m.label, body: m.body }, 'scheduler');
+          hive.send({ to: m.to, act: 'request', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
         }
         // No compaction here: that is Claude Code's own auto compact now, with its
         // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
@@ -950,7 +951,7 @@ function standupOnOfficeOpen(): void {
   if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
   standupFiredThisLaunch = true;
   try {
-    hive.send({ to: m.to, act: 'request', subject: m.label, body: m.body }, 'scheduler');
+    hive.send({ to: m.to, act: 'request', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
     const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
     writeConfig({ missions: next });
     try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
@@ -1062,10 +1063,10 @@ function ensureDefaultMissions(): void {
   // owner edited is theirs and stays. Idempotent.
   const cfg5 = readConfig();
   const missions5 = cfg5.missions ?? [];
-  if (missions5.some((m) => m.id === OPS_STANDUP_MISSION.id && m.body === OPS_STANDUP_BODY_BEFORE_2026_09_25)) {
+  if (missions5.some((m) => m.id === OPS_STANDUP_MISSION.id && OPS_STANDUP_BUILT_IN_BODIES.includes(m.body))) {
     writeConfig({
       missions: missions5.map((m) =>
-        m.id === OPS_STANDUP_MISSION.id && m.body === OPS_STANDUP_BODY_BEFORE_2026_09_25 ? { ...m, body: OPS_STANDUP_MISSION.body } : m)
+        m.id === OPS_STANDUP_MISSION.id && OPS_STANDUP_BUILT_IN_BODIES.includes(m.body) ? { ...m, body: OPS_STANDUP_MISSION.body } : m)
     });
   }
 }

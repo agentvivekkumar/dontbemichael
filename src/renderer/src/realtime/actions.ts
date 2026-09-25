@@ -351,12 +351,11 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
       parameters: {
         type: 'object',
         properties: {
-          label: { type: 'string', description: 'Short name for the schedule.' },
-          prompt: { type: 'string', description: 'The message the agent receives each time it fires.' },
+          label: { type: 'string', description: 'The job this schedule runs, e.g. "Weekly money summary". The agent does it the way its Work style says.' },
           intervalMinutes: { type: 'number', description: 'How often it fires, in minutes (min 5). Default 60.' },
           to: { type: 'string', description: 'Target agent name or id. Default: the god orchestrator.' }
         },
-        required: ['label', 'prompt'],
+        required: ['label'],
         additionalProperties: false
       },
       execute: (input) => act('create_schedule', input)

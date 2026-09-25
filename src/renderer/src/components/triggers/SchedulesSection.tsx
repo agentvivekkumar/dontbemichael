@@ -12,13 +12,17 @@ import { formatWeekly, nextWeeklyFireMs } from '@shared/weeklySchedule';
 import { useRtl } from '@/i18n/useDirection';
 
 /**
- * SCHEDULES — recurring auto-dispatched missions. The oldest trigger type, and
- * until now the whole of this tab.
+ * SCHEDULES — recurring auto-dispatched missions.
  *
- * Two gaps closed on the way over: a mission's PROMPT (`body`) is now visible on
- * the row and editable when the row is expanded — the seeded missions used to
- * dispatch text nobody could read — and the frequency is editable on every
- * mission, not just the retired compact one.
+ * A schedule says when and which job (owner, 2026-09-25): its label names the
+ * job, and the agent does it the way its Work style says. There is no prompt:
+ * a free-text prompt on each schedule competed with the Work style and drifted
+ * from it. Every run sends the same short message (scheduleMessage.ts).
+ *
+ * An older schedule may still carry a prompt (`body`). It is shown on the card,
+ * still sent after the standard message, and can be moved into the agent's Work
+ * style or removed; it is never silently dropped. The heartbeat keeps its own
+ * description box for now (TODOS.md).
  */
 
 /** Mirrors `ScheduledMission` in src/main/config.ts (and preload). Declared here
@@ -62,7 +66,7 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
   // null ⇒ the interval above is what runs. Non-null ⇒ days and a time do.
   const [mWeekly, setMWeekly] = useState<WeeklyDraft | null>(null);
   const [mTo, setMTo] = useState<string>('god');
-  const [mBody, setMBody] = useState('');
+  const updateAgent = useStore((s) => s.updateAgent);
 
   useEffect(() => {
     const load = () => { window.cth.listMissions().then(setMissions).catch(() => { /* noop */ }); };
@@ -89,7 +93,7 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
   const remove = (id: string) => persist(missions.filter((m) => m.id !== id));
 
   const add = () => {
-    if (!mLabel.trim() || !mBody.trim() || !whenIsUsable) return;
+    if (!mLabel.trim() || !whenIsUsable) return;
     persist([...missions, {
       id: `m_${Date.now().toString(36)}`,
       label: mLabel.trim(),
@@ -98,13 +102,23 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
       intervalMs: mInterval,
       ...(mWeekly ? { weekly: mWeekly } : {}),
       to: mTo,
-      body: mBody.trim(),
+      body: '',
       enabled: true
     }]);
-    setMLabel(''); setMBody(''); setMWeekly(null); setAdding(false);
+    setMLabel(''); setMWeekly(null); setAdding(false);
   };
   /** A weekly draft with no days picked would never fire, so it cannot be saved. */
   const whenIsUsable = !mWeekly || weeklyIsUsable(mWeekly);
+
+  /** An older schedule's instructions, appended to the target agent's Work
+   *  style (where the how belongs), then cleared from the schedule. */
+  const moveToWorkStyle = (m: ScheduledMission) => {
+    const agent = agents.find((a) => a.id === m.to);
+    const text = m.body.trim();
+    if (!agent || !text) return;
+    updateAgent(agent.id, { goal: [agent.goal?.trim(), `${m.label}: ${text}`].filter(Boolean).join('\n\n') });
+    patch(m.id, { body: '' });
+  };
 
   const targetName = (to: string) =>
     to === 'broadcast' ? t('schedulesSection.everyone')
@@ -122,6 +136,7 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
           agents={agents}
           onPatch={(fields) => patch(m.id, fields)}
           onDelete={() => remove(m.id)}
+          onMoveToWorkStyle={agents.some((a) => a.id === m.to) ? () => moveToWorkStyle(m) : undefined}
         />
       ))}
 
@@ -140,6 +155,7 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
               placeholder={t('schedulesSection.labelPlaceholder')}
               style={inputStyle}
             />
+            <Hint>{t('schedulesSection.labelHint')}</Hint>
           </Field>
           <Field label={t('schedulesSection.goesTo')}>
             <Select value={mTo} onChange={setMTo} style={{ width: '100%' }}>
@@ -156,21 +172,11 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
               onWeekly={setMWeekly}
             />
           </Field>
-          <Field label={t('schedulesSection.prompt')}>
-            <textarea
-              dir={rtl ? 'auto' : undefined}
-              value={mBody}
-              onChange={(e) => setMBody(e.target.value)}
-              rows={3}
-              placeholder={t('schedulesSection.promptPlaceholder')}
-              style={textareaStyle}
-            />
-          </Field>
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <PixelButton variant="primary" size="sm" onClick={add} disabled={!mLabel.trim() || !mBody.trim() || !whenIsUsable}>
+            <PixelButton variant="primary" size="sm" onClick={add} disabled={!mLabel.trim() || !whenIsUsable}>
               {t('common.add')}
             </PixelButton>
-            <PixelButton variant="ghost" size="sm" onClick={() => { setAdding(false); setMLabel(''); setMBody(''); setMWeekly(null); }}>
+            <PixelButton variant="ghost" size="sm" onClick={() => { setAdding(false); setMLabel(''); setMWeekly(null); }}>
               {t('common.cancel')}
             </PixelButton>
           </div>
@@ -184,12 +190,14 @@ export function SchedulesSection({ onSummary }: { onSummary?: (s: string) => voi
 
 interface RosterAgent { id: string; name: string; isGod?: boolean }
 
-function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
+function MissionRow({ mission, targetName, agents, onPatch, onDelete, onMoveToWorkStyle }: {
   mission: ScheduledMission;
   targetName: (to: string) => string;
   agents: RosterAgent[];
   onPatch: (fields: Partial<ScheduledMission>) => void;
   onDelete: () => void;
+  /** Present when the schedule goes to one agent whose Work style can take it. */
+  onMoveToWorkStyle?: () => void;
 }) {
   const { t } = useTranslation();
   const rtl = useRtl();
@@ -215,12 +223,14 @@ function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
   }, [open]);
 
   const heartbeat = mission.kind === 'heartbeat';
+  // Instructions an older schedule still carries (not the heartbeat's own box).
+  const legacy = heartbeat ? '' : mission.body.trim();
   const storedWeekly = weeklyDraft(mission.weekly);
   // Compare the CANONICAL form, not the raw object: [1,3] and [3,1] mean the
   // same schedule, and a row that reads as dirty after a no-op click is noise.
   const weeklyKey = (w: WeeklyDraft | null) => (w ? `${[...w.days].sort((a, b) => a - b).join(',')}@${w.minute}` : '');
   const dirty = label !== mission.label || to !== mission.to
-    || intervalMs !== mission.intervalMs || body !== mission.body
+    || intervalMs !== mission.intervalMs || (heartbeat && body !== mission.body)
     || weeklyKey(weekly) !== weeklyKey(storedWeekly);
   const whenIsUsable = !weekly || weeklyIsUsable(weekly);
 
@@ -246,7 +256,7 @@ function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
     // `weekly: undefined` is the switch back to interval mode. It has to be sent
     // explicitly — the backend merges by id and spreads, so simply omitting the
     // key would leave the old schedule in place and the row would snap back.
-    onPatch({ label: trimmed, to, intervalMs, body, weekly: weekly ?? undefined });
+    onPatch({ label: trimmed, to, intervalMs, ...(heartbeat ? { body } : {}), weekly: weekly ?? undefined });
     setSaved(true);
     setTimeout(() => setSaved(false), 1300);
   };
@@ -270,9 +280,9 @@ function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
         right={<Toggle on={mission.enabled} onClick={() => onPatch({ enabled: !mission.enabled })} />}
       />
 
-      {/* The prompt is the mission. Closed, you get the first line of it; open,
-          you get the whole thing in an editor. It used to be invisible. */}
-      {!open && (
+      {/* Closed: the heartbeat's description, or an older schedule's
+          instructions still waiting to move into a Work style. */}
+      {!open && (heartbeat || legacy) && (
         <div style={{
           marginTop: 6, padding: '4px 6px',
           background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
@@ -280,6 +290,7 @@ function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
           color: 'var(--cth-ink-700)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>{mission.body.trim() || t('schedulesSection.noPrompt')}</div>
       )}
+      {!open && !heartbeat && !legacy && <Hint>{t('schedulesSection.runsLabel')}</Hint>}
 
       {open && (
         <div style={{ marginTop: 4 }}>
@@ -301,16 +312,34 @@ function MissionRow({ mission, targetName, agents, onPatch, onDelete }: {
               : <SchedulePicker intervalMs={intervalMs} weekly={weekly} onInterval={setIntervalMs} onWeekly={setWeekly} />}
             {heartbeat && <Hint>{t('schedulesSection.beatCeiling')}</Hint>}
           </Field>
-          <Field label={t('schedulesSection.prompt')}>
-            <textarea
-              dir={rtl ? 'auto' : undefined}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={4}
-              placeholder={t('schedulesSection.promptPlaceholder')}
-              style={textareaStyle}
-            />
-          </Field>
+{heartbeat && (
+            <Field label={t('schedulesSection.prompt')}>
+              <textarea
+                dir={rtl ? 'auto' : undefined}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={4}
+                placeholder={t('schedulesSection.promptPlaceholder')}
+                style={textareaStyle}
+              />
+            </Field>
+          )}
+          {!heartbeat && <Hint>{t('schedulesSection.labelHint')}</Hint>}
+          {legacy && (
+            <Field label={t('schedulesSection.olderInstructions')}>
+              <div style={{
+                padding: '4px 6px', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
+                fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)', whiteSpace: 'pre-wrap'
+              }}>{legacy}</div>
+              <Hint>{t('schedulesSection.olderInstructionsHint', { name: targetName(mission.to) })}</Hint>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {onMoveToWorkStyle && (
+                  <MiniButton onClick={onMoveToWorkStyle}>{t('schedulesSection.moveToWorkStyle', { name: targetName(mission.to) })}</MiniButton>
+                )}
+                <MiniButton tone="danger" onClick={() => onPatch({ body: '' })}>{t('schedulesSection.removeOlder')}</MiniButton>
+              </div>
+            </Field>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
             <PixelButton variant="primary" size="sm" onClick={save} disabled={!dirty || !label.trim() || !whenIsUsable}>
               {saved && !dirty ? t('schedulesSection.saved') : t('common.save')}

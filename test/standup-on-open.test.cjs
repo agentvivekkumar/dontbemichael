@@ -21,7 +21,7 @@ test('Michael coming up sends the standup, once per launch', () => {
   const fn = main.slice(at, main.indexOf('\n}\n', at));
   assert.match(fn, /if \(standupFiredThisLaunch \|\| !hive\.enabled\(\)\) return;/, 'once, and only with an office');
   assert.match(fn, /if \(!m \|\| !m\.enabled \|\| normalizeWeekly\(m\.weekly\) \|\| !\(m\.intervalMs > 0\)\) return;/, 'only an enabled hourly standup');
-  assert.match(fn, /hive\.send\(\{ to: m\.to, act: 'request', subject: m\.label, body: m\.body \}, 'scheduler'\);/);
+  assert.match(fn, /hive\.send\(\{ to: m\.to, act: 'request', subject: m\.label, body: scheduledRunBody\(m\.label, m\.body\) \}, 'scheduler'\);/);
   assert.match(fn, /syncMissions\(\);/, 'the next one comes an interval after this one');
 });
 

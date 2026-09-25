@@ -273,7 +273,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 />
               </Row>
               <span style={helperStyle}>
-                Michael doesn't see this. It's how this team member gets their work done: the steps they follow and what they check before they finish.
+                Michael doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.
               </span>
             </Section>
               </div>

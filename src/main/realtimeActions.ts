@@ -705,8 +705,9 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
   // v0.3.4: create a brand-new schedule (edit_schedule only toggles/deletes).
   if (verb === 'create_schedule') {
     const label = str(a.label) || str(a.name) || str(a.title);
-    const body = str(a.prompt) || str(a.body) || str(a.message);
-    if (!label || !body) return { ok: false, spoken: 'I need a name for the schedule and what it should tell the agent.' };
+    // A schedule says when and which job (its name); how the job is done lives
+    // in the agent's Work style (owner, 2026-09-25), so no prompt is taken.
+    if (!label) return { ok: false, spoken: 'I need a name for the schedule, the job it runs.' };
     const minutes = typeof a.intervalMinutes === 'number' && isFinite(a.intervalMinutes)
       ? Math.min(7 * 24 * 60, Math.max(5, Math.round(a.intervalMinutes)))
       : 60;
@@ -718,7 +719,7 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
       label,
       intervalMs: minutes * 60_000,
       to: targetId,
-      body,
+      body: '',
       enabled: true
     };
     pending = {

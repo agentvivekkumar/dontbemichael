@@ -578,7 +578,7 @@
     "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
     "workStyle": "Work style (optional)",
     "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
-    "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done: the steps they follow and what they check before they finish.",
+    "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
     "folderInsideMichael": "A folder inside {{godName}}'s, named after the role. Only this team member, anyone in the same role, and {{godName}} can open it.",
     "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
     "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
@@ -988,7 +988,7 @@
     "addSchedule": "add a schedule",
     "newSchedule": "NEW SCHEDULE",
     "label": "LABEL",
-    "labelPlaceholder": "What this run is for",
+    "labelPlaceholder": "The job, for example: Weekly money summary",
     "goesTo": "GOES TO",
     "everyone": "everyone",
     "prompt": "PROMPT",
@@ -1000,7 +1000,13 @@
     "noPrompt": "No prompt set.",
     "saved": "saved",
     "when": "WHEN",
-    "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap."
+    "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap.",
+    "labelHint": "The agent is told this job name and does it the way its Work style says. Put how the job is done in that team member's Work style.",
+    "runsLabel": "Runs this job the way the agent's Work style says.",
+    "olderInstructions": "OLDER INSTRUCTIONS",
+    "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
+    "moveToWorkStyle": "Move to {{name}}'s Work style",
+    "removeOlder": "Remove"
   },
   "webhooksSection": {
     "summaryNone": "none",

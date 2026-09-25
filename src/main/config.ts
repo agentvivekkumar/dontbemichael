@@ -36,6 +36,12 @@ export interface ScheduledMission {
    *  the cadence the user had. See shared/weeklySchedule.ts. */
   weekly?: { days: number[]; minute: number };
   to: string;
+  /** A schedule says when and which job (its label); the how lives in the
+   *  agent's Work style (owner, 2026-09-25). New schedules leave this empty.
+   *  An older schedule's prompt stays here, and is sent after the standard
+   *  message (scheduleMessage.ts) until the owner moves it into the agent's
+   *  Work style from the Schedules card. The heartbeat still keeps its own
+   *  description here (see TODOS.md). */
   body: string;
   enabled: boolean;
   /** When true, the scheduler asks the renderer to compact live terminals when
@@ -60,30 +66,25 @@ export interface ScheduledMission {
   quietThresholdMs?: number;
 }
 
-/** The built-in hourly ops standup: god reviews who's doing what, whether tasks
- *  are on track, and whether agents are running. Shipped enabled by default;
- *  users can toggle it off in the Command Center. It says nothing about
- *  compaction: keeping contexts small is the app's job, not an instruction to
- *  an agent (owner, 2026-09-25). */
+/** The built-in hourly ops standup. A schedule says when and which job
+ *  (owner, 2026-09-25): the label names the job, and what Michael does at a
+ *  standup lives in his own instructions (hive.ts), not here. Shipped enabled;
+ *  users can toggle it off in the Command Center. */
 export const OPS_STANDUP_MISSION: ScheduledMission = {
   id: 'ops-standup',
   label: 'Hourly ops standup',
   intervalMs: 3_600_000,
   to: 'god',
-  body:
-    'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
-    'is still running (not stalled or idle-stale). Check the task board: are ' +
-    'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
-    'agents and at-risk tasks, and keep the board accurate.',
+  body: '',
   enabled: true
   // NO autoCompact. Compaction belongs to contextTrigger.compact and nothing else.
 };
 
-/** The standup text shipped before 2026-09-25, which told Michael each agent
- *  would be asked to summarise and compact. Kept only so an office still
- *  carrying it word for word is moved to the current text; an owner's own
- *  wording is never touched. */
-export const OPS_STANDUP_BODY_BEFORE_2026_09_25 =
+/** Standup prompts the app itself shipped. An office still carrying one of
+ *  them word for word gets the current (empty) body at launch, because its
+ *  content now lives in Michael's instructions; text the owner wrote is kept. */
+export const OPS_STANDUP_BUILT_IN_BODIES: readonly string[] = [
+  // Until 2026-09-25 (morning): told Michael each agent would compact.
   'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
   'is still running (not stalled or idle-stale). Check the task board \u2014 are ' +
   'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
@@ -91,7 +92,13 @@ export const OPS_STANDUP_BODY_BEFORE_2026_09_25 =
   "standup each working agent is asked to summarise its current task and the " +
   'next step, then compact and resume from the same point \u2014 so terminal ' +
   'contexts stay bounded without losing work. The compaction is queued and ' +
-  'runs when an agent is idle, so it never interrupts work mid-step.)';
+  'runs when an agent is idle, so it never interrupts work mid-step.)',
+  // 2026-09-25, before schedules stopped carrying prompts.
+  'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
+  'is still running (not stalled or idle-stale). Check the task board: are ' +
+  'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
+  'agents and at-risk tasks, and keep the board accurate.'
+];
 
 /** The built-in heartbeat (Lane A #1). A context-aware beat that, each tick,
  *  observes live floor state and — only when the floor has gone quiet — drops a

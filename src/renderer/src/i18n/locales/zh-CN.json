@@ -578,7 +578,7 @@
     "roleHelp": "{{godName}} 会根据角色和角色说明决定把哪些工作交给这位成员。",
     "workStyle": "工作方式（可选）",
     "workStylePlaceholder": "例如：每个数字都核对两遍。完成后发一份简短汇总。",
-    "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式：按什么步骤做，结束前检查什么。",
+    "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式，包括按日程运行的任务：按什么步骤做，结束前检查什么。",
     "folderInsideMichael": "放在 {{godName}} 的文件夹里，以角色命名。只有这位成员、同一角色的成员和 {{godName}} 能打开。",
     "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
     "errFolderShared": "这是 {{godName}} 的文件夹。请为这位成员选择一个自己的文件夹。",
@@ -988,7 +988,7 @@
     "addSchedule": "添加计划",
     "newSchedule": "新计划",
     "label": "名称",
-    "labelPlaceholder": "这次运行是做什么的",
+    "labelPlaceholder": "任务名称，例如：每周资金汇总",
     "goesTo": "发送给",
     "everyone": "所有人",
     "prompt": "提示词",
@@ -1000,7 +1000,13 @@
     "noPrompt": "未设置提示词。",
     "saved": "已保存",
     "when": "何时",
-    "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。"
+    "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。",
+    "labelHint": "成员会收到这个任务名称，并按照自己的工作方式去完成。任务具体怎么做，请写在该成员的工作方式里。",
+    "runsLabel": "按照成员的工作方式完成这个任务。",
+    "olderInstructions": "旧的说明",
+    "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
+    "moveToWorkStyle": "移到 {{name}} 的工作方式",
+    "removeOlder": "删除"
   },
   "webhooksSection": {
     "summaryNone": "无",
