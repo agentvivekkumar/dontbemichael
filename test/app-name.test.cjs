@@ -68,4 +68,7 @@ test('the quit item reads Close Office and is still the quit role', () => {
   assert.doesNotMatch(menu, /\{ role: 'appMenu' as const \}/, 'the default app menu would bring back "Quit <app name>"');
   assert.doesNotMatch(menu, /\{ role: 'quit' as const \}/, 'no quit item without the label');
   assert.equal((menu.match(/quitItem/g) || []).length, 3, 'defined once, used in the Mac app menu and the File menu');
+  // Hide gets the same treatment: "Hide Office", still the hide role (Cmd+H).
+  assert.match(main, /const HIDE_LABEL = 'Hide Office';/);
+  assert.match(menu, /\{ role: 'hide' as const, label: HIDE_LABEL \}/);
 });

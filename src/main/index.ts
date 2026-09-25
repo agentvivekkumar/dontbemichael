@@ -2500,6 +2500,9 @@ function openFloor(): BrowserWindow | null {
  *  "New Floor" item (Cmd/Ctrl+Shift+N). */
 /** The quit item's label in the app menu (and File on Windows and Linux). */
 const QUIT_LABEL = 'Close Office';
+/** The hide item's label in the Mac app menu, for the same reason as Quit:
+ *  "Hide Don't Be Michael" read as a double negative (owner, 2026-09-24). */
+const HIDE_LABEL = 'Hide Office';
 
 function installAppMenu(): void {
   const isMac = process.platform === 'darwin';
@@ -2508,9 +2511,10 @@ function installAppMenu(): void {
     accelerator: 'CmdOrCtrl+Shift+N',
     click: () => { openFloor(); }
   };
-  // Quit reads "Close Office": "Quit Don't Be Michael" put "Quit" and "Don't"
-  // side by side, which read as a double negative (owner, 2026-09-24). It keeps
-  // the quit role, so Cmd+Q and the quit guard behave exactly as before.
+  // Quit reads "Close Office" and Hide reads "Hide Office": "Quit Don't Be
+  // Michael" put "Quit" and "Don't" side by side, which read as a double
+  // negative (owner, 2026-09-24). Both keep their roles, so Cmd+Q, Cmd+H and
+  // the quit guard behave exactly as before.
   const quitItem = { role: 'quit' as const, label: QUIT_LABEL };
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac
@@ -2521,7 +2525,7 @@ function installAppMenu(): void {
           { type: 'separator' as const },
           { role: 'services' as const },
           { type: 'separator' as const },
-          { role: 'hide' as const },
+          { role: 'hide' as const, label: HIDE_LABEL },
           { role: 'hideOthers' as const },
           { role: 'unhide' as const },
           { type: 'separator' as const },

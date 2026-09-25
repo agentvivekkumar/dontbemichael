@@ -22,8 +22,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   instead of "god: Claude is waiting for your input", and each team member's notifications carry
   their own name.
 
-- **"Close Office" instead of "Quit Don't Be Michael".** The quit item in the menu no longer puts
-  "Quit" and "Don't" side by side. Cmd+Q works as before.
+- **"Close Office" and "Hide Office" in the menu.** They replace "Quit Don't Be Michael" and "Hide
+  Don't Be Michael", which put the action and "Don't" side by side. Cmd+Q and Cmd+H work as before.
 
 ### Removed
 
