@@ -103,6 +103,34 @@ test('new work cancels the clear and throws the handoff away', (t) => {
   assert.equal(fs.existsSync(r.handoff), false);
 });
 
+test('nothing is typed while the agent waits on the owner at a prompt', (t) => {
+  const r = rig(t);
+  r.clearer.noteHook('oscar', 'Notification', 'Claude needs your permission to use Bash');
+  r.clearer.beat();
+  assert.equal(r.typed.length, 0, 'no handoff typed into a permission prompt');
+  r.clearer.noteHook('oscar', 'PostToolUse');
+  r.tick(45 * 60_000);
+  r.clearer.beat();
+  assert.equal(r.typed.length, 1, 'once it moves on and is idle again, the ask can go');
+  r.clearer.noteHook('oscar', 'Notification', 'Please approve this command');
+  r.clearer.beat();
+  assert.equal(r.log.at(-1).reason, 'waiting-for-owner', 'an ask in flight is cancelled');
+});
+
+test('someone speaking to the agent after its handoff keeps the conversation', (t) => {
+  const r = rig(t);
+  r.clearer.beat();
+  r.writeHandoff('Nothing open.');
+  r.clearer.noteHook('oscar', 'Stop');
+  r.tick(5_000);
+  r.clearer.noteHook('oscar', 'UserPromptSubmit');
+  r.clearer.noteHook('oscar', 'Stop');
+  r.tick(30_000); r.set({ idleMs: 30_000 });
+  r.clearer.beat();
+  assert.ok(!r.typed.includes('/clear'));
+  assert.equal(r.log.at(-1).reason, 'new-prompt');
+});
+
 test('no handoff within ten minutes: give up, leave the conversation alone', (t) => {
   const r = rig(t);
   r.clearer.beat();
@@ -149,11 +177,11 @@ test('wiring: a beat each minute, the handoff at session start, undo through the
   const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
   const main = read('src/main/index.ts');
   assert.match(main, /safeClearTimer = setInterval\(\(\) => \{ try \{ safeClearer\.beat\(\); \}/);
-  assert.match(main, /safeClearer\.noteHook\(agentId, event\)/);
+  assert.match(main, /safeClearer\.noteHook\(agentId, event, message\)/);
   assert.match(main, /hive\.restoreSession\(id, state\.oldSession\);/);
   assert.match(main, /send\('power:resume', \{ reason: 'restore-conversation', awayMs: 0, dead: \[ptyId\], total: 1 \}\)/);
   const hooks = read('src/main/hooks.ts');
-  assert.match(hooks, /const handoffText = event === 'SessionStart' && agentId \? \(this\.hive\.takeHandoff\?\.\(agentId\) \?\? null\) : null;/);
+  assert.match(hooks, /const handoffText = event === 'SessionStart' && p\.source === 'clear' && agentId \? \(this\.hive\.takeHandoff\?\.\(agentId\) \?\? null\) : null;/);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /<ClearedBanner agentId=\{agent\.id\} name=\{agent\.name\} \/>/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));

@@ -323,7 +323,7 @@ const hookServer = new HookServer(
   control,
   breaker,
   standingGoalFromRoster,
-  (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event); },
+  (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event, message); },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
   companyProfileForAgents
 );
