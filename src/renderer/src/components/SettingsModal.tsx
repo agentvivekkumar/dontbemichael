@@ -15,7 +15,7 @@ import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
@@ -1249,24 +1249,26 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             {autoUpdateOn ? t('common.on') : t('common.off')}
                           </PixelButton>
                         </div>
-                        <div style={{ height: 10 }} />
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {t('settings.general.telemetry')}
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.general.telemetryDesc')}
-                            </span>
+                        {COLLECT_USAGE_STATS && (<>
+                          <div style={{ height: 10 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                                {t('settings.general.telemetry')}
+                              </span>
+                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                                {t('settings.general.telemetryDesc')}
+                              </span>
+                            </div>
+                            <PixelButton
+                              variant={telemetryOn ? 'primary' : 'secondary'}
+                              size="sm"
+                              onClick={toggleTelemetry}
+                            >
+                              {telemetryOn ? t('common.on') : t('common.off')}
+                            </PixelButton>
                           </div>
-                          <PixelButton
-                            variant={telemetryOn ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={toggleTelemetry}
-                          >
-                            {telemetryOn ? t('common.on') : t('common.off')}
-                          </PixelButton>
-                        </div>
+                        </>)}
                       </div>
 
                       {/* Office Theme — TV-show office maps (experimental; flag tvShowOffices, default off) */}

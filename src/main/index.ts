@@ -69,6 +69,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
+import { COLLECT_USAGE_STATS } from '../shared/buildFeatures';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -3252,7 +3253,7 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   const wasOnboarded = readConfig().onboardingComplete;
   const next = writeConfig(patch);
   // Live opt-in/out from Settings → Privacy (TELEMETRY.md).
-  if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(patch.telemetryEnabled);
+  if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(COLLECT_USAGE_STATS && patch.telemetryEnabled);
   // Activation funnel (v0.4.6): onboarding just finished (false → true) — the top of
   // the launch → first-agent funnel. `provider` is the engine chosen in the wizard.
   // Fired here (main), not in the renderer, so it rides the same allowlist as the rest.
@@ -5423,7 +5424,7 @@ app.whenReady().then(() => {
   analytics.init({
     stateDir: app.getPath('userData'),
     appVersion: app.getVersion(),
-    enabled: readConfig().telemetryEnabled !== false
+    enabled: COLLECT_USAGE_STATS && readConfig().telemetryEnabled !== false
   });
 
   // Warm the model catalog cache before any picker opens. The renderer reads

@@ -112,3 +112,41 @@ test('context upkeep lives in Settings, and it really does apply to every agent'
   assert.ok(fire > 0, 'the context trigger handler');
   assert.match(hive.slice(fire, fire + 300), /for \(const a of agents\) \{/, 'loops over every agent, not only Michael');
 });
+
+/**
+ * Anonymous usage stats are hidden until the owner decides whether to collect
+ * anything (owner, 2026-09-24): no onboarding row, no Settings switch, and no
+ * sending even from a build that carries a PostHog key. COLLECT_USAGE_STATS
+ * brings all three back together.
+ */
+test('this build collects no usage stats', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').COLLECT_USAGE_STATS, false);
+});
+
+test('the usage stats choice is hidden in onboarding and Settings', () => {
+  const wizard = read('src/renderer/src/components/OnboardingWizard.tsx');
+  const row = wizard.indexOf("label={t('onboarding.permissions.shareStats')}");
+  assert.ok(row > 0 && wizard.slice(row - 200, row).includes('{COLLECT_USAGE_STATS && ('), 'onboarding row is behind the switch');
+  assert.match(wizard, /\.\.\.\(COLLECT_USAGE_STATS \? \{ telemetryEnabled: shareStats \} : \{\}\)/);
+
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  const sw = settings.indexOf("{t('settings.general.telemetry')}");
+  assert.ok(sw > 0 && settings.slice(sw - 700, sw).includes('{COLLECT_USAGE_STATS && (<>'), 'Settings switch is behind the switch');
+});
+
+test('nothing is sent while usage stats are hidden, whatever the saved setting', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /enabled: COLLECT_USAGE_STATS && readConfig\(\)\.telemetryEnabled !== false/);
+  assert.match(main, /analytics\.setEnabled\(COLLECT_USAGE_STATS && patch\.telemetryEnabled\)/);
+});
+
+/**
+ * The header's "auto mode on / off" text is hidden (owner, 2026-09-24). The
+ * setting itself still works and stays in Settings → Autonomy & Budgets.
+ */
+test('the header hides the auto mode text', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
+  const app = read('src/renderer/src/App.tsx');
+  const label = app.indexOf("'auto mode on' : 'auto mode off'");
+  assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
+});

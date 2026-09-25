@@ -18,6 +18,13 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Setting up a new office gives it a folder of its own. The office keeps its own record in
   `office.json` in its folder.
 
+### Removed
+
+- **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
+  asks about it.
+- **No "auto mode" text in the header bar.** It named a setting in words owners don't use. The
+  setting itself is unchanged, in Settings under Autonomy & Budgets.
+
 ## [0.0.2] (2026-09-24)
 
 ### Changed

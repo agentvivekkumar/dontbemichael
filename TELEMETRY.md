@@ -1,5 +1,9 @@
 # Telemetry
 
+> **Currently off.** This build sends nothing. The code described below is switched off by
+> `COLLECT_USAGE_STATS` in `src/shared/buildFeatures.ts`, and the app does not show the choice in
+> onboarding or Settings. This file describes what would be sent if it were switched back on.
+
 Don't Be Michael collects a small set of **anonymous** usage events so we can
 understand adoption (how many people launch the app, whether they get a first
 agent running, which features get used) and make the product better. This

@@ -26,3 +26,16 @@ export const ALLOW_TEMP_WORKERS = false;
  *  from the Triggers tab and Settings → Connections, and a leftover key no
  *  longer surfaces the History tab (owner, 2026-09-24). */
 export const SHOW_ORG_TRIGGER = false;
+
+/** Anonymous usage stats (TELEMETRY.md): the "Share anonymous usage stats" row
+ *  in onboarding, the switch in Settings → General, and sending itself. Off
+ *  until the owner decides whether to collect anything at all. While off,
+ *  nothing is sent even if a release is built with a PostHog key, so the app
+ *  never sends without having shown the choice (owner, 2026-09-24). */
+export const COLLECT_USAGE_STATS = false;
+
+/** The "auto mode on / off" text in the header bar. It named a developer
+ *  setting in words owners don't use, and it wasn't clickable. The setting
+ *  itself is unchanged and stays in Settings → Autonomy & Budgets
+ *  (owner, 2026-09-24). */
+export const SHOW_AUTO_MODE_LABEL = false;
