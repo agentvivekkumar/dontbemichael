@@ -3705,6 +3705,12 @@ ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hi
 ipcMain.handle('hive:messages', (_evt, opts: unknown) =>
   hive.voiceMessages(opts && typeof opts === 'object' ? (opts as Parameters<typeof hive.voiceMessages>[0]) : {})
 );
+/** The owner's Ask me answer, added to the raising agent's memory notes. */
+ipcMain.handle('hive:rememberOwnerAnswer', (_evt, p: unknown) => {
+  const o = (p ?? {}) as { agentId?: unknown; task?: unknown; q?: unknown; a?: unknown };
+  if (typeof o.agentId !== 'string' || typeof o.q !== 'string' || typeof o.a !== 'string') return { ok: false };
+  return { ok: hive.rememberOwnerAnswer(o.agentId, typeof o.task === 'string' ? o.task : '', o.q, o.a) };
+});
 ipcMain.handle('hive:send', (_evt, partial: Partial<HiveMessage>, from: unknown) => {
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   const sender = typeof from === 'string' ? from : 'system';

@@ -6,6 +6,7 @@ import { useStore } from '@/store/store';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { type HiveTask, type HumanQA, openQuestion, waitsOnHuman } from './TasksKanban';
 import { compareByNewestAsk } from './askMeOrder';
+import { answerMessages, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 
@@ -116,18 +117,16 @@ export function AskMeTab() {
         : { ok: false };
       if (!result.ok) throw new Error('task changed before answer could be saved');
       setTasks(next);
-      // 2) Tell the god, so the card gets unblocked and work continues.
-      await window.cth.hiveSend({
-        to: 'god',
-        act: 'inform',
-        subject: `HUMAN ANSWER on task "${task.title}"`,
-        body: [
-          `The human answered the open question on task ${task.id} ("${task.title}"):`,
-          `Q: ${open.q}`,
-          `A: ${text}`,
-          'The answer is also recorded in the card\'s humanQA. Act on it, unblock the card, and continue the work.'
-        ].join('\n')
-      }, 'human');
+      // 2) The answer goes to whoever raised the question, and into their
+      //    memory notes, and Michael is told so he can unblock the card
+      //    (askMeRouting.ts).
+      const agents = useStore.getState().agents;
+      const raiser = raiserOf(open, task, new Set(agents.map((a) => a.id)));
+      const raiserName = agents.find((a) => a.id === raiser)?.name ?? raiser;
+      for (const m of answerMessages({ raiser, raiserName, taskId: task.id, title: task.title, q: open.q, a: text })) {
+        await window.cth.hiveSend({ to: m.to, act: 'inform', subject: m.subject, body: m.body }, 'human');
+      }
+      await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, q: open.q, a: text }).catch(() => undefined);
       setAnswerDraft(task.id, '');
     } catch { /* leave the draft so the user can retry */ }
     setSending(null);

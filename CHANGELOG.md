@@ -22,6 +22,11 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Michael included, is told to search. There is no shared Office folder any more: an existing one
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
+- **Ask me answers go back to whoever asked, and are remembered.** Each question on an Ask me
+  card now records the team member whose work needs the answer (or Michael, for his own). Your
+  answer goes straight to that agent, into its memory notes as your words, and Michael is told so he
+  can unblock the card. The memory tidy-up keeps the lasting part, like a rule or a preference, so
+  the same question isn't asked again.
 - **Agents' memory improves instead of piling up.** Each agent's memory is now a short index of
   one line notes (at most about 2,000 tokens) that the app keeps and gives the agent once per
   session. Agents add at most three notes after a task, and your instructions and corrections at

@@ -820,6 +820,9 @@ const api = {
   hiveBoard: (): Promise<string> => ipcRenderer.invoke('hive:board'),
   hiveTasks: (): Promise<unknown> => ipcRenderer.invoke('hive:tasks'),
   hiveLog: (n?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200),
+  /** Add the owner's Ask me answer to the raising agent's memory notes. */
+  hiveRememberOwnerAnswer: (p: { agentId: string; task: string; q: string; a: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('hive:rememberOwnerAnswer', p),
   hiveMemory: (id: string): Promise<string> => ipcRenderer.invoke('hive:memory', id),
   hiveInbox: (id: string): Promise<HiveMessage[]> => ipcRenderer.invoke('hive:inbox', id),
   /** Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED in

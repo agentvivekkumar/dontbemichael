@@ -106,6 +106,10 @@ export interface HumanQA {
   askedAt?: string;
   answeredAt?: string;
   dismissedAt?: string;
+  /** The agent whose work needs the answer: the one that learns from it
+   *  (owner, 2026-09-25). "god" when Michael raised it himself. Falls back to
+   *  the card's assignee, then Michael. */
+  raisedBy?: string;
 }
 
 export interface HiveTask {
@@ -1604,7 +1608,7 @@ export class HiveManager {
       : '';
     const godLine = meta.isGod
       ? 'You are the GOD / ORCHESTRATOR of this hive — your job is to ORCHESTRATE, not to implement: maintain live situational awareness and delegate the work. (1) AWARENESS — always know what is going on: keep an accurate picture of every agent (active vs archived/idle), the task board, and all in-flight work; drain your inbox continually and triage every other agent\'s requests, answering clarifications so the team runs autonomously. (2) DELEGATE — decompose work and fan it out to the hive agents via their inboxes (route messages and assign owners; do not do their jobs); do NOT take on grunt implementation yourself. Stay aware of who is already on the floor and delegate OPPORTUNISTICALLY: BEFORE you spawn anything, CHECK THE LIVE ROSTER (active agents in registry.json + their state in fleet.json) and prefer routing to an EXISTING agent that fits — above all when the request names one ("ask Pam to…", "have Jim…"), route to that agent instead of reflexively creating a new one. Reuse an idle or already-running agent whose role matches; only spawn a fresh agent when no existing one is a sensible fit, and say that you checked. One capable owner beats a duplicate. (3) OWN ONLY THE IMPORTANT, high-leverage things — task decomposition, dispatch decisions, sign-offs, conflict resolution, branch integration, and final QA — and remain the sole scribe of board.md. You are otherwise fully autonomous — there is NO separate approval queue. For the genuinely critical (destructive actions, spending real money, scope changes, unresolvable conflicts), ask the human directly in your own session and let the tool-permission prompt gate the action; the human approves natively, including remotely from their phone via /remote-control. Keep the team unblocked. When you DISPATCH a task, write it as a 4-part contract so the agent can run autonomously: (1) OBJECTIVE — the concrete goal; (2) OUTPUT — the expected deliverable/format; (3) TOOLS — what to use or avoid, and any references to read instead of re-deriving; (4) BOUNDARIES — scope limits + the definition of done. Pass references (file paths, message ids, board sections), not pasted content — keep dispatches short.'
-        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests — on each, review every agent via fleet.json, re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>"}; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a") AND arrives as an inbox message to you — read it, act on it, and unblock the card so work continues. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
+        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests — on each, review every agent via fleet.json, re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives as an inbox message to you: unblock the card, and route any follow-up, so work continues. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
@@ -1995,6 +1999,26 @@ export class HiveManager {
    * are none yet (or the file is still in the older free-form shape, which the
    * tidy-up migrates). Fixed for the session, so it caches.
    */
+  /**
+   * The owner's answer to a question an agent raised on Ask me, added to that
+   * agent's memory notes as coming from the owner (owner, 2026-09-25). The
+   * tidy-up keeps the part that lasts (a rule, a preference) and drops what
+   * only mattered once. False when the agent isn't one of this office's.
+   */
+  rememberOwnerAnswer(id: string, task: string, q: string, a: string): boolean {
+    if (!/^[\w-]+$/.test(id)) return false;
+    const dir = this.agentDir(id);
+    if (!existsSync(dir)) return false;
+    const line = (v: string) => v.replace(/\s+/g, ' ').trim();
+    const today = new Date().toISOString().slice(0, 10);
+    const note = `- From the owner (${today}), answering a question on "${line(task)}": Q: ${line(q)} A: ${line(a)}\n`;
+    try {
+      mkdirSync(join(dir, 'memory'), { recursive: true });
+      appendFileSync(join(dir, 'memory', 'inbox.md'), note, 'utf8');
+      return true;
+    } catch { return false; }
+  }
+
   memoryIndexFor(id: string): string | null {
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return null;
@@ -2970,7 +2994,7 @@ const NO_FIT_CAST = Object.entries(OFFICE_ROLES)
 
 /** Michael's rule for a job nobody on the team covers (owner, 2026-09-24).
  *  Replaces starting a temporary worker: the owner decides, on the ASK ME board. */
-const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask, written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
+const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask with "raisedBy": "god", written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
 
 /** PROTOCOL.md's section on starting a temporary worker. Included only in a
  *  build that allows them (ALLOW_TEMP_WORKERS); otherwise the protocol never
@@ -3072,11 +3096,12 @@ When a card can only move with the human — a question to answer, or an action 
 card \`"status": "blocked"\` and appends the ask to its \`humanQA\` array:
 
 \`\`\`json
-{ "q": "the ask, in markdown", "askedAt": "<iso timestamp>" }
+{ "q": "the ask, in markdown", "askedAt": "<iso timestamp>", "raisedBy": "<agent id, or god>" }
 \`\`\`
 
-The harness shows the open ask on the ASK ME board and in the ASK ME tab, and the human's reply lands
-in the same entry as \`"a"\` plus an inbox message to god. Every past entry stays on the card — that
+The harness shows the open ask on the ASK ME board and in the ASK ME tab. The human's reply lands in
+the same entry as \`"a"\`, goes to the agent that raised it (\`raisedBy\`) and into that agent's
+memory notes, and god is told so he can unblock the card. Every past entry stays on the card — that
 trail is the decision history.
 
 **Write the ask short, and in markdown.** The card renders it, so plain-text asterisks and backticks
