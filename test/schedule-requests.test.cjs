@@ -147,3 +147,14 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   assert.match(main, /title: michaelName\(\), body: `\$\{name\} asked to change a schedule\. It's waiting for you in ASK ME\.`/);
   assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return;/);
 });
+
+test('a save that landed is reported as saved even if re-arming the timers fails', () => {
+  const main = read('src/main/index.ts');
+  const fn = main.slice(main.indexOf('function applyMissions('), main.indexOf('const isMission ='));
+  assert.match(fn, /writeConfig\(\{ missions: next \}\);\s*\n(?:\s*\/\/.*\n)*\s*try \{ syncMissions\(\); \} catch/);
+});
+
+test('voice unarchive clears closed-by-owner', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(archived\) closeAgentByOwner\(id\);\s*\n(?:\s*\/\/.*\n)*\s*else hive\.setClosedByOwner\(id, false\);/);
+});

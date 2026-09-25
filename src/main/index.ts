@@ -4357,7 +4357,10 @@ function applyMissions(change: (list: ScheduledMission[]) => ScheduledMission[] 
     const next = change(readConfig().missions ?? []);
     if (!next) return { ok: false, error: 'not found' };
     writeConfig({ missions: next });
-    syncMissions();
+    // The change is saved from here on. Re-arming the timers can't turn that
+    // into a reported failure, or the owner retries a save that landed
+    // (adversarial review, 2026-09-25).
+    try { syncMissions(); } catch (e) { console.error('[missions] re-arm failed after save', e); }
     try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
     return { ok: true };
   } catch (e) {
@@ -4900,6 +4903,9 @@ registerRealtimeActionIpc({
     // The owner archiving an agent by voice is closing it on purpose, so its
     // schedules pause like a close from the panel (eng review R1).
     if (archived) closeAgentByOwner(id);
+    // Bringing it back ends "closed by the owner" (its schedules stay paused
+    // until the owner turns them on, design 6A).
+    else hive.setClosedByOwner(id, false);
     hive.setArchived(id, archived);
     try { liveWebContents()?.send(archived ? 'hive:agentArchived' : 'hive:agentSpawned', { id }); } catch { /* window gone */ }
     return { ok: true };
