@@ -21,6 +21,7 @@ import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import { ScheduleList, closeConfirmText } from './triggers/ScheduleList';
+import { OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 export interface AgentDetailPanelProps {
   agent: Agent;
@@ -270,9 +271,12 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
                   onToggleFullscreen={() => setFullscreen(agent.id)}
                   fullscreen={false}
                   embedded
+                  // Team members take work from Michael; the owner types to
+                  // one only in 1:1 (docs/designs/owner-talks-via-michael.md).
+                  inputLocked={!agent.onHold}
                 />
               </div>
-              <MessageQueueComposer agent={agent} />
+              {agent.onHold ? <MessageQueueComposer agent={agent} /> : <OwnerViaMichaelBar agent={agent} />}
             </div>
             )
           ) : (

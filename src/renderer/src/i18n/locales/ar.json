@@ -1544,5 +1544,15 @@
     "bringBack": "أعد المحادثة السابقة",
     "minutesAgo": "قبل {{count}} دقيقة",
     "hoursAgo": "قبل {{count}} ساعة"
+  },
+  "ownerVia": {
+    "watching": "مشاهدة فقط",
+    "aboutPrefix": "بخصوص {{name}}: ",
+    "regionAria": "التواصل مع {{name}}",
+    "explain": "يتلقى {{name}} العمل من {{godName}}. لتطلب شيئًا من {{name}}، أخبر {{godName}}، أو تحدث مع {{name}} على انفراد.",
+    "stuck": "ينتظر {{name}} أمرًا في الطرفية الخاصة به. تحدث على انفراد للرد.",
+    "message": "راسل {{godName}} بخصوص {{name}}",
+    "talk": "حديث على انفراد",
+    "holdFailed": "تعذر بدء الحديث على انفراد. حاول مجددًا."
   }
 }

@@ -26,6 +26,21 @@ import { APP_NAME } from '../shared/appName';
 /** Desktop notification bodies. The title is the agent's name (displayName). */
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
 export const NOTIFY_WAITING = 'Waiting for you.';
+
+/** Claude Code's in-terminal question tool. Refused for team members. */
+export const ASK_TOOL = 'AskUserQuestion';
+export const ASK_TOOL_REFUSAL =
+  "Don't ask the owner here: nobody answers your terminal. Send the question to Michael through your outbox (\"to\": \"michael\", \"act\": \"query\"). He answers it, or puts it on the owner's ASK ME board.";
+
+/** A Notification that means the session is stopped on a prompt a person must
+ *  answer in the terminal: a permission request or a question dialog, never the
+ *  plain idle "waiting for your input". */
+export function isTerminalPrompt(p: { notification_type?: string; message?: string }): boolean {
+  const type = (p.notification_type ?? '').toLowerCase();
+  if (type.includes('idle')) return false;
+  if (type.includes('permission') || type.includes('elicitation')) return true;
+  return /needs your permission|needs your approval/i.test(p.message ?? '');
+}
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
@@ -346,6 +361,21 @@ export class HookServer {
       }
     }
 
+    // A team member never asks the owner in its own terminal: team members wait
+    // on Michael at most (docs/designs/owner-talks-via-michael.md). Refusing the
+    // question tool turns the question into a message to him; he answers it or
+    // puts it on ASK ME.
+    if (event === 'PreToolUse' && agentId && p.tool_name === ASK_TOOL && !this.isGod(agentId)) {
+      this.emit(agentId, event, p);
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: ASK_TOOL_REFUSAL
+        }
+      };
+    }
+
     // Folder privacy (src/shared/folderAccess.ts). The spawn's settings already
     // deny the folders known then; this catches everything else: folders made
     // after the agent started, and Michael's own files, which a settings rule
@@ -508,6 +538,14 @@ export class HookServer {
       this.notify(agentId, NOTIFY_WAITING);
     }
 
+    // A team member's session stopped on a prompt only a person can answer in
+    // that terminal (a permission, a sign-in, a trust dialog). Tell Michael
+    // what it says; he can't type there, so he puts it on ASK ME for the owner
+    // to answer in a 1:1 (docs/designs/owner-talks-via-michael.md).
+    if (event === 'Notification' && agentId && !this.isGod(agentId) && isTerminalPrompt(p)) {
+      this.relayPromptToMichael(agentId, (p.message ?? '').trim());
+    }
+
     // Forward everything else to the renderer so avatars reflect real activity.
     this.emit(agentId, event, p);
     return {};
@@ -528,6 +566,24 @@ export class HookServer {
       if (!Notification.isSupported()) return;
       new Notification({ title: this.displayName(agentId), body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  /** agentId → last prompt relayed, so one prompt isn't relayed twice. */
+  private relayedPrompts = new Map<string, { text: string; at: number }>();
+
+  private relayPromptToMichael(agentId: string, text: string): void {
+    const last = this.relayedPrompts.get(agentId);
+    if (last && last.text === text && Date.now() - last.at < 10 * 60_000) return;
+    this.relayedPrompts.set(agentId, { text, at: Date.now() });
+    try {
+      const name = this.displayName(agentId);
+      this.hive.send({
+        to: this.hive.registry().godId ?? 'god',
+        act: 'inform',
+        subject: `${name} is waiting on something in their terminal`,
+        body: `${name}'s session stopped on a prompt only the owner can answer in that terminal${text ? `: "${text}"` : '.'} You can't answer it there. Put it on the owner's ASK ME board (a card for ${agentId}, status "blocked", one humanQA ask with "raisedBy": "${agentId}") saying what it is waiting on and to talk 1:1 with ${name} to answer it.`
+      }, 'system');
+    } catch { /* best-effort: the panel still shows "needs you" */ }
   }
 
   private isGod(agentId: string): boolean {

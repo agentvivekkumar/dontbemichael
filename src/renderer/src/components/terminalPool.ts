@@ -79,6 +79,11 @@ export interface TerminalEntry {
    * prompt (Ctrl-U, a respawn reset) has to clear both or the next keystroke
    * resurrects the deleted text as a phantom draft. */
   lineBuf: string;
+  /** The owner may only watch this terminal, not type into it: a team member
+   *  outside 1:1 (docs/designs/owner-talks-via-michael.md). Blocks the OWNER's
+   *  input paths only (keys, paste, drop, IME). The app's own writes (queued
+   *  delivery, terminal replies to the program) never go through them. */
+  inputLocked: boolean;
   /** Bumped every time this pty is respawned under the same id. Late events from
    * the OLD process carry the generation they were registered under, so they can
    * be recognised and dropped instead of corrupting the replacement. */
@@ -179,6 +184,7 @@ export function acquireTerminal(ptyId: string, theme?: ThemeMap, fontSize = 14):
     inputDirtyAt: 0,
     automationSettleUntil: 0,
     lineBuf: '',
+    inputLocked: false,
     generation: 0
   };
 
@@ -255,9 +261,18 @@ export function acquireTerminal(ptyId: string, theme?: ThemeMap, fontSize = 14):
     void window.cth.readClipboard().then((t) => { if (t) term.paste(t); });
   };
   term.attachCustomKeyEventHandler((ev) => {
+    const key = ev.key.toLowerCase();
+    // Watch-only: copying a selection still works, every other key is dropped
+    // before xterm turns it into input.
+    if (entry.inputLocked) {
+      if (ev.type === 'keydown' && (ev.ctrlKey || ev.metaKey) && key === 'c' && term.hasSelection()) {
+        copySelection();
+        ev.preventDefault();
+      }
+      return false;
+    }
     if (ev.type !== 'keydown') return true;
     if (!(ev.ctrlKey || ev.metaKey)) return true;
-    const key = ev.key.toLowerCase();
     if (key === 'c' && (ev.shiftKey || term.hasSelection())) {
       // Copy-on-Ctrl+C only while a selection exists; clear it after, so a
       // second Ctrl+C still interrupts the agent as usual.
@@ -275,8 +290,17 @@ export function acquireTerminal(ptyId: string, theme?: ThemeMap, fontSize = 14):
   host.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
     if (copySelection()) { term.clearSelection(); return; }
-    pasteClipboard();
+    if (!entry.inputLocked) pasteClipboard();
   });
+  // Watch-only also stops pasting, dropping and IME composition into the
+  // terminal. Capture phase, so xterm's own listeners never see them.
+  for (const type of ['paste', 'drop', 'compositionend', 'beforeinput'] as const) {
+    host.addEventListener(type, (ev) => {
+      if (!entry.inputLocked) return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    }, true);
+  }
 
   // Answer the terminal-colour queries (OSC 10 foreground, OSC 11 background).
   //
@@ -999,4 +1023,16 @@ function registerMarkdownLinkProvider(term: Terminal, ptyId: string): void {
       }
     });
   } catch { /* proposed API unavailable — feature silently off */ }
+}
+
+/** Let the owner type into this terminal, or only watch it (a team member
+ *  outside 1:1). Only the owner's input is affected; see TerminalEntry.inputLocked. */
+export function setTerminalInputLocked(ptyId: string, locked: boolean): void {
+  const entry = pool.get(ptyId);
+  if (!entry) return;
+  entry.inputLocked = locked;
+  // A read-only helper textarea keeps the OS keyboard and IME from composing
+  // into it at all.
+  const ta = entry.term.textarea;
+  if (ta) ta.readOnly = locked;
 }

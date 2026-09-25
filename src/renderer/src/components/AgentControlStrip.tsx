@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
 import { AgentHoldButton } from './AgentHoldButton';
+import { useStore } from '@/store/store';
 import { isComposingKey } from '@shared/imeGuard';
 
 /**
@@ -37,6 +38,9 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [steer, setSteer] = useState('');
+  // The steer note is a message to the agent, so it is only offered in 1:1
+  // (docs/designs/owner-talks-via-michael.md). The two brakes stay in every mode.
+  const inOneOnOne = useStore((s) => !!s.agents.find((a) => a.id === agentId)?.onHold);
   const [note, setNote] = useState('');
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -114,7 +118,7 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
         {snap?.halted && <span style={{ fontSize: 11, color: 'var(--cth-coral)' }}>{t('agentControl.halting')}</span>}
         {!!snap?.pendingSteers && <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{t('agentControl.steersQueued', { count: snap.pendingSteers })}</span>}
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
+      {inOneOnOne && <div style={{ display: 'flex', gap: 6 }}>
         <input
           className="cth-input"
           value={steer}
@@ -134,7 +138,7 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
             aria-label={t('agentControl.steerAria')}
           >{t('agentControl.steer')}</span>
         </PixelButton>
-      </div>
+      </div>}
       {note && <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{note}</span>}
     </div>
   );
