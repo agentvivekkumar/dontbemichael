@@ -270,7 +270,9 @@ export interface HarnessConfig {
   businessType?: string;
   businessName?: string;
   businessCity?: string;
-  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  /** Michael's folder: the business folder holding every team member's. */
+  businessFolder?: string;
+  /** Before 2026-09-25: the retired shared Office folder. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
    *  works in (Decisions 44, 47). The running office starts agents from this. */
@@ -607,7 +609,7 @@ const api = {
   /** Default `~/Documents/<Business>/<Folder>` paths for the team screen, or
    *  under `root` when the owner picked Michael's folder. Creates nothing. */
   foldersSuggest: (businessName: string, folders: string[], root?: string): Promise<{
-    home: string; root: string; office: string; byFolder: Record<string, string>; rootRefused?: boolean;
+    home: string; root: string; byFolder: Record<string, string>; rootRefused?: boolean;
   }> => ipcRenderer.invoke('folders:suggest', { businessName, folders, root }),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<

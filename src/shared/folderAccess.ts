@@ -1,16 +1,16 @@
 /**
  * Who may open and change which folder in an office (owner, 2026-09-25).
  *
- *  - Michael works in the business folder (`~/Documents/<Business>`). Every
- *    team member's folder sits inside it by default, and so does the Office
- *    folder.
- *  - A team member's folder is private: only that member (and anyone sharing
- *    the folder, which agents in the same role do by default) and their boss
- *    can open it. Michael is the only boss today.
+ *  - Every agent's folder is private: only that agent (and anyone sharing the
+ *    folder, which agents in the same role do by default) and anyone above it
+ *    can open it. Michael's folder is no exception: only he and the owner (who
+ *    isn't an agent) open it.
+ *  - Michael works in the business folder (`~/Documents/<Business>`), and every
+ *    team member's folder sits inside it by default. He is the only boss today.
  *  - A boss can READ a team member's folder but not change it. To get a file
  *    into it, the boss asks the team member.
- *  - The Office folder is company knowledge: everyone can read it; only
- *    Michael (and the owner, who isn't an agent) can change it.
+ *  - Company wide information, policies and rules are shared through the
+ *    knowledge feature, which every agent searches; no folder is shared.
  *
  * One pure module feeds both layers that enforce this:
  *  - `folderPolicy` becomes the Claude Code settings for a spawn: the OS
@@ -30,8 +30,6 @@ import { isAbsolute, relative, resolve } from 'node:path';
 export interface FolderLayout {
   /** Michael's folder: the business folder. Undefined on an office without one. */
   business?: string;
-  /** Company knowledge, read by everyone and changed only by Michael. */
-  office?: string;
   /** Every team member's working folder (never Michael's), each once. */
   teamFolders: string[];
 }
@@ -54,19 +52,11 @@ export const FOLDER_READ_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', '
 /** Claude's file tools that write. */
 export const FOLDER_WRITE_TOOLS: ReadonlySet<string> = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
-/** Michael's folder for an office whose Office folder is `office`: its parent. */
-export function businessFolderOf(office: string | undefined): string | undefined {
-  if (!office) return undefined;
-  const parent = resolve(office, '..');
-  return parent === resolve(office) ? undefined : parent;
-}
-
 /** The Claude Code settings that hold an agent to its folders. */
 export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsensitive: boolean): AgentFolderPolicy {
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
   const policy: AgentFolderPolicy = { sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [] };
-  const office = layout.office;
 
   if (agent.isGod) {
     // Read everything; change nothing that belongs to a team member.
@@ -79,23 +69,17 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   }
 
   const own = agent.cwd;
-  const ownIsOffice = !!office && same(own, office);
   const others = teamFoldersOf(layout, same).filter((f) => !same(f, own) && !inside(f, own));
-  // Michael's folder, except the parts this agent may open. allowRead wins over
-  // denyRead in Claude's sandbox, so the agent keeps its own folder and the
-  // Office even when both sit inside Michael's.
+  // Michael's folder, except this agent's own. allowRead wins over denyRead in
+  // Claude's sandbox, so the agent keeps its own folder when it sits inside
+  // Michael's.
   if (layout.business && !inside(own, layout.business)) {
     policy.sandbox.denyRead.push(layout.business);
     policy.sandbox.allowRead.push(own);
-    if (office) policy.sandbox.allowRead.push(office);
   }
   for (const f of others) {
     policy.sandbox.denyRead.push(f);
     policy.deny.push(rule('Read', f), rule('Edit', f));
-  }
-  if (office && !ownIsOffice) {
-    policy.sandbox.denyWrite.push(office);
-    policy.deny.push(rule('Edit', office));
   }
   return policy;
 }
@@ -116,7 +100,6 @@ export function folderDecision(
   if (!writes && !FOLDER_READ_TOOLS.has(tool)) return { deny: false };
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
-  const office = layout.office;
   const teamFolder = teamFoldersOf(layout, same).find((f) => inside(f, target));
 
   if (agent.isGod) {
@@ -131,13 +114,6 @@ export function folderDecision(
 
   const own = agent.cwd;
   if (inside(own, target)) return { deny: false };
-  if (office && inside(office, target)) {
-    if (!writes) return { deny: false };
-    return {
-      deny: true,
-      reason: `The Office folder holds company knowledge, and only ${godName} and the owner change it. Save your work in your own folder (${own}), and send anything meant for everyone to ${godName}.`
-    };
-  }
   if (teamFolder) {
     return {
       deny: true,
@@ -160,12 +136,11 @@ function rule(tool: 'Read' | 'Edit', folder: string): string {
   return `${tool}(/${p.startsWith('/') ? p : `/${p}`}/**)`;
 }
 
-/** Team folders, each once, never the Office or Michael's folder itself. */
+/** Team folders, each once, never Michael's folder itself. */
 function teamFoldersOf(layout: FolderLayout, same: (a: string, b: string) => boolean): string[] {
   const out: string[] = [];
   for (const f of layout.teamFolders) {
     if (!f || !isAbsolute(f)) continue;
-    if (layout.office && same(f, layout.office)) continue;
     if (layout.business && same(f, layout.business)) continue;
     if (out.some((o) => same(o, f))) continue;
     out.push(resolve(f));

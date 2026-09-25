@@ -28,7 +28,7 @@ import { linkWorktreeDeps, unlinkWorktreeDeps } from './worktreeDeps';
 import { HiveManager, type AgentMeta, type HiveMessage, type HiveTask } from './hive';
 import { HookServer } from './hooks';
 import { loadBundledPacks, packsResourceDir } from './packs';
-import { businessFolderRoot, ensureFolder, OFFICE_FOLDER, safeFolderName } from './agentFolders';
+import { businessFolderRoot, ensureFolder, safeFolderName } from './agentFolders';
 import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
@@ -94,7 +94,7 @@ import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
 import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
-import { touchesOffice } from '../shared/officeRecord';
+import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -1487,27 +1487,48 @@ function docTextCliPath(): string {
   return join(app.getAppPath(), 'out', 'main', 'docTextCli.js');
 }
 
-/** The shared Office folder (Decision 44): Michael's working directory, and
- *  writable by every agent. Created at onboarding; recreated here (empty) if the
- *  owner deleted it, rather than failing every spawn that depends on it.
- *  Undefined on installs that predate agent folders, which keep today's layout. */
-function officeFolderReady(): string | undefined {
-  const office = readConfig().officeFolder;
-  if (!office) return undefined;
-  const r = ensureFolder(expandTilde(office));
+/** Michael's folder (the business folder), created if the owner deleted it
+ *  rather than failing every spawn that depends on it. Undefined on installs
+ *  that predate agent folders, which keep today's layout. An office set up
+ *  before 2026-09-25 recorded only its Office folder; launch fills
+ *  businessFolder from it (migrateBusinessFolder), and until then its parent is
+ *  used here. */
+function businessFolderReady(): string | undefined {
+  const cfg = readConfig();
+  const folder = cfg.businessFolder ?? legacyBusinessFolder(cfg.officeFolder);
+  if (!folder) return undefined;
+  const r = ensureFolder(expandTilde(folder));
   return r.ok ? r.path : undefined;
 }
 
-/** Every team member's folder and the office's own folders, for the access
- *  rules (folderAccess.ts): the folders picked at setup plus every hired
- *  agent's, archived ones included (their files are still theirs). */
-function officeFolderLayout(officeFolder: string): FolderLayout {
+/** One-time at launch: an office set up before 2026-09-25 recorded its shared
+ *  Office folder; Michael's folder is the one holding it. Nothing moves on
+ *  disk: the Office folder becomes an ordinary folder inside Michael's. A parent
+ *  that can't hold an office (the home folder, a system folder) keeps Michael
+ *  in the Office folder itself. Also switches the knowledge feature on once,
+ *  now that it is where company knowledge lives. */
+function migrateBusinessFolder(): void {
+  const cfg = readConfig();
+  if (!cfg.businessFolder && cfg.officeFolder) {
+    const office = expandTilde(cfg.officeFolder);
+    const parent = legacyBusinessFolder(office);
+    writeConfig({ businessFolder: parent && isUsableTeamFolder(parent) ? parent : office });
+  }
+  if (!readConfig().knowledgeOnSeeded) {
+    writeConfig({ knowledgeGraph: { ...(readConfig().knowledgeGraph ?? {}), enabled: true }, knowledgeOnSeeded: true });
+  }
+}
+
+/** Every team member's folder and Michael's, for the access rules
+ *  (folderAccess.ts): the folders picked at setup plus every hired agent's,
+ *  archived ones included (their files are still theirs). */
+function businessFolderLayout(businessFolder: string): FolderLayout {
   const cfg = readConfig();
   const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
   for (const a of Object.values(hive.registry().agents)) {
     if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
   }
-  return folderLayoutFor(officeFolder, folders, cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined);
+  return folderLayoutFor(businessFolder, folders, cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined);
 }
 
 /** Where the helper discovers `{ port, token }` for the loopback endpoint. Kept
@@ -2715,17 +2736,14 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   opts.cwd = expandTilde(opts.cwd);
   if (opts.hive) opts.hive = { ...opts.hive, cwd: expandTilde(opts.hive.cwd) };
   // Before anything checks the working folder. Michael works in the business
-  // folder, the one holding the Office and every team member's folder, so he can
-  // read his team's work (folderAccess.ts). The renderer asks for the Office
-  // folder; the business folder is decided here, where the folder checks live.
-  // An office whose Office folder has no usable parent keeps Michael in it.
-  const officeFolder = officeFolderReady();
-  if (opts.hive?.isGod && officeFolder && resolve(opts.cwd) === resolve(officeFolder)) {
-    const business = officeFolderLayout(officeFolder).business;
-    if (business) {
-      opts.cwd = business;
-      opts.hive = { ...opts.hive, cwd: business };
-    }
+  // folder, private to him and the owner, which holds every team member's
+  // folder so he can read his team's work (folderAccess.ts). The renderer may
+  // ask for an older place (the retired Office folder); main decides here, where
+  // the folder checks live.
+  const businessFolder = businessFolderReady();
+  if (opts.hive?.isGod && businessFolder) {
+    opts.cwd = businessFolder;
+    opts.hive = { ...opts.hive, cwd: businessFolder };
   }
   // Which CLI is this? Explicit wins; else inferred from the binary
   // (claude/codex/grok/agy). Non-Claude providers skip every Claude-only spawn step
@@ -2885,14 +2903,12 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           skillsDir: skillsResourceDir(),
           // The shared palace is mutated by the agent's own `mempalace` calls, so
           // the OS sandbox must let it through (empty when memory is off).
-          // …and, for Michael, the Office folder: company knowledge he keeps up to
-          // date. Team members read it but don't change it (folderAccess.ts).
-          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH, opts.hive.isGod ? officeFolder : undefined].filter((p): p is string => !!p),
-          officeFolder,
-          folderPolicy: officeFolder
+          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH].filter((p): p is string => !!p),
+          businessFolder,
+          folderPolicy: businessFolder
             ? folderPolicy(
               { isGod: !!opts.hive.isGod, cwd: opts.cwd },
-              officeFolderLayout(officeFolder),
+              businessFolderLayout(businessFolder),
               process.platform !== 'linux'
             )
             : undefined,
@@ -3753,9 +3769,8 @@ ipcMain.handle('packs:list', () => {
 });
 
 /** Default folders for the onboarding team screen (Decisions 44, 45):
- *  `~/Documents/<Business>/<Folder>` for each folder name, plus the Office.
- *  The business folder is Michael's, and holds the Office and the team's
- *  folders. When the owner picks another one (`root`), every default follows
+ *  `~/Documents/<Business>/<Folder>` for each folder name. The business folder
+ *  is Michael's, and holds the team's folders. When the owner picks another one (`root`), every default follows
  *  it; a folder that can't hold an office (the home folder, a system folder)
  *  is refused and the default kept. Nothing is created here. */
 ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
@@ -3774,7 +3789,6 @@ ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
     // For display only: the screen shows ~/Documents/… rather than /Users/<name>/…
     home: app.getPath('home'),
     root,
-    office: join(root, OFFICE_FOLDER),
     byFolder,
     ...(rootRefused ? { rootRefused: true } : {})
   };
@@ -5337,6 +5351,7 @@ function bootstrapHiveServices(): void {
     if (r.ok) console.log('[broker] integration broker listening on', integrationBroker.url());
     else console.error('[broker] failed to start:', r.error);
   });
+  migrateBusinessFolder(); // one-time: Michael's folder from the retired Office folder
   ensureDefaultMissions(); // one-time: seed the built-in hourly ops standup
   syncMissions(); // arm recurring auto-dispatch missions now the router is live
   syncContextTriggers(); // …and the context trigger's own compact/clear cadences

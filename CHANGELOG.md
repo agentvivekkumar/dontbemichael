@@ -10,13 +10,17 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 ### Changed
 
-- **Each team member's folder is private.** Only that team member, anyone sharing the folder
-  (agents in the same role do by default), and Michael can open it. Michael can read his team's
-  files but not change them. Held by Claude Code's own sandbox and permission rules, and checked
-  again by the app on every file an agent opens.
-- **Michael works in the business folder.** He moves up from the Office folder to the folder that
-  holds it and everyone's folders, so he can read his team's work. His conversation carries over.
-  Setup now asks for this one folder, and the Office and team folders go inside it.
+- **Every agent's folder is private.** A team member's folder opens only for that team member,
+  anyone sharing the folder (agents in the same role do by default), and Michael, who can read his
+  team's files but not change them. Michael's own folder opens only for him and you. Held by Claude
+  Code's own sandbox and permission rules, and checked again by the app on every file an agent opens.
+- **Michael works in the business folder,** the one holding everyone's folders, so he can read his
+  team's work. His conversation carries over. Setup now asks for this one folder, and the team's
+  folders go inside it.
+- **Company knowledge lives in Memory & Knowledge.** Company wide information, policies and rules
+  are shared through the knowledge feature, which is now on for every office and which every agent,
+  Michael included, is told to search. There is no shared Office folder any more: an existing one
+  stays on disk as an ordinary folder inside Michael's.
 - **House rules for every agent, Michael included.** Every agent now starts with five short rules:
   state only facts it can trace to a source and name the source, say so when it doesn't know,
   mark estimates as estimates, report outcomes as they are, and never make up people, customers or
@@ -33,9 +37,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   one on a new office was lost, and a reopened office only got one when it was overdue.
 - **Hiring asks for Role, Role description and Work style,** the same fields as Edit Agent. A new
   team member's folder goes inside Michael's, named after the role, so people in the same role
-  share one. Michael's folder and the Office can't be picked as a team member's own folder.
-- **The Office folder is company knowledge.** The whole team reads it; only Michael and you change
-  it. Team members send anything meant for everyone to Michael.
+  share one. Michael's folder can't be picked as a team member's own folder.
 
 ### Fixed
 

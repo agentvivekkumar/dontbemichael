@@ -721,9 +721,10 @@ export class HiveManager {
        *  MemPalace dir, which `mempalace` mutates). Absolute paths; ignored
        *  for providers without a sandbox. */
       extraWritableDirs?: string[];
-      /** The shared Office folder (Decision 44). When set, every agent is told
-       *  where its own work belongs and that the hive is coordination only. */
-      officeFolder?: string;
+      /** Michael's folder, the business folder (Decision 44). When set, every
+       *  agent is told where its own work belongs, who can open it, and that
+       *  the hive is coordination only. */
+      businessFolder?: string;
       /** Absolute path of the agent-facing `doc-text` CLI (F6). */
       docTextCliPath?: string;
       /** Which folders this agent may open and change (src/shared/folderAccess.ts). */
@@ -842,7 +843,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -986,7 +987,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1484,7 +1485,7 @@ export class HiveManager {
     semanticMemory: boolean,
     knowledgeGraph: boolean,
     kgCliPath?: string,
-    officeFolder?: string,
+    businessFolder?: string,
     docTextCliPath?: string
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
@@ -1513,8 +1514,10 @@ export class HiveManager {
     // cmd.exe/PowerShell as well as a POSIX shell.
     const hiveNode = this.nodeCommand();
     const kgCli = kgCliPath || (process.platform === 'win32' ? '%KG_CLI%' : '$KG_CLI');
+    // Company knowledge (owner, 2026-09-25): the one place company wide
+    // information, policies and rules are shared, searched by every agent.
     const knowledgeLine = knowledgeGraph
-      ? `Enterprise knowledge: this organisation has a private Knowledge Graph of its own documents, policies, and business context. When a task needs that context — company-specific facts, house style, internal processes — query it instead of guessing: run \`"${hiveNode}" "${kgCli}" search "<query>"\` for ranked passages, \`"${hiveNode}" "${kgCli}" list\` to see what is available, and \`"${hiveNode}" "${kgCli}" get <id>\` for a full document. (That first path is the harness's bundled Node — use it instead of bare \`node\`, which may not be on your PATH.)`
+      ? `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says. Run \`"${hiveNode}" "${kgCli}" search "<words>"\` for matching passages, \`"${hiveNode}" "${kgCli}" list\` to see what's there, and \`"${hiveNode}" "${kgCli}" get <id>\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`
       : '';
     // Item 13: state the build. Agents had no way to tell which version, or even
     // which KIND of build, they were running inside, so anything that varies
@@ -1541,14 +1544,14 @@ export class HiveManager {
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
-    // WHERE WORK LIVES (Decisions 44, 48). Only on installs with an Office folder:
+    // WHERE WORK LIVES (Decisions 44, 48). Only on installs with a business folder:
     // an older install's Michael still runs inside the harness folder, and telling
-    // him never to write there would contradict where he actually is. Both paths
+    // him never to write there would contradict where he actually is. The paths
     // are stable for the agent's lifetime, so the prompt-cache invariant holds.
-    const folderLine = officeFolder
+    const folderLine = businessFolder
       ? (meta.isGod
-        ? `YOUR FOLDERS: you work in ${meta.cwd}, the business folder. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them. ${officeFolder} is the Office folder: company knowledge that the whole team reads and only you and the owner change. Keep it accurate, and save anything meant for everyone there.`
-        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them. ${officeFolder} is the Office folder: company knowledge that everyone reads and only ${godNameForPrompt} and the owner change. Send anything meant for the whole team to ${godNameForPrompt}.`)
+        ? `YOUR FOLDERS: you work in ${meta.cwd}, your folder. It is private: only you and the owner can open it. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them.`
+        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them.`)
         + ` The hive (${root}) is ONLY for coordination — your memory.md, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
         + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
       : '';

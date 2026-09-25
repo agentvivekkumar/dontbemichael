@@ -17,8 +17,7 @@ import {
   type RegistryAgentFields
 } from '../shared/officeRecord';
 import { homeFolderStatus } from './homeFolder';
-import { OFFICE_FOLDER } from './agentFolders';
-import { businessFolderOf, type FolderLayout } from '../shared/folderAccess';
+import type { FolderLayout } from '../shared/folderAccess';
 
 export function officeRecordPath(home: string): string {
   return join(home, 'office.json');
@@ -144,7 +143,7 @@ export function isUsableTeamFolder(folder: string, home = homedir()): boolean {
  * that contains Michael's folder (an agent started in ~/Documents is not a
  * reason to hide ~/Documents).
  */
-export function folderLayoutFor(officeFolder: string | undefined, folders: string[], harnessHome?: string): FolderLayout {
+export function folderLayoutFor(businessFolder: string | undefined, folders: string[], harnessHome?: string): FolderLayout {
   const onDisk = (p: string) => {
     try { return realpathSync.native(resolve(p)); } catch { return resolve(p); }
   };
@@ -155,9 +154,7 @@ export function folderLayoutFor(officeFolder: string | undefined, folders: strin
     const a = fold(parent); const b = fold(child);
     return a === b || b.startsWith(a.endsWith(sep) ? a : a + sep);
   };
-  const office = officeFolder && isUsableTeamFolder(officeFolder) ? onDisk(officeFolder) : undefined;
-  const parent = businessFolderOf(office);
-  const business = parent && isUsableTeamFolder(parent) ? parent : undefined;
+  const business = businessFolder && isUsableTeamFolder(businessFolder) ? onDisk(businessFolder) : undefined;
   const app = harnessHome ? onDisk(harnessHome) : undefined;
   const teamFolders: string[] = [];
   for (const raw of folders) {
@@ -165,11 +162,10 @@ export function folderLayoutFor(officeFolder: string | undefined, folders: strin
     const f = onDisk(raw);
     if (app && (within(app, f) || within(f, app))) continue;
     if (business && within(f, business)) continue;
-    if (office && within(f, office)) continue;
     if (teamFolders.some((t) => fold(t) === fold(f))) continue;
     teamFolders.push(f);
   }
-  return { business, office, teamFolders };
+  return { business, teamFolders };
 }
 
 /** The deepest folder that contains every path's parent, or undefined. */
@@ -188,25 +184,23 @@ function isFolder(p: string): boolean {
   try { return statSync(p).isDirectory(); } catch { return false; }
 }
 
-/** Only usable folders, and for an office that never recorded its Office folder,
- *  the one that is already there beside the team's folders (Documents/<Business>/Office). */
+/** Only usable folders, and for an office that never recorded Michael's folder,
+ *  the folder its team's folders share (Documents/<Business>). */
 function checkedRecord(rec: OfficeRecord): OfficeRecord {
   const team = rec.team.filter((m) => isUsableTeamFolder(m.folder));
-  let officeFolder = rec.officeFolder && isUsableTeamFolder(rec.officeFolder) ? rec.officeFolder : undefined;
-  if (!officeFolder) {
-    officeFolder = team.map((m) => join(dirname(m.folder), OFFICE_FOLDER)).find(isFolder);
-  }
-  // With no Office folder to go on, the team's folders must share a business
-  // folder of their own. Sharing only the home folder (hires in unrelated
-  // places) is not an office to continue: it would put Michael's Office in ~
-  // and name the business after the user account.
-  if (!officeFolder) {
+  let businessFolder = rec.businessFolder && isUsableTeamFolder(rec.businessFolder) ? rec.businessFolder : undefined;
+  // With no business folder to go on, the team's folders must share one of
+  // their own. Sharing only the home folder (hires in unrelated places) is not
+  // an office to continue: it would put Michael in ~ and name the business
+  // after the user account.
+  if (!businessFolder) {
     const parents = new Set(team.map((m) => dirname(resolve(m.folder))));
     const one = parents.size === 1 ? [...parents][0] : undefined;
     const shared = one ?? commonDir(team.map((m) => resolve(m.folder)));
-    if (!shared || !isUsableTeamFolder(shared)) return { ...rec, officeFolder: undefined, team: [] };
+    if (!shared || !isUsableTeamFolder(shared)) return { ...rec, businessFolder: undefined, team: [] };
+    businessFolder = shared;
   }
-  return { ...rec, officeFolder, team };
+  return { ...rec, businessFolder, team };
 }
 
 /** What is in this folder: an office, and if so which one and which team. */
@@ -235,6 +229,6 @@ function stripEmpty(rec: OfficeRecord): Partial<OfficeRecord> {
   if (rec.businessName) out.businessName = rec.businessName;
   if (rec.businessCity) out.businessCity = rec.businessCity;
   if (rec.businessType) out.businessType = rec.businessType;
-  if (rec.officeFolder) out.officeFolder = rec.officeFolder;
+  if (rec.businessFolder) out.businessFolder = rec.businessFolder;
   return out;
 }

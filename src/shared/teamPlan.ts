@@ -11,15 +11,14 @@ import type { OfficePack } from './officePack';
 
 /**
  * Key for Michael's folder in the owner's override map. Michael's folder is the
- * business folder: the Office and every team member's default folder sit inside
- * it (src/shared/folderAccess.ts), so picking it moves those defaults too.
+ * business folder: every team member's default folder sits inside it
+ * (src/shared/folderAccess.ts), so picking it moves those defaults too.
  */
 export const OFFICE_KEY = '__office__';
 
 /** Default absolute paths from main, all under `root` (Michael's folder). */
 export interface FolderSuggestions {
   root: string;
-  office: string;
   byFolder: Record<string, string>;
   /** The folder the owner picked for Michael can't hold an office; `root` is the default. */
   rootRefused?: boolean;
@@ -72,12 +71,12 @@ export function folderFor(
   return suggestionsCurrent(suggestions, overrides) ? suggestions?.byFolder[folderNameFor(agent)] : undefined;
 }
 
-/** The Office folder: always inside Michael's. */
-export function officeFolderFor(
+/** Michael's folder once main has worked out the defaults under it. */
+function businessFolderFor(
   suggestions: FolderSuggestions | undefined,
   overrides: Record<string, string>
 ): string | undefined {
-  return suggestionsCurrent(suggestions, overrides) ? suggestions?.office : undefined;
+  return suggestionsCurrent(suggestions, overrides) ? suggestions?.root : undefined;
 }
 
 /**
@@ -102,17 +101,18 @@ export function connectionsNeeded(
 export type TeamPlan =
   | {
     ok: true;
-    office: string;
+    /** Michael's folder, the business folder. */
+    business: string;
     /** Picked agents, each with the absolute folder it works in. */
     team: Array<{ agentId: string; folder: string }>;
-    /** Every folder to make sure exists, Office first, each listed once. */
+    /** Every folder to make sure exists, Michael's first, each listed once. */
     folders: string[];
   }
   | { ok: false };
 
 /**
- * What finish persists and creates. Not ready (`ok: false`) until every picked
- * agent, and the Office, has a resolved folder.
+ * What finish persists and creates. Not ready (`ok: false`) until Michael's
+ * folder, and every picked agent's, is resolved.
  */
 export function teamPlan(
   agents: AgentDefinitionV2[],
@@ -120,8 +120,8 @@ export function teamPlan(
   suggestions: FolderSuggestions | undefined,
   overrides: Record<string, string>
 ): TeamPlan {
-  const office = officeFolderFor(suggestions, overrides);
-  if (!office) return { ok: false };
+  const business = businessFolderFor(suggestions, overrides);
+  if (!business) return { ok: false };
   const team: Array<{ agentId: string; folder: string }> = [];
   for (const a of agents) {
     if (!picked[a.id]) continue;
@@ -129,7 +129,7 @@ export function teamPlan(
     if (!folder) return { ok: false };
     team.push({ agentId: a.id, folder });
   }
-  return { ok: true, office, team, folders: [...new Set([office, ...team.map((t) => t.folder)])] };
+  return { ok: true, business, team, folders: [...new Set([business, ...team.map((t) => t.folder)])] };
 }
 
 // ─── Starting a picked team member (Decision 44) ─────────────────────────────

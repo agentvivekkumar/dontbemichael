@@ -721,7 +721,7 @@
     "team": {
       "intro": "Suggested for {{pack}}. Pick whoever you want, and you can hire more later.",
       "introOther": "Start with {{godName}} and Oscar. Once your office is running, {{godName}} will ask you a few questions and suggest who else to hire.",
-      "folderNote": "Everyone works in their own folder, inside {{root}}. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. The Office folder in there holds company knowledge: the whole team reads it, and only {{godName}} and you change it.",
+      "folderNote": "Everyone works in their own folder, inside {{root}}, which is {{godName}}'s. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. Company wide information, policies and rules go in Settings, Memory & Knowledge, where every team member can search them.",
       "managerName": "{{godName}} · Office Manager",
       "managerSummary": "Runs the office. Hands out work, and checks in with you when something needs a yes.",
       "alwaysOn": "always on",

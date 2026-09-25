@@ -296,13 +296,13 @@ export class HookServer {
     }
 
     // Decision 48 — the harness folder is plumbing only. On a business install
-    // (one with an Office folder), a file write into it is refused unless it's a
+    // (one with a business folder), a file write into it is refused unless it's a
     // protocol file; the reason tells the agent where the work belongs instead.
     // The tool check comes first so ordinary tool calls never read config.
     if (event === 'PreToolUse' && agentId && GUARDED_TOOLS.has(p.tool_name ?? '')) {
       const cfg = this.getConfig();
       const hiveRoot = this.hive.root();
-      if (cfg.officeFolder && cfg.harnessHome && hiveRoot) {
+      if ((cfg.businessFolder || cfg.officeFolder) && cfg.harnessHome && hiveRoot) {
         const d = harnessWriteDecision({
           tool: p.tool_name ?? '',
           toolInput: p.tool_input,
@@ -443,10 +443,10 @@ export class HookServer {
    *  (2026-09-24). Michael's name follows a rename; an agent the registry does
    *  not know is announced as the app. */
   /** One file tool call judged against the office's folder rules. Offices
-   *  without an Office folder (older installs) have no rules to apply. */
+   *  without a business folder (older installs) have no rules to apply. */
   private folderCheck(agentId: string, tool: string, input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
     const cfg = this.getConfig();
-    if (!cfg.officeFolder) return { deny: false };
+    if (!cfg.businessFolder) return { deny: false };
     const target = folderToolTarget(tool, input, cwd);
     if (!target) return { deny: false };
     const reg = this.hive.registry();
@@ -456,7 +456,7 @@ export class HookServer {
     for (const a of Object.values(reg.agents)) {
       if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
     }
-    const layout = folderLayoutFor(cfg.officeFolder, folders, cfg.harnessHome ?? undefined);
+    const layout = folderLayoutFor(cfg.businessFolder, folders, cfg.harnessHome ?? undefined);
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
     return folderDecision({ isGod: !!me.isGod, cwd: me.cwd }, layout, tool, target, process.platform !== 'linux', godName);
   }

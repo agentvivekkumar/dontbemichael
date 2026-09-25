@@ -198,7 +198,12 @@ export interface HarnessConfig {
    *  "your business". Never used as a path or an id. */
   businessName?: string;
   businessCity?: string;
-  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  /** Michael's folder: the business folder, private to him and the owner, that
+   *  holds every team member's folder by default (src/shared/folderAccess.ts). */
+  businessFolder?: string;
+  /** Before 2026-09-25: the shared Office folder, inside Michael's. Read once at
+   *  launch to fill businessFolder (its parent); nothing else uses it. Company
+   *  knowledge lives in the knowledge feature now. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
    *  works in (Decisions 44, 47). The running office starts agents from this. */
@@ -249,6 +254,10 @@ export interface HarnessConfig {
   /** One-time guard: has the built-in hourly ops standup been seeded into an
    *  existing install's missions? Prevents re-adding it after a user deletes it. */
   opsStandupSeeded?: boolean;
+  /** One-time guard: the knowledge feature was switched on for this install
+   *  when it became the company knowledge store (2026-09-25). An owner who
+   *  turns it off afterwards keeps it off. */
+  knowledgeOnSeeded?: boolean;
   /** One-time guard for the built-in heartbeat mission (mirrors opsStandupSeeded
    *  so a user who deletes the heartbeat doesn't get it re-added every boot). */
   heartbeatSeeded?: boolean;
@@ -507,11 +516,11 @@ const DEFAULTS: HarnessConfig = {
   reflectSectionTrigger: 50,
   reflectRecentKeep: 12,
   reflectMinBytes: 16_384,
-  // Enterprise Knowledge Graph — opt-in; dark until the user enables it.
-  // v0.3.4 fix: default OFF, matching the field's own documentation ("Default
-  // OFF / dark until enabled") — the true default contradicted it. Existing
-  // installs keep their persisted value.
-  knowledgeGraph: { enabled: false }
+  // Company knowledge (the knowledge feature): ON by default (owner,
+  // 2026-09-25). It is where company wide information, policies and rules live,
+  // and every agent, Michael included, searches it. Existing installs are
+  // switched on once at launch (knowledgeOnSeeded).
+  knowledgeGraph: { enabled: true }
 };
 
 function configPath(): string {

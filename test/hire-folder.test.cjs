@@ -29,15 +29,15 @@ test('the hire dialog asks for Role, Role description and Work style', () => {
 });
 
 test('a new team member\'s folder defaults to Michael\'s folder, named after the role', () => {
-  assert.match(modal, /const michaelFolder = parentFolder\(config\.officeFolder\);/);
+  assert.match(modal, /const michaelFolder = config\.businessFolder;/);
   assert.match(modal, /const folderLabel = role\.trim\(\) \|\| name\.trim\(\);/, 'the role, or the name while no role is typed');
   assert.match(modal, /window\.cth\.foldersSuggest\(config\.businessName \?\? '', \[folderLabel\], michaelFolder\)/);
   assert.match(modal, /const setCwd = \(path: string\) => \{ setCwdAuto\(false\); setCwdRaw\(path\); \};/, 'any pick by the owner wins');
   assert.match(modal, /if \(michaelFolder && cwdAuto\) \{\s*const \[made\] = await window\.cth\.foldersEnsure\(\[cwd\]\)/, 'made on hire, never overwritten');
 });
 
-test('Michael\'s folder and the Office are never a team member\'s own folder', () => {
-  assert.match(modal, /\[michaelFolder, config\.officeFolder\]\.some\(\(f\) => f && samePath\(f, cwd\)\)/);
-  assert.match(wizard, /key !== OFFICE_KEY && \(same\(michaelFolderFor\(folderSuggestions, folderOverrides\)\) \|\| same\(folderSuggestions\?\.office\)\)/);
+test('Michael\'s folder is never a team member\'s own folder', () => {
+  assert.match(modal, /if \(michaelFolder && samePath\(michaelFolder, cwd\)\)/);
+  assert.match(wizard, /key !== OFFICE_KEY && same\(michaelFolderFor\(folderSuggestions, folderOverrides\)\)/);
   assert.doesNotMatch(en.addAgent.errFolderShared, /[–—]/);
 });

@@ -215,10 +215,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setError(undefined);
     const res = await window.cth.chooseFolder();
     if (!res.ok) { if (res.error !== 'cancelled') setError(res.error); return; }
-    // Michael's folder and the Office are his to change, so neither can be a
-    // team member's own folder (src/shared/folderAccess.ts).
+    // Michael's folder is private to him, so it can't be a team member's own
+    // folder (src/shared/folderAccess.ts).
     const same = (a?: string) => !!a && a.replace(/[\\/]+$/, '').toLowerCase() === res.path.replace(/[\\/]+$/, '').toLowerCase();
-    if (key !== OFFICE_KEY && (same(michaelFolderFor(folderSuggestions, folderOverrides)) || same(folderSuggestions?.office))) {
+    if (key !== OFFICE_KEY && same(michaelFolderFor(folderSuggestions, folderOverrides))) {
       setError(t('addAgent.errFolderShared'));
       return;
     }
@@ -430,7 +430,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         setBusy(false);
         return;
       }
-      // Make each agent's folder, and the shared Office. Only missing folders are
+      // Make Michael's folder and each agent's. Only missing folders are
       // created; one the owner picked (or already had) is left exactly as it is.
       const made = await window.cth.foldersEnsure(finishPlan.folders);
       const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
@@ -449,7 +449,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         // Where the office works (Decision 44). The running office starts each
         // agent inside its folder; the folders also become the hire dialog's
         // quick-picks, which is what registeredRepos has always fed.
-        officeFolder: finishPlan.office,
+        businessFolder: finishPlan.business,
         businessTeam: finishPlan.team,
         registeredRepos: finishPlan.folders,
         autoMode,

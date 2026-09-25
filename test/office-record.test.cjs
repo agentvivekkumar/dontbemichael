@@ -34,7 +34,7 @@ const cfg = {
   businessName: 'MoblizeIt',
   businessCity: 'Mountain View, CA',
   businessType: 'saas-consulting',
-  officeFolder: `${DOCS}/Office`,
+  businessFolder: DOCS,
   businessTeam: team
 };
 
@@ -48,9 +48,15 @@ test('the config describes the office once setup has finished, and not before', 
     businessName: 'MoblizeIt',
     businessCity: 'Mountain View, CA',
     businessType: 'saas-consulting',
-    officeFolder: `${DOCS}/Office`,
+    businessFolder: DOCS,
     team
   });
+  // An office set up before 2026-09-25 recorded its shared Office folder;
+  // Michael's folder is the one holding it.
+  const { businessFolder, ...older } = cfg;
+  void businessFolder;
+  assert.equal(rec.officeRecordFromConfig({ ...older, officeFolder: `${DOCS}/Office` }).businessFolder, DOCS);
+  assert.equal(rec.parseOfficeRecord({ version: 1, officeFolder: `${DOCS}/Office`, team }).businessFolder, DOCS);
 });
 
 test('a record read from disk is checked, and junk is dropped rather than trusted', () => {
@@ -83,14 +89,14 @@ test('an older office is described from its registry: every member with a folder
 test('continuing an office keeps its recorded folders, whatever name is typed this time', () => {
   const plan = rec.teamPlanFromRecord(rec.officeRecordFromConfig({ ...cfg, businessName: 'Moblize It' }));
   assert.equal(plan.ok, true);
-  assert.equal(plan.office, `${DOCS}/Office`);
+  assert.equal(plan.business, DOCS);
   assert.deepEqual(plan.team, team);
-  assert.deepEqual(plan.folders, [`${DOCS}/Office`, `${DOCS}/Finance`, `${DOCS}/Admin`]);
+  assert.deepEqual(plan.folders, [DOCS, `${DOCS}/Finance`, `${DOCS}/Admin`]);
 });
 
-test('an office with no recorded Office folder gets one beside the team', () => {
+test('an office with no recorded business folder uses the one its team shares', () => {
   const plan = rec.teamPlanFromRecord({ version: 1, team });
-  assert.equal(plan.office, `${DOCS}/Office`);
+  assert.equal(plan.business, DOCS);
   assert.deepEqual(rec.teamPlanFromRecord({ version: 1, team: [] }), { ok: false });
   assert.deepEqual(rec.teamPlanFromRecord(null), { ok: false });
 });
@@ -229,7 +235,7 @@ test('a record never sends agents to the disk root, the home folder, or key and 
   try {
     fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
       version: 1,
-      officeFolder: h,
+      businessFolder: h,
       team: [
         { agentId: 'oscar', folder: `${DOCS}/Finance` },
         { agentId: 'root', folder: '/' },
@@ -242,13 +248,13 @@ test('a record never sends agents to the disk root, the home folder, or key and 
     }));
     const found = file.findOffice(home);
     assert.deepEqual(found.record.team.map((m) => m.agentId), ['oscar']);
-    assert.notEqual(found.record.officeFolder, h, 'the home folder is not an Office');
+    assert.notEqual(found.record.businessFolder, h, 'the home folder is not a business folder');
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
 
-test('an older office uses the Office folder already beside its team', () => {
+test('an older office uses the folder its team shares as Michael\'s', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'office-'));
   const biz = fs.mkdtempSync(path.join(os.tmpdir(), 'biz-'));
   try {
@@ -261,7 +267,7 @@ test('an older office uses the Office folder already beside its team', () => {
       }
     }));
     const found = file.findOffice(home);
-    assert.equal(found.record.officeFolder, path.join(biz, 'Office'));
+    assert.equal(found.record.businessFolder, biz);
     assert.equal(found.record.team.length, 2, 'archived in the registry is still on the team');
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
@@ -295,7 +301,7 @@ test('a team folder that is a link to the home folder counts as the home folder'
   try {
     fs.symlinkSync(os.homedir(), link);
     fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
-      version: 1, officeFolder: `${DOCS}/Office`, team: [{ agentId: 'oscar', folder: link }, ...team.slice(1)]
+      version: 1, businessFolder: DOCS, team: [{ agentId: 'oscar', folder: link }, ...team.slice(1)]
     }));
     assert.deepEqual(file.findOffice(home).record.team.map((m) => m.agentId), ['pam']);
   } finally {
@@ -317,7 +323,7 @@ test('the folder check ignores letter case where the disk does', { skip: process
   const h = os.homedir();
   try {
     fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
-      version: 1, officeFolder: `${DOCS}/Office`,
+      version: 1, businessFolder: DOCS,
       team: [...team, { agentId: 'lib', folder: path.join(h, 'LIBRARY', 'x') }, { agentId: 'home', folder: h.toUpperCase() }]
     }));
     assert.deepEqual(file.findOffice(home).record.team.map((m) => m.agentId), ['oscar', 'pam']);

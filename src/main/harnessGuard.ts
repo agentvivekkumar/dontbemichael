@@ -53,9 +53,7 @@ export function harnessWriteDecision(i: HarnessWriteInput): { deny: boolean; rea
     deny: true,
     reason:
       'The hive folder is only for coordination: your memory.md, inbox and outbox, and tasks.json. ' +
-      `Save documents, drafts and other work in your own folder${workHere} instead` +
-      // Only Michael changes the Office folder (folderAccess.ts).
-      (i.isGod ? ', or in the Office folder.' : '.')
+      `Save documents, drafts and other work in your own folder${workHere} instead.`
   };
 }
 

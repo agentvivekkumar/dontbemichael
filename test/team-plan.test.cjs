@@ -29,7 +29,6 @@ const pack = { agents: [oscar, pam, kelly, creed], defaultPicks: ['oscar', 'pam'
 
 const suggestions = {
   root: '/D/Pho',
-  office: '/D/Pho/Office',
   byFolder: { Finance: '/D/Pho/Finance', Admin: '/D/Pho/Admin', Customers: '/D/Pho/Customers', Quality: '/D/Pho/Quality' }
 };
 
@@ -69,31 +68,30 @@ test('unpicked agents add nothing to connect', () => {
   assert.deepEqual(connectionsNeeded(pack.agents, { creed: true }), { required: [], optional: [] });
 });
 
-test('finish persists only picked agents, each with its folder, Office first and deduplicated', () => {
+test('finish persists only picked agents, each with its folder, Michael\'s first and deduplicated', () => {
   const plan = teamPlan(pack.agents, { oscar: true, pam: false, kelly: true, creed: true }, suggestions,
     { kelly: '/D/Pho/Finance' }); // owner pointed Kelly at Oscar's folder: they share it
   assert.equal(plan.ok, true);
-  assert.equal(plan.office, '/D/Pho/Office');
+  assert.equal(plan.business, '/D/Pho');
   assert.deepEqual(plan.team, [
     { agentId: 'oscar', folder: '/D/Pho/Finance' },
     { agentId: 'kelly', folder: '/D/Pho/Finance' },
     { agentId: 'creed', folder: '/D/Pho/Quality' }
   ]);
-  assert.deepEqual(plan.folders, ['/D/Pho/Office', '/D/Pho/Finance', '/D/Pho/Quality']);
+  assert.deepEqual(plan.folders, ['/D/Pho', '/D/Pho/Finance', '/D/Pho/Quality']);
 });
 
-test('picking Michael\'s folder moves the Office and the team\'s default folders with it', () => {
+test('picking Michael\'s folder moves the team\'s default folders with it', () => {
   const picked = { [OFFICE_KEY]: '/Users/me/Dropbox/Pho' };
   // Until main has worked out the defaults under the new folder, nothing is ready.
   assert.equal(teamPlan(pack.agents, { oscar: true }, suggestions, picked).ok, false);
   assert.equal(michaelFolderFor(suggestions, picked), '/Users/me/Dropbox/Pho');
   const moved = {
     root: '/Users/me/Dropbox/Pho',
-    office: '/Users/me/Dropbox/Pho/Office',
     byFolder: { Finance: '/Users/me/Dropbox/Pho/Finance', Admin: '/Users/me/Dropbox/Pho/Admin' }
   };
   const plan = teamPlan(pack.agents, { oscar: true }, moved, picked);
-  assert.equal(plan.office, '/Users/me/Dropbox/Pho/Office');
+  assert.equal(plan.business, '/Users/me/Dropbox/Pho');
   assert.deepEqual(plan.team, [{ agentId: 'oscar', folder: '/Users/me/Dropbox/Pho/Finance' }]);
   // A folder main refused (the home folder, say) never becomes the plan.
   assert.equal(teamPlan(pack.agents, { oscar: true }, { ...moved, rootRefused: true }, picked).ok, false);
@@ -107,7 +105,7 @@ test('a team of just Michael is allowed', () => {
   const plan = teamPlan(pack.agents, {}, suggestions, {});
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.team, []);
-  assert.deepEqual(plan.folders, ['/D/Pho/Office']);
+  assert.deepEqual(plan.folders, ['/D/Pho']);
 });
 
 test('not ready until every folder is resolved', () => {

@@ -24,9 +24,12 @@ export interface OfficeRecord {
   businessName?: string;
   businessCity?: string;
   businessType?: string;
-  /** The shared Office folder (Michael's). Absent when only the registry was
-   *  available and no Office folder could be told apart from the team's. */
-  officeFolder?: string;
+  /** Michael's folder, the business folder that holds the team's folders by
+   *  default (src/shared/folderAccess.ts). Absent when only the registry was
+   *  available and no business folder could be told apart from the team's.
+   *  Records written before 2026-09-25 named the shared Office folder instead;
+   *  those are read as the folder holding it (legacyBusinessFolder). */
+  businessFolder?: string;
   /** Each team member and the folder it works in. Michael is not listed. */
   team: Array<{ agentId: string; folder: string }>;
 }
@@ -38,6 +41,8 @@ export interface OfficeConfigFields {
   businessName?: string;
   businessCity?: string;
   businessType?: string;
+  businessFolder?: string;
+  /** Before 2026-09-25: the shared Office folder, inside Michael's. */
   officeFolder?: string;
   businessTeam?: Array<{ agentId: string; folder: string }>;
 }
@@ -54,6 +59,19 @@ const GOD_ID = 'god';
 
 const str = (v: unknown): string | undefined =>
   typeof v === 'string' && v.trim() ? v.trim() : undefined;
+
+/**
+ * Michael's folder for an office set up before 2026-09-25, which recorded only
+ * its shared Office folder: the folder holding it. The Office folder is gone as
+ * a concept (company knowledge lives in the knowledge feature); on disk it's an
+ * ordinary folder inside Michael's.
+ */
+export function legacyBusinessFolder(officeFolder: string | undefined): string | undefined {
+  const o = str(officeFolder)?.replace(/[\\/]+$/, '');
+  if (!o) return undefined;
+  const at = Math.max(o.lastIndexOf('/'), o.lastIndexOf('\\'));
+  return at > 0 ? o.slice(0, at) : undefined;
+}
 
 function cleanTeam(v: unknown): Array<{ agentId: string; folder: string }> {
   if (!Array.isArray(v)) return [];
@@ -79,7 +97,7 @@ export function parseOfficeRecord(v: unknown): OfficeRecord | null {
     businessName: str(o.businessName),
     businessCity: str(o.businessCity),
     businessType: str(o.businessType),
-    officeFolder: str(o.officeFolder),
+    businessFolder: str(o.businessFolder) ?? legacyBusinessFolder(str(o.officeFolder)),
     team: cleanTeam(o.team)
   };
 }
@@ -92,7 +110,7 @@ export function officeRecordFromConfig(cfg: OfficeConfigFields): OfficeRecord | 
     businessName: str(cfg.businessName),
     businessCity: str(cfg.businessCity),
     businessType: str(cfg.businessType),
-    officeFolder: str(cfg.officeFolder),
+    businessFolder: str(cfg.businessFolder) ?? legacyBusinessFolder(cfg.officeFolder),
     team: cleanTeam(cfg.businessTeam)
   };
 }
@@ -142,30 +160,24 @@ export function officeRecordFromRegistry(
   return {
     version: 1,
     businessName: parent ? baseName(parent) : undefined,
-    officeFolder: undefined,
+    businessFolder: undefined,
     team
   };
-}
-
-/** Joins a folder name onto a parent, keeping the parent's separator. */
-function joinPath(parent: string, name: string): string {
-  const sep = parent.includes('\\') && !parent.includes('/') ? '\\' : '/';
-  return parent.endsWith(sep) ? parent + name : parent + sep + name;
 }
 
 /**
  * The setup plan that continues this office exactly as recorded: the same team
  * in the same folders, whatever the owner would type as the business name. An
- * office with no recorded Office folder gets one beside the team's folders.
+ * office with no recorded business folder uses the folder its team's folders
+ * share.
  */
 export function teamPlanFromRecord(rec: OfficeRecord | null | undefined): TeamPlan {
   if (!rec || rec.team.length === 0) return { ok: false };
-  const parent = commonParent(rec.team.map((m) => m.folder));
-  const office = rec.officeFolder ?? (parent ? joinPath(parent, 'Office') : undefined);
-  if (!office) return { ok: false };
-  const folders = [office];
+  const business = rec.businessFolder ?? commonParent(rec.team.map((m) => m.folder));
+  if (!business) return { ok: false };
+  const folders = [business];
   for (const m of rec.team) if (!folders.includes(m.folder)) folders.push(m.folder);
-  return { ok: true, office, team: rec.team.map((m) => ({ ...m })), folders };
+  return { ok: true, business, team: rec.team.map((m) => ({ ...m })), folders };
 }
 
 /** True when two records describe the same office, so an unchanged one is not rewritten. */
@@ -178,7 +190,7 @@ export function sameOfficeRecord(a: OfficeRecord | null, b: OfficeRecord | null)
  *  save that only switches offices (harnessHome) must never write the previous
  *  office's description into the new one (2026-09-24 review). */
 export const OFFICE_FIELDS = [
-  'onboardingComplete', 'businessName', 'businessCity', 'businessType', 'officeFolder', 'businessTeam'
+  'onboardingComplete', 'businessName', 'businessCity', 'businessType', 'businessFolder', 'officeFolder', 'businessTeam'
 ] as const;
 
 export function touchesOffice(patch: unknown): boolean {

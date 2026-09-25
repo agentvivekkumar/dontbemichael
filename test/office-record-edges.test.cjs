@@ -20,7 +20,7 @@ const file = loadTs('src/main/officeFile.ts');
 test('the shared folder: one member, Windows paths, and members with nothing in common', () => {
   const one = rec.teamPlanFromRecord({ version: 1, team: [{ agentId: 'oscar', folder: '/Users/o/Documents/Biz/Finance' }] });
   assert.equal(one.ok, true);
-  assert.equal(one.office, '/Users/o/Documents/Biz/Office', 'a lone member gets an Office beside it');
+  assert.equal(one.business, '/Users/o/Documents/Biz', 'a lone member\'s parent is Michael\'s folder');
   assert.equal(rec.officeRecordFromRegistry({ oscar: { id: 'oscar', cwd: '/Users/o/Documents/Biz/Finance' } }).businessName, 'Biz');
 
   const win = [
@@ -28,23 +28,23 @@ test('the shared folder: one member, Windows paths, and members with nothing in 
     { agentId: 'pam', folder: 'C:\\Users\\o\\Documents\\Biz\\Admin' }
   ];
   const wplan = rec.teamPlanFromRecord({ version: 1, team: win });
-  assert.equal(wplan.office, 'C:\\Users\\o\\Documents\\Biz\\Office', 'Windows separator is kept');
+  assert.equal(wplan.business, 'C:\\Users\\o\\Documents\\Biz', 'Windows separator is kept');
   assert.equal(rec.officeRecordFromRegistry({ oscar: { cwd: win[0].folder }, pam: { cwd: win[1].folder } }).businessName, 'Biz');
 
   const apart = [
     { agentId: 'oscar', folder: '/Volumes/Work/Finance' },
     { agentId: 'pam', folder: '/Users/o/Admin' }
   ];
-  assert.deepEqual(rec.teamPlanFromRecord({ version: 1, team: apart }), { ok: false }, 'only the root in common: no Office is guessed');
+  assert.deepEqual(rec.teamPlanFromRecord({ version: 1, team: apart }), { ok: false }, 'only the root in common: no business folder is guessed');
   assert.equal(rec.officeRecordFromRegistry({ oscar: { cwd: apart[0].folder }, pam: { cwd: apart[1].folder } }).businessName, undefined);
   assert.deepEqual(
     rec.teamPlanFromRecord({ version: 1, team: [{ agentId: 'a', folder: 'C:\\A\\x' }, { agentId: 'b', folder: 'D:\\B\\y' }] }),
     { ok: false },
     'different drives share nothing'
   );
-  const recorded = rec.teamPlanFromRecord({ version: 1, officeFolder: '/Users/o/Office', team: apart });
-  assert.equal(recorded.ok, true, 'a recorded Office folder needs no guessing');
-  assert.deepEqual(recorded.folders, ['/Users/o/Office', '/Volumes/Work/Finance', '/Users/o/Admin']);
+  const recorded = rec.teamPlanFromRecord({ version: 1, businessFolder: '/Users/o/Biz', team: apart });
+  assert.equal(recorded.ok, true, 'a recorded business folder needs no guessing');
+  assert.deepEqual(recorded.folders, ['/Users/o/Biz', '/Volumes/Work/Finance', '/Users/o/Admin']);
 });
 
 function office(agents) {
@@ -62,13 +62,13 @@ test('a record file with no team keeps its business details and takes the team f
   try {
     fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
       version: 1, businessName: 'MoblizeIt', businessCity: 'Austin, TX',
-      officeFolder: '/Users/o/Documents/Guess/Office', team: []
+      officeFolder: '/Users/o/Documents/Guess/Office', team: [] // written before 2026-09-25
     }));
     const f = file.findOffice(home);
     assert.equal(f.source, 'registry');
     assert.equal(f.record.businessName, 'MoblizeIt', 'the file names the business, not the folder guess');
     assert.equal(f.record.businessCity, 'Austin, TX');
-    assert.equal(f.record.officeFolder, '/Users/o/Documents/Guess/Office');
+    assert.equal(f.record.businessFolder, '/Users/o/Documents/Guess', 'the folder holding the old Office');
     assert.deepEqual(f.record.team, [{ agentId: 'oscar', folder: '/Users/o/Documents/Guess/Finance' }]);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });

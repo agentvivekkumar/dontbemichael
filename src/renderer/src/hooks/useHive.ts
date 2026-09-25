@@ -499,11 +499,11 @@ export function useHive(config: HarnessConfig | null): void {
       const godModel = config.godModel;
       const command = buildSpawnCommand(config, godModel, godProvider);
       const [exe, ...args] = tokenizeCommand(command.trim());
-      // Decision 44: on a business install Michael works among the office's
-      // folders, not the hive's plumbing. Main moves him from the Office folder up
-      // to the business folder that holds it (folderAccess.ts) and reports where.
-      // Older installs have no Office and keep the harness folder, exactly as before.
-      const requestedCwd = config.officeFolder || config.harnessHome!;
+      // Decision 44: on a business install Michael works in the business folder,
+      // his own private folder holding his team's (folderAccess.ts), not the
+      // hive's plumbing. Main makes that call and reports where he started.
+      // Older installs have none and keep the harness folder, exactly as before.
+      const requestedCwd = config.businessFolder || config.harnessHome!;
       const res = await window.cth.spawnPty({
         id: GOD_PTY,
         cwd: requestedCwd,

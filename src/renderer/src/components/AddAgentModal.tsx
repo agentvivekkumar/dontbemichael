@@ -130,13 +130,6 @@ function basename(path: string): string {
   return path.split('/').filter(Boolean).pop() ?? path;
 }
 
-/** `/a/b/Office` → `/a/b`: Michael's folder is the one holding the Office. */
-function parentFolder(path: string | undefined): string | undefined {
-  const p = (path ?? '').replace(/[\\/]+$/, '');
-  const at = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-  return at > 0 ? p.slice(0, at) : undefined;
-}
-
 /** Same folder, ignoring a trailing slash and (as macOS and Windows do) case. */
 function samePath(a: string, b: string): boolean {
   const n = (p: string) => p.trim().replace(/[\\/]+$/, '').toLowerCase();
@@ -210,10 +203,10 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [character, setCharacter] = useState<OfficeCharacterName>(knownCharacter(pendingHire?.character));
   const [accent, setAccent] = useState<AccentColorName>(knownAccent(pendingHire?.accent));
   // On a business install a new team member's folder goes inside Michael's (the
-  // business folder that holds the Office), named after its role, and is private
-  // to it and Michael (src/shared/folderAccess.ts). It follows the Role field
-  // until the owner picks a folder; any pick below turns that off.
-  const michaelFolder = parentFolder(config.officeFolder);
+  // business folder), named after its role, and is private to it and Michael
+  // (src/shared/folderAccess.ts). It follows the Role field until the owner
+  // picks a folder; any pick below turns that off.
+  const michaelFolder = config.businessFolder;
   const [cwdAuto, setCwdAuto] = useState<boolean>(!!michaelFolder);
   const [cwd, setCwdRaw] = useState<string>(michaelFolder ? '' : (config.registeredRepos[0] ?? ''));
   const setCwd = (path: string) => { setCwdAuto(false); setCwdRaw(path); };
@@ -442,9 +435,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     // the offending section as we surface the error — the field is never hidden.
     if (!name.trim()) { setError(tr('addAgent.errName')); setSection('identity'); return; }
     if (!cwd) { setError(tr('addAgent.errFolder')); setSection('workspace'); return; }
-    // Michael's folder and the Office are his to change, so neither can be a team
-    // member's own folder (src/shared/folderAccess.ts).
-    if (michaelFolder && [michaelFolder, config.officeFolder].some((f) => f && samePath(f, cwd))) {
+    // Michael's folder is private to him, so it can't be a team member's own
+    // folder (src/shared/folderAccess.ts).
+    if (michaelFolder && samePath(michaelFolder, cwd)) {
       setError(tr('addAgent.errFolderShared')); setSection('workspace'); return;
     }
     if (!command.trim()) { setError(tr('addAgent.errCommand')); setSection('engine'); return; }
