@@ -551,7 +551,9 @@ export class HookServer {
     const asked = folderDecision(agent, layout, tool, target, ci, godName);
     if (asked.deny) return asked;
     const real = realPathOf(target);
-    return real && real !== target ? folderDecision(agent, layout, tool, real, ci, godName) : asked;
+    if (!real || real === target) return asked;
+    // The folders in the layout are real paths, so the agent's own is too here.
+    return folderDecision({ ...agent, cwd: realPathOf(me.cwd) ?? me.cwd }, layout, tool, real, ci, godName);
   }
 
   private displayName(agentId: string | undefined): string {

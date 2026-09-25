@@ -62,8 +62,11 @@ export class SafeClearer {
     this.lastHookAt.set(agentId, t);
     if (event === 'Stop') this.lastStopAt.set(agentId, t);
     if (event === 'UserPromptSubmit') this.lastPromptAt.set(agentId, t);
-    if (classifyHook(event, message) === 'needsHuman') this.lastNeedsOwnerAt.set(agentId, t);
-    else if (event === 'PreToolUse' || event === 'PostToolUse' || event === 'UserPromptSubmit' || event === 'Stop') {
+    const kind = classifyHook(event, message);
+    if (kind === 'needsHuman') this.lastNeedsOwnerAt.set(agentId, t);
+    // An idle notice or a new session means the prompt is gone too (the owner
+    // can dismiss one, which ends the turn with no Stop).
+    else if (kind === 'idle' || event === 'SessionStart' || event === 'PreToolUse' || event === 'PostToolUse' || event === 'UserPromptSubmit' || event === 'Stop') {
       this.lastMovedOnAt.set(agentId, t);
     }
   }

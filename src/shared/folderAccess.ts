@@ -25,7 +25,7 @@
  * rules without touching the plumbing.
  */
 
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export interface FolderLayout {
   /** Michael's folder: the business folder. Undefined on an office without one. */
@@ -177,14 +177,13 @@ export function folderToolTarget(tool: string, input: unknown, cwd: string | und
   const o = input as Record<string, unknown>;
   const str = (k: string) => (typeof o[k] === 'string' && (o[k] as string).length > 0 ? (o[k] as string) : null);
   let p = str('file_path') ?? str('notebook_path') ?? str('path');
-  if (!p && tool === 'Glob') {
+  if (tool === 'Glob') {
+    // Judged by the part before the first wildcard, relative or not and with
+    // or without a path: `../Finance/**` lists another folder's files.
     const pattern = str('pattern');
-    // Judged by the part before the first wildcard, relative or not: a
-    // pattern like `../Finance/**` lists another folder's files.
-    if (pattern) {
-      const cut = pattern.search(/[*?[{]/);
-      p = cut === -1 ? pattern : pattern.slice(0, cut);
-    }
+    const cut = pattern ? pattern.search(/[*?[{]/) : -1;
+    const prefix = pattern ? (cut === -1 ? pattern : pattern.slice(0, cut)) : '';
+    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') ? join(p, prefix) : prefix;
   }
   if (!p) return null;
   if (p.startsWith('~/') && typeof process !== 'undefined' && process.env.HOME) p = resolve(process.env.HOME, p.slice(2));

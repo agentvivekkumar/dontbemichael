@@ -146,3 +146,23 @@ test('the hook judges the real path too, so a link out of an agent\'s folder is 
   assert.equal(folderDecision(me, l, 'Read', real, true).deny, true);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('a Glob with a path is judged by where its pattern points', () => {
+  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**', path: `${B}/Finance` }, `${B}/Finance`), `${B}/Admin`);
+  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md', path: `${B}/Finance/docs` }, `${B}/Finance`), `${B}/Finance/docs`);
+  assert.equal(folderToolTarget('Glob', { pattern: `${B}/Admin/*.pdf`, path: `${B}/Finance` }, `${B}/Finance`), `${B}/Admin`);
+});
+
+test('an agent whose folder is reached through a link still opens its own files', () => {
+  const { realPathOf } = loadTs('src/main/hooks.ts');
+  const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
+  assert.match(hooks, /cwd: realPathOf\(me\.cwd\) \?\? me\.cwd/);
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-linkcwd-')));
+  fs.mkdirSync(path.join(dir, 'Biz', 'Finance'), { recursive: true });
+  fs.symlinkSync(path.join(dir, 'Biz'), path.join(dir, 'BizLink'));
+  const l = { business: path.join(dir, 'Biz'), teamFolders: [path.join(dir, 'Biz', 'Finance')] };
+  const linkedCwd = path.join(dir, 'BizLink', 'Finance');
+  const real = realPathOf(path.join(linkedCwd, 'june.pdf'));
+  assert.equal(folderDecision({ isGod: false, cwd: realPathOf(linkedCwd) }, l, 'Read', real, true).deny, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
