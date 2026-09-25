@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelBadge } from './PixelBadge';
@@ -7,6 +7,9 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
+import { MemoryNotes, memorySummary } from './MemoryNotes';
+import { MarkdownPreview } from '@/markdown/MarkdownPreview';
+import { memoryView } from '@shared/memoryIndex';
 import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
@@ -1143,61 +1146,133 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
   const [internalWho, setInternalWho] = useState<string>(godId);
   const who = controlledWho ?? internalWho;
   const setWho = onWho ?? setInternalWho;
-  const [mem, setMem] = useState('');
+  const name = agents.find((a) => a.id === who)?.name ?? who;
+  // undefined: first read not back yet; null: the read failed.
+  const [detail, setDetail] = useState<{ index: string; waiting: number } | null | undefined>(undefined);
+  const [showFile, setShowFile] = useState(false);
+  // One search box: exact words across the hive files, or by meaning (MemPalace).
+  const [mode, setMode] = useState<'text' | 'meaning'>('text');
   const [query, setQuery] = useState('');
-  const [searchOut, setSearchOut] = useState('');
   const [busy, setBusy] = useState(false);
-  // Full-text search across hive files (board, tasks, memory) — additive.
-  const [textQuery, setTextQuery] = useState('');
+  const [searchOut, setSearchOut] = useState('');
   const [textResults, setTextResults] = useState<Array<{ source: string; excerpt: string }>>([]);
   const [textSearched, setTextSearched] = useState(false);
-  const [textBusy, setTextBusy] = useState(false);
 
   useEffect(() => {
-    window.cth.hiveMemory(who).then(setMem).catch(() => setMem(''));
+    let alive = true;
+    setShowFile(false);
+    // Switching agents keeps the last view until the new one arrives.
+    window.cth.hiveMemoryDetail(who)
+      .then((d) => { if (alive) setDetail(d); })
+      .catch(() => { if (alive) setDetail(null); });
+    return () => { alive = false; };
   }, [who]);
 
+  const view = useMemo(() => memoryView(detail?.index ?? ''), [detail]);
+  const waiting = detail?.waiting ?? 0;
+
   const search = async () => {
-    if (!query.trim()) return;
+    const q = query.trim();
+    if (!q) return;
     setBusy(true);
     try {
-      const res = await window.cth.searchMemory(query.trim());
-      setSearchOut(res.ok ? (res.output || t('commandCenter.searchNoMatch')) : `${t('commandCenter.dispatchFailed', { error: res.error })}`);
+      if (mode === 'text') {
+        const res = await window.cth.textSearch(q);
+        setTextResults(res.ok ? res.results.slice(0, 10) : []);
+        setTextSearched(true);
+      } else {
+        const res = await window.cth.searchMemory(q);
+        setSearchOut(res.ok ? (res.output || t('commandCenter.searchNoMatch')) : `${t('commandCenter.dispatchFailed', { error: res.error })}`);
+      }
+    } catch {
+      if (mode === 'text') { setTextResults([]); setTextSearched(true); }
     } finally { setBusy(false); }
   };
 
-  const textSearch = async () => {
-    if (!textQuery.trim()) return;
-    setTextBusy(true);
-    try {
-      const res = await window.cth.textSearch(textQuery.trim());
-      setTextResults(res.ok ? res.results.slice(0, 10) : []);
-    } catch { setTextResults([]); }
-    finally { setTextBusy(false); setTextSearched(true); }
+  const linkButton: React.CSSProperties = {
+    padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+    fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-sky)', textDecoration: 'underline'
   };
 
-  // A flex column rather than the shared Scroll wrapper, so the memory file can take all the
-  // height the searches leave (owner, 2026-09-25). It keeps a floor, and the
-  // tab still scrolls when search results push it down.
+  // Memory first, search below (docs/designs/memory-tab-readable.md). A flex
+  // column so the raw file view can still take the height the tab has left.
   return (
     <div style={{
       flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 10,
       background: 'var(--cth-paper-200)', display: 'flex', flexDirection: 'column'
     }}>
-      <Section title={t('commandCenter.textSearch')}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ margin: 0, flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: 'var(--cth-ink-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {t('memoryNotes.title', { name })}
+        </h2>
+        <label style={{ display: 'flex', minWidth: 0 }}>
+          <span style={srOnly}>{t('memoryNotes.whose')}</span>
+          <Select value={who} onChange={setWho}>
+            {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+          </Select>
+        </label>
+      </div>
+
+      {detail === undefined ? (
+        <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('memoryNotes.loading')}</p>
+      ) : detail === null ? (
+        <p role="alert" style={{ margin: '12px 0 0', fontSize: 14, color: 'var(--cth-coral)' }}>! {t('memoryNotes.readFailed', { name })}</p>
+      ) : (
+        <>
+          {memorySummary(t, view, waiting) && (
+            <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)', marginTop: 2 }}>{memorySummary(t, view, waiting)}</div>
+          )}
+          {showFile ? (
+            <div style={{ flex: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
+              <Pre fill>{detail.index || t('commandCenter.noMemory')}</Pre>
+            </div>
+          ) : view.isIndex || !detail.index.trim() ? (
+            <MemoryNotes agentId={who} name={name} view={view} waiting={waiting} />
+          ) : (
+            // An older free-form memory, not yet turned into an index by its first tidy-up.
+            <div style={{ marginTop: 12, fontSize: 14, lineHeight: '20px' }}><MarkdownPreview source={detail.index} variant="card" /></div>
+          )}
+          {detail.index.trim() && (
+            <div style={{ marginTop: 10 }}>
+              <button type="button" aria-pressed={showFile} onClick={() => setShowFile((v) => !v)} style={linkButton}>
+                {showFile ? t('memoryNotes.showNotes') : t('memoryNotes.showFile')}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
+        <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', fontWeight: 400, color: 'var(--cth-ink-500)' }}>{t('memoryNotes.searchTitle')}</h3>
+        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
+          {(['text', 'meaning'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => setMode(m)}
+              style={{
+                padding: '2px 10px', border: 'none', cursor: 'pointer', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px',
+                background: mode === m ? 'var(--cth-ink-900)' : 'transparent', color: mode === m ? 'var(--cth-cream-50)' : 'var(--cth-ink-900)'
+              }}
+            >{t(m === 'text' ? 'memoryNotes.exactWords' : 'memoryNotes.byMeaning')}</button>
+          ))}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <input
-            value={textQuery}
-            onChange={(e) => setTextQuery(e.target.value)}
-            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') textSearch(); }}
-            placeholder={t('commandCenter.textSearchPlaceholder')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') search(); }}
+            placeholder={t(mode === 'text' ? 'commandCenter.textSearchPlaceholder' : 'commandCenter.semanticPlaceholder')}
+            aria-label={t('memoryNotes.searchTitle')}
             style={{ ...textareaStyle, height: 30 }}
           />
-          <PixelButton variant="primary" size="sm" onClick={textSearch} disabled={textBusy || !textQuery.trim()}>
-            {textBusy ? '…' : t('common.search')}
+          <PixelButton variant="primary" size="sm" onClick={search} disabled={busy || !query.trim()}>
+            {busy ? '…' : t('common.search')}
           </PixelButton>
         </div>
-        {textResults.length > 0 && (
+        {mode === 'text' && textResults.length > 0 && (
           <div style={{ marginTop: 6 }}>
             {textResults.map((r, i) => (
               <div key={i} style={{ marginBottom: 4 }}>
@@ -1207,35 +1282,16 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
             ))}
           </div>
         )}
-        {textSearched && textResults.length === 0 && <Muted>{t('commandCenter.nothingMatched')}</Muted>}
-      </Section>
-
-      <Section title={t('commandCenter.semanticSearch')}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') search(); }}
-            placeholder={t('commandCenter.semanticPlaceholder')}
-            style={{ ...textareaStyle, height: 30 }}
-          />
-          <PixelButton variant="primary" size="sm" onClick={search} disabled={busy || !query.trim()}>
-            {busy ? '…' : t('common.search')}
-          </PixelButton>
-        </div>
-        {searchOut && <Pre>{searchOut}</Pre>}
-      </Section>
-
-      <div style={{ flex: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', color: 'var(--cth-ink-500)', marginBottom: 6 }}>{t('commandCenter.memoryFile')}</div>
-        <div><Select value={who} onChange={setWho}>
-          {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-        </Select></div>
-        <Pre fill>{mem || t('commandCenter.noMemory')}</Pre>
-      </div>
+        {mode === 'text' && textSearched && textResults.length === 0 && <Muted>{t('commandCenter.nothingMatched')}</Muted>}
+        {mode === 'meaning' && searchOut && <Pre>{searchOut}</Pre>}
+      </section>
     </div>
   );
 }
+
+const srOnly: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0
+};
 
 // ─── Fleet telemetry bits (folded into the Floor AGENTS cards) ───────────────
 

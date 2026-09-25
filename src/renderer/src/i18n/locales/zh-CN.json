@@ -1560,5 +1560,41 @@
     "inOneOnOne": "正在与 {{name}} 一对一",
     "inOneOnOneNote": "正在与 {{name}} 一对一。结束之前，{{godName}} 不会给 {{name}} 派活。",
     "endOneOnOne": "结束一对一"
+  },
+  "memoryNotes": {
+    "title": "{{name}} 的记忆",
+    "whose": "查看谁的记忆",
+    "loading": "加载中…",
+    "readFailed": "无法读取 {{name}} 的记忆。",
+    "remembered": "记住了 {{count}} 件事",
+    "rememberedPlural": "记住了 {{count}} 件事",
+    "waiting": "{{count}} 条笔记等待整理",
+    "waitingPlural": "{{count}} 条笔记等待整理",
+    "joiner": "，",
+    "empty": "{{name}} 还没有记住任何事。",
+    "emptyWaiting": "有 {{count}} 条笔记等待整理。整理在后台进行，通常一天之内完成。",
+    "emptyWaitingPlural": "有 {{count}} 条笔记等待整理。整理在后台进行，通常一天之内完成。",
+    "group": {
+      "preference": "你的偏好",
+      "procedure": "做法",
+      "fact": "事实",
+      "reference": "东西放在哪里",
+      "other": "其他笔记"
+    },
+    "source": {
+      "owner": "来自你",
+      "michael": "来自 {{godName}}",
+      "task": "在任务中学到",
+      "tool": "来自工具"
+    },
+    "sourceLine": "{{source}}，{{date}}",
+    "checkAgain": "{{date}} 再核对",
+    "outOfDate": "可能已过时（{{date}}）",
+    "stepsMissing": "这项的步骤还没有保存。",
+    "showFile": "显示文件",
+    "showNotes": "显示为笔记",
+    "searchTitle": "搜索办公室",
+    "exactWords": "精确词语",
+    "byMeaning": "按含义"
   }
 }

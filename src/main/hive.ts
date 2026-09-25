@@ -18,7 +18,9 @@
  *
  * Everything here runs in the Electron main process.
  */
-import { entriesBlock, parseIndex, renderIndex, type MemoryEntry } from '../shared/memoryIndex';
+import {
+  entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
+} from '../shared/memoryIndex';
 import type { AgentFolderPolicy } from '../shared/folderAccess';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync,
@@ -2162,6 +2164,22 @@ export class HiveManager {
   memory(id: string): string {
     const p = join(this.agentDir(id), 'memory.md');
     return existsSync(p) ? readFileSync(p, 'utf8') : '';
+  }
+  /** The Memory tab's read: the index plus how many notes wait in
+   *  memory/inbox.md for the next tidy-up (docs/designs/memory-tab-readable.md). */
+  memoryDetail(id: string): { index: string; waiting: number } {
+    if (!/^[\w-]+$/.test(id) || !this.root()) return { index: '', waiting: 0 };
+    const inbox = join(this.agentDir(id), 'memory', 'inbox.md');
+    let waiting = 0;
+    try { if (existsSync(inbox)) waiting = parseInbox(readFileSync(inbox, 'utf8')).length; } catch { /* count stays 0 */ }
+    return { index: this.memory(id), waiting };
+  }
+  /** One procedure's steps, for the Memory tab. Only an app-written slug inside
+   *  that agent's procedures folder; null when there's no such file. */
+  procedure(id: string, slug: string): string | null {
+    if (!/^[\w-]+$/.test(id) || !isProcedureSlug(slug) || !this.root()) return null;
+    const p = join(this.agentDir(id), 'memory', 'procedures', `${slug}.md`);
+    try { return existsSync(p) ? readFileSync(p, 'utf8').slice(0, MAX_PROCEDURE_CHARS) : null; } catch { return null; }
   }
   /** Whether an agent has recorded NON-TRIVIAL memory — i.e. has appended real
    *  notes beyond the boilerplate header ensureAgent seeds. Lets the voice

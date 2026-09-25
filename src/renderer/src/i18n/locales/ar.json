@@ -1560,5 +1560,41 @@
     "inOneOnOne": "على انفراد مع {{name}}",
     "inOneOnOneNote": "على انفراد مع {{name}}. لن يرسل {{godName}} عملًا إلى {{name}} حتى تنهي ذلك.",
     "endOneOnOne": "إنهاء الحديث على انفراد"
+  },
+  "memoryNotes": {
+    "title": "ذاكرة {{name}}",
+    "whose": "ذاكرة من",
+    "loading": "جارٍ التحميل…",
+    "readFailed": "تعذّرت قراءة ذاكرة {{name}}.",
+    "remembered": "{{count}} شيء محفوظ",
+    "rememberedPlural": "{{count}} أشياء محفوظة",
+    "waiting": "{{count}} ملاحظة بانتظار الفرز",
+    "waitingPlural": "{{count}} ملاحظات بانتظار الفرز",
+    "joiner": "، ",
+    "empty": "لم يحفظ {{name}} أي شيء بعد.",
+    "emptyWaiting": "هناك {{count}} ملاحظة بانتظار الفرز. يتم ذلك في الخلفية، عادةً خلال يوم.",
+    "emptyWaitingPlural": "هناك {{count}} ملاحظات بانتظار الفرز. يتم ذلك في الخلفية، عادةً خلال يوم.",
+    "group": {
+      "preference": "تفضيلاتك",
+      "procedure": "طريقة العمل",
+      "fact": "حقائق",
+      "reference": "أماكن الأشياء",
+      "other": "ملاحظات أخرى"
+    },
+    "source": {
+      "owner": "منك",
+      "michael": "من {{godName}}",
+      "task": "تعلّمه أثناء مهمة",
+      "tool": "من أداة"
+    },
+    "sourceLine": "{{source}}، {{date}}",
+    "checkAgain": "راجِعه مجددًا في {{date}}",
+    "outOfDate": "قد يكون قديمًا ({{date}})",
+    "stepsMissing": "لم تُحفظ خطوات هذا بعد.",
+    "showFile": "اعرض الملف",
+    "showNotes": "اعرض كملاحظات",
+    "searchTitle": "ابحث في المكتب",
+    "exactWords": "كلمات مطابقة",
+    "byMeaning": "حسب المعنى"
   }
 }

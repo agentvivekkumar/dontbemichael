@@ -3758,6 +3758,9 @@ ipcMain.handle('hive:board', () => hive.board());
 ipcMain.handle('hive:tasks', () => hive.tasks());
 ipcMain.handle('hive:log', (_evt, n: unknown) => hive.logTail(typeof n === 'number' ? n : 200));
 ipcMain.handle('hive:memory', (_evt, id: unknown) => (typeof id === 'string' ? hive.memory(id) : ''));
+ipcMain.handle('hive:memoryDetail', (_evt, id: unknown) => (typeof id === 'string' ? hive.memoryDetail(id) : { index: '', waiting: 0 }));
+ipcMain.handle('hive:procedure', (_evt, id: unknown, slug: unknown) =>
+  (typeof id === 'string' && typeof slug === 'string' ? hive.procedure(id, slug) : null));
 ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hive.inbox(id) : []));
 /** An agent's handoff history, received and sent, for its Messages tab. */
 ipcMain.handle('hive:history', (_evt, id: unknown) => (typeof id === 'string' ? hive.messageHistory(id) : []));

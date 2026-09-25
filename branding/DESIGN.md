@@ -476,6 +476,19 @@ schedule) end in `›` and open that agent's Schedules tab.
 The agent panel tab strip uses Inter 14 px labels and scrolls sideways when four tabs
 outgrow the panel.
 
+### 7.11 Memory notes (`MemoryNotes`, the Memory tab)
+
+The memory index is shown as notes, never its raw lines (the `[m3]` id, kind word and
+pipes stay in "Show the file"). Memory comes first: the agent's name in Press Start 2P
+12 px with the picker beside it, then a 13 px `ink-500` count line ("12 things
+remembered, 3 notes waiting to be sorted in"). Groups in this order, each an Inter 13 px
+semibold `ink-700` heading with its count: Your preferences, How to, Facts, Where things
+live, Other notes. Rows follow §7.10: a divided list on the panel ground, entry text
+Inter 14 px, a 13 px `ink-500` line under it ("learned on a task, Sep 25"). A future
+"check again" date is a `lemon-light` chip; a passed one is `coral-light` with a `!`.
+Procedures are disclosure buttons that open to their steps (markdown, `card` variant).
+One search box sits below the memory with an "Exact words / By meaning" switch.
+
 ---
 
 ## 8. Web components [Web]

@@ -13,7 +13,9 @@ const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/compone
 
 test('the memory file fills the tab; search results keep their cap', () => {
   const tab = src.slice(src.indexOf('function MemoryTab('), src.indexOf('// ─── Fleet telemetry bits'));
-  assert.match(tab, /<Pre fill>\{mem \|\| t\('commandCenter\.noMemory'\)\}<\/Pre>/);
+  // The raw file ("Show the file") still fills; the notes view is the default now
+  // (docs/designs/memory-tab-readable.md).
+  assert.match(tab, /<Pre fill>\{detail\.index \|\| t\('commandCenter\.noMemory'\)\}<\/Pre>/);
   assert.match(tab, /flex: 1, minHeight: 240, display: 'flex', flexDirection: 'column'/, 'grows, with a floor');
   assert.doesNotMatch(tab, /<Scroll>/, 'a flex column, so the file can take the height left');
   assert.match(src, /\.\.\.\(fill \? \{ flex: 1, minHeight: 0 \} : \{ maxHeight: 200 \}\)/);

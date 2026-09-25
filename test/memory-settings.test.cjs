@@ -33,5 +33,5 @@ test('Settings → Memory & Knowledge has the switch, the status and the search 
 });
 
 test('searching memory still has a home: Michael\'s Memory tab', () => {
-  assert.match(read('src/renderer/src/components/CommandCenterPanel.tsx'), /window\.cth\.searchMemory\(query\.trim\(\)\)/);
+  assert.match(read('src/renderer/src/components/CommandCenterPanel.tsx'), /window\.cth\.searchMemory\(q\)/);
 });

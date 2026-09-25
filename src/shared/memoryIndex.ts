@@ -232,3 +232,60 @@ export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string)
 export function archiveLines(archived: TidyOutcome['archived'], today: string): string {
   return archived.map(({ entry, reason }) => `${entryLine(entry)} | archived ${today}: ${reason.replace(/\|/g, '/')}`).join('\n');
 }
+
+// ─── Reading it: the Memory tab (docs/designs/memory-tab-readable.md) ────────
+
+/** The order the Memory tab shows the kinds in: the owner's own words first. */
+export const MEMORY_VIEW_ORDER: readonly MemoryKind[] = ['preference', 'procedure', 'fact', 'reference'];
+
+export interface MemoryView {
+  isIndex: boolean;
+  /** Non-empty groups only, in MEMORY_VIEW_ORDER. */
+  groups: Array<{ kind: MemoryKind; entries: MemoryEntry[] }>;
+  /** Lines in an index that aren't entries (a hand-written "- LESSON: ..."),
+   *  without their bullet. The parser skips them; the owner shouldn't lose them. */
+  other: string[];
+}
+
+const INDEX_NOTE = /^The app keeps this file\b/;
+
+/** An index file as the Memory tab shows it. */
+export function memoryView(text: string): MemoryView {
+  const { isIndex, entries } = parseIndex(text);
+  const groups = MEMORY_VIEW_ORDER
+    .map((kind) => ({ kind, entries: entries.filter((e) => e.kind === kind) }))
+    .filter((g) => g.entries.length > 0);
+  const other: string[] = [];
+  if (isIndex) {
+    const kept = new Set(entries.map((e) => e.id));
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#') || line === INDEX_MARKER || INDEX_NOTE.test(line)) continue;
+      const m = ENTRY.exec(line);
+      if (m && kept.has(m[1])) continue;
+      const body = line.replace(/^[-*]\s+/, '').trim();
+      if (body) other.push(body);
+    }
+  }
+  return { isIndex, groups, other };
+}
+
+/** A procedure pointer ("Shutdown protocol: steps in memory/procedures/shutdown-protocol.md")
+ *  split into the name to show and the slug to read, or null for any other text. */
+export function procedurePointer(text: string): { name: string; slug: string } | null {
+  const m = /^(.*): steps in memory\/procedures\/([a-z0-9-]{1,60})\.md$/.exec(text.trim());
+  return m && m[1].trim() ? { name: m[1].trim(), slug: m[2] } : null;
+}
+
+/** A slug the app could have written (procedureSlug output): the only names the
+ *  procedure read accepts, so it can't be pointed outside the folder. */
+export function isProcedureSlug(slug: unknown): slug is string {
+  return typeof slug === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) && slug.length <= 60;
+}
+
+/** Whether a fact's "check again" date is still ahead, or has passed. Dates are
+ *  YYYY-MM-DD, so they compare as strings; `today` is the local date. */
+export function expiryState(expires: string | undefined, today: string): 'none' | 'future' | 'passed' {
+  if (!expires || !DATE.test(expires)) return 'none';
+  return expires < today ? 'passed' : 'future';
+}

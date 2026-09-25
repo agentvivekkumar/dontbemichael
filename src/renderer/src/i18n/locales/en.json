@@ -1560,5 +1560,41 @@
     "inOneOnOne": "In 1:1 with {{name}}",
     "inOneOnOneNote": "In 1:1 with {{name}}. {{godName}} sends {{name}} no work until you end it.",
     "endOneOnOne": "End 1:1"
+  },
+  "memoryNotes": {
+    "title": "{{name}}'s memory",
+    "whose": "Whose memory",
+    "loading": "Loading…",
+    "readFailed": "Couldn't read {{name}}'s memory.",
+    "remembered": "{{count}} thing remembered",
+    "rememberedPlural": "{{count}} things remembered",
+    "waiting": "{{count}} note waiting to be sorted in",
+    "waitingPlural": "{{count}} notes waiting to be sorted in",
+    "joiner": ", ",
+    "empty": "{{name}} hasn't remembered anything yet.",
+    "emptyWaiting": "{{count}} note is waiting to be sorted in. That happens in the background, usually within a day.",
+    "emptyWaitingPlural": "{{count}} notes are waiting to be sorted in. That happens in the background, usually within a day.",
+    "group": {
+      "preference": "Your preferences",
+      "procedure": "How to",
+      "fact": "Facts",
+      "reference": "Where things live",
+      "other": "Other notes"
+    },
+    "source": {
+      "owner": "from you",
+      "michael": "from {{godName}}",
+      "task": "learned on a task",
+      "tool": "from a tool"
+    },
+    "sourceLine": "{{source}}, {{date}}",
+    "checkAgain": "check again {{date}}",
+    "outOfDate": "may be out of date ({{date}})",
+    "stepsMissing": "The steps for this aren't saved yet.",
+    "showFile": "Show the file",
+    "showNotes": "Show as notes",
+    "searchTitle": "Search the office",
+    "exactWords": "Exact words",
+    "byMeaning": "By meaning"
   }
 }

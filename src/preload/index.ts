@@ -822,6 +822,8 @@ const api = {
   hiveRememberOwnerAnswer: (p: { agentId: string; task: string; q: string; a: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('hive:rememberOwnerAnswer', p),
   hiveMemory: (id: string): Promise<string> => ipcRenderer.invoke('hive:memory', id),
+  hiveMemoryDetail: (id: string): Promise<{ index: string; waiting: number }> => ipcRenderer.invoke('hive:memoryDetail', id),
+  hiveProcedure: (id: string, slug: string): Promise<string | null> => ipcRenderer.invoke('hive:procedure', id, slug),
   hiveInbox: (id: string): Promise<HiveMessage[]> => ipcRenderer.invoke('hive:inbox', id),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),
