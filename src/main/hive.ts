@@ -2401,6 +2401,46 @@ export class HiveManager {
       : 12;
     return out.slice(0, lim);
   }
+  /**
+   * An agent's handoff history for its Messages tab (owner, 2026-09-25): what it
+   * received and what it sent, handled or not, newest first, REDACTED like the
+   * voice read-layer.
+   *
+   * Sent messages are read from the RECIPIENTS' inboxes (`from === agentId`),
+   * not the agent's own outbox/.sent: that folder keeps the raw file the agent
+   * wrote, with no id or timestamp, while the router delivers the complete,
+   * stamped copy to whoever it was for.
+   */
+  messageHistory(agentId: string, limit = 300): Array<VoiceMessage & { dir: 'in' | 'out' }> {
+    const root = this.root();
+    if (!root || !agentId) return [];
+    const agentsDir = join(root, 'agents');
+    let owners: string[];
+    try { owners = readdirSync(agentsDir).filter((id) => !id.startsWith('.') && existsSync(this.agentDir(id))); } catch { return []; }
+    const seen = new Set<string>();
+    const out: Array<VoiceMessage & { dir: 'in' | 'out' }> = [];
+    for (const owner of owners) {
+      const base = this.agentDir(owner);
+      for (const [dir, archived] of [[join(base, 'inbox'), false], [join(base, 'inbox', '.done'), true]] as const) {
+        for (const m of this.listMessages(dir)) {
+          if (!m || typeof m.id !== 'string' || seen.has(m.id)) continue;
+          const received = owner === agentId;
+          const sent = m.from === agentId;
+          if (!received && !sent) continue;
+          seen.add(m.id);
+          out.push({
+            id: m.id, conversation: m.conversation, from: m.from, to: m.to, act: m.act,
+            subject: redactSecrets(m.subject), body: redactSecrets(m.body),
+            requires_reply: !!m.requires_reply, direction: 'inbox', owner, archived,
+            created_at: m.created_at, dir: received ? 'in' : 'out'
+          });
+        }
+      }
+    }
+    out.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    return out.slice(0, Math.max(1, Math.min(1000, Math.round(limit))));
+  }
+
   /** Count undrained inbox messages for an agent (cheap — for the fleet snapshot). */
   inboxBacklog(id: string): number {
     const dir = join(this.agentDir(id), 'inbox');

@@ -1179,11 +1179,14 @@
   },
   "threads": {
     "noSubject": "(no subject)",
-    "empty": "No conversations yet. Messages this agent receives will appear here as threads.",
     "less": "less",
     "more": "more",
-    "replyPlaceholder": "Reply to {{name}}…",
-    "send": "Send"
+    "emptyHistory": "No messages yet. What {{name}} receives and sends shows up here.",
+    "you": "you",
+    "everyone": "everyone",
+    "routine": "routine",
+    "sentTo": "To {{to}}",
+    "receivedFrom": "From {{from}}"
   },
   "skillsTab": {
     "installed": "Installed",

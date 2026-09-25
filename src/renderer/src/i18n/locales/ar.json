@@ -1179,11 +1179,14 @@
   },
   "threads": {
     "noSubject": "(بلا موضوع)",
-    "empty": "لا محادثات بعد. ستظهر هنا الرسائل التي يستقبلها هذا الوكيل على شكل مواضيع.",
     "less": "أقل",
     "more": "المزيد",
-    "replyPlaceholder": "ردّ على {{name}}…",
-    "send": "إرسال"
+    "emptyHistory": "لا رسائل بعد. ما يستلمه {{name}} وما يرسله يظهر هنا.",
+    "you": "أنت",
+    "everyone": "الجميع",
+    "routine": "روتيني",
+    "sentTo": "إلى {{to}}",
+    "receivedFrom": "من {{from}}"
   },
   "skillsTab": {
     "installed": "المثبَّتة",

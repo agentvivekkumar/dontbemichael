@@ -1179,11 +1179,14 @@
   },
   "threads": {
     "noSubject": "（无主题）",
-    "empty": "还没有对话。该智能体收到的消息会以对话线程的形式显示在这里。",
     "less": "收起",
     "more": "更多",
-    "replyPlaceholder": "回复 {{name}}…",
-    "send": "发送"
+    "emptyHistory": "还没有消息。{{name}} 收到和发出的消息会显示在这里。",
+    "you": "你",
+    "everyone": "所有人",
+    "routine": "例行",
+    "sentTo": "发给 {{to}}",
+    "receivedFrom": "来自 {{from}}"
   },
   "skillsTab": {
     "installed": "已安装",
