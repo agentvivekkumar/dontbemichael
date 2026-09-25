@@ -720,7 +720,9 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
       intervalMs: minutes * 60_000,
       to: targetId,
       body: '',
-      enabled: true
+      enabled: true,
+      // Spoken by the owner and confirmed by them, so it is the owner's.
+      createdBy: 'owner'
     };
     pending = {
       verb, confirmWord: 'schedule', targetLabel: label, createdAt: Date.now(),

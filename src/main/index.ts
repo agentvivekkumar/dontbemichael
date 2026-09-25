@@ -20,6 +20,11 @@ import {
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import {
+  armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
+  migrateMissions, buildScheduleRequest, applyScheduleRequest, requestIsStale, missionsFor,
+  type ScheduleRequest
+} from '../shared/missions';
+import {
   getBranch, getStatus, getLog, getBranches, getAheadBehind, isRepo, getDiff, mainRepoRoot,
   addWorktree, removeWorktree, worktreeHasUnintegratedWork, worktreeIsGcSafe,
   getLogGraph, getCommitFiles, getFileAtRev, compareRefs, listWorktrees, checkoutRef
@@ -734,25 +739,21 @@ function syncMissions(): void {
   clearMissionTimers();
   const missions = readConfig().missions ?? [];
   for (const m of missions) {
-    if (!m.enabled) continue;
-    // A weekly mission (day-of-week + time) is armed below and does NOT need an
-    // interval, so the interval guard has to come after that branch — it used to
-    // be folded into the line above and would have rejected every one of them.
-    const weekly = m.kind === 'heartbeat' ? null : normalizeWeekly(m.weekly);
-    if (!weekly && !(m.intervalMs > 0)) continue;
+    // Every decision (skip, heartbeat, weekly, interval and its first wait) is
+    // armPlan's, in shared/missions.ts, where test/missions.test.cjs pins it.
+    const plan = armPlan(m, Date.now(), { standupId: OPS_STANDUP_MISSION.id, standupFiredThisLaunch });
+    if (plan.type === 'skip') continue;
     // Heartbeat (Lane A #1) opts out of the fixed setInterval and self-reschedules
     // with an adaptive cadence. Registered into the same missionTimers map so
     // clearMissionTimers() tears it down identically on quit/reset.
-    if (m.kind === 'heartbeat') { armHeartbeat(m); continue; }
+    if (plan.type === 'heartbeat') { armHeartbeat(m); continue; }
     const fire = (): void => {
       try {
-        // A 'compact' maintenance mission (maint-1) is compaction-ONLY: it carries
-        // no dispatch body/target, so skip the hive.send and just fire auto-compact.
-        // Gate on `kind!=='compact'` ALONE — that already excludes the compact mission;
-        // we deliberately do NOT add `&& m.body`, so other (dispatch) missions keep
-        // their prior behaviour, including the historical empty-body send (Pam N1).
-        if (m.kind !== 'compact' && hive.enabled()) {
-          hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
+        // A 'compact' maintenance mission carries no dispatch (firePayload is
+        // null), so only the stamp below happens.
+        const payload = firePayload(m);
+        if (payload && hive.enabled()) {
+          hive.send({ to: payload.to, act: 'inform', subject: payload.subject, body: payload.body }, 'scheduler');
         }
         // No compaction here: that is Claude Code's own auto compact now, with its
         // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
@@ -768,7 +769,7 @@ function syncMissions(): void {
       }
     };
     const entry: MissionTimer = {};
-    if (weekly) {
+    if (plan.type === 'weekly') {
       // Weekly self-reschedules: there is no steady interval to settle into,
       // because the gap between two slots varies (Fri to Mon is not Mon to Wed,
       // and the week the clocks change is not 168 hours long).
@@ -782,7 +783,7 @@ function syncMissions(): void {
       const rearm = (justFired: boolean): void => {
         const now = Date.now();
         const persisted = (readConfig().missions ?? []).find((x) => x.id === m.id)?.lastFiredAt ?? 0;
-        const delay = weeklyDelayMs(weekly, now, justFired ? Math.max(persisted, now) : persisted);
+        const delay = weeklyDelayMs(plan.weekly, now, justFired ? Math.max(persisted, now) : persisted);
         if (delay === null) return;
         entry.timeout = setTimeout(() => { fire(); rearm(true); }, delay);
       };
@@ -790,19 +791,13 @@ function syncMissions(): void {
       missionTimers.set(m.id, entry);
       continue;
     }
-    // Honor lastFiredAt so a partially-elapsed interval is not restarted from
-    // zero on reboot or when an unrelated mission is edited: wait only the time
-    // remaining until the next due fire, then settle into a steady interval.
-    //
-    // The standup is the exception at launch: its first fire is the one sent when
-    // Michael comes up (standupOnOfficeOpen), which restarts this timer. Until
-    // then it waits a full interval, so an overdue standup isn't sent twice.
-    const waitForOpen = m.id === OPS_STANDUP_MISSION.id && !standupFiredThisLaunch;
-    const remaining = waitForOpen ? m.intervalMs : Math.max(0, m.intervalMs - (Date.now() - (m.lastFiredAt ?? 0)));
+    // Interval: wait what remains until the next due fire, then settle into a
+    // steady interval. The standup waits a full interval until the office opens
+    // (standupOnOfficeOpen sends the launch one), so it isn't sent twice.
     entry.timeout = setTimeout(() => {
       fire();
-      entry.interval = setInterval(fire, m.intervalMs);
-    }, remaining);
+      entry.interval = setInterval(fire, plan.everyMs);
+    }, plan.firstDelayMs);
     missionTimers.set(m.id, entry);
   }
 }
@@ -908,6 +903,94 @@ function standupOnOfficeOpen(): void {
     console.error('[scheduler] standup on open', e);
   }
 }
+
+/** One-time: schedules move to per-agent ownership. Every "everyone" row becomes
+ *  Michael's relay job and every row gets a creator (migrateMissions). Nothing is
+ *  paused: `archived` is set for every agent without a terminal at boot, so it
+ *  says nothing about what the owner wants (eng review R1). */
+function migrateMissionOwners(): void {
+  const cfg = readConfig();
+  if (cfg.missionsOwnersMigrated) return;
+  const { missions, changed } = migrateMissions(cfg.missions ?? []);
+  writeConfig(changed ? { missions, missionsOwnersMigrated: true } : { missionsOwnersMigrated: true });
+}
+
+/** The god agent's id in the hive, for ownership checks ('god' before the hive is up). */
+function hiveGodId(): string {
+  try { return hive.registry().godId ?? 'god'; } catch { return 'god'; }
+}
+
+/** Pause the agent's schedules and flag it closed by the owner. */
+function closeAgentByOwner(id: string): { ok: boolean; paused: number } {
+  let paused = 0;
+  const res = applyMissions((list) => {
+    const r = pauseMissionsOf(list, id, hiveGodId());
+    paused = r.paused;
+    return r.missions;
+  });
+  try { hive.setClosedByOwner(id, true); } catch (e) { console.error('[hive] setClosedByOwner failed:', e); }
+  return { ok: res.ok, paused };
+}
+
+/** An agent asked (from its outbox) to change one of its schedules. Nothing
+ *  changes here: the request waits in ASK ME. The return text goes back to the
+ *  agent as the scheduler's reply. */
+function receiveScheduleRequest(actor: string, payload: unknown): string {
+  const cfg = readConfig();
+  // "list" is a question, not a change: answer it directly with the ids an
+  // update, pause, resume or delete request needs.
+  if (payload && typeof payload === 'object' && (payload as { op?: unknown }).op === 'list') {
+    const mine = missionsFor(cfg.missions ?? [], actor, hiveGodId());
+    return mine.length === 0
+      ? 'You have no schedules.'
+      : ['Your schedules (id: job):', ...mine.map((m) => `${m.id}: ${m.label}${m.enabled ? '' : ' (paused)'}`)].join('\n');
+  }
+  const built = buildScheduleRequest(actor, payload, cfg.missions ?? [], hiveGodId(), Date.now(), `sr_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`);
+  if (!built.ok) return `Schedule request not sent: ${built.reason}`;
+  writeConfig({ scheduleRequests: [...(cfg.scheduleRequests ?? []), built.request] });
+  try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
+  // ASK ME has no badge, so tell the owner there is something to decide.
+  if (readConfig().notifications) {
+    try {
+      const name = hive.registry().agents[actor]?.name?.trim() || 'A team member';
+      if (Notification.isSupported()) new Notification({ title: name, body: `${name} asked to change a schedule. Approve or decline it in ASK ME.` }).show();
+    } catch { /* best-effort */ }
+  }
+  return 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
+}
+
+/** The owner approved or declined a request. Approval applies exactly that one
+ *  change; a request whose schedule changed since it was asked is refused. */
+function decideScheduleRequest(id: string, approve: boolean): { ok: true } | { ok: false; error: string } {
+  const cfg = readConfig();
+  const req = (cfg.scheduleRequests ?? []).find((r) => r.id === id);
+  if (!req) return { ok: false, error: 'not found' };
+  const missions = cfg.missions ?? [];
+  if (approve) {
+    if (requestIsStale(req, missions)) return { ok: false, error: 'stale' };
+    const applied = applyScheduleRequest(req, missions, `m_${Date.now().toString(36)}`);
+    if (!applied.ok) return { ok: false, error: applied.error };
+    const res = applyMissions(() => applied.missions);
+    if (!res.ok) return res;
+  }
+  writeConfig({ scheduleRequests: (readConfig().scheduleRequests ?? []).filter((r) => r.id !== id) });
+  try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
+  if (hive.enabled()) {
+    hive.send({
+      to: req.agentId, act: 'inform',
+      subject: approve ? 'Schedule change approved' : 'Schedule change declined',
+      body: `${approve ? 'Approved' : 'Declined'}: ${describeScheduleRequest(req)}. ${approve ? 'It is in place now.' : 'Nothing changed.'}`
+    }, 'scheduler');
+  }
+  return { ok: true };
+}
+
+function describeScheduleRequest(req: ScheduleRequest): string {
+  const target = (readConfig().missions ?? []).find((m) => m.id === req.missionId);
+  const name = req.draft?.label ?? target?.label ?? 'a schedule';
+  return `${req.op} "${name}"`;
+}
+
 
 /** One-time migration: ensure the built-in hourly ops standup exists for installs
  *  that predate it. Guarded by `opsStandupSeeded` so a user who later deletes the
@@ -4250,24 +4333,48 @@ ipcMain.handle('control:snapshot', (_evt, agentId: unknown) =>
   typeof agentId === 'string' ? control.snapshot(agentId) : null);
 
 // ─── IPC: scheduled missions (recurring auto-dispatch) ──────────────────────
+// One schedule per call. Each op reads the config as it is NOW and changes only
+// the schedule it names, so a view opened earlier (an agent's tab, Michael's
+// list) can never delete a schedule it didn't know about. The old whole-list
+// save did exactly that once schedules could be added from ASK ME (eng review
+// R2). Every op answers { ok, error? } so the UI can show a failed save (7A).
+type MissionOpResult = { ok: true } | { ok: false; error: string };
+function applyMissions(change: (list: ScheduledMission[]) => ScheduledMission[] | null): MissionOpResult {
+  try {
+    const next = change(readConfig().missions ?? []);
+    if (!next) return { ok: false, error: 'not found' };
+    writeConfig({ missions: next });
+    syncMissions();
+    try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
+    return { ok: true };
+  } catch (e) {
+    console.error('[missions] write failed', e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+const isMission = (m: unknown): m is ScheduledMission =>
+  !!m && typeof m === 'object' && typeof (m as ScheduledMission).id === 'string' && typeof (m as ScheduledMission).label === 'string'
+  && typeof (m as ScheduledMission).to === 'string' && typeof (m as ScheduledMission).enabled === 'boolean';
 ipcMain.handle('missions:list', () => readConfig().missions ?? []);
-ipcMain.handle('missions:save', (_evt, missions) => {
-  // lastFiredAt is scheduler-owned. The renderer loads missions once and later
-  // sends back a STALE array, so a wholesale write would clobber every
-  // lastFiredAt the scheduler has stamped since. Merge by id and keep the newer
-  // lastFiredAt (almost always the persisted one) so the UI can never erase it.
-  const incoming = (Array.isArray(missions) ? missions : []) as ScheduledMission[];
-  const persistedById = new Map(
-    (readConfig().missions ?? []).map((m) => [m.id, m] as const)
-  );
-  const merged = incoming.map((m) => {
-    const prevLastFired = persistedById.get(m.id)?.lastFiredAt ?? 0;
-    const lastFiredAt = Math.max(m.lastFiredAt ?? 0, prevLastFired) || undefined;
-    return { ...m, lastFiredAt };
-  });
-  writeConfig({ missions: merged });
-  syncMissions();
-  return { ok: true };
+ipcMain.handle('missions:upsert', (_evt, mission: unknown): MissionOpResult =>
+  isMission(mission) ? applyMissions((list) => upsertMission(list, mission)) : { ok: false, error: 'invalid schedule' });
+ipcMain.handle('missions:delete', (_evt, id: unknown): MissionOpResult =>
+  typeof id === 'string' ? applyMissions((list) => deleteMission(list, id)) : { ok: false, error: 'invalid id' });
+ipcMain.handle('missions:setEnabled', (_evt, id: unknown, on: unknown): MissionOpResult =>
+  typeof id === 'string' ? applyMissions((list) => setMissionEnabled(list, id, on === true)) : { ok: false, error: 'invalid id' });
+
+// ─── IPC: schedule requests (an agent asked, the owner decides in ASK ME) ────
+ipcMain.handle('scheduleRequests:list', () => readConfig().scheduleRequests ?? []);
+ipcMain.handle('scheduleRequests:decide', (_evt, id: unknown, approve: unknown): MissionOpResult => {
+  if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
+  return decideScheduleRequest(id, approve === true);
+});
+
+/** The owner closed this agent (not a crash or a restart): pause its schedules
+ *  and mark it, so Michael's list shows it as closed (design 6A, eng review R1). */
+ipcMain.handle('agent:closedByOwner', (_evt, id: unknown): { ok: boolean; paused: number } => {
+  if (typeof id !== 'string' || !id) return { ok: false, paused: 0 };
+  return closeAgentByOwner(id);
 });
 
 // ─── IPC: full-text search across hive files (board, tasks, memory) ──────────
@@ -4777,6 +4884,9 @@ registerRealtimeActionIpc({
   controlGateTool: (id, toolName, on) => control.gateTool(id, toolName, on),
   setArchived: (id, archived) => {
     if (!hive.enabled()) return { ok: false, error: 'hive disabled' };
+    // The owner archiving an agent by voice is closing it on purpose, so its
+    // schedules pause like a close from the panel (eng review R1).
+    if (archived) closeAgentByOwner(id);
     hive.setArchived(id, archived);
     try { liveWebContents()?.send(archived ? 'hive:agentArchived' : 'hive:agentSpawned', { id }); } catch { /* window gone */ }
     return { ok: true };
@@ -5327,6 +5437,7 @@ function bootstrapHiveServices(): void {
   if (!hive.enabled()) return;
   // A business office gets the plain PROTOCOL.md and no COMMANDS.md.
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
+  hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
@@ -5371,6 +5482,7 @@ function bootstrapHiveServices(): void {
   });
   migrateBusinessFolder(); // one-time: Michael's folder from the retired Office folder
   ensureDefaultMissions(); // one-time: seed the built-in hourly ops standup
+  migrateMissionOwners(); // one-time: everyone rows to Michael, createdBy stamped
   syncMissions(); // arm recurring auto-dispatch missions now the router is live
   syncContextTriggers(); // …and the context trigger's own compact/clear cadences
   // Pair replies to inbound webhook messages in the ledger. Tied to the FEATURE

@@ -120,7 +120,7 @@ test('content direction in components is gated, never content-sniffed', () => {
     'components/CommandCenterPanel', 'components/FullscreenTerminal',
     'components/MessageQueueComposer',
     'components/TasksKanban', 'components/ThreadsPanel',
-    'components/triggers/SchedulesSection',
+    'components/triggers/ScheduleList',
     'components/triggers/TriggerHistoryTab'
   ];
   let gated = 0;

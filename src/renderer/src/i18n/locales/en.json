@@ -90,7 +90,8 @@
     "editNote": "Edit private note",
     "addNote": "Add private note",
     "editNoteAria": "Edit note for {{name}}",
-    "noteAria": "Note for {{name}}"
+    "noteAria": "Note for {{name}}",
+    "nextRun": "next job: {{time}}"
   },
   "askMe": {
     "emptyTitle": "Nothing needs you right now. 🌿",
@@ -106,7 +107,16 @@
     "viewAnswersHistory": "open the task detail with the full Q&A history",
     "blockingDownstream": "BLOCKING {{count}} DOWNSTREAM TASK",
     "blockingDownstreamPlural": "BLOCKING {{count}} DOWNSTREAM TASKS",
-    "more": "… +{{count}} more"
+    "more": "… +{{count}} more",
+    "scheduleTitle": "{{name}} asks to change a schedule",
+    "scheduleAdd": "Add: {{label}}, {{when}}",
+    "scheduleUpdate": "Change: {{before}}. To: {{after}}",
+    "schedulePause": "Pause: {{label}}",
+    "scheduleResume": "Turn back on: {{label}}",
+    "scheduleDelete": "Delete: {{label}}",
+    "scheduleStale": "This changed since {{name}} asked, so it can only be declined.",
+    "approve": "Approve",
+    "decline": "Decline"
   },
   "agentStrip": {
     "privateNote": "PRIVATE NOTE · {{name}}",
@@ -129,7 +139,8 @@
     "terminal": "terminal",
     "git": "git",
     "messages": "messages",
-    "traces": "traces"
+    "traces": "traces",
+    "schedules": "schedules"
   },
   "toolWaterfall": {
     "fresh": "fresh {{tokens}}t",
@@ -154,7 +165,9 @@
     "terminalTip": "Open your system terminal app in {{cwd}}: a normal shell in this agent's folder, separate from the agent's own terminal.",
     "openIde": "Open the IDE",
     "ide": "IDE",
-    "openTerminalAria": "Open a system terminal in this agent's folder"
+    "openTerminalAria": "Open a system terminal in this agent's folder",
+    "killConfirmSchedules": "Close {{name}}? {{name}} has {{count}} schedule on. It'll pause.",
+    "killConfirmSchedulesPlural": "Close {{name}}? {{name}} has {{count}} schedules on. They'll pause."
   },
   "settingsHero": {
     "sponsoredBy": "Sponsored by",
@@ -947,9 +960,10 @@
   "triggersTab": {
     "intro": "Everything that can start work without you typing.",
     "schedules": "SCHEDULES",
-    "schedulesBlurb": "Run a prompt on a repeating clock.",
+    "schedulesBlurb": "Jobs that run on a clock.",
     "organisation": "ORGANISATION",
-    "organisationBlurb": "Let a teammate's office message yours."
+    "organisationBlurb": "Let a teammate's office message yours.",
+    "officeBlurb": "Everyone else's jobs on a clock. Open a team member to change theirs."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -964,15 +978,8 @@
     "justNow": "just now",
     "ago": "{{unit}} ago",
     "in": "in {{unit}}",
-    "summaryNone": "none",
-    "summary": "{{on}} of {{total}} on",
-    "nothingScheduled": "Nothing is scheduled yet.",
-    "addSchedule": "add a schedule",
-    "newSchedule": "NEW SCHEDULE",
     "label": "DO WHAT?",
     "labelPlaceholder": "For example: Follow up on unpaid invoices",
-    "goesTo": "GOES TO",
-    "everyone": "everyone",
     "prompt": "PROMPT",
     "promptPlaceholder": "Sent word for word on every run.",
     "fired": "fired {{time}}",
@@ -984,11 +991,34 @@
     "when": "WHEN",
     "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap.",
     "labelHint": "The agent is told this job name and does it the way its Work style says. Put how the job is done in that team member's Work style.",
-    "runsLabel": "Runs this job the way the agent's Work style says.",
     "olderInstructions": "OLDER INSTRUCTIONS",
     "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
     "moveToWorkStyle": "Move to {{name}}'s Work style",
-    "removeOlder": "Remove"
+    "removeOlder": "Remove",
+    "ownJobs": "{{godName}}'s jobs",
+    "officeSchedule": "Office schedule",
+    "officeEmpty": "No one on the team runs jobs on a clock yet.",
+    "emptyAgent": "{{name}} has no jobs on a clock yet.",
+    "addFor": "add a schedule for {{name}}",
+    "agentSummary": "{{name}} runs {{count}} job on a clock.",
+    "agentSummaryPlural": "{{name}} runs {{count}} jobs on a clock.",
+    "nextAt": "Next: {{time}}.",
+    "paused": "paused",
+    "loading": "One sec...",
+    "loadError": "Couldn't load {{name}}'s schedules.",
+    "loadErrorOffice": "Couldn't load the office schedule.",
+    "tryAgain": "Try again",
+    "saveFailed": "Didn't save. Try again.",
+    "sure": "Sure?",
+    "deleteIt": "delete it",
+    "keep": "keep",
+    "addedByYou": "added by you",
+    "addedBy": "added by {{name}}",
+    "runAria": "Run {{job}}",
+    "openRow": "Open {{name}}'s schedules: {{job}}",
+    "closedGroup": "{{name}} (closed)",
+    "closedNote": "{{name}} is closed, so these are paused.",
+    "relayHint": "{{godName}} hands this job to the team."
   },
   "webhooksSection": {
     "summaryNone": "none",

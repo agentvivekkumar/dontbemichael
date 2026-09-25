@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
+import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
 export type { HireManifest } from '../shared/hire';
@@ -103,6 +104,8 @@ export interface HiveRegistry {
     status: string;
     lastSeen: number;
     archived?: boolean;
+    /** The owner closed this agent on purpose; its schedules were paused. */
+    closedByOwner?: boolean;
     sessionId?: string;
   }>;
 }
@@ -230,21 +233,8 @@ export interface SpawnPtyOptions {
 
 export interface PtyExit { exitCode: number; signal?: number | undefined }
 
-/** A recurring auto-dispatched mission fired on an interval by the scheduler. */
-export interface ScheduledMission {
-  id: string;
-  label: string;
-  intervalMs: number;
-  to: string;
-  body: string;
-  enabled: boolean;
-  autoCompact?: boolean;
-  lastFiredAt?: number;
-  /** Mission flavor; 'heartbeat' (Lane A #1) is a context-aware adaptive beat. */
-  kind?: 'dispatch' | 'heartbeat' | 'compact';
-  /** Heartbeat only: floor-quiet threshold in ms. */
-  quietThresholdMs?: number;
-}
+/** A recurring schedule; the type lives in shared/missions.ts. */
+export type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 
 /** Circuit-breaker thresholds (Lane A #6.6b). Mirrors src/main/config.ts. */
 export interface KnowledgeGraphConfig {
@@ -1154,8 +1144,25 @@ const api = {
 
   // ─── Scheduled missions (recurring auto-dispatch) ──────────────────────────
   listMissions: (): Promise<ScheduledMission[]> => ipcRenderer.invoke('missions:list'),
-  saveMissions: (missions: ScheduledMission[]): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('missions:save', missions),
+  /** One schedule per call, applied by main to the current list (eng review R2). */
+  upsertMission: (mission: ScheduledMission): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('missions:upsert', mission),
+  deleteMission: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('missions:delete', id),
+  setMissionEnabled: (id: string, on: boolean): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('missions:setEnabled', id, on),
+  /** Schedule changes agents asked for, waiting for the owner in ASK ME. */
+  listScheduleRequests: (): Promise<ScheduleRequest[]> => ipcRenderer.invoke('scheduleRequests:list'),
+  decideScheduleRequest: (id: string, approve: boolean): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('scheduleRequests:decide', id, approve),
+  onScheduleRequestsUpdated: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('scheduleRequests:updated', listener);
+    return () => ipcRenderer.removeListener('scheduleRequests:updated', listener);
+  },
+  /** The owner is closing this agent: pause its schedules and mark it closed. */
+  closeAgentByOwner: (id: string): Promise<{ ok: boolean; paused: number }> =>
+    ipcRenderer.invoke('agent:closedByOwner', id),
   /** Fires when the scheduler stamps a mission's lastFiredAt (a beat/dispatch),
    *  so the SCHEDULES panel can refresh "last fired" without a reload. */
   onMissionsUpdated: (cb: () => void): (() => void) => {

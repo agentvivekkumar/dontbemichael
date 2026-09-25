@@ -1,0 +1,227 @@
+/**
+ * Per-agent schedules (docs/designs/per-agent-schedules.md): the shared rules in
+ * src/shared/missions.ts. The armPlan block is the scheduler's regression
+ * contract (eng review D6): it pins what syncMissions did before schedules moved
+ * onto each agent, plus the two intended changes (a former "everyone" row runs
+ * as Michael's relay, and a paused row never fires).
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const loadTs = require('./load-ts.cjs');
+
+process.env.TZ = 'UTC';
+
+const M = loadTs('src/shared/missions.ts');
+const { scheduledRunBody, relayRunBody } = loadTs('src/shared/scheduleMessage.ts');
+
+const HOUR = 3_600_000;
+const at = (y, m, d, h = 0, min = 0) => new Date(Date.UTC(y, m - 1, d, h, min)).getTime();
+const ctx = { standupId: 'ops-standup', standupFiredThisLaunch: true };
+const mk = (over = {}) => ({ id: 'm1', label: 'Triage the inbox', intervalMs: HOUR, to: 'pam', body: '', enabled: true, ...over });
+
+/* ─────────────────────────── ownership ─────────────────────────── */
+
+test('ownerOf: Michael owns god and legacy broadcast rows', () => {
+  assert.equal(M.ownerOf({ to: 'god' }, 'god'), 'god');
+  assert.equal(M.ownerOf({ to: 'broadcast' }, 'g1'), 'g1');
+  assert.equal(M.ownerOf({ to: 'pam' }, 'god'), 'pam');
+});
+
+test('missionsFor lists only that agent\'s schedules', () => {
+  const list = [mk({ id: 'a' }), mk({ id: 'b', to: 'oscar' }), mk({ id: 'c', to: 'god' })];
+  assert.deepEqual(M.missionsFor(list, 'pam', 'god').map((m) => m.id), ['a']);
+  assert.deepEqual(M.missionsFor(list, 'god', 'god').map((m) => m.id), ['c']);
+});
+
+test('canEdit: own schedule only', () => {
+  assert.equal(M.canEdit('pam', mk(), 'god'), true);
+  assert.equal(M.canEdit('oscar', mk(), 'god'), false);
+  assert.equal(M.canEdit('god', mk({ to: 'god' }), 'god'), true);
+});
+
+/* ─────────────────────────── migration ─────────────────────────── */
+
+test('migrateMissions: everyone rows become Michael\'s relay, rows get createdBy owner', () => {
+  const r = M.migrateMissions([mk({ id: 'a', to: 'broadcast', enabled: false }), mk({ id: 'b' })]);
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.missions[0], { ...mk({ id: 'a', enabled: false }), to: 'god', relay: true, createdBy: 'owner' });
+  assert.equal(r.missions[0].enabled, false, 'a paused everyone row stays paused');
+  assert.equal(r.missions[1].createdBy, 'owner');
+});
+
+test('migrateMissions is idempotent', () => {
+  const once = M.migrateMissions([mk({ to: 'broadcast' }), mk({ id: 'x', createdBy: 'pam' })]).missions;
+  const twice = M.migrateMissions(once);
+  assert.equal(twice.changed, false);
+  assert.deepEqual(twice.missions, once);
+  assert.equal(once[1].createdBy, 'pam', 'an agent-added row keeps its creator');
+});
+
+/* ────────────────── scheduler regression contract (D6) ────────────────── */
+
+test('armPlan: disabled never arms', () => {
+  assert.deepEqual(M.armPlan(mk({ enabled: false }), 0, ctx), { type: 'skip' });
+});
+
+test('armPlan: no interval and no weekly never arms', () => {
+  assert.deepEqual(M.armPlan(mk({ intervalMs: 0 }), 0, ctx), { type: 'skip' });
+});
+
+test('armPlan: heartbeat arms its own adaptive timer, even with a weekly value', () => {
+  assert.deepEqual(M.armPlan(mk({ kind: 'heartbeat', weekly: { days: [1], minute: 540 } }), 0, ctx), { type: 'heartbeat' });
+});
+
+test('armPlan: interval honors lastFiredAt', () => {
+  const now = 10 * HOUR;
+  assert.deepEqual(M.armPlan(mk({ lastFiredAt: now - 20 * 60_000 }), now, ctx), { type: 'interval', firstDelayMs: 40 * 60_000, everyMs: HOUR });
+  assert.equal(M.armPlan(mk({ lastFiredAt: now - 3 * HOUR }), now, ctx).firstDelayMs, 0, 'overdue fires now');
+  assert.equal(M.armPlan(mk(), now, ctx).firstDelayMs, 0, 'never fired fires now');
+});
+
+test('armPlan: the standup waits a full interval until the office opens', () => {
+  const standup = mk({ id: 'ops-standup', to: 'god', lastFiredAt: 0 });
+  assert.equal(M.armPlan(standup, 10 * HOUR, { ...ctx, standupFiredThisLaunch: false }).firstDelayMs, HOUR);
+  assert.equal(M.armPlan(standup, 10 * HOUR, ctx).firstDelayMs, 0);
+});
+
+test('armPlan: weekly waits for the next slot', () => {
+  const monday9 = { days: [1], minute: 540 };
+  const now = at(2026, 9, 21, 8, 0); // a Monday, 08:00
+  assert.deepEqual(M.armPlan(mk({ weekly: monday9 }), now, ctx), { type: 'weekly', weekly: monday9, firstDelayMs: HOUR });
+});
+
+test('armPlan: weekly catches up a slot missed within the window, once', () => {
+  const monday9 = { days: [1], minute: 540 };
+  const now = at(2026, 9, 21, 9, 30);
+  assert.equal(M.armPlan(mk({ weekly: monday9 }), now, ctx).firstDelayMs, 0, 'missed 30m ago: fire now');
+  const done = M.armPlan(mk({ weekly: monday9, lastFiredAt: at(2026, 9, 21, 9, 0) }), now, ctx);
+  assert.ok(done.firstDelayMs > 6 * 24 * HOUR, 'already ran: wait for next week');
+});
+
+test('firePayload: standard body, relay body for a former everyone row, none for compaction', () => {
+  assert.deepEqual(M.firePayload(mk()), { to: 'pam', subject: 'Triage the inbox', body: scheduledRunBody('Triage the inbox', '') });
+  const relay = M.firePayload(mk({ to: 'god', relay: true, body: 'old words' }));
+  assert.equal(relay.to, 'god');
+  assert.equal(relay.body, relayRunBody('Triage the inbox', 'old words'));
+  assert.match(relay.body, /Hand this job to each team member/);
+  assert.equal(M.firePayload(mk({ kind: 'compact' })), null);
+});
+
+test('nextRunAt matches the armed schedule', () => {
+  const now = at(2026, 9, 21, 8, 0);
+  assert.equal(M.nextRunAt(mk({ weekly: { days: [1], minute: 540 } }), now), at(2026, 9, 21, 9, 0));
+  assert.equal(M.nextRunAt(mk({ lastFiredAt: now }), now), now + HOUR);
+  assert.equal(M.nextRunAt(mk(), now), null, 'an interval that never fired cannot say');
+  assert.equal(M.nextRunAt(mk({ enabled: false, lastFiredAt: now }), now), null);
+});
+
+/* ──────────────────────── one-schedule edits (R2) ──────────────────────── */
+
+test('upsert never drops a schedule it did not name', () => {
+  const list = [mk({ id: 'a' }), mk({ id: 'b', to: 'oscar', createdBy: 'oscar' })];
+  const next = M.upsertMission(list, mk({ id: 'a', label: 'Renamed' }));
+  assert.deepEqual(next.map((m) => m.id), ['a', 'b']);
+  assert.equal(next[0].label, 'Renamed');
+  assert.equal(next[1].createdBy, 'oscar');
+});
+
+test('upsert keeps the newer lastFiredAt and the original creator', () => {
+  const list = [mk({ id: 'a', lastFiredAt: 500, createdBy: 'pam' })];
+  const next = M.upsertMission(list, mk({ id: 'a', lastFiredAt: 100, createdBy: 'owner' }));
+  assert.equal(next[0].lastFiredAt, 500);
+  assert.equal(next[0].createdBy, 'pam');
+});
+
+test('upsert with weekly undefined switches back to the interval', () => {
+  const list = [mk({ id: 'a', weekly: { days: [1], minute: 540 } })];
+  const next = M.upsertMission(list, { ...mk({ id: 'a' }), weekly: undefined });
+  assert.equal('weekly' in next[0], false);
+});
+
+test('upsert adds a new schedule as the owner\'s', () => {
+  const next = M.upsertMission([], mk({ id: 'n' }));
+  assert.equal(next[0].createdBy, 'owner');
+});
+
+test('delete and setEnabled touch one schedule only', () => {
+  const list = [mk({ id: 'a' }), mk({ id: 'b' })];
+  assert.deepEqual(M.deleteMission(list, 'a').map((m) => m.id), ['b']);
+  assert.deepEqual(M.setMissionEnabled(list, 'b', false).map((m) => m.enabled), [true, false]);
+  assert.equal(M.setMissionEnabled(list, 'zzz', false), null);
+});
+
+test('pauseMissionsOf pauses only that agent\'s enabled schedules', () => {
+  const list = [mk({ id: 'a' }), mk({ id: 'b', enabled: false }), mk({ id: 'c', to: 'oscar' })];
+  const r = M.pauseMissionsOf(list, 'pam', 'god');
+  assert.equal(r.paused, 1);
+  assert.deepEqual(r.missions.map((m) => m.enabled), [false, false, true]);
+});
+
+/* ─────────────────── agent schedule requests (R3, R6) ─────────────────── */
+
+test('parseWhen reads intervals and day lists', () => {
+  assert.deepEqual(M.parseWhen({ every: '2h' }), { intervalMs: 2 * HOUR });
+  assert.deepEqual(M.parseWhen({ every: '30 min' }), { intervalMs: 30 * 60_000 });
+  assert.deepEqual(M.parseWhen({ days: ['weekdays'], at: '09:00' }).weekly, { days: [1, 2, 3, 4, 5], minute: 540 });
+  assert.deepEqual(M.parseWhen({ days: ['Friday', 'mon'], at: '7:30' }).weekly, { days: [1, 5], minute: 450 });
+  assert.equal(M.parseWhen({ every: '0m' }), null);
+  assert.equal(M.parseWhen({ every: 'soon' }), null);
+  assert.equal(M.parseWhen({ days: ['someday'], at: '09:00' }), null);
+  assert.equal(M.parseWhen({ days: ['mon'], at: '25:00' }), null);
+  assert.equal(M.parseWhen(null), null);
+});
+
+test('an add request proposes, and writes nothing', () => {
+  const list = [mk()];
+  const r = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { days: ['fri'], at: '09:00' } }, list, 'god', 5, 'r1');
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.request, { id: 'r1', agentId: 'pam', op: 'add', draft: { label: 'Check invoices', intervalMs: 86_400_000, weekly: { days: [5], minute: 540 } }, createdAt: 5 });
+  assert.equal(list.length, 1, 'building a request never touches the list');
+});
+
+test('requests about another agent\'s schedule are refused', () => {
+  const r = M.buildScheduleRequest('oscar', { op: 'pause', id: 'm1' }, [mk()], 'god', 0, 'r');
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /another team member/);
+});
+
+test('malformed and unknown requests are refused with a reason', () => {
+  const bad = (p) => M.buildScheduleRequest('pam', p, [mk()], 'god', 0, 'r');
+  assert.equal(bad(null).ok, false);
+  assert.equal(bad({ op: 'explode' }).ok, false);
+  assert.equal(bad({ op: 'add', when: { every: '1h' } }).ok, false, 'no label');
+  assert.equal(bad({ op: 'add', label: 'x', when: { every: 'never' } }).ok, false, 'bad when');
+  assert.equal(bad({ op: 'delete', id: 'nope' }).ok, false, 'unknown id');
+  assert.equal(bad({ op: 'update', id: 'm1' }).ok, false, 'update with nothing new');
+  assert.equal(bad({ op: 'add', label: 'x'.repeat(81), when: { every: '1h' } }).ok, false, 'label too long');
+});
+
+test('approve applies an add exactly once, as the agent\'s', () => {
+  const req = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { every: '1d' } }, [], 'god', 0, 'r').request;
+  const r = M.applyScheduleRequest(req, [], 'new1');
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.missions, [{ id: 'new1', label: 'Check invoices', intervalMs: 86_400_000, to: 'pam', body: '', enabled: true, createdBy: 'pam' }]);
+});
+
+test('approve applies update, pause, resume and delete', () => {
+  const list = [mk()];
+  const req = (p) => M.buildScheduleRequest('pam', p, list, 'god', 0, 'r').request;
+  assert.equal(M.applyScheduleRequest(req({ op: 'pause', id: 'm1' }), list, 'x').missions[0].enabled, false);
+  assert.deepEqual(M.applyScheduleRequest(req({ op: 'delete', id: 'm1' }), list, 'x').missions, []);
+  const up = M.applyScheduleRequest(req({ op: 'update', id: 'm1', when: { days: ['mon'], at: '08:00' } }), list, 'x').missions[0];
+  assert.deepEqual(up.weekly, { days: [1], minute: 480 });
+  assert.equal(up.label, 'Triage the inbox', 'a when-only update keeps the label');
+  const paused = [mk({ enabled: false })];
+  const resume = M.buildScheduleRequest('pam', { op: 'resume', id: 'm1' }, paused, 'god', 0, 'r').request;
+  assert.equal(M.applyScheduleRequest(resume, paused, 'x').missions[0].enabled, true);
+});
+
+test('a request whose schedule changed since is stale and never applies', () => {
+  const list = [mk()];
+  const req = M.buildScheduleRequest('pam', { op: 'pause', id: 'm1' }, list, 'god', 0, 'r').request;
+  const edited = [mk({ label: 'Owner renamed it' })];
+  assert.equal(M.requestIsStale(req, edited), true);
+  assert.deepEqual(M.applyScheduleRequest(req, edited, 'x'), { ok: false, error: 'stale' });
+  assert.equal(M.requestIsStale(req, []), true, 'deleted since');
+  assert.equal(M.requestIsStale(req, list), false);
+});

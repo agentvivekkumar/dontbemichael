@@ -20,6 +20,7 @@ import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@share
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
+import { ScheduleList, closeConfirmText } from './triggers/ScheduleList';
 
 export interface AgentDetailPanelProps {
   agent: Agent;
@@ -117,7 +118,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
   const onKill = async () => {
     if (!agent.ptyId) return;
-    if (!confirm(t('agentDetail.killConfirm', { name: agent.name }))) return;
+    if (!confirm(closeConfirmText(agent.id, agent.name, t))) return;
+    // The owner is closing this agent on purpose: its schedules pause (design
+    // 6A). A crash or a quit only archives it and leaves them running.
+    await window.cth.closeAgentByOwner(agent.id).catch(() => undefined);
     await window.cth.killPty(agent.ptyId);
     disposeTerminal(agent.ptyId);
     archiveAgent(agent.id);
@@ -284,6 +288,12 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
         {sidebarTab === 'messages' && (
           <ThreadsPanel agentId={agent.id} />
+        )}
+
+        {sidebarTab === 'schedules' && (
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 12 }}>
+            <ScheduleList mode="agent" agentId={agent.id} agentName={agent.name} />
+          </div>
         )}
 
         {sidebarTab === 'traces' && (

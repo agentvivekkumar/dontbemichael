@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TRIGGER_MODES, type TriggerMode } from '@shared/triggers';
 import {
@@ -80,15 +80,25 @@ export function Callout({ children, tone = 'warn' }: { children: ReactNode; tone
 
 /* ─────────────────────────────── controls ────────────────────────────────── */
 
-export function Toggle({ on, onClick, onLabel, offLabel }: {
-  on: boolean; onClick: () => void; onLabel?: string; offLabel?: string;
+/** An on/off switch. `role="switch"` + `aria-checked` so a screen reader hears
+ *  "Run Triage the inbox, on" rather than a bare button (design 12A); `label`
+ *  names what it switches. */
+export function Toggle({ on, onClick, onLabel, offLabel, label, disabled }: {
+  on: boolean; onClick: () => void; onLabel?: string; offLabel?: string; label?: string; disabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      aria-busy={disabled || undefined}
+      disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '2px 8px 1px', border: 'none', cursor: 'pointer', flexShrink: 0,
+        padding: '2px 8px 1px', border: 'none', cursor: disabled ? 'progress' : 'pointer', flexShrink: 0,
+        opacity: disabled ? 0.6 : 1,
         background: on ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
         boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
         fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)'
@@ -97,20 +107,27 @@ export function Toggle({ on, onClick, onLabel, offLabel }: {
   );
 }
 
-export function MiniButton({ children, onClick, tone = 'plain', disabled }: {
-  children: ReactNode; onClick: () => void; tone?: 'plain' | 'danger' | 'good'; disabled?: boolean;
+/** `destructive` is the DESIGN.md 7.2 variant (coral fill, on-accent text): the
+ *  committing step of a delete, never the first click (design 11A). */
+export function MiniButton({ children, onClick, tone = 'plain', disabled, autoFocus, buttonRef }: {
+  children: ReactNode; onClick: () => void; tone?: 'plain' | 'danger' | 'good' | 'destructive'; disabled?: boolean;
+  autoFocus?: boolean; buttonRef?: Ref<HTMLButtonElement>;
 }) {
+  const destructive = tone === 'destructive';
   return (
     <button
+      type="button"
+      ref={buttonRef}
+      autoFocus={autoFocus}
       onClick={onClick}
       disabled={disabled}
       style={{
         flexShrink: 0, padding: '2px 7px 1px', border: 'none',
         cursor: disabled ? 'default' : 'pointer',
-        background: tone === 'good' ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
-        boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
+        background: tone === 'good' ? 'var(--cth-mint)' : destructive ? 'var(--cth-coral)' : 'var(--cth-cream-200)',
+        boxShadow: `inset 0 0 0 1px ${destructive ? 'var(--cth-ink-500)' : 'var(--cth-ink-100)'}`,
         fontFamily: 'var(--cth-font-ui)', fontSize: 14,
-        color: disabled ? 'var(--cth-ink-300)' : tone === 'danger' ? 'var(--cth-coral)' : 'var(--cth-ink-900)'
+        color: disabled ? 'var(--cth-ink-300)' : destructive ? 'var(--cth-on-accent)' : tone === 'danger' ? 'var(--cth-coral)' : 'var(--cth-ink-900)'
       }}
     >{children}</button>
   );

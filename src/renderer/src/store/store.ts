@@ -17,6 +17,7 @@ import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
 import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
+import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
 
@@ -160,7 +161,7 @@ export interface QueuedMessage {
 // 'files' retired in v0.3.4 (the per-agent IDE button superseded it) — a
 // persisted 'files' selection falls back to 'terminal' on load. 'git' added in
 // v0.3.4: at-a-glance branch/status/log without opening the IDE.
-export type SidebarTab = 'terminal' | 'messages' | 'traces' | 'git';
+export type SidebarTab = 'terminal' | 'messages' | 'schedules' | 'traces' | 'git';
 
 /** Lifecycle of the god agent ("Michael") bootstrap on launch.
  *  'booting' until his PTY is confirmed live, then 'ready' (or 'failed' if the
@@ -256,6 +257,14 @@ interface State {
    *  makes repeated identical requests distinct. */
   ccTabRequest: { tab: string; seq: number } | null;
   requestCommandCenterTab: (tab: string) => void;
+  /** Every schedule in the office, as main last reported it (missions:list). */
+  missions: ScheduledMission[];
+  missionsStatus: 'loading' | 'ready' | 'error';
+  setMissions: (missions: ScheduledMission[], status?: 'ready' | 'error') => void;
+  /** Open an agent's Schedules tab with one schedule expanded (Michael's office
+   *  list jumps here). seq makes repeated identical requests distinct. */
+  scheduleFocus: { missionId: string; seq: number } | null;
+  openAgentSchedule: (agentId: string, missionId: string) => void;
   /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
    *  the tab, and names the agent. The floor's GRAPH view uses it, since the
    *  graph no longer sits next to that tab. seq-keyed like ccTabRequest. */
@@ -658,7 +667,7 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'terminal' || v === 'messages' || v === 'traces') return v;
+    if (v === 'terminal' || v === 'messages' || v === 'schedules' || v === 'traces') return v;
     // A saved GIT tab opens on the terminal while this build hides git.
     if (v === 'git') return SHOW_GIT ? v : 'terminal';
   } catch { /* noop */ }
@@ -731,6 +740,23 @@ export const useStore = create<State>((set, get) => ({
   }),
   requestCommandCenterTab: (tab) =>
     set((s) => ({ ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 } })),
+  missions: [],
+  missionsStatus: 'loading',
+  setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
+  scheduleFocus: null,
+  openAgentSchedule: (agentId, missionId) => {
+    try { window.localStorage.setItem(LS_SIDEBAR_TAB, 'schedules'); } catch { /* noop */ }
+    set((s) => {
+      persistAgents(s.agents, agentId);
+      return {
+        selectedId: agentId,
+        sidebarTab: 'schedules',
+        ccTabRequest: null,
+        memoryFocusRequest: null,
+        scheduleFocus: { missionId, seq: (s.scheduleFocus?.seq ?? 0) + 1 }
+      };
+    });
+  },
   fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
   prefersFocusMode: initialPrefersFocusMode,
   floorView: initialFloorView,

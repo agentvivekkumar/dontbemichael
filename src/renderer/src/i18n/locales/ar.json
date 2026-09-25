@@ -90,7 +90,8 @@
     "editNote": "تحرير ملاحظة خاصة",
     "addNote": "إضافة ملاحظة خاصة",
     "editNoteAria": "تحرير ملاحظة {{name}}",
-    "noteAria": "ملاحظة {{name}}"
+    "noteAria": "ملاحظة {{name}}",
+    "nextRun": "العمل التالي: {{time}}"
   },
   "askMe": {
     "emptyTitle": "لا شيء يحتاجك الآن. 🌿",
@@ -106,7 +107,16 @@
     "viewAnswersHistory": "افتح تفاصيل المهمة مع سجلّ الأسئلة والأجوبة كاملًا",
     "blockingDownstream": "يعطّل {{count}} مهمة لاحقة",
     "blockingDownstreamPlural": "يعطّل {{count}} مهام لاحقة",
-    "more": "… +{{count}} أخرى"
+    "more": "… +{{count}} أخرى",
+    "scheduleTitle": "{{name}} يطلب تغيير موعد",
+    "scheduleAdd": "إضافة: {{label}}، {{when}}",
+    "scheduleUpdate": "تغيير: {{before}}. إلى: {{after}}",
+    "schedulePause": "إيقاف مؤقت: {{label}}",
+    "scheduleResume": "إعادة التشغيل: {{label}}",
+    "scheduleDelete": "حذف: {{label}}",
+    "scheduleStale": "تغيّر هذا منذ أن طلبه {{name}}، لذا يمكن رفضه فقط.",
+    "approve": "موافقة",
+    "decline": "رفض"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",
@@ -129,7 +139,8 @@
     "terminal": "الطرفية",
     "git": "git",
     "messages": "الرسائل",
-    "traces": "التتبّع"
+    "traces": "التتبّع",
+    "schedules": "المواعيد"
   },
   "toolWaterfall": {
     "fresh": "جديد {{tokens}}ر",
@@ -154,7 +165,9 @@
     "terminalTip": "افتح تطبيق الطرفية في نظامك عند {{cwd}}، صدفة عادية داخل مجلد هذا الوكيل، منفصلة عن طرفيته الخاصة.",
     "openIde": "افتح بيئة التطوير",
     "ide": "بيئة التطوير",
-    "openTerminalAria": "افتح طرفية نظام في مجلد هذا الوكيل"
+    "openTerminalAria": "افتح طرفية نظام في مجلد هذا الوكيل",
+    "killConfirmSchedules": "إغلاق {{name}}؟ لدى {{name}} موعد مفعل واحد ({{count}}). سيتوقف مؤقتًا.",
+    "killConfirmSchedulesPlural": "إغلاق {{name}}؟ لدى {{name}} {{count}} مواعيد مفعلة. ستتوقف مؤقتًا."
   },
   "settingsHero": {
     "sponsoredBy": "برعاية",
@@ -947,9 +960,10 @@
   "triggersTab": {
     "intro": "كل ما يمكنه بدء العمل دون أن تكتب أنت شيئًا.",
     "schedules": "الجدولة",
-    "schedulesBlurb": "شغّل مطالبة على ساعة متكرّرة.",
+    "schedulesBlurb": "أعمال تعمل حسب الساعة.",
     "organisation": "المؤسسة",
-    "organisationBlurb": "دع مكتب زميلك يراسل مكتبك."
+    "organisationBlurb": "دع مكتب زميلك يراسل مكتبك.",
+    "officeBlurb": "أعمال بقية الفريق المجدولة. افتح عضوًا في الفريق لتغيير مواعيده."
   },
   "orgSection": {
     "acceptMessages": "قبول الرسائل من مؤسستك",
@@ -964,15 +978,8 @@
     "justNow": "الآن",
     "ago": "قبل {{unit}}",
     "in": "خلال {{unit}}",
-    "summaryNone": "لا شيء",
-    "summary": "{{on}} من {{total}} مفعّل",
-    "nothingScheduled": "لا شيء مجدول بعد.",
-    "addSchedule": "أضف جدولًا",
-    "newSchedule": "جدول جديد",
     "label": "ماذا يُنجز؟",
     "labelPlaceholder": "مثلًا: متابعة الفواتير غير المدفوعة",
-    "goesTo": "يذهب إلى",
-    "everyone": "الجميع",
     "prompt": "الموجّه",
     "promptPlaceholder": "يُرسَل حرفيًا في كل تشغيل.",
     "fired": "عمل {{time}}",
@@ -984,11 +991,34 @@
     "when": "متى",
     "beatCeiling": "تتكيّف النبضة مع هدوء الأرضية، فهذا هو الحدّ الأعلى لا الفاصل الدقيق.",
     "labelHint": "يصل اسم المهمة إلى العضو فينجزها كما يصف أسلوب عمله. اكتب طريقة إنجاز المهمة في أسلوب عمل ذلك العضو.",
-    "runsLabel": "ينجز هذه المهمة كما يصف أسلوب عمل العضو.",
     "olderInstructions": "تعليمات قديمة",
     "olderInstructionsHint": "أُعدّ هذا الجدول بتعليمات خاصة به، وما زالت تُرسل في كل تشغيل. طريقة إنجاز المهمة مكانها أسلوب عمل {{name}}، فانقلها إليه أو احذفها.",
     "moveToWorkStyle": "انقلها إلى أسلوب عمل {{name}}",
-    "removeOlder": "حذف"
+    "removeOlder": "حذف",
+    "ownJobs": "أعمال {{godName}}",
+    "officeSchedule": "جدول المكتب",
+    "officeEmpty": "لا أحد في الفريق لديه أعمال مجدولة بعد.",
+    "emptyAgent": "ليس لدى {{name}} أعمال مجدولة بعد.",
+    "addFor": "أضف موعدًا لـ {{name}}",
+    "agentSummary": "لدى {{name}} عمل مجدول واحد ({{count}}).",
+    "agentSummaryPlural": "لدى {{name}} {{count}} أعمال مجدولة.",
+    "nextAt": "التالي: {{time}}.",
+    "paused": "متوقف مؤقتًا",
+    "loading": "لحظة...",
+    "loadError": "تعذر تحميل مواعيد {{name}}.",
+    "loadErrorOffice": "تعذر تحميل جدول المكتب.",
+    "tryAgain": "حاول مجددًا",
+    "saveFailed": "لم يُحفظ. حاول مجددًا.",
+    "sure": "متأكد؟",
+    "deleteIt": "احذفه",
+    "keep": "أبقه",
+    "addedByYou": "أضفته أنت",
+    "addedBy": "أضافه {{name}}",
+    "runAria": "تشغيل {{job}}",
+    "openRow": "افتح مواعيد {{name}}: {{job}}",
+    "closedGroup": "{{name}} (مغلق)",
+    "closedNote": "{{name}} مغلق، لذا هذه المواعيد متوقفة مؤقتًا.",
+    "relayHint": "يوزع {{godName}} هذا العمل على الفريق."
   },
   "webhooksSection": {
     "summaryNone": "لا شيء",

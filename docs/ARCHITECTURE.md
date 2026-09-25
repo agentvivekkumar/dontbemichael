@@ -71,13 +71,18 @@ src/
     agentDefinition.ts       each agent's levels and outward capabilities
     folderAccess.ts          who may open and change which folder: sandbox, permission rules, hook checks
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
+    missions.ts              schedules: ownership, next run, the scheduler's arm plan, one-schedule edits,
+                             and agent schedule requests the owner approves in Ask me
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring
     design/                  tokens.css / tokens.ts / global.css (design source of truth)
     components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, OnboardingWizard, …
     CommandCenterPanel,      Michael's control surface (Ask me/Terminal/Triggers/History/Memory/Advanced tabs;
-                             Advanced holds Monitor and Activity)
+                             Advanced holds Monitor and Activity). Triggers holds Michael's own schedules
+                             plus a read-only office schedule; Ask me also shows agents' schedule requests
+    triggers/ScheduleList,   per-agent schedules: the Schedules tab on every agent panel (agent mode) and
+                             Michael's office schedule (office mode); rules live in shared/missions.ts
     FloorViewToggle,         the floor's OFFICE / TASKS / GRAPH switch
     OfficeFolderMissing,     launch screen shown only when the office folder is missing
     ToolWaterfall,           per-agent tool-span waterfall for the observability view

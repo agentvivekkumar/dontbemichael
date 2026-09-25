@@ -313,6 +313,10 @@ export interface RegistryAgent extends AgentMeta {
    *  "do not dispatch to them", not "they are gone", which is why it is its own
    *  flag rather than a reuse of `archived` or a breaker level. */
   onHold?: boolean;
+  /** The owner closed this agent on purpose (not a crash, quit or restart,
+   *  which only set `archived`). Its schedules were paused then; Michael's
+   *  schedule list shows it as closed. Cleared when the agent starts again. */
+  closedByOwner?: boolean;
   /** Most recent Claude Code session_id seen for this agent (Lane A #6.6a),
    *  captured from hook payloads. Doubles as the `--resume` key (idempotent
    *  resume after a crash/restart) AND the cost accounting/dedup key on every
@@ -524,6 +528,13 @@ export class HiveManager {
    *  2026-09-25). Set by main before the hive bootstraps. */
   private businessOffice = false;
   setBusinessOffice(on: boolean): void { this.businessOffice = on; }
+
+  /** Main's handler for an agent's schedule request (a message to "scheduler"
+   *  with a `schedule` object). It records a request for the owner and returns
+   *  the reply for the agent; it never changes a schedule itself (owner,
+   *  2026-09-25). `actor` is the owning outbox folder, never the message. */
+  private scheduleRequestHandler: ((actor: string, payload: unknown) => string) | null = null;
+  onScheduleRequest(handler: (actor: string, payload: unknown) => string): void { this.scheduleRequestHandler = handler; }
 
   /** agentId → whether it has been told company knowledge is on, as of its
    *  spawn or its last update. Lets an owner's toggle reach running agents
@@ -949,6 +960,7 @@ export class HiveManager {
       cwdValid: cwd.valid,
       // A (re)spawn always means a live terminal — clear any prior archived flag.
       archived: false,
+      closedByOwner: false,
       lastSeen: Date.now()
     };
     if (meta.isGod) reg.godId = meta.id;
@@ -1211,6 +1223,20 @@ export class HiveManager {
       this.commit(`hive: ${archived ? 'archive' : 'unarchive'} ${id}`);
     } catch { /* best-effort — never crash a lifecycle handler */ }
   }
+  /** Mark (or clear) that the owner closed this agent. Best-effort, like setArchived. */
+  setClosedByOwner(id: string, closed: boolean): void {
+    const root = this.root();
+    if (!root) return;
+    try {
+      const reg = this.registry();
+      const agent = reg.agents[id];
+      if (!agent || !!agent.closedByOwner === closed) return;
+      agent.closedByOwner = closed;
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
+      this.appendLog({ kind: 'closed-by-owner', agentId: id, closed });
+    } catch { /* best-effort */ }
+  }
+
 
   /**
    * Change an agent's display name without changing its durable identity.
@@ -2030,6 +2056,21 @@ export class HiveManager {
           }
           const msg = this.normalize(partial, id);
           msg.from = id; // sender is authoritative — the owning directory
+          const schedule = (partial as { schedule?: unknown }).schedule;
+          if (msg.to === 'scheduler' && schedule !== undefined && this.scheduleRequestHandler) {
+            // A schedule request, not mail: main files it for the owner and the
+            // scheduler answers the asking agent (and only that agent).
+            let reply: string;
+            try { reply = this.scheduleRequestHandler(id, schedule); } catch (e) {
+              reply = 'Schedule request not sent: the app hit an error. Try again later.';
+              console.error('[hive] schedule request', e);
+            }
+            this.appendLog({ kind: 'schedule-request', from: id, id: msg.id });
+            this.routeMessage(this.normalize({ to: id, act: 'inform', subject: 'Schedule request', body: reply }, 'scheduler'));
+            renameSync(full, join(outbox, '.sent', f));
+            routed++;
+            continue;
+          }
           this.routeMessage(msg);
           renameSync(full, join(outbox, '.sent', f)); // archive, don't reprocess
           routed++;
@@ -3349,6 +3390,19 @@ Write one JSON file into \`outbox/\` (any filename ending in \`.json\`):
 
 The harness fills in \`id\`, \`from\`, \`hops\`, and timestamps.
 
+## Your schedules
+A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
+
+\`\`\`json
+{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
+  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
+\`\`\`
+
+- \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
+- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
+- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
+
 ## Rules of the road
 - Only \`request\`, \`query\`, and \`propose\` expect a reply. \`inform\` and \`done\` are terminal —
   don't reply to them, or two agents will loop forever.
@@ -3456,6 +3510,19 @@ One JSON file in \`outbox/\`, any name ending in \`.json\`:
 \`\`\`
 
 The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
+
+## Your schedules
+A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
+
+\`\`\`json
+{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
+  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
+\`\`\`
+
+- \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
+- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
+- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
 
 ## The task board
 \`tasks.json\` in the hive folder holds the cards (todo, doing, blocked, done), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.

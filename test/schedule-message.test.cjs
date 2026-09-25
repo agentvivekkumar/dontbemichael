@@ -29,10 +29,12 @@ test('an older schedule\'s prompt is still sent, labelled, until it moves', () =
 
 test('the scheduler sends that message, and the Schedules card has no prompt for new schedules', () => {
   const main = read('src/main/index.ts');
-  assert.equal((main.match(/body: scheduledRunBody\(m\.label, m\.body\)/g) ?? []).length, 2, 'the timer and the launch standup');
-  const ui = read('src/renderer/src/components/triggers/SchedulesSection.tsx');
-  assert.match(ui, /if \(!mLabel\.trim\(\) \|\| !whenIsUsable\) return;/, 'a label is all a new schedule needs');
-  assert.doesNotMatch(ui, /mBody/);
+  assert.equal((main.match(/body: scheduledRunBody\(m\.label, m\.body\)/g) ?? []).length, 1, 'the launch standup');
+  assert.match(main, /const payload = firePayload\(m\);/, 'the timer sends what firePayload builds');
+  assert.match(read('src/shared/missions.ts'), /body: m\.relay \? relayRunBody\(m\.label, m\.body\) : scheduledRunBody\(m\.label, m\.body\)/);
+  const ui = read('src/renderer/src/components/triggers/ScheduleList.tsx');
+  assert.match(ui, /if \(!label\.trim\(\) \|\| !whenIsUsable\) return;/, 'a label is all a new schedule needs');
+  assert.doesNotMatch(ui, /goesTo/, 'a schedule belongs to its agent, so there is no "goes to"');
   assert.match(ui, /updateAgent\(agent\.id, \{ goal: \[agent\.goal\?\.trim\(\), `\$\{m\.label\}: \$\{text\}`\]/, 'older instructions move into the Work style');
   assert.match(ui, /\{heartbeat && \(\s*<Field label=\{t\('schedulesSection\.prompt'\)\}>/, 'the heartbeat keeps its box for now');
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));

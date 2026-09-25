@@ -462,6 +462,20 @@ third-party packs is not something the app can promise.
 
 CSS-only `.cth-tip`, 400 ms show delay. Text at 13 px (currently 11 px, §17).
 
+### 7.10 Schedule row (`triggers/ScheduleList`)
+
+A divided list, never boxed tiles: one `ink-100` hairline between rows. Row: a when
+chip (Inter 14 px, `lemon-light` when on, `cream-300` with `ink-500` text when paused),
+the job name at 14 px, and a 13 px `ink-500` sub-line ("fired 2h ago, next in 40m,
+added by you"), then the `Toggle` (`role="switch"`). The open row's editor uses the
+`inset` variant (§6.1). Delete asks first: the ghost `Delete` becomes "Sure?" with a
+`destructive` "delete it" (§7.2) and a secondary "keep". A failed save reverts the row
+and says "Didn't save. Try again." in coral with a `!`. Read-only rows (Michael's office
+schedule) end in `›` and open that agent's Schedules tab.
+
+The agent panel tab strip uses Inter 14 px labels and scrolls sideways when four tabs
+outgrow the panel.
+
 ---
 
 ## 8. Web components [Web]

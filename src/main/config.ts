@@ -1,4 +1,5 @@
 import type { CompanyProfile } from '../shared/companyProfile';
+import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import { app } from 'electron';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -24,47 +25,10 @@ import {
   type WebhookTrigger
 } from '../shared/triggers';
 
-/** A recurring auto-dispatched mission fired on an interval by the scheduler. */
-export interface ScheduledMission {
-  id: string;
-  label: string;
-  intervalMs: number;
-  /** Day-of-week + time-of-day schedule. When present and valid this REPLACES
-   *  `intervalMs` — an interval cannot say "weekday mornings", because it drifts
-   *  against the clock and a 24h one started at 15:00 fires at 15:00 forever.
-   *  `intervalMs` is deliberately left on the record so switching back restores
-   *  the cadence the user had. See shared/weeklySchedule.ts. */
-  weekly?: { days: number[]; minute: number };
-  to: string;
-  /** A schedule says when and which job (its label); the how lives in the
-   *  agent's Work style (owner, 2026-09-25). New schedules leave this empty.
-   *  An older schedule's prompt stays here, and is sent after the standard
-   *  message (scheduleMessage.ts) until the owner moves it into the agent's
-   *  Work style from the Schedules card. The heartbeat still keeps its own
-   *  description here (see TODOS.md). */
-  body: string;
-  enabled: boolean;
-  /** When true, the scheduler asks the renderer to compact live terminals when
-   *  this mission fires — but only agents whose context has filled past the bar
-   *  in `contextTrigger.compact` (60% by default, 40% on ~1M-token windows), so
-   *  small/idle sessions are left alone instead of compacting on every tick.
-   *
-   *  This gate used to be described here but was never actually implemented: every
-   *  live agent was compacted on every tick. It is real now, and the bars live in
-   *  `ContextTriggerConfig` where the operator can edit them, so do not restate
-   *  the numbers anywhere else — they will drift. */
-  autoCompact?: boolean;
-  lastFiredAt?: number;
-  /** Mission flavor. Absent ⇒ 'dispatch' (the classic interval-dispatch mission,
-   *  e.g. the ops standup). 'heartbeat' (Lane A #1) is a context-aware beat: it
-   *  observes live floor state, re-engages a quiet god, and ticks the circuit
-   *  breaker — armed with an adaptive cadence, not a fixed setInterval. */
-  kind?: 'dispatch' | 'heartbeat' | 'compact';
-  /** Heartbeat only: a floor is "quiet" when no tracked signal (log.jsonl mtime,
-   *  inbox/outbox mtimes, any PTY output) has moved in this many ms. Default
-   *  ~5 min. NOT derived from registry.status (which never transitions in main). */
-  quietThresholdMs?: number;
-}
+/** A recurring schedule. The type and every rule about it (ownership, next run,
+ *  what a run sends) live in shared/missions.ts so main, preload and the
+ *  renderer can't drift apart. */
+export type { ScheduledMission } from '../shared/missions';
 
 /** The built-in hourly ops standup. A schedule says when and which job
  *  (owner, 2026-09-25): the label names the job, and what Michael does at a
@@ -265,6 +229,12 @@ export interface HarnessConfig {
   embeddingModel: 'minilm' | 'embeddinggemma';
   /** Recurring auto-dispatch missions handled by the scheduler. */
   missions?: ScheduledMission[];
+  /** One-time guard: schedules were moved to per-agent ownership (everyone rows
+   *  to Michael, createdBy stamped). See migrateMissions in shared/missions.ts. */
+  missionsOwnersMigrated?: boolean;
+  /** Schedule changes agents asked for, waiting for the owner in ASK ME. An
+   *  agent never changes a schedule itself (owner, 2026-09-25). */
+  scheduleRequests?: ScheduleRequest[];
   /** One-time guard: has the built-in hourly ops standup been seeded into an
    *  existing install's missions? Prevents re-adding it after a user deletes it. */
   opsStandupSeeded?: boolean;
