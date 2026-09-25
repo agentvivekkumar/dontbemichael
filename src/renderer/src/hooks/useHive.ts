@@ -24,6 +24,7 @@ import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/comp
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart } from '../../../shared/teamPlan';
+import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
 
 const GOD_ID = 'god';
 /** Accent palette for MAIN-spawned (voice-hired) agents — picked deterministically
@@ -287,7 +288,13 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
 
   const { packs, core } = await window.cth.packsList();
   const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? core;
-  const defs = new Map((pack?.agents ?? []).map((a) => [a.id, a]));
+  // The business's own pack first, then every other pack: an office continued
+  // from its registry may not know its business type, and its members must
+  // still be found (a Kelly or a Dwight is not in the core pack).
+  const defs = new Map<string, AgentDefinitionV2>();
+  for (const p of [pack, ...packs.map((x) => x.pack), core]) {
+    for (const a of p?.agents ?? []) if (!defs.has(a.id)) defs.set(a.id, a);
+  }
   const reg = await window.cth.hiveRegistry().catch(() => null);
 
   const provider = inferAgentProvider(config.defaultCommand);

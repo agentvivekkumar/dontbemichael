@@ -92,7 +92,8 @@ import { claudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
-import { findOffice, syncOfficeRecord } from './officeFile';
+import { backfillOfficeRecord, findOffice, syncOfficeRecord } from './officeFile';
+import { touchesOffice } from '../shared/officeRecord';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -3252,6 +3253,11 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   const hiveWasEnabled = hive.enabled();
   const wasOnboarded = readConfig().onboardingComplete;
   const next = writeConfig(patch);
+  // The office describes itself in <home>/office.json, so a reinstall finds it
+  // by folder rather than by the business name typed into setup. Only a save
+  // that changes the office's own fields writes it: switching offices changes
+  // harnessHome alone, and must not copy one office's team into another.
+  if (touchesOffice(patch)) syncOfficeRecord(next);
   // Live opt-in/out from Settings (TELEMETRY.md); stays off while
   // COLLECT_USAGE_STATS is false.
   if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(COLLECT_USAGE_STATS && patch.telemetryEnabled);
@@ -5460,8 +5466,9 @@ app.whenReady().then(() => {
   const homeReady = homeReadyAtLaunch(readConfig());
   if (homeReady) {
     bootstrapHiveServices();
-    // An office set up before office.json existed gets one now (officeFile.ts).
-    syncOfficeRecord(readConfig());
+    // An office set up before office.json existed gets one now, if the config's
+    // team is really this office's team (officeFile.ts).
+    backfillOfficeRecord(readConfig());
   }
   else console.warn('[home] office folder missing, waiting for the owner:', readConfig().harnessHome);
   // Survive sleep/lock. macOS freezes libuv timers during true system sleep, so a
@@ -5518,9 +5525,6 @@ app.on('before-quit', (e) => {
 // Every window loads the config once at start-up, so tell them all when a
 // setting is saved — a floor left out would keep showing what it opened with.
 onConfigWritten((config) => {
-  // The office describes itself in <home>/office.json, so a reinstall finds it
-  // by folder rather than by the business name typed into setup.
-  syncOfficeRecord(config);
   for (const w of allWindows) {
     if (w.isDestroyed() || w.webContents.isDestroyed()) continue;
     w.webContents.send('config:changed', config);

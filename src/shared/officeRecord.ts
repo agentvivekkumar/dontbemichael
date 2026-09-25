@@ -170,3 +170,40 @@ export function teamPlanFromRecord(rec: OfficeRecord | null | undefined): TeamPl
 export function sameOfficeRecord(a: OfficeRecord | null, b: OfficeRecord | null): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+/** Config fields that describe the office. Only a save that changes one of
+ *  these may rewrite office.json: the fields are global, not per office, so a
+ *  save that only switches offices (harnessHome) must never write the previous
+ *  office's description into the new one (2026-09-24 review). */
+export const OFFICE_FIELDS = [
+  'onboardingComplete', 'businessName', 'businessCity', 'businessType', 'officeFolder', 'businessTeam'
+] as const;
+
+export function touchesOffice(patch: unknown): boolean {
+  if (!patch || typeof patch !== 'object') return false;
+  return OFFICE_FIELDS.some((k) => k in (patch as Record<string, unknown>));
+}
+
+/**
+ * Whether the config's team is this office's team: every member is in the
+ * office's registry, working in the same folder. The launch backfill writes a
+ * record only then, so an install with several offices never labels one office
+ * with another's team. `caseInsensitive` for macOS and Windows, whose folder
+ * names ignore case.
+ */
+export function configMatchesRegistry(
+  cfg: OfficeConfigFields,
+  agents: Record<string, RegistryAgentFields> | undefined,
+  caseInsensitive: boolean
+): boolean {
+  const team = cleanTeam(cfg.businessTeam);
+  if (team.length === 0 || !agents) return false;
+  const norm = (p: string) => {
+    const t = p.replace(/[\\/]+$/, '');
+    return caseInsensitive ? t.toLowerCase() : t;
+  };
+  return team.every((m) => {
+    const cwd = str(agents[m.agentId]?.cwd);
+    return !!cwd && norm(cwd) === norm(m.folder);
+  });
+}

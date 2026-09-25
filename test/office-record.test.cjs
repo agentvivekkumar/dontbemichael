@@ -148,11 +148,41 @@ test('finding an office: its own record first, its registry for an older office,
 
 // --- wiring ------------------------------------------------------------------
 
-test('main keeps office.json current on every config save and backfills it at launch', () => {
+test('main writes office.json only when the office itself changes, and backfills it carefully', () => {
   const main = read('src/main/index.ts');
-  assert.match(main, /onConfigWritten\(\(config\) => \{[\s\S]{0,300}syncOfficeRecord\(config\);/);
-  assert.match(main, /bootstrapHiveServices\(\);\s*\/\/[^\n]*\n\s*syncOfficeRecord\(readConfig\(\)\);/);
+  // Switching offices saves harnessHome alone; it must never copy the previous
+  // office's (global) business fields into the new office's record.
+  assert.match(main, /const next = writeConfig\(patch\);[\s\S]{0,500}if \(touchesOffice\(patch\)\) syncOfficeRecord\(next\);/);
+  const hook = main.slice(main.indexOf('onConfigWritten((config) => {'), main.indexOf('onConfigWritten((config) => {') + 300);
+  assert.doesNotMatch(hook, /syncOfficeRecord/);
+  assert.match(main, /backfillOfficeRecord\(readConfig\(\)\);/);
   assert.match(main, /ipcMain\.handle\('office:find'/);
+});
+
+test('only saves that describe the office count, and the backfill needs the office to agree', () => {
+  assert.equal(rec.touchesOffice({ harnessHome: '/x' }), false, 'switching offices');
+  assert.equal(rec.touchesOffice({ autoMode: true }), false);
+  for (const k of rec.OFFICE_FIELDS) assert.equal(rec.touchesOffice({ [k]: undefined }), true, k);
+  const agents = { oscar: { id: 'oscar', cwd: `${DOCS}/Finance` }, pam: { id: 'pam', cwd: `${DOCS}/Admin/` } };
+  assert.equal(rec.configMatchesRegistry(cfg, agents, false), true, 'same folders (a trailing slash is the same folder)');
+  const typedDifferently = { ...cfg, businessTeam: team.map((m) => ({ ...m, folder: m.folder.replace('MoblizeIt', 'MoblizeIT') })) };
+  assert.equal(rec.configMatchesRegistry(typedDifferently, agents, true), true, 'macOS folder names ignore case');
+  assert.equal(rec.configMatchesRegistry(typedDifferently, agents, false), false);
+  assert.equal(rec.configMatchesRegistry(cfg, { oscar: agents.oscar }, true), false, 'a member this office never had');
+  assert.equal(rec.configMatchesRegistry({ ...cfg, businessTeam: [] }, agents, true), false);
+});
+
+test('the launch backfill skips an office whose registry holds a different team', () => {
+  const home = office(); // registry: oscar and pam in DOCS
+  try {
+    const other = { ...cfg, harnessHome: home, businessTeam: [{ agentId: 'kelly', folder: '/Users/owner/Documents/Other/Support' }] };
+    assert.equal(file.backfillOfficeRecord(other), false);
+    assert.equal(file.readOfficeRecord(home), null, 'nothing written');
+    assert.equal(file.backfillOfficeRecord({ ...cfg, harnessHome: home }), true, 'its own team: written');
+    assert.equal(file.backfillOfficeRecord({ ...cfg, harnessHome: home }), false, 'only once');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('setup opens on the office it found, and continuing uses the recorded team and folders', () => {
@@ -237,4 +267,47 @@ test('an older office uses the Office folder already beside its team', () => {
     fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(biz, { recursive: true, force: true });
   }
+});
+
+test('an older office whose folders share only the home folder is not offered to continue', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'office-'));
+  const h = os.homedir();
+  try {
+    fs.mkdirSync(path.join(home, 'hive'), { recursive: true });
+    fs.writeFileSync(path.join(home, 'hive', 'registry.json'), JSON.stringify({
+      agents: {
+        a: { id: 'a', cwd: path.join(h, 'code-app-that-does-not-exist') },
+        b: { id: 'b', cwd: path.join(h, 'Documents', 'Other-that-does-not-exist', 'Sales') }
+      }
+    }));
+    const found = file.findOffice(home);
+    assert.equal(found.hasOffice, true);
+    assert.deepEqual(found.record.team, [], 'no team to continue, so setup starts fresh');
+    assert.equal(rec.teamPlanFromRecord(found.record).ok, false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('a team folder that is a link to the home folder counts as the home folder', () => {
+  const home = office();
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'link-')), 'Finance');
+  try {
+    fs.symlinkSync(os.homedir(), link);
+    fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
+      version: 1, officeFolder: `${DOCS}/Office`, team: [{ agentId: 'oscar', folder: link }, ...team.slice(1)]
+    }));
+    assert.deepEqual(file.findOffice(home).record.team.map((m) => m.agentId), ['pam']);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(path.dirname(link), { recursive: true, force: true });
+  }
+});
+
+test('setup checks a folder picked by hand, and team start finds members in any pack', () => {
+  const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
+  assert.match(wiz, /if \(step === 'home'\) \{\s*const f = await window\.cth\.officeFind\(home\.trim\(\)\)/);
+  assert.match(wiz, /setError\(t\('onboarding\.resume\.folderInUse'\)\);/);
+  const hive = read('src/renderer/src/hooks/useHive.ts');
+  assert.match(hive, /for \(const p of \[pack, \.\.\.packs\.map\(\(x\) => x\.pack\), core\]\)/);
 });

@@ -3,10 +3,11 @@
  *
  * Plain node:fs, no electron import, so it tests as a node module.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import {
+  configMatchesRegistry,
   officeRecordFromConfig,
   officeRecordFromRegistry,
   parseOfficeRecord,
@@ -56,6 +57,8 @@ export function syncOfficeRecord(cfg: OfficeConfigFields): boolean {
   const rec = officeRecordFromConfig(cfg);
   const home = cfg.harnessHome;
   if (!rec || !home) return false;
+  // A save that switches offices only (harnessHome) never gets here: callers
+  // sync on saves that touch the office's own fields (touchesOffice).
   // Only an office that exists gets a record. Setup makes the home folder
   // before it saves, and a missing office must not be recreated as a stray file.
   if (!existsSync(home)) return false;
@@ -67,6 +70,20 @@ export function syncOfficeRecord(cfg: OfficeConfigFields): boolean {
     console.error('[office] could not save office.json:', e);
     return false;
   }
+}
+
+/**
+ * At launch: give an office set up before office.json existed its record, but
+ * only when the config's team really is this office's team (its registry has
+ * each member in the same folder). Several offices share one config, so
+ * without that check a switch between them could label one with another's team.
+ */
+export function backfillOfficeRecord(cfg: OfficeConfigFields): boolean {
+  const home = cfg.harnessHome;
+  if (!home || !existsSync(home) || readOfficeRecord(home)) return false;
+  const caseInsensitive = process.platform === 'darwin' || process.platform === 'win32';
+  if (!configMatchesRegistry(cfg, readRegistryAgents(home), caseInsensitive)) return false;
+  return syncOfficeRecord(cfg);
 }
 
 function readRegistryAgents(home: string): Record<string, RegistryAgentFields> | undefined {
@@ -97,14 +114,28 @@ export interface FoundOffice {
  *  synced from elsewhere, so its folders are checked before setup offers them. */
 function isUsableTeamFolder(folder: string, home = homedir()): boolean {
   if (!isAbsolute(folder)) return false;
-  const f = resolve(folder);
-  const h = resolve(home);
+  // Follow links: a folder that is a link into ~/.ssh is ~/.ssh.
+  const real = (p: string) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
+  const f = real(folder);
+  const h = real(home);
   if (f === resolve(sep) || f === h) return false;
   for (const kept of ['.ssh', '.claude', '.config', '.gnupg', 'Library']) {
     const k = join(h, kept);
     if (f === k || f.startsWith(k + sep)) return false;
   }
   return true;
+}
+
+/** The deepest folder that contains every path's parent, or undefined. */
+function commonDir(paths: string[]): string | undefined {
+  if (paths.length === 0) return undefined;
+  let dir = dirname(paths[0]);
+  while (!paths.every((p) => p === dir || p.startsWith(dir + sep))) {
+    const up = dirname(dir);
+    if (up === dir) return undefined;
+    dir = up;
+  }
+  return dir;
 }
 
 function isFolder(p: string): boolean {
@@ -118,6 +149,16 @@ function checkedRecord(rec: OfficeRecord): OfficeRecord {
   let officeFolder = rec.officeFolder && isUsableTeamFolder(rec.officeFolder) ? rec.officeFolder : undefined;
   if (!officeFolder) {
     officeFolder = team.map((m) => join(dirname(m.folder), OFFICE_FOLDER)).find(isFolder);
+  }
+  // With no Office folder to go on, the team's folders must share a business
+  // folder of their own. Sharing only the home folder (hires in unrelated
+  // places) is not an office to continue: it would put Michael's Office in ~
+  // and name the business after the user account.
+  if (!officeFolder) {
+    const parents = new Set(team.map((m) => dirname(resolve(m.folder))));
+    const one = parents.size === 1 ? [...parents][0] : undefined;
+    const shared = one ?? commonDir(team.map((m) => resolve(m.folder)));
+    if (!shared || !isUsableTeamFolder(shared)) return { ...rec, officeFolder: undefined, team: [] };
   }
   return { ...rec, officeFolder, team };
 }

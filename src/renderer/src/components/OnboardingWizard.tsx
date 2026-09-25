@@ -1132,7 +1132,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   <PixelButton
                     variant="primary"
                     size="md"
-                    onClick={() => {
+                    onClick={async () => {
                       // Step 1 needs a name, a location and a business type before
                       // anything else. The button stays clickable so the owner is
                       // TOLD what's missing, rather than facing a grey button.
@@ -1150,6 +1150,22 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       if (step === 'home' && !home.trim()) {
                         setError(t('onboarding.errPickHome'));
                         return;
+                      }
+                      // A folder that already holds an office is never set up as a
+                      // new one: that would mix a second team into it. Offer to
+                      // continue it instead, or ask for another folder.
+                      if (step === 'home') {
+                        const f = await window.cth.officeFind(home.trim()).catch(() => null);
+                        if (f?.hasOffice) {
+                          if (f.path && f.record && teamPlanFromRecord(f.record).ok) {
+                            setFound({ path: f.path, record: f.record });
+                            setError(undefined);
+                            setStep('resume');
+                          } else {
+                            setError(t('onboarding.resume.folderInUse'));
+                          }
+                          return;
+                        }
                       }
                       // Same idea for the engine: refuse here, with the reason on
                       // screen, instead of letting a pick that cannot boot through
