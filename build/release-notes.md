@@ -1,5 +1,3 @@
-- **New instructions for Michael and the team.** Your team gets them once.
-- **Every folder is private.** Michael reads his team's work.
-- **A company profile.** Every agent works from it.
-- **Memory that improves.** Ask me answers are remembered.
-- **Idle conversations cleared safely.** You can bring them back.
+- **The new brand in the app.** New logo, app icon and loading screen.
+- **Names change only in Edit Agent.** No more accidental renames.
+- **Renames reach the whole team.** A name already in use is refused.
