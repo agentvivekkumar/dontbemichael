@@ -17,8 +17,9 @@ much cheaper than finding out in review.
 - **Keep the change scoped to one clear improvement, fix, or refactor.** A fix
   plus a rename plus a refactor is three pull requests, and all three merge
   faster than the one.
-- **Don't Be Michael targets macOS, Windows and Linux.** Every change has to work
-  on all three unless it sits behind an explicit runtime platform check. Most
+- **Releases are Mac only for now, but the code runs on macOS, Windows and
+  Linux.** Every change has to keep working on all three unless it sits behind an
+  explicit runtime platform check, so the other two can ship later. Most
   of our cross-platform bugs are paths: use `path.join` and the Node path
   helpers, never a hand-built `"a/b"` string.
 - **Paths with spaces are real.** Several shipped bugs came from a hive folder
@@ -30,14 +31,15 @@ much cheaper than finding out in review.
   specific logic behind an explicit check. Anything that assumes Claude Code
   specifically will break the other eleven when they return.
 - **Hidden surfaces have one switch each.** Git views, the IDE, temporary
-  workers and the organisation trigger are off in this build through
+  workers, voice and the organisation trigger are off in this build through
   `src/shared/buildFeatures.ts`. Gate new code for those surfaces on the same
   constant instead of deleting or forking it.
 - **Owner facing text is plain words with no dashes.** The product is for small
   business owners. No em dash, en dash, or hyphen used as punctuation in UI
   strings, Office Packs, or reasons shown in the app; `test/no-dashes.test.cjs`
   enforces it. Strings that name the manager use `{{godName}}`, never a literal
-  "Michael" (`test/i18n-god-name.test.cjs`), because the owner can rename him.
+  "Michael" (`test/i18n-god-name.test.cjs`), because an office may have given
+  him another name before renaming him was removed.
 - **Nothing points at the upstream project.** Updates, fetched content, links
   and the URL scheme all belong to this repo; `test/no-upstream.test.cjs`
   scans `src/`, `resources/`, `scripts/`, `tools/`, `.github/`, this file and
@@ -46,16 +48,17 @@ much cheaper than finding out in review.
 - **Do not assume the local machine.** Agents run against their own working
   directories and their own environments; a process, file, credential or shell
   that exists on yours may not exist on theirs.
-- **New UI derives from the design tokens.** [`DESIGN.md`](./DESIGN.md) is
+- **New UI derives from the design tokens.** [`branding/DESIGN.md`](./branding/DESIGN.md) is
   canonical. No ad-hoc colors, spacing or fonts.
 
 ## Development setup
 
 ### Prerequisites
 
-- **macOS, Windows, or Linux** — signed/notarized macOS builds, plus Windows and
-  Linux builds, ship from the [releases page](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
-  Cross-platform smoke-testing and fixes are still very welcome (see
+- **macOS, Windows, or Linux** to build and run from source. Releases on the
+  [releases page](https://github.com/agentvivekkumar/dontbemichael/releases/latest)
+  are Mac only for now, and not yet signed with an Apple Developer ID.
+  Cross-platform smoke-testing and fixes are very welcome (see
   [Good first areas](#good-first-areas)).
 - **Node.js 18+** and npm.
 - A **C/C++ toolchain** to build `node-pty`'s native addon. On macOS:
@@ -96,7 +99,7 @@ required.
    test for it — a bug fix with no test is a bug fix that comes back.
 3. **Confirm a production build works:** `npm run build`.
 4. **Match the aesthetic.** Any new UI **must** derive from the design tokens in
-   [`DESIGN.md`](./DESIGN.md) / `src/renderer/src/design/tokens.ts` — no ad-hoc
+   [`branding/DESIGN.md`](./branding/DESIGN.md) / `src/renderer/src/design/tokens.ts` — no ad-hoc
    colors, spacing, or fonts. `tokens.ts` and `tokens.css` are mirrored; if you
    change one, change both.
 5. **Read your own diff.** Every line of it. Debug logging, commented-out code,
@@ -152,12 +155,13 @@ the module by module layout, and the design system.
 
 ## Good first areas
 
-- **Wiring real Claude Code hook events** — avatar behavior is currently driven
-  by a mock event loop (`src/renderer/src/store/mockEvents.ts`). Replacing it
-  with real tool events is the headline next milestone.
+- **Fuller avatar coverage.** Real Claude Code hook events drive the avatars;
+  the synthetic loop in `src/renderer/src/store/mockEvents.ts` runs only in demo
+  mode or when no agent is live. Some station visits and tool bubbles still
+  need their real events.
 - The add-agent flow and config drawer.
-- Cross-platform smoke-testing — Windows and Linux builds ship, but real-world
-  coverage (WSL2, various distros, uncommon shells) is thin.
+- Cross-platform smoke-testing. Windows and Linux builds don't ship yet, and
+  real-world coverage (WSL2, various distros, uncommon shells) is thin.
 
 ## Commit & PR conventions
 

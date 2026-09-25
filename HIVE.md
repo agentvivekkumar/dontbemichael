@@ -48,8 +48,7 @@ stream, retrieval, reflection, and planning.
    keeps running fully autonomously. **Critical** items (destructive ops, spend,
    scope changes, unresolvable conflicts) route to the god, who surfaces them to
    the human natively in his own Claude Code session — there is no separate
-   approval queue. Tool-permission prompts are the HITL gate, and they're
-   approvable remotely from a phone via `/remote-control`.
+   approval queue. Tool-permission prompts are the HITL gate.
 4. **Memory: markdown first.** Per-agent `memory.md` + shared blackboard, with a
    SQLite FTS index when keyword recall isn't enough. A heavyweight vector layer
    (Letta/Mem0/Zep) is *not* needed at 5–15 agents and is architecturally wrong
@@ -176,12 +175,11 @@ is the primary control surface — tune the prompt, not the code.
   and keep running (guarded by `stop_hook_active` + cursor); hook events stream to
   the renderer to drive avatars.
 - **Phase 2 — God mode** ✅: the god agent auto-spawns into Michael's room
-  (`desk-ceo` reserved) and, on a fresh spawn, is started with `/remote-control`
-  (best-effort) plus an orientation prompt so it begins running the floor on its
-  own. The router routes `to:"human"` traffic to the god (the human's proxy);
+  (`desk-ceo` reserved). Nothing is typed into his terminal at start: his
+  startup instructions orient him, and the standup sent when the office opens
+  gives him his first turn. The router routes `to:"human"` traffic to the god (the human's proxy);
   there is no separate approval queue — human-in-the-loop is native to each
-  agent's Claude Code session (permission prompts, approvable remotely from a
-  phone). Idle agents are woken when they hold unread inbox messages.
+  agent's Claude Code session (permission prompts). Idle agents are woken when they hold unread inbox messages.
 - **Phase 3 — Semantic memory** ✅ (CLI integration): `memory.ts` wraps the
   **MemPalace CLI** (not MCP, by decision). The harness keeps one shared palace
   under `harnessHome`, points every agent's `MEMPALACE_PALACE_PATH` at it, mines
@@ -190,8 +188,9 @@ is the primary control surface — tune the prompt, not the code.
   isn't installed (markdown memory still works). Default model `minilm` (light,
   for low-RAM Macs); `embeddinggemma` is the multilingual opt-in. Michael's **Memory** tab
   lets the human search the same palace.
-  - *Still open*: reflection/summarization to bound `memory.md`; needs a live
-    `mempalace` install to validate retrieval end-to-end.
+  - `memory.md` is now a short index the app keeps. Agents add notes to
+    `memory/inbox.md`, and a background tidy up (`memoryTidy.ts`, Haiku with no
+    tools) sorts them in with itemised changes, so memory stays bounded.
 
 ---
 
@@ -203,7 +202,7 @@ is the primary control surface — tune the prompt, not the code.
 | Infinite Stop-hook loop | Guard on `stop_hook_active`; `hops` cap; `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` |
 | Two agents ping-ponging | Only request/query/propose obligate replies; hop cap → god escalates |
 | Reprocessing messages | Per-agent `cursor.json`; processed messages move to `inbox/.done/` |
-| `memory.md` unbounded growth | Phase 3 reflection/summarization |
+| `memory.md` unbounded growth | App kept index with a size budget, tidied in the background (`memoryTidy.ts`) |
 | Modifying the user's repo with hooks | Write hooks to `<cwd>/.claude/settings.local.json` (gitignored convention) |
 
 ---
