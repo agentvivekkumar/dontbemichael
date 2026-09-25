@@ -17,6 +17,9 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Michael works in the business folder.** He moves up from the Office folder to the folder that
   holds it and everyone's folders, so he can read his team's work. His conversation carries over.
   Setup now asks for this one folder, and the Office and team folders go inside it.
+- **The standup runs every time the office opens.** Michael gets the hourly standup as soon as he's
+  up, including a brand new office right after setup, then every hour from there. Before, the first
+  one on a new office was lost, and a reopened office only got one when it was overdue.
 - **Hiring asks for Role, Role description and Work style,** the same fields as Edit Agent. A new
   team member's folder goes inside Michael's, named after the role, so people in the same role
   share one. Michael's folder and the Office can't be picked as a team member's own folder.

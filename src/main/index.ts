@@ -778,7 +778,12 @@ function syncMissions(): void {
     // Honor lastFiredAt so a partially-elapsed interval is not restarted from
     // zero on reboot or when an unrelated mission is edited: wait only the time
     // remaining until the next due fire, then settle into a steady interval.
-    const remaining = Math.max(0, m.intervalMs - (Date.now() - (m.lastFiredAt ?? 0)));
+    //
+    // The standup is the exception at launch: its first fire is the one sent when
+    // Michael comes up (standupOnOfficeOpen), which restarts this timer. Until
+    // then it waits a full interval, so an overdue standup isn't sent twice.
+    const waitForOpen = m.id === OPS_STANDUP_MISSION.id && !standupFiredThisLaunch;
+    const remaining = waitForOpen ? m.intervalMs : Math.max(0, m.intervalMs - (Date.now() - (m.lastFiredAt ?? 0)));
     entry.timeout = setTimeout(() => {
       fire();
       entry.interval = setInterval(fire, m.intervalMs);
@@ -927,11 +932,34 @@ function archiveOrphanedAgents(): void {
   }
 }
 
+/** The standup fires every time the office opens (owner, 2026-09-25): once per
+ *  launch, as soon as Michael is up, including a brand-new office right after
+ *  setup. The hourly timer then restarts from this fire, so the next one comes an
+ *  hour later. Only when the standup is on and runs on an interval; a standup the
+ *  owner moved to weekly slots keeps to its slots. Michael starting again later in
+ *  the same launch doesn't fire it again. */
+let standupFiredThisLaunch = false;
+function standupOnOfficeOpen(): void {
+  if (standupFiredThisLaunch || !hive.enabled()) return;
+  const m = (readConfig().missions ?? []).find((x) => x.id === OPS_STANDUP_MISSION.id);
+  if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
+  standupFiredThisLaunch = true;
+  try {
+    hive.send({ to: m.to, act: 'request', subject: m.label, body: m.body }, 'scheduler');
+    const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
+    writeConfig({ missions: next });
+    try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
+    syncMissions();
+  } catch (e) {
+    console.error('[scheduler] standup on open', e);
+  }
+}
+
 /** One-time migration: ensure the built-in hourly ops standup exists for installs
  *  that predate it. Guarded by `opsStandupSeeded` so a user who later deletes the
  *  mission doesn't get it re-added on every boot. Stamps lastFiredAt = now so the
- *  first standup waits a full interval instead of firing (and compacting every
- *  terminal) immediately on launch. */
+ *  interval timer doesn't also fire it at launch: the launch standup is sent
+ *  once Michael is up (standupOnOfficeOpen). */
 function ensureDefaultMissions(): void {
   const cfg = readConfig();
   if (!cfg.opsStandupSeeded) {
@@ -3123,6 +3151,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   const worktreePath = worktreePaths.get(opts.id);
   // `cwd` echoes back the TILDE-EXPANDED absolute path so the renderer's agent
   // record matches what the registry and the PTY actually used.
+  if (res.ok && opts.hive?.isGod) standupOnOfficeOpen();
   return { ...res, cwd: opts.cwd, ...(worktreePath ? { worktreePath } : {}), ...(resumeNotFound ? { resumeNotFound: true } : {}), ...(didResume ? { resumed: true } : {}), ...(seedPrompt ? { seedPrompt } : {}) };
 }
 ipcMain.handle('pty:write', (_evt, id: string, data: string) => {
