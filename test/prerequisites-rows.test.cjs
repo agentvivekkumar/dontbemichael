@@ -33,3 +33,13 @@ test('the panel filters what it shows, not what main reports', () => {
   const main = fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8');
   assert.match(main, /return toolCatalog\(\)\.map\(/, 'tools:status keeps the full catalog');
 });
+
+test('Agents & Models hides the API keys panel while no offered engine reads it', () => {
+  const { showByokSettings, BUILD_ENGINES } = loadTs('src/shared/agentProvider.ts');
+  assert.deepEqual([...BUILD_ENGINES], ['claude']);
+  assert.equal(showByokSettings(), false, 'Claude Code uses its own login');
+  assert.equal(showByokSettings(['claude', 'opencode']), true, 'it comes back when a build offers OpenCode');
+  const modal = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/SettingsModal.tsx'), 'utf8');
+  assert.match(modal, /\{showByokSettings\(\) && \(\s*<>\s*<AiEnginesSettings config=\{config\} \/>/);
+  assert.match(modal, /settings\.agentsModels\.maxTurns/, 'Max turns stays (owner, 2026-09-25)');
+});

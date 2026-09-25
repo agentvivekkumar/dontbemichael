@@ -172,6 +172,18 @@ export interface AgentProviderPreset {
  *  adding its id here and nothing else. Setup's manager step reads this. */
 export const BUILD_ENGINES: readonly AgentProvider[] = ['claude'];
 
+/** Engines that read the owner's own API keys and local endpoints (Settings →
+ *  Agents & Models, AI engine providers). Claude Code and Codex use their own
+ *  login, so the panel only means something when a build offers one of these. */
+export const BYOK_ENGINES: readonly AgentProvider[] = ['opencode', 'crush', 'pi', 'qwen'];
+
+/** Show the API keys and endpoints panel? Only when this build offers an engine
+ *  that reads them; otherwise nothing typed there reaches any agent (owner,
+ *  2026-09-25). */
+export function showByokSettings(engines: readonly AgentProvider[] = BUILD_ENGINES): boolean {
+  return engines.some((e) => BYOK_ENGINES.includes(e));
+}
+
 export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
   {
     id: 'claude',
