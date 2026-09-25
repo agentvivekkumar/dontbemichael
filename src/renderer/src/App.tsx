@@ -35,7 +35,10 @@ import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
 import { SHOW_IDE, SHOW_AUTO_MODE_LABEL } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
-import brandLogo from '@brand/logo.png?url';
+// The header shows the brand kit's horizontal lockup (branding/logo/lockup):
+// ink on the light theme, cream on the dark one. CSS in tokens.css shows one.
+import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
+import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 
 // Injected at build time from package.json (see electron.vite.config.ts).
 declare const __APP_VERSION__: string;
@@ -309,9 +312,16 @@ export function App() {
         }}
       >
         <img
-          src={brandLogo}
+          className="cth-lockup-light"
+          src={lockupLight}
           alt="Don't Be Michael"
-          style={{ height: 20, width: 'auto', display: 'block' }}
+          style={{ height: 20, width: 'auto' }}
+        />
+        <img
+          className="cth-lockup-dark"
+          src={lockupDark}
+          alt="Don't Be Michael"
+          style={{ height: 20, width: 'auto' }}
         />
         {/* v0.3.7: the version is no longer inert text — it doubles as the
             update control (check / download / restart to update). */}
