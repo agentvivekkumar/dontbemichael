@@ -92,7 +92,10 @@ export class HookServer {
     /** Optional observer of every hook boundary (agentId, event, message). The
      *  worker inbox-wake watchdog (workerWake.ts) feeds on this to learn when an
      *  agent is parked on a permission/HITL prompt so it never types into it. */
-    private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void
+    private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void,
+    /** Company knowledge's live state, so turning it on or off reaches running
+     *  agents on their next prompt instead of at their next start. */
+    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string }
   ) {}
 
   start(): void {
@@ -398,12 +401,17 @@ export class HookServer {
       }
     }
 
-    if (steer || roster || goal) {
+    // Company knowledge turned on or off since this agent was last told.
+    const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
+      ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
+      : null;
+
+    if (steer || roster || goal || knowledgeNote) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, goal, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
         }
       };
     }

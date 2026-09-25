@@ -86,6 +86,13 @@ export class KnowledgeManager {
     return { KG_ROOT: this.root(), KG_CLI: this.cliPath(), KG_CORE: this.corePath() };
   }
 
+  /** What a running agent needs to search the store: whether it's on, the CLI,
+   *  and the store's folder (passed as --root, so no restart is needed). */
+  agentAccess(): { active: boolean; cliPath?: string; root?: string } {
+    if (!this.active()) return { active: false };
+    return { active: true, cliPath: this.cliPath(), root: this.root() };
+  }
+
   status(): KnowledgeStatus {
     const enabled = this.active();
     const root = this.root();

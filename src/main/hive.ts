@@ -155,6 +155,21 @@ export const HOUSE_RULES = [
   '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.'
 ].join('\n');
 
+/**
+ * How every agent is told about company knowledge (owner, 2026-09-25): at
+ * spawn in its startup instructions, or through the hook if the owner turns
+ * the store on while it is running. `root`, when known, rides on each command
+ * so it works without KG_ROOT in the agent's environment.
+ */
+export function companyKnowledgeLine(node: string, cli: string, root?: string): string {
+  const at = root ? ` --root "${root}"` : '';
+  return `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says. Run \`"${node}" "${cli}" search "<words>"${at}\` for matching passages, \`"${node}" "${cli}" list${at}\` to see what's there, and \`"${node}" "${cli}" get <id>${at}\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`;
+}
+
+/** What a running agent is told when the owner turns company knowledge off. */
+export const COMPANY_KNOWLEDGE_OFF =
+  'COMPANY KNOWLEDGE: the owner has turned the company knowledge store off. Its commands stop working until it is turned on again.';
+
 export interface AgentMeta {
   id: string;
   name: string;
@@ -386,6 +401,24 @@ export class HiveManager {
   ) {}
 
   private routerTimer: NodeJS.Timeout | null = null;
+
+  /** agentId → whether it has been told company knowledge is on, as of its
+   *  spawn or its last update. Lets an owner's toggle reach running agents
+   *  without a restart (knowledgeUpdate). */
+  private knowledgeTold = new Map<string, boolean>();
+
+  /**
+   * What a running agent should be told because the owner turned company
+   * knowledge on or off since it was last told, or null when nothing changed.
+   * Agents this app didn't start in this launch are left alone.
+   */
+  knowledgeUpdate(agentId: string, k: { active: boolean; cliPath?: string; root?: string }): string | null {
+    const told = this.knowledgeTold.get(agentId);
+    if (told === undefined || told === k.active) return null;
+    if (k.active && !k.cliPath) return null;
+    this.knowledgeTold.set(agentId, k.active);
+    return k.active ? companyKnowledgeLine(this.nodeCommand(), k.cliPath!, k.root) : COMPANY_KNOWLEDGE_OFF;
+  }
 
   /** The embedded OTLP collector's loopback URL, set by the main process once the
    *  collector is bound (telemetry.ts). null = telemetry off → no OTel env is
@@ -709,6 +742,9 @@ export class HiveManager {
        *  instructions were unusable on Windows. Optional: undefined degrades to the
        *  old env-var spelling. */
       kgCliPath?: string;
+      /** The company knowledge store's folder, written into the search command
+       *  so it works without KG_ROOT in the agent's environment. */
+      kgRoot?: string;
       theme?: 'light' | 'dark';
       /** Consent state for the default-MCP bundle (W3). Threaded from the live
        *  HarnessConfig by the caller; undefined → catalog defaults apply. */
@@ -734,6 +770,7 @@ export class HiveManager {
     const root = this.root();
     if (!root) return { args: [], env: {} };
     this.ensureHive();
+    this.knowledgeTold.set(meta.id, !!opts.knowledgeGraph);
 
     const dir = this.agentDir(meta.id);
     mkdirSync(join(dir, 'inbox', '.done'), { recursive: true });
@@ -843,7 +880,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -987,7 +1024,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1486,7 +1523,8 @@ export class HiveManager {
     knowledgeGraph: boolean,
     kgCliPath?: string,
     businessFolder?: string,
-    docTextCliPath?: string
+    docTextCliPath?: string,
+    kgRoot?: string
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
     const inDir = (...parts: string[]): string => join(dir, ...parts);
@@ -1516,9 +1554,7 @@ export class HiveManager {
     const kgCli = kgCliPath || (process.platform === 'win32' ? '%KG_CLI%' : '$KG_CLI');
     // Company knowledge (owner, 2026-09-25): the one place company wide
     // information, policies and rules are shared, searched by every agent.
-    const knowledgeLine = knowledgeGraph
-      ? `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says. Run \`"${hiveNode}" "${kgCli}" search "<words>"\` for matching passages, \`"${hiveNode}" "${kgCli}" list\` to see what's there, and \`"${hiveNode}" "${kgCli}" get <id>\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`
-      : '';
+    const knowledgeLine = knowledgeGraph ? companyKnowledgeLine(hiveNode, kgCli, kgRoot) : '';
     // Item 13: state the build. Agents had no way to tell which version, or even
     // which KIND of build, they were running inside, so anything that varies
     // between a packaged app and a local dev run (umask being the one that bit

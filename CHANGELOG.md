@@ -20,7 +20,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Company knowledge lives in Memory & Knowledge.** Company wide information, policies and rules
   are shared through the knowledge feature, which is now on for every office and which every agent,
   Michael included, is told to search. There is no shared Office folder any more: an existing one
-  stays on disk as an ordinary folder inside Michael's.
+  stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
+  agents that are already running on their next message, instead of at their next start.
 - **House rules for every agent, Michael included.** Every agent now starts with five short rules:
   state only facts it can trace to a source and name the source, say so when it doesn't know,
   mark estimates as estimates, report outcomes as they are, and never make up people, customers or
