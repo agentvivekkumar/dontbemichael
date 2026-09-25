@@ -35,6 +35,10 @@ export interface HiddenClaudeOptions {
   command?: string;
   /** Tools the session is forbidden to use. Defaults to ['Edit','Write','NotebookEdit']. */
   disallowedTools?: string[];
+  /** No tools and no MCP servers at all: for a pure text transform that reads
+   *  text other agents wrote (the memory tidy up), so nothing in that text can
+   *  make it open files or reach the web. Overrides disallowedTools. */
+  noTools?: boolean;
   /** Directories added via --add-dir (for context gathering). */
   addDirs?: string[];
   /** Hard cap ms before forcing prompt send regardless of boot activity. Default 7000. */
@@ -115,7 +119,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     const args: string[] = [
       '--model', opts.model,
       '--permission-mode', 'bypassPermissions',
-      '--disallowedTools', ...disallowed,
+      ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--disallowedTools', ...disallowed]),
     ];
     for (const d of addDirs) { args.push('--add-dir', d); }
 

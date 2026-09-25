@@ -217,7 +217,8 @@ export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string)
       const slug = procedureSlug(op.name);
       const path = `memory/procedures/${slug}.md`;
       procedures.push({ slug, name: op.name, content: `# ${op.name}\n\n${op.steps}\n\nUpdated ${today}.\n` });
-      const pointer = `${op.name}: steps in ${path}`.slice(0, MAX_ENTRY_CHARS);
+      // Shorten the name, never the path: the agent needs the path to find it.
+      const pointer = `${op.name.slice(0, Math.max(1, MAX_ENTRY_CHARS - path.length - 11))}: steps in ${path}`;
       const i = next.findIndex((e) => e.kind === 'procedure' && e.text.includes(path));
       if (i >= 0) next[i] = { ...next[i], text: pointer, date: today };
       else next.push({ id: newId(), kind: 'procedure', text: pointer, source: op.source, date: today });

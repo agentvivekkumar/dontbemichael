@@ -132,10 +132,13 @@ export class MemoryTidy {
     }
     if (!existsSync(indexPath) && !existsSync(inboxPath)) return null;
 
+    // A file that exists but can't be read is left alone: reading it as empty
+    // would replace the agent's memory with an empty index.
     const indexText = readText(indexPath);
+    if (indexText === null) return this.abort(id, 'index-unreadable');
     const { isIndex, entries } = parseIndex(indexText);
     const migrating = !isIndex && legacyNotes(indexText).length > 0;
-    const inboxNotes = parseInbox(readText(inboxPath));
+    const inboxNotes = parseInbox(readText(inboxPath) ?? '');
     const notes = [...(migrating ? legacyNotes(indexText) : []), ...inboxNotes];
     const overBudget = estimateTokens(entriesBlock(entries)) > INDEX_BUDGET_TOKENS * INDEX_PRUNE_AT;
     const last = readState(statePath).lastTidyAt ?? 0;
@@ -143,7 +146,9 @@ export class MemoryTidy {
       || (notes.length > 0 && (force || Date.now() - last >= DAY_MS || this.isIdle()));
     if (!due) {
       // An empty older file just becomes an empty index, no model call needed.
-      if (!isIndex && existsSync(indexPath)) atomicWrite(indexPath, renderIndex(this.nameOf(id), id, []));
+      if (!isIndex && existsSync(indexPath)) {
+        try { atomicWrite(indexPath, renderIndex(this.nameOf(id), id, [])); } catch { /* next pass */ }
+      }
       return null;
     }
 
@@ -153,7 +158,7 @@ export class MemoryTidy {
     const processing = join(memDir, 'inbox.processing.md');
     let held = '';
     try {
-      if (existsSync(inboxPath)) { renameSync(inboxPath, processing); held = readText(processing); }
+      if (existsSync(inboxPath)) { renameSync(inboxPath, processing); held = readText(processing) ?? ''; }
     } catch (e) {
       return this.abort(id, 'inbox-move-failed', String(e));
     }
@@ -171,16 +176,31 @@ export class MemoryTidy {
       restore();
       return this.abort(id, 'model-failed', String(e));
     }
+    // A reply with no list of changes is a failed reply, not "keep nothing":
+    // the notes go back to the inbox instead of being dropped.
+    if (!(raw && typeof raw === 'object' && Array.isArray((raw as { ops?: unknown }).ops))) {
+      restore();
+      return this.abort(id, 'model-failed', 'no list of changes in the response');
+    }
     const ops = validateOps(raw, entries);
     const outcome = applyOps(entries, ops, today);
 
     try {
+      const stamp = utcStamp();
       if (existsSync(indexPath)) {
-        const backup = join(home, 'hive', 'backups', utcStamp(), id, 'memory.md');
+        const backup = join(home, 'hive', 'backups', stamp, id, 'memory.md');
         mkdirSync(dirname(backup), { recursive: true });
         copyFileSync(indexPath, backup);
       }
       if (outcome.procedures.length) mkdirSync(join(memDir, 'procedures'), { recursive: true });
+      // A procedure being replaced is backed up beside the index, never lost.
+      for (const p of outcome.procedures) {
+        const file = join(memDir, 'procedures', `${p.slug}.md`);
+        if (!existsSync(file)) continue;
+        const backup = join(home, 'hive', 'backups', stamp, id, 'procedures', `${p.slug}.md`);
+        mkdirSync(dirname(backup), { recursive: true });
+        copyFileSync(file, backup);
+      }
       for (const p of outcome.procedures) atomicWrite(join(memDir, 'procedures', `${p.slug}.md`), p.content);
       if (outcome.archived.length) appendFileSync(join(memDir, 'archive.md'), archiveLines(outcome.archived, today) + '\n');
       atomicWrite(indexPath, renderIndex(this.nameOf(id), id, outcome.entries));
@@ -221,8 +241,9 @@ export class MemoryTidy {
       model: TIDY_MODEL,
       cwd: home,
       command: this.getCommand(),
-      // A pure text transform: it must never touch files or run commands.
-      disallowedTools: ['Edit', 'Write', 'NotebookEdit', 'Bash'],
+      // A pure text transform over text agents wrote: no tools at all, so a
+      // note can't get it to open a file or fetch a page (review, 2026-09-25).
+      noTools: true,
       env: this.getEnv(),
       timeoutMs: TIMEOUT_MS
     });
@@ -243,8 +264,9 @@ export function extractJson(text: string): unknown {
   try { return JSON.parse(text.slice(start, end + 1)); } catch { return undefined; }
 }
 
-function readText(path: string): string {
-  try { return existsSync(path) ? readFileSync(path, 'utf8') : ''; } catch { return ''; }
+/** A file's text, '' when there is no file, null when it can't be read. */
+function readText(path: string): string | null {
+  try { return existsSync(path) ? readFileSync(path, 'utf8') : ''; } catch { return null; }
 }
 
 function readState(path: string): { lastTidyAt?: number } {

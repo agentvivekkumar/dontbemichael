@@ -126,6 +126,35 @@ test('if the model call fails, the notes go back into the inbox untouched', asyn
   assert.equal(f.log[0].kind, 'memory-tidy-abort');
 });
 
+test('a reply without a list of changes puts the notes back', async (t) => {
+  const f = office(t);
+  fs.writeFileSync(path.join(f.dir, 'memory.md'), mi.renderIndex('Oscar', 'oscar', []));
+  fs.writeFileSync(path.join(f.dir, 'memory', 'inbox.md'), Array.from({ length: 10 }, (_, i) => `- note ${i}`).join('\n'));
+  f.setReply({ op: 'add', kind: 'fact', text: 'x', source: 'task' });
+  const [r] = await f.tidy.tidyNow();
+  assert.equal(r.tidied, false);
+  assert.equal(mi.parseInbox(fs.readFileSync(path.join(f.dir, 'memory', 'inbox.md'), 'utf8')).length, 10);
+});
+
+test('a replaced procedure is backed up, and a long name keeps its path', async (t) => {
+  const f = office(t);
+  fs.writeFileSync(path.join(f.dir, 'memory.md'), mi.renderIndex('Oscar', 'oscar', []));
+  fs.mkdirSync(path.join(f.dir, 'memory', 'procedures'), { recursive: true });
+  const name = 'Weekly summary';
+  const slug = mi.procedureSlug(name);
+  fs.writeFileSync(path.join(f.dir, 'memory', 'procedures', `${slug}.md`), 'old steps');
+  fs.writeFileSync(path.join(f.dir, 'memory', 'inbox.md'), Array.from({ length: 10 }, (_, i) => `- note ${i}`).join('\n'));
+  f.setReply({ ops: [{ op: 'procedure', name, steps: '1. new', source: 'task' }] });
+  await f.tidy.tidyNow();
+  const stamp = fs.readdirSync(path.join(f.home, 'hive', 'backups'))[0];
+  assert.equal(fs.readFileSync(path.join(f.home, 'hive', 'backups', stamp, 'oscar', 'procedures', `${slug}.md`), 'utf8'), 'old steps');
+  const long = 'x'.repeat(190);
+  const a = mi.applyOps([], [{ op: 'procedure', name: long, steps: '1. a', source: 'task' }], '2026-09-25');
+  const b = mi.applyOps(a.entries, [{ op: 'procedure', name: long, steps: '1. b', source: 'task' }], '2026-09-25');
+  assert.equal(b.entries.length, 1, 'updated in place, not duplicated');
+  assert.match(b.entries[0].text, /memory\/procedures\/.+\.md$/);
+});
+
 test('JSON is found in a fenced or chatty reply', () => {
   assert.deepEqual(extractJson('Here:\n```json\n{"ops":[]}\n```'), { ops: [] });
   assert.equal(extractJson('nothing'), undefined);
@@ -155,4 +184,11 @@ test('agents are told to add notes, not logs, and closing time no longer writes 
   assert.doesNotMatch(prompt, /append what you learned to memory\.md/);
   const closing = fs.readFileSync(path.resolve(__dirname, '../src/main/closingTime.ts'), 'utf8');
   assert.doesNotMatch(closing, /append (its|your) (current state|shift summary)[^']*memory\.md/);
+});
+
+test('the tidy up runs with no tools and no MCP servers', () => {
+  const tidy = fs.readFileSync(path.resolve(__dirname, '../src/main/memoryTidy.ts'), 'utf8');
+  const hidden = fs.readFileSync(path.resolve(__dirname, '../src/main/hiddenClaude.ts'), 'utf8');
+  assert.match(tidy, /noTools: true,/);
+  assert.match(hidden, /opts\.noTools \? \['--tools', '', '--strict-mcp-config'\]/);
 });
