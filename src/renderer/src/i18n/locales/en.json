@@ -140,7 +140,8 @@
     "git": "git",
     "messages": "messages",
     "traces": "traces",
-    "schedules": "schedules"
+    "schedules": "schedules",
+    "memory": "memory"
   },
   "toolWaterfall": {
     "fresh": "fresh {{tokens}}t",

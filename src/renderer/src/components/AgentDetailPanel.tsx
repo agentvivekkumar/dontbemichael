@@ -7,7 +7,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { terminalInstanceKey } from './terminalRecovery';
 import { MessageQueueComposer } from './MessageQueueComposer';
-import { CommandCenterPanel } from './CommandCenterPanel';
+import { CommandCenterPanel, MemoryTab } from './CommandCenterPanel';
 import { disposeTerminal } from './terminalPool';
 import { SidebarTabs } from './SidebarTabs';
 import { ThreadsPanel } from './ThreadsPanel';
@@ -298,6 +298,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 12 }}>
             <ScheduleList mode="agent" agentId={agent.id} agentName={agent.name} />
           </div>
+        )}
+
+        {sidebarTab === 'memory' && (
+          <MemoryTab key={agent.id} godId={agent.id} ownOnly />
         )}
 
         {sidebarTab === 'traces' && (

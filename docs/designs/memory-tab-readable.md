@@ -107,6 +107,13 @@ box around a group.
 - In an RTL app language, entry text gets `dir="auto"` (the `useRtl` rule used elsewhere).
 - Every string in en, zh-CN and ar; `{{godName}}` for Michael; no dashes in copy.
 
+### Every agent has its own Memory tab (owner, 2026-09-25)
+
+"The memory tab is very useful and should be there for every agent for their data."
+Each team member's panel has a Memory tab after Schedules showing that agent's own
+memory, the same notes view with no picker and no office search. Michael's tab keeps
+both: his own memory by default, any agent's through the picker, and the office search.
+
 ## States
 
 | Feature | Loading | Empty | Error | Success | Partial |

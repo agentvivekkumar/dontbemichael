@@ -1139,12 +1139,17 @@ function ArchivedSection() {
 
 // ─── Memory tab ──────────────────────────────────────────────────────────────
 
-function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: string; onWho?: (id: string) => void }) {
+/** Michael's Memory tab: any agent's memory (picker) and the office search.
+ *  `ownOnly`: a team member's own Memory tab, that agent only, no picker and no
+ *  office search (owner, 2026-09-25). */
+export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }: {
+  godId: string; who?: string; onWho?: (id: string) => void; ownOnly?: boolean;
+}) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   // Selection is controllable from the floor's GRAPH view (openAgentMemory); falls back to local state.
   const [internalWho, setInternalWho] = useState<string>(godId);
-  const who = controlledWho ?? internalWho;
+  const who = ownOnly ? godId : (controlledWho ?? internalWho);
   const setWho = onWho ?? setInternalWho;
   const name = agents.find((a) => a.id === who)?.name ?? who;
   // undefined: first read not back yet; null: the read failed.
@@ -1205,12 +1210,14 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
         <h2 style={{ margin: 0, flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: 'var(--cth-ink-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {t('memoryNotes.title', { name })}
         </h2>
-        <label style={{ display: 'flex', minWidth: 0 }}>
-          <span style={srOnly}>{t('memoryNotes.whose')}</span>
-          <Select value={who} onChange={setWho}>
-            {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-          </Select>
-        </label>
+        {!ownOnly && (
+          <label style={{ display: 'flex', minWidth: 0 }}>
+            <span style={srOnly}>{t('memoryNotes.whose')}</span>
+            <Select value={who} onChange={setWho}>
+              {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+            </Select>
+          </label>
+        )}
       </div>
 
       {detail === undefined ? (
@@ -1242,7 +1249,7 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
         </>
       )}
 
-      <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
+      {!ownOnly && <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
         <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', fontWeight: 400, color: 'var(--cth-ink-500)' }}>{t('memoryNotes.searchTitle')}</h3>
         <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
           {(['text', 'meaning'] as const).map((m) => (
@@ -1284,7 +1291,7 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
         )}
         {mode === 'text' && textSearched && textResults.length === 0 && <Muted>{t('commandCenter.nothingMatched')}</Muted>}
         {mode === 'meaning' && searchOut && <Pre>{searchOut}</Pre>}
-      </section>
+      </section>}
     </div>
   );
 }

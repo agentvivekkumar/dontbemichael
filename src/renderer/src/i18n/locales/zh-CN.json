@@ -140,7 +140,8 @@
     "git": "Git",
     "messages": "消息",
     "traces": "追踪",
-    "schedules": "定时任务"
+    "schedules": "定时任务",
+    "memory": "记忆"
   },
   "toolWaterfall": {
     "fresh": "新计 {{tokens}}t",

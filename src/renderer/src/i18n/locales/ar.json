@@ -140,7 +140,8 @@
     "git": "git",
     "messages": "الرسائل",
     "traces": "التتبّع",
-    "schedules": "المواعيد"
+    "schedules": "المواعيد",
+    "memory": "الذاكرة"
   },
   "toolWaterfall": {
     "fresh": "جديد {{tokens}}ر",

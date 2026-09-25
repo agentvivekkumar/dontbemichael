@@ -139,3 +139,14 @@ test('strings exist in every language, Michael by godName, no dashes', () => {
     }
   }
 });
+
+test('every agent has its own Memory tab; Michael keeps the picker and the office search', () => {
+  const panel = read('src/renderer/src/components/AgentDetailPanel.tsx');
+  assert.match(panel, /\{sidebarTab === 'memory' && \(\s*<MemoryTab key=\{agent\.id\} godId=\{agent\.id\} ownOnly \/>/);
+  const src = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  assert.match(src, /const who = ownOnly \? godId : \(controlledWho \?\? internalWho\);/, 'a team member sees only its own memory');
+  assert.match(src, /\{!ownOnly && \(\s*<label/, 'no picker on a team member tab');
+  assert.match(src, /\{!ownOnly && <section/, 'no office search on a team member tab');
+  assert.match(src, /<MemoryTab godId=\{agent\.id\} who=\{selectedMemoryAgent \?\? undefined\} onWho=\{setSelectedMemoryAgent\} \/>/, "Michael's tab unchanged");
+  for (const loc of ['en', 'zh-CN', 'ar']) assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).sidebar.memory, loc);
+});

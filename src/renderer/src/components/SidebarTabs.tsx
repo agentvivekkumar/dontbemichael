@@ -13,6 +13,8 @@ const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
   { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
   // The agent's own jobs on a clock (docs/designs/per-agent-schedules.md).
   { key: 'schedules', labelKey: 'sidebar.schedules', icon: 'clock' },
+  // What the agent has learned, as notes (docs/designs/memory-tab-readable.md).
+  { key: 'memory',    labelKey: 'sidebar.memory',    icon: 'ledger' },
   { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },
   { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
   { key: 'traces',   labelKey: 'sidebar.traces',   icon: 'web' }
