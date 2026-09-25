@@ -36,7 +36,8 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   assert.match(fn, /cwd: workFolder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: workFolder, role \}/, 'spawned inside its own folder');
   assert.match(fn, /goal: teamMemberGoal\(def, \{ name: config\.businessName, city: config\.businessCity \}\)/);
   assert.match(fn, /\}, \{ select: false \}\);/, 'the card appears without taking the focus');
-  assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? core;/, '"Something else" starts from the core pack');
+  assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? byTeam \?\? core;/, '"Something else" starts from the core pack');
+  assert.match(fn, /\(coverage\(p\) > coverage\(best\) \? p : best\), core\);/, 'core wins ties, so a team picked from core stays on core');
   assert.match(fn, /await window\.cth\.updateConfig\(\{ businessTeamStarted: true \}\)/);
 
   // Michael: the Office folder when there is one, the harness folder otherwise.

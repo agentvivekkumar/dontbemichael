@@ -306,8 +306,30 @@ test('a team folder that is a link to the home folder counts as the home folder'
 
 test('setup checks a folder picked by hand, and team start finds members in any pack', () => {
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(wiz, /if \(step === 'home'\) \{\s*const f = await window\.cth\.officeFind\(home\.trim\(\)\)/);
+  assert.match(wiz, /if \(step === 'home'\) \{\s*setBusy\(true\);\s*const f = await window\.cth\.officeFind\(home\.trim\(\)\)/);
   assert.match(wiz, /setError\(t\('onboarding\.resume\.folderInUse'\)\);/);
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /for \(const p of \[pack, \.\.\.packs\.map\(\(x\) => x\.pack\), core\]\)/);
+});
+
+test('the folder check ignores letter case where the disk does', { skip: process.platform !== 'darwin' && process.platform !== 'win32' }, () => {
+  const home = office();
+  const h = os.homedir();
+  try {
+    fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
+      version: 1, officeFolder: `${DOCS}/Office`,
+      team: [...team, { agentId: 'lib', folder: path.join(h, 'LIBRARY', 'x') }, { agentId: 'home', folder: h.toUpperCase() }]
+    }));
+    assert.deepEqual(file.findOffice(home).record.team.map((m) => m.agentId), ['oscar', 'pam']);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('an unknown business type picks the pack that holds most of the team; a failed folder check stops setup', () => {
+  const hive = read('src/renderer/src/hooks/useHive.ts');
+  assert.match(hive, /\?\? byTeam \?\? core;/);
+  const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
+  assert.match(wiz, /if \(!f\) \{ setError\(t\('onboarding\.resume\.folderCheckFailed'\)\); return; \}/);
+  assert.match(wiz, /disabled=\{busy \|\| \(step === 'orchestrator' && engineBlocked\)\}/);
 });

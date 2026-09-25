@@ -607,6 +607,7 @@
       "desc": "This Mac already has an office in {{folder}}: {{business}}, with {{count}} team members. Continue with it to keep your team, their folders, their memory and their work.",
       "foldersHead": "Your team works in these folders:",
       "folderInUse": "This folder already holds an office. Pick an empty folder for a new one.",
+      "folderCheckFailed": "Couldn't check this folder. Try again, or pick another place.",
       "unnamed": "your business",
       "newNote": "Setting up a new office gives it a folder of its own, so this office stays exactly as it is.",
       "continue": "Continue with this office",

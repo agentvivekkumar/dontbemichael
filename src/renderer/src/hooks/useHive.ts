@@ -287,7 +287,17 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   if (team.length === 0 || config.businessTeamStarted) return;
 
   const { packs, core } = await window.cth.packsList();
-  const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? core;
+  // The business's pack; when its type is unknown (an office continued from its
+  // registry), the pack that holds the most of this team, so each member comes
+  // back with its own business's job description.
+  const teamIds = new Set(team.map((m) => m.agentId));
+  const coverage = (p: { agents?: Array<{ id: string }> } | undefined) =>
+    (p?.agents ?? []).filter((a) => teamIds.has(a.id)).length;
+  const byTeam = config.businessType
+    ? undefined
+    // Core wins ties, so "Something else" (a team picked from core) stays on core.
+    : packs.map((p) => p.pack).reduce<typeof core | undefined>((best, p) => (coverage(p) > coverage(best) ? p : best), core);
+  const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? byTeam ?? core;
   // The business's own pack first, then every other pack: an office continued
   // from its registry may not know its business type, and its members must
   // still be found (a Kelly or a Dwight is not in the core pack).

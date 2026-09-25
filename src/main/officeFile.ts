@@ -114,13 +114,19 @@ export interface FoundOffice {
  *  synced from elsewhere, so its folders are checked before setup offers them. */
 function isUsableTeamFolder(folder: string, home = homedir()): boolean {
   if (!isAbsolute(folder)) return false;
-  // Follow links: a folder that is a link into ~/.ssh is ~/.ssh.
-  const real = (p: string) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
+  // Follow links (a folder that is a link into ~/.ssh is ~/.ssh), and compare
+  // ignoring case where the disk does: on macOS and Windows ~/LIBRARY is ~/Library.
+  const fold = process.platform === 'darwin' || process.platform === 'win32'
+    ? (p: string) => p.toLowerCase()
+    : (p: string) => p;
+  const real = (p: string) => {
+    try { return fold(realpathSync.native(resolve(p))); } catch { return fold(resolve(p)); }
+  };
   const f = real(folder);
   const h = real(home);
   if (f === resolve(sep) || f === h) return false;
   for (const kept of ['.ssh', '.claude', '.config', '.gnupg', 'Library']) {
-    const k = join(h, kept);
+    const k = join(h, fold(kept));
     if (f === k || f.startsWith(k + sep)) return false;
   }
   return true;

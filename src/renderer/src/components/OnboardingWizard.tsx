@@ -1155,8 +1155,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       // new one: that would mix a second team into it. Offer to
                       // continue it instead, or ask for another folder.
                       if (step === 'home') {
+                        setBusy(true);
                         const f = await window.cth.officeFind(home.trim()).catch(() => null);
-                        if (f?.hasOffice) {
+                        setBusy(false);
+                        // A check that failed says nothing about the folder: stay
+                        // here rather than risk setting up a second team in it.
+                        if (!f) { setError(t('onboarding.resume.folderCheckFailed')); return; }
+                        if (f.hasOffice) {
                           if (f.path && f.record && teamPlanFromRecord(f.record).ok) {
                             setFound({ path: f.path, record: f.record });
                             setError(undefined);
@@ -1177,7 +1182,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       setError(undefined);
                       setStep(nextStep(step));
                     }}
-                    disabled={step === 'orchestrator' && engineBlocked}
+                    disabled={busy || (step === 'orchestrator' && engineBlocked)}
                   >
                     {step === 'welcome' ? t('onboarding.team.suggestCta') : t('common.next')}
                   </PixelButton>

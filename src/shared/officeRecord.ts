@@ -9,9 +9,11 @@
  * folder is the one thing that survives a reinstall, so the office describes
  * itself there, and setup recognises it by folder, never by name.
  *
- * The record is written whenever the config's business fields change (main,
- * onConfigWritten) and backfilled at launch. An office that predates it is
- * described from its hive registry instead (`officeRecordFromRegistry`).
+ * The record is written by config:update only when a save changes the office's
+ * own fields (touchesOffice), never when a save only switches offices, and is
+ * backfilled at launch (backfillOfficeRecord) only when the config's team
+ * matches the office's registry. An office without one is described from its
+ * hive registry instead (`officeRecordFromRegistry`).
  *
  * Pure data and pure functions; the file I/O lives in src/main/officeFile.ts.
  */
