@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { OFFICE_KEY, folderNameFor, folderNames, initialPicks, folderFor, connectionsNeeded, teamPlan } =
+const { OFFICE_KEY, folderNameFor, folderNames, initialPicks, folderFor, michaelFolderFor, connectionsNeeded, teamPlan } =
   loadTs('src/shared/teamPlan.ts');
 
 const agent = (id, over = {}) => ({
@@ -82,9 +82,25 @@ test('finish persists only picked agents, each with its folder, Office first and
   assert.deepEqual(plan.folders, ['/D/Pho/Office', '/D/Pho/Finance', '/D/Pho/Quality']);
 });
 
-test('the Office folder can be moved too', () => {
-  const plan = teamPlan(pack.agents, { oscar: true }, suggestions, { [OFFICE_KEY]: '/Users/me/Dropbox/Office' });
-  assert.equal(plan.office, '/Users/me/Dropbox/Office');
+test('picking Michael\'s folder moves the Office and the team\'s default folders with it', () => {
+  const picked = { [OFFICE_KEY]: '/Users/me/Dropbox/Pho' };
+  // Until main has worked out the defaults under the new folder, nothing is ready.
+  assert.equal(teamPlan(pack.agents, { oscar: true }, suggestions, picked).ok, false);
+  assert.equal(michaelFolderFor(suggestions, picked), '/Users/me/Dropbox/Pho');
+  const moved = {
+    root: '/Users/me/Dropbox/Pho',
+    office: '/Users/me/Dropbox/Pho/Office',
+    byFolder: { Finance: '/Users/me/Dropbox/Pho/Finance', Admin: '/Users/me/Dropbox/Pho/Admin' }
+  };
+  const plan = teamPlan(pack.agents, { oscar: true }, moved, picked);
+  assert.equal(plan.office, '/Users/me/Dropbox/Pho/Office');
+  assert.deepEqual(plan.team, [{ agentId: 'oscar', folder: '/Users/me/Dropbox/Pho/Finance' }]);
+  // A folder main refused (the home folder, say) never becomes the plan.
+  assert.equal(teamPlan(pack.agents, { oscar: true }, { ...moved, rootRefused: true }, picked).ok, false);
+});
+
+test('Michael\'s folder is the suggested business folder until the owner picks one', () => {
+  assert.equal(michaelFolderFor(suggestions, {}), suggestions.root);
 });
 
 test('a team of just Michael is allowed', () => {

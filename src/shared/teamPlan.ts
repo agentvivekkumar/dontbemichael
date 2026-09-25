@@ -9,14 +9,37 @@
 import type { AgentDefinitionV2 } from './agentDefinition';
 import type { OfficePack } from './officePack';
 
-/** Key for the shared Office folder (Michael's) in the owner's override map. */
+/**
+ * Key for Michael's folder in the owner's override map. Michael's folder is the
+ * business folder: the Office and every team member's default folder sit inside
+ * it (src/shared/folderAccess.ts), so picking it moves those defaults too.
+ */
 export const OFFICE_KEY = '__office__';
 
-/** Default absolute paths from main: the Office, and one per folder name. */
+/** Default absolute paths from main, all under `root` (Michael's folder). */
 export interface FolderSuggestions {
   root: string;
   office: string;
   byFolder: Record<string, string>;
+  /** The folder the owner picked for Michael can't hold an office; `root` is the default. */
+  rootRefused?: boolean;
+}
+
+const trimSlash = (p: string) => p.replace(/[\\/]+$/, '');
+
+/** Michael's folder: the owner's pick, or the suggested business folder. */
+export function michaelFolderFor(
+  suggestions: FolderSuggestions | undefined,
+  overrides: Record<string, string>
+): string | undefined {
+  return overrides[OFFICE_KEY] ?? suggestions?.root;
+}
+
+/** True once the suggestions were worked out for the Michael folder now picked. */
+function suggestionsCurrent(suggestions: FolderSuggestions | undefined, overrides: Record<string, string>): boolean {
+  const picked = overrides[OFFICE_KEY];
+  if (!suggestions) return false;
+  return picked === undefined || (!suggestions.rootRefused && trimSlash(picked) === trimSlash(suggestions.root));
 }
 
 /** The folder NAME an agent works in: its pack's choice, or its role if the pack didn't say. */
@@ -45,14 +68,16 @@ export function folderFor(
   suggestions: FolderSuggestions | undefined,
   overrides: Record<string, string>
 ): string | undefined {
-  return overrides[agent.id] ?? suggestions?.byFolder[folderNameFor(agent)];
+  if (overrides[agent.id] !== undefined) return overrides[agent.id];
+  return suggestionsCurrent(suggestions, overrides) ? suggestions?.byFolder[folderNameFor(agent)] : undefined;
 }
 
+/** The Office folder: always inside Michael's. */
 export function officeFolderFor(
   suggestions: FolderSuggestions | undefined,
   overrides: Record<string, string>
 ): string | undefined {
-  return overrides[OFFICE_KEY] ?? suggestions?.office;
+  return suggestionsCurrent(suggestions, overrides) ? suggestions?.office : undefined;
 }
 
 /**

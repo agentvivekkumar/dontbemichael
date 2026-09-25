@@ -8,6 +8,18 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 ## [Unreleased]
 
+### Changed
+
+- **Each team member's folder is private.** Only that team member, anyone sharing the folder
+  (agents in the same role do by default), and Michael can open it. Michael can read his team's
+  files but not change them. Held by Claude Code's own sandbox and permission rules, and checked
+  again by the app on every file an agent opens.
+- **Michael works in the business folder.** He moves up from the Office folder to the folder that
+  holds it and everyone's folders, so he can read his team's work. His conversation carries over.
+  Setup now asks for this one folder, and the Office and team folders go inside it.
+- **The Office folder is company knowledge.** The whole team reads it; only Michael and you change
+  it. Team members send anything meant for everyone to Michael.
+
 ### Fixed
 
 - **Setting up again no longer loses your team.** When setup finished on an office that already

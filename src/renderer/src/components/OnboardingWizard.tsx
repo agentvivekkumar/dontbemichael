@@ -14,7 +14,7 @@ import type { ToolStatus } from '@shared/toolCatalog';
 import type { OfficePack } from '@shared/officePack';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import {
-  OFFICE_KEY, folderNames, initialPicks, folderFor, officeFolderFor, connectionsNeeded, teamPlan,
+  OFFICE_KEY, folderNames, initialPicks, folderFor, michaelFolderFor, connectionsNeeded, teamPlan,
   type FolderSuggestions
 } from '@shared/teamPlan';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
@@ -178,18 +178,30 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPack?.businessType]);
 
-  // Where each folder goes by default, which depends on the business name. Asked
-  // only while the team step is showing; nothing is created until finish.
+  // Where each folder goes by default, which depends on the business name, or on
+  // the folder the owner picked for Michael: the Office and the team's folders
+  // sit inside his. Asked only while the team step is showing; nothing is
+  // created until finish.
   const teamFolderKey = folderNames(teamAgents).join('|');
+  const pickedMichaelFolder = folderOverrides[OFFICE_KEY];
   useEffect(() => {
     if (step !== 'team' || !teamPack) return;
     let cancelled = false;
-    window.cth.foldersSuggest(businessName, folderNames(teamAgents))
-      .then((sug) => { if (!cancelled) setFolderSuggestions(sug); })
+    window.cth.foldersSuggest(businessName, folderNames(teamAgents), pickedMichaelFolder)
+      .then((sug) => {
+        if (cancelled) return;
+        if (sug.rootRefused) {
+          // The home folder or a system folder can't hold an office: say so and
+          // go back to the suggested one.
+          setError(t('onboarding.team.errMichaelFolder'));
+          setFolderOverrides((o) => { const n = { ...o }; delete n[OFFICE_KEY]; return n; });
+        }
+        setFolderSuggestions(sug);
+      })
       .catch(() => { if (!cancelled) setFolderSuggestions(undefined); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, businessName, teamFolderKey]);
+  }, [step, businessName, teamFolderKey, pickedMichaelFolder]);
 
   const plan = teamPlan(teamAgents, teamPicked, folderSuggestions, folderOverrides);
   const needed = connectionsNeeded(teamAgents, teamPicked);
@@ -947,7 +959,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     name={t('onboarding.team.managerName')}
                     summary={t('onboarding.team.managerSummary')}
                     chips={[{ tone: 'muted', label: t('onboarding.team.alwaysOn') }]}
-                    folder={officeFolderFor(folderSuggestions, folderOverrides)}
+                    folder={michaelFolderFor(folderSuggestions, folderOverrides)}
                     folderNote={t('onboarding.team.sharedFolder')}
                     displayPath={tildePath}
                     overridden={folderOverrides[OFFICE_KEY] !== undefined}

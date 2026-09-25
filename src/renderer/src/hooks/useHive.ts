@@ -499,13 +499,14 @@ export function useHive(config: HarnessConfig | null): void {
       const godModel = config.godModel;
       const command = buildSpawnCommand(config, godModel, godProvider);
       const [exe, ...args] = tokenizeCommand(command.trim());
-      // Decision 44: on a business install Michael works in the shared Office
-      // folder, not among the hive's plumbing. Older installs have no Office and
-      // keep the harness folder, exactly as before.
-      const godCwd = config.officeFolder || config.harnessHome!;
+      // Decision 44: on a business install Michael works among the office's
+      // folders, not the hive's plumbing. Main moves him from the Office folder up
+      // to the business folder that holds it (folderAccess.ts) and reports where.
+      // Older installs have no Office and keep the harness folder, exactly as before.
+      const requestedCwd = config.officeFolder || config.harnessHome!;
       const res = await window.cth.spawnPty({
         id: GOD_PTY,
-        cwd: godCwd,
+        cwd: requestedCwd,
         command: exe,
         provider: godProvider,
         args,
@@ -517,10 +518,11 @@ export function useHive(config: HarnessConfig | null): void {
         // fresh session. Without this the most important context on the floor —
         // the orchestrator's — was lost on every restart.
         resume: true,
-        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: godCwd, isGod: true, role: 'orchestrator (god)' }
+        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true, role: 'orchestrator (god)' }
       });
       if (cancelled) { godSpawning.current = false; return; }
       if (!res.ok) { godSpawning.current = false; useStore.getState().setGodStatus('failed'); return; }
+      const godCwd = res.cwd || requestedCwd;
       const god: Agent = {
         id: GOD_ID,
         name: godName,

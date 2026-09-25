@@ -714,7 +714,7 @@
     "team": {
       "intro": "Suggested for {{pack}}. Pick whoever you want, and you can hire more later.",
       "introOther": "Start with {{godName}} and Oscar. Once your office is running, {{godName}} will ask you a few questions and suggest who else to hire.",
-      "folderNote": "Everyone works in their own folder, inside {{root}}. Put the documents each person needs in their folder. They'll read them, and save their work there too. The Office folder is shared by the whole team.",
+      "folderNote": "Everyone works in their own folder, inside {{root}}. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. The Office folder in there holds company knowledge: the whole team reads it, and only {{godName}} and you change it.",
       "managerName": "{{godName}} · Office Manager",
       "managerSummary": "Runs the office. Hands out work, and checks in with you when something needs a yes.",
       "alwaysOn": "always on",
@@ -725,11 +725,12 @@
       "worksIn": "Works in",
       "change": "change",
       "useSuggested": "use suggested",
-      "sharedFolder": "shared with everyone",
+      "sharedFolder": "holds everyone's folders",
       "summary": "{{picked}} picked · {{connect}} to connect",
       "suggestCta": "Suggest my team",
       "errFolder": "Couldn't set up {{path}}: {{reason}}",
       "errNoFolders": "Couldn't work out where your team's folders go. Go back and check your business name.",
+      "errMichaelFolder": "That folder can't hold your office. Pick a folder of its own, not your home folder or a system folder.",
       "conn": {
         "email": "Email",
         "quickbooks": "QuickBooks",

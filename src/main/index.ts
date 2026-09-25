@@ -28,7 +28,7 @@ import { linkWorktreeDeps, unlinkWorktreeDeps } from './worktreeDeps';
 import { HiveManager, type AgentMeta, type HiveMessage, type HiveTask } from './hive';
 import { HookServer } from './hooks';
 import { loadBundledPacks, packsResourceDir } from './packs';
-import { businessFolderRoot, defaultAgentFolder, ensureFolder, OFFICE_FOLDER } from './agentFolders';
+import { businessFolderRoot, ensureFolder, OFFICE_FOLDER, safeFolderName } from './agentFolders';
 import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
@@ -92,7 +92,8 @@ import { claudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
-import { backfillOfficeRecord, findOffice, syncOfficeRecord } from './officeFile';
+import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
+import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { touchesOffice } from '../shared/officeRecord';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
@@ -1471,6 +1472,18 @@ function officeFolderReady(): string | undefined {
   return r.ok ? r.path : undefined;
 }
 
+/** Every team member's folder and the office's own folders, for the access
+ *  rules (folderAccess.ts): the folders picked at setup plus every hired
+ *  agent's, archived ones included (their files are still theirs). */
+function officeFolderLayout(officeFolder: string): FolderLayout {
+  const cfg = readConfig();
+  const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
+  for (const a of Object.values(hive.registry().agents)) {
+    if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+  }
+  return folderLayoutFor(officeFolder, folders, cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined);
+}
+
 /** Where the helper discovers `{ port, token }` for the loopback endpoint. Kept
  *  under userData (NOT the git repo, NOT mined into MemPalace). */
 function slackReplyConfigPath(): string {
@@ -2675,8 +2688,19 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // returned to the caller so the renderer records the same absolute path.
   opts.cwd = expandTilde(opts.cwd);
   if (opts.hive) opts.hive = { ...opts.hive, cwd: expandTilde(opts.hive.cwd) };
-  // Before anything checks the working folder: Michael's IS the Office folder.
+  // Before anything checks the working folder. Michael works in the business
+  // folder, the one holding the Office and every team member's folder, so he can
+  // read his team's work (folderAccess.ts). The renderer asks for the Office
+  // folder; the business folder is decided here, where the folder checks live.
+  // An office whose Office folder has no usable parent keeps Michael in it.
   const officeFolder = officeFolderReady();
+  if (opts.hive?.isGod && officeFolder && resolve(opts.cwd) === resolve(officeFolder)) {
+    const business = officeFolderLayout(officeFolder).business;
+    if (business) {
+      opts.cwd = business;
+      opts.hive = { ...opts.hive, cwd: business };
+    }
+  }
   // Which CLI is this? Explicit wins; else inferred from the binary
   // (claude/codex/grok/agy). Non-Claude providers skip every Claude-only spawn step
   // below. Persist the resolved provider onto opts (+ hive meta) so the registry
@@ -2835,9 +2859,17 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           skillsDir: skillsResourceDir(),
           // The shared palace is mutated by the agent's own `mempalace` calls, so
           // the OS sandbox must let it through (empty when memory is off).
-          // …and the shared Office folder, which every agent reads and writes.
-          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH, officeFolder].filter((p): p is string => !!p),
+          // …and, for Michael, the Office folder: company knowledge he keeps up to
+          // date. Team members read it but don't change it (folderAccess.ts).
+          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH, opts.hive.isGod ? officeFolder : undefined].filter((p): p is string => !!p),
           officeFolder,
+          folderPolicy: officeFolder
+            ? folderPolicy(
+              { isGod: !!opts.hive.isGod, cwd: opts.cwd },
+              officeFolderLayout(officeFolder),
+              process.platform !== 'linux'
+            )
+            : undefined,
           docTextCliPath: docTextCliPath()
         }
       );
@@ -3687,23 +3719,30 @@ ipcMain.handle('packs:list', () => {
 });
 
 /** Default folders for the onboarding team screen (Decisions 44, 45):
- *  `~/Documents/<Business>/<Folder>` for each folder name, plus the shared Office.
- *  Nothing is created here. The owner can still change any of them. */
+ *  `~/Documents/<Business>/<Folder>` for each folder name, plus the Office.
+ *  The business folder is Michael's, and holds the Office and the team's
+ *  folders. When the owner picks another one (`root`), every default follows
+ *  it; a folder that can't hold an office (the home folder, a system folder)
+ *  is refused and the default kept. Nothing is created here. */
 ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
-  const p = (payload ?? {}) as { businessName?: unknown; folders?: unknown };
+  const p = (payload ?? {}) as { businessName?: unknown; folders?: unknown; root?: unknown };
   const businessName = typeof p.businessName === 'string' ? p.businessName : '';
   const names = Array.isArray(p.folders)
     ? p.folders.filter((x): x is string => typeof x === 'string').slice(0, 50)
     : [];
   const docs = app.getPath('documents');
+  const picked = typeof p.root === 'string' && p.root.trim() ? resolve(expandTilde(p.root.trim())) : undefined;
+  const rootRefused = !!picked && (!isAbsolute(picked) || !isUsableTeamFolder(picked));
+  const root = picked && !rootRefused ? picked : businessFolderRoot(docs, businessName);
   const byFolder: Record<string, string> = {};
-  for (const n of names) byFolder[n] = defaultAgentFolder(docs, businessName, n);
+  for (const n of names) byFolder[n] = join(root, safeFolderName(n));
   return {
     // For display only: the screen shows ~/Documents/… rather than /Users/<name>/…
     home: app.getPath('home'),
-    root: businessFolderRoot(docs, businessName),
-    office: defaultAgentFolder(docs, businessName, OFFICE_FOLDER),
-    byFolder
+    root,
+    office: join(root, OFFICE_FOLDER),
+    byFolder,
+    ...(rootRefused ? { rootRefused: true } : {})
   };
 });
 

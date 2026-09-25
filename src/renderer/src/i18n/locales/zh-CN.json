@@ -714,7 +714,7 @@
     "team": {
       "intro": "为{{pack}}推荐的团队。想选谁就选谁，之后还可以再招人。",
       "introOther": "先从 {{godName}} 和 Oscar 开始。办公室运转起来后，{{godName}} 会问您几个问题，并建议还需要招谁。",
-      "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里。“Office”文件夹由整个团队共用。",
+      "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里，只有他们本人和 {{godName}} 能打开。里面的“Office”文件夹存放公司资料：全体成员都能阅读，只有 {{godName}} 和您可以修改。",
       "managerName": "{{godName}} · 办公室经理",
       "managerSummary": "打理整个办公室。分派工作，遇到需要您点头的事时会来问您。",
       "alwaysOn": "始终在岗",
@@ -725,11 +725,12 @@
       "worksIn": "工作文件夹",
       "change": "更改",
       "useSuggested": "使用建议位置",
-      "sharedFolder": "全员共用",
+      "sharedFolder": "包含所有人的文件夹",
       "summary": "已选 {{picked}} 人 · 需连接 {{connect}} 个账号",
       "suggestCta": "推荐我的团队",
       "errFolder": "无法设置 {{path}}：{{reason}}",
       "errNoFolders": "无法确定团队文件夹的位置。请返回检查您的企业名称。",
+      "errMichaelFolder": "这个文件夹不能用来存放您的办公室。请选择一个单独的文件夹，不要选主文件夹或系统文件夹。",
       "conn": {
         "email": "电子邮件",
         "quickbooks": "QuickBooks",

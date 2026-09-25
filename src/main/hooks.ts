@@ -26,6 +26,8 @@ import { APP_NAME } from '../shared/appName';
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
 export const NOTIFY_WAITING = 'Waiting for you.';
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
+import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
+import { folderLayoutFor } from './officeFile';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -325,6 +327,26 @@ export class HookServer {
       }
     }
 
+    // Folder privacy (src/shared/folderAccess.ts). The spawn's settings already
+    // deny the folders known then; this catches everything else: folders made
+    // after the agent started, and Michael's own files, which a settings rule
+    // can't hide without hiding the folders inside his.
+    const toolName = p.tool_name ?? '';
+    if (event === 'PreToolUse' && agentId && (FOLDER_READ_TOOLS.has(toolName) || FOLDER_WRITE_TOOLS.has(toolName))) {
+      const d = this.folderCheck(agentId, toolName, p.tool_input, p.cwd);
+      if (d.deny) {
+        this.emitControl(agentId, toolName, d.reason);
+        this.emit(agentId, event, p);
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: d.reason
+          }
+        };
+      }
+    }
+
     // 7C.2 — mid-run steering: inject queued operator guidance as context on the
     // next eligible hook (no fragile typing into the TUI). Delivered once.
     // Merged with the roster line below so the two injections never displace each
@@ -420,6 +442,25 @@ export class HookServer {
    *  internal id: Michael's id is `god` and nobody in the office is called that
    *  (2026-09-24). Michael's name follows a rename; an agent the registry does
    *  not know is announced as the app. */
+  /** One file tool call judged against the office's folder rules. Offices
+   *  without an Office folder (older installs) have no rules to apply. */
+  private folderCheck(agentId: string, tool: string, input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
+    const cfg = this.getConfig();
+    if (!cfg.officeFolder) return { deny: false };
+    const target = folderToolTarget(tool, input, cwd);
+    if (!target) return { deny: false };
+    const reg = this.hive.registry();
+    const me = reg.agents[agentId];
+    if (!me?.cwd || me.isAssistant) return { deny: false };
+    const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
+    for (const a of Object.values(reg.agents)) {
+      if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+    }
+    const layout = folderLayoutFor(cfg.officeFolder, folders, cfg.harnessHome ?? undefined);
+    const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
+    return folderDecision({ isGod: !!me.isGod, cwd: me.cwd }, layout, tool, target, process.platform !== 'linux', godName);
+  }
+
   private displayName(agentId: string | undefined): string {
     if (!agentId) return APP_NAME;
     try {

@@ -40,9 +40,12 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   assert.match(fn, /\(coverage\(p\) > coverage\(best\) \? p : best\), core\);/, 'core wins ties, so a team picked from core stays on core');
   assert.match(fn, /await window\.cth\.updateConfig\(\{ businessTeamStarted: true \}\)/);
 
-  // Michael: the Office folder when there is one, the harness folder otherwise.
-  assert.match(hive, /const godCwd = config\.officeFolder \|\| config\.harnessHome!;/);
-  assert.match(hive, /hive: \{ id: GOD_ID, name: godName, provider: godProvider, cwd: godCwd, isGod: true/);
+  // Michael: asked for in the Office folder when there is one (main moves him up
+  // to the business folder that holds it), the harness folder otherwise; the
+  // floor records wherever main actually started him.
+  assert.match(hive, /const requestedCwd = config\.officeFolder \|\| config\.harnessHome!;/);
+  assert.match(hive, /hive: \{ id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true/);
+  assert.match(hive, /const godCwd = res\.cwd \|\| requestedCwd;/);
   // The team starts only after Michael is up.
   // (The other 'ready' is the already-running path, which starts nothing.)
   const start = hive.indexOf('void startBusinessTeam(config);');

@@ -604,10 +604,11 @@ const api = {
   }> => ipcRenderer.invoke('packs:list'),
 
   // ─── Agent folders (Decisions 44, 45) ───────────────────────────────────
-  /** Default `~/Documents/<Business>/<Folder>` paths for the team screen. Creates nothing. */
-  foldersSuggest: (businessName: string, folders: string[]): Promise<{
-    home: string; root: string; office: string; byFolder: Record<string, string>;
-  }> => ipcRenderer.invoke('folders:suggest', { businessName, folders }),
+  /** Default `~/Documents/<Business>/<Folder>` paths for the team screen, or
+   *  under `root` when the owner picked Michael's folder. Creates nothing. */
+  foldersSuggest: (businessName: string, folders: string[], root?: string): Promise<{
+    home: string; root: string; office: string; byFolder: Record<string, string>; rootRefused?: boolean;
+  }> => ipcRenderer.invoke('folders:suggest', { businessName, folders, root }),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }

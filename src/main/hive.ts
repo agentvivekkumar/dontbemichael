@@ -18,6 +18,7 @@
  *
  * Everything here runs in the Electron main process.
  */
+import type { AgentFolderPolicy } from '../shared/folderAccess';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync,
   readdirSync, statSync, lstatSync, realpathSync, rmSync, appendFileSync,
@@ -704,6 +705,8 @@ export class HiveManager {
       officeFolder?: string;
       /** Absolute path of the agent-facing `doc-text` CLI (F6). */
       docTextCliPath?: string;
+      /** Which folders this agent may open and change (src/shared/folderAccess.ts). */
+      folderPolicy?: AgentFolderPolicy;
     } = {}
   ): Promise<SpawnInjection> {
     const root = this.root();
@@ -971,7 +974,7 @@ export class HiveManager {
     if (sock && shim) {
       env.HIVE_SOCK = sock;
       const settingsPath = join(dir, 'settings.json');
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs)));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy));
       args.push('--settings', settingsPath);
     }
     return { args, env };
@@ -1152,7 +1155,7 @@ export class HiveManager {
     return Array.from(new Set(out));
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = []): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through `sh -c` with a stripped PATH, where `node` is often absent.
     const cmd = this.nodeRun(shim);
@@ -1195,10 +1198,26 @@ export class HiveManager {
       // Edit/Write tools; with only one the agent deadlocks on its own inbox.
       // failIfUnavailable stays false: a platform without a sandbox (Windows)
       // runs as before rather than refusing to spawn.
+      //
+      // Folder privacy (src/shared/folderAccess.ts) rides the same two layers:
+      // denyRead/denyWrite (with allowRead re-opening an agent's own folder and
+      // the Office inside Michael's) hold shell commands, and permission deny
+      // rules hold the file tools. Deny rules apply in auto mode too.
       ...(writableDirs.length
         ? {
-            sandbox: { enabled: true, filesystem: { allowWrite: writableDirs } },
-            permissions: { additionalDirectories: writableDirs }
+            sandbox: {
+              enabled: true,
+              filesystem: {
+                allowWrite: writableDirs,
+                ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),
+                ...(folders?.sandbox.denyRead.length ? { denyRead: folders.sandbox.denyRead } : {}),
+                ...(folders?.sandbox.allowRead.length ? { allowRead: folders.sandbox.allowRead } : {})
+              }
+            },
+            permissions: {
+              additionalDirectories: writableDirs,
+              ...(folders?.deny.length ? { deny: folders.deny } : {})
+            }
           }
         : {}),
       hooks: {
@@ -1452,9 +1471,10 @@ export class HiveManager {
     const inRoot = (...parts: string[]): string => join(root, ...parts);
     // Resolved ONCE here, at THIS agent's own spawn — same prompt-cache-stable
     // shape as name/id/dir/root above it, not a live re-read on every turn.
-    // Needed only for the PREP ASSISTANT persona below, which refers to god by
-    // name in prose; god's own prompt already gets its name via `meta.name`.
-    const godRegistry = meta.isAssistant ? this.registry() : null;
+    // Needed where another agent's prompt refers to god by name in prose: the
+    // PREP ASSISTANT persona and a team member's folder line. God's own prompt
+    // already gets its name via `meta.name`.
+    const godRegistry = meta.isGod ? null : this.registry();
     const godNameForPrompt = godRegistry
       ? resolveGodName(godRegistry.agents[godRegistry.godId ?? 'god']?.name)
       : '';
@@ -1505,9 +1525,9 @@ export class HiveManager {
     // him never to write there would contradict where he actually is. Both paths
     // are stable for the agent's lifetime, so the prompt-cache invariant holds.
     const folderLine = officeFolder
-      ? (meta.cwd === officeFolder
-        ? `YOUR FOLDERS: you work in ${meta.cwd}, the Office folder shared by the whole team. Company-wide documents live there: read them for context before searching the internet, and save anything meant for the whole team there. Each team member also has a folder of their own, which is where their work goes.`
-        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner puts the documents you need there, so read it for context before searching the internet, and save everything you produce there — drafts, reports, spreadsheets. ${officeFolder} is the Office folder shared by the whole team: company-wide documents live there, and anything meant for everyone goes there.`)
+      ? (meta.isGod
+        ? `YOUR FOLDERS: you work in ${meta.cwd}, the business folder. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them. ${officeFolder} is the Office folder: company knowledge that the whole team reads and only you and the owner change. Keep it accurate, and save anything meant for everyone there.`
+        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them. ${officeFolder} is the Office folder: company knowledge that everyone reads and only ${godNameForPrompt} and the owner change. Send anything meant for the whole team to ${godNameForPrompt}.`)
         + ` The hive (${root}) is ONLY for coordination — your memory.md, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
         + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
       : '';

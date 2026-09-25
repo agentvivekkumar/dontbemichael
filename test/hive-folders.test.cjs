@@ -50,17 +50,21 @@ test('a team member is told its own folder, the shared Office, and that the hive
   ));
   assert.ok(p.includes(`you work in ${finance}`), 'names its own folder');
   assert.match(p, /read it for context before searching the internet/);
-  assert.ok(p.includes(`${office} is the Office folder shared by the whole team`), 'names the Office');
+  assert.match(p, /It is private: only you, anyone sharing this folder, and Michael can open it/, 'its folder is private');
+  assert.ok(p.includes(`${office} is the Office folder: company knowledge that everyone reads and only Michael and the owner change`), 'names the Office');
   assert.match(p, /NEVER save documents, drafts or other work anywhere in the hive/);
 });
 
-test('Michael, whose folder IS the Office, is told so rather than given two folders', async (t) => {
+test('Michael works in the business folder, reads his team\'s folders, and keeps the Office', async (t) => {
   const { hive, office } = setup(t);
+  const business = path.dirname(office);
   const p = promptOf(await hive.ensureAgent(
-    { id: 'god', name: 'Michael', provider: 'claude', cwd: office, isGod: true },
+    { id: 'god', name: 'Michael', provider: 'claude', cwd: business, isGod: true },
     { officeFolder: office }
   ));
-  assert.ok(p.includes(`you work in ${office}, the Office folder shared by the whole team`));
+  assert.ok(p.includes(`you work in ${business}, the business folder`));
+  assert.match(p, /You can read their files, but only they change them/);
+  assert.ok(p.includes(`${office} is the Office folder: company knowledge that the whole team reads and only you and the owner change`));
   assert.match(p, /NEVER save documents/);
 });
 

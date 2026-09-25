@@ -18,6 +18,7 @@ import {
 } from '../shared/officeRecord';
 import { homeFolderStatus } from './homeFolder';
 import { OFFICE_FOLDER } from './agentFolders';
+import { businessFolderOf, type FolderLayout } from '../shared/folderAccess';
 
 export function officeRecordPath(home: string): string {
   return join(home, 'office.json');
@@ -112,7 +113,7 @@ export interface FoundOffice {
  *  the disk root, the home folder itself, and the places that hold keys and
  *  app settings. A record is a file in a folder that could have been copied or
  *  synced from elsewhere, so its folders are checked before setup offers them. */
-function isUsableTeamFolder(folder: string, home = homedir()): boolean {
+export function isUsableTeamFolder(folder: string, home = homedir()): boolean {
   if (!isAbsolute(folder)) return false;
   // Follow links (a folder that is a link into ~/.ssh is ~/.ssh), and compare
   // ignoring case where the disk does: on macOS and Windows ~/LIBRARY is ~/Library.
@@ -130,6 +131,45 @@ function isUsableTeamFolder(folder: string, home = homedir()): boolean {
     if (f === k || f.startsWith(k + sep)) return false;
   }
   return true;
+}
+
+/**
+ * The folders an office's access rules are built from (src/shared/folderAccess.ts).
+ *
+ * `folders` is every team member's working folder as recorded (config and
+ * registry), which can differ in case from the disk ("MoblizeIt" for
+ * "MoblizeIT"), so each is resolved to its real path: the OS sandbox matches
+ * real paths. Folders that aren't a team member's own place are dropped: the
+ * home folder and the app's kept folders, the app's own folder, and anything
+ * that contains Michael's folder (an agent started in ~/Documents is not a
+ * reason to hide ~/Documents).
+ */
+export function folderLayoutFor(officeFolder: string | undefined, folders: string[], harnessHome?: string): FolderLayout {
+  const onDisk = (p: string) => {
+    try { return realpathSync.native(resolve(p)); } catch { return resolve(p); }
+  };
+  const fold = process.platform === 'darwin' || process.platform === 'win32'
+    ? (p: string) => p.toLowerCase()
+    : (p: string) => p;
+  const within = (parent: string, child: string) => {
+    const a = fold(parent); const b = fold(child);
+    return a === b || b.startsWith(a.endsWith(sep) ? a : a + sep);
+  };
+  const office = officeFolder && isUsableTeamFolder(officeFolder) ? onDisk(officeFolder) : undefined;
+  const parent = businessFolderOf(office);
+  const business = parent && isUsableTeamFolder(parent) ? parent : undefined;
+  const app = harnessHome ? onDisk(harnessHome) : undefined;
+  const teamFolders: string[] = [];
+  for (const raw of folders) {
+    if (!raw || !isAbsolute(raw) || !isUsableTeamFolder(raw)) continue;
+    const f = onDisk(raw);
+    if (app && (within(app, f) || within(f, app))) continue;
+    if (business && within(f, business)) continue;
+    if (office && within(f, office)) continue;
+    if (teamFolders.some((t) => fold(t) === fold(f))) continue;
+    teamFolders.push(f);
+  }
+  return { business, office, teamFolders };
 }
 
 /** The deepest folder that contains every path's parent, or undefined. */
