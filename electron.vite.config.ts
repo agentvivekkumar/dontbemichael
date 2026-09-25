@@ -85,6 +85,7 @@ export default defineConfig({
       alias: {
         '@': resolve(__dirname, 'src/renderer/src'),
         '@brand': resolve(__dirname, 'docs'),
+        '@brandkit': resolve(__dirname, 'branding'),
         '@shared': resolve(__dirname, 'src/shared')
       }
     }

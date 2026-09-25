@@ -9,7 +9,6 @@ import { SHOW_VOICE } from '@shared/buildFeatures';
 import { CostHud } from '@/realtime/CostHud';
 import { AccentColorName } from '@/design/tokens';
 import { OfficeCharacterName } from '@/scene/office/cast';
-import { AgentNameEditor } from './AgentNameEditor';
 
 export interface AgentCardProps {
   name: string;
@@ -33,8 +32,6 @@ export interface AgentCardProps {
    *  (`isGod` / the `god` agent id stay as-is internally; this is display only.) */
   isGod?: boolean;
   onClick?: () => void;
-  /** Persists an inline display-name edit; identity and hive paths stay unchanged. */
-  onRename?: (name: string) => Promise<{ ok: boolean; error?: string }>;
   /** Number of ledger tasks this agent is actively DOING — rendered as a blue
    *  sticky note stuck to the card. Clicking it opens the first task's detail. */
   doingCount?: number;
@@ -57,7 +54,7 @@ const fmtK = (n: number): string => `${Math.round(n / 1000)}k`;
  */
 export function AgentCard({
   name, character, accent, status, ptyId, project, action, progress = 0,
-  contextTokens, contextLimit, selected, isGod, onClick, onRename,
+  contextTokens, contextLimit, selected, isGod, onClick,
   doingCount = 0, onTaskNoteClick, draggable, note, onEditNote
 }: AgentCardProps) {
   const { t } = useTranslation();
@@ -205,10 +202,10 @@ export function AgentCard({
             {/* Identity row: name (+ BOSS tag) + status. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', minWidth: 0 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minWidth: 0, flex: 1 }}>
-                {onRename ? (
-                  <AgentNameEditor name={name} onCommit={onRename} uppercase />
-                ) : (
-                  <span style={{
+                {/* Plain text: a click on the name used to start renaming it,
+                    mostly by accident. Names change in Edit Agent (owner,
+                    2026-09-25). */}
+                <span style={{
                     fontFamily: 'var(--cth-font-display)',
                     fontSize: 'var(--cth-text-display-sm)',
                     lineHeight: 'var(--cth-lh-display-sm)',
@@ -216,7 +213,6 @@ export function AgentCard({
                     flex: 1, minWidth: 0,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>{name.toUpperCase()}</span>
-                )}
                 {isGod && (
                   <span style={{
                     fontFamily: 'var(--cth-font-display)', fontSize: 7, lineHeight: '11px',

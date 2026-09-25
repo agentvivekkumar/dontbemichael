@@ -32,6 +32,9 @@ export interface EditAgentModalProps {
  */
 export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const updateAgent = useStore((s) => s.updateAgent);
+  const renameAgent = useStore((s) => s.renameAgent);
+  const [nameError, setNameError] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<HarnessConfig | null>(null);
 
   const [name, setName] = useState(agent.name);
@@ -75,8 +78,19 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
 
   const preset = providerPreset(provider);
 
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     const trimmedName = name.trim() || agent.name;
+    // A new name goes through the office registry first, the rename Michael
+    // and the team read names from. If it's refused (say, the name is taken),
+    // the dialog stays open and nothing is saved (owner, 2026-09-25).
+    if (trimmedName !== agent.name) {
+      setSaving(true);
+      const renamed = await renameAgent(agent.id, trimmedName);
+      setSaving(false);
+      if (!renamed.ok) { setNameError(renamed.error ?? 'Could not rename agent'); return; }
+    }
+    setNameError(undefined);
     // Both fields cleared keeps the role it had, rather than saving a blank.
     const trimmedDescription = joinAgentRole(role, roleDescription) || agent.description;
     const trimmedGoal = goal.trim();
@@ -85,7 +99,6 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       : agent.command;
 
     updateAgent(agent.id, {
-      name: trimmedName,
       character,
       accent,
       provider,
@@ -134,11 +147,15 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               <Row label="Name">
                 <input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => { setName(e.target.value); setNameError(undefined); }}
                   placeholder="Stanley"
-                  style={inputStyle}
+                  aria-invalid={nameError ? true : undefined}
+                  style={nameError ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral)' } : inputStyle}
                   autoFocus
                 />
+                {nameError && (
+                  <span role="alert" style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>{nameError}</span>
+                )}
               </Row>
 
               <Row label="Character">
@@ -282,7 +299,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
               <PixelButton variant="ghost" size="md" onClick={onClose}>cancel</PixelButton>
               <div style={{ flex: 1 }} />
-              <PixelButton variant="primary" size="md" onClick={save}>save changes</PixelButton>
+              <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving}>save changes</PixelButton>
             </div>
           </div>
         </PixelPanel>

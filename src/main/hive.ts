@@ -1269,6 +1269,11 @@ export class HiveManager {
       const agent = reg.agents[id];
       if (!agent) return { ok: false, error: 'Agent not found' };
       if (agent.name === nextName) return { ok: true, name: nextName };
+      // Names are how Michael and the team address each other, so two agents
+      // can't share one (owner, 2026-09-25).
+      const taken = Object.entries(reg.agents).some(([otherId, other]) =>
+        otherId !== id && !!other?.name && other.name.trim().toLowerCase() === nextName.toLowerCase());
+      if (taken) return { ok: false, error: `Another team member is already called ${nextName}. Pick a different name.` };
 
       const previousName = agent.name;
       agent.name = nextName;

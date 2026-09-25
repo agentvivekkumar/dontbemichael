@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.4] (2026-09-25)
+
+### Changed
+
+- **Names change only in Edit Agent.** Clicking or double clicking a name on a card or in a panel
+  no longer starts renaming it, which mostly happened by accident. Renaming in Edit Agent now
+  reaches Michael and the team, and a name another team member already has is refused. Michael's
+  name can't be changed.
+- **The app shows the new brand.** The header shows the Don't Be Michael lockup, and the window
+  icon, the loading screen and the app icon show the Struck M, instead of the old portrait.
+
+### Documentation
+
+- **The README describes the small business office** that the app is today, with the new logo,
+  instead of the original developer tool. Contributor documents no longer claim Windows and Linux
+  releases or signed builds.
+
 ## [0.0.3] (2026-09-25)
 
 ### Changed

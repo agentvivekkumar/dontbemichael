@@ -171,3 +171,9 @@
   /* Hard shadow reads as depth, not void */
   --cth-shadow-hard: 4px 4px 0 rgba(0, 0, 0, 0.45);
 }
+
+/* The header lockup: one image per theme (App.tsx). */
+.cth-lockup-light { display: block; }
+.cth-lockup-dark { display: none; }
+:root[data-cth-theme='dark'] .cth-lockup-light { display: none; }
+:root[data-cth-theme='dark'] .cth-lockup-dark { display: block; }

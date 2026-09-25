@@ -18,12 +18,8 @@
         background: #FFF8E7; color: #1A1320;
         font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       }
-      #cth-splash .mk {
-        display: grid; place-items: center; width: 56px; height: 56px;
-        background: #6E1423; color: #F4F1EA; border: 4px solid #4A0D17;
-        font-family: "Press Start 2P", monospace; font-size: 16px; letter-spacing: -2px;
-        box-shadow: 4px 4px 0 rgba(26,19,32,0.25);
-      }
+      /* Holds the mark's place until main.tsx swaps in the brand kit's Struck M. */
+      #cth-splash .mk { width: 56px; height: 56px; }
       #cth-splash .title { font-family: "Press Start 2P", monospace; font-size: 13px; }
       #cth-splash .hint { font-size: 15px; color: #6B5878; }
     </style>
@@ -31,7 +27,7 @@
   <body>
     <div id="root">
       <div id="cth-splash">
-        <div class="mk">DBM</div>
+        <div class="mk"></div>
         <div class="title">DON'T BE MICHAEL</div>
         <div class="hint">opening the office…</div>
       </div>
