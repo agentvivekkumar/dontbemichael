@@ -18,6 +18,7 @@
  * Pure data and pure functions; the file I/O lives in src/main/officeFile.ts.
  */
 import type { TeamPlan } from './teamPlan';
+import { cleanCompanyProfile, type CompanyProfile } from './companyProfile';
 
 export interface OfficeRecord {
   version: 1;
@@ -30,6 +31,9 @@ export interface OfficeRecord {
    *  Records written before 2026-09-25 named the shared Office folder instead;
    *  those are read as the folder holding it (legacyBusinessFolder). */
   businessFolder?: string;
+  /** Key facts about the business (src/shared/companyProfile.ts), kept with the
+   *  office so setting it up again doesn't ask for them twice. */
+  companyProfile?: CompanyProfile;
   /** Each team member and the folder it works in. Michael is not listed. */
   team: Array<{ agentId: string; folder: string }>;
 }
@@ -44,6 +48,7 @@ export interface OfficeConfigFields {
   businessFolder?: string;
   /** Before 2026-09-25: the shared Office folder, inside Michael's. */
   officeFolder?: string;
+  companyProfile?: CompanyProfile;
   businessTeam?: Array<{ agentId: string; folder: string }>;
 }
 
@@ -66,6 +71,13 @@ const str = (v: unknown): string | undefined =>
  * a concept (company knowledge lives in the knowledge feature); on disk it's an
  * ordinary folder inside Michael's.
  */
+/** `{ companyProfile }` when there is anything in it, else nothing, so an
+ *  office without a profile keeps the record shape it always had. */
+function profileField(raw: unknown): { companyProfile?: CompanyProfile } {
+  const p = cleanCompanyProfile(raw);
+  return Object.keys(p).length ? { companyProfile: p } : {};
+}
+
 export function legacyBusinessFolder(officeFolder: string | undefined): string | undefined {
   const o = str(officeFolder)?.replace(/[\\/]+$/, '');
   if (!o) return undefined;
@@ -98,6 +110,7 @@ export function parseOfficeRecord(v: unknown): OfficeRecord | null {
     businessCity: str(o.businessCity),
     businessType: str(o.businessType),
     businessFolder: str(o.businessFolder) ?? legacyBusinessFolder(str(o.officeFolder)),
+    ...profileField(o.companyProfile),
     team: cleanTeam(o.team)
   };
 }
@@ -111,6 +124,7 @@ export function officeRecordFromConfig(cfg: OfficeConfigFields): OfficeRecord | 
     businessCity: str(cfg.businessCity),
     businessType: str(cfg.businessType),
     businessFolder: str(cfg.businessFolder) ?? legacyBusinessFolder(cfg.officeFolder),
+    ...profileField(cfg.companyProfile),
     team: cleanTeam(cfg.businessTeam)
   };
 }
@@ -190,7 +204,7 @@ export function sameOfficeRecord(a: OfficeRecord | null, b: OfficeRecord | null)
  *  save that only switches offices (harnessHome) must never write the previous
  *  office's description into the new one (2026-09-24 review). */
 export const OFFICE_FIELDS = [
-  'onboardingComplete', 'businessName', 'businessCity', 'businessType', 'businessFolder', 'officeFolder', 'businessTeam'
+  'onboardingComplete', 'businessName', 'businessCity', 'businessType', 'businessFolder', 'officeFolder', 'companyProfile', 'businessTeam'
 ] as const;
 
 export function touchesOffice(patch: unknown): boolean {

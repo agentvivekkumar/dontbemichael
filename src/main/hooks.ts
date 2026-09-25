@@ -76,6 +76,9 @@ export class HookServer {
    *  prompt only bloats the transcript. One entry per agent is sufficient: an
    *  agent has one live session, and a new session id replaces the old entry. */
   private deliveredGoalByAgent = new Map<string, { sessionId: string | null; goal: string | null }>();
+  /** The company profile last delivered to each agent's session: same once per
+   *  session, again on change, rule as the goal. */
+  private deliveredProfileByAgent = new Map<string, { sessionId: string | null; text: string | null }>();
 
   constructor(
     private hive: HiveManager,
@@ -95,7 +98,9 @@ export class HookServer {
     private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void,
     /** Company knowledge's live state, so turning it on or off reaches running
      *  agents on their next prompt instead of at their next start. */
-    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string; meaning?: { bin: string; palace: string } }
+    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string; meaning?: { bin: string; palace: string } },
+    /** The company profile as agents read it (companyProfileContext), or null. */
+    private getCompanyProfile?: () => string | null
   ) {}
 
   start(): void {
@@ -401,17 +406,33 @@ export class HookServer {
       }
     }
 
+    // The company profile (owner, 2026-09-25): key facts every agent, Michael
+    // included, works from. Delivered at the start of each session and again
+    // when the owner changes it, never repeated unchanged.
+    let profile: string | null = null;
+    if ((event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getCompanyProfile) {
+      const text = this.getCompanyProfile();
+      const sessionId = p.session_id ?? null;
+      const delivered = this.deliveredProfileByAgent.get(agentId);
+      const fresh = event === 'SessionStart' || !delivered || delivered.sessionId !== sessionId;
+      if (fresh || delivered.text !== text) {
+        this.deliveredProfileByAgent.set(agentId, { sessionId, text });
+        if (text) profile = text;
+        else if (!fresh && delivered?.text) profile = 'COMPANY PROFILE. The owner cleared the company profile; the facts given earlier no longer apply.';
+      }
+    }
+
     // Company knowledge turned on or off since this agent was last told.
     const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
       ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
       : null;
 
-    if (steer || roster || goal || knowledgeNote) {
+    if (steer || roster || goal || knowledgeNote || profile) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
         }
       };
     }

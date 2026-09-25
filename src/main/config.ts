@@ -1,3 +1,4 @@
+import type { CompanyProfile } from '../shared/companyProfile';
 import { app } from 'electron';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -198,6 +199,9 @@ export interface HarnessConfig {
    *  "your business". Never used as a path or an id. */
   businessName?: string;
   businessCity?: string;
+  /** The company profile: key facts with short, definite answers, delivered
+   *  to every agent (src/shared/companyProfile.ts). */
+  companyProfile?: CompanyProfile;
   /** Michael's folder: the business folder, private to him and the owner, that
    *  holds every team member's folder by default (src/shared/folderAccess.ts). */
   businessFolder?: string;

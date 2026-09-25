@@ -230,5 +230,6 @@ function stripEmpty(rec: OfficeRecord): Partial<OfficeRecord> {
   if (rec.businessCity) out.businessCity = rec.businessCity;
   if (rec.businessType) out.businessType = rec.businessType;
   if (rec.businessFolder) out.businessFolder = rec.businessFolder;
+  if (rec.companyProfile) out.companyProfile = rec.companyProfile;
   return out;
 }

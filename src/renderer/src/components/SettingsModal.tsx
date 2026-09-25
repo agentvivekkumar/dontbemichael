@@ -21,6 +21,7 @@ import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
+import { CompanyProfileSettings } from './CompanyProfileSettings';
 import { SetupPanel } from './SetupPanel';
 import { Icon } from './Icon';
 import { OfficeThemePicker } from './OfficeThemePicker';
@@ -177,14 +178,15 @@ const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
 /** The 2px rule between Settings sections. */
 const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
 
-export type Section = 'General' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
-const NAV_SECTIONS: Section[] = ['General', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
+const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
 /** The tabs shown: the Voice tab is hidden while voice is off (SHOW_VOICE). */
 const VISIBLE_SECTIONS: Section[] = NAV_SECTIONS.filter((s) => s !== 'Voice' || SHOW_VOICE);
 /** i18n key for each nav section's label — the Section values themselves stay
  *  as stable identifiers (tab state, deep links). */
 const NAV_SECTION_KEYS: Record<Section, string> = {
   'General': 'settings.nav.general',
+  'Company profile': 'settings.nav.companyProfile',
   'Prerequisites': 'settings.nav.prerequisites',
   'Agents & Models': 'settings.nav.agentsModels',
   'Skills': 'settings.nav.skills',
@@ -1495,6 +1497,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   )}
 
                   {/* MEMORY & KNOWLEDGE */}
+                  {/* COMPANY PROFILE: key facts every agent works from. */}
+                  {activeSection === 'Company profile' && (
+                    <CompanyProfileSettings config={config} onOpenKnowledge={() => setActiveSection('Memory & Knowledge')} />
+                  )}
+
                   {activeSection === 'Memory & Knowledge' && (
                     <>
                       <div>

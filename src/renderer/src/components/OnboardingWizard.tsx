@@ -1,3 +1,5 @@
+import { CompanyProfileFields, localCurrency, localTimeZone } from './CompanyProfileFields';
+import { cityLine, cleanCompanyProfile, missingProfileFields, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -27,7 +29,7 @@ export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
 }
 
-type Step = 'resume' | 'business' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
+type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
 
 /** The "no pack fits" tile. Not an error path: Michael asks a few questions and
  *  builds from the core pack, so the grid always resolves to something. */
@@ -122,18 +124,33 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // and it is the plain one.
   const [businessType, setBusinessType] = useState<string | undefined>();
   const [businessName, setBusinessName] = useState('');
-  const [businessCity, setBusinessCity] = useState('');
-  // Name, location and type are all required (see businessProfile.ts). Gaps are
-  // only SHOWN after the owner has tried to continue: flagging empty fields the
-  // moment the screen opens reads as scolding before they've typed anything.
-  // After that the message is live, shrinking as each field is filled in.
+  // The company profile (src/shared/companyProfile.ts): the essentials on step
+  // 1, everything else optional on step 2. Time zone and currency start from
+  // the Mac's own settings.
+  const [profile, setProfile] = useState<CompanyProfile>(() => ({ timeZone: localTimeZone(), currency: localCurrency() }));
+  // The city line older parts of the app still read (businessCity).
+  const businessCity = cityLine(profile.address) ?? '';
+  // Name, type, CEO and the headquarters address are required (businessProfile.ts,
+  // companyProfile.ts). Gaps are only SHOWN after the owner has tried to
+  // continue: flagging empty fields the moment the screen opens reads as
+  // scolding before they've typed anything. After that the message is live,
+  // shrinking as each field is filled in.
   const [triedBusiness, setTriedBusiness] = useState(false);
-  const businessGaps = missingBusinessFields({ name: businessName, location: businessCity, type: businessType });
+  const profileGaps = missingProfileFields(cleanCompanyProfile(profile), businessType === OTHER_BUSINESS);
+  const businessGaps = [
+    ...missingBusinessFields({ name: businessName, location: businessCity || '-', type: businessType }),
+    ...profileGaps
+  ];
   const gapShown = (field: BusinessField) => triedBusiness && businessGaps.includes(field);
-  const gapMessage: Record<BusinessField, string> = {
+  const gapMessage: Record<BusinessField | RequiredProfileField, string> = {
     name: t('onboarding.business.errName'),
     location: t('onboarding.business.errLocation'),
-    type: t('onboarding.business.errType')
+    type: t('onboarding.business.errType'),
+    ceo: t('companyProfile.missing.ceo'),
+    street: t('companyProfile.missing.street'),
+    city: t('companyProfile.missing.city'),
+    country: t('companyProfile.missing.country'),
+    industry: t('companyProfile.missing.industry')
   };
 
   // The bundled Office Packs, each already merged with core. `undefined` = not
@@ -365,7 +382,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (!found) return;
     const r = found.record;
     setBusinessName(r.businessName ?? '');
-    setBusinessCity(r.businessCity ?? '');
+    setProfile((p) => ({ ...p, ...(r.companyProfile ?? {}) }));
     if (r.businessType) setBusinessType(r.businessType);
     setHome(found.path);
     setResuming(true);
@@ -445,6 +462,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         businessType: businessType === OTHER_BUSINESS ? undefined : businessType,
         businessName: businessName.trim() || undefined,
         businessCity: businessCity.trim() || undefined,
+        companyProfile: cleanCompanyProfile(profile),
         harnessHome, // the same trimmed value we just mkdir'd, not the raw field
         // Where the office works (Decision 44). The running office starts each
         // agent inside its folder; the folders also become the hire dialog's
@@ -493,6 +511,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           title={
             step === 'resume' ? t('onboarding.titles.resume')
             : step === 'business' ? t('onboarding.titles.business')
+            : step === 'details' ? t('onboarding.titles.details')
             : step === 'welcome' ? t('onboarding.titles.welcome')
             : step === 'home' ? t('onboarding.titles.home')
             : step === 'orchestrator' ? t('onboarding.titles.orchestrator')
@@ -565,7 +584,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 {/* Name and location are required: agents write as this business, so
                     they need to know what it's called and where it is. Neither is
                     ever used as an id or a path. */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
                       {t('onboarding.business.nameLabel')}
@@ -579,19 +598,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       style={fieldStyle(gapShown('name'))}
                     />
                   </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
-                      {t('onboarding.business.cityLabel')}
-                    </span>
-                    <input
-                      value={businessCity}
-                      onChange={(e) => setBusinessCity(e.target.value)}
-                      placeholder={t('onboarding.business.cityPlaceholder')}
-                      aria-required
-                      aria-invalid={gapShown('location')}
-                      style={fieldStyle(gapShown('location'))}
-                    />
-                  </label>
+
                 </div>
 
                 <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
@@ -628,6 +635,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   </div>
                 )}
 
+                {/* The rest of the essentials: every agent works from these
+                    (companyProfile.ts). The industry line appears only when no
+                    business type fits. */}
+                <CompanyProfileFields
+                  value={profile}
+                  onChange={setProfile}
+                  parts={['essentials']}
+                  needsIndustry={businessType === OTHER_BUSINESS}
+                  missing={triedBusiness ? profileGaps : []}
+                />
+
                 {triedBusiness && businessGaps.length > 0 && (
                   <div role="alert" style={{
                     padding: '6px 10px',
@@ -638,6 +656,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     {businessGaps.map((g) => gapMessage[g]).join(' ')}
                   </div>
                 )}
+              </>
+            )}
+
+            {step === 'details' && (
+              <>
+                <div style={{ fontSize: 14, color: 'var(--cth-ink-700)', lineHeight: '19px' }}>
+                  {t('onboarding.details.intro', { godName })}
+                </div>
+                <CompanyProfileFields value={profile} onChange={setProfile} parts={['details', 'hint']} />
               </>
             )}
 
@@ -1416,7 +1443,7 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
 }
 
 function Dots({ step }: { step: Step }) {
-  const order: Step[] = ['business', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
+  const order: Step[] = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {order.map((s) => (
@@ -1436,7 +1463,8 @@ const DEFAULT_HOME = '~/HarnessAgents';
 const NEW_OFFICE_SUGGESTIONS = 20;
 
 function nextStep(s: Step): Step {
-  return s === 'business' ? 'welcome'
+  return s === 'business' ? 'details'
+    : s === 'details' ? 'welcome'
     : s === 'welcome' ? 'team'
     : s === 'team' ? 'home'
     : s === 'home' ? 'orchestrator'
@@ -1448,6 +1476,7 @@ function prevStep(s: Step): Step {
     : s === 'orchestrator' ? 'home'
     : s === 'home' ? 'team'
     : s === 'team' ? 'welcome'
+    : s === 'welcome' ? 'details'
     : 'business';
 }
 

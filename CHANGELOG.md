@@ -22,6 +22,13 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Michael included, is told to search. There is no shared Office folder any more: an existing one
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
+- **A company profile every agent works from.** Setup asks for the essentials (business name,
+  industry, CEO or owner, headquarters address, website), then an optional Company details step:
+  legal name and business type, main phone, public email, social links, business hours, time zone,
+  where you serve, languages, currency and when your financial year starts. Time zone and currency
+  start from your Mac. Every agent, Michael included, gets these facts at the start of each session
+  and again when you change them in the new Settings, Company profile page. Anything longer (product
+  lists, ideal customers, how you sell, policies) goes in Memory & Knowledge, which the page points to.
 - **Company knowledge can be searched by meaning.** When MemPalace is installed, every document you
   add is indexed into it, so a search for "money back" finds your refund policy. Removed documents
   leave the index too. Without MemPalace, agents search by exact words as before.

@@ -95,6 +95,7 @@ import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
 import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
+import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -321,7 +322,8 @@ const hookServer = new HookServer(
   breaker,
   standingGoalFromRoster,
   (agentId, event, message) => workerWake.noteHook(agentId, event, message),
-  () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() })
+  () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
+  companyProfileForAgents
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
@@ -329,6 +331,25 @@ const memory = new MemoryManager(
   // Company knowledge, indexed into the palace for searching by meaning.
   () => knowledge.meaningMirror()
 );
+/** The company profile as every agent reads it (src/shared/companyProfile.ts).
+ *  The industry is the owner's own words when no business type fit, else the
+ *  business type's name. Read fresh on each hook, so an edit in Settings
+ *  reaches running agents on their next message. */
+const packNameCache = new Map<string, string | undefined>();
+function companyProfileForAgents(): string | null {
+  const cfg = readConfig();
+  let industry: string | undefined;
+  if (cfg.businessType) {
+    // Packs are read from disk; the hook runs on every prompt, so remember names.
+    if (!packNameCache.has(cfg.businessType)) {
+      try { packNameCache.set(cfg.businessType, loadBundledPacks({ packsDir }).packs.find((x) => x.pack.businessType === cfg.businessType)?.pack.displayName); }
+      catch { /* the profile still goes out without it */ }
+    }
+    industry = packNameCache.get(cfg.businessType);
+  }
+  return companyProfileContext({ name: cfg.businessName, industry }, cleanCompanyProfile(cfg.companyProfile));
+}
+
 /** MemPalace, for agents to search company knowledge by meaning: only when it's
  *  installed and on, and company knowledge is on. */
 function meaningSearch(): { bin: string; palace: string } | undefined {

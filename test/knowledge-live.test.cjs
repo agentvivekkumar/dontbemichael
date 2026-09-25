@@ -39,8 +39,8 @@ test('an agent started with knowledge off is told once when it turns on, and onc
 test('the hook carries the update alongside the roster and goal', () => {
   const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
   assert.match(hooks, /this\.hive\.knowledgeUpdate\(agentId, this\.getKnowledge\(\)\)/);
-  assert.match(hooks, /\[roster, goal, knowledgeNote, steer\]\.filter\(Boolean\)/);
-  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8'), /\(\) => \(\{ \.\.\.knowledge\.agentAccess\(\), meaning: meaningSearch\(\) \}\)\n\);/);
+  assert.match(hooks, /\[roster, profile, goal, knowledgeNote, steer\]\.filter\(Boolean\)/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8'), /\(\) => \(\{ \.\.\.knowledge\.agentAccess\(\), meaning: meaningSearch\(\) \}\),\n  companyProfileForAgents\n\);/);
 });
 
 test('the search tool finds the store from --root, with no KG_ROOT set', () => {

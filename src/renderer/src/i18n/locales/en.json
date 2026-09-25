@@ -204,7 +204,8 @@
       "autonomyBudgets": "Autonomy & Budgets",
       "connections": "Connections",
       "voice": "Voice",
-      "memoryKnowledge": "Memory & Knowledge"
+      "memoryKnowledge": "Memory & Knowledge",
+      "companyProfile": "Company profile"
     },
     "changeHome": {
       "newHome": "New office folder",
@@ -601,13 +602,14 @@
   "onboarding": {
     "titles": {
       "resume": "WELCOME BACK",
-      "welcome": "STEP 2 OF 6 · MEET YOUR OFFICE",
-      "home": "STEP 4 OF 6 · A HOME FOR THE APP",
-      "orchestrator": "STEP 5 OF 6 · YOUR MANAGER",
-      "permissions": "STEP 6 OF 6 · PERMISSIONS & RELIABILITY",
+      "welcome": "STEP 3 OF 7 · MEET YOUR OFFICE",
+      "home": "STEP 5 OF 7 · A HOME FOR THE APP",
+      "orchestrator": "STEP 6 OF 7 · YOUR MANAGER",
+      "permissions": "STEP 7 OF 7 · PERMISSIONS & RELIABILITY",
       "done": "ALL SET",
-      "business": "STEP 1 OF 6 · YOUR BUSINESS",
-      "team": "STEP 3 OF 6 · YOUR TEAM"
+      "business": "STEP 1 OF 7 · YOUR BUSINESS",
+      "details": "STEP 2 OF 7 · COMPANY DETAILS",
+      "team": "STEP 4 OF 7 · YOUR TEAM"
     },
     "resume": {
       "headline": "WE FOUND YOUR OFFICE",
@@ -708,8 +710,6 @@
       "body": "I run your office. Tell me about your business and I'll suggest a starter team. You pick who joins.",
       "nameLabel": "Business name",
       "namePlaceholder": "e.g. Pho Saigon Kitchen",
-      "cityLabel": "City, State",
-      "cityPlaceholder": "e.g. Austin, TX",
       "ask": "WHAT KIND OF BUSINESS DO YOU RUN?",
       "otherTitle": "Something else",
       "otherDesc": "{{godName}} will ask a few questions",
@@ -751,7 +751,10 @@
         "github": "GitHub"
       }
     },
-    "errSaveSetup": "Couldn't save your setup. Try again."
+    "errSaveSetup": "Couldn't save your setup. Try again.",
+    "details": {
+      "intro": "All optional. {{godName}} and the team use these for signatures, scheduling and prices. You can fill them in later in Settings, Company profile."
+    }
   },
   "office": {
     "gpuError": "The office floor lost its GPU context.\n\nToo many terminals are using the GPU at once.\nClose a few agent terminals, or restart the app, to bring it back.",
@@ -1455,5 +1458,66 @@
     "tasksIntro": "Every job the team has, by stage: To do, Doing, Blocked and Done. Each card shows who has it, and a ? means it is waiting on you (answer it on the Ask me tab). Click a card for the details.",
     "graphIntroTitle": "Who talks to whom.",
     "graphIntro": "Each box is a team member and each line is the messages between them, coloured by kind: asking, answering, agreeing and so on. Turn on topics to see what each one remembers. Click a person to read their memory on {{godName}}'s panel."
+  },
+  "companyProfile": {
+    "intro": "Key facts about your business. Every team member, {{godName}} included, works from them. Short answers only: anything longer goes in Memory & Knowledge.",
+    "ceo": "CEO or owner",
+    "ceoPlaceholder": "Full name",
+    "website": "Website",
+    "industry": "Industry",
+    "industryPlaceholder": "For example: Dental clinic",
+    "addressHead": "HEADQUARTERS ADDRESS",
+    "street": "Street address",
+    "city": "City",
+    "region": "State or region",
+    "postalCode": "Postal code",
+    "country": "Country",
+    "contactHead": "CONTACT DETAILS",
+    "legalName": "Legal name",
+    "legalNamePlaceholder": "For example: MoblizeIT LLC",
+    "entityType": "Business type",
+    "entity": {
+      "sole-proprietor": "Sole proprietor",
+      "partnership": "Partnership",
+      "llc": "LLC",
+      "corporation": "Corporation",
+      "nonprofit": "Nonprofit",
+      "other": "Other"
+    },
+    "phone": "Main phone",
+    "email": "Public email",
+    "social": "Social media links",
+    "socialHint": "One link per line, up to 5.",
+    "operateHead": "HOW YOU OPERATE",
+    "hours": "Business hours",
+    "hoursPlaceholder": "For example: Mon to Fri, 9am to 5pm",
+    "timeZone": "Time zone",
+    "serviceArea": "Where you serve",
+    "area": {
+      "local": "One city or town",
+      "regional": "A region or state",
+      "national": "The whole country",
+      "international": "Worldwide"
+    },
+    "languages": "Languages you serve customers in",
+    "languagesPlaceholder": "For example: English, Spanish",
+    "moneyHead": "MONEY",
+    "currency": "Currency",
+    "fiscalMonth": "Financial year starts in",
+    "notSet": "Not set",
+    "knowledgeHead": "Everything else goes in Memory & Knowledge",
+    "knowledgeBody": "Product and price lists, your ideal customers, how you sell, policies, your mission: add them as documents in Settings, Memory & Knowledge. Every team member can search them.",
+    "knowledgeOpen": "Open Memory & Knowledge",
+    "save": "Save",
+    "saved": "Saved. Your team gets the change with their next message.",
+    "saveFailed": "Couldn't save. Try again.",
+    "stillMissing": "Fields marked * are still empty.",
+    "missing": {
+      "ceo": "Add the CEO or owner's name.",
+      "street": "Add the street address.",
+      "city": "Add the city.",
+      "country": "Add the country.",
+      "industry": "Say what kind of business this is."
+    }
   }
 }

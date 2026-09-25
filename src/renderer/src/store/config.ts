@@ -1,5 +1,6 @@
 // Mirrors src/main/config.ts. Kept as a renderer-side type-only module
 // so we don't have to reach into the preload package to type-check.
+import type { CompanyProfile } from '@shared/companyProfile';
 import {
   AGENT_PROVIDER_PRESETS,
   BUILD_ENGINES,
@@ -66,6 +67,9 @@ export interface HarnessConfig {
   /** The business's name and city as the owner typed them. Mirrors src/main/config.ts. */
   businessName?: string;
   businessCity?: string;
+  /** The company profile: key facts with short, definite answers, delivered
+   *  to every agent (src/shared/companyProfile.ts). */
+  companyProfile?: CompanyProfile;
   /** Michael's folder: the business folder, private to him and the owner, that
    *  holds every team member's folder by default (src/shared/folderAccess.ts). */
   businessFolder?: string;

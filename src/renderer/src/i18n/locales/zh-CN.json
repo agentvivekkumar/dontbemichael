@@ -204,7 +204,8 @@
       "autonomyBudgets": "自主权与预算",
       "connections": "连接",
       "voice": "语音",
-      "memoryKnowledge": "记忆与知识"
+      "memoryKnowledge": "记忆与知识",
+      "companyProfile": "公司资料"
     },
     "changeHome": {
       "newHome": "新的办公室文件夹",
@@ -601,13 +602,14 @@
   "onboarding": {
     "titles": {
       "resume": "欢迎回来",
-      "welcome": "第 2 步，共 6 步 · 认识你的办公室",
-      "home": "第 4 步，共 6 步 · 为应用找一个家",
-      "orchestrator": "第 5 步，共 6 步 · 您的经理",
-      "permissions": "第 6 步，共 6 步 · 权限与可靠性",
+      "welcome": "第 3 步，共 7 步 · 认识你的办公室",
+      "home": "第 5 步，共 7 步 · 为应用找一个家",
+      "orchestrator": "第 6 步，共 7 步 · 您的经理",
+      "permissions": "第 7 步，共 7 步 · 权限与可靠性",
       "done": "全部就绪",
-      "business": "第 1 步，共 6 步 · 您的业务",
-      "team": "第 3 步，共 6 步 · 您的团队"
+      "business": "第 1 步，共 7 步 · 您的业务",
+      "details": "第 2 步，共 7 步 · 公司详情",
+      "team": "第 4 步，共 7 步 · 您的团队"
     },
     "resume": {
       "headline": "我们找到了你的办公室",
@@ -708,8 +710,6 @@
       "body": "我来打理您的办公室。告诉我您的业务，我会推荐一支启动团队，由您决定谁加入。",
       "nameLabel": "企业名称",
       "namePlaceholder": "例如：西贡越南餐厅",
-      "cityLabel": "城市、州",
-      "cityPlaceholder": "例如：奥斯汀，德州",
       "ask": "您经营哪一类业务？",
       "otherTitle": "其他",
       "otherDesc": "{{godName}} 会问您几个问题",
@@ -751,7 +751,10 @@
         "github": "GitHub"
       }
     },
-    "errSaveSetup": "无法保存你的设置，请重试。"
+    "errSaveSetup": "无法保存你的设置，请重试。",
+    "details": {
+      "intro": "全部可选。{{godName}} 和团队会在签名、日程安排和报价时用到这些信息。您也可以稍后在“设置 > 公司资料”里填写。"
+    }
   },
   "office": {
     "gpuError": "办公楼层丢失了 GPU 上下文。\n\n同时使用 GPU 的终端太多了。\n关闭几个智能体终端，或重启应用，即可恢复。",
@@ -1455,5 +1458,66 @@
     "tasksIntro": "团队的每项工作按阶段排列：待办、进行中、已阻塞、已完成。每张卡片显示负责人；带 ? 的卡片在等你处理（请在“问我”标签页回答）。点击卡片查看详情。",
     "graphIntroTitle": "谁在和谁交流。",
     "graphIntro": "每个方框是一位团队成员，每条线是他们之间的消息，按类型着色：提问、回答、同意等。打开“主题”可查看每个人记住了什么。点击某人即可在 {{godName}} 的面板上查看其记忆。"
+  },
+  "companyProfile": {
+    "intro": "关于您公司的关键信息。每位成员，包括 {{godName}}，都会以此为依据工作。只填简短的答案，较长的内容请放进“记忆与知识”。",
+    "ceo": "CEO 或负责人",
+    "ceoPlaceholder": "全名",
+    "website": "网站",
+    "industry": "行业",
+    "industryPlaceholder": "例如：牙科诊所",
+    "addressHead": "总部地址",
+    "street": "街道地址",
+    "city": "城市",
+    "region": "州或地区",
+    "postalCode": "邮政编码",
+    "country": "国家",
+    "contactHead": "联系方式",
+    "legalName": "法定名称",
+    "legalNamePlaceholder": "例如：MoblizeIT LLC",
+    "entityType": "企业类型",
+    "entity": {
+      "sole-proprietor": "个体经营",
+      "partnership": "合伙企业",
+      "llc": "有限责任公司",
+      "corporation": "股份公司",
+      "nonprofit": "非营利组织",
+      "other": "其他"
+    },
+    "phone": "主要电话",
+    "email": "对外邮箱",
+    "social": "社交媒体链接",
+    "socialHint": "每行一个链接，最多 5 个。",
+    "operateHead": "经营方式",
+    "hours": "营业时间",
+    "hoursPlaceholder": "例如：周一至周五，上午 9 点到下午 5 点",
+    "timeZone": "时区",
+    "serviceArea": "服务范围",
+    "area": {
+      "local": "一个城市或城镇",
+      "regional": "一个地区或州",
+      "national": "全国",
+      "international": "全球"
+    },
+    "languages": "为客户提供服务的语言",
+    "languagesPlaceholder": "例如：英语、西班牙语",
+    "moneyHead": "财务",
+    "currency": "货币",
+    "fiscalMonth": "财年起始月份",
+    "notSet": "未设置",
+    "knowledgeHead": "其他内容请放进“记忆与知识”",
+    "knowledgeBody": "产品和价格表、理想客户、销售方式、各项政策、公司使命：请在“设置 > 记忆与知识”里以文档形式添加。每位成员都能搜索。",
+    "knowledgeOpen": "打开“记忆与知识”",
+    "save": "保存",
+    "saved": "已保存。团队会在下一条消息时收到更新。",
+    "saveFailed": "保存失败，请重试。",
+    "stillMissing": "标有 * 的字段仍为空。",
+    "missing": {
+      "ceo": "请填写 CEO 或负责人的姓名。",
+      "street": "请填写街道地址。",
+      "city": "请填写城市。",
+      "country": "请填写国家。",
+      "industry": "请说明这是什么类型的业务。"
+    }
   }
 }

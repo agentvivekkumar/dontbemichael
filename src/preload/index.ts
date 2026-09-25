@@ -272,6 +272,8 @@ export interface HarnessConfig {
   businessCity?: string;
   /** Michael's folder: the business folder holding every team member's. */
   businessFolder?: string;
+  /** Key facts about the business (src/shared/companyProfile.ts). */
+  companyProfile?: import('../shared/companyProfile').CompanyProfile;
   /** Before 2026-09-25: the retired shared Office folder. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
