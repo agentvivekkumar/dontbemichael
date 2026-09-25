@@ -120,3 +120,26 @@ test('a Claude agent\'s settings file carries the folder rules', async () => {
   assert.ok(settings.permissions.deny.includes('Read(//Users/me/Documents/Pho/Admin/**)'));
   assert.ok(Array.isArray(settings.permissions.additionalDirectories), 'the write allowances are still there');
 });
+
+test('a name starting with two dots is inside its folder; a relative Glob is judged by its folder', () => {
+  const allow = (tool, p) => folderDecision(oscar, layout, tool, p, true).deny === false;
+  assert.ok(allow('Read', `${B}/Finance/..notes`));
+  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**' }, `${B}/Finance`), `${B}/Admin/`.replace(/\/$/, ''));
+  assert.ok(!allow('Glob', folderToolTarget('Glob', { pattern: '../Admin/**' }, `${B}/Finance`)));
+  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md' }, `${B}/Finance`), null, 'a pattern in its own folder names no other');
+});
+
+test('the hook judges the real path too, so a link out of an agent\'s folder is refused', () => {
+  const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
+  assert.match(hooks, /const real = realPathOf\(target\);/);
+  const { realPathOf } = loadTs('src/main/hooks.ts');
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-link-')));
+  fs.mkdirSync(path.join(dir, 'Biz', 'Finance'), { recursive: true });
+  fs.symlinkSync(path.join(dir, 'Biz'), path.join(dir, 'Biz', 'Finance', 'biz'));
+  const real = realPathOf(path.join(dir, 'Biz', 'Finance', 'biz', 'payroll.xlsx'));
+  assert.equal(real, path.join(dir, 'Biz', 'payroll.xlsx'), 'a file not there yet takes its folder\'s real path');
+  const l = { business: path.join(dir, 'Biz'), teamFolders: [path.join(dir, 'Biz', 'Finance')] };
+  const me = { isGod: false, cwd: path.join(dir, 'Biz', 'Finance') };
+  assert.equal(folderDecision(me, l, 'Read', real, true).deny, true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

@@ -25,7 +25,7 @@
  * rules without touching the plumbing.
  */
 
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 export interface FolderLayout {
   /** Michael's folder: the business folder. Undefined on an office without one. */
@@ -158,14 +158,15 @@ function insideFn(ci: boolean) {
   const n = (p: string) => (ci ? resolve(p).toLowerCase() : resolve(p));
   return (parent: string, child: string) => {
     const rel = relative(n(parent), n(child));
-    return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+    // `..x` is a name inside the parent; only `..` itself or `../…` climbs out.
+    return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
   };
 }
 
 /**
  * The absolute path a file tool call touches, or null if it names none (a Grep
- * or Glob with no path runs in the agent's own folder). A Glob whose pattern is
- * absolute is judged by the part before its first wildcard.
+ * or Glob with no path runs in the agent's own folder). A Glob is judged by the
+ * part of its pattern before the first wildcard.
  */
 export function folderToolTarget(tool: string, input: unknown, cwd: string | undefined): string | null {
   if (!input || typeof input !== 'object') return null;
@@ -174,7 +175,9 @@ export function folderToolTarget(tool: string, input: unknown, cwd: string | und
   let p = str('file_path') ?? str('notebook_path') ?? str('path');
   if (!p && tool === 'Glob') {
     const pattern = str('pattern');
-    if (pattern && isAbsolute(pattern)) {
+    // Judged by the part before the first wildcard, relative or not: a
+    // pattern like `../Finance/**` lists another folder's files.
+    if (pattern) {
       const cut = pattern.search(/[*?[{]/);
       p = cut === -1 ? pattern : pattern.slice(0, cut);
     }

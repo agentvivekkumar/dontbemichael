@@ -11,7 +11,8 @@
  * Runs in the Electron main process.
  */
 import { createServer, type Server } from 'node:net';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { Notification, type WebContents } from 'electron';
 import type { HiveManager } from './hive';
 import type { HarnessConfig } from './config';
@@ -473,7 +474,9 @@ export class HookServer {
 
     // A handoff the agent wrote just before its conversation was cleared
     // (safeClearer.ts): given once, at the start of the new conversation.
-    const handoffText = event === 'SessionStart' && agentId ? (this.hive.takeHandoff?.(agentId) ?? null) : null;
+    // Only a conversation that was really cleared takes it: a restart or a
+    // compaction mid-handoff leaves it for the clearer (review, 2026-09-25).
+    const handoffText = event === 'SessionStart' && p.source === 'clear' && agentId ? (this.hive.takeHandoff?.(agentId) ?? null) : null;
     const handoff = handoffText ? handoffContext(handoffText) : null;
 
     // Company knowledge turned on or off since this agent was last told.
@@ -541,7 +544,14 @@ export class HookServer {
     }
     const layout = folderLayoutFor(cfg.businessFolder, folders, cfg.harnessHome ?? undefined);
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
-    return folderDecision({ isGod: !!me.isGod, cwd: me.cwd }, layout, tool, target, process.platform !== 'linux', godName);
+    const agent = { isGod: !!me.isGod, cwd: me.cwd };
+    const ci = process.platform !== 'linux';
+    // Judge the path as asked and the file it really is: a link inside the
+    // agent's own folder can point anywhere (review, 2026-09-25).
+    const asked = folderDecision(agent, layout, tool, target, ci, godName);
+    if (asked.deny) return asked;
+    const real = realPathOf(target);
+    return real && real !== target ? folderDecision(agent, layout, tool, real, ci, godName) : asked;
   }
 
   private displayName(agentId: string | undefined): string {
@@ -577,5 +587,20 @@ export class HookServer {
       return;
     }
     this.getWebContents()?.send('hive:hookEvent', payload);
+  }
+}
+
+/** The real path of `p`, following links and taking the letter case on disk.
+ *  A file that doesn't exist yet takes the real path of its nearest existing
+ *  folder. Null when nothing along the way can be read. */
+export function realPathOf(p: string): string | null {
+  let dir = p;
+  const rest: string[] = [];
+  for (;;) {
+    try { return join(realpathSync.native(dir), ...rest); } catch { /* not there yet */ }
+    const up = dirname(dir);
+    if (up === dir) return null;
+    rest.unshift(basename(dir));
+    dir = up;
   }
 }
