@@ -14,7 +14,7 @@ import {
   remoteControlCommandForProvider,
   terminalReadyToReceive
 } from '../../../shared/providerAutomation';
-import { DEFAULT_CONTEXT_TRIGGER, type ContextRule } from '../../../shared/triggers';
+import { type ContextRule } from '../../../shared/triggers';
 import type { AgentProvider } from '../../../shared/agentProvider';
 import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
 import { isDurableRole, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
@@ -1259,19 +1259,13 @@ export function useHive(config: HarnessConfig | null): void {
         cb: (p: { action: 'compact' | 'clear'; rule: ContextRule }) => void
       ) => () => void;
     }).onContextTrigger?.((p) => {
-      if (!p?.rule) return;
-      fire(p.action === 'clear' ? 'clear' : 'compact', p.rule);
+      // Only the owner's optional auto-clear arrives here. Compaction is Claude
+      // Code's own auto compact now (AUTO_COMPACT_WINDOW_TOKENS, set at spawn).
+      if (!p?.rule || p.action !== 'clear') return;
+      fire('clear', p.rule);
     });
 
-    // LEGACY fallback: main still emits the old parameterless auto-compact until
-    // it switches over. Treat it as the default compact rule so behaviour is
-    // continuous across that landing. Harmless if both fire — the dedupe above
-    // drops the duplicate.
-    const offLegacy = window.cth.onAutoCompact(
-      () => fire('compact', DEFAULT_CONTEXT_TRIGGER.compact)
-    );
-
-    return () => { off?.(); offLegacy?.(); };
+    return () => { off?.(); };
   }, [config?.onboardingComplete]);
 
   // 7) Auto-revive wedged PTYs after the Mac sleeps/locks. Kevin's main-process

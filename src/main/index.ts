@@ -44,7 +44,7 @@ import {
 } from './webhook';
 import {
   classifyInboundKind, isAutoAllowed,
-  DEFAULT_CONTEXT_TRIGGER, DEFAULT_ORG_TRIGGER, DEFAULT_TRIGGER_MODE, DEFAULT_WEBHOOK_SCHEMA,
+  AUTO_COMPACT_WINDOW_TOKENS, DEFAULT_CONTEXT_TRIGGER, DEFAULT_ORG_TRIGGER, DEFAULT_TRIGGER_MODE, DEFAULT_WEBHOOK_SCHEMA,
   type ContextRule, type ContextTriggerConfig, type InboundKind, type OrgTriggerConfig,
   type TriggerHistoryEntry, type TriggerMode, type WebhookTrigger
 } from '../shared/triggers';
@@ -728,19 +728,8 @@ function syncMissions(): void {
         if (m.kind !== 'compact' && hive.enabled()) {
           hive.send({ to: m.to, act: 'request', subject: m.label, body: m.body }, 'scheduler');
         }
-        // Auto-compact: do NOT jam /compact into busy terminals. Hand it to the
-        // renderer, which queues a /compact per agent (deduped — never two at
-        // once) and delivers it only when that agent goes idle (its drain loop),
-        // so a working agent compacts between steps, never mid-step.
-        //
-        // The CADENCE now belongs to the context trigger, not to a mission — but
-        // the legacy per-mission `autoCompact` flag keeps working, routed through
-        // the same emit so there is exactly ONE path from main to the renderer.
-        // It carries the context trigger's current rule so a mission-driven
-        // compaction obeys the same pressure thresholds as a trigger-driven one.
-        if (m.autoCompact || m.kind === 'compact') {
-          emitContextTrigger('compact', contextRule('compact'));
-        }
+        // No compaction here: that is Claude Code's own auto compact now, with its
+        // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
         const current = readConfig().missions ?? [];
         const next = current.map((x) =>
           x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x
@@ -867,12 +856,6 @@ function clearContextTimers(): void {
  *  to the renderer for each action. */
 function emitContextTrigger(action: 'compact' | 'clear', rule: ContextRule): void {
   try { liveWebContents()?.send('trigger:context', { action, rule }); } catch { /* window gone */ }
-  // TRANSITIONAL ALIAS: the renderer still carries the pre-Triggers
-  // `mission:autoCompact` listener as a fallback. Both fire for compact until
-  // every consumer has moved to `trigger:context`; then this line goes.
-  if (action === 'compact') {
-    try { liveWebContents()?.send('mission:autoCompact'); } catch { /* window gone */ }
-  }
 }
 
 /** (Re)arm both context timers from persisted config. Clear-then-arm, so calling
@@ -881,7 +864,9 @@ function emitContextTrigger(action: 'compact' | 'clear', rule: ContextRule): voi
  *  an overdue rule fires ONCE and then settles into its steady cadence. */
 function syncContextTriggers(): void {
   clearContextTimers();
-  for (const action of ['compact', 'clear'] as const) {
+  // Compaction is Claude Code's own auto compact now (AUTO_COMPACT_WINDOW_TOKENS);
+  // only the owner's optional auto-clear still runs on a clock.
+  for (const action of ['clear'] as const) {
     const rule = contextRule(action);
     if (!rule.enabled || !(rule.everyMs > 0)) continue;
     const fire = (): void => {
@@ -2979,6 +2964,13 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           console.warn(`[spawn] ${opts.hive.id}: ${pick.downgraded.from} needs Claude Code ${pick.downgraded.need}+, found ${pick.downgraded.have}; running ${pick.model}`);
         }
       }
+    }
+    // Compaction is Claude Code's own auto compact (owner, 2026-09-25): the app
+    // only moves where it fires. Claude Code clamps this to the model's window,
+    // so a 200k model is unchanged and a 1M model compacts at about 300k.
+    // An owner who set the variable themselves keeps their value.
+    if (!process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW && !opts.env?.CLAUDE_CODE_AUTO_COMPACT_WINDOW) {
+      opts.env = { ...(opts.env ?? {}), CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(AUTO_COMPACT_WINDOW_TOKENS) };
     }
     // Name the Remote Control session after the agent (Michael, Jim, Dev1…) so it
     // is identifiable in claude.ai / the mobile app. Otherwise Claude defaults the

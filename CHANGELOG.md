@@ -17,6 +17,10 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Michael works in the business folder.** He moves up from the Office folder to the folder that
   holds it and everyone's folders, so he can read his team's work. His conversation carries over.
   Setup now asks for this one folder, and the Office and team folders go inside it.
+- **Compaction is left to Claude Code.** The app no longer types `/compact` into idle agents every
+  two hours, and its Settings control is gone. Each Claude agent now starts with Claude Code set to
+  compact at about 300k tokens (models with a smaller window keep their usual point), instead of
+  waiting until about 967k on 1M token models. Auto clear, off by default, is unchanged.
 - **The standup no longer talks about compaction.** Keeping each agent's context small is the
   app's job, not something agents are told to do. An office still using the original standup text
   gets the new one; text you edited yourself is left as it is.

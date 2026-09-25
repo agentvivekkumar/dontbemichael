@@ -10,8 +10,10 @@ import { useRtl } from '@/i18n/useDirection';
 
 /**
  * CONTEXT — the trigger that fires on an agent's own terminal filling up rather
- * than on the clock alone. Two rules, and they are not the same operation:
- * compaction SUMMARISES the context, clearing THROWS IT AWAY.
+ * than on the clock alone. Only auto-clear is left here: it THROWS the context
+ * away and ships off. Compaction, which summarises it, is Claude Code's own
+ * auto compact now, set per agent at spawn (owner, 2026-09-25), so it has no
+ * control on this screen.
  */
 
 const WRITE_DEBOUNCE_MS = 400;
@@ -32,11 +34,7 @@ export function ContextSection({ onSummary }: { onSummary?: (s: string) => void 
 
   useEffect(() => {
     if (!cfg) return;
-    const on = [
-      cfg.compact.enabled ? t('contextSection.compact') : null,
-      cfg.clear.enabled ? t('contextSection.clear') : null
-    ].filter(Boolean);
-    onSummary?.(on.length ? on.join(' + ') : t('contextSection.bothOff'));
+    onSummary?.(cfg.clear.enabled ? t('contextSection.clear') : t('contextSection.off'));
   }, [cfg, onSummary, t]);
 
   // Optimistic + debounced: the controls answer instantly, and a burst of typing
@@ -46,7 +44,7 @@ export function ContextSection({ onSummary }: { onSummary?: (s: string) => void 
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setContextTrigger(next), WRITE_DEBOUNCE_MS);
   };
-  const patch = (key: 'compact' | 'clear', fields: Partial<ContextRule>) => {
+  const patch = (key: 'clear', fields: Partial<ContextRule>) => {
     if (!cfg) return;
     commit({ ...cfg, [key]: { ...cfg[key], ...fields } });
   };
@@ -59,16 +57,6 @@ export function ContextSection({ onSummary }: { onSummary?: (s: string) => void 
         {t('contextSection.intro')}
       </Muted>
       <div style={{ height: 8 }} />
-
-      <RuleCard
-        title={t('contextSection.compact')}
-        blurb={t('contextSection.compactBlurb')}
-        rule={cfg.compact}
-        messageLabel={t('contextSection.extraFocus')}
-        messageHint={t('contextSection.extraFocusHint')}
-        messagePlaceholder={t('contextSection.extraFocusPlaceholder')}
-        onPatch={(fields) => patch('compact', fields)}
-      />
 
       <RuleCard
         title={t('contextSection.clear')}

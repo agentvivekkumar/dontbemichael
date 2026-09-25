@@ -1149,13 +1149,6 @@ const api = {
     ipcRenderer.on('missions:updated', listener);
     return () => ipcRenderer.removeListener('missions:updated', listener);
   },
-  /** Fires when an autoCompact mission ticks — the renderer queues a /compact
-   *  per agent (deduped) and delivers it when each agent is idle. */
-  onAutoCompact: (cb: () => void): (() => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on('mission:autoCompact', listener);
-    return () => ipcRenderer.removeListener('mission:autoCompact', listener);
-  },
 
   // ─── Full-text search across hive files (board, tasks, memory) ─────────────
   textSearch: (q: string): Promise<{ ok: boolean; results: Array<{ source: string; excerpt: string }> }> =>
