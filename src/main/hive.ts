@@ -1394,6 +1394,7 @@ export class HiveManager {
         ? {
             sandbox: {
               enabled: true,
+              ...(folders?.sandboxOnly ? { allowUnsandboxedCommands: false } : {}),
               filesystem: {
                 allowWrite: writableDirs,
                 ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),

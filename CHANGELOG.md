@@ -13,7 +13,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Every agent's folder is private.** A team member's folder opens only for that team member,
   anyone sharing the folder (agents in the same role do by default), and Michael, who can read his
   team's files but not change them. Michael's own folder opens only for him and you. Held by Claude
-  Code's own sandbox and permission rules, and checked again by the app on every file an agent opens.
+  Code's own sandbox and permission rules, and checked again by the app on every file an agent opens,
+  including through links. A team member's shell commands can't switch the sandbox off.
 - **Michael works in the business folder,** the one holding everyone's folders, so he can read his
   team's work. His conversation carries over. Setup now asks for this one folder, and the team's
   folders go inside it.

@@ -78,7 +78,9 @@ test('the spawn settings hold the same rules for shell commands and file tools',
   assert.ok(w.deny.includes(`Read(//Users/me/Documents/Pho/Admin/**)`));
   assert.ok(!w.deny.some((r) => r.includes('/Finance')), 'never locks the agent out of its own folder');
 
+  assert.equal(w.sandboxOnly, true, 'a team member can\'t switch the sandbox off');
   const g = folderPolicy(michael, layout, true);
+  assert.equal(g.sandboxOnly, false, 'Michael keeps it');
   assert.deepEqual(g.sandbox.denyRead, []);
   assert.deepEqual(g.sandbox.denyWrite, [`${B}/Finance`, `${B}/Admin`, '/Users/me/Dropbox/Sales']);
   assert.ok(g.deny.every((r) => r.startsWith('Edit(')), 'Michael is never denied a read');
@@ -119,6 +121,7 @@ test('a Claude agent\'s settings file carries the folder rules', async () => {
   assert.deepEqual(settings.sandbox.filesystem.allowRead, [`${B}/Finance`]);
   assert.ok(settings.permissions.deny.includes('Read(//Users/me/Documents/Pho/Admin/**)'));
   assert.ok(Array.isArray(settings.permissions.additionalDirectories), 'the write allowances are still there');
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, false, 'no shell command runs outside the sandbox');
 });
 
 test('a name starting with two dots is inside its folder; a relative Glob is judged by its folder', () => {

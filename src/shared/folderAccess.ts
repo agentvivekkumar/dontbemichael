@@ -39,6 +39,10 @@ export interface AgentFolderPolicy {
   sandbox: { denyWrite: string[]; denyRead: string[]; allowRead: string[] };
   /** `permissions.deny` rules, e.g. `Read(//Users/a/Documents/Biz/Finance/**)`. */
   deny: string[];
+  /** No shell command may run outside the sandbox (`allowUnsandboxedCommands:
+   *  false`). Without it, an agent in auto mode can rerun a command with the
+   *  sandbox off and read any folder (owner, 2026-09-25). Team members only. */
+  sandboxOnly: boolean;
 }
 
 export interface FolderAgent {
@@ -56,7 +60,7 @@ export const FOLDER_WRITE_TOOLS: ReadonlySet<string> = new Set(['Write', 'Edit',
 export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsensitive: boolean): AgentFolderPolicy {
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
-  const policy: AgentFolderPolicy = { sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [] };
+  const policy: AgentFolderPolicy = { sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [], sandboxOnly: !agent.isGod };
 
   if (agent.isGod) {
     // Read everything; change nothing that belongs to a team member.
