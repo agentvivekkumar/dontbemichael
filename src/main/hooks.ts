@@ -19,6 +19,8 @@ import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
 import { validateHookEvent } from '../shared/hookEvents';
+import { resolveGodName } from '../shared/godIdentity';
+import { APP_NAME } from '../shared/appName';
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
@@ -263,7 +265,7 @@ export class HookServer {
       // path bypassed terminal-draft/HITL safety and could spend credits while a
       // user was answering a question. Inbox files remain durable; the renderer
       // wakes the agent later through its guarded idle-only delivery path.
-      this.notify(agentId ?? 'Agent', 'finished and idle');
+      this.notify(agentId, 'finished and idle');
       this.emit(agentId, event, p);
       return {};
     }
@@ -389,7 +391,7 @@ export class HookServer {
       (p.notification_type === 'idle' ||
         (p.message ?? '').toLowerCase().includes('waiting for your input'))
     ) {
-      this.notify(agentId ?? 'Agent', p.message ?? 'needs your attention');
+      this.notify(agentId, p.message ?? 'needs your attention');
     }
 
     // Forward everything else to the renderer so avatars reflect real activity.
@@ -400,12 +402,28 @@ export class HookServer {
   /** Fire a native desktop notification — gated on the user's `notifications`
    *  setting. Only the OS toast is gated; the hive:hookEvent emit is always sent
    *  so avatars/UI stay live regardless. Best-effort: never throw into the hook. */
-  private notify(title: string, body: string): void {
+  private notify(agentId: string | undefined, body: string): void {
     if (!this.getConfig().notifications) return;
     try {
       if (!Notification.isSupported()) return;
-      new Notification({ title, body }).show();
+      new Notification({ title: this.displayName(agentId), body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  /** The name the owner knows an agent by, for a notification title. Never the
+   *  internal id: Michael's id is `god` and nobody in the office is called that
+   *  (2026-09-24). Michael's name follows a rename; an agent the registry does
+   *  not know is announced as the app. */
+  private displayName(agentId: string | undefined): string {
+    if (!agentId) return APP_NAME;
+    try {
+      const reg = this.hive.registry();
+      const name = reg.agents?.[agentId]?.name;
+      if (agentId === (reg.godId ?? 'god')) return resolveGodName(name);
+      return name?.trim() || APP_NAME;
+    } catch {
+      return APP_NAME;
+    }
   }
 
   /** Tell the renderer a tool call was gated/denied (#7C.1) so it can surface it
