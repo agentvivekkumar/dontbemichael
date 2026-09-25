@@ -1,0 +1,109 @@
+{
+  "neutrals": {
+    "cream-50": {
+      "light": "#FFFDF5",
+      "app_dark": "#17171B"
+    },
+    "cream-100": {
+      "light": "#FFF8E7",
+      "app_dark": "#1D1D22"
+    },
+    "cream-200": {
+      "light": "#F4E9C7",
+      "app_dark": "#26262C"
+    },
+    "cream-300": {
+      "light": "#E8D9A0",
+      "app_dark": "#313139"
+    },
+    "paper-100": {
+      "light": "#FCFAF0",
+      "app_dark": "#1A1A1F"
+    },
+    "paper-200": {
+      "light": "#F0EAD2",
+      "app_dark": "#222229"
+    },
+    "ink-900": {
+      "light": "#1A1320",
+      "app_dark": "#DEDBD6"
+    },
+    "ink-700": {
+      "light": "#3D2E4A",
+      "app_dark": "#B3B0AC"
+    },
+    "ink-500": {
+      "light": "#6B5878",
+      "app_dark": "#96919F"
+    },
+    "ink-300": {
+      "light": "#A899B5",
+      "app_dark": "#787684"
+    },
+    "ink-100": {
+      "light": "#D9CFE0",
+      "app_dark": "#3E3D46"
+    }
+  },
+  "accents": {
+    "coral": {
+      "meaning": "Stop, needs you, Michael",
+      "app_light": "#D96A62",
+      "app_light_tint": "#F3D3CD",
+      "app_dark": "#E08C82",
+      "app_dark_tint": "#3B2724",
+      "web": "#FF6B6B",
+      "web_tint": "#FFB4B4"
+    },
+    "mint": {
+      "meaning": "Done, good, go",
+      "app_light": "#5CA97A",
+      "app_light_tint": "#D2E7DA",
+      "app_dark": "#74C096",
+      "app_dark_tint": "#1E3227",
+      "web": "#6BCF7F",
+      "web_tint": "#B4E5BD"
+    },
+    "sky": {
+      "meaning": "Thinking, info",
+      "app_light": "#4F9FAF",
+      "app_light_tint": "#CFE5E9",
+      "app_dark": "#6FB3C4",
+      "app_dark_tint": "#1F3238",
+      "web": "#4ECDC4",
+      "web_tint": "#A8E6E0"
+    },
+    "lemon": {
+      "meaning": "Working, highlight",
+      "app_light": "#DCAB3C",
+      "app_light_tint": "#F3E4BC",
+      "app_dark": "#CFAA57",
+      "app_dark_tint": "#332C1D",
+      "web": "#FFD93D",
+      "web_tint": "#FFEC99"
+    },
+    "lilac": {
+      "meaning": "Web, MCP, compacting",
+      "app_light": "#9482D3",
+      "app_light_tint": "#E0DAF2",
+      "app_dark": "#A896E3",
+      "app_dark_tint": "#2B2740",
+      "web": "#B197FC",
+      "web_tint": "#D6C5FF"
+    },
+    "peach": {
+      "meaning": "Warm highlight, tabs",
+      "app_light": "#D99168",
+      "app_light_tint": "#F3DACA",
+      "app_dark": "#DFA57F",
+      "app_dark_tint": "#352822",
+      "web": "#FFA07A",
+      "web_tint": "#FFD0B5"
+    }
+  },
+  "logo": {
+    "ink": "#1A1320",
+    "cream": "#FFFDF5",
+    "slash": "#FF6B6B"
+  }
+}
