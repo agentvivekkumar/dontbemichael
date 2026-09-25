@@ -64,9 +64,10 @@ export class SafeClearer {
     if (event === 'UserPromptSubmit') this.lastPromptAt.set(agentId, t);
     const kind = classifyHook(event, message);
     if (kind === 'needsHuman') this.lastNeedsOwnerAt.set(agentId, t);
-    // An idle notice or a new session means the prompt is gone too (the owner
-    // can dismiss one, which ends the turn with no Stop).
-    else if (kind === 'idle' || event === 'SessionStart' || event === 'PreToolUse' || event === 'PostToolUse' || event === 'UserPromptSubmit' || event === 'Stop') {
+    // A new session means the prompt is gone too (a dismissed one ends the
+    // turn with no Stop). An idle notice doesn't: Claude Code can send one
+    // while a permission prompt is still open.
+    else if (event === 'SessionStart' || event === 'PreToolUse' || event === 'PostToolUse' || event === 'UserPromptSubmit' || event === 'Stop') {
       this.lastMovedOnAt.set(agentId, t);
     }
   }

@@ -118,7 +118,11 @@ test('nothing is typed while the agent waits on the owner at a prompt', (t) => {
   r.clearer.noteHook('oscar', 'Notification', 'Claude is waiting for your input');
   r.tick(45 * 60_000);
   r.clearer.beat();
-  assert.equal(r.typed.length, 2, 'a dismissed prompt does not block clearing for good');
+  assert.equal(r.typed.length, 1, 'an idle notice can come while the prompt is still open');
+  r.clearer.noteHook('oscar', 'SessionStart');
+  r.tick(45 * 60_000);
+  r.clearer.beat();
+  assert.equal(r.typed.length, 2, 'a new session means the prompt is gone');
 });
 
 test('someone speaking to the agent after its handoff keeps the conversation', (t) => {
