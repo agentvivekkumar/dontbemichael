@@ -163,3 +163,23 @@ test('the close agent button is hidden everywhere', () => {
   assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'),
     /\{!agent\.isGod && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
 });
+
+/**
+ * "Open a Terminal window here" is hidden everywhere (owner, 2026-09-24): the
+ * open button next to edit, the same button in full screen, and the terminal
+ * icon beside each folder in Michael's Command Center.
+ */
+test('the open terminal buttons are hidden everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_OPEN_TERMINAL, false);
+  const cases = [
+    ['AgentDetailPanel.tsx', "onClick={openTerminal} disabled={openTerminalState === 'opening'}"],
+    ['FullscreenTerminal.tsx', "onClick={openTerminal} disabled={openState === 'opening'}"],
+    ['CommandCenterPanel.tsx', 'onClick={() => window.cth.openTerminalAt(r)}']
+  ];
+  for (const [file, marker] of cases) {
+    const src = read(`src/renderer/src/components/${file}`);
+    const at = src.indexOf(marker);
+    assert.ok(at > 0, `${file} still has the button`);
+    assert.ok(src.slice(Math.max(0, at - 160), at).includes('{SHOW_OPEN_TERMINAL && ('), `${file}: behind SHOW_OPEN_TERMINAL`);
+  }
+});

@@ -7,7 +7,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
-import { SHOW_IDE, ALLOW_TEMP_WORKERS } from '@shared/buildFeatures';
+import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
 import { TriggerCard } from './triggers/ui';
@@ -1010,11 +1010,13 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
         {repos.map((r) => (
           <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ flex: 1, fontSize: 12, color: 'var(--cth-ink-700)', wordBreak: 'break-all' }}>{r}</span>
-            <button
-              onClick={() => window.cth.openTerminalAt(r)}
-              title={t('commandCenter.openInTerminal')}
-              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-500)' }}
-            ><Icon name="terminal" /></button>
+            {SHOW_OPEN_TERMINAL && (
+              <button
+                onClick={() => window.cth.openTerminalAt(r)}
+                title={t('commandCenter.openInTerminal')}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-500)' }}
+              ><Icon name="terminal" /></button>
+            )}
           </div>
         ))}
       </Section>

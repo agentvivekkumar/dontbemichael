@@ -15,7 +15,7 @@ import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
 import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
-import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT } from '@shared/buildFeatures';
+import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
 import { Icon } from './Icon';
 import { AgentNameEditor } from './AgentNameEditor';
 import { useStore, type Agent } from '@/store/store';
@@ -197,26 +197,28 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           </span>
         </PixelButton>
         )}
-        <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openTerminalState === 'opening'}>
-          {/* "open" said nothing about WHAT opens, sitting in a row where IDE
-              and Talk both also open something. The label names the thing you
-              get; the tip names the folder you get it in. */}
-          <span
-            className="cth-tip cth-tip-wrap"
-            data-tip={t('agentDetail.terminalTip', { cwd: agent.cwd })}
-            aria-label={t('agentDetail.openTerminalAria')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          >
-            <Icon name="terminal" />
-            {/* The transient states survive compact mode: they are feedback on
-                a click you just made, and they are two characters wide. Only
-                the resting word "terminal" is worth its space. */}
-            {openTerminalState === 'opening' ? t('agentDetail.opening')
-              : openTerminalState === 'ok' ? t('agentDetail.ok')
-              : openTerminalState === 'error' ? t('agentDetail.err')
-              : compactHeader ? '' : t('agentDetail.open')}
-          </span>
-        </PixelButton>
+        {SHOW_OPEN_TERMINAL && (
+          <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openTerminalState === 'opening'}>
+            {/* "open" said nothing about WHAT opens, sitting in a row where IDE
+                and Talk both also open something. The label names the thing you
+                get; the tip names the folder you get it in. */}
+            <span
+              className="cth-tip cth-tip-wrap"
+              data-tip={t('agentDetail.terminalTip', { cwd: agent.cwd })}
+              aria-label={t('agentDetail.openTerminalAria')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="terminal" />
+              {/* The transient states survive compact mode: they are feedback on
+                  a click you just made, and they are two characters wide. Only
+                  the resting word "terminal" is worth its space. */}
+              {openTerminalState === 'opening' ? t('agentDetail.opening')
+                : openTerminalState === 'ok' ? t('agentDetail.ok')
+                : openTerminalState === 'error' ? t('agentDetail.err')
+                : compactHeader ? '' : t('agentDetail.open')}
+            </span>
+          </PixelButton>
+        )}
         {isReal && SHOW_CLOSE_AGENT && (
           <PixelButton variant="destructive" size="sm" onClick={onKill}>
             <Icon name="x" />

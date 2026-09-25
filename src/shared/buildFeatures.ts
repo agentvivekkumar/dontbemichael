@@ -45,3 +45,9 @@ export const SHOW_AUTO_MODE_LABEL = false;
  *  back and no return on relaunch, behind a confirm that spoke of a "PTY"
  *  (owner, 2026-09-24). Michael never had it. */
 export const SHOW_CLOSE_AGENT = false;
+
+/** "Open a Terminal window here": the open button next to edit on each agent,
+ *  the same button in the full screen view, and the terminal icon beside each
+ *  folder in Michael's Command Center. A developer tool owners don't use
+ *  (owner, 2026-09-24). */
+export const SHOW_OPEN_TERMINAL = false;
