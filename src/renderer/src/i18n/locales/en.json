@@ -862,7 +862,7 @@
     "docs": "docs →",
     "askDesc": "{{godName}} can install the {{count}} missing recommended tool for you. This fills in his dispatch box; nothing runs until you press dispatch.",
     "askDescPlural": "{{godName}} can install the {{count}} missing recommended tools for you. This fills in his dispatch box; nothing runs until you press dispatch.",
-    "allReady": "Everything recommended is installed. Individual engines above are optional: set up only the ones you use.",
+    "allReady": "Everything is installed.",
     "askMichael": "ask {{godName}} to set up everything",
     "sections": {
       "prerequisites": {
@@ -875,7 +875,7 @@
       },
       "engine": {
         "title": "Agent engines",
-        "blurb": "The CLIs your agents run on. You need whichever ones you actually use, not all of them."
+        "blurb": "What your agents run on."
       }
     }
   },

@@ -8,6 +8,13 @@
  *  control, and a diff view reads as something broken (owner, 2026-09-23). */
 export const SHOW_GIT = false;
 
+/** Developer tools on Settings → Prerequisites: the git and Node.js rows, and
+ *  every agent engine this build doesn't offer (BUILD_ENGINES). Owners only need
+ *  Claude Code, uv and MemPalace; the rest read as problems ("NOT SET UP") that
+ *  change nothing they see. git only keeps the office's own history and Node is
+ *  covered by the app's bundled copy (owner, 2026-09-25). */
+export const SHOW_DEV_TOOLS = false;
+
 /** The IDE: the full window code editor with a file tree, opened from the IDE
  *  button on every agent (Michael's panel, the agent panel, focus mode) and
  *  from file links in a terminal. Owners don't edit code; a file link now shows

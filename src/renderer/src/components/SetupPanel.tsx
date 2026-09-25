@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
 import { Icon } from './Icon';
 import { useStore } from '@/store/store';
-import { setupPrompt, type ToolStatus, type ToolKind } from '../../../shared/toolCatalog';
+import { prerequisiteRows, setupPrompt, type ToolStatus, type ToolKind } from '../../../shared/toolCatalog';
 
 const SECTIONS: { kind: ToolKind; titleKey: string; blurbKey: string }[] = [
   { kind: 'prerequisite', titleKey: 'setupPanel.sections.prerequisites.title', blurbKey: 'setupPanel.sections.prerequisites.blurb' },
@@ -125,7 +125,8 @@ export function SetupPanel({ onDone }: { onDone?: () => void } = {}) {
 
   const refresh = useCallback(async () => {
     setBusy(true);
-    try { setTools(await window.cth.toolsStatus()); }
+    // Only what this build uses: its engines, uv and MemPalace (SHOW_DEV_TOOLS).
+    try { setTools(prerequisiteRows(await window.cth.toolsStatus())); }
     catch { setTools([]); }
     finally { setBusy(false); }
   }, []);
