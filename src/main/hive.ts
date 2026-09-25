@@ -192,7 +192,7 @@ export const COMPANY_KNOWLEDGE_OFF =
  * after a task at most three notes; the app tidies them into the index.
  */
 function memoryRule(inboxPath: string, memDir: string): string {
-  return `Your memory: the app gives you your memory index at the start of each session; procedure files it names are in ${memDir}. Before researching something, check it and search the company knowledge store, which also holds team notes and the owner's decisions, and reuse what's there when it still fits. When the owner tells you to remember something, or corrects you, add it to ${inboxPath} straight away, with the date.`;
+  return `Your memory: the app gives you your memory index at the start of each session; procedure files it names are in ${memDir}. Before researching something, check it and search the company knowledge store, and reuse what's there when it still fits. When the owner tells you to remember something, or corrects you, add it to ${inboxPath} straight away, with the date.`;
 }
 function memoryEndOfTask(inboxPath: string): string {
   return `When you finish a task, add at most three short notes to ${inboxPath}, and only for things you would otherwise work out again: a fact you researched (with its source and the date you checked it), the steps that worked for a task you'll do again, or a correction or preference from the owner or Michael (with the reason). Often there's nothing worth saving, and that's fine. Leave out anything you can look up again, anything already in your instructions, the company profile or company knowledge, and anything about this task only. Don't write session logs or status updates. The app tidies your notes into your index in the background.`;
