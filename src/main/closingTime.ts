@@ -2,17 +2,19 @@
  * Closing Time — the graceful, data-loss-free shutdown protocol.
  *
  * Killing the PTYs mid-thought loses whatever the agents were holding in
- * working memory: uncommitted WIP, unrecorded decisions, half-updated
- * memory.md files. "Closing time" closes the floor the way a real office
+ * working memory: uncommitted WIP, unrecorded decisions, task cards that
+ * don't say where the work stands. "Closing time" closes the floor the way a real office
  * does: the human announces it, every worker packs up and confirms, the
  * manager locks the door.
  *
  *   1. The human clicks "closing time" in the quit dialog.
  *   2. We mail the god agent a shutdown brief: broadcast closing time to the
- *      team; every worker commits/parks WIP, appends state + next steps to
- *      its memory.md, then replies with subject CLOSING-TIME-ACK.
+ *      team; every worker commits/parks WIP, makes its task card say where
+ *      the work stands and the next step (state goes on the board, not in
+ *      memory, which keeps only lessons: owner, 2026-09-25), then replies
+ *      with subject CLOSING-TIME-ACK.
  *   3. The god waits for every ACK (the harness shows live progress by
- *      watching the same inbox traffic), saves its own memory, and sends a
+ *      watching the same inbox traffic), updates board.md, and sends a
  *      message with subject CLOSING-TIME-COMPLETE.
  *   4. The router observer spots that message → the app tears down and quits.
  *
@@ -117,9 +119,9 @@ export class ClosingTimeController {
         'The human pressed "closing time": the harness will close as soon as you confirm the floor is safe. Run this protocol now, before anything else:',
         '',
         `1. BROADCAST closing time to the team (message with "to":"broadcast"). Current workers: ${names}.`,
-        '   Tell each worker to immediately: park or commit any work-in-progress safely, append its current state + concrete next steps to its memory.md, and then reply to you with a message whose subject is exactly "CLOSING-TIME-ACK".',
+        '   Tell each worker to immediately: park or commit any work-in-progress safely, make sure its task card on tasks.json says where the work stands and the next step, and then reply to you with a message whose subject is exactly "CLOSING-TIME-ACK".',
         '2. WAIT and keep draining your inbox until EVERY worker above has sent its CLOSING-TIME-ACK. Nudge stragglers once if needed.',
-        '3. Save your own state: update board.md and append your shift summary to your memory.md.',
+        '3. Save your own state: update board.md so it says where every piece of work stands. Session logs don\'t go in memory: it holds only lessons worth keeping.',
         `4. CONCLUDE by sending a message with "to":"human" and the subject exactly "CLOSING-TIME-COMPLETE" — the harness watches for it and closes the app. Do not send it before every worker has acked: the harness independently verifies the ACKs and will reject a premature conclusion.`,
         '',
         this.workers.size === 0
@@ -139,7 +141,7 @@ export class ClosingTimeController {
       'CLOSING TIME was pressed by the human: pause your current work at the next sensible point and drain your inbox NOW — a shutdown brief is waiting there. Coordinate the floor shutdown before anything else.');
     for (const id of this.workers) {
       this.control?.steer(id,
-        'CLOSING TIME — the office is shutting down. Finish your current step but do NOT start new work. Park or commit your work-in-progress safely, append your current state + concrete next steps to your memory.md, then reply to god with a message whose subject is exactly "CLOSING-TIME-ACK".');
+        'CLOSING TIME: the office is shutting down. Finish your current step but do not start new work. Park or commit your work in progress safely, make sure your task card on tasks.json says where the work stands and the next step, then reply to god with a message whose subject is exactly "CLOSING-TIME-ACK".');
     }
 
     this.armTimeout();

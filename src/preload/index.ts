@@ -876,10 +876,9 @@ const api = {
   memoryWakeUp: (wing?: string): Promise<{ ok: boolean; output: string; error?: string }> =>
     ipcRenderer.invoke('hive:memoryWakeUp', wing),
   mineNow: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('hive:mineNow'),
-  /** Condense agent memory.md files (the janitor's missing half). With an id,
-   *  condense that agent on demand; without, run a full threshold scan. Returns
-   *  the per-agent outcomes ({ id, condensed, reason, oldBytes?, newBytes? }). */
-  reflectNow: (id?: string): Promise<Array<{ id: string; condensed: boolean; reason: string; oldBytes?: number; newBytes?: number }>> =>
+  /** Tidy agents' memory notes into their index now (memoryTidy.ts). With an
+   *  id, that agent is tidied if it has anything to tidy. */
+  reflectNow: (id?: string): Promise<Array<{ id: string; tidied: boolean; reason: string }>> =>
     ipcRenderer.invoke('memory:reflectNow', id),
 
   // ─── Enterprise Knowledge Graph (multimodal context for agents) ───────────

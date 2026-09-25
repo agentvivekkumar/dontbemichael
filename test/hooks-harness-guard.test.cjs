@@ -76,7 +76,7 @@ test('on a business install, a document written into the hive is refused through
 
 test('the same install still lets an agent write its memory and its work, and read anything', async (t) => {
   const f = await floor(t, ({ home, office }) => ({ harnessHome: home, officeFolder: office }));
-  assert.ok(!denied(await f.write(path.join(f.hiveRoot, 'agents', 'oscar', 'memory.md'))));
+  assert.ok(!denied(await f.write(path.join(f.hiveRoot, 'agents', 'oscar', 'memory', 'inbox.md'))));
   assert.ok(!denied(await f.write(path.join(f.finance, 'march-summary.md'))));
   // Tools that do not write a file are never judged, even aimed at the hive.
   const read = await f.write(path.join(f.hiveRoot, 'shared', 'x.md'), { tool_name: 'Read', tool_input: { file_path: path.join(f.hiveRoot, 'board.md') } });

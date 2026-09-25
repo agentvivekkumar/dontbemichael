@@ -23,7 +23,7 @@ they are mediated and credential-free from your side).
 The harness injects these env vars (use them; don't hard-code paths):
 
 - `AGENT_ID`, `AGENT_NAME` — your identity in the hive.
-- `AGENT_DIR` — your private workspace (`identity.md`, `memory.md`, `inbox/`,
+- `AGENT_DIR` — your private workspace (`identity.md`, `memory.md` (your memory index, kept by the app), `memory/inbox.md` (your notes), `inbox/`,
   `outbox/`, and `.claude/skills/`). Your bundled skills live under
   `$AGENT_DIR/.claude/skills/`.
 - `HIVE_ROOT` — the shared hive (`PROTOCOL.md`, the kanban, other agents).

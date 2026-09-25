@@ -18,6 +18,7 @@
  *
  * Everything here runs in the Electron main process.
  */
+import { entriesBlock, parseIndex, renderIndex, type MemoryEntry } from '../shared/memoryIndex';
 import type { AgentFolderPolicy } from '../shared/folderAccess';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync,
@@ -180,6 +181,18 @@ export interface MeaningSearch {
 /** What a running agent is told when the owner turns company knowledge off. */
 export const COMPANY_KNOWLEDGE_OFF =
   'COMPANY KNOWLEDGE: the owner has turned the company knowledge store off. Its commands stop working until it is turned on again.';
+
+/**
+ * How an agent keeps its memory (owner, 2026-09-25): it reads its index (given
+ * at session start), adds owner instructions and corrections at once, and
+ * after a task at most three notes; the app tidies them into the index.
+ */
+function memoryRule(inboxPath: string, memDir: string): string {
+  return `Your memory: the app gives you your memory index at the start of each session; procedure files it names are in ${memDir}. Before researching something, check it and search the company knowledge store, which also holds team notes and the owner's decisions, and reuse what's there when it still fits. When the owner tells you to remember something, or corrects you, add it to ${inboxPath} straight away, with the date.`;
+}
+function memoryEndOfTask(inboxPath: string): string {
+  return `When you finish a task, add at most three short notes to ${inboxPath}, and only for things you would otherwise work out again: a fact you researched (with its source and the date you checked it), the steps that worked for a task you'll do again, or a correction or preference from the owner or Michael (with the reason). Often there's nothing worth saving, and that's fine. Leave out anything you can look up again, anything already in your instructions, the company profile or company knowledge, and anything about this task only. Don't write session logs or status updates. The app tidies your notes into your index in the background.`;
+}
 
 export interface AgentMeta {
   id: string;
@@ -807,10 +820,11 @@ export class HiveManager {
     // partial source dir is a no-op (Kevin populates the resource dir in lp-manifest).
     if (opts.skillsDir) this.copyBundledSkills(opts.skillsDir, join(dir, '.claude', 'skills'));
 
+    // The memory index (src/shared/memoryIndex.ts): only the app writes it; the
+    // agent adds notes to memory/inbox.md, tidied in by memoryTidy.ts.
     const memory = join(dir, 'memory.md');
-    if (!existsSync(memory)) {
-      writeFileSync(memory, `# Memory — ${meta.name} (${meta.id})\n\n_Append durable facts, decisions, and context below._\n`, 'utf8');
-    }
+    if (!existsSync(memory)) writeFileSync(memory, renderIndex(meta.name, meta.id, []), 'utf8');
+    mkdirSync(join(dir, 'memory'), { recursive: true });
     ensureMineIgnore(dir); // keep settings.json / cursor / messages out of mempalace's index
     const cursor = join(dir, 'cursor.json');
     if (!existsSync(cursor)) this.writeJson(cursor, { lastProcessed: null });
@@ -1558,7 +1572,7 @@ export class HiveManager {
       // The palace location is named, not spelled as `$MEMPALACE_PALACE_PATH`:
       // `mempalace` reads that env var itself, and the POSIX `$` form was noise
       // (or an empty expansion) for a Windows agent that tried to use it literally.
-      ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your notes in memory.md are mined into the palace automatically — write durable facts there.'
+      ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your memory index is mined into the palace automatically.'
       : '';
     // Enterprise Knowledge Graph (opt-in). Volatile-free: the bundled-node launcher
     // and the KG CLI are both fixed absolute paths for an install, so baking them
@@ -1602,7 +1616,7 @@ export class HiveManager {
       ? (meta.isGod
         ? `YOUR FOLDERS: you work in ${meta.cwd}, your folder. It is private: only you and the owner can open it. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them.`
         : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them.`)
-        + ` The hive (${root}) is ONLY for coordination — your memory.md, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
+        + ` The hive (${root}) is ONLY for coordination — your memory notes, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
         + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
       : '';
     const guardrailsLine = 'Guardrails: a circuit breaker watches the floor — a "Circuit breaker: steer/constrain" message means you are looping or overspending, so STOP repeating, summarize what you tried, and follow it. Be token-frugal (a floor-wide or per-agent token budget can pause you). The shared plan has two parts: board.md (freeform; god is the sole scribe) and tasks.json (structured kanban — todo/doing/blocked/done).';
@@ -1616,10 +1630,10 @@ export class HiveManager {
       HOUSE_RULES,
       '',
       'HIVE PROTOCOL — follow it every task:',
-      `1. At the START of a task, read ${inDir('memory.md')} and EVERY file in ${inDir('inbox')} (messages other agents sent you). After handling an inbox message, move its file into ${inDir('inbox', '.done')}.`,
-      `2. Record durable facts, decisions, and context by appending to ${inDir('memory.md')}.`,
+      `1. At the START of a task, read EVERY file in ${inDir('inbox')} (messages other agents sent you). After handling an inbox message, move its file into ${inDir('inbox', '.done')}.`,
+      `2. ${memoryRule(inDir('memory', 'inbox.md'), inDir('memory'))}`,
       `3. To ask another agent for something or share information, write ONE message JSON into ${inDir('outbox')} (schema in PROTOCOL.md). NEVER write into another agent's folder — the orchestrator delivers your outbox.`,
-      '4. At the END of a task, append what you learned to memory.md so future-you remembers.',
+      `4. ${memoryEndOfTask(inDir('memory', 'inbox.md'))}`,
       folderLine,
       guardrailsLine,
       memoryLine,
@@ -1967,10 +1981,34 @@ export class HiveManager {
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return false;
     try {
-      // A fresh seed is ~90 chars (one header line + the prompt). Anything
-      // meaningfully longer means the agent appended durable facts.
-      return readFileSync(p, 'utf8').trim().length > 200;
+      const text = readFileSync(p, 'utf8');
+      const { isIndex, entries } = parseIndex(text);
+      // An index has memory once it has entries; an older free-form file once
+      // it holds more than the seeded header.
+      return isIndex ? entries.length > 0 : text.trim().length > 200;
     } catch { return false; }
+  }
+
+  /**
+   * An agent's memory index as it is given the agent at the start of each
+   * session (owner, 2026-09-25): the entries only, labelled, or null when there
+   * are none yet (or the file is still in the older free-form shape, which the
+   * tidy-up migrates). Fixed for the session, so it caches.
+   */
+  memoryIndexFor(id: string): string | null {
+    const p = join(this.agentDir(id), 'memory.md');
+    if (!existsSync(p)) return null;
+    let entries: MemoryEntry[] = [];
+    try {
+      const parsed = parseIndex(readFileSync(p, 'utf8'));
+      if (!parsed.isIndex) return null;
+      entries = parsed.entries;
+    } catch { return null; }
+    if (entries.length === 0) return null;
+    return [
+      'YOUR MEMORY. Notes from your past work, kept by the app. Each line: id, kind, the note, where it came from (owner means the owner said it), date, and an expiry for facts that change. Steps for recurring tasks are in the procedure files it names, under your memory folder.',
+      entriesBlock(entries)
+    ].join('\n');
   }
   inbox(id: string): HiveMessage[] {
     return this.listMessages(join(this.agentDir(id), 'inbox'));
@@ -2983,7 +3021,8 @@ only thing that moves messages between agents.
 
 ## Your workspace — \`agents/<your-id>/\`
 - \`identity.md\`  — who you are (read-only; the harness writes it).
-- \`memory.md\`    — your long-term memory. Read at the start of a task; append to it as you learn.
+- \`memory.md\`    — your memory index. The app keeps it and gives it to you at the start of each session.
+- \`memory/inbox.md\` — where you add notes worth keeping; the app sorts them into your index.
 - \`inbox/\`       — messages addressed to you. Read them at the start of a task.
 - \`inbox/.done/\` — move a message here once you've handled it.
 - \`outbox/\`      — drop messages here to send them. The harness delivers them.
@@ -3080,8 +3119,8 @@ searchable MemPalace and you have the \`mempalace\` CLI:
   agent, \`--results N\` to widen.
 - \`mempalace wake-up\` — a short digest of what matters, good at the start of a task.
 
-Your \`memory.md\` is mined into the palace automatically, so the durable facts you
-write there become searchable by every agent. You don't run \`mine\` yourself.
+Your memory index is mined into the palace automatically, so what the app keeps
+there becomes searchable by every agent. You don't run \`mine\` yourself.
 `;
 
 // ─── cth-hook shim (written to <hive>/bin/cth-hook.cjs) ──────────────────────

@@ -441,22 +441,6 @@ export interface HarnessConfig {
   /** One-time guard for `migrateTriggersV1` (legacy webhook → webhookTriggers,
    *  1h → 2h compact cadence). Set once the migration has run to completion. */
   triggersMigratedV1?: boolean;
-
-  // ─── Memory reflection (the janitor's condense half) ───────────────────────
-  /** Master toggle for the in-process MemoryReflector. Default on. */
-  reflectEnabled?: boolean;
-  /** How often to scan agent memory.md files for condensing (default 30 min). */
-  reflectIntervalMs?: number;
-  /** Condense when bytes exceed this percent of the 128 KB budget (matches the
-   *  janitor's TRIGGER_PCT). DECIDED: 50. */
-  reflectByteTriggerPct?: number;
-  /** ...OR when `## ` section count exceeds this (AND bytes > floor). DECIDED: 50. */
-  reflectSectionTrigger?: number;
-  /** Newest K verbatim `## ` sections kept untouched on each condense. */
-  reflectRecentKeep?: number;
-  /** Never condense a file smaller than this; also the section-trigger byte floor.
-   *  DECIDED: 16 KB. */
-  reflectMinBytes?: number;
 }
 
 const DEFAULTS: HarnessConfig = {
@@ -511,15 +495,6 @@ const DEFAULTS: HarnessConfig = {
   webhookTriggers: [],
   orgTrigger: DEFAULT_ORG_TRIGGER,
   triggersMigratedV1: false,
-  // Memory reflection — preventive; nobody is over threshold today, so it sits
-  // dark until an agent's memory crosses one of these (the verify gate is the
-  // safety for the LLM step). Thresholds DECIDED by god 2026-06-06.
-  reflectEnabled: true,
-  reflectIntervalMs: 1_800_000,
-  reflectByteTriggerPct: 50,
-  reflectSectionTrigger: 50,
-  reflectRecentKeep: 12,
-  reflectMinBytes: 16_384,
   // Company knowledge (the knowledge feature): ON by default (owner,
   // 2026-09-25). It is where company wide information, policies and rules live,
   // and every agent, Michael included, searches it. Existing installs are

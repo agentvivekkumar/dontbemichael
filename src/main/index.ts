@@ -33,7 +33,7 @@ import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
-import { MemoryReflector, type ReflectSettings } from './reflect';
+import { MemoryTidy } from './memoryTidy';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
@@ -359,26 +359,15 @@ function meaningSearch(): { bin: string; palace: string } | undefined {
 }
 // Enterprise Knowledge Graph — file-backed store + agent CLI (default OFF).
 const knowledge = new KnowledgeManager();
-/** Reads the reflect tunables from config each tick (defaults baked in here so a
- *  pre-existing config.json without the keys still gets sane values). */
-function reflectSettings(): ReflectSettings {
-  const c = readConfig();
-  return {
-    enabled: c.reflectEnabled !== false,
-    intervalMs: c.reflectIntervalMs ?? 1_800_000,
-    byteTriggerPct: c.reflectByteTriggerPct ?? 50,
-    sectionTrigger: c.reflectSectionTrigger ?? 50,
-    recentKeep: c.reflectRecentKeep ?? 12,
-    minBytes: c.reflectMinBytes ?? 16_384
-  };
-}
-// Finishes the janitor's missing condense half: bounds each agent's memory.md
-// (Haiku tail-summary, backup→verify→atomic-swap) so it never grows unbounded.
-const reflector = new MemoryReflector(
+// Keeps each agent's memory index useful (owner, 2026-09-25): agents add notes
+// to memory/inbox.md and this turns them into itemised changes on Haiku, in
+// the background. It replaces the old whole-file condenser (reflect.ts).
+const memoryTidy = new MemoryTidy(
   () => readConfig().harnessHome,
   () => readConfig().defaultCommand ?? 'claude',
   () => memory.env(),
-  reflectSettings,
+  () => isFloorQuiet(300_000),
+  (id) => hive.registry().agents[id]?.name ?? id,
   (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
 );
 // Durable harness state (SQLite, main process). Phase A: window bounds (kv) +
@@ -3471,7 +3460,7 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   try { stopSlackServer(); } catch (e) { console.error('[changeHome] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[changeHome] webhook.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[changeHome] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[changeHome] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[changeHome] memoryTidy.stop:', e); }
 
   if (mode === 'move' && oldHome) {
     try {
@@ -3931,7 +3920,7 @@ ipcMain.handle('hive:mineNow', () => { memory.mineNow(); return { ok: true }; })
 // Condense memory.md on demand: an explicit id condenses that one agent (skips
 // the size trigger — a "condense now" button); no id runs a full threshold scan.
 ipcMain.handle('memory:reflectNow', (_evt, id: unknown) =>
-  reflector.reflectNow(typeof id === 'string' && id ? id : undefined));
+  memoryTidy.tidyNow(typeof id === 'string' && id ? id : undefined));
 
 // ─── IPC: enterprise Knowledge Graph (multimodal context for agents) ─────────
 ipcMain.handle('kg:status', () => knowledge.status());
@@ -4063,7 +4052,7 @@ function teardownAndQuit(): void {
   try { stopSlackServer(); } catch (e) { console.error('[quit] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[quit] webhook.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[quit] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[quit] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[quit] memoryTidy.stop:', e); }
   try { persist.close(); } catch (e) { console.error('[quit] persist.close:', e); }
   try { hive.stopAllProxyBridges(); } catch (e) { console.error('[quit] stopAllProxyBridges:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[quit] killAll:', e); }
@@ -4123,7 +4112,7 @@ ipcMain.handle('app:resetAll', () => {
   try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[reset] slack.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[reset] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[reset] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[reset] memoryTidy.stop:', e); }
   try { persist.close(); } catch (e) { console.error('[reset] persist.close:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[reset] killAll:', e); }
   try { hive.removeExposedCodexData(); } catch (e) { console.error('[reset] removeExposedCodexData:', e); }
@@ -5412,7 +5401,7 @@ function bootstrapHiveServices(): void {
     else console.error('[telemetry] collector failed to start:', r.error);
   });
   memory.start(); // init shared palace + mine loop (no-op without mempalace)
-  reflector.start(); // bound oversized memory.md files on a timer (no-op until threshold)
+  memoryTidy.start(); // tidy agents' memory notes into their index in the background
 
   armAlwaysOnBeats();
 }

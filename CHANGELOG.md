@@ -22,6 +22,16 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Michael included, is told to search. There is no shared Office folder any more: an existing one
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
+- **Agents' memory improves instead of piling up.** Each agent's memory is now a short index of
+  one line notes (at most about 2,000 tokens) that the app keeps and gives the agent once per
+  session. Agents add at most three notes after a task, and your instructions and corrections at
+  once, to their memory inbox; they no longer append session logs. In the background, a small model
+  (Haiku) sorts the notes in with itemised changes, never rewriting the whole file: it merges
+  duplicates, updates facts that changed (the old version goes to an archive), and turns steps that
+  worked for a recurring task into a procedure file. It runs after about 10 notes, once a day, or
+  when the office is idle. Closing time no longer writes session logs to memory; where work stands
+  goes on the task board. Existing memory is sorted once, with the original backed up. This
+  replaces the old condenser, which rewrote the whole file.
 - **A company profile every agent works from.** Setup asks for the essentials (business name,
   industry, CEO or owner, headquarters address, website), then an optional Company details step:
   legal name and business type, main phone, public email, social links, business hours, time zone,

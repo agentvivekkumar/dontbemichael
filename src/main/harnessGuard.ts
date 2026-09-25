@@ -52,7 +52,7 @@ export function harnessWriteDecision(i: HarnessWriteInput): { deny: boolean; rea
   return {
     deny: true,
     reason:
-      'The hive folder is only for coordination: your memory.md, inbox and outbox, and tasks.json. ' +
+      'The hive folder is only for coordination: your memory/inbox.md, your inbox and outbox, and tasks.json. Your memory index (memory.md) is kept by the app: add notes to memory/inbox.md instead. ' +
       `Save documents, drafts and other work in your own folder${workHere} instead.`
   };
 }
@@ -63,7 +63,9 @@ export function harnessWriteDecision(i: HarnessWriteInput): { deny: boolean; rea
  */
 function isPlumbing(rel: string, agentId: string, isGod: boolean): boolean {
   const own = `agents/${agentId}/`;
-  if (rel === `${own}memory.md`) return true;
+  // An agent adds notes to its memory inbox; the index (memory.md) is the
+  // app's to write (memoryTidy.ts).
+  if (rel === `${own}memory/inbox.md`) return true;
   if (rel.startsWith(`${own}outbox/`) || rel.startsWith(`${own}inbox/`)) return true;
   // Every agent keeps its task's status current; Michael adds owner questions.
   if (rel === 'tasks.json') return true;

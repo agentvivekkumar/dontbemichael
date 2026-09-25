@@ -79,6 +79,8 @@ export class HookServer {
   /** The company profile last delivered to each agent's session: same once per
    *  session, again on change, rule as the goal. */
   private deliveredProfileByAgent = new Map<string, { sessionId: string | null; text: string | null }>();
+  /** The session each agent was last given its memory index in. */
+  private deliveredMemoryByAgent = new Map<string, string | null>();
 
   constructor(
     private hive: HiveManager,
@@ -355,6 +357,16 @@ export class HookServer {
       }
     }
 
+    // Memory pays off only if it's used (owner, 2026-09-25): record each time an
+    // agent opens one of its procedure files, next to the tidy-up's own counts.
+    if (event === 'PostToolUse' && agentId && toolName === 'Read') {
+      const file = folderToolTarget('Read', p.tool_input, p.cwd);
+      const root = this.hive.root();
+      if (file && root && /[\\/]memory[\\/]procedures[\\/][^\\/]+\.md$/.test(file) && file.startsWith(root)) {
+        try { this.hive.appendLog({ kind: 'memory-read', agentId, file: file.slice(root.length + 1) }); } catch { /* best-effort */ }
+      }
+    }
+
     // 7C.2 — mid-run steering: inject queued operator guidance as context on the
     // next eligible hook (no fragile typing into the TUI). Delivered once.
     // Merged with the roster line below so the two injections never displace each
@@ -422,17 +434,29 @@ export class HookServer {
       }
     }
 
+    // The agent's memory index (owner, 2026-09-25): once at the start of each
+    // session, and never again within it, so it stays in the prompt cache. The
+    // tidy-up's changes arrive with the next session.
+    let memoryIndex: string | null = null;
+    if ((event === 'SessionStart' || event === 'UserPromptSubmit') && agentId) {
+      const sessionId = p.session_id ?? null;
+      if (event === 'SessionStart' || this.deliveredMemoryByAgent.get(agentId) !== sessionId) {
+        this.deliveredMemoryByAgent.set(agentId, sessionId);
+        memoryIndex = this.hive.memoryIndexFor?.(agentId) ?? null;
+      }
+    }
+
     // Company knowledge turned on or off since this agent was last told.
     const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
       ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
       : null;
 
-    if (steer || roster || goal || knowledgeNote || profile) {
+    if (steer || roster || goal || knowledgeNote || profile || memoryIndex) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, profile, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, memoryIndex, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
         }
       };
     }
