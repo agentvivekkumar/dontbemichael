@@ -21,6 +21,10 @@ import { estimateCostUsd } from './pricing';
 import { validateHookEvent } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
+
+/** Desktop notification bodies. The title is the agent's name (displayName). */
+export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
+export const NOTIFY_WAITING = 'Waiting for you.';
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
@@ -265,7 +269,7 @@ export class HookServer {
       // path bypassed terminal-draft/HITL safety and could spend credits while a
       // user was answering a question. Inbox files remain durable; the renderer
       // wakes the agent later through its guarded idle-only delivery path.
-      this.notify(agentId, 'finished and idle');
+      this.notify(agentId, NOTIFY_FINISHED);
       this.emit(agentId, event, p);
       return {};
     }
@@ -391,7 +395,9 @@ export class HookServer {
       (p.notification_type === 'idle' ||
         (p.message ?? '').toLowerCase().includes('waiting for your input'))
     ) {
-      this.notify(agentId, p.message ?? 'needs your attention');
+      // Our own words, not Claude Code's ("Claude is waiting for your input"):
+      // the title already names the person, and owners don't know the engine.
+      this.notify(agentId, NOTIFY_WAITING);
     }
 
     // Forward everything else to the renderer so avatars reflect real activity.

@@ -18,6 +18,10 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Setting up a new office gives it a folder of its own. The office keeps its own record in
   `office.json` in its folder.
 
+- **Notifications name the person.** A desktop notification now reads "Michael: Waiting for you."
+  instead of "god: Claude is waiting for your input", and each team member's notifications carry
+  their own name.
+
 ### Removed
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer

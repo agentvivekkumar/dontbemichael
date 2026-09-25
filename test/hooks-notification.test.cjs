@@ -84,7 +84,7 @@ test('Stop fires "finished and idle"', async (t) => {
   const { fire } = await floor(t);
   await fire({ hook_event_name: 'Stop' });
   assert.equal(notifications.length, 1);
-  assert.equal(notifications[0].body, 'finished and idle');
+  assert.equal(notifications[0].body, 'Finished and ready for the next thing.');
 });
 
 test('Stop with stop_hook_active does NOT re-notify', async (t) => {
@@ -98,7 +98,7 @@ test('SubagentStop behaves the same as Stop', async (t) => {
   const { fire } = await floor(t);
   await fire({ hook_event_name: 'SubagentStop' });
   assert.equal(notifications.length, 1);
-  assert.equal(notifications[0].body, 'finished and idle');
+  assert.equal(notifications[0].body, 'Finished and ready for the next thing.');
 });
 
 test('notifications setting off suppresses the OS toast but the hook still resolves', async (t) => {
@@ -147,4 +147,11 @@ test('a team member is notified under its name; an unknown id never shows raw', 
   await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Stop' });
   await server.handle({ agent_id: 'worker-7f3a', session_id: 's1', hook_event_name: 'Stop' });
   assert.deepEqual(notifications.map((n) => n.title), ['Oscar', 'Michael', "Don't Be Michael"]);
+});
+
+test('the message is in our words, never the engine\'s', async (t) => {
+  const server = await office(t, 'Michael');
+  await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Notification', notification_type: 'idle', message: 'Claude is waiting for your input' });
+  assert.equal(notifications[0].body, 'Waiting for you.');
+  assert.doesNotMatch(notifications[0].body, /Claude/);
 });
