@@ -2498,6 +2498,9 @@ function openFloor(): BrowserWindow | null {
  *  flag-off keeps Electron's default menu (zero behavior change). Uses standard
  *  role-based items so copy/paste/quit/etc. work per-platform, and adds the
  *  "New Floor" item (Cmd/Ctrl+Shift+N). */
+/** The quit item's label in the app menu (and File on Windows and Linux). */
+const QUIT_LABEL = 'Close Office';
+
 function installAppMenu(): void {
   const isMac = process.platform === 'darwin';
   const newFloorItem = {
@@ -2505,13 +2508,32 @@ function installAppMenu(): void {
     accelerator: 'CmdOrCtrl+Shift+N',
     click: () => { openFloor(); }
   };
+  // Quit reads "Close Office": "Quit Don't Be Michael" put "Quit" and "Don't"
+  // side by side, which read as a double negative (owner, 2026-09-24). It keeps
+  // the quit role, so Cmd+Q and the quit guard behave exactly as before.
+  const quitItem = { role: 'quit' as const, label: QUIT_LABEL };
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(isMac
+      ? [{
+        role: 'appMenu' as const,
+        submenu: [
+          { role: 'about' as const },
+          { type: 'separator' as const },
+          { role: 'services' as const },
+          { type: 'separator' as const },
+          { role: 'hide' as const },
+          { role: 'hideOthers' as const },
+          { role: 'unhide' as const },
+          { type: 'separator' as const },
+          quitItem
+        ]
+      }]
+      : []),
     {
       label: 'File',
       submenu: isMac
         ? [newFloorItem, { type: 'separator' as const }, { role: 'close' as const }]
-        : [newFloorItem, { type: 'separator' as const }, { role: 'quit' as const }]
+        : [newFloorItem, { type: 'separator' as const }, quitItem]
     },
     // The Edit menu is spelled out rather than `{ role: 'editMenu' }` for one
     // reason: `registerAccelerator: false` on the clipboard items.

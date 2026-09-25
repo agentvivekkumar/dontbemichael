@@ -22,6 +22,9 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   instead of "god: Claude is waiting for your input", and each team member's notifications carry
   their own name.
 
+- **"Close Office" instead of "Quit Don't Be Michael".** The quit item in the menu no longer puts
+  "Quit" and "Don't" side by side. Cmd+Q works as before.
+
 ### Removed
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
