@@ -18,7 +18,6 @@ import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
 import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
 import { Icon } from './Icon';
-import { AgentNameEditor } from './AgentNameEditor';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
 
@@ -79,7 +78,6 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
   }, []);
   const archiveAgent = useStore(s => s.archiveAgent);
   const updateAgent = useStore(s => s.updateAgent);
-  const renameAgent = useStore(s => s.renameAgent);
   const setFullscreen = useStore(s => s.setFullscreen);
   const fullscreenAgentId = useStore(s => s.fullscreenAgentId);
   const sidebarTab = useStore(s => s.sidebarTab);
@@ -156,12 +154,12 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', minWidth: 0, lineHeight: '14px' }}>
-            <AgentNameEditor
-              name={agent.name}
-              onCommit={(name) => renameAgent(agent.id, name)}
-              uppercase
-              fontSize={10}
-            />
+            {/* Plain text; the name changes in Edit Agent (owner, 2026-09-25). */}
+            <span style={{
+              fontFamily: 'var(--cth-font-display)', fontSize: 10,
+              color: 'var(--cth-ink-900)',
+              minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+            }}>{agent.name.toUpperCase()}</span>
           </div>
           <div style={{
             display: 'flex', gap: 6, alignItems: 'center', marginTop: 1,
