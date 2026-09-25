@@ -29,6 +29,7 @@ import {
   isClaudeProvider
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
+import { joinAgentRole, splitAgentRole } from '@shared/agentRole';
 import { useRtl } from '@/i18n/useDirection';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
@@ -129,6 +130,24 @@ function basename(path: string): string {
   return path.split('/').filter(Boolean).pop() ?? path;
 }
 
+/** `/a/b/Office` → `/a/b`: Michael's folder is the one holding the Office. */
+function parentFolder(path: string | undefined): string | undefined {
+  const p = (path ?? '').replace(/[\\/]+$/, '');
+  const at = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+  return at > 0 ? p.slice(0, at) : undefined;
+}
+
+/** Same folder, ignoring a trailing slash and (as macOS and Windows do) case. */
+function samePath(a: string, b: string): boolean {
+  const n = (p: string) => p.trim().replace(/[\\/]+$/, '').toLowerCase();
+  return n(a) === n(b);
+}
+
+/** A plain note under a field: what it is for, in the owner's words. */
+const helperStyle: CSSProperties = {
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-500)'
+};
+
 function uniqueId(name: string): string {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
 }
@@ -190,7 +209,14 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [name, setName] = useState(pendingHire?.name ?? 'Jim');
   const [character, setCharacter] = useState<OfficeCharacterName>(knownCharacter(pendingHire?.character));
   const [accent, setAccent] = useState<AccentColorName>(knownAccent(pendingHire?.accent));
-  const [cwd, setCwd] = useState<string>(config.registeredRepos[0] ?? '');
+  // On a business install a new team member's folder goes inside Michael's (the
+  // business folder that holds the Office), named after its role, and is private
+  // to it and Michael (src/shared/folderAccess.ts). It follows the Role field
+  // until the owner picks a folder; any pick below turns that off.
+  const michaelFolder = parentFolder(config.officeFolder);
+  const [cwdAuto, setCwdAuto] = useState<boolean>(!!michaelFolder);
+  const [cwd, setCwdRaw] = useState<string>(michaelFolder ? '' : (config.registeredRepos[0] ?? ''));
+  const setCwd = (path: string) => { setCwdAuto(false); setCwdRaw(path); };
   // Local mirror of the registered projects so one added from here shows as a
   // quick-pick immediately (the `config` prop is a snapshot taken at open time).
   const [repos, setRepos] = useState<string[]>(config.registeredRepos);
@@ -201,7 +227,10 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [command, setCommand] = useState(
     pendingHire ? hireCommand(pendingHire) : buildSpawnCommand(config, initialModel, initialProvider)
   );
-  const [description, setDescription] = useState(pendingHire?.description ?? 'a fresh harness');
+  // The stored role is `Role: description` (joinAgentRole), as in Edit Agent.
+  const [role, setRole] = useState(() => splitAgentRole(pendingHire?.description).role);
+  const [roleDescription, setRoleDescription] = useState(() => splitAgentRole(pendingHire?.description).roleDescription);
+  const description = joinAgentRole(role, roleDescription);
   const [hireMeta, setHireMeta] = useState<HireManifest | null>(pendingHire);
 
   // Picking a model rebuilds the command; the command field stays editable for
@@ -268,6 +297,24 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
+
+  // The default folder: <Michael's folder>/<Role>, or the agent's name while no
+  // role is typed. Main cleans the name into a safe folder name. Agents with the
+  // same role share a folder by default (owner, 2026-09-25).
+  const folderLabel = role.trim() || name.trim();
+  useEffect(() => {
+    if (!michaelFolder || !cwdAuto) return;
+    if (!folderLabel) { setCwdRaw(''); return; }
+    let cancelled = false;
+    window.cth.foldersSuggest(config.businessName ?? '', [folderLabel], michaelFolder)
+      .then((sug) => {
+        if (cancelled) return;
+        if (sug.rootRefused) { setCwdAuto(false); setCwdRaw(''); return; }
+        setCwdRaw(sug.byFolder[folderLabel] ?? '');
+      })
+      .catch(() => { /* the owner can still pick a folder */ });
+    return () => { cancelled = true; };
+  }, [michaelFolder, cwdAuto, folderLabel, config.businessName]);
 
   // Zero-step resume: when a session id is entered, look up the cwd it originally
   // ran in (from the transcript) and pre-fill the Folder so the user doesn't have
@@ -344,7 +391,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     setProvider(m.provider ?? initialProvider);
     setModel(m.model);
     setCommand(hireCommand(m));
-    setDescription(m.description ?? 'a fresh harness');
+    const split = splitAgentRole(m.description);
+    setRole(split.role);
+    setRoleDescription(split.roleDescription);
     setGoal(m.goal ?? '');
     setIsolate(m.isolate ?? false);
     setResumeSessionId('');
@@ -393,9 +442,25 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     // the offending section as we surface the error — the field is never hidden.
     if (!name.trim()) { setError(tr('addAgent.errName')); setSection('identity'); return; }
     if (!cwd) { setError(tr('addAgent.errFolder')); setSection('workspace'); return; }
+    // Michael's folder and the Office are his to change, so neither can be a team
+    // member's own folder (src/shared/folderAccess.ts).
+    if (michaelFolder && [michaelFolder, config.officeFolder].some((f) => f && samePath(f, cwd))) {
+      setError(tr('addAgent.errFolderShared')); setSection('workspace'); return;
+    }
     if (!command.trim()) { setError(tr('addAgent.errCommand')); setSection('engine'); return; }
 
     setBusy(true);
+    // A team member's default folder is made here, the first time it's needed.
+    // Only ever adds a missing folder; an existing one is left as it is.
+    if (michaelFolder && cwdAuto) {
+      const [made] = await window.cth.foldersEnsure([cwd]).catch(() => [undefined]);
+      if (!made || !made.ok) {
+        setBusy(false);
+        setError(made && !made.ok ? made.reason : tr('addAgent.errFolder'));
+        setSection('workspace');
+        return;
+      }
+    }
     const id = uniqueId(name);
     const ptyId = `pty-${id}`;
     // Split the editable command field into argv-style pieces for node-pty.
@@ -818,6 +883,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                           </span>
                         </PixelButton>
                       </div>
+                      {michaelFolder && (
+                        <span style={helperStyle}>
+                          {cwdAuto ? tr('addAgent.folderInsideMichael') : tr('addAgent.folderPrivate')}
+                        </span>
+                      )}
                       {cwd.trim() && !repos.includes(cwd.trim()) && (
                         <button
                           onClick={() => registerProject(cwd)}
@@ -1028,7 +1098,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                         {DESCRIPTION_TEMPLATES.map((t) => (
                           <button
                             key={t.labelKey}
-                            onClick={() => { setDescription(t.description); setGoal(t.goal); }}
+                            onClick={() => { setRole(tr(t.labelKey)); setRoleDescription(t.description); setGoal(t.goal); }}
                             title={t.goal}
                             style={{
                               padding: '3px 8px 1px',
@@ -1044,25 +1114,38 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       </div>
                     </Row>
 
-                    <Row label={tr('addAgent.description')}>
+                    <Row label={tr('addAgent.role')}>
                       <input
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder={tr('addAgent.descriptionPlaceholder')}
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        placeholder={tr('addAgent.rolePlaceholder')}
                         style={inputStyle}
                       />
                     </Row>
 
-                    <Row label={tr('addAgent.goal')}>
+                    <Row label={tr('addAgent.roleDescription')}>
+                      <textarea
+                        dir={rtl ? 'auto' : undefined}
+                        value={roleDescription}
+                        onChange={(e) => setRoleDescription(e.target.value)}
+                        placeholder={tr('addAgent.roleDescriptionPlaceholder')}
+                        rows={3}
+                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
+                      />
+                    </Row>
+                    <span style={helperStyle}>{tr('addAgent.roleHelp')}</span>
+
+                    <Row label={tr('addAgent.workStyle')}>
                       <textarea
                         dir={rtl ? 'auto' : undefined}
                         value={goal}
                         onChange={(e) => setGoal(e.target.value)}
-                        placeholder={tr('addAgent.goalPlaceholder')}
-                        rows={2}
-                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'none' }}
+                        placeholder={tr('addAgent.workStylePlaceholder')}
+                        rows={4}
+                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                       />
                     </Row>
+                    <span style={helperStyle}>{tr('addAgent.workStyleHelp')}</span>
                   </>
                 )}
               </div>

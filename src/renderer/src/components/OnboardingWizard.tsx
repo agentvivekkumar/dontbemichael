@@ -214,8 +214,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const chooseTeamFolder = async (key: string) => {
     setError(undefined);
     const res = await window.cth.chooseFolder();
-    if (res.ok) setFolderOverrides((o) => ({ ...o, [key]: res.path }));
-    else if (res.error !== 'cancelled') setError(res.error);
+    if (!res.ok) { if (res.error !== 'cancelled') setError(res.error); return; }
+    // Michael's folder and the Office are his to change, so neither can be a
+    // team member's own folder (src/shared/folderAccess.ts).
+    const same = (a?: string) => !!a && a.replace(/[\\/]+$/, '').toLowerCase() === res.path.replace(/[\\/]+$/, '').toLowerCase();
+    if (key !== OFFICE_KEY && (same(michaelFolderFor(folderSuggestions, folderOverrides)) || same(folderSuggestions?.office))) {
+      setError(t('addAgent.errFolderShared'));
+      return;
+    }
+    setFolderOverrides((o) => ({ ...o, [key]: res.path }));
   };
   const resetTeamFolder = (key: string) =>
     setFolderOverrides((o) => { const n = { ...o }; delete n[key]; return n; });
