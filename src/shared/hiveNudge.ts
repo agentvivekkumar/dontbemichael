@@ -10,7 +10,9 @@
  */
 
 /** The fixed head of every nudge; the ids that follow differ per nudge. */
-const NUDGE_HEAD = 'You have new hive inbox message(s)';
+const NUDGE_HEAD = 'New message in your inbox';
+/** The head nudges had before 2026-09-25, still recognised in queues saved then. */
+const OLD_NUDGE_HEAD = 'You have new hive inbox message(s)';
 
 /**
  * Build the nudge, naming the messages that prompted it.
@@ -23,8 +25,10 @@ const NUDGE_HEAD = 'You have new hive inbox message(s)';
  * reading the directory, so the text must never invite it to stop at the ids.
  */
 export function inboxNudgeText(ids: string[]): string {
-  const named = ids.length ? ` — at least: ${ids.join(', ')}` : '';
-  return `${NUDGE_HEAD}${named}. Read your inbox, act on what is pending there, and move handled ones to inbox/.done/. Your inbox directory is authoritative: work everything still pending in it, and if a named id is already in inbox/.done/ you handled it on an earlier turn and can ignore that one. Act autonomously; only message god if you genuinely need a decision.`;
+  // Short and plain (owner cleanup, 2026-09-25): the instructions already say
+  // how to work the inbox, so the nudge only says what arrived.
+  const named = ids.length ? `: ${ids.join(', ')}` : '';
+  return `${NUDGE_HEAD}${named}. Work everything still pending in your inbox; an id already in inbox/.done/ was handled earlier.`;
 }
 
 /**
@@ -35,5 +39,6 @@ export function inboxNudgeText(ids: string[]): string {
  * `isCompactionCommand`, and the queue's one-pending rule leans on it the same way.
  */
 export function isInboxNudge(text: string): boolean {
-  return text.trim().startsWith(NUDGE_HEAD);
+  const t = text.trim();
+  return t.startsWith(NUDGE_HEAD) || t.startsWith(OLD_NUDGE_HEAD);
 }

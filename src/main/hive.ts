@@ -519,6 +519,12 @@ export class HiveManager {
 
   private routerTimer: NodeJS.Timeout | null = null;
 
+  /** A business office (one with a business folder): its PROTOCOL.md is the
+   *  short plain version, and no COMMANDS.md is written (owner cleanup,
+   *  2026-09-25). Set by main before the hive bootstraps. */
+  private businessOffice = false;
+  setBusinessOffice(on: boolean): void { this.businessOffice = on; }
+
   /** agentId → whether it has been told company knowledge is on, as of its
    *  spawn or its last update. Lets an owner's toggle reach running agents
    *  without a restart (knowledgeUpdate). */
@@ -767,7 +773,7 @@ export class HiveManager {
     // the day it was initialised, so every protocol addition since had reached
     // new hives only. The file is generated, not user-authored, and agents are
     // pointed at it as the authority, so a stale copy is worse than a rewrite.
-    writeFileSync(join(root, 'PROTOCOL.md'), PROTOCOL_MD, 'utf8');
+    writeFileSync(join(root, 'PROTOCOL.md'), this.businessOffice ? PROTOCOL_BUSINESS_MD : PROTOCOL_MD, 'utf8');
 
     const registry = join(root, 'registry.json');
     if (!existsSync(registry)) {
@@ -791,7 +797,7 @@ export class HiveManager {
 
     // The Claude Code command reference Michael consults (refreshed each bootstrap
     // so it tracks the bundled list).
-    writeFileSync(join(root, 'COMMANDS.md'), COMMANDS_MD, 'utf8');
+    if (!this.businessOffice) writeFileSync(join(root, 'COMMANDS.md'), COMMANDS_MD, 'utf8');
 
     // Keep the churny/ephemeral live files out of the hive git repo.
     const gitignore = join(root, '.gitignore');
@@ -1606,7 +1612,7 @@ export class HiveManager {
     return [
       `# ${meta.name} (${meta.id})`,
       '',
-      `- Role: ${meta.role ?? (meta.isGod ? 'orchestrator (god)' : 'agent')}`,
+      `- Role: ${meta.role ?? (meta.isGod ? 'office manager' : 'agent')}`,
       `- Capabilities: ${caps}`,
       `- Working directory: ${meta.cwd}`,
       meta.isGod ? '- You are the **god / orchestrator**. You run the floor — keep awareness of the whole team, delegate execution, and personally own only the important calls (decomposition, sign-offs, conflicts, integration), not the grunt work.' : '',
@@ -3413,6 +3419,43 @@ searchable MemPalace and you have the \`mempalace\` CLI:
 
 Your memory index is mined into the palace automatically, so what the app keeps
 there becomes searchable by every agent. You don't run \`mine\` yourself.
+`;
+
+/** PROTOCOL.md for a business office: the message format and the files, in
+ *  plain words, without the older text about git, remote control, spawning or
+ *  COMMANDS.md (owner cleanup, 2026-09-25). The instructions each agent gets at
+ *  startup carry how to work; this is the reference they point to. */
+const PROTOCOL_BUSINESS_MD = `# Message format
+
+The office coordinates through files. The app moves messages between agents; nobody writes into another agent's folder.
+
+## Your folder in the hive: \`agents/<your id>/\`
+- \`inbox/\`: messages to you. Act on each, then move it to \`inbox/.done/\`.
+- \`outbox/\`: write a message here to send it. The app delivers it and moves it to \`outbox/.sent/\`.
+- \`memory.md\`: your memory index. The app keeps it and gives it to you at the start of each session.
+- \`memory/inbox.md\`: notes worth keeping, which the app sorts into your index.
+- \`memory/handoff.md\`: written only when the app asks for a handoff before a fresh start.
+
+## A message
+One JSON file in \`outbox/\`, any name ending in \`.json\`:
+
+\`\`\`json
+{
+  "to": "michael | <team member id> | broadcast",
+  "act": "request | inform | query | done",
+  "subject": "one line",
+  "body": "the details",
+  "in_reply_to": "<id of the message you are answering> (optional)"
+}
+\`\`\`
+
+The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
+
+## The task board
+\`tasks.json\` in the hive folder holds the cards (todo, doing, blocked, done), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.
+
+## Asking the owner
+Only Michael asks the owner, on the Ask me board. He sets the card to blocked and adds \`{ "q": "...", "askedAt": "<time>", "raisedBy": "<id, or god>" }\` to its \`humanQA\` list. The owner's answer goes to whoever raised it, into their memory, and to Michael.
 `;
 
 // ─── cth-hook shim (written to <hive>/bin/cth-hook.cjs) ──────────────────────

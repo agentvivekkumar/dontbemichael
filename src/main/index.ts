@@ -752,7 +752,7 @@ function syncMissions(): void {
         // we deliberately do NOT add `&& m.body`, so other (dispatch) missions keep
         // their prior behaviour, including the historical empty-body send (Pam N1).
         if (m.kind !== 'compact' && hive.enabled()) {
-          hive.send({ to: m.to, act: 'request', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
+          hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
         }
         // No compaction here: that is Claude Code's own auto compact now, with its
         // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
@@ -899,7 +899,7 @@ function standupOnOfficeOpen(): void {
   if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
   standupFiredThisLaunch = true;
   try {
-    hive.send({ to: m.to, act: 'request', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
+    hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
     const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
     writeConfig({ missions: next });
     try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
@@ -1259,10 +1259,10 @@ function runBreakerBeat(progressWindowMs: number): void {
     const reason = d.state.reason;
     if (d.action === 'steer') {
       hive.send({ to: d.state.agentId, act: 'request', subject: 'Circuit breaker: steer',
-        body: `Automated guardrail: ${reason}. Re-check your approach — if you're looping or stuck, STOP repeating, summarize what you've tried, and ask god for direction.` }, 'breaker');
+        body: `The app noticed a problem with this task (${reason}). If you are repeating yourself or stuck, stop, and send Michael a short summary of what you tried and what you need.` }, 'breaker');
     } else if (d.action === 'constrain') {
       hive.send({ to: d.state.agentId, act: 'request', subject: 'Circuit breaker: constrain',
-        body: `Automated guardrail escalated: ${reason}. Stop active work now: switch to read-only/plan, write a short plan of your next step, and send it to god for sign-off BEFORE running more tools.` }, 'breaker');
+        body: `The app paused this task (${reason}). Before running more tools, send Michael a short plan of your next step and wait for his go ahead.` }, 'breaker');
       breakerToast(`${name} constrained`, reason);
     } else if (d.action === 'stop') {
       const ptyId = ptyForAgent(d.state.agentId);
@@ -1395,14 +1395,16 @@ let lastSlackUrl: string | undefined;
  *  renderer keeps them split). Trailing space is intentional so the user's message
  *  reads naturally after it. */
 function buildAutonomousRequestProtocol(channel: string, threadTs: string, helperPath: string): string {
-  return `[AUTONOMOUS REQUEST PROTOCOL — this request arrived via Slack; no interactive human is watching] Handle it under this protocol:
-1. ROUTE FAST — triage and hand this to the single most-relevant agent right away. CHECK THE LIVE ROSTER FIRST (active agents in registry.json + their state in fleet.json) and prefer an EXISTING agent that fits — especially when the request names one ("ask Pam…", "have Jim…"): route to that agent and only spawn a new one if none is a sensible fit. Decompose only if it genuinely needs several. Don't sit on it.
-2. DELEGATE WITH THE REPLY HANDLE — tell that agent to do the work autonomously AND to post its result back to THIS Slack thread itself when done, using exactly: "${hive.nodeCommand()}" "${helperPath}" --channel ${channel} --thread ${threadTs} --text "<substantive result>" (that first path is the harness's bundled Node, already resolved for this machine — pass it verbatim; bare "node" is not on the hook/agent PATH on many machines.)
-3. AUTONOMOUS EXECUTION — no interactive questions. PAUSE/ask ONLY for high-severity actions: pushing to main or any remote; buying or spawning infrastructure or paid services; deleting an existing repo, file, or folder it did not create. Stay READ-ONLY at critical infrastructure and git-push-type changes unless explicitly approved.
-4. DIRECT, SUBSTANTIVE REPLY — the agent posts a real Slack-mrkdwn answer (short *bold* headline + the actual outcome/specifics/links), NEVER a bare "done"/":white_check_mark:".
-5. REPORT TO GOD — the agent then tells you (Michael) what it did.
-6. ASYNC QUESTIONS — if a decision is genuinely needed, don't block: post the question + numbered OPTIONS to the thread via that reply command, and record {q, options, askedAt (ISO + day & time), thread_ts ${threadTs}} so the threaded human reply correlates back and resumes.
-The user's message starts now: `;
+  // Slack reply rules ride the Slack request itself, not every agent's startup
+  // instructions (owner cleanup, 2026-09-25). Plain, no spawning or git.
+  return `[Slack request: nobody is watching the office live, so handle it this way.]
+1. Route it straight to the one team member whose role fits, from the roster. When the request names someone ("ask Pam"), send it to them.
+2. Tell them to do the work and post the result to this Slack thread themselves when done, with exactly: "${hive.nodeCommand()}" "${helperPath}" --channel ${channel} --thread ${threadTs} --text "<the result>". Use that Node path as it is; plain "node" is often missing.
+3. No questions in the office. Only spending money, anything public, or deleting something they did not create needs the owner first.
+4. The Slack reply is the real answer in Slack formatting: a short *bold* headline, then the outcome, specifics and links. Never just "done".
+5. They then tell you (Michael) what they did.
+6. If a decision is needed, post the question with numbered options to the thread with the same command, and record {q, options, askedAt, thread_ts ${threadTs}} so the reply in the thread finds its way back.
+The request starts now: `;
 }
 
 // ─── Slack done-notifier (Slack-origin task → done → one summary reply) ───────
@@ -5321,6 +5323,8 @@ ipcMain.handle('workers:stop', (_evt, workerId: string): { ok: boolean; error?: 
  *  (config:changeHome tears these down before copying). No-op without a home. */
 function bootstrapHiveServices(): void {
   if (!hive.enabled()) return;
+  // A business office gets the plain PROTOCOL.md and no COMMANDS.md.
+  hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.ensureHive();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.

@@ -109,25 +109,25 @@ export class ClosingTimeController {
 
     const names = [...this.workers]
       .map((id) => `${reg.agents[id]?.name ?? id} (${id})`)
-      .join(', ') || '(none — the floor is just you)';
+      .join(', ') || '(none: the office is just you)';
 
     this.hive.send({
       to: 'god',
       act: 'request',
-      subject: 'CLOSING TIME — run the shutdown protocol now',
+      subject: 'Closing time: close the office now',
       body: [
-        'The human pressed "closing time": the harness will close as soon as you confirm the floor is safe. Run this protocol now, before anything else:',
+        'The owner pressed "closing time". The app closes as soon as you confirm the office is safe to close. Do this now, before anything else:',
         '',
-        `1. BROADCAST closing time to the team (message with "to":"broadcast"). Current workers: ${names}.`,
-        '   Tell each worker to immediately: park or commit any work-in-progress safely, make sure its task card on tasks.json says where the work stands and the next step, and then reply to you with a message whose subject is exactly "CLOSING-TIME-ACK".',
-        '2. WAIT and keep draining your inbox until EVERY worker above has sent its CLOSING-TIME-ACK. Nudge stragglers once if needed.',
-        '3. Save your own state: update board.md so it says where every piece of work stands. Session logs don\'t go in memory: it holds only lessons worth keeping.',
-        `4. CONCLUDE by sending a message with "to":"human" and the subject exactly "CLOSING-TIME-COMPLETE" — the harness watches for it and closes the app. Do not send it before every worker has acked: the harness independently verifies the ACKs and will reject a premature conclusion.`,
+        `1. Tell the team it is closing time (a message with "to": "broadcast"). Team members now: ${names}.`,
+        '   Ask each to save any work in progress, make sure its task card on tasks.json says where the work stands and the next step, and then reply to you with the subject exactly "CLOSING-TIME-ACK".',
+        '2. Keep working your inbox until every team member above has sent CLOSING-TIME-ACK. Remind anyone slow once if needed.',
+        '3. Update board.md so it says where every piece of work stands. Session logs do not go in memory: it holds only lessons worth keeping.',
+        '4. Then send a message with "to": "human" and the subject exactly "CLOSING-TIME-COMPLETE"; the app watches for it and closes. Send it only after every team member has acknowledged: the app checks the acknowledgements and rejects an early one.',
         '',
         this.workers.size === 0
-          ? 'There are no workers on the floor right now — do steps 3 and 4 immediately.'
-          : 'The prep assistant saves its own memory separately — do NOT wait for it and do not message it.',
-        'This is a shutdown: do not start new work and do not accept new tasks.'
+          ? 'Nobody else is in the office right now, so do steps 3 and 4 straight away.'
+          : 'This is a shutdown: do not start new work or accept new tasks.',
+        ...(this.workers.size === 0 ? ['This is a shutdown: do not start new work or accept new tasks.'] : [])
       ].join('\n')
     }, 'human');
 
@@ -138,10 +138,10 @@ export class ClosingTimeController {
     // closing time within one tool call. Idle agents are covered by the
     // inbox-wake nudge; busy ones by the steer — both rails, no PTY typing.
     this.control?.steer(this.godId,
-      'CLOSING TIME was pressed by the human: pause your current work at the next sensible point and drain your inbox NOW — a shutdown brief is waiting there. Coordinate the floor shutdown before anything else.');
+      'The owner pressed closing time: pause your current work at the next sensible point and read your inbox, where the closing steps are waiting. Close the office before anything else.');
     for (const id of this.workers) {
       this.control?.steer(id,
-        'CLOSING TIME: the office is shutting down. Finish your current step but do not start new work. Park or commit your work in progress safely, make sure your task card on tasks.json says where the work stands and the next step, then reply to god with a message whose subject is exactly "CLOSING-TIME-ACK".');
+        'Closing time: the office is closing. Finish your current step but do not start new work. Save any work in progress, make sure your task card on tasks.json says where the work stands and the next step, then send Michael ("to": "michael") a message with the subject exactly "CLOSING-TIME-ACK".');
     }
 
     this.armTimeout();
@@ -163,8 +163,8 @@ export class ClosingTimeController {
       this.hive.send({
         to: 'god',
         act: 'inform',
-        subject: 'CLOSING TIME CANCELLED',
-        body: 'The human cancelled the shutdown — disregard the closing-time protocol and resume normal operation. Any memory saves already done are a bonus, not a problem.'
+        subject: 'Closing time cancelled',
+        body: 'The owner cancelled closing time. Carry on as normal; anything already saved stays saved.'
       }, 'human');
     } catch { /* best-effort */ }
   }
@@ -199,11 +199,11 @@ export class ClosingTimeController {
         this.hive.send({
           to: 'god',
           act: 'refuse',
-          subject: 'CLOSING TIME — conclusion rejected, workers still missing',
+          subject: 'Closing time: still waiting on the team',
           body: [
-            `The harness is still missing a CLOSING-TIME-ACK from: ${names}.`,
-            'The app stays open until every worker has confirmed its memory is saved.',
-            'Chase the stragglers (re-send the closing-time instruction to each), wait for their ACKs, then send CLOSING-TIME-COMPLETE again.'
+            `The app has no CLOSING-TIME-ACK yet from: ${names}.`,
+            'It stays open until every team member has confirmed its work is saved.',
+            'Ask each of them again, wait for their acknowledgements, then send CLOSING-TIME-COMPLETE again.'
           ].join('\n')
         }, 'human');
         this.emitState('progress');

@@ -8,13 +8,10 @@ import {
   tokenizeCommand,
   type HarnessConfig
 } from '@/store/config';
-import {
-  remoteControlCommandForProvider,
-  terminalReadyToReceive
-} from '../../../shared/providerAutomation';
+import { terminalReadyToReceive } from '../../../shared/providerAutomation';
 import type { AgentProvider } from '../../../shared/agentProvider';
 import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
-import { isDurableRole, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
+import { isDurableRole, MICHAEL_ROLE, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
 import { inboxNudgeText } from '../../../shared/hiveNudge';
 import { resolveGodName } from '../../../shared/godIdentity';
 import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
@@ -30,7 +27,6 @@ const GOD_ID = 'god';
 const SPAWN_ACCENTS = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'] as const;
 const GOD_PTY = `pty-${GOD_ID}`;
 
-const REMOTE_CONTROL_SETTLE_MS = 1500;
 // Provider-agnostic PTY-quiescence idle fallback (#2e). A non-Claude bridge that
 // fires a 'working' event but never its turn-end signal (Stop / session.idle /
 // agent_end) would pin the agent 'working' forever → the idle-only inbox-wake nudge
@@ -68,17 +64,6 @@ function withStandingGoal(agent: Agent, text: string): string {
   if (text.includes('<goal>')) return text;
   return `<goal>\n${goal}\n</goal>\n\n${text}`;
 }
-
-// The first thing Michael (god) is told on a fresh spawn — orient him and put
-// him to work running the floor. Kept terse and action-oriented.
-const INITIAL_GOD_PROMPT = [
-  "You're online as Michael, the orchestrator of the hive. Get oriented, then start running the floor:",
-  '1. Drain every message in your inbox.',
-  '2. Review board.md + tasks.json and the current roster of agents (active vs archived).',
-  '3. Check fleet health: read fleet.json in the hive root for every agent\'s live tokens, cost, status, breaker level, and inbox backlog (`claude agents` will NOT show your hive\'s agents). Flag anyone stalled, over-budget, or breaker-armed.',
-  '4. Skim COMMANDS.md (hive root) for the Claude Code commands you can use — and run `mempalace wake-up` for a memory digest if the CLI is available.',
-  'Then begin orchestrating: triage requests, delegate work to the team, and keep everyone unblocked. You are fully autonomous — there is no approval queue, so handle tool-permission prompts in this session yourself (the human can approve them remotely from their phone).'
-].join('\n');
 
 // Per-pty submission chain. Every submitToPty for a given pty is appended here so
 // two callers (e.g. the boot sequence's /remote-control and the inbox-wake nudge)
@@ -467,7 +452,7 @@ export function useHive(config: HarnessConfig | null): void {
         // fresh session. Without this the most important context on the floor —
         // the orchestrator's — was lost on every restart.
         resume: true,
-        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true, role: 'orchestrator (god)' }
+        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true, role: MICHAEL_ROLE }
       });
       if (cancelled) { godSpawning.current = false; return; }
       if (!res.ok) { godSpawning.current = false; useStore.getState().setGodStatus('failed'); return; }
@@ -498,35 +483,21 @@ export function useHive(config: HarnessConfig | null): void {
       // inside its own folder. After this they restore like any hired agent.
       void startBusinessTeam(config);
 
-      // Kick Michael off once his TUI is up. Always re-enable remote control so
-      // the human can approve permission prompts from their phone (best-effort — a
-      // failed/unknown slash command just prints to his terminal and is harmless).
-      // Then, ONLY on a genuinely fresh spawn, hand him the orientation prompt —
-      // a RESUMED Michael already has his full context and must not be re-oriented
-      // mid-thread (that would reset the floor's situational awareness). Both go
-      // through the per-pty submit chain, so they're strictly sequential and can't
-      // jam together; the boot-grace window keeps the inbox-wake/drain loops off
-      // Michael until he's settled. The live-PTY branch above skips this entirely.
+      // Nothing is typed into Michael's terminal at start (owner cleanup,
+      // 2026-09-25): his startup instructions cover orientation, and the standup
+      // sent when the office opens (standupOnOfficeOpen) gives him his first turn
+      // through the inbox. /remote-control is no longer switched on. Only an
+      // engine that can't take its protocol on the command line (Crush) still
+      // has it typed, on a fresh spawn, because that is its instructions.
       const resumedGod = res.resumed === true;
-      bootGraceUntil.current[GOD_ID] = Date.now() + BOOT_GRACE_MS;
-      void (async () => {
-        try {
-          const remoteCommand = remoteControlCommandForProvider(godProvider, godName);
-          if (remoteCommand) {
-            // settleMs pauses the chain ~1.5s after /remote-control before the
-            // orientation prompt (fresh spawns only) is submitted next.
-            await submitToPty(GOD_PTY, remoteCommand, godProvider, REMOTE_CONTROL_SETTLE_MS);
-          }
-          if (!cancelled && !resumedGod) {
-            // A type-into-tui god (Crush) can't ride its hive protocol on argv, so the
-            // main process hands it back as seedPrompt — type it FIRST (identity), then
-            // the orientation kick. Serialized via writeChains so they can't jam. (ondev-b)
-            if (res.seedPrompt) await submitToPty(GOD_PTY, res.seedPrompt, godProvider);
-            await submitToPty(GOD_PTY, INITIAL_GOD_PROMPT, godProvider);
-          }
-        } catch { /* PTY may have died during startup */ }
-        finally { bootGraceUntil.current[GOD_ID] = 0; }
-      })();
+      if (res.seedPrompt && !resumedGod) {
+        bootGraceUntil.current[GOD_ID] = Date.now() + BOOT_GRACE_MS;
+        void (async () => {
+          try { if (!cancelled) await submitToPty(GOD_PTY, res.seedPrompt!, godProvider); }
+          catch { /* PTY may have died during startup */ }
+          finally { bootGraceUntil.current[GOD_ID] = 0; }
+        })();
+      }
     }, 1200);
     return () => { cancelled = true; clearTimeout(t); };
   }, [config?.onboardingComplete, config?.harnessHome]);
