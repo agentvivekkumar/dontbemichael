@@ -58,3 +58,8 @@ export const SHOW_OPEN_TERMINAL = false;
  *  cleared at launch, so no one is left with messages held and no switch to
  *  release them. */
 export const SHOW_DELIVERY_SWITCH = false;
+
+/** Hiring by voice: voice Michael's spawn_agent tool, the hiring lines in his
+ *  instructions, and the main process accepting a spawn request from him. Off
+ *  for now (owner, 2026-09-24); the rest of voice Michael is unchanged. */
+export const ALLOW_VOICE_HIRE = false;

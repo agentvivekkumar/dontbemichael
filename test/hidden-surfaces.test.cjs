@@ -198,3 +198,19 @@ test('the delivery switch is hidden, and a saved pause cannot strand messages', 
   const main = read('src/main/index.ts');
   assert.match(main, /if \(SHOW_DELIVERY_SWITCH\) \{\s*control\.replaceAutoDeliveryPauses\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\);\s*\} else if \(\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\)\.length > 0\) \{\s*writeConfig\(\{ autoDeliveryPausedAgents: \[\] \}\);/);
 });
+
+/**
+ * Hiring by voice is off (owner, 2026-09-24): voice Michael is not given the
+ * spawn_agent tool, his instructions say he can't hire, and main refuses a
+ * spawn request that arrives anyway.
+ */
+test('voice Michael cannot hire', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').ALLOW_VOICE_HIRE, false);
+  const actions = read('src/renderer/src/realtime/actions.ts');
+  const at = actions.indexOf("name: 'spawn_agent'");
+  assert.ok(at > 0 && actions.slice(at - 120, at).includes('...(ALLOW_VOICE_HIRE ? ['), 'tool offered only when allowed');
+  const session = read('src/renderer/src/realtime/session.ts');
+  assert.match(session, /\$\{ALLOW_VOICE_HIRE \? 'hire a new agent, ' : ''\}/);
+  assert.match(session, /You cannot hire new team members by voice in this version/);
+  assert.match(read('src/main/realtimeActions.ts'), /if \(verb === 'spawn'\) \{[\s\S]{0,200}if \(!ALLOW_VOICE_HIRE\) \{\s*return \{ ok: false, spoken:/);
+});

@@ -28,11 +28,13 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Edit a team member's engine from two short lists.** Provider and model are now dropdowns
   instead of rows of buttons, and the provider list shows the engines this app offers.
 
-- **Only Claude Code can be picked, everywhere.** The hire dialog, Michael's engine and model
-  pickers, and hiring by voice now offer the same engines as setup. The others are not ready to run
+- **Only Claude Code can be picked, everywhere.** The hire dialog and Michael's engine and model
+  pickers now offer the same engines as setup. The others are not ready to run
   an office member yet.
 
 ### Removed
+
+- **No hiring by voice.** Voice Michael no longer offers to hire; add team members in the office.
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
   asks about it.

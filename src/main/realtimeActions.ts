@@ -38,6 +38,7 @@ import { ipcMain } from 'electron';
 import type { HiveMessage, HiveTask, Registry } from './hive';
 import type { ScheduledMission } from './config';
 import { inferAgentProvider, BUILD_ENGINES, type AgentProvider } from '../shared/agentProvider';
+import { ALLOW_VOICE_HIRE } from '../shared/buildFeatures';
 import { clearCommandForProvider } from '../shared/providerAutomation';
 import { resolveGodName } from '../shared/godIdentity';
 
@@ -644,6 +645,11 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
 
   // spawn / hire — expensive; stubbed $ estimate (rt-9 wires the real number).
   if (verb === 'spawn') {
+    // Hiring by voice is off in this build (ALLOW_VOICE_HIRE); the tool is not
+    // offered, and a spawn request that arrives anyway is refused here.
+    if (!ALLOW_VOICE_HIRE) {
+      return { ok: false, spoken: "I can't hire by voice in this version. You can add a team member in the office." };
+    }
     const provider = (str(a.provider) || 'claude').toLowerCase();
     // Only the engines this build offers (BUILD_ENGINES), the same list the
     // hire dialog shows: the others are not ready to run an office member.

@@ -20,6 +20,7 @@
  *   tools: [...realtimeReadTools(), ...realtimeActionTools()]
  */
 import { tool } from '@openai/agents-realtime';
+import { ALLOW_VOICE_HIRE } from '@shared/buildFeatures';
 
 const obj = (x: unknown): Record<string, unknown> =>
   x && typeof x === 'object' ? (x as Record<string, unknown>) : {};
@@ -180,23 +181,26 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
     }),
 
     // ── destructive / expensive (echo-back confirm required) ──────────────
-    tool({
-      name: 'spawn_agent',
-      description:
-        'Hire a NEW agent worker (provider engine + optional role). This does NOT run immediately; it asks for verbal confirmation first. After the user confirms, call confirm_action.',
-      parameters: {
-        type: 'object',
-        properties: {
-          provider: { type: 'string', description: 'Engine: claude. It is the only engine this version offers.' },
-          role: { type: 'string', description: 'Optional. The role/job for the new agent.' },
-          name: { type: 'string', description: 'Optional. A name for the agent.' },
-          cwd: { type: 'string', description: 'Optional. Working directory; defaults to the hive root.' }
+    // Hiring by voice is off in this build (ALLOW_VOICE_HIRE, buildFeatures.ts).
+    ...(ALLOW_VOICE_HIRE ? [
+      tool({
+        name: 'spawn_agent',
+        description:
+          'Hire a NEW agent worker (provider engine + optional role). This does NOT run immediately; it asks for verbal confirmation first. After the user confirms, call confirm_action.',
+        parameters: {
+          type: 'object',
+          properties: {
+            provider: { type: 'string', description: 'Engine: claude. It is the only engine this version offers.' },
+            role: { type: 'string', description: 'Optional. The role/job for the new agent.' },
+            name: { type: 'string', description: 'Optional. A name for the agent.' },
+            cwd: { type: 'string', description: 'Optional. Working directory; defaults to the hive root.' }
+          },
+          required: [],
+          additionalProperties: false
         },
-        required: [],
-        additionalProperties: false
-      },
-      execute: (input) => act('spawn', input)
-    }),
+        execute: (input) => act('spawn', input)
+      })
+    ] : []),
     tool({
       name: 'kill_agent',
       description:
