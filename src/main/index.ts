@@ -91,6 +91,7 @@ import { claudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
+import { findOffice, syncOfficeRecord } from './officeFile';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -3359,6 +3360,12 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
 /** Is an office folder there? No path = the current home. The launch screen
  *  uses it to decide between the floor and "we can't find your office", and
  *  Settings uses it to tell an existing office from an empty folder. */
+/** Setup asks what is in a folder before it creates anything: an office, and if
+ *  so its business and team (office.json, else the hive registry). */
+ipcMain.handle('office:find', (_evt, path: unknown) => {
+  const home = typeof path === 'string' && path.trim() ? resolve(expandTilde(path.trim())) : readConfig().harnessHome;
+  return home ? findOffice(home) : { path: null, hasOffice: false, record: null, source: null };
+});
 ipcMain.handle('config:homeStatus', (_evt, path: unknown) =>
   homeFolderStatus(typeof path === 'string' && path ? resolve(expandTilde(path)) : readConfig().harnessHome ?? null)
 );
@@ -5448,7 +5455,11 @@ app.whenReady().then(() => {
   // folder, bootstrapping would quietly rebuild an EMPTY office at the old path;
   // instead nothing touches it and the renderer asks where it went (homeFolder.ts).
   const homeReady = homeReadyAtLaunch(readConfig());
-  if (homeReady) bootstrapHiveServices();
+  if (homeReady) {
+    bootstrapHiveServices();
+    // An office set up before office.json existed gets one now (officeFile.ts).
+    syncOfficeRecord(readConfig());
+  }
   else console.warn('[home] office folder missing, waiting for the owner:', readConfig().harnessHome);
   // Survive sleep/lock. macOS freezes libuv timers during true system sleep, so a
   // locked/idle/slept Mac stops firing schedules and can wedge PTYs. On wake we
@@ -5504,6 +5515,9 @@ app.on('before-quit', (e) => {
 // Every window loads the config once at start-up, so tell them all when a
 // setting is saved — a floor left out would keep showing what it opened with.
 onConfigWritten((config) => {
+  // The office describes itself in <home>/office.json, so a reinstall finds it
+  // by folder rather than by the business name typed into setup.
+  syncOfficeRecord(config);
   for (const w of allWindows) {
     if (w.isDestroyed() || w.webContents.isDestroyed()) continue;
     w.webContents.send('config:changed', config);

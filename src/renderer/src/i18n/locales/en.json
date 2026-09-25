@@ -593,6 +593,7 @@
   },
   "onboarding": {
     "titles": {
+      "resume": "WELCOME BACK",
       "welcome": "STEP 2 OF 6 · MEET YOUR OFFICE",
       "home": "STEP 4 OF 6 · A HOME FOR THE APP",
       "orchestrator": "STEP 5 OF 6 · YOUR MANAGER",
@@ -600,6 +601,14 @@
       "done": "ALL SET",
       "business": "STEP 1 OF 6 · YOUR BUSINESS",
       "team": "STEP 3 OF 6 · YOUR TEAM"
+    },
+    "resume": {
+      "headline": "WE FOUND YOUR OFFICE",
+      "desc": "This Mac already has an office in {{folder}}: {{business}}, with {{count}} team members. Continue with it to keep your team, their folders, their memory and their work.",
+      "unnamed": "your business",
+      "newNote": "Setting up a new office gives it a folder of its own, so this office stays exactly as it is.",
+      "continue": "Continue with this office",
+      "startNew": "Set up a new office"
     },
     "welcome": {
       "headline": "YOUR MANAGER AND THE FLOOR HE RUNS",

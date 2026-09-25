@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
+import type { OfficeRecord } from '../shared/officeRecord';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
 export type { HireManifest } from '../shared/hire';
@@ -708,6 +709,15 @@ const api = {
   /** Whether a folder (default: the current home) exists and holds an office. */
   homeStatus: (path?: string): Promise<{ path: string | null; exists: boolean; hasOffice: boolean }> =>
     ipcRenderer.invoke('config:homeStatus', path),
+  /** What is in a folder: an office, and if so its business and team, read from
+   *  its office.json or, for an older office, its hive registry. Setup uses it
+   *  to continue an existing office by folder, never by business name. */
+  officeFind: (path: string): Promise<{
+    path: string | null;
+    hasOffice: boolean;
+    record: OfficeRecord | null;
+    source: 'file' | 'registry' | null;
+  }> => ipcRenderer.invoke('office:find', path),
   /** Start an empty office at the current home path after it went missing.
    *  Relaunches on success (never resolves); returns { ok: false } on failure. */
   startOverHere: (): Promise<{ ok: boolean; error?: string }> =>

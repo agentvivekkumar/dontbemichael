@@ -276,9 +276,15 @@ function passesContextPressure(a: Agent, rule: ContextRule): boolean {
  * Each member is spawned exactly as the hire dialog spawns an agent — same
  * engine command, same hive provisioning — but inside its own folder and with
  * its pack's job description as its standing goal. `businessTeamStarted` stops
- * a second run; the registry check stops duplicates if the app died midway,
- * since registry.json survives a restart. A member that fails to start is
- * skipped rather than blocking the rest.
+ * a second run. A member already on the floor is left alone. A member the hive
+ * registry knows but the floor does not (its roster entry was lost, as on
+ * 2026-09-24 after setup ran again) is started again in the folder the registry
+ * says it works in, rather than skipped on the hope that the roster brings it
+ * back. The registry's own `archived` flag is NOT a removal (every agent is
+ * archived when the app quits and its terminal closes), so what the floor holds
+ * decides: a member on the floor, in its archived list, or waiting to be
+ * restored is left to the floor. A member that fails to start is skipped rather
+ * than blocking the rest.
  */
 async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   const team = config.businessTeam ?? [];
@@ -300,25 +306,32 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
     const def = defs.get(member.agentId);
     if (!def) continue;
     const id = member.agentId;
-    if (reg?.agents?.[id]) continue; // already started; the roster restores it
+    // The floor already accounts for it: running, archived by the owner, or
+    // waiting to be restored.
+    const floor = useStore.getState();
+    if ([...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents].some((a) => a.id === id)) continue;
+    const known = reg?.agents?.[id];
+    // The folder it actually works in, whatever setup would derive from the
+    // business name this time.
+    const workFolder = known?.cwd || member.folder;
     const ptyId = `pty-${id}`;
     const name = teamMemberName(def);
     const role = teamMemberRole(def);
     const res = await window.cth.spawnPty({
       id: ptyId,
-      cwd: member.folder,
+      cwd: workFolder,
       command: exe,
       provider,
       args,
       cols: 100,
       rows: 30,
-      hive: { id, name, provider, cwd: member.folder, role }
+      hive: { id, name, provider, cwd: workFolder, role }
     });
     if (!res.ok) {
       console.warn(`[team] ${name} did not start: ${res.error ?? 'unknown error'}`);
       continue;
     }
-    const folder = res.cwd || member.folder;
+    const folder = res.cwd || workFolder;
     // A new team's first start: the cards appear, the focus stays on Michael.
     useStore.getState().addAgent({
       id,

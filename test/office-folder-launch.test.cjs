@@ -51,7 +51,7 @@ test('before onboarding there is nothing to lose, so launch proceeds', () => {
 
 test('a missing office is never rebuilt empty at launch, and nothing that feeds it starts', () => {
   const main = read('src/main/index.ts');
-  assert.match(main, /const homeReady = homeReadyAtLaunch\(readConfig\(\)\);\s*if \(homeReady\) bootstrapHiveServices\(\);/);
+  assert.match(main, /const homeReady = homeReadyAtLaunch\(readConfig\(\)\);\s*if \(homeReady\) \{?\s*bootstrapHiveServices\(\);/);
   assert.match(main, /if \(homeReady && slackCfg\.slackEnabled && slackCfg\.slackSigningSecret\)/);
   assert.match(main, /if \(homeReady && enabledWebhookEndpoints\(\)\.length > 0\)/);
 });

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Fixed
+
+- **Setting up again no longer loses your team.** When setup finished on an office that already
+  had a team, the floor could save Michael alone over the team's list. Setup now reads the
+  office's team first, and any team member the office knows but the floor lost comes back.
+- **Your office is found by its folder, not its name.** When setup finds an office on this Mac, it
+  offers to continue with it: the same team, in the same folders, whatever business name you type.
+  Setting up a new office gives it a folder of its own. The office keeps its own record in
+  `office.json` in its folder.
+
 ## [0.0.2] (2026-09-24)
 
 ### Changed

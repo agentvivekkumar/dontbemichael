@@ -20,12 +20,13 @@ import {
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { missingBusinessFields, type BusinessField } from '@shared/businessProfile';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { teamPlanFromRecord, type OfficeRecord } from '@shared/officeRecord';
 
 export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
 }
 
-type Step = 'business' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
+type Step = 'resume' | 'business' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
 
 /** The "no pack fits" tile. Not an error path: Michael asks a few questions and
  *  builds from the core pack, so the grid always resolves to something. */
@@ -190,6 +191,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }, [step, businessName, teamFolderKey]);
 
   const plan = teamPlan(teamAgents, teamPicked, folderSuggestions, folderOverrides);
+  const pickedPlan = plan;
   const needed = connectionsNeeded(teamAgents, teamPicked);
   const pickedCount = teamAgents.filter((a) => teamPicked[a.id]).length;
   /** `/Users/me/Documents/Pho` → `~/Documents/Pho`: shorter, and what an owner recognises. */
@@ -315,9 +317,52 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // at the config-write boundary AND at ensureHarnessHome's mkdir, so every
   // downstream reader still sees one absolute path. No new IPC surface.
   useEffect(() => {
-    if (!home) setHome('~/HarnessAgents');
+    if (!home) setHome(DEFAULT_HOME);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // An office already in the suggested home folder (a reinstall, or a new data
+  // folder): offer to continue it exactly as it is, by folder. Continuing never
+  // depends on the business name typed this time (officeRecord.ts).
+  const [found, setFound] = useState<{ path: string; record: OfficeRecord } | null>(null);
+  const [resuming, setResuming] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void window.cth.officeFind(DEFAULT_HOME)
+      .then((f) => {
+        if (!alive || !f.hasOffice || !f.path || !f.record || f.record.team.length === 0) return;
+        setFound({ path: f.path, record: f.record });
+        // Only take over the first screen if the owner has not started on it yet.
+        setStep((s) => (s === 'business' ? 'resume' : s));
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  const continueOffice = () => {
+    if (!found) return;
+    const r = found.record;
+    setBusinessName(r.businessName ?? '');
+    setBusinessCity(r.businessCity ?? '');
+    if (r.businessType) setBusinessType(r.businessType);
+    setHome(found.path);
+    setResuming(true);
+    setError(undefined);
+    setStep('orchestrator');
+  };
+  const startNewOffice = async () => {
+    // A new office needs its own folder: setting it up in this one would mix a
+    // second team into the office that is already there.
+    let n = 2;
+    while (n < 50) {
+      const st = await window.cth.homeStatus(`${DEFAULT_HOME} ${n}`).catch(() => null);
+      if (!st?.exists) break;
+      n++;
+    }
+    setHome(`${DEFAULT_HOME} ${n}`);
+    setResuming(false);
+    setError(undefined);
+    setStep('business');
+  };
 
   const pickHome = async () => {
     setError(undefined);
@@ -330,6 +375,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const finish = async () => {
     setBusy(true);
     setError(undefined);
+    // Continuing an office keeps its recorded team and folders; a new office
+    // uses the team and folders picked in setup.
+    const plan = resuming ? teamPlanFromRecord(found?.record) : pickedPlan;
     // The team's folders must be resolvable before anything is created.
     if (!plan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
     const harnessHome = home.trim(); // whitespace-only is not a folder
@@ -414,7 +462,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <PixelPanel
           variant="dialog"
           title={
-            step === 'business' ? t('onboarding.titles.business')
+            step === 'resume' ? t('onboarding.titles.resume')
+            : step === 'business' ? t('onboarding.titles.business')
             : step === 'welcome' ? t('onboarding.titles.welcome')
             : step === 'home' ? t('onboarding.titles.home')
             : step === 'orchestrator' ? t('onboarding.titles.orchestrator')
@@ -425,6 +474,32 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           noPadding
         >
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '86vh', overflowY: 'auto' }}>
+
+            {step === 'resume' && found && (
+              <>
+                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                  {t('onboarding.resume.headline')}
+                </div>
+                <p style={{ margin: 0, lineHeight: '22px' }}>
+                  {t('onboarding.resume.desc', {
+                    business: found.record.businessName ?? t('onboarding.resume.unnamed'),
+                    count: found.record.team.length,
+                    folder: tildePath(found.path)
+                  })}
+                </p>
+                <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
+                  {t('onboarding.resume.newNote')}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <PixelButton variant="primary" size="md" onClick={continueOffice}>
+                    {t('onboarding.resume.continue')}
+                  </PixelButton>
+                  <PixelButton variant="secondary" size="md" onClick={() => { void startNewOffice(); }}>
+                    {t('onboarding.resume.startNew')}
+                  </PixelButton>
+                </div>
+              </>
+            )}
 
             {step === 'business' && (
               <>
@@ -1020,12 +1095,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
               <Dots step={step} />
               <div style={{ display: 'flex', gap: 8 }}>
-                {step !== 'business' && (
-                  <PixelButton variant="ghost" size="md" onClick={() => setStep(prevStep(step))} disabled={busy}>
+                {step !== 'business' && step !== 'resume' && (
+                  <PixelButton
+                    variant="ghost"
+                    size="md"
+                    onClick={() => setStep(resuming && step === 'orchestrator' ? 'resume' : prevStep(step))}
+                    disabled={busy}
+                  >
                     {t('common.back')}
                   </PixelButton>
                 )}
-                {step !== 'permissions' && (
+                {step !== 'permissions' && step !== 'resume' && (
                   <PixelButton
                     variant="primary"
                     size="md"
@@ -1286,6 +1366,9 @@ function Dots({ step }: { step: Step }) {
     </div>
   );
 }
+
+/** Where setup suggests the office lives, and looks for an existing one. */
+const DEFAULT_HOME = '~/HarnessAgents';
 
 function nextStep(s: Step): Step {
   return s === 'business' ? 'welcome'

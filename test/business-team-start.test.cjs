@@ -29,9 +29,11 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   const fn = hive.slice(at, hive.indexOf('\nexport function useHive', at));
 
   assert.match(fn, /if \(team\.length === 0 \|\| config\.businessTeamStarted\) return;/, 'runs once');
-  assert.match(fn, /if \(reg\?\.agents\?\.\[id\]\) continue;/, 'a member already in the registry is not started twice');
+  // A member the floor already holds is not started twice; one the registry
+  // knows but the floor lost comes back (office-record.test.cjs).
+  assert.match(fn, /\.some\(\(a\) => a\.id === id\)\) continue;/, 'a member already on the floor is not started twice');
   assert.match(fn, /if \(!res\.ok\) \{[\s\S]{0,120}continue;\s*\}/, 'a failed start skips that member only');
-  assert.match(fn, /cwd: member\.folder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: member\.folder, role \}/, 'spawned inside its own folder');
+  assert.match(fn, /cwd: workFolder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: workFolder, role \}/, 'spawned inside its own folder');
   assert.match(fn, /goal: teamMemberGoal\(def, \{ name: config\.businessName, city: config\.businessCity \}\)/);
   assert.match(fn, /\}, \{ select: false \}\);/, 'the card appears without taking the focus');
   assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? core;/, '"Something else" starts from the core pack');
