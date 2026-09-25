@@ -78,6 +78,24 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Hiring asks for Role, Role description and Work style,** the same fields as Edit Agent. A new
   team member's folder goes inside Michael's, named after the role, so people in the same role
   share one. Michael's folder can't be picked as a team member's own folder.
+- **New instructions for Michael and the team.** In an office with a business folder, Michael
+  starts as the office manager of your business: he runs the team, sends work to whoever's role
+  fits, and brings you only what needs you. Each team member starts knowing its job, who it reports
+  to, and how to hand work back. Replies meant for you or for Michael reach Michael, whatever name
+  an agent uses for him.
+- **Each role in a business pack comes with its Role description and Work style,** written for
+  that business, with your business name and city filled in. A new hire from a pack gets them.
+- **Your existing team gets the new text too, once.** Each team member that came from a pack gets
+  today's Role description and Work style when the app next opens. The team list is backed up to
+  `roster-backups` first; if the backup fails, nothing changes. Team members you hired yourself are
+  left as they are.
+- **Michael gets the team list only when it changes,** instead of on every message, and a short
+  status line when someone's status changes.
+- **Plainer messages from the app.** The inbox nudge, the pause and stop notes, closing time, Slack
+  requests and the message format reference are rewritten in plain words, and scheduled runs arrive
+  as information rather than as tasks. Michael's role is "office manager".
+- **Nothing is typed into Michael's terminal when he starts.** He no longer gets a remote control
+  command or an orientation prompt; his instructions and the standup when the office opens cover it.
 
 ### Fixed
 
