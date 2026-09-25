@@ -244,7 +244,9 @@ to follow a docs page.
 > [!NOTE]
 > **Hidden in this build.** Git views, the built in code editor, temporary helper agents that
 > Michael starts on his own, and the organisation trigger are switched off, because business owners
-> don't use them. The code stays in place, and each one has a single switch in
+> don't use them. So are the "auto mode" text in the header bar (the setting itself stays in
+> Settings under Autonomy & Budgets) and the usage stats choice (see [Telemetry](#telemetry)).
+> The code stays in place, and each one has a single switch in
 > [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
 
 **For your business**
@@ -253,6 +255,7 @@ to follow a docs page.
 - **OFFICE, TASKS and GRAPH views.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
 - **Michael asks when no one fits.** A big job outside everyone's role goes on the Ask me board with suggestions, instead of Michael starting a new agent on his own.
 - **"We can't find your office."** If the office folder is moved or deleted, launch asks where it went instead of quietly starting an empty office.
+- **"We found your office."** If this Mac already has an office, setup offers to continue with it: the same team, in the same folders, whatever business name you type. The office keeps its own record in `office.json` in the office folder, so it is found by its folder, never by its name. Setting up a new office gives it a folder of its own.
 
 **The floor**
 - **Every terminal is a real agent.** Claude Code in this release (the other engines stay in the code; see [Supported agents](#supported-agents)). Each runs in its own `node-pty` PTY, rendered with xterm.js.
