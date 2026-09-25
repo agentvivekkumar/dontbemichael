@@ -28,6 +28,7 @@ export const NOTIFY_WAITING = 'Waiting for you.';
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
+import { handoffContext } from '../shared/safeClear';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -446,17 +447,22 @@ export class HookServer {
       }
     }
 
+    // A handoff the agent wrote just before its conversation was cleared
+    // (safeClearer.ts): given once, at the start of the new conversation.
+    const handoffText = event === 'SessionStart' && agentId ? (this.hive.takeHandoff?.(agentId) ?? null) : null;
+    const handoff = handoffText ? handoffContext(handoffText) : null;
+
     // Company knowledge turned on or off since this agent was last told.
     const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
       ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
       : null;
 
-    if (steer || roster || goal || knowledgeNote || profile || memoryIndex) {
+    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, profile, memoryIndex, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
         }
       };
     }

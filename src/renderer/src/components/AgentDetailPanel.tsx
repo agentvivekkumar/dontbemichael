@@ -13,6 +13,7 @@ import { SidebarTabs } from './SidebarTabs';
 import { ThreadsPanel } from './ThreadsPanel';
 import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
+import { ClearedBanner } from './ClearedBanner';
 import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
 import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
@@ -236,6 +237,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
       )}
 
       {/* #7C — operator control (pause / halt / steer) for live agents */}
+      {isReal && <ClearedBanner agentId={agent.id} name={agent.name} />}
       {isReal && <AgentControlStrip agentId={agent.id} />}
 
       {/* Tabs */}

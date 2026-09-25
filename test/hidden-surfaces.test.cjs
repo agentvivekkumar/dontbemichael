@@ -96,21 +96,14 @@ test('webhooks live in Settings, with nothing lost from the Triggers card', () =
 });
 
 /**
- * Context upkeep (the compact / clear rules) moved from Michael's Triggers tab
- * to Settings → Agents & Models (owner, 2026-09-24): each run goes through every
- * live agent, so it is a setting for how all agents run, not Michael's trigger.
+ * Context upkeep has no setting any more (owner, 2026-09-25): compaction is
+ * Claude Code's own, and a conversation is cleared only after a finished,
+ * handed-off task (safeClearer.ts), never on a clock.
  */
-test('context upkeep lives in Settings, and it really does apply to every agent', () => {
+test('no clock-driven context upkeep is left in Settings or the Triggers tab', () => {
   assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /ContextSection/);
-  const settings = read('src/renderer/src/components/SettingsModal.tsx');
-  const agents = settings.indexOf("activeSection === 'Agents & Models'");
-  const autonomy = settings.indexOf("activeSection === 'Autonomy & Budgets'");
-  const at = settings.indexOf('<ContextSection />');
-  assert.ok(agents > 0 && at > agents && at < autonomy, 'inside Agents & Models');
-  const hive = read('src/renderer/src/hooks/useHive.ts');
-  const fire = hive.indexOf("const fire = (action: 'compact' | 'clear', rule: ContextRule): void => {");
-  assert.ok(fire > 0, 'the context trigger handler');
-  assert.match(hive.slice(fire, fire + 300), /for \(const a of agents\) \{/, 'loops over every agent, not only Michael');
+  assert.doesNotMatch(read('src/renderer/src/components/SettingsModal.tsx'), /ContextSection/);
+  assert.doesNotMatch(read('src/renderer/src/hooks/useHive.ts'), /onContextTrigger/);
 });
 
 /**

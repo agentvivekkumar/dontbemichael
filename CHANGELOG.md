@@ -22,6 +22,14 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   Michael included, is told to search. There is no shared Office folder any more: an existing one
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
+- **A fresh start for idle team members, without losing work.** When a team member's conversation
+  is large (50k tokens or more) and has sat idle for 30 minutes with nothing open (no open task
+  card, empty inbox, no reply it is waiting on, no unanswered Ask me question), the app first asks
+  it to write a handoff of anything unfinished, then clears its conversation. The new conversation
+  starts with that handoff, its memory, Work style and the company profile. If new work arrives
+  before the clear, it is cancelled. The earlier conversation is kept: the team member's panel says
+  when it was cleared and offers to bring it back. Michael is never cleared. The clock based auto
+  clear in Settings is gone.
 - **A schedule says when and which job, not how.** Schedules no longer have a Prompt: the label
   names the job (for example "Follow up on unpaid invoices"), and the agent does it the way its Work style
   says. Every run sends the same short message, including a way to stop quietly when there is
@@ -60,7 +68,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **Compaction is left to Claude Code.** The app no longer types `/compact` into idle agents every
   two hours, and its Settings control is gone. Each Claude agent now starts with Claude Code set to
   compact at about 300k tokens (models with a smaller window keep their usual point), instead of
-  waiting until about 967k on 1M token models. Auto clear, off by default, is unchanged.
+  waiting until about 967k on 1M token models.
 - **The standup no longer talks about compaction.** Keeping each agent's context small is the
   app's job, not something agents are told to do. An office still using the original standup text
   gets the new one; text you edited yourself is left as it is.

@@ -820,6 +820,11 @@ const api = {
   hiveBoard: (): Promise<string> => ipcRenderer.invoke('hive:board'),
   hiveTasks: (): Promise<unknown> => ipcRenderer.invoke('hive:tasks'),
   hiveLog: (n?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200),
+  /** When the app last cleared this agent's conversation, or null. */
+  hiveClearedState: (id: string): Promise<{ at: number; oldSession: string; tokensBefore: number } | null> =>
+    ipcRenderer.invoke('hive:clearedState', id),
+  /** Undo a clear: restart the agent into its earlier conversation. */
+  restoreConversation: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('agent:restoreConversation', id),
   /** Add the owner's Ask me answer to the raising agent's memory notes. */
   hiveRememberOwnerAnswer: (p: { agentId: string; task: string; q: string; a: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('hive:rememberOwnerAnswer', p),

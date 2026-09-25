@@ -9,12 +9,9 @@ import {
   type HarnessConfig
 } from '@/store/config';
 import {
-  clearCommandForProvider,
-  compactionCommandForProvider,
   remoteControlCommandForProvider,
   terminalReadyToReceive
 } from '../../../shared/providerAutomation';
-import { type ContextRule } from '../../../shared/triggers';
 import type { AgentProvider } from '../../../shared/agentProvider';
 import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
 import { isDurableRole, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
@@ -227,50 +224,6 @@ function stationForTool(tool: string): { station: StationKind; carry?: ToolKind 
   return { station: 'desk' };
 }
 
-/** At/above this window size an agent counts as "large context" and is judged
- *  against `minContextPctLargeWindow` instead. Sits between the two real-world
- *  window sizes the app ever sees (200k and 1M) so neither lands ambiguously. */
-const LARGE_CONTEXT_WINDOW = 500_000;
-
-/**
- * How full this agent's context window is, 0-100, or null when we have no
- * reading at all.
- *
- * Two sources feed the store and only one is exact: the status-line shim pushes
- * real `contextTokens` + `contextLimit` (effect 2d), while the transcript poll
- * (2c) backfills tokens ONLY. So an agent can legitimately know its token count
- * without knowing its window — infer the window the same way 2c does rather
- * than throwing the token reading away.
- */
-function contextFillPct(a: Agent): number | null {
-  if (a.contextTokens === undefined || !Number.isFinite(a.contextTokens)) return null;
-  const limit = a.contextLimit && a.contextLimit > 0
-    ? a.contextLimit
-    : (/1m/i.test(a.model ?? '') ? 1_000_000 : 200_000);
-  return (a.contextTokens / limit) * 100;
-}
-
-/**
- * The context-pressure gate: is this agent full enough to be worth interrupting?
- *
- * `minContextPct` of 0 disables the gate (the rule's cadence alone fires it).
- *
- * FAIL-OPEN when we have no reading. That is the deliberate choice: context
- * telemetry arrives over the Claude status-line/hook path, so most non-Claude
- * providers report nothing at all. Failing closed there would silently reinstate
- * the very bug this replaces — a fleet that never compacts — only harder to
- * notice. An unmetered agent therefore falls back to time-only firing, which is
- * exactly the old behaviour and no worse.
- */
-function passesContextPressure(a: Agent, rule: ContextRule): boolean {
-  const large = (a.contextLimit ?? 0) >= LARGE_CONTEXT_WINDOW;
-  const bar = large ? rule.minContextPctLargeWindow : rule.minContextPct;
-  if (!(bar > 0)) return true;
-  const pct = contextFillPct(a);
-  if (pct === null) return true;
-  return pct >= bar;
-}
-
 /**
  * Start the team the owner picked during onboarding (Decisions 44, 47), ONCE.
  *
@@ -397,10 +350,6 @@ export function useHive(config: HarnessConfig | null): void {
   // negligible next to a stalled agent. Evicting ids that have left the inbox would
   // bound it exactly; deliberately not done here to keep this fix minimal.
   const nudged = useRef<Record<string, Set<string>>>({});
-  // Per-agent context size at the last auto-/compact queued. See the latch note
-  // in the context-trigger effect: an idle agent's token count is frozen, so
-  // without this the pressure gate re-fires on the identical number every cycle.
-  const lastCompactUsed = useRef<Record<string, number>>({});
   // Per-agent timestamp of the last queued-message we submitted. Guards against
   // re-sending the next message before the agent's hooks have flipped it to
   // 'working' (there's a short window where it still reads 'idle' right after we
@@ -1040,11 +989,6 @@ export function useHive(config: HarnessConfig | null): void {
         if (!messageQueues[a.id]?.length) continue;
                 void dispatch(a.id, a).then(({ sent, message }) => {
           if (sent && message?.slack) void ensureSlackCard(message);
-          // Write the compact latch only once delivery genuinely happened — see
-          // the comment in fire() above.
-          if (sent && message?.compactUsed !== undefined) {
-            lastCompactUsed.current[a.id] = message.compactUsed;
-          }
         });
       }
     };
@@ -1179,94 +1123,9 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, [config?.onboardingComplete]);
 
-  // 6) CONTEXT TRIGGERS (compact / clear). Main decides WHEN — cadence, and which
-  //    half of the rule fired — and pushes `{action, rule}`; this decides WHO, then
-  //    queues the provider's own command so the drain (#4) delivers it only at an
-  //    idle prompt, never jamming a working terminal.
-  //
-  //    THE PRESSURE GATE. main/config.ts has long DOCUMENTED that auto-compact
-  //    "only compacts agents whose context has filled past a threshold (30% for
-  //    ~250k windows, 20% for ~1M windows)". No such check was ever implemented:
-  //    every live agent with a resolvable command got compacted on every tick,
-  //    hourly, however empty its window was. This makes the documented behaviour
-  //    real — `rule.minContextPct`, or `minContextPctLargeWindow` once the window
-  //    is >= LARGE_CONTEXT_WINDOW, must be met before an agent is interrupted.
-  //    (The shipped bars are now 60/40, twice the stale doc's numbers; see
-  //    DEFAULT_CONTEXT_TRIGGER. The doc comment in config.ts is still stale.)
-  //
-  //    Dedupe generalises to both actions: keyed on the command's own verb, so a
-  //    queued `/compact` blocks a second compact without blocking a `/clear`.
-  useEffect(() => {
-    if (!config?.onboardingComplete) return;
-
-       const fire = (action: 'compact' | 'clear', rule: ContextRule): void => {
-      const { agents, messageQueues, enqueueMessage } = useStore.getState();
-      const now = Date.now();
-      for (const a of agents) {
-        if (!a.ptyId) continue;
-        // Gate #109-2: don't enqueue a context command for an agent that cannot
-        // currently receive one (e.g. god 'blocked' on a human prompt). Enqueuing
-        // anyway left a stuck /compact at the head of the queue that dedupe then
-        // collapsed every subsequent hourly attempt against, forever — the exact
-        // same check the drain itself uses immediately before typing, so a
-        // command is never queued in a state the drain would refuse to deliver.
-        if (!canDeliverToAgent(a.status, ptyQuietMs(a.ptyId, now), QUIESCE_IDLE_MS)) continue;
-        const provider = inferAgentProvider(a.command, a.provider);
-        const command = action === 'clear'
-          ? clearCommandForProvider(provider, rule.message)
-          : compactionCommandForProvider(provider, rule.message);
-        // No trustworthy command for this CLI (Crush's palette-only TUI, Copilot's
-        // print mode, an unknown custom binary) — leave its terminal alone.
-        if (!command) continue;
-        if (!passesContextPressure(a, rule)) continue;
-        const verb = command.trimStart().split(/\s+/)[0];
-        const queued = messageQueues[a.id] ?? [];
-        if (queued.some((m) => m.text.trimStart().startsWith(verb))) continue;
-        // The latch, compact only. `used` reaches this gate from Claude's status
-        // line, which only reports after an API call. A /compact on an agent that
-        // has done nothing since the last one makes no call at all — Claude refuses
-        // it locally with "Not enough messages to compact" — so the count stays
-        // byte-identical and the pressure gate passes on the same number the next
-        // cycle, and the next. Seen in the wild: /compact every hour for 15 straight
-        // hours at exactly 400958 tokens, then 11 more at exactly 221772, each a
-        // no-op the agent still had to read and answer. Higher thresholds make it
-        // rarer, not absent: any agent parked above its bar repeats forever.
-        //
-        // So remember the count at the last compact queued and skip while it is
-        // byte-identical. Deliberately equality and not "hasn't grown": the rule's
-        // thresholds own that decision, and an agent still above them deserves its
-        // /compact whether the count moved up or down. A frozen count is the one
-        // state those thresholds cannot reason about, because nothing they could do
-        // would ever change it. /clear needs no equivalent — the queue drain zeroes
-        // the store reading when it lands.
-               const used = a.contextTokens ?? 0;
-        if (action === 'compact' && lastCompactUsed.current[a.id] === used) continue;
-        // The latch is written at successful DELIVERY (see the flush() dispatch
-        // callback below), not here. Writing it at enqueue time recorded
-        // "already compacted at N tokens" for a compaction that might never
-        // actually happen — e.g. blocked by the gate just above, or a failed
-        // send — silently latching out every future attempt at that count.
-        // compactUsed rides on the queued message so the delivery site knows
-        // which count to latch.
-        enqueueMessage(a.id, command, action === 'compact' ? { compactUsed: used } : undefined);
-      }
-    };
-
-    // The typed `onContextTrigger` arrives with the main-process/preload change
-    // that emits it; access it defensively so this lands independently of that.
-    const off = (window.cth as unknown as {
-      onContextTrigger?: (
-        cb: (p: { action: 'compact' | 'clear'; rule: ContextRule }) => void
-      ) => () => void;
-    }).onContextTrigger?.((p) => {
-      // Only the owner's optional auto-clear arrives here. Compaction is Claude
-      // Code's own auto compact now (AUTO_COMPACT_WINDOW_TOKENS, set at spawn).
-      if (!p?.rule || p.action !== 'clear') return;
-      fire('clear', p.rule);
-    });
-
-    return () => { off?.(); };
-  }, [config?.onboardingComplete]);
+  // 6) Context upkeep has no clock-driven path here any more: compaction is
+  //    Claude Code's own, and a team member's conversation is cleared only by
+  //    main after a finished, handed-off task (safeClearer.ts; owner, 2026-09-25).
 
   // 7) Auto-revive wedged PTYs after the Mac sleeps/locks. Kevin's main-process
   //    keepalive catches up its schedules on wake and DETECTS terminals that were

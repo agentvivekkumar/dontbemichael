@@ -2019,6 +2019,94 @@ export class HiveManager {
     } catch { return false; }
   }
 
+  // — clearing a conversation safely (src/shared/safeClear.ts) —
+
+  /** Task cards assigned to an agent that aren't done. */
+  openCardsFor(id: string): number {
+    const ledger = this.tasks() as { tasks?: HiveTask[] };
+    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    return tasks.filter((t) => t?.assignee === id && t.status !== 'done').length;
+  }
+
+  /** Ask me questions an agent raised (or, unrecorded, on its card) still unanswered. */
+  openQuestionsRaisedBy(id: string): number {
+    const ledger = this.tasks() as { tasks?: HiveTask[] };
+    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    let n = 0;
+    for (const t of tasks) {
+      for (const q of t?.humanQA ?? []) {
+        if (q && !q.a && !q.dismissedAt && (q.raisedBy ?? t.assignee) === id) n++;
+      }
+    }
+    return n;
+  }
+
+  /** Messages an agent sent in the last day that asked for a reply and haven't
+   *  had one: a message back in the same conversation, or one naming it. */
+  awaitingReplies(id: string, withinMs = 24 * 60 * 60_000): number {
+    const root = this.root();
+    if (!root) return 0;
+    const dir = this.agentDir(id);
+    const since = Date.now() - withinMs;
+    const sent = this.listMessages(join(dir, 'outbox', '.sent'))
+      .filter((m) => m?.requires_reply && m.to !== 'broadcast' && Date.parse(m.created_at) >= since);
+    if (sent.length === 0) return 0;
+    const got = [...this.listMessages(join(dir, 'inbox')), ...this.listMessages(join(dir, 'inbox', '.done'))];
+    return sent.filter((s) => !got.some((r) =>
+      r.in_reply_to === s.id || (r.conversation === s.conversation && r.from === s.to && r.created_at > s.created_at)
+    )).length;
+  }
+
+  /** Where an agent writes its handoff before a clear. */
+  handoffPath(id: string): string {
+    return join(this.agentDir(id), 'memory', 'handoff.md');
+  }
+
+  /** The handoff, taken once: returned, then archived under memory/handoffs/. */
+  takeHandoff(id: string): string | null {
+    const p = this.handoffPath(id);
+    if (!existsSync(p)) return null;
+    try {
+      const text = readFileSync(p, 'utf8').trim();
+      const archive = join(this.agentDir(id), 'memory', 'handoffs');
+      mkdirSync(archive, { recursive: true });
+      renameSync(p, join(archive, `${new Date().toISOString().replace(/[:.]/g, '-')}.md`));
+      return text || null;
+    } catch { return null; }
+  }
+
+  /** The last clear: when, the conversation it replaced, and how big it was. */
+  clearedState(id: string): { at: number; oldSession: string; tokensBefore: number } | null {
+    try {
+      const v = JSON.parse(readFileSync(join(this.agentDir(id), 'memory', 'cleared.json'), 'utf8'));
+      return typeof v?.at === 'number' && typeof v?.oldSession === 'string' ? v : null;
+    } catch { return null; }
+  }
+
+  recordClear(id: string, state: { at: number; oldSession: string; tokensBefore: number } | null): void {
+    const p = join(this.agentDir(id), 'memory', 'cleared.json');
+    try {
+      if (!state) { rmSync(p, { force: true }); return; }
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(state), 'utf8');
+    } catch { /* best-effort */ }
+  }
+
+  /** Point an agent back at an earlier conversation (undoing a clear); its
+   *  next resume restarts into it. */
+  restoreSession(id: string, sessionId: string): void {
+    const root = this.root();
+    if (!root) return;
+    try {
+      const reg = this.registry();
+      const agent = reg.agents[id];
+      if (!agent) return;
+      agent.sessionId = sessionId;
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
+      this.appendLog({ kind: 'session-restored', agentId: id, sessionId });
+    } catch { /* best-effort */ }
+  }
+
   memoryIndexFor(id: string): string | null {
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return null;

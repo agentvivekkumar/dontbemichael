@@ -17,7 +17,6 @@ import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/
 import { plainReasonKey } from '@/store/plainReason';
 import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
-import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
@@ -1358,19 +1357,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={sectionRule} />
-
-                      {/* Context upkeep: compact / clear rules. Lived in Michael's
-                          Triggers tab, but each run goes through EVERY live agent
-                          (useHive's context trigger), so it is a setting for how all
-                          agents run, not a trigger of Michael's. */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={sectionHeadTight}>{t('settings.agentsModels.contextUpkeep')}</div>
-                        <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                          {t('settings.agentsModels.contextUpkeepDesc')}
-                        </span>
-                        <ContextSection />
-                      </div>
                     </>
                   )}
 

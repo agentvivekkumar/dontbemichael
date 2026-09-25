@@ -257,9 +257,7 @@
       "advanced": "高级",
       "maxTurns": "每次运行最大轮数",
       "unlimited": "无限制",
-      "blankUnlimited": "留空 = 无限制",
-      "contextUpkeep": "让智能体保持清爽",
-      "contextUpkeepDesc": "智能体工作时，它对对话的记忆会逐渐填满。这些规则会为团队里的每个智能体整理记忆：压缩会总结之前的内容，让工作继续；清除则会把它清空。默认设置适合大多数办公室。"
+      "blankUnlimited": "留空 = 无限制"
     },
     "autonomy": {
       "autonomy": "自主权",
@@ -962,22 +960,6 @@
     "noKeyWarning": "此项已开启但没有设置密钥，所以目前还没有队友能联系到你。",
     "noKey": "无密钥"
   },
-  "contextSection": {
-    "loading": "稍等…",
-    "intro": "规则只有在两半都满足时才触发：距离上次运行的时间已过，且该智能体的上下文至少达到指示条的量。指示条为 0% 意味着只看时钟。",
-    "clear": "清空",
-    "clearBlurb": "丢弃上下文。不做任何摘要。",
-    "clearCaution": "清空会把上下文扔掉，它不是压缩的缩小版。正在执行任务的智能体会忘记自己在做什么。除非你以其他方式保留上下文，否则请保持关闭。",
-    "command": "命令",
-    "commandHint": "原样发送。留空则发送裸清空命令。",
-    "off": "关闭。",
-    "hintEvery": "每 {{interval}} 一次，且上下文超过 {{pct}}% 时。",
-    "noSoonerThan": "不早于每",
-    "contextBar": "上下文指示条",
-    "contextBarHint": "窗口满到什么程度才允许运行。0% = 只看时间。",
-    "bigWindows": "大窗口指示条",
-    "bigWindowsHint": "用于约 1M 令牌的窗口，那里即使较小的占比也是海量文本。"
-  },
   "schedulesSection": {
     "justNow": "刚刚",
     "ago": "{{unit}} 前",
@@ -1525,5 +1507,11 @@
       "country": "请填写国家。",
       "industry": "请说明这是什么类型的业务。"
     }
+  },
+  "clearedBanner": {
+    "text": "应用在保存交接说明和笔记后，于{{ago}}让 {{name}} 重新开始了对话。没有丢失任何内容。",
+    "bringBack": "恢复之前的对话",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前"
   }
 }

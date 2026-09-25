@@ -257,9 +257,7 @@
       "advanced": "Advanced",
       "maxTurns": "Max turns per run",
       "unlimited": "unlimited",
-      "blankUnlimited": "blank = unlimited",
-      "contextUpkeep": "Keeping agents fresh",
-      "contextUpkeepDesc": "As an agent works, its memory of the conversation fills up. These rules tidy it for every agent on the team: compacting summarises what came before so the work carries on; clearing wipes it. The defaults suit most offices."
+      "blankUnlimited": "blank = unlimited"
     },
     "autonomy": {
       "autonomy": "Autonomy",
@@ -962,22 +960,6 @@
     "noKeyWarning": "This is switched on with no key set, so no teammate can reach you yet.",
     "noKey": "no key"
   },
-  "contextSection": {
-    "loading": "One sec…",
-    "intro": "A rule fires only when both halves agree: the gap since its last run has passed, AND that agent's context is at least as full as the bar. A bar of 0% means the clock alone.",
-    "clear": "Clear",
-    "clearBlurb": "Discards the context. Nothing is summarised.",
-    "clearCaution": "Clearing throws context away; it is not a smaller version of compaction. An agent in the middle of a task forgets what it was doing. Leave this off unless you keep context another way.",
-    "command": "COMMAND",
-    "commandHint": "Sent literally. Empty sends the bare clear command.",
-    "off": "Off.",
-    "hintEvery": "Every {{interval}}, once context passes {{pct}}%.",
-    "noSoonerThan": "NO SOONER THAN EVERY",
-    "contextBar": "CONTEXT BAR",
-    "contextBarHint": "How full the window must be before this may run. 0% = time alone.",
-    "bigWindows": "BAR ON BIG WINDOWS",
-    "bigWindowsHint": "Used on windows of about 1M tokens, where a smaller slice is still an enormous amount of text."
-  },
   "schedulesSection": {
     "justNow": "just now",
     "ago": "{{unit}} ago",
@@ -1525,5 +1507,11 @@
       "country": "Add the country.",
       "industry": "Say what kind of business this is."
     }
+  },
+  "clearedBanner": {
+    "text": "The app gave {{name}} a fresh start {{ago}}, after saving a handoff and its notes. Nothing was lost.",
+    "bringBack": "Bring back the earlier conversation",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago"
   }
 }

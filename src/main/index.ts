@@ -34,6 +34,7 @@ import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
+import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
@@ -322,7 +323,7 @@ const hookServer = new HookServer(
   control,
   breaker,
   standingGoalFromRoster,
-  (agentId, event, message) => workerWake.noteHook(agentId, event, message),
+  (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event); },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
   companyProfileForAgents
 );
@@ -835,32 +836,6 @@ function contextRunMap(): Record<string, number> {
   return contextLastRun;
 }
 
-/** When the rule last ran. An UNRECORDED half is stamped NOW rather than read as
- *  the epoch: `remaining` would otherwise clamp to 0 and compact every terminal
- *  the instant the app boots. It is the same trap `ensureDefaultMissions` avoids
- *  by stamping `lastFiredAt` when it seeds a mission — a first launch should wait
- *  a full cadence, not open with an interruption. */
-function contextLastRunAt(action: 'compact' | 'clear'): number {
-  const map = contextRunMap();
-  const v = map[action];
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  return stampContextRun(action);
-}
-
-function stampContextRun(action: 'compact' | 'clear'): number {
-  const map = contextRunMap();
-  const at = Date.now();
-  map[action] = at;
-  try { persist.setKv(CONTEXT_LAST_RUN_KV_KEY, map); } catch { /* DB best-effort */ }
-  return at;
-}
-
-/** The live rule for one half, deep-filled. `readConfig` already fills both
- *  halves, so the default is only a belt-and-braces fallback. */
-function contextRule(action: 'compact' | 'clear'): ContextRule {
-  return readConfig().contextTrigger?.[action] ?? DEFAULT_CONTEXT_TRIGGER[action];
-}
-
 /** Clear and forget both context timers (setTimeout + setInterval handles). */
 function clearContextTimers(): void {
   for (const t of contextTimers.values()) {
@@ -870,44 +845,13 @@ function clearContextTimers(): void {
   contextTimers.clear();
 }
 
-/** Ask the renderer to run one half of the context trigger.
- *
- *  Both callers funnel through here — the legacy per-mission `autoCompact` flag
- *  and the context trigger's own timer — so there is exactly one path from main
- *  to the renderer for each action. */
-function emitContextTrigger(action: 'compact' | 'clear', rule: ContextRule): void {
-  try { liveWebContents()?.send('trigger:context', { action, rule }); } catch { /* window gone */ }
-}
-
-/** (Re)arm both context timers from persisted config. Clear-then-arm, so calling
- *  it after a settings change, on boot, or on wake from sleep can never stack
- *  duplicates. Honors elapsed-time-since-last-run exactly like mission arming:
- *  an overdue rule fires ONCE and then settles into its steady cadence. */
 function syncContextTriggers(): void {
+  // Nothing runs on a clock any more. Compaction is Claude Code's own
+  // (AUTO_COMPACT_WINDOW_TOKENS), and a conversation is cleared only after a
+  // finished, handed-off task (safeClearer.ts), never on a timer (owner,
+  // 2026-09-25). Kept so older callers (boot, settings, wake) still stop any
+  // timer a previous version armed.
   clearContextTimers();
-  // Compaction is Claude Code's own auto compact now (AUTO_COMPACT_WINDOW_TOKENS);
-  // only the owner's optional auto-clear still runs on a clock.
-  for (const action of ['clear'] as const) {
-    const rule = contextRule(action);
-    if (!rule.enabled || !(rule.everyMs > 0)) continue;
-    const fire = (): void => {
-      try {
-        stampContextRun(action);
-        // Re-read: the operator may have edited the message/thresholds since the
-        // timer was armed, and the renderer should act on what's current.
-        emitContextTrigger(action, contextRule(action));
-      } catch (e) {
-        console.error('[triggers] context', action, e);
-      }
-    };
-    const remaining = Math.max(0, rule.everyMs - (Date.now() - contextLastRunAt(action)));
-    const entry: MissionTimer = {};
-    entry.timeout = setTimeout(() => {
-      fire();
-      entry.interval = setInterval(fire, rule.everyMs);
-    }, remaining);
-    contextTimers.set(action, entry);
-  }
 }
 
 /** Startup migration (#57/#58): archive every agent entry that is `archived:false`
@@ -1042,7 +986,7 @@ function ensureDefaultMissions(): void {
   // Strip it wherever it survives. This is a pure de-duplication, not a behaviour
   // change: contextTrigger.compact still runs, still on the user's own cadence and
   // pressure gate, and it is what actually performed every one of these
-  // compactions already — both paths have called emitContextTrigger since Triggers
+  // compactions already — both paths have called the context trigger since Triggers
   // landed. Idempotent, so it costs one no-op scan per boot once clean.
   const cfg4 = readConfig();
   const missions4 = cfg4.missions ?? [];
@@ -3706,6 +3650,21 @@ ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hi
 ipcMain.handle('hive:messages', (_evt, opts: unknown) =>
   hive.voiceMessages(opts && typeof opts === 'object' ? (opts as Parameters<typeof hive.voiceMessages>[0]) : {})
 );
+/** The last time the app cleared an agent's conversation (safeClearer.ts). */
+ipcMain.handle('hive:clearedState', (_evt, id: unknown) => (typeof id === 'string' ? hive.clearedState(id) : null));
+/** Undo a clear: point the agent back at its earlier conversation and restart
+ *  it into it, through the same respawn-with-resume path the app uses after
+ *  sleep (the renderer's power:resume handler). */
+ipcMain.handle('agent:restoreConversation', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return { ok: false };
+  const state = hive.clearedState(id);
+  const ptyId = ptyForAgent(id);
+  if (!state || !ptyId) return { ok: false };
+  hive.restoreSession(id, state.oldSession);
+  hive.recordClear(id, null);
+  try { liveWebContents()?.send('power:resume', { reason: 'restore-conversation', awayMs: 0, dead: [ptyId], total: 1 }); } catch { /* window gone */ }
+  return { ok: true };
+});
 /** The owner's Ask me answer, added to the raising agent's memory notes. */
 ipcMain.handle('hive:rememberOwnerAnswer', (_evt, p: unknown) => {
   const o = (p ?? {}) as { agentId?: unknown; task?: unknown; q?: unknown; a?: unknown };
@@ -5417,6 +5376,61 @@ function bootstrapHiveServices(): void {
  *  own nudge cooldown so a throttled window is caught within ~15s of a stall. */
 const WORKER_WAKE_POLL_MS = 15_000;
 let workerWakeTimer: ReturnType<typeof setInterval> | null = null;
+let safeClearTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Type text into a terminal and submit it: text first, Enter a tick later (a
+ *  single-chunk write would land the "\r" inside the input box). */
+function typeIntoPty(ptyId: string, text: string): void {
+  const wrote = ptyManager.write(ptyId, text);
+  if (!wrote.ok) { console.warn(`[type] write failed for ${ptyId}: ${wrote.error}`); return; }
+  setTimeout(() => { try { ptyManager.write(ptyId, '\r'); } catch (e) { console.error('[type] submit threw:', e); } }, 140);
+}
+
+/** Clears a team member's conversation only when worth it and safe, after a
+ *  handoff, and undoably (safeClearer.ts, src/shared/safeClear.ts). Michael is
+ *  never a candidate. */
+const safeClearer = new SafeClearer({
+  agents: () => {
+    if (!hive.enabled()) return [];
+    const reg = hive.registry();
+    const out: ReturnType<SafeClearDeps['agents']> = [];
+    for (const [id, a] of Object.entries(reg.agents ?? {})) {
+      if (a?.archived) continue;
+      const ptyId = ptyForAgent(id);
+      if (!ptyId) continue;
+      const snap = control.snapshot(id);
+      // A conversation size recorded before the last clear is stale: the new
+      // conversation hasn't reported its size yet.
+      const ctx = hookServer.contextFor(id);
+      const cleared = hive.clearedState(id);
+      const tokens = ctx && (!cleared || ctx.ts > cleared.at) ? ctx.tokens : 0;
+      out.push({
+        id,
+        ptyId,
+        lastOutputAt: ptyManager.lastOutputAt(ptyId) ?? 0,
+        facts: {
+          isGod: id === reg.godId || !!a.isGod,
+          isAssistant: !!a.isAssistant,
+          isClaude: isClaudeProvider(a.provider ?? 'claude'),
+          held: !!a.onHold,
+          paused: snap.paused || snap.halted || snap.autoDeliveryPaused,
+          contextTokens: tokens,
+          openCards: hive.openCardsFor(id),
+          inbox: hive.inbox(id).length,
+          awaitingReplies: hive.awaitingReplies(id),
+          openQuestions: hive.openQuestionsRaisedBy(id)
+        }
+      });
+    }
+    return out;
+  },
+  handoffPath: (id) => hive.handoffPath(id),
+  memoryInboxPath: (id) => join(hive.root() ?? '', 'agents', id, 'memory', 'inbox.md'),
+  lastSession: (id) => hive.lastSession(id),
+  recordClear: (id, state) => hive.recordClear(id, state),
+  type: typeIntoPty,
+  log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
 
 /** Type the renderer's guarded nudge into one worker's PTY — text first, Enter a
  *  tick later (the exact submitToPty pattern: a single-chunk write would land the
@@ -5493,6 +5507,8 @@ function armAlwaysOnBeats(): void {
   breakerBeatTimer = setInterval(() => { try { runBreakerBeat(300_000); } catch (e) { console.error('[breaker beat]', e); } }, 30_000);
   if (workerWakeTimer) clearInterval(workerWakeTimer);
   workerWakeTimer = setInterval(() => { try { runWorkerWakeBeat(); } catch (e) { console.error('[worker-wake beat]', e); } }, WORKER_WAKE_POLL_MS);
+  if (safeClearTimer) clearInterval(safeClearTimer);
+  safeClearTimer = setInterval(() => { try { safeClearer.beat(); } catch (e) { console.error('[safe-clear beat]', e); } }, 60_000);
   runWorkerWakeBeat(); // catch-up on arm — power-resume re-arms and drains the backlog
 }
 

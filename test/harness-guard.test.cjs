@@ -40,6 +40,7 @@ test('an agent\'s own work, in its own folder, is never touched', () => {
 test('the protocol files an agent is told to write are allowed', () => {
   for (const p of [
     `${HIVE}/agents/oscar/memory/inbox.md`,
+    `${HIVE}/agents/oscar/memory/handoff.md`,
     `${HIVE}/agents/oscar/outbox/msg-1.json`,
     `${HIVE}/agents/oscar/inbox/.done/msg-0.json`,
     `${HIVE}/tasks.json`

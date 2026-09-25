@@ -66,6 +66,8 @@ function isPlumbing(rel: string, agentId: string, isGod: boolean): boolean {
   // An agent adds notes to its memory inbox; the index (memory.md) is the
   // app's to write (memoryTidy.ts).
   if (rel === `${own}memory/inbox.md`) return true;
+  // The handoff it writes before its conversation is cleared (safeClearer.ts).
+  if (rel === `${own}memory/handoff.md`) return true;
   if (rel.startsWith(`${own}outbox/`) || rel.startsWith(`${own}inbox/`)) return true;
   // Every agent keeps its task's status current; Michael adds owner questions.
   if (rel === 'tasks.json') return true;
