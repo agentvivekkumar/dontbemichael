@@ -10,7 +10,7 @@
  * existing spawn-injection flow.
  */
 import { app } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readConfig } from './config';
 import { extractDocumentText } from './docText';
@@ -84,6 +84,45 @@ export class KnowledgeManager {
   env(): Record<string, string> {
     if (!this.active()) return {};
     return { KG_ROOT: this.root(), KG_CLI: this.cliPath(), KG_CORE: this.corePath() };
+  }
+
+  /**
+   * Company knowledge searched by meaning (owner, 2026-09-25): MemPalace, the
+   * local vector store the app already drives for agents' memory, indexes a
+   * mirror of the store, one file per document named by its id, with the title
+   * and id on top so every search result says which document to `get`.
+   * Brought up to date here (missing files written, removed documents' files
+   * deleted); MemoryManager indexes the folder into the palace's "company"
+   * section. Null when company knowledge is off. `signature` changes whenever
+   * the set of documents does, so an unchanged store isn't indexed again.
+   */
+  meaningMirror(): { dir: string; signature: string } | null {
+    if (!this.active()) return null;
+    const root = this.root();
+    const dir = join(root, 'meaning');
+    try { mkdirSync(dir, { recursive: true }); } catch { return null; }
+    const docs = existsSync(root) ? core.list(root) : [];
+    const ids = new Set<string>();
+    for (const meta of docs) {
+      const id = String(meta.id ?? '');
+      if (!/^[A-Za-z0-9_-]+$/.test(id)) continue;
+      ids.add(id);
+      const file = join(dir, `${id}.md`);
+      if (existsSync(file)) continue;
+      const doc = core.getDoc(root, id);
+      if (!doc) continue;
+      try {
+        writeFileSync(file, `Title: ${meta.title ?? id}\nDocument id: ${id}\n\n${doc.text}\n`, 'utf8');
+      } catch { /* the next pass retries */ }
+    }
+    let files: string[] = [];
+    try { files = readdirSync(dir); } catch { /* none */ }
+    for (const f of files) {
+      if (f.endsWith('.md') && !ids.has(f.slice(0, -3))) {
+        try { rmSync(join(dir, f), { force: true }); } catch { /* next pass */ }
+      }
+    }
+    return { dir, signature: [...ids].sort().join(',') };
   }
 
   /** What a running agent needs to search the store: whether it's on, the CLI,

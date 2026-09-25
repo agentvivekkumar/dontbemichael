@@ -95,7 +95,7 @@ export class HookServer {
     private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void,
     /** Company knowledge's live state, so turning it on or off reaches running
      *  agents on their next prompt instead of at their next start. */
-    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string }
+    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string; meaning?: { bin: string; palace: string } }
   ) {}
 
   start(): void {

@@ -321,12 +321,21 @@ const hookServer = new HookServer(
   breaker,
   standingGoalFromRoster,
   (agentId, event, message) => workerWake.noteHook(agentId, event, message),
-  () => knowledge.agentAccess()
+  () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() })
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
-  () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; }
+  () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; },
+  // Company knowledge, indexed into the palace for searching by meaning.
+  () => knowledge.meaningMirror()
 );
+/** MemPalace, for agents to search company knowledge by meaning: only when it's
+ *  installed and on, and company knowledge is on. */
+function meaningSearch(): { bin: string; palace: string } | undefined {
+  const bin = memory.bin();
+  const palace = memory.palacePath();
+  return memory.active() && knowledge.active() && bin && palace ? { bin, palace } : undefined;
+}
 // Enterprise Knowledge Graph — file-backed store + agent CLI (default OFF).
 const knowledge = new KnowledgeManager();
 /** Reads the reflect tunables from config each tick (defaults baked in here so a
@@ -2899,6 +2908,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           // Windows floor. Empty when the KG is off (the line isn't emitted then).
           kgCliPath: knowledge.env().KG_CLI,
           kgRoot: knowledge.env().KG_ROOT,
+          meaningSearch: meaningSearch(),
           theme: readConfig().terminalTheme ?? 'light',
           // W3 — default-MCP consent state + the bundled skills source dir.
           mcpDefaults: readConfig().mcpDefaults,
@@ -3368,6 +3378,8 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   // that changes the office's own fields writes it: switching offices changes
   // harnessHome alone, and must not copy one office's team into another.
   if (touchesOffice(patch)) syncOfficeRecord(next);
+  // Company knowledge just turned on: index it for search by meaning now.
+  if (patch && typeof patch === 'object' && 'knowledgeGraph' in patch) memory.companyKnowledgeChanged();
   // Live opt-in/out from Settings (TELEMETRY.md); stays off while
   // COLLECT_USAGE_STATS is false.
   if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(COLLECT_USAGE_STATS && patch.telemetryEnabled);
@@ -3909,15 +3921,20 @@ ipcMain.handle('kg:search', (_evt, query: unknown, limit: unknown) => {
 });
 ipcMain.handle('kg:get', (_evt, id: unknown) =>
   (typeof id === 'string' && id ? knowledge.get(id) : null));
-ipcMain.handle('kg:remove', (_evt, id: unknown) =>
-  ({ ok: typeof id === 'string' && id ? knowledge.remove(id) : false }));
+ipcMain.handle('kg:remove', (_evt, id: unknown) => {
+  const ok = typeof id === 'string' && id ? knowledge.remove(id) : false;
+  if (ok) memory.companyKnowledgeChanged(); // drop it from search by meaning too
+  return { ok };
+});
 // Ingest one or more files from disk. Best-effort per file; returns per-file
 // results so the UI can report partial success.
 ipcMain.handle('kg:ingestFiles', async (_evt, payload: unknown) => {
   const p = (payload ?? {}) as { paths?: unknown; tags?: unknown };
   const paths = Array.isArray(p.paths) ? p.paths.filter((x): x is string => typeof x === 'string') : [];
   const tags = Array.isArray(p.tags) ? p.tags.filter((x): x is string => typeof x === 'string') : undefined;
-  return { results: await ingestSequentially(paths, tags) };
+  const results = await ingestSequentially(paths, tags);
+  if (results.some((r) => r.ok)) memory.companyKnowledgeChanged(); // index it for search by meaning
+  return { results };
 });
 // Open a multi-file picker and ingest the chosen artifacts in one round-trip.
 ipcMain.handle('kg:addFiles', async (evt) => {
@@ -3928,7 +3945,9 @@ ipcMain.handle('kg:addFiles', async (evt) => {
     title: 'Add documents to the Knowledge Graph'
   });
   if (res.canceled || res.filePaths.length === 0) return { ok: false as const, error: 'cancelled' };
-  return { ok: true as const, results: await ingestSequentially(res.filePaths) };
+  const results = await ingestSequentially(res.filePaths);
+  if (results.some((r) => r.ok)) memory.companyKnowledgeChanged(); // index it for search by meaning
+  return { ok: true as const, results };
 });
 
 /** Ingest files one at a time. Sequential on purpose: kg-core appends every

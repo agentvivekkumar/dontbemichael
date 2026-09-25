@@ -125,10 +125,22 @@ export class MemoryManager {
   /** agentId → memory.md mtimeMs at last successful mine (skip unchanged). */
   private lastMined = new Map<string, number>();
 
+  /** The company knowledge mirror last indexed, by its document set, so an
+   *  unchanged store isn't indexed again (see indexCompanyKnowledge). */
+  private companySignature: string | null = null;
+  /** Company knowledge changed while a pass was running: run another after it. */
+  private companyPending = false;
+
   constructor(
     private getHome: () => string | null,
-    private getSettings: () => MemorySettings
+    private getSettings: () => MemorySettings,
+    /** Company knowledge's mirror folder for searching by meaning
+     *  (KnowledgeManager.meaningMirror), or null when it is off. */
+    private getCompanyKnowledge?: () => { dir: string; signature: string } | null
   ) {}
+
+  /** The palace section company knowledge is indexed into. */
+  static readonly COMPANY_WING = 'company';
 
   palacePath(): string | null {
     const h = this.getHome();
@@ -290,11 +302,10 @@ export class MemoryManager {
     const home = this.getHome();
     const bin = this.bin();
     if (!this.active() || !home || !bin) return;
-    if (this.mining) return; // a previous pass is still running — let it finish
+    if (this.mining) return; // a previous pass is still running; let it finish
     const agentsDir = join(home, 'hive', 'agents');
-    if (!existsSync(agentsDir)) return;
-    let ids: string[];
-    try { ids = readdirSync(agentsDir); } catch { return; }
+    let ids: string[] = [];
+    try { if (existsSync(agentsDir)) ids = readdirSync(agentsDir); } catch { /* company knowledge still gets indexed */ }
     this.mining = true;
     try {
       for (const id of ids) {
@@ -307,8 +318,13 @@ export class MemoryManager {
         this.lastMined.set(id, mtime);
         await this.mineAgent(agentDir, id); // one writer at a time
       }
+      await this.indexCompanyKnowledge();
     } finally {
       this.mining = false;
+    }
+    if (this.companyPending) {
+      this.companyPending = false;
+      void this.mineNow();
     }
     // Every pass above may have left another copy behind, and whether it did
     // decides how long we wait before the next one.
@@ -359,6 +375,30 @@ export class MemoryManager {
     return fresh;
   }
 
+  /**
+   * Index company knowledge for searching by meaning (owner, 2026-09-25):
+   * mine the store's mirror into the "company" section, then prune documents
+   * the owner removed. Runs inside mineNow's single-writer pass. Skipped while
+   * the set of documents is unchanged.
+   */
+  private async indexCompanyKnowledge(): Promise<void> {
+    const src = this.getCompanyKnowledge?.();
+    if (!src || src.signature === this.companySignature) return;
+    const wing = MemoryManager.COMPANY_WING;
+    // The mine gets the same generous ceiling as an agent's: a first run may
+    // download the embedding model, and a big document takes a while to embed.
+    const mined = await this.runCli(['mine', src.dir, '--wing', wing, '--agent', wing], 'mine company', MINE_TIMEOUT_MS);
+    const synced = await this.runCli(['sync', '--wing', wing, '--apply', src.dir], 'sync company');
+    if (mined.ok && synced.ok) this.companySignature = src.signature;
+  }
+
+  /** Index company knowledge now, after the owner added or removed a
+   *  document, rather than at the next timed pass. */
+  companyKnowledgeChanged(): void {
+    if (this.mining) { this.companyPending = true; return; }
+    void this.mineNow();
+  }
+
   private mineAgent(agentDir: string, id: string): Promise<void> {
     return new Promise((resolve) => {
       const bin = this.bin();
@@ -397,7 +437,7 @@ export class MemoryManager {
    *  with a 120s timeout — on a cold model load that BLOCKED the Electron main
    *  process (renderer IPC, timers, every window) for up to two minutes. Same
    *  contract, but the event loop keeps breathing and a wedged CLI is swept. */
-  private runCli(args: string[], label: string): Promise<{ ok: boolean; output: string; error?: string }> {
+  private runCli(args: string[], label: string, timeoutMs = 120_000): Promise<{ ok: boolean; output: string; error?: string }> {
     return new Promise((resolve) => {
       const bin = this.bin();
       if (!this.active() || !bin) { resolve({ ok: false, output: '', error: 'semantic memory not active' }); return; }
@@ -421,7 +461,7 @@ export class MemoryManager {
         try { proc.kill('SIGTERM'); } catch { /* gone */ }
         ensureKilled(proc.pid);
         settle({ ok: false, output: out, error: `${label} timed out` });
-      }, 120_000);
+      }, timeoutMs);
       timer.unref?.();
       proc.on('close', (code) => {
         if (code !== 0) settle({ ok: false, output: out, error: (err || `${label} failed`).trim() });

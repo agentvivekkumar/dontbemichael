@@ -40,7 +40,7 @@ test('the hook carries the update alongside the roster and goal', () => {
   const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
   assert.match(hooks, /this\.hive\.knowledgeUpdate\(agentId, this\.getKnowledge\(\)\)/);
   assert.match(hooks, /\[roster, goal, knowledgeNote, steer\]\.filter\(Boolean\)/);
-  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8'), /\(\) => knowledge\.agentAccess\(\)\n\);/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8'), /\(\) => \(\{ \.\.\.knowledge\.agentAccess\(\), meaning: meaningSearch\(\) \}\)\n\);/);
 });
 
 test('the search tool finds the store from --root, with no KG_ROOT set', () => {

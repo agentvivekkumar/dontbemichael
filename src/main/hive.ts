@@ -161,9 +161,20 @@ export const HOUSE_RULES = [
  * the store on while it is running. `root`, when known, rides on each command
  * so it works without KG_ROOT in the agent's environment.
  */
-export function companyKnowledgeLine(node: string, cli: string, root?: string): string {
+export function companyKnowledgeLine(node: string, cli: string, root?: string, meaning?: MeaningSearch): string {
   const at = root ? ` --root "${root}"` : '';
-  return `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says. Run \`"${node}" "${cli}" search "<words>"${at}\` for matching passages, \`"${node}" "${cli}" list${at}\` to see what's there, and \`"${node}" "${cli}" get <id>${at}\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`;
+  // Search by meaning (owner, 2026-09-25) through MemPalace, when it's installed.
+  const byMeaning = meaning
+    ? ` Search by meaning with \`"${meaning.bin}" --palace "${meaning.palace}" search "<question>" --wing company\`: it also finds passages that say the same thing in other words, and each result shows its document id.`
+    : '';
+  return `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says.${byMeaning} Run \`"${node}" "${cli}" search "<words>"${at}\` for passages with the exact words, \`"${node}" "${cli}" list${at}\` to see what's there, and \`"${node}" "${cli}" get <id>${at}\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`;
+}
+
+/** MemPalace, for searching company knowledge by meaning: its CLI and the
+ *  office's palace, both absolute so the command works from any agent. */
+export interface MeaningSearch {
+  bin: string;
+  palace: string;
 }
 
 /** What a running agent is told when the owner turns company knowledge off. */
@@ -412,12 +423,12 @@ export class HiveManager {
    * knowledge on or off since it was last told, or null when nothing changed.
    * Agents this app didn't start in this launch are left alone.
    */
-  knowledgeUpdate(agentId: string, k: { active: boolean; cliPath?: string; root?: string }): string | null {
+  knowledgeUpdate(agentId: string, k: { active: boolean; cliPath?: string; root?: string; meaning?: MeaningSearch }): string | null {
     const told = this.knowledgeTold.get(agentId);
     if (told === undefined || told === k.active) return null;
     if (k.active && !k.cliPath) return null;
     this.knowledgeTold.set(agentId, k.active);
-    return k.active ? companyKnowledgeLine(this.nodeCommand(), k.cliPath!, k.root) : COMPANY_KNOWLEDGE_OFF;
+    return k.active ? companyKnowledgeLine(this.nodeCommand(), k.cliPath!, k.root, k.meaning) : COMPANY_KNOWLEDGE_OFF;
   }
 
   /** The embedded OTLP collector's loopback URL, set by the main process once the
@@ -745,6 +756,8 @@ export class HiveManager {
       /** The company knowledge store's folder, written into the search command
        *  so it works without KG_ROOT in the agent's environment. */
       kgRoot?: string;
+      /** MemPalace, when installed: company knowledge searched by meaning. */
+      meaningSearch?: MeaningSearch;
       theme?: 'light' | 'dark';
       /** Consent state for the default-MCP bundle (W3). Threaded from the live
        *  HarnessConfig by the caller; undefined → catalog defaults apply. */
@@ -880,7 +893,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -1024,7 +1037,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1524,7 +1537,8 @@ export class HiveManager {
     kgCliPath?: string,
     businessFolder?: string,
     docTextCliPath?: string,
-    kgRoot?: string
+    kgRoot?: string,
+    meaningSearch?: MeaningSearch
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
     const inDir = (...parts: string[]): string => join(dir, ...parts);
@@ -1554,7 +1568,7 @@ export class HiveManager {
     const kgCli = kgCliPath || (process.platform === 'win32' ? '%KG_CLI%' : '$KG_CLI');
     // Company knowledge (owner, 2026-09-25): the one place company wide
     // information, policies and rules are shared, searched by every agent.
-    const knowledgeLine = knowledgeGraph ? companyKnowledgeLine(hiveNode, kgCli, kgRoot) : '';
+    const knowledgeLine = knowledgeGraph ? companyKnowledgeLine(hiveNode, kgCli, kgRoot, meaningSearch) : '';
     // Item 13: state the build. Agents had no way to tell which version, or even
     // which KIND of build, they were running inside, so anything that varies
     // between a packaged app and a local dev run (umask being the one that bit
