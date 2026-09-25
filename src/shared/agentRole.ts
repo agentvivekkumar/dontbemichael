@@ -48,3 +48,32 @@ export function roleForHiveSpawn(agent: {
   const role = agent.description?.trim();
   return role && isDurableRole(role) ? role : undefined;
 }
+
+/** Longest text read as a role title rather than a sentence. */
+const ROLE_TITLE_MAX = 40;
+
+/**
+ * Split a stored role ("Finance: Keeps track of your finances") into the two
+ * fields Edit Agent shows: the role title and its description. Setup writes
+ * pack members as `Role: summary` (teamMemberRole), so the first ": " splits
+ * them. A status caption ("on standby", "a fresh harness") is not a role and
+ * shows as empty fields.
+ */
+export function splitAgentRole(stored: string | undefined | null): { role: string; roleDescription: string } {
+  const text = (stored ?? '').trim();
+  if (!isDurableRole(text)) return { role: '', roleDescription: '' };
+  const at = text.indexOf(': ');
+  if (at > 0 && at <= ROLE_TITLE_MAX) {
+    return { role: text.slice(0, at).trim(), roleDescription: text.slice(at + 2).trim() };
+  }
+  return text.length <= ROLE_TITLE_MAX ? { role: text, roleDescription: '' } : { role: '', roleDescription: text };
+}
+
+/** The stored role for the two fields: `Role: description`, or whichever one is
+ *  filled in. Empty when both are, so the caller can keep what it had. */
+export function joinAgentRole(role: string, roleDescription: string): string {
+  const r = role.trim().replace(/:+$/, '').trim();
+  const d = roleDescription.trim();
+  if (r && d) return `${r}: ${d}`;
+  return r || d;
+}

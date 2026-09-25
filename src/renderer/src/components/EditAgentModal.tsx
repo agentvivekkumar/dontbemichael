@@ -16,6 +16,7 @@ import {
   isClaudeProvider
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
+import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -40,7 +41,10 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     inferAgentProvider(agent.command, agent.provider)
   );
   const [model, setModel] = useState<string | undefined>(agent.model);
-  const [description, setDescription] = useState(agent.description);
+  // The stored role is one string ("Finance: Keeps track of..."), shown here as
+  // two fields and joined back on save (agentRole.ts).
+  const [role, setRole] = useState(() => splitAgentRole(agent.description).role);
+  const [roleDescription, setRoleDescription] = useState(() => splitAgentRole(agent.description).roleDescription);
   const [goal, setGoal] = useState(agent.goal ?? '');
 
   useEffect(() => {
@@ -54,7 +58,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     setAccent(agent.accent);
     setProvider(inferAgentProvider(agent.command, agent.provider));
     setModel(agent.model);
-    setDescription(agent.description);
+    setRole(splitAgentRole(agent.description).role);
+    setRoleDescription(splitAgentRole(agent.description).roleDescription);
     setGoal(agent.goal ?? '');
   }, [agent.id]);
 
@@ -72,7 +77,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
 
   const save = () => {
     const trimmedName = name.trim() || agent.name;
-    const trimmedDescription = description.trim() || 'a fresh harness';
+    // Both fields cleared keeps the role it had, rather than saving a blank.
+    const trimmedDescription = joinAgentRole(role, roleDescription) || agent.description;
     const trimmedGoal = goal.trim();
     const command = config
       ? buildSpawnCommand(config, model, provider)
@@ -88,6 +94,11 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       description: trimmedDescription,
       goal: trimmedGoal || undefined
     });
+    // Michael routes work by the role in the office registry. Update it now, so
+    // he sees the change on his next message instead of after a restart.
+    if (trimmedDescription !== agent.description) {
+      void window.cth.hivePatchAgentRole(agent.id, trimmedDescription).catch(() => undefined);
+    }
     onClose();
   };
 
@@ -229,25 +240,41 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
 
               </div>
               <div style={{ minWidth: 0 }}>
-            <Section label="Briefing" hint="description · goal">
-              <Row label="Description">
+            <Section label="Briefing" hint="role · work style">
+              <Row label="Role">
                 <input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="what is this agent for"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="For example: Finance"
                   style={inputStyle}
                 />
               </Row>
 
-              <Row label="Goal (optional)">
+              <Row label="Role description">
+                <textarea
+                  value={roleDescription}
+                  onChange={(e) => setRoleDescription(e.target.value)}
+                  placeholder="For example: Keeps track of money in and money out, and sends a weekly summary"
+                  rows={3}
+                  style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
+                />
+              </Row>
+              <span style={helperStyle}>
+                Michael reads the role and role description to decide which work to give this team member.
+              </span>
+
+              <Row label="Work style (optional)">
                 <textarea
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  placeholder="long-running directive injected on every prompt"
+                  placeholder="For example: Check every number twice. Send a short summary when you finish."
                   rows={4}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
                 />
               </Row>
+              <span style={helperStyle}>
+                Michael doesn't see this. It's how this team member gets their work done: the steps they follow and what they check before they finish.
+              </span>
             </Section>
               </div>
             </div>
@@ -263,6 +290,13 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     </div>
   );
 }
+
+/** A plain note under a field: what it is for, in the owner's words. */
+const helperStyle: CSSProperties = {
+  fontSize: 14,
+  lineHeight: '18px',
+  color: 'var(--cth-ink-500)'
+};
 
 const inputStyle: CSSProperties = {
   width: '100%',

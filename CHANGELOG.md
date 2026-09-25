@@ -32,6 +32,11 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   pickers now offer the same engines as setup. The others are not ready to run
   an office member yet.
 
+- **Role, Role description and Work style when editing a team member.** The old Description is
+  split into a role and what the role covers, which Michael reads to decide who gets which work, and
+  a save reaches him straight away. Goal is now Work style: how the team member does its work,
+  which Michael doesn't see.
+
 ### Removed
 
 - **No voice, for now.** Talking to Michael and dictating messages are switched off, along with
