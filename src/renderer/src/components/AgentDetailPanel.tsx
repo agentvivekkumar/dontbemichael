@@ -21,7 +21,7 @@ import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import { ScheduleList, closeConfirmText } from './triggers/ScheduleList';
-import { OwnerViaMichaelBar } from './OwnerViaMichaelBar';
+import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 export interface AgentDetailPanelProps {
   agent: Agent;
@@ -276,7 +276,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
                   inputLocked={!agent.onHold}
                 />
               </div>
-              {agent.onHold ? <MessageQueueComposer agent={agent} /> : <OwnerViaMichaelBar agent={agent} />}
+              {agent.onHold ? <><OneOnOneLine agent={agent} /><MessageQueueComposer agent={agent} /></> : <OwnerViaMichaelBar agent={agent} />}
             </div>
             )
           ) : (

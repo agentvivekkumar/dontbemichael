@@ -37,10 +37,16 @@ must stop the owner's keystrokes only, never the app's own delivery.
 - Michael's own panel is unchanged.
 - Wireframe: `~/.gstack/projects/agentvivekkumar-dontbemichael/designs/owner-talks-via-michael-20260925/panel.html` (variant A).
 
-### 2A. Steer only in 1:1; the brakes always (approved 2026-09-25)
+### 2A. Steer only in 1:1 (approved 2026-09-25; brakes amended same day)
 
-The steer box is hidden outside 1:1. "Block tools" and "stop after this step" stay
-available in every mode: they are safety controls, not messages.
+The steer box is hidden outside 1:1.
+
+**Amended (owner, after the build):** "Block tools" and "stop after this step" are hidden
+too, behind `SHOW_AGENT_BRAKES` in `buildFeatures.ts`; the circuit breaker still steps in
+on its own. The top "1:1" button is removed: 1:1 lives only at the bottom, "Talk 1:1" in
+the bar, and while in 1:1 a line above the message box: "In 1:1 with {{name}}. {{godName}}
+sends {{name}} no work until you end it." with `End 1:1`. Outside 1:1 the top strip shows
+nothing and is not rendered.
 
 ### 3A. An agent stuck on a question routes to Michael, then ASK ME (owner, 2026-09-25)
 

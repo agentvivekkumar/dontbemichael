@@ -53,6 +53,11 @@ export const SHOW_AUTO_MODE_LABEL = false;
  *  (owner, 2026-09-24). Michael never had it. */
 export const SHOW_CLOSE_AGENT = false;
 
+/** "Block tools" and "stop after this step" on a team member's panel and focus
+ *  view. Owners manage the team through Michael; the circuit breaker still
+ *  steps in on its own when an agent loops or overspends (owner, 2026-09-25). */
+export const SHOW_AGENT_BRAKES = false;
+
 /** "Open a Terminal window here": the open button next to edit on each agent,
  *  the same button in the full screen view, and the terminal icon beside each
  *  folder in Michael's Command Center. A developer tool owners don't use

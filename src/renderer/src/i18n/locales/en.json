@@ -1553,6 +1553,9 @@
     "stuck": "{{name}} is waiting on something in their terminal. Talk 1:1 to answer.",
     "message": "Message {{godName}} about {{name}}",
     "talk": "Talk 1:1",
-    "holdFailed": "Couldn't start the 1:1. Try again."
+    "holdFailed": "Couldn't start the 1:1. Try again.",
+    "inOneOnOne": "In 1:1 with {{name}}",
+    "inOneOnOneNote": "In 1:1 with {{name}}. {{godName}} sends {{name}} no work until you end it.",
+    "endOneOnOne": "End 1:1"
   }
 }

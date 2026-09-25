@@ -85,21 +85,28 @@ test('team member panels lock input and swap the message box for the bar outside
   for (const f of ['src/renderer/src/components/AgentDetailPanel.tsx', 'src/renderer/src/components/FullscreenTerminal.tsx']) {
     const src = read(f);
     assert.match(src, /inputLocked=\{!agent\.onHold\}/, f);
-    assert.match(src, /\{agent\.onHold \? <MessageQueueComposer agent=\{agent\} \/> : <OwnerViaMichaelBar agent=\{agent\} \/>\}/, f);
+    assert.match(src, /\{agent\.onHold \? <><OneOnOneLine agent=\{agent\} \/><MessageQueueComposer agent=\{agent\} \/><\/> : <OwnerViaMichaelBar agent=\{agent\} \/>\}/, f);
   }
   const strip = read('src/renderer/src/components/AgentControlStrip.tsx');
   assert.match(strip, /\{inOneOnOne && <div style=\{\{ display: 'flex', gap: 6 \}\}>/, 'steer only in 1:1');
-  assert.match(strip, /agentControl\.blockTools/, 'the brakes stay');
+  // 1:1 lives only in the bottom bar now, and the brakes are hidden (owner, 2026-09-25).
+  assert.doesNotMatch(strip, /AgentHoldButton/);
+  assert.ok(!fs.existsSync(path.resolve(__dirname, '../src/renderer/src/components/AgentHoldButton.tsx')));
+  assert.match(strip, /if \(!SHOW_AGENT_BRAKES && !inOneOnOne\) return null;/);
+  assert.match(strip, /\{SHOW_AGENT_BRAKES && <div/);
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AGENT_BRAKES, false);
   const bar = read('src/renderer/src/components/OwnerViaMichaelBar.tsx');
   assert.match(bar, /s\.setDraft\(godId,/);
   assert.match(bar, /s\.requestCommandCenterTab\('terminal'\);/);
-  assert.match(bar, /hiveSetAgentHold\?\.\(agent\.id, true\)/);
+  assert.match(bar, /hiveSetAgentHold\?\.\(agentId, on\)/);
+  assert.match(bar, /onClick=\{\(\) => setHold\(false\)\}/, 'End 1:1 lives in the bottom line');
+  assert.match(bar, /function useSyncedHold\(agentId: string\)/, 'the 1:1 state is read back from the registry at launch');
 });
 
 test('new strings exist in every language, Michael by godName', () => {
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).ownerVia;
-    for (const k of ['watching', 'aboutPrefix', 'explain', 'stuck', 'message', 'talk', 'holdFailed']) assert.ok(d?.[k], `${loc} ${k}`);
+    for (const k of ['watching', 'aboutPrefix', 'explain', 'stuck', 'message', 'talk', 'holdFailed', 'inOneOnOne', 'inOneOnOneNote', 'endOneOnOne']) assert.ok(d?.[k], `${loc} ${k}`);
     assert.match(d.message, /\{\{godName\}\}/);
   }
 });

@@ -24,7 +24,7 @@ import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import type { HarnessConfig } from '@/store/config';
 import { useRtl } from '@/i18n/useDirection';
 import { closeConfirmText } from './triggers/ScheduleList';
-import { OwnerViaMichaelBar } from './OwnerViaMichaelBar';
+import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 /** Roster rail width. A fixed 232px is right on a 14" laptop but reads as a
  *  sliver on a 27" display, where names truncate for no reason — so it tracks
@@ -607,7 +607,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                     inputLocked={!agent.onHold}
                   />
                 </div>
-                {agent.onHold ? <MessageQueueComposer agent={agent} /> : <OwnerViaMichaelBar agent={agent} />}
+                {agent.onHold ? <><OneOnOneLine agent={agent} /><MessageQueueComposer agent={agent} /></> : <OwnerViaMichaelBar agent={agent} />}
               </div>
             </>
           )}
