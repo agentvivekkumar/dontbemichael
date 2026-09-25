@@ -1,3 +1,5 @@
-- **Setup runs again.** Settings from 0.0.1 are not carried over.
-- **Your folders are kept.** Use the same business name to find them.
-- **Its own name and copyright.** Shown in the About panel.
+- **New instructions for Michael and the team.** Your team gets them once.
+- **Every folder is private.** Michael reads his team's work.
+- **A company profile.** Every agent works from it.
+- **Memory that improves.** Ask me answers are remembered.
+- **Idle conversations cleared safely.** You can bring them back.
