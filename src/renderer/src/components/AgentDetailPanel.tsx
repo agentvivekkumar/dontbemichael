@@ -15,7 +15,7 @@ import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
 import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
-import { SHOW_GIT, SHOW_IDE } from '@shared/buildFeatures';
+import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT } from '@shared/buildFeatures';
 import { Icon } from './Icon';
 import { AgentNameEditor } from './AgentNameEditor';
 import { useStore, type Agent } from '@/store/store';
@@ -217,7 +217,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
               : compactHeader ? '' : t('agentDetail.open')}
           </span>
         </PixelButton>
-        {isReal && (
+        {isReal && SHOW_CLOSE_AGENT && (
           <PixelButton variant="destructive" size="sm" onClick={onKill}>
             <Icon name="x" />
           </PixelButton>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SHOW_IDE } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_CLOSE_AGENT } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
@@ -1034,7 +1034,7 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
           status={typing ? 'typing' : agent.status}
           style={{ height: 24, padding: '0 8px', lineHeight: '24px' }}
         />
-        {!agent.isGod && (
+        {!agent.isGod && SHOW_CLOSE_AGENT && (
           <PixelButton variant="destructive" size="sm" onClick={onKill}>
             {/* inline-flex + center: the other buttons hold TEXT, whose line box
                 the button centres for free. A bare <Icon> is replaced-content

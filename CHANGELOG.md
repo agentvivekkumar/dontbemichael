@@ -29,6 +29,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
   asks about it.
+- **No close button on team members.** It stopped a team member mid-task and took it off the floor,
+  with no button to bring it back.
 - **No "auto mode" text in the header bar.** It named a setting in words owners don't use. The
   setting itself is unchanged, in Settings under Autonomy & Budgets.
 

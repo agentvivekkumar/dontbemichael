@@ -150,3 +150,16 @@ test('the header hides the auto mode text', () => {
   const label = app.indexOf("'auto mode on' : 'auto mode off'");
   assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
 });
+
+/**
+ * The close button on a team member is hidden (owner, 2026-09-24): it stopped
+ * the agent mid-task and archived it with no way back in the app. Hidden in
+ * both places it lived, the agent panel and the full screen view.
+ */
+test('the close agent button is hidden everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_CLOSE_AGENT, false);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'),
+    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+  assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'),
+    /\{!agent\.isGod && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+});

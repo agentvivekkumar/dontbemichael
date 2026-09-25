@@ -245,8 +245,8 @@ to follow a docs page.
 > **Hidden in this build.** Git views, the built in code editor, temporary helper agents that
 > Michael starts on his own, and the organisation trigger are switched off, because business owners
 > don't use them. So are the "auto mode" text in the header bar (the setting itself stays in
-> Settings under Autonomy & Budgets) and the usage stats choice (see [Telemetry](#telemetry)).
-> The code stays in place, and each one has a single switch in
+> Settings under Autonomy & Budgets), the usage stats choice (see [Telemetry](#telemetry)), and the
+> close button on a team member, which stopped it with no way to bring it back. The code stays in place, and each one has a single switch in
 > [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
 
 **For your business**

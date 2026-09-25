@@ -39,3 +39,9 @@ export const COLLECT_USAGE_STATS = false;
  *  itself is unchanged and stays in Settings → Autonomy & Budgets
  *  (owner, 2026-09-24). */
 export const SHOW_AUTO_MODE_LABEL = false;
+
+/** The red close button on a team member's panel and in its full screen view.
+ *  It stopped the agent mid-task and archived it, with no button to bring it
+ *  back and no return on relaunch, behind a confirm that spoke of a "PTY"
+ *  (owner, 2026-09-24). Michael never had it. */
+export const SHOW_CLOSE_AGENT = false;
