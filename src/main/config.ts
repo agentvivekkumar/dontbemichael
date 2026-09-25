@@ -1,6 +1,6 @@
 import type { CompanyProfile } from '../shared/companyProfile';
 import { app } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -843,11 +843,20 @@ function ensureClaudeProjectTrust(home: string, cwd: string): void {
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
       c = parsed as ClaudeConfig;
     }
-    if (c.projects?.[cwd]?.hasTrustDialogAccepted !== true) {
+    // Claude Code looks the folder up by its real name on disk. On a Mac a
+    // folder typed as "MoblizeIT" opens "MoblizeIt" too, but only the real name
+    // counts as trusted, so trust that as well; otherwise the agent stops on
+    // the trust question (seen live 2026-09-25).
+    let real = cwd;
+    try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
+    let changed = false;
+    for (const key of new Set([cwd, real])) {
+      if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
       c.projects = c.projects ?? {};
-      c.projects[cwd] = { ...(c.projects[cwd] ?? {}), hasTrustDialogAccepted: true };
-      writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
+      c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
+      changed = true;
     }
+    if (changed) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
   } catch (error) {
     console.warn(
       `[config] Could not safely update Claude config at ${p}:`,
