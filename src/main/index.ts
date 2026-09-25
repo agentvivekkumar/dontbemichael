@@ -337,18 +337,22 @@ const memory = new MemoryManager(
  *  The industry is the owner's own words when no business type fit, else the
  *  business type's name. Read fresh on each hook, so an edit in Settings
  *  reaches running agents on their next message. */
-const packNameCache = new Map<string, string | undefined>();
+const packInfoCache = new Map<string, { displayName?: string; briefing?: string }>();
+/** The office's business pack: its display name and Michael's briefing. Packs
+ *  are read from disk and the hook runs on every prompt, so it's remembered. */
+function businessPackInfo(businessType: string | undefined): { displayName?: string; briefing?: string } {
+  if (!businessType) return {};
+  if (!packInfoCache.has(businessType)) {
+    try {
+      const pack = loadBundledPacks({ packsDir }).packs.find((x) => x.pack.businessType === businessType)?.pack;
+      packInfoCache.set(businessType, { displayName: pack?.displayName, briefing: pack?.briefing });
+    } catch { return {}; }
+  }
+  return packInfoCache.get(businessType) ?? {};
+}
 function companyProfileForAgents(): string | null {
   const cfg = readConfig();
-  let industry: string | undefined;
-  if (cfg.businessType) {
-    // Packs are read from disk; the hook runs on every prompt, so remember names.
-    if (!packNameCache.has(cfg.businessType)) {
-      try { packNameCache.set(cfg.businessType, loadBundledPacks({ packsDir }).packs.find((x) => x.pack.businessType === cfg.businessType)?.pack.displayName); }
-      catch { /* the profile still goes out without it */ }
-    }
-    industry = packNameCache.get(cfg.businessType);
-  }
+  const industry = businessPackInfo(cfg.businessType).displayName;
   return companyProfileContext({ name: cfg.businessName, industry }, cleanCompanyProfile(cfg.companyProfile));
 }
 
@@ -2872,6 +2876,17 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           // the OS sandbox must let it through (empty when memory is off).
           extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH].filter((p): p is string => !!p),
           businessFolder,
+          business: (() => {
+            const cfg = readConfig();
+            const pack = businessPackInfo(cfg.businessType);
+            const profile = cleanCompanyProfile(cfg.companyProfile);
+            return {
+              name: cfg.businessName,
+              city: cfg.businessCity,
+              typeName: pack.displayName ?? profile.industry,
+              briefing: pack.briefing
+            };
+          })(),
           folderPolicy: businessFolder
             ? folderPolicy(
               { isGod: !!opts.hive.isGod, cwd: opts.cwd },

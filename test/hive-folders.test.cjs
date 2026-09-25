@@ -51,7 +51,7 @@ test('a team member is told its own folder is private, and that the hive is off 
   assert.match(p, /read it for context before searching the internet/);
   assert.match(p, /It is private: only you, anyone sharing this folder, and Michael can open it/, 'its folder is private');
   assert.doesNotMatch(p, /Office folder/, 'no shared folder: company knowledge is the knowledge feature');
-  assert.match(p, /NEVER save documents, drafts or other work anywhere in the hive/);
+  assert.match(p, /is only for coordination: your memory notes, inbox and outbox\. Save documents, drafts and other work outside it\./);
 });
 
 test('Michael works in his own private folder and reads his team\'s folders', async (t) => {
@@ -63,7 +63,7 @@ test('Michael works in his own private folder and reads his team\'s folders', as
   assert.ok(p.includes(`you work in ${business}, your folder. It is private: only you and the owner can open it.`));
   assert.match(p, /You can read their files, but only they change them/);
   assert.doesNotMatch(p, /Office folder/);
-  assert.match(p, /NEVER save documents/);
+  assert.match(p, /Save documents, drafts and other work outside it/);
 });
 
 test('agents are given the exact doc-text command for Word, Excel and PowerPoint', async (t) => {

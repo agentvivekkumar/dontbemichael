@@ -198,6 +198,95 @@ function memoryEndOfTask(inboxPath: string): string {
   return `When you finish a task, add at most three short notes to ${inboxPath}, and only for things you would otherwise work out again: a fact you researched (with its source and the date you checked it), the steps that worked for a task you'll do again, or a correction or preference from the owner or Michael (with the reason). Often there's nothing worth saving, and that's fine. Leave out anything you can look up again, anything already in your instructions, the company profile or company knowledge, and anything about this task only. Don't write session logs or status updates. The app tidies your notes into your index in the background.`;
 }
 
+/** Business details a business office's prompts are filled from, once at spawn. */
+export interface PromptBusiness {
+  name?: string;
+  city?: string;
+  /** The business type's display name, e.g. "Restaurant & Food". */
+  typeName?: string;
+  /** The pack's briefing for Michael, `{Business}` and `{City}` still in it. */
+  briefing?: string;
+}
+
+/** Paths and helpers both business prompts name, fixed for the agent's life. */
+interface PromptPaths {
+  inbox: string;
+  inboxDone: string;
+  outbox: string;
+  protocol: string;
+  hiveRoot: string;
+  docText?: string;
+}
+
+const where = (b: PromptBusiness): string =>
+  `${b.name?.trim() || 'the business'}${b.city?.trim() ? ` in ${b.city.trim()}` : ''}`;
+
+/**
+ * Michael's standing instructions in a business office (agent instructions
+ * audit, 2026-09-25, README section 1), merged with what was built since: the
+ * standup, Ask me routing back to the raiser, the "michael" address. Plain,
+ * calm wording with reasons, no CAPS, no dashes; nothing volatile, so it
+ * caches. House rules, folders, memory and company knowledge are appended by
+ * injectedPrompt.
+ */
+export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPaths): string {
+  const type = b.typeName ? `, a ${b.typeName.toLowerCase()} business` : '';
+  const briefing = b.briefing
+    ? b.briefing.replace(/\{Business\}/g, b.name?.trim() || 'the business').replace(/ in \{City\}/g, b.city?.trim() ? ` in ${b.city.trim()}` : '').replace(/\{City\}/g, b.city?.trim() || '')
+    : '';
+  return [
+    '## Who you are',
+    `You are ${name}, the office manager for ${b.name?.trim() || 'the business'}${type}${b.city?.trim() ? ` in ${b.city.trim()}` : ''}. You work for the owner. Team members report to you, never to the owner, so you are the owner's one point of contact: you route work, relay results, and bring the owner only what needs them. At the start of a session, act on everything in your inbox.`,
+    ...(briefing ? ['', '## The business', briefing] : []),
+    '',
+    '## Routing work',
+    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. It is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
+    '',
+    '## Doing it yourself',
+    'Answer small things yourself: a fact you know, a short reply, a quick lookup. Research, documents and anything longer go to a team member, so you stay free to route.',
+    '',
+    '## When no one fits',
+    'If a request is outside every role and too big to do yourself, ask the owner on the Ask me board, with "raisedBy": "god". Open with a bold sentence naming the job and why nobody covers it, then offer these options and mark the one you recommend:',
+    '1. Add a team member for it (name the role; the owner uses Add agent).',
+    '2. Hand it to the closest team member (name them and what they would put aside).',
+    '3. You do it yourself this once (say roughly how long).',
+    '4. Drop it.',
+    '',
+    '## The Ask me board',
+    'Every question for the owner goes on the Ask me board: a decision, an approval, an answer, or an action only the owner can do, such as signing in to an account. The owner reads each ask on a small card, often on a phone, so keep it to a short paragraph plus options, about 700 characters. Open with one bold sentence saying exactly what you need. Give each option its own bullet or number, with a blank line between paragraphs. Put amounts, file names and account names in backticks. Rewrite a team member\'s report into this shape, because the owner wants the decision, not the investigation. The owner prefers text without dashes, so use commas, colons and periods in anything the owner reads. Record who raised the question in "raisedBy": the team member whose work needs the answer, or "god" when it is yours. The answer goes straight to them and into their memory, and you are told so you can unblock the card and route any follow-up.',
+    '',
+    '## Keeping the task board accurate',
+    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
+    '',
+    '## Scheduled runs',
+    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. The scheduler does not read replies, so do not answer it.',
+    '',
+    '## Staying cheap',
+    'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
+    '',
+    '## Files',
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To send one, write a JSON file to your outbox (${p.outbox}) with "to" (the id in brackets on the roster, or "human" for the owner at closing time), "act" (request, inform or done; only request expects a reply), "subject" and "body". Cards live in tasks.json beside board.md in ${p.hiveRoot}; to ask the owner, set a card to "blocked" and add {"q": "...", "askedAt": "<time>", "raisedBy": "<id or god>"} to its humanQA list, keeping earlier entries. The hive folder holds only messages, notes and boards, so save documents in your own folder.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+  ].join('\n');
+}
+
+/**
+ * The shared instructions every team member gets in a business office (audit
+ * README section 3), merged with what was built since. The team member's own
+ * Work style arrives separately, through the hook. House rules, folders,
+ * memory and company knowledge are appended by injectedPrompt.
+ */
+export function teamMemberInstructions(name: string, role: string, michael: string, b: PromptBusiness, p: PromptPaths): string {
+  return [
+    `You are ${name}, the ${role} on the team at ${where(b)}. ${michael} is the office manager: he gives you work and is your only link to the owner. Anything you need from the owner, such as an approval, an answer or a file, goes to ${michael}, who puts it on the owner's Ask me board.`,
+    '',
+    'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else.',
+    '',
+    `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
+    '',
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+  ].join('\n');
+}
+
 export interface AgentMeta {
   id: string;
   name: string;
@@ -775,6 +864,8 @@ export class HiveManager {
       kgRoot?: string;
       /** MemPalace, when installed: company knowledge searched by meaning. */
       meaningSearch?: MeaningSearch;
+      /** The business, for a business office's prompts (name, city, type, briefing). */
+      business?: PromptBusiness;
       theme?: 'light' | 'dark';
       /** Consent state for the default-MCP bundle (W3). Threaded from the live
        *  HarnessConfig by the caller; undefined → catalog defaults apply. */
@@ -911,7 +1002,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -1055,7 +1146,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1556,7 +1647,8 @@ export class HiveManager {
     businessFolder?: string,
     docTextCliPath?: string,
     kgRoot?: string,
-    meaningSearch?: MeaningSearch
+    meaningSearch?: MeaningSearch,
+    business?: PromptBusiness
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
     const inDir = (...parts: string[]): string => join(dir, ...parts);
@@ -1620,9 +1712,38 @@ export class HiveManager {
       ? (meta.isGod
         ? `YOUR FOLDERS: you work in ${meta.cwd}, your folder. It is private: only you and the owner can open it. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them.`
         : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them.`)
-        + ` The hive (${root}) is ONLY for coordination — your memory notes, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
-        + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
+        + ` The hive (${root}) is only for coordination: your memory notes, inbox and outbox. Save documents, drafts and other work outside it. You can open PDFs and images directly.`
       : '';
+    // A business office (one with a business folder) gets the rewritten
+    // instructions (agent instructions audit, 2026-09-25): Michael's standing
+    // instructions or the shared team member instructions, then the house
+    // rules, folders, memory and company knowledge. Older installs keep the
+    // text below.
+    if (businessFolder && !meta.isAssistant) {
+      const paths: PromptPaths = {
+        inbox: inDir('inbox'),
+        inboxDone: inDir('inbox', '.done'),
+        outbox: inDir('outbox'),
+        protocol: inRoot('PROTOCOL.md'),
+        hiveRoot: root,
+        ...(docTextCliPath ? { docText: `"${hiveNode}" "${docTextCliPath}"` } : {})
+      };
+      const b = business ?? {};
+      const roleTitle = (meta.role ?? '').split(': ')[0].trim() || 'team member';
+      return [
+        meta.isGod
+          ? michaelInstructions(meta.name, b, paths)
+          : teamMemberInstructions(meta.name, roleTitle, godNameForPrompt || 'Michael', b, paths),
+        '',
+        HOUSE_RULES,
+        '',
+        folderLine,
+        memoryRule(inDir('memory', 'inbox.md'), inDir('memory')),
+        memoryEndOfTask(inDir('memory', 'inbox.md')),
+        knowledgeLine,
+        memoryLine
+      ].filter(Boolean).join('\n');
+    }
     const guardrailsLine = 'Guardrails: a circuit breaker watches the floor — a "Circuit breaker: steer/constrain" message means you are looping or overspending, so STOP repeating, summarize what you tried, and follow it. Be token-frugal (a floor-wide or per-agent token budget can pause you). The shared plan has two parts: board.md (freeform; god is the sole scribe) and tasks.json (structured kanban — todo/doing/blocked/done).';
     const slackLine = meta.isGod
       ? 'SLACK REPLIES: When composing a Slack reply (or writing the `result` field of a Slack-origin kanban card), you MUST: (1) directly address what the user asked — never a bare "done"; (2) include the relevant specifics, outcome, and details; (3) format for Slack mrkdwn — open with a short *bold* headline, use bullet points for multiple items, wrap code/paths in `backtick` blocks, keep it concise (no walls of text). When finishing a Slack-origin task, always write a complete, user-facing, well-formatted `result` on the kanban card — the system posts it verbatim to Slack as the done reply.'
@@ -1703,7 +1824,20 @@ export class HiveManager {
     // The hive has no separate human-approval queue — approvals are native to
     // each agent's Claude Code session (and approvable remotely). A message aimed
     // at "human" is handled by the god/orchestrator, the human's proxy here.
-    const resolveTo = (to: string): string => (to === 'human' || to === 'god' ? godId : to);
+    // Michael answers to his internal id, "michael", his display name and, for
+    // the owner, "human" (agents are told to write "michael"; owner cleanup,
+    // 2026-09-25).
+    const godName = resolveGodName(reg.agents[godId]?.name).toLowerCase();
+    const resolveTo = (to: string): string => {
+      const t = to.toLowerCase();
+      return t === 'human' || t === 'god' || t === 'michael' || t === godName ? godId : to;
+    };
+    // The scheduler and heartbeat send; they don't read. A reply to one is
+    // dropped quietly instead of bouncing back to Michael as undeliverable.
+    if (msg.to === 'scheduler' || msg.to === 'heartbeat') {
+      this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: msg.from, to: msg.to, id: msg.id });
+      return;
+    }
     const targets = msg.to === 'broadcast'
       // The roster for fan-out is the ACTIVE registry: skip the send-only prep
       // assistant and any archived agent (closed tab). Hookless providers are
