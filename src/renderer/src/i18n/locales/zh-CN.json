@@ -987,7 +987,7 @@
     "nothingScheduled": "还没有计划任务。",
     "addSchedule": "添加计划",
     "newSchedule": "新计划",
-    "label": "名称",
+    "label": "做什么？",
     "labelPlaceholder": "任务名称，例如：每周资金汇总",
     "goesTo": "发送给",
     "everyone": "所有人",

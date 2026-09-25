@@ -987,7 +987,7 @@
     "nothingScheduled": "لا شيء مجدول بعد.",
     "addSchedule": "أضف جدولًا",
     "newSchedule": "جدول جديد",
-    "label": "التسمية",
+    "label": "ماذا يُنجز؟",
     "labelPlaceholder": "اسم المهمة، مثلًا: الملخص المالي الأسبوعي",
     "goesTo": "يذهب إلى",
     "everyone": "الجميع",
