@@ -3252,7 +3252,8 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   const hiveWasEnabled = hive.enabled();
   const wasOnboarded = readConfig().onboardingComplete;
   const next = writeConfig(patch);
-  // Live opt-in/out from Settings → Privacy (TELEMETRY.md).
+  // Live opt-in/out from Settings (TELEMETRY.md); stays off while
+  // COLLECT_USAGE_STATS is false.
   if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(COLLECT_USAGE_STATS && patch.telemetryEnabled);
   // Activation funnel (v0.4.6): onboarding just finished (false → true) — the top of
   // the launch → first-agent funnel. `provider` is the engine chosen in the wizard.
@@ -3358,15 +3359,15 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   return { ok: true as const }; // unreachable (process exits) — typed for the renderer
 });
 
-/** Is an office folder there? No path = the current home. The launch screen
- *  uses it to decide between the floor and "we can't find your office", and
- *  Settings uses it to tell an existing office from an empty folder. */
 /** Setup asks what is in a folder before it creates anything: an office, and if
  *  so its business and team (office.json, else the hive registry). */
 ipcMain.handle('office:find', (_evt, path: unknown) => {
   const home = typeof path === 'string' && path.trim() ? resolve(expandTilde(path.trim())) : readConfig().harnessHome;
   return home ? findOffice(home) : { path: null, hasOffice: false, record: null, source: null };
 });
+/** Is an office folder there? No path = the current home. The launch screen
+ *  uses it to decide between the floor and "we can't find your office", and
+ *  Settings uses it to tell an existing office from an empty folder. */
 ipcMain.handle('config:homeStatus', (_evt, path: unknown) =>
   homeFolderStatus(typeof path === 'string' && path ? resolve(expandTilde(path)) : readConfig().harnessHome ?? null)
 );
@@ -5419,8 +5420,9 @@ app.whenReady().then(() => {
   if (readConfig().realtimeVoiceEnabled) writeConfig({ realtimeVoiceEnabled: false });
 
   // Anonymous product analytics (PostHog) — the full contract lives in
-  // TELEMETRY.md. No-op unless a build-time key was injected (official releases
-  // only), and gated on DO_NOT_TRACK + the telemetryEnabled config (opt-out).
+  // TELEMETRY.md. Off entirely while COLLECT_USAGE_STATS (buildFeatures.ts) is
+  // false. Otherwise a no-op unless a build-time key was injected (official
+  // releases only), and gated on DO_NOT_TRACK + the telemetryEnabled config.
   analytics.init({
     stateDir: app.getPath('userData'),
     appVersion: app.getVersion(),

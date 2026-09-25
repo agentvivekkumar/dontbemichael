@@ -530,7 +530,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     catch { setAutoUpdateOn(!next); }
   };
 
-  // ─── Anonymous usage stats (default ON = opt-out; contract in TELEMETRY.md) ─
+  // ─── Anonymous usage stats (TELEMETRY.md). Rendered only while
+  // COLLECT_USAGE_STATS (buildFeatures.ts) is on; off in this build. ─
   const [telemetryOn, setTelemetryOn] = useState<boolean>(config.telemetryEnabled !== false);
   const toggleTelemetry = async () => {
     const next = !telemetryOn;

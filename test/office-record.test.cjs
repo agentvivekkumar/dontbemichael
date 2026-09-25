@@ -159,15 +159,82 @@ test('setup opens on the office it found, and continuing uses the recorded team 
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
   assert.match(wiz, /window\.cth\.officeFind\(DEFAULT_HOME\)/);
   assert.match(wiz, /setStep\(\(s\) => \(s === 'business' \? 'resume' : s\)\)/);
-  assert.match(wiz, /const plan = resuming \? teamPlanFromRecord\(found\?\.record\) : pickedPlan;/);
-  // A new office never lands in the folder of the one it found.
-  assert.match(wiz, /setHome\(`\$\{DEFAULT_HOME\} \$\{n\}`\)/);
+  // Offered only when the office can really be continued, so Finish can't dead-end.
+  assert.match(wiz, /!f\.record \|\| !teamPlanFromRecord\(f\.record\)\.ok\) return;/);
+  assert.match(wiz, /const finishPlan = resuming && foundPlan \? foundPlan : plan;/);
+  // The owner sees the folders before continuing.
+  assert.match(wiz, /foundPlan\?\.ok && foundPlan\.folders\.map/);
+  // A new office never lands in the folder of the one it found: the first free
+  // "~/HarnessAgents N", or an empty field (the home step then asks) when none is.
+  assert.match(wiz, /if \(!st\.exists\) \{ free = candidate; break; \}/);
+  assert.match(wiz, /setHome\(free\);/);
 });
 
 test('team start brings back a member the registry knows but the floor lost, in its real folder', () => {
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.doesNotMatch(hive, /if \(reg\?\.agents\?\.\[id\]\) continue;/, 'no more skipping on the hope the roster restores it');
-  assert.match(hive, /\[\.\.\.floor\.agents, \.\.\.floor\.archivedAgents, \.\.\.floor\.restorableAgents\]\.some\(\(a\) => a\.id === id\)\) continue;/);
-  assert.doesNotMatch(hive, /known\?\.archived/, 'the registry archived flag is not a removal');
-  assert.match(hive, /const workFolder = known\?\.cwd \|\| member\.folder;/);
+  assert.match(hive, /\[\.\.\.floor\.agents, \.\.\.floor\.archivedAgents, \.\.\.floor\.restorableAgents\]\.map\(\(a\) => a\.id\)/);
+  assert.match(hive, /const decision = teamMemberStart\(id, member\.folder, floorIds, reg\?\.agents\?\.\[id\]\?\.cwd\);/);
+  assert.doesNotMatch(hive, /\.archived\) continue/, 'the registry archived flag is not a removal');
+});
+
+// --- which members team start starts ------------------------------------------
+
+const { teamMemberStart } = loadTs('src/shared/teamPlan.ts');
+
+test('team start leaves the floor alone and brings a lost member back in its real folder', () => {
+  const floor = new Set(['oscar']);
+  assert.deepEqual(teamMemberStart('oscar', `${DOCS}/Finance`, floor, `${DOCS}/Finance`), { start: false }, 'already on the floor');
+  assert.deepEqual(teamMemberStart('pam', '/Users/owner/Documents/Moblize It/Admin', floor, `${DOCS}/Admin`),
+    { start: true, cwd: `${DOCS}/Admin` }, 'the registry folder wins over a name typed differently');
+  assert.deepEqual(teamMemberStart('toby', `${DOCS}/HR`, floor, undefined), { start: true, cwd: `${DOCS}/HR` }, 'new member: setup folder');
+  assert.deepEqual(teamMemberStart('toby', `${DOCS}/HR`, floor, '  '), { start: true, cwd: `${DOCS}/HR` });
+});
+
+// --- folders a record may name ------------------------------------------------
+
+test('a record never sends agents to the disk root, the home folder, or key and settings folders', () => {
+  const home = office();
+  const h = os.homedir();
+  try {
+    fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
+      version: 1,
+      officeFolder: h,
+      team: [
+        { agentId: 'oscar', folder: `${DOCS}/Finance` },
+        { agentId: 'root', folder: '/' },
+        { agentId: 'home', folder: h },
+        { agentId: 'ssh', folder: path.join(h, '.ssh') },
+        { agentId: 'claude', folder: path.join(h, '.claude', 'x') },
+        { agentId: 'lib', folder: path.join(h, 'Library', 'Keychains') },
+        { agentId: 'rel', folder: 'Documents/Finance' }
+      ]
+    }));
+    const found = file.findOffice(home);
+    assert.deepEqual(found.record.team.map((m) => m.agentId), ['oscar']);
+    assert.notEqual(found.record.officeFolder, h, 'the home folder is not an Office');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('an older office uses the Office folder already beside its team', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'office-'));
+  const biz = fs.mkdtempSync(path.join(os.tmpdir(), 'biz-'));
+  try {
+    for (const f of ['Finance', 'Admin', 'Office']) fs.mkdirSync(path.join(biz, f));
+    fs.mkdirSync(path.join(home, 'hive'), { recursive: true });
+    fs.writeFileSync(path.join(home, 'hive', 'registry.json'), JSON.stringify({
+      agents: {
+        oscar: { id: 'oscar', cwd: path.join(biz, 'Finance'), archived: true },
+        pam: { id: 'pam', cwd: path.join(biz, 'Admin'), archived: true }
+      }
+    }));
+    const found = file.findOffice(home);
+    assert.equal(found.record.officeFolder, path.join(biz, 'Office'));
+    assert.equal(found.record.team.length, 2, 'archived in the registry is still on the team');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(biz, { recursive: true, force: true });
+  }
 });

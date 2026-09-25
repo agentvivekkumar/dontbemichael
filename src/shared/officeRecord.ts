@@ -40,11 +40,11 @@ export interface OfficeConfigFields {
   businessTeam?: Array<{ agentId: string; folder: string }>;
 }
 
-/** The fields of a hive registry entry a record reads. */
+/** The fields of a hive registry entry a record reads. Its `archived` flag is
+ *  deliberately not among them: see officeRecordFromRegistry. */
 export interface RegistryAgentFields {
   id?: string;
   cwd?: string;
-  archived?: boolean;
 }
 
 /** The god agent's registry id. It works in the hive, not in a business folder. */

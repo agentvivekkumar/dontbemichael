@@ -20,6 +20,9 @@
  *     output — nothing free-form crosses this seam.
  *
  * Sending is gated on ALL of (checked in this order):
+ *   0. COLLECT_USAGE_STATS (src/shared/buildFeatures.ts). Off in this build, so
+ *      nothing is sent even from a release built with a key; the gates below
+ *      apply only once it is turned back on (owner, 2026-09-24).
  *   1. A build-time key (__POSTHOG_KEY__, injected from the POSTHOG_KEY env in
  *      release CI). Dev builds and forks compile with '' → this whole module is
  *      a silent no-op for them.

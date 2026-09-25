@@ -3,8 +3,9 @@
  *
  * Plain node:fs, no electron import, so it tests as a node module.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import {
   officeRecordFromConfig,
   officeRecordFromRegistry,
@@ -15,6 +16,7 @@ import {
   type RegistryAgentFields
 } from '../shared/officeRecord';
 import { homeFolderStatus } from './homeFolder';
+import { OFFICE_FOLDER } from './agentFolders';
 
 export function officeRecordPath(home: string): string {
   return join(home, 'office.json');
@@ -89,8 +91,44 @@ export interface FoundOffice {
   source: 'file' | 'registry' | null;
 }
 
+/** Folders an office record may never send an agent into, whatever it says:
+ *  the disk root, the home folder itself, and the places that hold keys and
+ *  app settings. A record is a file in a folder that could have been copied or
+ *  synced from elsewhere, so its folders are checked before setup offers them. */
+function isUsableTeamFolder(folder: string, home = homedir()): boolean {
+  if (!isAbsolute(folder)) return false;
+  const f = resolve(folder);
+  const h = resolve(home);
+  if (f === resolve(sep) || f === h) return false;
+  for (const kept of ['.ssh', '.claude', '.config', '.gnupg', 'Library']) {
+    const k = join(h, kept);
+    if (f === k || f.startsWith(k + sep)) return false;
+  }
+  return true;
+}
+
+function isFolder(p: string): boolean {
+  try { return statSync(p).isDirectory(); } catch { return false; }
+}
+
+/** Only usable folders, and for an office that never recorded its Office folder,
+ *  the one that is already there beside the team's folders (Documents/<Business>/Office). */
+function checkedRecord(rec: OfficeRecord): OfficeRecord {
+  const team = rec.team.filter((m) => isUsableTeamFolder(m.folder));
+  let officeFolder = rec.officeFolder && isUsableTeamFolder(rec.officeFolder) ? rec.officeFolder : undefined;
+  if (!officeFolder) {
+    officeFolder = team.map((m) => join(dirname(m.folder), OFFICE_FOLDER)).find(isFolder);
+  }
+  return { ...rec, officeFolder, team };
+}
+
 /** What is in this folder: an office, and if so which one and which team. */
 export function findOffice(home: string): FoundOffice {
+  const found = findOfficeUnchecked(home);
+  return found.record ? { ...found, record: checkedRecord(found.record) } : found;
+}
+
+function findOfficeUnchecked(home: string): FoundOffice {
   const st = homeFolderStatus(home);
   if (!st.hasOffice) return { path: home, hasOffice: false, record: null, source: null };
   const fromFile = readOfficeRecord(home);

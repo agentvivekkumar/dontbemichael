@@ -192,7 +192,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }, [step, businessName, teamFolderKey]);
 
   const plan = teamPlan(teamAgents, teamPicked, folderSuggestions, folderOverrides);
-  const pickedPlan = plan;
   const needed = connectionsNeeded(teamAgents, teamPicked);
   const pickedCount = teamAgents.filter((a) => teamPicked[a.id]).length;
   /** `/Users/me/Documents/Pho` → `~/Documents/Pho`: shorter, and what an owner recognises. */
@@ -240,8 +239,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   const [home, setHome] = useState<string>('');
   const [autoMode, setAutoMode] = useState<boolean>(true);
-  // Anonymous usage stats (TELEMETRY.md). Default ON (opt-out); persisted by
-  // finish() so unchecking before finishing means nothing is ever sent.
+  // Anonymous usage stats (TELEMETRY.md). Shown and saved only while
+  // COLLECT_USAGE_STATS (buildFeatures.ts) is on; off in this build.
   const [shareStats, setShareStats] = useState<boolean>(true);
   const [godProvider, setGodProvider] = useState<AgentProvider>('claude');
   const [godModel, setGodModel] = useState<string | undefined>(
@@ -327,11 +326,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // depends on the business name typed this time (officeRecord.ts).
   const [found, setFound] = useState<{ path: string; record: OfficeRecord } | null>(null);
   const [resuming, setResuming] = useState(false);
+  const foundPlan = found ? teamPlanFromRecord(found.record) : null;
   useEffect(() => {
     let alive = true;
     void window.cth.officeFind(DEFAULT_HOME)
       .then((f) => {
-        if (!alive || !f.hasOffice || !f.path || !f.record || f.record.team.length === 0) return;
+        // Offer it only when it can really be continued: a team, and folders
+        // for all of it (an older office whose folders share nothing would
+        // otherwise fail at Finish with no way forward).
+        if (!alive || !f.hasOffice || !f.path || !f.record || !teamPlanFromRecord(f.record).ok) return;
         setFound({ path: f.path, record: f.record });
         // Only take over the first screen if the owner has not started on it yet.
         setStep((s) => (s === 'business' ? 'resume' : s));
@@ -352,16 +355,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   };
   const startNewOffice = async () => {
     // A new office needs its own folder: setting it up in this one would mix a
-    // second team into the office that is already there.
-    let n = 2;
-    while (n < 50) {
-      const st = await window.cth.homeStatus(`${DEFAULT_HOME} ${n}`).catch(() => null);
-      if (!st?.exists) break;
-      n++;
+    // second team into the office that is already there. Suggest the first
+    // free "~/HarnessAgents N"; if none is free (or the check fails), leave the
+    // field empty so the home step asks the owner to pick one.
+    setBusy(true);
+    let free = '';
+    for (let n = 2; n <= NEW_OFFICE_SUGGESTIONS; n++) {
+      const candidate = `${DEFAULT_HOME} ${n}`;
+      const st = await window.cth.homeStatus(candidate).catch(() => null);
+      if (!st) break;
+      if (!st.exists) { free = candidate; break; }
     }
-    setHome(`${DEFAULT_HOME} ${n}`);
+    setHome(free);
     setResuming(false);
     setError(undefined);
+    setBusy(false);
     setStep('business');
   };
 
@@ -378,9 +386,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setError(undefined);
     // Continuing an office keeps its recorded team and folders; a new office
     // uses the team and folders picked in setup.
-    const plan = resuming ? teamPlanFromRecord(found?.record) : pickedPlan;
+    const finishPlan = resuming && foundPlan ? foundPlan : plan;
     // The team's folders must be resolvable before anything is created.
-    if (!plan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
+    if (!finishPlan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
     const harnessHome = home.trim(); // whitespace-only is not a folder
     if (!harnessHome) { setError(t('onboarding.errPickHome')); setBusy(false); setStep('home'); return; }
     // The orchestrator step already refuses to advance on this, but a late probe
@@ -405,7 +413,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       }
       // Make each agent's folder, and the shared Office. Only missing folders are
       // created; one the owner picked (or already had) is left exactly as it is.
-      const made = await window.cth.foldersEnsure(plan.folders);
+      const made = await window.cth.foldersEnsure(finishPlan.folders);
       const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
       if (failed) {
         setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
@@ -422,9 +430,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         // Where the office works (Decision 44). The running office starts each
         // agent inside its folder; the folders also become the hire dialog's
         // quick-picks, which is what registeredRepos has always fed.
-        officeFolder: plan.office,
-        businessTeam: plan.team,
-        registeredRepos: plan.folders,
+        officeFolder: finishPlan.office,
+        businessTeam: finishPlan.team,
+        registeredRepos: finishPlan.folders,
         autoMode,
         godProvider,
         godModel,
@@ -486,17 +494,28 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   {t('onboarding.resume.desc', {
                     business: found.record.businessName ?? t('onboarding.resume.unnamed'),
                     count: found.record.team.length,
-                    folder: tildePath(found.path)
+                    // Isolated so a path reads left to right inside Arabic text.
+                    folder: `\u2066${tildePath(found.path)}\u2069`
                   })}
                 </p>
-                <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
+                {/* Where the team will keep working: shown before Continue so the
+                    owner can see exactly which folders this office uses. */}
+                <div style={{ fontSize: 14, lineHeight: '18px', color: 'var(--cth-ink-700)' }}>
+                  <div style={{ marginBottom: 4 }}>{t('onboarding.resume.foldersHead')}</div>
+                  <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+                    {foundPlan?.ok && foundPlan.folders.map((f) => (
+                      <li key={f} dir="ltr" style={{ textAlign: 'start' }}>{tildePath(f)}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ fontSize: 14, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>
                   {t('onboarding.resume.newNote')}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <PixelButton variant="primary" size="md" onClick={continueOffice}>
+                  <PixelButton variant="primary" size="md" onClick={continueOffice} disabled={busy}>
                     {t('onboarding.resume.continue')}
                   </PixelButton>
-                  <PixelButton variant="secondary" size="md" onClick={() => { void startNewOffice(); }}>
+                  <PixelButton variant="secondary" size="md" onClick={() => { void startNewOffice(); }} disabled={busy}>
                     {t('onboarding.resume.startNew')}
                   </PixelButton>
                 </div>
@@ -1097,7 +1116,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
             {/* Footer / nav */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <Dots step={step} />
+              {step === 'resume' ? <span /> : <Dots step={step} />}
               <div style={{ display: 'flex', gap: 8 }}>
                 {step !== 'business' && step !== 'resume' && (
                   <PixelButton
@@ -1373,6 +1392,8 @@ function Dots({ step }: { step: Step }) {
 
 /** Where setup suggests the office lives, and looks for an existing one. */
 const DEFAULT_HOME = '~/HarnessAgents';
+/** How many "~/HarnessAgents N" names a new office tries before asking the owner to pick. */
+const NEW_OFFICE_SUGGESTIONS = 20;
 
 function nextStep(s: Step): Step {
   return s === 'business' ? 'welcome'

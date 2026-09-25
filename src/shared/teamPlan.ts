@@ -148,3 +148,24 @@ const TEAM_ACCENTS = ['mint', 'sky', 'coral', 'lilac', 'peach', 'lemon'] as cons
 export function teamAccent(index: number): (typeof TEAM_ACCENTS)[number] {
   return TEAM_ACCENTS[((index % TEAM_ACCENTS.length) + TEAM_ACCENTS.length) % TEAM_ACCENTS.length];
 }
+
+/**
+ * Whether team start should start this member, and where.
+ *
+ * The floor decides, not the hive registry: a member already on the floor, in
+ * its archived list, or waiting to be restored is left to the floor. The
+ * registry's own `archived` flag is not a removal (every agent is archived when
+ * the app quits), so a member the registry knows but the floor lost is started
+ * again, in the folder the registry says it works in rather than the one setup
+ * derived this time (2026-09-24).
+ */
+export function teamMemberStart(
+  id: string,
+  setupFolder: string,
+  floorIds: ReadonlySet<string>,
+  registryCwd?: string
+): { start: false } | { start: true; cwd: string } {
+  if (floorIds.has(id)) return { start: false };
+  const known = typeof registryCwd === 'string' && registryCwd.trim() ? registryCwd : undefined;
+  return { start: true, cwd: known ?? setupFolder };
+}

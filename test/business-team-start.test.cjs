@@ -31,7 +31,7 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   assert.match(fn, /if \(team\.length === 0 \|\| config\.businessTeamStarted\) return;/, 'runs once');
   // A member the floor already holds is not started twice; one the registry
   // knows but the floor lost comes back (office-record.test.cjs).
-  assert.match(fn, /\.some\(\(a\) => a\.id === id\)\) continue;/, 'a member already on the floor is not started twice');
+  assert.match(fn, /const decision = teamMemberStart\(id, member\.folder, floorIds,[^\n]*\);\s*if \(!decision\.start\) continue;/, 'a member already on the floor is not started twice');
   assert.match(fn, /if \(!res\.ok\) \{[\s\S]{0,120}continue;\s*\}/, 'a failed start skips that member only');
   assert.match(fn, /cwd: workFolder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: workFolder, role \}/, 'spawned inside its own folder');
   assert.match(fn, /goal: teamMemberGoal\(def, \{ name: config\.businessName, city: config\.businessCity \}\)/);
