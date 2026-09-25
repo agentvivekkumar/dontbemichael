@@ -988,7 +988,7 @@
     "addSchedule": "أضف جدولًا",
     "newSchedule": "جدول جديد",
     "label": "ماذا يُنجز؟",
-    "labelPlaceholder": "اسم المهمة، مثلًا: الملخص المالي الأسبوعي",
+    "labelPlaceholder": "مثلًا: متابعة الفواتير غير المدفوعة",
     "goesTo": "يذهب إلى",
     "everyone": "الجميع",
     "prompt": "الموجّه",

@@ -351,7 +351,7 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
       parameters: {
         type: 'object',
         properties: {
-          label: { type: 'string', description: 'The job this schedule runs, e.g. "Weekly money summary". The agent does it the way its Work style says.' },
+          label: { type: 'string', description: 'The job this schedule runs, e.g. "Follow up on unpaid invoices"; the timing is set separately. The agent does it the way its Work style says.' },
           intervalMinutes: { type: 'number', description: 'How often it fires, in minutes (min 5). Default 60.' },
           to: { type: 'string', description: 'Target agent name or id. Default: the god orchestrator.' }
         },

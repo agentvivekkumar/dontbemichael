@@ -23,7 +23,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   stays on disk as an ordinary folder inside Michael's. Turning it on or off in Settings now reaches
   agents that are already running on their next message, instead of at their next start.
 - **A schedule says when and which job, not how.** Schedules no longer have a Prompt: the label
-  names the job (for example "Weekly money summary"), and the agent does it the way its Work style
+  names the job (for example "Follow up on unpaid invoices"), and the agent does it the way its Work style
   says. Every run sends the same short message, including a way to stop quietly when there is
   nothing to do. The hourly standup's instructions moved into Michael's own. A schedule that already
   had its own instructions keeps sending them, and its card offers to move them into that team
