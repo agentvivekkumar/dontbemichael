@@ -80,6 +80,8 @@ export class HookServer {
   /** The company profile last delivered to each agent's session: same once per
    *  session, again on change, rule as the goal. */
   private deliveredProfileByAgent = new Map<string, { sessionId: string | null; text: string | null }>();
+  /** What roster each agent's session was last given, so it is sent again only on a change. */
+  private deliveredRosterByAgent = new Map<string, { sessionId: string | null; layoutKey: string; statusKey: string }>();
   /** The session each agent was last given its memory index in. */
   private deliveredMemoryByAgent = new Map<string, string | null>();
 
@@ -388,9 +390,26 @@ export class HookServer {
     // Hand the roster the LIVE context-window occupancy (contextById) so each
     // agent line can carry a `ctx NN%` — god then sees whose context is nearly
     // full when it routes work, instead of guessing from cumulative token spend.
-    const roster = wantsRoster
-      ? this.hive.rosterContext((id) => this.contextFor(id))
-      : null;
+    // A business office (owner, 2026-09-25) sends the full roster at the start
+    // of a session and when the team changes, a one line status when only who
+    // is busy or on hold changed, and nothing otherwise. Older installs keep
+    // the live roster on every prompt.
+    let roster: string | null = null;
+    if (wantsRoster && this.getConfig().businessFolder && typeof this.hive.teamRoster === 'function') {
+      const r = this.hive.teamRoster();
+      const sessionId = p.session_id ?? null;
+      const last = this.deliveredRosterByAgent.get(agentId!);
+      if (r) {
+        if (event === 'SessionStart' || !last || last.sessionId !== sessionId || last.layoutKey !== r.layoutKey) {
+          roster = r.full;
+        } else if (last.statusKey !== r.statusKey) {
+          roster = r.status;
+        }
+        this.deliveredRosterByAgent.set(agentId!, { sessionId, layoutKey: r.layoutKey, statusKey: r.statusKey });
+      }
+    } else if (wantsRoster) {
+      roster = this.hive.rosterContext((id) => this.contextFor(id));
+    }
 
     // Standing goal (hire Briefing) — durable roster field, re-read every cycle so
     // an Edit Agent save is picked up on the next UserPromptSubmit without

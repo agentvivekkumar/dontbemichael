@@ -2931,6 +2931,51 @@ export class HiveManager {
         + 'Route work to someone on this list before spawning anyone new.';
     } catch { return null; }
   }
+  /**
+   * The team roster for a business office (agent instructions audit,
+   * 2026-09-25): a fixed header and one line per team member (Michael
+   * excluded) with the Role description Michael routes by, plus a status tag
+   * only when it changes routing (busy on a card, on hold). `layoutKey` changes
+   * only when a line's name, role or description does; `statusKey` only when a
+   * tag does, so the hook can send the full roster on a team change and a
+   * short status line otherwise (hooks.ts).
+   */
+  teamRoster(): { full: string; status: string; layoutKey: string; statusKey: string } | null {
+    const root = this.root();
+    if (!root) return null;
+    try {
+      const snap = JSON.parse(readFileSync(join(root, 'fleet.json'), 'utf8')) as {
+        agents?: Array<{ id: string; name?: string; role?: string; isGod?: boolean; onHold?: boolean }>;
+      };
+      const team = (Array.isArray(snap.agents) ? snap.agents : []).filter((a) => !a.isGod);
+      if (!team.length) return null;
+      const ledger = this.tasks() as { tasks?: HiveTask[] };
+      const cards = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+      const busyOn = (id: string) => cards.find((t) => t?.assignee === id && t.status === 'doing')?.title;
+      const lines: string[] = [];
+      const tagged: string[] = [];
+      const layout: string[] = [];
+      for (const a of team) {
+        const base = `- ${a.name ?? a.id} (${a.id}), ${a.role ?? 'team member'}`;
+        layout.push(base);
+        const tags: string[] = [];
+        const busy = busyOn(a.id);
+        if (busy) { tags.push(`busy: ${busy}`); tagged.push(`${a.name ?? a.id} busy (${busy})`); }
+        if (a.onHold) { tags.push('on hold'); tagged.push(`${a.name ?? a.id} on hold`); }
+        lines.push(tags.length ? `${base} (${tags.join('; ')})` : base);
+      }
+      const status = tagged.length
+        ? `Status now: ${tagged.join(', ')}. Everyone else free.`
+        : 'Status now: everyone is free.';
+      return {
+        full: ['Team roster (address messages by the id in brackets):', ...lines].join('\n'),
+        status,
+        layoutKey: layout.join('\n'),
+        statusKey: tagged.join('\n')
+      };
+    } catch { return null; }
+  }
+
   logTail(n = 200): unknown[] {
     const root = this.root();
     if (!root || !existsSync(join(root, 'log.jsonl'))) return [];
