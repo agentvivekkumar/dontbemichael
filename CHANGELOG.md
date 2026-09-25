@@ -25,6 +25,9 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 - **"Close Office" and "Hide Office" in the menu.** They replace "Quit Don't Be Michael" and "Hide
   Don't Be Michael", which put the action and "Don't" side by side. Cmd+Q and Cmd+H work as before.
 
+- **Edit a team member's engine from two short lists.** Provider and model are now dropdowns
+  instead of rows of buttons, and the provider list shows the engines this app offers.
+
 ### Removed
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer

@@ -2,7 +2,6 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
-import { ProviderLogo } from './ProviderLogo';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -16,6 +15,7 @@ import {
   providerPreset,
   isClaudeProvider
 } from '@/store/config';
+import { BUILD_ENGINES } from '@shared/agentProvider';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -186,72 +186,44 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               </Row>
             </Section>
 
-            <Section label="Engine" hint="provider · model · next restart">
+            <Section label="Engine" hint="provider · model">
               <Row label="Provider">
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {AGENT_PROVIDER_PRESETS.map((p) => {
-                    const active = provider === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => pickProvider(p.id)}
-                        title={p.label}
-                        style={{
-                          padding: '3px 8px 1px',
-                          background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                          boxShadow: active
-                            ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                            : 'inset 0 0 0 1px var(--cth-ink-100)',
-                          fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-                          color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none',
-                          display: 'inline-flex', alignItems: 'center', gap: 6
-                        }}
-                      >
-                        <ProviderLogo provider={p.id} size={14} />
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* A list, not a grid of buttons. Only the engines this build
+                    offers (BUILD_ENGINES, like setup), plus the agent's own if it
+                    runs on another, so a list never hides what it is on. */}
+                <select
+                  value={provider}
+                  onChange={(e) => pickProvider(e.target.value as AgentProvider)}
+                  style={inputStyle}
+                >
+                  {AGENT_PROVIDER_PRESETS
+                    .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
+                    .map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
               </Row>
 
               {preset.supportsModel && (
                 <Row label="Model">
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <select
+                    value={model ?? ''}
+                    onChange={(e) => setModel(e.target.value || undefined)}
+                    style={inputStyle}
+                  >
+                    {/* Always list the current model: a <select> whose value
+                        matches no option shows its first row while the saved
+                        model stays the other one. */}
                     {(() => {
                       const known = modelsForProvider(provider);
                       return model && !known.some((m) => m.id === model)
                         ? [...known, { id: model, label: `${model} (current)` }]
                         : known;
-                    })().map((m) => {
-                      const active = (model ?? '') === (m.id ?? '');
-                      return (
-                        <button
-                          key={m.label}
-                          type="button"
-                          onClick={() => setModel(m.id)}
-                          title={m.id ?? 'CLI default model'}
-                          style={{
-                            padding: '3px 8px 1px',
-                            background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                            boxShadow: active
-                              ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                              : 'inset 0 0 0 1px var(--cth-ink-100)',
-                            fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-                            color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-                          }}
-                        >
-                          {m.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                    })().map((m) => <option key={m.id ?? m.label} value={m.id ?? ''}>{m.label}</option>)}
+                  </select>
                 </Row>
               )}
 
-              <span style={{ fontSize: 12, color: 'var(--cth-ink-500)', lineHeight: '16px' }}>
-                Engine changes are saved for the next restart. Use Command Center → Floor to restart a live session onto a new provider/model now.
+              <span style={{ fontSize: 14, color: 'var(--cth-ink-500)', lineHeight: '18px' }}>
+                A new engine or model takes effect the next time this team member starts.
               </span>
             </Section>
 
