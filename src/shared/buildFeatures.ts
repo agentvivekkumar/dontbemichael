@@ -51,3 +51,10 @@ export const SHOW_CLOSE_AGENT = false;
  *  folder in Michael's Command Center. A developer tool owners don't use
  *  (owner, 2026-09-24). */
 export const SHOW_OPEN_TERMINAL = false;
+
+/** The Auto / Pause switch in Michael's Command Center header, which holds
+ *  every queued message for every agent. A power-user control owners had no
+ *  use for (owner, 2026-09-24). While it is hidden, a pause saved earlier is
+ *  cleared at launch, so no one is left with messages held and no switch to
+ *  release them. */
+export const SHOW_DELIVERY_SWITCH = false;

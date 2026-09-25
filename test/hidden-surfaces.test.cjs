@@ -183,3 +183,18 @@ test('the open terminal buttons are hidden everywhere', () => {
     assert.ok(src.slice(Math.max(0, at - 160), at).includes('{SHOW_OPEN_TERMINAL && ('), `${file}: behind SHOW_OPEN_TERMINAL`);
   }
 });
+
+/**
+ * The floor-wide Auto / Pause delivery switch is hidden (owner, 2026-09-24).
+ * A pause is saved per agent in the config and restored at launch, so while the
+ * switch is hidden a saved pause is cleared instead: no one is left with held
+ * messages and no switch to release them.
+ */
+test('the delivery switch is hidden, and a saved pause cannot strand messages', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_DELIVERY_SWITCH, false);
+  const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  const at = cc.indexOf("variant={floorDeliveryPaused ? 'primary' : 'secondary'}");
+  assert.ok(at > 0 && cc.slice(at - 120, at).includes('{SHOW_DELIVERY_SWITCH && ('), 'switch behind SHOW_DELIVERY_SWITCH');
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(SHOW_DELIVERY_SWITCH\) \{\s*control\.replaceAutoDeliveryPauses\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\);\s*\} else if \(\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\)\.length > 0\) \{\s*writeConfig\(\{ autoDeliveryPausedAgents: \[\] \}\);/);
+});

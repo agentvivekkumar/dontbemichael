@@ -7,7 +7,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
-import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
+import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
 import { TriggerCard } from './triggers/ui';
@@ -212,25 +212,27 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
             agent's queue), and the IDE opens from agent level, not the toolbar.
             Short labels — the tooltips carry the full explanation. */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <PixelButton
-            variant={floorDeliveryPaused ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => { void toggleFloorDelivery(); }}
-          >
-            <span
-              className="cth-tip cth-tip-wrap"
-              data-tip={floorDeliveryPaused
-                ? t('commandCenter.deliveryPausedTitle')
-                : t('commandCenter.deliveryOnTitle')}
-              aria-label={floorDeliveryPaused
-                ? t('commandCenter.deliveryResumeAria')
-                : t('commandCenter.deliveryHoldAria')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          {SHOW_DELIVERY_SWITCH && (
+            <PixelButton
+              variant={floorDeliveryPaused ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => { void toggleFloorDelivery(); }}
             >
-              <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
-              {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
-            </span>
-          </PixelButton>
+              <span
+                className="cth-tip cth-tip-wrap"
+                data-tip={floorDeliveryPaused
+                  ? t('commandCenter.deliveryPausedTitle')
+                  : t('commandCenter.deliveryOnTitle')}
+                aria-label={floorDeliveryPaused
+                  ? t('commandCenter.deliveryResumeAria')
+                  : t('commandCenter.deliveryHoldAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
+                {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
+              </span>
+            </PixelButton>
+          )}
           {/* Floor-level surface with no agent of its own: the honest target is
               whoever is selected, stated explicitly rather than left to the
               IDE's fallback so the intent is visible at the call site. */}

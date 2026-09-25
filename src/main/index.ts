@@ -69,7 +69,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
-import { COLLECT_USAGE_STATS } from '../shared/buildFeatures';
+import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH } from '../shared/buildFeatures';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -5245,7 +5245,14 @@ function bootstrapHiveServices(): void {
     electron: process.versions.electron,
     platform: process.platform
   });
-  control.replaceAutoDeliveryPauses(readConfig().autoDeliveryPausedAgents ?? []);
+  // While the Auto / Pause switch is hidden (buildFeatures.ts), a pause saved
+  // before it was hidden is cleared rather than restored: otherwise those
+  // agents' queued messages would be held with no switch to release them.
+  if (SHOW_DELIVERY_SWITCH) {
+    control.replaceAutoDeliveryPauses(readConfig().autoDeliveryPausedAgents ?? []);
+  } else if ((readConfig().autoDeliveryPausedAgents ?? []).length > 0) {
+    writeConfig({ autoDeliveryPausedAgents: [] });
+  }
   archiveOrphanedAgents(); // #57/#58: archive stale archived:false entries with no live PTY
   hive.startRouter();
   startEphemeralWorkerWatcher(); // poll HIVE_ROOT/spawn-requests → ephemeral workers

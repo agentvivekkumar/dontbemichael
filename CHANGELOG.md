@@ -29,6 +29,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
   asks about it.
+- **No Auto / Pause switch in Michael's Command Center.** It held back every message queued for
+  the team. Queued messages are always delivered now, and a pause saved earlier is cleared.
 - **No "open" button next to edit.** It opened a Terminal window in the agent's folder, a developer
   tool. The terminal icons beside folders in Michael's Command Center are gone too.
 - **No close button on team members.** It stopped a team member mid-task and took it off the floor,
