@@ -1,3 +1,8 @@
+> **Superseded for Don't Be Michael (2026-09-24).** This file describes the upstream
+> Munder Difflin landing site (munderdiffl.in) and is kept only as history. The
+> Don't Be Michael website is dontbemichael.com, and its rules live in the root
+> [`DESIGN.md`](../DESIGN.md), chapters 1 to 8. Do not design from this file.
+
 # Munder Difflin — Landing Site Design System
 
 > Source of truth for `docs/index.html` (the marketing site at **munderdiffl.in**).
