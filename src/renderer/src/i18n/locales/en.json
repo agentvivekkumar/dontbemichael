@@ -204,7 +204,8 @@
       "autonomyBudgets": "Autonomy & Budgets",
       "connections": "Connections",
       "voice": "Voice",
-      "memoryKnowledge": "Memory & Knowledge"
+      "memoryKnowledge": "Memory & Knowledge",
+      "companyProfile": "Company profile"
     },
     "changeHome": {
       "newHome": "New office folder",
@@ -256,9 +257,7 @@
       "advanced": "Advanced",
       "maxTurns": "Max turns per run",
       "unlimited": "unlimited",
-      "blankUnlimited": "blank = unlimited",
-      "contextUpkeep": "Keeping agents fresh",
-      "contextUpkeepDesc": "As an agent works, its memory of the conversation fills up. These rules tidy it for every agent on the team: compacting summarises what came before so the work carries on; clearing wipes it. The defaults suit most offices."
+      "blankUnlimited": "blank = unlimited"
     },
     "autonomy": {
       "autonomy": "Autonomy",
@@ -419,8 +418,8 @@
     "sentToMichael": "sent to {{godName}}",
     "sentToWithSuggestion": "sent to {{godName}} (suggesting {{name}})",
     "dispatchFailed": "failed: {{error}}",
-    "dispatchSuggestion": "(The human suggests {{name}} ({{id}}) for this. Your call as orchestrator.)",
-    "taskFromHuman": "Task from the human",
+    "dispatchSuggestion": "(The owner suggests {{name}} ({{id}}) for this. Your call as office manager.)",
+    "taskFromHuman": "Task from the owner",
     "agents": "AGENTS",
     "godTag": " (god)",
     "toolCalls": "{{count}} tool calls",
@@ -570,10 +569,17 @@
         "label": "Release manager"
       }
     },
-    "description": "Description",
-    "descriptionPlaceholder": "job: what this agent is for, not live status",
-    "goal": "Goal (optional)",
-    "goalPlaceholder": "standing directive injected on every prompt",
+    "role": "Role",
+    "rolePlaceholder": "For example: Finance",
+    "roleDescription": "Role description",
+    "roleDescriptionPlaceholder": "For example: Keeps track of money in and money out, and sends a weekly summary",
+    "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
+    "workStyle": "Work style (optional)",
+    "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
+    "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
+    "folderInsideMichael": "A folder inside {{godName}}'s, named after the role. Only this team member, anyone in the same role, and {{godName}} can open it.",
+    "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
+    "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
     "importHire": "Import hire",
     "importHireDesc": "Import hire loads a ready to use agent from a .json manifest. It fills in every field below for you to review. Nothing spawns until you hit spawn.",
     "generateWithAI": "generate one with AI…",
@@ -593,13 +599,26 @@
   },
   "onboarding": {
     "titles": {
-      "welcome": "STEP 2 OF 6 · MEET YOUR OFFICE",
-      "home": "STEP 4 OF 6 · A HOME FOR THE APP",
-      "orchestrator": "STEP 5 OF 6 · YOUR MANAGER",
-      "permissions": "STEP 6 OF 6 · PERMISSIONS & RELIABILITY",
+      "resume": "WELCOME BACK",
+      "welcome": "STEP 3 OF 7 · MEET YOUR OFFICE",
+      "home": "STEP 5 OF 7 · A HOME FOR THE APP",
+      "orchestrator": "STEP 6 OF 7 · YOUR MANAGER",
+      "permissions": "STEP 7 OF 7 · PERMISSIONS & RELIABILITY",
       "done": "ALL SET",
-      "business": "STEP 1 OF 6 · YOUR BUSINESS",
-      "team": "STEP 3 OF 6 · YOUR TEAM"
+      "business": "STEP 1 OF 7 · YOUR BUSINESS",
+      "details": "STEP 2 OF 7 · COMPANY DETAILS",
+      "team": "STEP 4 OF 7 · YOUR TEAM"
+    },
+    "resume": {
+      "headline": "WE FOUND YOUR OFFICE",
+      "desc": "This Mac already has an office in {{folder}}: {{business}}, with {{count}} team members. Continue with it to keep your team, their folders, their memory and their work.",
+      "foldersHead": "Your team works in these folders:",
+      "folderInUse": "This folder already holds an office. Pick an empty folder for a new one.",
+      "folderCheckFailed": "Couldn't check this folder. Try again, or pick another place.",
+      "unnamed": "your business",
+      "newNote": "Setting up a new office gives it a folder of its own, so this office stays exactly as it is.",
+      "continue": "Continue with this office",
+      "startNew": "Set up a new office"
     },
     "welcome": {
       "headline": "YOUR MANAGER AND THE FLOOR HE RUNS",
@@ -689,8 +708,6 @@
       "body": "I run your office. Tell me about your business and I'll suggest a starter team. You pick who joins.",
       "nameLabel": "Business name",
       "namePlaceholder": "e.g. Pho Saigon Kitchen",
-      "cityLabel": "City, State",
-      "cityPlaceholder": "e.g. Austin, TX",
       "ask": "WHAT KIND OF BUSINESS DO YOU RUN?",
       "otherTitle": "Something else",
       "otherDesc": "{{godName}} will ask a few questions",
@@ -702,7 +719,7 @@
     "team": {
       "intro": "Suggested for {{pack}}. Pick whoever you want, and you can hire more later.",
       "introOther": "Start with {{godName}} and Oscar. Once your office is running, {{godName}} will ask you a few questions and suggest who else to hire.",
-      "folderNote": "Everyone works in their own folder, inside {{root}}. Put the documents each person needs in their folder. They'll read them, and save their work there too. The Office folder is shared by the whole team.",
+      "folderNote": "Everyone works in their own folder, inside {{root}}, which is {{godName}}'s. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. Company wide information, policies and rules go in Settings, Memory & Knowledge, where every team member can search them.",
       "managerName": "{{godName}} · Office Manager",
       "managerSummary": "Runs the office. Hands out work, and checks in with you when something needs a yes.",
       "alwaysOn": "always on",
@@ -713,11 +730,12 @@
       "worksIn": "Works in",
       "change": "change",
       "useSuggested": "use suggested",
-      "sharedFolder": "shared with everyone",
+      "sharedFolder": "holds everyone's folders",
       "summary": "{{picked}} picked · {{connect}} to connect",
       "suggestCta": "Suggest my team",
       "errFolder": "Couldn't set up {{path}}: {{reason}}",
       "errNoFolders": "Couldn't work out where your team's folders go. Go back and check your business name.",
+      "errMichaelFolder": "That folder can't hold your office. Pick a folder of its own, not your home folder or a system folder.",
       "conn": {
         "email": "Email",
         "quickbooks": "QuickBooks",
@@ -731,7 +749,10 @@
         "github": "GitHub"
       }
     },
-    "errSaveSetup": "Couldn't save your setup. Try again."
+    "errSaveSetup": "Couldn't save your setup. Try again.",
+    "details": {
+      "intro": "All optional. {{godName}} and the team use these for signatures, scheduling and prices. You can fill them in later in Settings, Company profile."
+    }
   },
   "office": {
     "gpuError": "The office floor lost its GPU context.\n\nToo many terminals are using the GPU at once.\nClose a few agent terminals, or restart the app, to bring it back.",
@@ -939,28 +960,6 @@
     "noKeyWarning": "This is switched on with no key set, so no teammate can reach you yet.",
     "noKey": "no key"
   },
-  "contextSection": {
-    "loading": "One sec…",
-    "intro": "A rule fires only when both halves agree: the gap since its last run has passed, AND that agent's context is at least as full as the bar. A bar of 0% means the clock alone.",
-    "compact": "Compact",
-    "compactBlurb": "Summarises the context so the thread keeps going.",
-    "clear": "Clear",
-    "clearBlurb": "Discards the context. Nothing is summarised.",
-    "clearCaution": "Clearing throws context away; it is not a smaller version of compaction. An agent in the middle of a task forgets what it was doing. Leave this off unless you keep context another way.",
-    "extraFocus": "EXTRA FOCUS",
-    "extraFocusHint": "Appended to the provider's compaction command. Empty sends the bare command.",
-    "extraFocusPlaceholder": "What the summary must keep…",
-    "command": "COMMAND",
-    "commandHint": "Sent literally. Empty sends the bare clear command.",
-    "bothOff": "both off",
-    "off": "Off.",
-    "hintEvery": "Every {{interval}}, once context passes {{pct}}%.",
-    "noSoonerThan": "NO SOONER THAN EVERY",
-    "contextBar": "CONTEXT BAR",
-    "contextBarHint": "How full the window must be before this may run. 0% = time alone.",
-    "bigWindows": "BAR ON BIG WINDOWS",
-    "bigWindowsHint": "Used on windows of about 1M tokens, where a smaller slice is still an enormous amount of text."
-  },
   "schedulesSection": {
     "justNow": "just now",
     "ago": "{{unit}} ago",
@@ -970,8 +969,8 @@
     "nothingScheduled": "Nothing is scheduled yet.",
     "addSchedule": "add a schedule",
     "newSchedule": "NEW SCHEDULE",
-    "label": "LABEL",
-    "labelPlaceholder": "What this run is for",
+    "label": "DO WHAT?",
+    "labelPlaceholder": "For example: Follow up on unpaid invoices",
     "goesTo": "GOES TO",
     "everyone": "everyone",
     "prompt": "PROMPT",
@@ -983,7 +982,13 @@
     "noPrompt": "No prompt set.",
     "saved": "saved",
     "when": "WHEN",
-    "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap."
+    "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap.",
+    "labelHint": "The agent is told this job name and does it the way its Work style says. Put how the job is done in that team member's Work style.",
+    "runsLabel": "Runs this job the way the agent's Work style says.",
+    "olderInstructions": "OLDER INSTRUCTIONS",
+    "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
+    "moveToWorkStyle": "Move to {{name}}'s Work style",
+    "removeOlder": "Remove"
   },
   "webhooksSection": {
     "summaryNone": "none",
@@ -1441,5 +1446,72 @@
     "tasksIntro": "Every job the team has, by stage: To do, Doing, Blocked and Done. Each card shows who has it, and a ? means it is waiting on you (answer it on the Ask me tab). Click a card for the details.",
     "graphIntroTitle": "Who talks to whom.",
     "graphIntro": "Each box is a team member and each line is the messages between them, coloured by kind: asking, answering, agreeing and so on. Turn on topics to see what each one remembers. Click a person to read their memory on {{godName}}'s panel."
+  },
+  "companyProfile": {
+    "intro": "Key facts about your business. Every team member, {{godName}} included, works from them. Short answers only: anything longer goes in Memory & Knowledge.",
+    "ceo": "CEO or owner",
+    "ceoPlaceholder": "Full name",
+    "website": "Website",
+    "industry": "Industry",
+    "industryPlaceholder": "For example: Dental clinic",
+    "addressHead": "HEADQUARTERS ADDRESS",
+    "street": "Street address",
+    "city": "City",
+    "region": "State or region",
+    "postalCode": "Postal code",
+    "country": "Country",
+    "contactHead": "CONTACT DETAILS",
+    "legalName": "Legal name",
+    "legalNamePlaceholder": "For example: MoblizeIT LLC",
+    "entityType": "Business type",
+    "entity": {
+      "sole-proprietor": "Sole proprietor",
+      "partnership": "Partnership",
+      "llc": "LLC",
+      "corporation": "Corporation",
+      "nonprofit": "Nonprofit",
+      "other": "Other"
+    },
+    "phone": "Main phone",
+    "email": "Public email",
+    "social": "Social media links",
+    "socialHint": "One link per line, up to 5.",
+    "operateHead": "HOW YOU OPERATE",
+    "hours": "Business hours",
+    "hoursPlaceholder": "For example: Mon to Fri, 9am to 5pm",
+    "timeZone": "Time zone",
+    "serviceArea": "Where you serve",
+    "area": {
+      "local": "One city or town",
+      "regional": "A region or state",
+      "national": "The whole country",
+      "international": "Worldwide"
+    },
+    "languages": "Languages you serve customers in",
+    "languagesPlaceholder": "For example: English, Spanish",
+    "moneyHead": "MONEY",
+    "currency": "Currency",
+    "fiscalMonth": "Financial year starts in",
+    "notSet": "Not set",
+    "knowledgeHead": "Everything else goes in Memory & Knowledge",
+    "knowledgeBody": "Product and price lists, your ideal customers, how you sell, policies, your mission: add them as documents in Settings, Memory & Knowledge. Every team member can search them.",
+    "knowledgeOpen": "Open Memory & Knowledge",
+    "save": "Save",
+    "saved": "Saved. Your team gets the change with their next message.",
+    "saveFailed": "Couldn't save. Try again.",
+    "stillMissing": "Fields marked * are still empty.",
+    "missing": {
+      "ceo": "Add the CEO or owner's name.",
+      "street": "Add the street address.",
+      "city": "Add the city.",
+      "country": "Add the country.",
+      "industry": "Say what kind of business this is."
+    }
+  },
+  "clearedBanner": {
+    "text": "The app gave {{name}} a fresh start {{ago}}, after saving a handoff and its notes. Nothing was lost.",
+    "bringBack": "Bring back the earlier conversation",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago"
   }
 }

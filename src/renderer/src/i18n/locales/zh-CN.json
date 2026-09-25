@@ -204,7 +204,8 @@
       "autonomyBudgets": "自主权与预算",
       "connections": "连接",
       "voice": "语音",
-      "memoryKnowledge": "记忆与知识"
+      "memoryKnowledge": "记忆与知识",
+      "companyProfile": "公司资料"
     },
     "changeHome": {
       "newHome": "新的办公室文件夹",
@@ -256,9 +257,7 @@
       "advanced": "高级",
       "maxTurns": "每次运行最大轮数",
       "unlimited": "无限制",
-      "blankUnlimited": "留空 = 无限制",
-      "contextUpkeep": "让智能体保持清爽",
-      "contextUpkeepDesc": "智能体工作时，它对对话的记忆会逐渐填满。这些规则会为团队里的每个智能体整理记忆：压缩会总结之前的内容，让工作继续；清除则会把它清空。默认设置适合大多数办公室。"
+      "blankUnlimited": "留空 = 无限制"
     },
     "autonomy": {
       "autonomy": "自主权",
@@ -419,8 +418,8 @@
     "sentToMichael": "已发送给 {{godName}}",
     "sentToWithSuggestion": "已发送给 {{godName}}（建议 {{name}}）",
     "dispatchFailed": "失败：{{error}}",
-    "dispatchSuggestion": "（人类建议由 {{name}}（{{id}}）处理，你是调度者，你来定。）",
-    "taskFromHuman": "来自人类的任务",
+    "dispatchSuggestion": "（负责人建议由 {{name}}（{{id}}）处理，由你这位办公室经理决定。）",
+    "taskFromHuman": "来自负责人的任务",
     "agents": "智能体",
     "godTag": "（上帝）",
     "toolCalls": "{{count}} 次工具调用",
@@ -570,10 +569,17 @@
         "label": "发布经理"
       }
     },
-    "description": "描述",
-    "descriptionPlaceholder": "职责：该智能体是做什么的，而非实时状态",
-    "goal": "目标（可选）",
-    "goalPlaceholder": "每次提示都会注入的长期指令",
+    "role": "角色",
+    "rolePlaceholder": "例如：财务",
+    "roleDescription": "角色说明",
+    "roleDescriptionPlaceholder": "例如：记录每一笔收入和支出，每周发一份汇总",
+    "roleHelp": "{{godName}} 会根据角色和角色说明决定把哪些工作交给这位成员。",
+    "workStyle": "工作方式（可选）",
+    "workStylePlaceholder": "例如：每个数字都核对两遍。完成后发一份简短汇总。",
+    "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式，包括按日程运行的任务：按什么步骤做，结束前检查什么。",
+    "folderInsideMichael": "放在 {{godName}} 的文件夹里，以角色命名。只有这位成员、同一角色的成员和 {{godName}} 能打开。",
+    "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
+    "errFolderShared": "这是 {{godName}} 的文件夹。请为这位成员选择一个自己的文件夹。",
     "importHire": "导入 hire",
     "importHireDesc": "导入 hire 会从一个 .json 清单加载现成的智能体，它会填好下方所有字段供你检查。不点 生成 就不会启动任何东西。",
     "generateWithAI": "用 AI 生成一个…",
@@ -593,13 +599,26 @@
   },
   "onboarding": {
     "titles": {
-      "welcome": "第 2 步，共 6 步 · 认识你的办公室",
-      "home": "第 4 步，共 6 步 · 为应用找一个家",
-      "orchestrator": "第 5 步，共 6 步 · 您的经理",
-      "permissions": "第 6 步，共 6 步 · 权限与可靠性",
+      "resume": "欢迎回来",
+      "welcome": "第 3 步，共 7 步 · 认识你的办公室",
+      "home": "第 5 步，共 7 步 · 为应用找一个家",
+      "orchestrator": "第 6 步，共 7 步 · 您的经理",
+      "permissions": "第 7 步，共 7 步 · 权限与可靠性",
       "done": "全部就绪",
-      "business": "第 1 步，共 6 步 · 您的业务",
-      "team": "第 3 步，共 6 步 · 您的团队"
+      "business": "第 1 步，共 7 步 · 您的业务",
+      "details": "第 2 步，共 7 步 · 公司详情",
+      "team": "第 4 步，共 7 步 · 您的团队"
+    },
+    "resume": {
+      "headline": "我们找到了你的办公室",
+      "desc": "这台 Mac 上已有一个办公室，位于 {{folder}}：{{business}}，共有 {{count}} 位团队成员。继续使用它，可以保留你的团队、他们的文件夹、记忆和工作。",
+      "foldersHead": "你的团队在这些文件夹中工作：",
+      "folderInUse": "这个文件夹里已经有一个办公室。请为新办公室选择一个空文件夹。",
+      "folderCheckFailed": "无法检查这个文件夹。请重试，或选择其他位置。",
+      "unnamed": "你的企业",
+      "newNote": "新建办公室会使用单独的文件夹，这个办公室会保持原样。",
+      "continue": "继续使用这个办公室",
+      "startNew": "新建一个办公室"
     },
     "welcome": {
       "headline": "您的经理和他打理的办公室",
@@ -689,8 +708,6 @@
       "body": "我来打理您的办公室。告诉我您的业务，我会推荐一支启动团队，由您决定谁加入。",
       "nameLabel": "企业名称",
       "namePlaceholder": "例如：西贡越南餐厅",
-      "cityLabel": "城市、州",
-      "cityPlaceholder": "例如：奥斯汀，德州",
       "ask": "您经营哪一类业务？",
       "otherTitle": "其他",
       "otherDesc": "{{godName}} 会问您几个问题",
@@ -702,7 +719,7 @@
     "team": {
       "intro": "为{{pack}}推荐的团队。想选谁就选谁，之后还可以再招人。",
       "introOther": "先从 {{godName}} 和 Oscar 开始。办公室运转起来后，{{godName}} 会问您几个问题，并建议还需要招谁。",
-      "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里。“Office”文件夹由整个团队共用。",
+      "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}，也就是 {{godName}} 的文件夹。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里，只有他们本人和 {{godName}} 能打开。公司范围的信息、政策和规定请放在“设置 > 记忆与知识”里，每位成员都能搜索。",
       "managerName": "{{godName}} · 办公室经理",
       "managerSummary": "打理整个办公室。分派工作，遇到需要您点头的事时会来问您。",
       "alwaysOn": "始终在岗",
@@ -713,11 +730,12 @@
       "worksIn": "工作文件夹",
       "change": "更改",
       "useSuggested": "使用建议位置",
-      "sharedFolder": "全员共用",
+      "sharedFolder": "包含所有人的文件夹",
       "summary": "已选 {{picked}} 人 · 需连接 {{connect}} 个账号",
       "suggestCta": "推荐我的团队",
       "errFolder": "无法设置 {{path}}：{{reason}}",
       "errNoFolders": "无法确定团队文件夹的位置。请返回检查您的企业名称。",
+      "errMichaelFolder": "这个文件夹不能用来存放您的办公室。请选择一个单独的文件夹，不要选主文件夹或系统文件夹。",
       "conn": {
         "email": "电子邮件",
         "quickbooks": "QuickBooks",
@@ -731,7 +749,10 @@
         "github": "GitHub"
       }
     },
-    "errSaveSetup": "无法保存你的设置，请重试。"
+    "errSaveSetup": "无法保存你的设置，请重试。",
+    "details": {
+      "intro": "全部可选。{{godName}} 和团队会在签名、日程安排和报价时用到这些信息。您也可以稍后在“设置 > 公司资料”里填写。"
+    }
   },
   "office": {
     "gpuError": "办公楼层丢失了 GPU 上下文。\n\n同时使用 GPU 的终端太多了。\n关闭几个智能体终端，或重启应用，即可恢复。",
@@ -939,28 +960,6 @@
     "noKeyWarning": "此项已开启但没有设置密钥，所以目前还没有队友能联系到你。",
     "noKey": "无密钥"
   },
-  "contextSection": {
-    "loading": "稍等…",
-    "intro": "规则只有在两半都满足时才触发：距离上次运行的时间已过，且该智能体的上下文至少达到指示条的量。指示条为 0% 意味着只看时钟。",
-    "compact": "压缩",
-    "compactBlurb": "对上下文做摘要，让对话继续下去。",
-    "clear": "清空",
-    "clearBlurb": "丢弃上下文。不做任何摘要。",
-    "clearCaution": "清空会把上下文扔掉，它不是压缩的缩小版。正在执行任务的智能体会忘记自己在做什么。除非你以其他方式保留上下文，否则请保持关闭。",
-    "extraFocus": "额外重点",
-    "extraFocusHint": "追加到提供方的压缩命令之后。留空则发送裸命令。",
-    "extraFocusPlaceholder": "摘要必须保留的内容…",
-    "command": "命令",
-    "commandHint": "原样发送。留空则发送裸清空命令。",
-    "bothOff": "都关闭",
-    "off": "关闭。",
-    "hintEvery": "每 {{interval}} 一次，且上下文超过 {{pct}}% 时。",
-    "noSoonerThan": "不早于每",
-    "contextBar": "上下文指示条",
-    "contextBarHint": "窗口满到什么程度才允许运行。0% = 只看时间。",
-    "bigWindows": "大窗口指示条",
-    "bigWindowsHint": "用于约 1M 令牌的窗口，那里即使较小的占比也是海量文本。"
-  },
   "schedulesSection": {
     "justNow": "刚刚",
     "ago": "{{unit}} 前",
@@ -970,8 +969,8 @@
     "nothingScheduled": "还没有计划任务。",
     "addSchedule": "添加计划",
     "newSchedule": "新计划",
-    "label": "名称",
-    "labelPlaceholder": "这次运行是做什么的",
+    "label": "做什么？",
+    "labelPlaceholder": "例如：跟进未付的发票",
     "goesTo": "发送给",
     "everyone": "所有人",
     "prompt": "提示词",
@@ -983,7 +982,13 @@
     "noPrompt": "未设置提示词。",
     "saved": "已保存",
     "when": "何时",
-    "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。"
+    "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。",
+    "labelHint": "成员会收到这个任务名称，并按照自己的工作方式去完成。任务具体怎么做，请写在该成员的工作方式里。",
+    "runsLabel": "按照成员的工作方式完成这个任务。",
+    "olderInstructions": "旧的说明",
+    "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
+    "moveToWorkStyle": "移到 {{name}} 的工作方式",
+    "removeOlder": "删除"
   },
   "webhooksSection": {
     "summaryNone": "无",
@@ -1441,5 +1446,72 @@
     "tasksIntro": "团队的每项工作按阶段排列：待办、进行中、已阻塞、已完成。每张卡片显示负责人；带 ? 的卡片在等你处理（请在“问我”标签页回答）。点击卡片查看详情。",
     "graphIntroTitle": "谁在和谁交流。",
     "graphIntro": "每个方框是一位团队成员，每条线是他们之间的消息，按类型着色：提问、回答、同意等。打开“主题”可查看每个人记住了什么。点击某人即可在 {{godName}} 的面板上查看其记忆。"
+  },
+  "companyProfile": {
+    "intro": "关于您公司的关键信息。每位成员，包括 {{godName}}，都会以此为依据工作。只填简短的答案，较长的内容请放进“记忆与知识”。",
+    "ceo": "CEO 或负责人",
+    "ceoPlaceholder": "全名",
+    "website": "网站",
+    "industry": "行业",
+    "industryPlaceholder": "例如：牙科诊所",
+    "addressHead": "总部地址",
+    "street": "街道地址",
+    "city": "城市",
+    "region": "州或地区",
+    "postalCode": "邮政编码",
+    "country": "国家",
+    "contactHead": "联系方式",
+    "legalName": "法定名称",
+    "legalNamePlaceholder": "例如：MoblizeIT LLC",
+    "entityType": "企业类型",
+    "entity": {
+      "sole-proprietor": "个体经营",
+      "partnership": "合伙企业",
+      "llc": "有限责任公司",
+      "corporation": "股份公司",
+      "nonprofit": "非营利组织",
+      "other": "其他"
+    },
+    "phone": "主要电话",
+    "email": "对外邮箱",
+    "social": "社交媒体链接",
+    "socialHint": "每行一个链接，最多 5 个。",
+    "operateHead": "经营方式",
+    "hours": "营业时间",
+    "hoursPlaceholder": "例如：周一至周五，上午 9 点到下午 5 点",
+    "timeZone": "时区",
+    "serviceArea": "服务范围",
+    "area": {
+      "local": "一个城市或城镇",
+      "regional": "一个地区或州",
+      "national": "全国",
+      "international": "全球"
+    },
+    "languages": "为客户提供服务的语言",
+    "languagesPlaceholder": "例如：英语、西班牙语",
+    "moneyHead": "财务",
+    "currency": "货币",
+    "fiscalMonth": "财年起始月份",
+    "notSet": "未设置",
+    "knowledgeHead": "其他内容请放进“记忆与知识”",
+    "knowledgeBody": "产品和价格表、理想客户、销售方式、各项政策、公司使命：请在“设置 > 记忆与知识”里以文档形式添加。每位成员都能搜索。",
+    "knowledgeOpen": "打开“记忆与知识”",
+    "save": "保存",
+    "saved": "已保存。团队会在下一条消息时收到更新。",
+    "saveFailed": "保存失败，请重试。",
+    "stillMissing": "标有 * 的字段仍为空。",
+    "missing": {
+      "ceo": "请填写 CEO 或负责人的姓名。",
+      "street": "请填写街道地址。",
+      "city": "请填写城市。",
+      "country": "请填写国家。",
+      "industry": "请说明这是什么类型的业务。"
+    }
+  },
+  "clearedBanner": {
+    "text": "应用在保存交接说明和笔记后，于{{ago}}让 {{name}} 重新开始了对话。没有丢失任何内容。",
+    "bringBack": "恢复之前的对话",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前"
   }
 }

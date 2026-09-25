@@ -73,7 +73,7 @@ test('protocol paths use native separators the agent can actually use', async (t
   const { inj, dir, root } = await floor(t);
   const prompt = promptOf(inj);
   for (const p of [
-    path.join(dir, 'memory.md'),
+    path.join(dir, 'memory', 'inbox.md'),
     path.join(dir, 'inbox'),
     path.join(dir, 'inbox', '.done'),
     path.join(dir, 'outbox'),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SHOW_IDE } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL, SHOW_VOICE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
@@ -1011,19 +1011,21 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
             god orchestrator) globally, not the agent in view, so users can start a
             voice session even while a worker's terminal fills the screen. The cost
             HUD stays Michael-only (it belongs to his card). */}
-        <RealtimeMichaelToggle />
+        {SHOW_VOICE && <RealtimeMichaelToggle />}
         {agent.isGod && <CostHud compact />}
-        <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openState === 'opening'}>
-          <span
-            className="cth-tip cth-tip-wrap"
-            data-tip={t('fullscreenTerminal.openTerminalTip', { cwd: agent.worktreePath || agent.cwd })}
-            aria-label={t('fullscreenTerminal.openTerminalAria')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          >
-            <Icon name="terminal" />
-            {openState === 'opening' ? t('agentDetail.opening') : openState === 'ok' ? t('agentDetail.ok') : openState === 'error' ? t('agentDetail.err') : t('agentDetail.open')}
-          </span>
-        </PixelButton>
+        {SHOW_OPEN_TERMINAL && (
+          <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openState === 'opening'}>
+            <span
+              className="cth-tip cth-tip-wrap"
+              data-tip={t('fullscreenTerminal.openTerminalTip', { cwd: agent.worktreePath || agent.cwd })}
+              aria-label={t('fullscreenTerminal.openTerminalAria')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="terminal" />
+              {openState === 'opening' ? t('agentDetail.opening') : openState === 'ok' ? t('agentDetail.ok') : openState === 'error' ? t('agentDetail.err') : t('agentDetail.open')}
+            </span>
+          </PixelButton>
+        )}
         {/* The badge is a STATUS, not a button, but it sits in a row of them.
             Its own box is 20px (lineHeight 18 + 2px padding) against the 24px
             every size="sm" PixelButton is fixed at, so the row read as ragged.
@@ -1034,7 +1036,7 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
           status={typing ? 'typing' : agent.status}
           style={{ height: 24, padding: '0 8px', lineHeight: '24px' }}
         />
-        {!agent.isGod && (
+        {!agent.isGod && SHOW_CLOSE_AGENT && (
           <PixelButton variant="destructive" size="sm" onClick={onKill}>
             {/* inline-flex + center: the other buttons hold TEXT, whose line box
                 the button centres for free. A bare <Icon> is replaced-content

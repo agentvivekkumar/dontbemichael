@@ -51,7 +51,7 @@ test('before onboarding there is nothing to lose, so launch proceeds', () => {
 
 test('a missing office is never rebuilt empty at launch, and nothing that feeds it starts', () => {
   const main = read('src/main/index.ts');
-  assert.match(main, /const homeReady = homeReadyAtLaunch\(readConfig\(\)\);\s*if \(homeReady\) bootstrapHiveServices\(\);/);
+  assert.match(main, /const homeReady = homeReadyAtLaunch\(readConfig\(\)\);\s*if \(homeReady\) \{?\s*bootstrapHiveServices\(\);/);
   assert.match(main, /if \(homeReady && slackCfg\.slackEnabled && slackCfg\.slackSigningSecret\)/);
   assert.match(main, /if \(homeReady && enabledWebhookEndpoints\(\)\.length > 0\)/);
 });
@@ -62,8 +62,9 @@ test('a normal launch shows no picker; only a missing office shows the new scree
   assert.ok(!fs.existsSync(path.resolve(__dirname, '../src/renderer/src/components/HivePicker.tsx')));
   assert.match(app, /setHomeState\(st\.hasOffice \? 'ok' : 'missing'\)/);
   assert.match(app, /if \(homeState === 'missing'\) \{\s*return <OfficeFolderMissing config=\{config\} \/>;/);
-  // Onboarding lands straight in the office it just made.
-  assert.match(app, /onComplete=\{\(next\) => \{ setConfig\(next\); setHomeState\('ok'\); \}\}/);
+  // Onboarding lands straight in the office it just made (after reloading, when
+  // that office is not the one the roster was loaded for: roster-source.test.cjs).
+  assert.match(app, /onComplete=\{\(next\) => \{[\s\S]{0,200}?setConfig\(next\); setHomeState\('ok'\);\s*\}\}/);
 });
 
 test('the missing screen only opens a folder that really holds an office', () => {

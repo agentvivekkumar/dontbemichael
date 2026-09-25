@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { OFFICE_KEY, folderNameFor, folderNames, initialPicks, folderFor, connectionsNeeded, teamPlan } =
+const { OFFICE_KEY, folderNameFor, folderNames, initialPicks, folderFor, michaelFolderFor, connectionsNeeded, teamPlan } =
   loadTs('src/shared/teamPlan.ts');
 
 const agent = (id, over = {}) => ({
@@ -29,7 +29,6 @@ const pack = { agents: [oscar, pam, kelly, creed], defaultPicks: ['oscar', 'pam'
 
 const suggestions = {
   root: '/D/Pho',
-  office: '/D/Pho/Office',
   byFolder: { Finance: '/D/Pho/Finance', Admin: '/D/Pho/Admin', Customers: '/D/Pho/Customers', Quality: '/D/Pho/Quality' }
 };
 
@@ -69,29 +68,44 @@ test('unpicked agents add nothing to connect', () => {
   assert.deepEqual(connectionsNeeded(pack.agents, { creed: true }), { required: [], optional: [] });
 });
 
-test('finish persists only picked agents, each with its folder, Office first and deduplicated', () => {
+test('finish persists only picked agents, each with its folder, Michael\'s first and deduplicated', () => {
   const plan = teamPlan(pack.agents, { oscar: true, pam: false, kelly: true, creed: true }, suggestions,
     { kelly: '/D/Pho/Finance' }); // owner pointed Kelly at Oscar's folder: they share it
   assert.equal(plan.ok, true);
-  assert.equal(plan.office, '/D/Pho/Office');
+  assert.equal(plan.business, '/D/Pho');
   assert.deepEqual(plan.team, [
     { agentId: 'oscar', folder: '/D/Pho/Finance' },
     { agentId: 'kelly', folder: '/D/Pho/Finance' },
     { agentId: 'creed', folder: '/D/Pho/Quality' }
   ]);
-  assert.deepEqual(plan.folders, ['/D/Pho/Office', '/D/Pho/Finance', '/D/Pho/Quality']);
+  assert.deepEqual(plan.folders, ['/D/Pho', '/D/Pho/Finance', '/D/Pho/Quality']);
 });
 
-test('the Office folder can be moved too', () => {
-  const plan = teamPlan(pack.agents, { oscar: true }, suggestions, { [OFFICE_KEY]: '/Users/me/Dropbox/Office' });
-  assert.equal(plan.office, '/Users/me/Dropbox/Office');
+test('picking Michael\'s folder moves the team\'s default folders with it', () => {
+  const picked = { [OFFICE_KEY]: '/Users/me/Dropbox/Pho' };
+  // Until main has worked out the defaults under the new folder, nothing is ready.
+  assert.equal(teamPlan(pack.agents, { oscar: true }, suggestions, picked).ok, false);
+  assert.equal(michaelFolderFor(suggestions, picked), '/Users/me/Dropbox/Pho');
+  const moved = {
+    root: '/Users/me/Dropbox/Pho',
+    byFolder: { Finance: '/Users/me/Dropbox/Pho/Finance', Admin: '/Users/me/Dropbox/Pho/Admin' }
+  };
+  const plan = teamPlan(pack.agents, { oscar: true }, moved, picked);
+  assert.equal(plan.business, '/Users/me/Dropbox/Pho');
+  assert.deepEqual(plan.team, [{ agentId: 'oscar', folder: '/Users/me/Dropbox/Pho/Finance' }]);
+  // A folder main refused (the home folder, say) never becomes the plan.
+  assert.equal(teamPlan(pack.agents, { oscar: true }, { ...moved, rootRefused: true }, picked).ok, false);
+});
+
+test('Michael\'s folder is the suggested business folder until the owner picks one', () => {
+  assert.equal(michaelFolderFor(suggestions, {}), suggestions.root);
 });
 
 test('a team of just Michael is allowed', () => {
   const plan = teamPlan(pack.agents, {}, suggestions, {});
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.team, []);
-  assert.deepEqual(plan.folders, ['/D/Pho/Office']);
+  assert.deepEqual(plan.folders, ['/D/Pho']);
 });
 
 test('not ready until every folder is resolved', () => {
@@ -113,27 +127,33 @@ test('the role is the job title plus the plain-language summary, so Michael can 
   assert.equal(teamMemberRole({ role: 'Finance', summary: 'Tracks food cost.' }), 'Finance: Tracks food cost.');
 });
 
-test('the standing goal carries the whole job description, addressed to the business', () => {
+test('the Work style comes from the pack, with the business filled in', () => {
+  const ws = 'The owner set this work style for your role at {Business}, {City}.\n\n### The job\nTrack food cost.';
+  assert.equal(
+    teamMemberGoal({ role: 'Finance', summary: 's', does: [], wontDo: [], workStyle: ws }, { name: 'Pho Saigon Kitchen', city: 'Austin, TX' }),
+    'The owner set this work style for your role at Pho Saigon Kitchen, Austin, TX.\n\n### The job\nTrack food cost.'
+  );
+  assert.match(teamMemberGoal({ role: 'F', summary: 's', does: [], wontDo: [], workStyle: ws }, {}), /^The owner set this work style for your role at the business\./, 'no name, no city');
+  assert.equal(teamMemberRole({ role: 'Finance', summary: 'owner card text', routing: 'Oscar keeps the books.' }), 'Finance: Oscar keeps the books.');
+});
+
+test('an imported pack agent without a Work style gets one from its card fields, written to it', () => {
   const goal = teamMemberGoal(
-    { role: 'Finance', summary: 'Tracks food cost.', does: ['Watch invoices'], wontDo: ['Move money'], firstAction: 'Send a money summary Monday' },
+    { role: 'Finance', summary: 'Tracks food cost.', does: ['Watch invoices'], wontDo: ['Move money'] },
     { name: 'Pho Saigon Kitchen', city: 'Austin, TX' }
   );
   assert.equal(goal, [
-    'You are the Finance for Pho Saigon Kitchen, Austin, TX. Tracks food cost.',
+    'The owner set this work style for your role at Pho Saigon Kitchen, Austin, TX.',
+    '',
+    'The job: Tracks food cost.',
     '',
     'What you do:',
     '• Watch invoices',
     '',
-    'Leave these alone and ask the owner first:',
-    '• Move money',
-    '',
-    'Your first job: Send a money summary Monday'
+    "Needs the owner's approval (send it to Michael first):",
+    '• Move money'
   ].join('\n'));
-});
-
-test('a goal still reads well with no business name and no rules', () => {
-  const goal = teamMemberGoal({ role: 'Quality', summary: 'Keeps checklists.', does: [], wontDo: [] }, {});
-  assert.equal(goal, 'You are the Quality for the business. Keeps checklists.');
+  assert.doesNotMatch(goal, /You are the/);
 });
 
 test('team colours cycle, with Michael\'s lemon last', () => {

@@ -158,3 +158,14 @@ test('preserves existing config files with unsafe JSON root shapes', () => {
   assert.equal(fs.readFileSync(settingsPath, 'utf8'), 'null\n');
   assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), '["keep"]\n');
 });
+
+test('a folder typed in another letter case is trusted under its real name too', () => {
+  const real = path.join(home, 'workspace', 'CaseFolder');
+  fs.mkdirSync(real, { recursive: true });
+  const typed = path.join(home, 'workspace', 'CASEFOLDER');
+  const caseInsensitive = fs.existsSync(typed);
+  ensureClaudePermissionsAccepted(caseInsensitive ? typed : real);
+  const projects = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects;
+  assert.equal(projects[fs.realpathSync.native(real)].hasTrustDialogAccepted, true, 'the real name is trusted');
+  if (caseInsensitive) assert.equal(projects[typed].hasTrustDialogAccepted, true, 'the typed name stays trusted');
+});

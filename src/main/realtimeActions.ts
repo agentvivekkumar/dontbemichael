@@ -37,7 +37,8 @@
 import { ipcMain } from 'electron';
 import type { HiveMessage, HiveTask, Registry } from './hive';
 import type { ScheduledMission } from './config';
-import { inferAgentProvider } from '../shared/agentProvider';
+import { inferAgentProvider, BUILD_ENGINES, type AgentProvider } from '../shared/agentProvider';
+import { ALLOW_VOICE_HIRE } from '../shared/buildFeatures';
 import { clearCommandForProvider } from '../shared/providerAutomation';
 import { resolveGodName } from '../shared/godIdentity';
 
@@ -644,7 +645,17 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
 
   // spawn / hire — expensive; stubbed $ estimate (rt-9 wires the real number).
   if (verb === 'spawn') {
+    // Hiring by voice is off in this build (ALLOW_VOICE_HIRE); the tool is not
+    // offered, and a spawn request that arrives anyway is refused here.
+    if (!ALLOW_VOICE_HIRE) {
+      return { ok: false, spoken: "I can't hire by voice in this version. You can add a team member in the office." };
+    }
     const provider = (str(a.provider) || 'claude').toLowerCase();
+    // Only the engines this build offers (BUILD_ENGINES), the same list the
+    // hire dialog shows: the others are not ready to run an office member.
+    if (!BUILD_ENGINES.includes(provider as AgentProvider)) {
+      return { ok: false, spoken: `I can only hire on Claude Code in this version, not ${provider}. Say the word and I'll hire them on Claude Code.` };
+    }
     const role = str(a.role) || str(a.job);
     const name = str(a.name) || (role ? role.replace(/\b\w/g, (c) => c.toUpperCase()) : provider) || 'Worker';
     const godCwd = reg.godId ? reg.agents[reg.godId]?.cwd : undefined;
@@ -694,8 +705,9 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
   // v0.3.4: create a brand-new schedule (edit_schedule only toggles/deletes).
   if (verb === 'create_schedule') {
     const label = str(a.label) || str(a.name) || str(a.title);
-    const body = str(a.prompt) || str(a.body) || str(a.message);
-    if (!label || !body) return { ok: false, spoken: 'I need a name for the schedule and what it should tell the agent.' };
+    // A schedule says when and which job (its name); how the job is done lives
+    // in the agent's Work style (owner, 2026-09-25), so no prompt is taken.
+    if (!label) return { ok: false, spoken: 'I need a name for the schedule, the job it runs.' };
     const minutes = typeof a.intervalMinutes === 'number' && isFinite(a.intervalMinutes)
       ? Math.min(7 * 24 * 60, Math.max(5, Math.round(a.intervalMinutes)))
       : 60;
@@ -707,7 +719,7 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
       label,
       intervalMs: minutes * 60_000,
       to: targetId,
-      body,
+      body: '',
       enabled: true
     };
     pending = {

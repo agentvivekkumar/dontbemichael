@@ -4,7 +4,7 @@
  * Where agents are told their work lives (Decisions 44, 48; F4-F6).
  *
  * The folder instructions are GATED: they appear only on a business install,
- * one with an Office folder. On an older install Michael still runs inside the
+ * one with a business folder (Michael's). On an older install Michael still runs inside the
  * harness folder, and telling him never to write there would contradict where
  * he actually is, so the gate matters in both directions.
  */
@@ -28,62 +28,52 @@ function promptOf(inj) {
 function setup(t) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-folders-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
-  const office = path.join(home, 'Documents', 'Pho', 'Office');
-  const finance = path.join(home, 'Documents', 'Pho', 'Finance');
-  fs.mkdirSync(office, { recursive: true });
+  const business = path.join(home, 'Documents', 'Pho');
+  const finance = path.join(business, 'Finance');
   fs.mkdirSync(finance, { recursive: true });
-  return { home, office, finance, hive: new HiveManager(() => home) };
+  return { home, business, finance, hive: new HiveManager(() => home) };
 }
 
-test('an older install (no Office folder) gets no folder instructions at all', async (t) => {
+test('an older install (no business folder) gets no folder instructions at all', async (t) => {
   const { home, hive } = setup(t);
   const p = promptOf(await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true }));
   assert.doesNotMatch(p, /YOUR FOLDERS/);
   assert.doesNotMatch(p, /NEVER save documents/);
 });
 
-test('a team member is told its own folder, the shared Office, and that the hive is off limits', async (t) => {
-  const { hive, office, finance } = setup(t);
+test('a team member is told its own folder is private, and that the hive is off limits', async (t) => {
+  const { hive, business, finance } = setup(t);
   const p = promptOf(await hive.ensureAgent(
     { id: 'oscar', name: 'Oscar', provider: 'claude', cwd: finance, role: 'Finance' },
-    { officeFolder: office }
+    { businessFolder: business }
   ));
   assert.ok(p.includes(`you work in ${finance}`), 'names its own folder');
   assert.match(p, /read it for context before searching the internet/);
-  assert.ok(p.includes(`${office} is the Office folder shared by the whole team`), 'names the Office');
-  assert.match(p, /NEVER save documents, drafts or other work anywhere in the hive/);
+  assert.match(p, /It is private: only you, anyone sharing this folder, and Michael can open it/, 'its folder is private');
+  assert.doesNotMatch(p, /Office folder/, 'no shared folder: company knowledge is the knowledge feature');
+  assert.match(p, /is only for coordination: your memory notes, inbox and outbox\. Save documents, drafts and other work outside it\./);
 });
 
-test('Michael, whose folder IS the Office, is told so rather than given two folders', async (t) => {
-  const { hive, office } = setup(t);
+test('Michael works in his own private folder and reads his team\'s folders', async (t) => {
+  const { hive, business } = setup(t);
   const p = promptOf(await hive.ensureAgent(
-    { id: 'god', name: 'Michael', provider: 'claude', cwd: office, isGod: true },
-    { officeFolder: office }
+    { id: 'god', name: 'Michael', provider: 'claude', cwd: business, isGod: true },
+    { businessFolder: business }
   ));
-  assert.ok(p.includes(`you work in ${office}, the Office folder shared by the whole team`));
-  assert.match(p, /NEVER save documents/);
+  assert.ok(p.includes(`you work in ${business}, your folder. It is private: only you and the owner can open it.`));
+  assert.match(p, /You can read their files, but only they change them/);
+  assert.doesNotMatch(p, /Office folder/);
+  assert.match(p, /Save documents, drafts and other work outside it/);
 });
 
 test('agents are given the exact doc-text command for Word, Excel and PowerPoint', async (t) => {
-  const { hive, office, finance } = setup(t);
+  const { hive, business, finance } = setup(t);
   const cli = '/App/Contents/Resources/app.asar/out/main/docTextCli.js';
   const p = promptOf(await hive.ensureAgent(
     { id: 'oscar', name: 'Oscar', provider: 'claude', cwd: finance },
-    { officeFolder: office, docTextCliPath: cli }
+    { businessFolder: business, docTextCliPath: cli }
   ));
   assert.match(p, /To read a Word, Excel or PowerPoint file, run/);
   assert.ok(p.includes(`"${cli}" "<file>"`), 'the absolute CLI path, quoted');
   assert.match(p, /You can open PDFs and images directly/);
-});
-
-test('the Office folder is writable for every agent it is given to', async (t) => {
-  const { hive, office, finance } = setup(t);
-  const inj = await hive.ensureAgent(
-    { id: 'oscar', name: 'Oscar', provider: 'claude', cwd: finance },
-    { officeFolder: office, extraWritableDirs: [office] }
-  );
-  const settingsArg = inj.args[inj.args.indexOf('--settings') + 1];
-  const settings = JSON.parse(fs.readFileSync(settingsArg, 'utf8'));
-  const dirs = settings.permissions?.additionalDirectories ?? [];
-  assert.ok(dirs.includes(office), `Office in additionalDirectories: ${JSON.stringify(dirs)}`);
 });

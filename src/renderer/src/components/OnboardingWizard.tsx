@@ -1,3 +1,5 @@
+import { CompanyProfileFields, localCurrency, localTimeZone } from './CompanyProfileFields';
+import { cityLine, cleanCompanyProfile, missingProfileFields, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -14,18 +16,20 @@ import type { ToolStatus } from '@shared/toolCatalog';
 import type { OfficePack } from '@shared/officePack';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import {
-  OFFICE_KEY, folderNames, initialPicks, folderFor, officeFolderFor, connectionsNeeded, teamPlan,
+  OFFICE_KEY, folderNames, initialPicks, folderFor, michaelFolderFor, connectionsNeeded, teamPlan,
   type FolderSuggestions
 } from '@shared/teamPlan';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { missingBusinessFields, type BusinessField } from '@shared/businessProfile';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { teamPlanFromRecord, type OfficeRecord } from '@shared/officeRecord';
+import { COLLECT_USAGE_STATS } from '@shared/buildFeatures';
 
 export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
 }
 
-type Step = 'business' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
+type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
 
 /** The "no pack fits" tile. Not an error path: Michael asks a few questions and
  *  builds from the core pack, so the grid always resolves to something. */
@@ -120,18 +124,33 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // and it is the plain one.
   const [businessType, setBusinessType] = useState<string | undefined>();
   const [businessName, setBusinessName] = useState('');
-  const [businessCity, setBusinessCity] = useState('');
-  // Name, location and type are all required (see businessProfile.ts). Gaps are
-  // only SHOWN after the owner has tried to continue: flagging empty fields the
-  // moment the screen opens reads as scolding before they've typed anything.
-  // After that the message is live, shrinking as each field is filled in.
+  // The company profile (src/shared/companyProfile.ts): the essentials on step
+  // 1, everything else optional on step 2. Time zone and currency start from
+  // the Mac's own settings.
+  const [profile, setProfile] = useState<CompanyProfile>(() => ({ timeZone: localTimeZone(), currency: localCurrency() }));
+  // The city line older parts of the app still read (businessCity).
+  const businessCity = cityLine(profile.address) ?? '';
+  // Name, type, CEO and the headquarters address are required (businessProfile.ts,
+  // companyProfile.ts). Gaps are only SHOWN after the owner has tried to
+  // continue: flagging empty fields the moment the screen opens reads as
+  // scolding before they've typed anything. After that the message is live,
+  // shrinking as each field is filled in.
   const [triedBusiness, setTriedBusiness] = useState(false);
-  const businessGaps = missingBusinessFields({ name: businessName, location: businessCity, type: businessType });
+  const profileGaps = missingProfileFields(cleanCompanyProfile(profile), businessType === OTHER_BUSINESS);
+  const businessGaps = [
+    ...missingBusinessFields({ name: businessName, location: businessCity || '-', type: businessType }),
+    ...profileGaps
+  ];
   const gapShown = (field: BusinessField) => triedBusiness && businessGaps.includes(field);
-  const gapMessage: Record<BusinessField, string> = {
+  const gapMessage: Record<BusinessField | RequiredProfileField, string> = {
     name: t('onboarding.business.errName'),
     location: t('onboarding.business.errLocation'),
-    type: t('onboarding.business.errType')
+    type: t('onboarding.business.errType'),
+    ceo: t('companyProfile.missing.ceo'),
+    street: t('companyProfile.missing.street'),
+    city: t('companyProfile.missing.city'),
+    country: t('companyProfile.missing.country'),
+    industry: t('companyProfile.missing.industry')
   };
 
   // The bundled Office Packs, each already merged with core. `undefined` = not
@@ -176,18 +195,30 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPack?.businessType]);
 
-  // Where each folder goes by default, which depends on the business name. Asked
-  // only while the team step is showing; nothing is created until finish.
+  // Where each folder goes by default, which depends on the business name, or on
+  // the folder the owner picked for Michael: the Office and the team's folders
+  // sit inside his. Asked only while the team step is showing; nothing is
+  // created until finish.
   const teamFolderKey = folderNames(teamAgents).join('|');
+  const pickedMichaelFolder = folderOverrides[OFFICE_KEY];
   useEffect(() => {
     if (step !== 'team' || !teamPack) return;
     let cancelled = false;
-    window.cth.foldersSuggest(businessName, folderNames(teamAgents))
-      .then((sug) => { if (!cancelled) setFolderSuggestions(sug); })
+    window.cth.foldersSuggest(businessName, folderNames(teamAgents), pickedMichaelFolder)
+      .then((sug) => {
+        if (cancelled) return;
+        if (sug.rootRefused) {
+          // The home folder or a system folder can't hold an office: say so and
+          // go back to the suggested one.
+          setError(t('onboarding.team.errMichaelFolder'));
+          setFolderOverrides((o) => { const n = { ...o }; delete n[OFFICE_KEY]; return n; });
+        }
+        setFolderSuggestions(sug);
+      })
       .catch(() => { if (!cancelled) setFolderSuggestions(undefined); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, businessName, teamFolderKey]);
+  }, [step, businessName, teamFolderKey, pickedMichaelFolder]);
 
   const plan = teamPlan(teamAgents, teamPicked, folderSuggestions, folderOverrides);
   const needed = connectionsNeeded(teamAgents, teamPicked);
@@ -200,8 +231,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const chooseTeamFolder = async (key: string) => {
     setError(undefined);
     const res = await window.cth.chooseFolder();
-    if (res.ok) setFolderOverrides((o) => ({ ...o, [key]: res.path }));
-    else if (res.error !== 'cancelled') setError(res.error);
+    if (!res.ok) { if (res.error !== 'cancelled') setError(res.error); return; }
+    // Michael's folder is private to him, so it can't be a team member's own
+    // folder (src/shared/folderAccess.ts).
+    const same = (a?: string) => !!a && a.replace(/[\\/]+$/, '').toLowerCase() === res.path.replace(/[\\/]+$/, '').toLowerCase();
+    if (key !== OFFICE_KEY && same(michaelFolderFor(folderSuggestions, folderOverrides))) {
+      setError(t('addAgent.errFolderShared'));
+      return;
+    }
+    setFolderOverrides((o) => ({ ...o, [key]: res.path }));
   };
   const resetTeamFolder = (key: string) =>
     setFolderOverrides((o) => { const n = { ...o }; delete n[key]; return n; });
@@ -237,8 +275,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   const [home, setHome] = useState<string>('');
   const [autoMode, setAutoMode] = useState<boolean>(true);
-  // Anonymous usage stats (TELEMETRY.md). Default ON (opt-out); persisted by
-  // finish() so unchecking before finishing means nothing is ever sent.
+  // Anonymous usage stats (TELEMETRY.md). Shown and saved only while
+  // COLLECT_USAGE_STATS (buildFeatures.ts) is on; off in this build.
   const [shareStats, setShareStats] = useState<boolean>(true);
   const [godProvider, setGodProvider] = useState<AgentProvider>('claude');
   const [godModel, setGodModel] = useState<string | undefined>(
@@ -315,9 +353,61 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // at the config-write boundary AND at ensureHarnessHome's mkdir, so every
   // downstream reader still sees one absolute path. No new IPC surface.
   useEffect(() => {
-    if (!home) setHome('~/HarnessAgents');
+    if (!home) setHome(DEFAULT_HOME);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // An office already in the suggested home folder (a reinstall, or a new data
+  // folder): offer to continue it exactly as it is, by folder. Continuing never
+  // depends on the business name typed this time (officeRecord.ts).
+  const [found, setFound] = useState<{ path: string; record: OfficeRecord } | null>(null);
+  const [resuming, setResuming] = useState(false);
+  const foundPlan = found ? teamPlanFromRecord(found.record) : null;
+  useEffect(() => {
+    let alive = true;
+    void window.cth.officeFind(DEFAULT_HOME)
+      .then((f) => {
+        // Offer it only when it can really be continued: a team, and folders
+        // for all of it (an older office whose folders share nothing would
+        // otherwise fail at Finish with no way forward).
+        if (!alive || !f.hasOffice || !f.path || !f.record || !teamPlanFromRecord(f.record).ok) return;
+        setFound({ path: f.path, record: f.record });
+        // Only take over the first screen if the owner has not started on it yet.
+        setStep((s) => (s === 'business' ? 'resume' : s));
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  const continueOffice = () => {
+    if (!found) return;
+    const r = found.record;
+    setBusinessName(r.businessName ?? '');
+    setProfile((p) => ({ ...p, ...(r.companyProfile ?? {}) }));
+    if (r.businessType) setBusinessType(r.businessType);
+    setHome(found.path);
+    setResuming(true);
+    setError(undefined);
+    setStep('orchestrator');
+  };
+  const startNewOffice = async () => {
+    // A new office needs its own folder: setting it up in this one would mix a
+    // second team into the office that is already there. Suggest the first
+    // free "~/HarnessAgents N"; if none is free (or the check fails), leave the
+    // field empty so the home step asks the owner to pick one.
+    setBusy(true);
+    let free = '';
+    for (let n = 2; n <= NEW_OFFICE_SUGGESTIONS; n++) {
+      const candidate = `${DEFAULT_HOME} ${n}`;
+      const st = await window.cth.homeStatus(candidate).catch(() => null);
+      if (!st) break;
+      if (!st.exists) { free = candidate; break; }
+    }
+    setHome(free);
+    setResuming(false);
+    setError(undefined);
+    setBusy(false);
+    setStep('business');
+  };
 
   const pickHome = async () => {
     setError(undefined);
@@ -330,8 +420,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const finish = async () => {
     setBusy(true);
     setError(undefined);
+    // Continuing an office keeps its recorded team and folders; a new office
+    // uses the team and folders picked in setup.
+    const finishPlan = resuming && foundPlan ? foundPlan : plan;
     // The team's folders must be resolvable before anything is created.
-    if (!plan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
+    if (!finishPlan.ok) { setError(t('onboarding.team.errNoFolders')); setBusy(false); setStep('team'); return; }
     const harnessHome = home.trim(); // whitespace-only is not a folder
     if (!harnessHome) { setError(t('onboarding.errPickHome')); setBusy(false); setStep('home'); return; }
     // The orchestrator step already refuses to advance on this, but a late probe
@@ -354,9 +447,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         setBusy(false);
         return;
       }
-      // Make each agent's folder, and the shared Office. Only missing folders are
+      // Make Michael's folder and each agent's. Only missing folders are
       // created; one the owner picked (or already had) is left exactly as it is.
-      const made = await window.cth.foldersEnsure(plan.folders);
+      const made = await window.cth.foldersEnsure(finishPlan.folders);
       const failed = made.find((r): r is { ok: false; path: string; reason: string } => !r.ok);
       if (failed) {
         setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
@@ -369,17 +462,19 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         businessType: businessType === OTHER_BUSINESS ? undefined : businessType,
         businessName: businessName.trim() || undefined,
         businessCity: businessCity.trim() || undefined,
+        companyProfile: cleanCompanyProfile(profile),
         harnessHome, // the same trimmed value we just mkdir'd, not the raw field
         // Where the office works (Decision 44). The running office starts each
         // agent inside its folder; the folders also become the hire dialog's
         // quick-picks, which is what registeredRepos has always fed.
-        officeFolder: plan.office,
-        businessTeam: plan.team,
-        registeredRepos: plan.folders,
+        businessFolder: finishPlan.business,
+        businessTeam: finishPlan.team,
+        registeredRepos: finishPlan.folders,
         autoMode,
         godProvider,
         godModel,
-        telemetryEnabled: shareStats
+        // Only written when the choice was shown (buildFeatures.ts).
+        ...(COLLECT_USAGE_STATS ? { telemetryEnabled: shareStats } : {})
       });
       setBusy(false);
       onComplete(next);
@@ -414,7 +509,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <PixelPanel
           variant="dialog"
           title={
-            step === 'business' ? t('onboarding.titles.business')
+            step === 'resume' ? t('onboarding.titles.resume')
+            : step === 'business' ? t('onboarding.titles.business')
+            : step === 'details' ? t('onboarding.titles.details')
             : step === 'welcome' ? t('onboarding.titles.welcome')
             : step === 'home' ? t('onboarding.titles.home')
             : step === 'orchestrator' ? t('onboarding.titles.orchestrator')
@@ -425,6 +522,43 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           noPadding
         >
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '86vh', overflowY: 'auto' }}>
+
+            {step === 'resume' && found && (
+              <>
+                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                  {t('onboarding.resume.headline')}
+                </div>
+                <p style={{ margin: 0, lineHeight: '22px' }}>
+                  {t('onboarding.resume.desc', {
+                    business: found.record.businessName ?? t('onboarding.resume.unnamed'),
+                    count: found.record.team.length,
+                    // Isolated so a path reads left to right inside Arabic text.
+                    folder: `\u2066${tildePath(found.path)}\u2069`
+                  })}
+                </p>
+                {/* Where the team will keep working: shown before Continue so the
+                    owner can see exactly which folders this office uses. */}
+                <div style={{ fontSize: 14, lineHeight: '18px', color: 'var(--cth-ink-700)' }}>
+                  <div style={{ marginBottom: 4 }}>{t('onboarding.resume.foldersHead')}</div>
+                  <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+                    {foundPlan?.ok && foundPlan.folders.map((f) => (
+                      <li key={f} dir="ltr" style={{ textAlign: 'start' }}>{tildePath(f)}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ fontSize: 14, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>
+                  {t('onboarding.resume.newNote')}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <PixelButton variant="primary" size="md" onClick={continueOffice} disabled={busy}>
+                    {t('onboarding.resume.continue')}
+                  </PixelButton>
+                  <PixelButton variant="secondary" size="md" onClick={() => { void startNewOffice(); }} disabled={busy}>
+                    {t('onboarding.resume.startNew')}
+                  </PixelButton>
+                </div>
+              </>
+            )}
 
             {step === 'business' && (
               <>
@@ -450,7 +584,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 {/* Name and location are required: agents write as this business, so
                     they need to know what it's called and where it is. Neither is
                     ever used as an id or a path. */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
                       {t('onboarding.business.nameLabel')}
@@ -464,19 +598,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       style={fieldStyle(gapShown('name'))}
                     />
                   </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
-                      {t('onboarding.business.cityLabel')}
-                    </span>
-                    <input
-                      value={businessCity}
-                      onChange={(e) => setBusinessCity(e.target.value)}
-                      placeholder={t('onboarding.business.cityPlaceholder')}
-                      aria-required
-                      aria-invalid={gapShown('location')}
-                      style={fieldStyle(gapShown('location'))}
-                    />
-                  </label>
+
                 </div>
 
                 <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
@@ -513,6 +635,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   </div>
                 )}
 
+                {/* The rest of the essentials: every agent works from these
+                    (companyProfile.ts). The industry line appears only when no
+                    business type fits. */}
+                <CompanyProfileFields
+                  value={profile}
+                  onChange={setProfile}
+                  parts={['essentials']}
+                  needsIndustry={businessType === OTHER_BUSINESS}
+                  missing={triedBusiness ? profileGaps : []}
+                />
+
                 {triedBusiness && businessGaps.length > 0 && (
                   <div role="alert" style={{
                     padding: '6px 10px',
@@ -523,6 +656,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     {businessGaps.map((g) => gapMessage[g]).join(' ')}
                   </div>
                 )}
+              </>
+            )}
+
+            {step === 'details' && (
+              <>
+                <div style={{ fontSize: 14, color: 'var(--cth-ink-700)', lineHeight: '19px' }}>
+                  {t('onboarding.details.intro', { godName })}
+                </div>
+                <CompanyProfileFields value={profile} onChange={setProfile} parts={['details', 'hint']} />
               </>
             )}
 
@@ -851,7 +993,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     name={t('onboarding.team.managerName')}
                     summary={t('onboarding.team.managerSummary')}
                     chips={[{ tone: 'muted', label: t('onboarding.team.alwaysOn') }]}
-                    folder={officeFolderFor(folderSuggestions, folderOverrides)}
+                    folder={michaelFolderFor(folderSuggestions, folderOverrides)}
                     folderNote={t('onboarding.team.sharedFolder')}
                     displayPath={tildePath}
                     overridden={folderOverrides[OFFICE_KEY] !== undefined}
@@ -958,15 +1100,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   onChange={toggleOpenAtLogin}
                 />
 
-                <ToggleRow
-                  icon="info"
-                  label={t('onboarding.permissions.shareStats')}
-                  desc={t('onboarding.permissions.shareStatsDesc')}
-                  on={shareStats}
-                  tint="var(--cth-lemon-light)"
-                  edge="var(--cth-lemon)"
-                  onChange={() => setShareStats(!shareStats)}
-                />
+                {COLLECT_USAGE_STATS && (
+                  <ToggleRow
+                    icon="info"
+                    label={t('onboarding.permissions.shareStats')}
+                    desc={t('onboarding.permissions.shareStatsDesc')}
+                    on={shareStats}
+                    tint="var(--cth-lemon-light)"
+                    edge="var(--cth-lemon)"
+                    onChange={() => setShareStats(!shareStats)}
+                  />
+                )}
 
                 {/* Instruction-only: the OS won't let the app flip its sleep setting
                     itself, so we deep-link the pane where one exists (macOS/Windows)
@@ -1018,18 +1162,23 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
             {/* Footer / nav */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <Dots step={step} />
+              {step === 'resume' ? <span /> : <Dots step={step} />}
               <div style={{ display: 'flex', gap: 8 }}>
-                {step !== 'business' && (
-                  <PixelButton variant="ghost" size="md" onClick={() => setStep(prevStep(step))} disabled={busy}>
+                {step !== 'business' && step !== 'resume' && (
+                  <PixelButton
+                    variant="ghost"
+                    size="md"
+                    onClick={() => setStep(resuming && step === 'orchestrator' ? 'resume' : prevStep(step))}
+                    disabled={busy}
+                  >
                     {t('common.back')}
                   </PixelButton>
                 )}
-                {step !== 'permissions' && (
+                {step !== 'permissions' && step !== 'resume' && (
                   <PixelButton
                     variant="primary"
                     size="md"
-                    onClick={() => {
+                    onClick={async () => {
                       // Step 1 needs a name, a location and a business type before
                       // anything else. The button stays clickable so the owner is
                       // TOLD what's missing, rather than facing a grey button.
@@ -1048,6 +1197,27 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                         setError(t('onboarding.errPickHome'));
                         return;
                       }
+                      // A folder that already holds an office is never set up as a
+                      // new one: that would mix a second team into it. Offer to
+                      // continue it instead, or ask for another folder.
+                      if (step === 'home') {
+                        setBusy(true);
+                        const f = await window.cth.officeFind(home.trim()).catch(() => null);
+                        setBusy(false);
+                        // A check that failed says nothing about the folder: stay
+                        // here rather than risk setting up a second team in it.
+                        if (!f) { setError(t('onboarding.resume.folderCheckFailed')); return; }
+                        if (f.hasOffice) {
+                          if (f.path && f.record && teamPlanFromRecord(f.record).ok) {
+                            setFound({ path: f.path, record: f.record });
+                            setError(undefined);
+                            setStep('resume');
+                          } else {
+                            setError(t('onboarding.resume.folderInUse'));
+                          }
+                          return;
+                        }
+                      }
                       // Same idea for the engine: refuse here, with the reason on
                       // screen, instead of letting a pick that cannot boot through
                       // to a Michael that never starts.
@@ -1058,7 +1228,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       setError(undefined);
                       setStep(nextStep(step));
                     }}
-                    disabled={step === 'orchestrator' && engineBlocked}
+                    disabled={busy || (step === 'orchestrator' && engineBlocked)}
                   >
                     {step === 'welcome' ? t('onboarding.team.suggestCta') : t('common.next')}
                   </PixelButton>
@@ -1273,7 +1443,7 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
 }
 
 function Dots({ step }: { step: Step }) {
-  const order: Step[] = ['business', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
+  const order: Step[] = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {order.map((s) => (
@@ -1287,8 +1457,14 @@ function Dots({ step }: { step: Step }) {
   );
 }
 
+/** Where setup suggests the office lives, and looks for an existing one. */
+const DEFAULT_HOME = '~/HarnessAgents';
+/** How many "~/HarnessAgents N" names a new office tries before asking the owner to pick. */
+const NEW_OFFICE_SUGGESTIONS = 20;
+
 function nextStep(s: Step): Step {
-  return s === 'business' ? 'welcome'
+  return s === 'business' ? 'details'
+    : s === 'details' ? 'welcome'
     : s === 'welcome' ? 'team'
     : s === 'team' ? 'home'
     : s === 'home' ? 'orchestrator'
@@ -1300,6 +1476,7 @@ function prevStep(s: Step): Step {
     : s === 'orchestrator' ? 'home'
     : s === 'home' ? 'team'
     : s === 'team' ? 'welcome'
+    : s === 'welcome' ? 'details'
     : 'business';
 }
 

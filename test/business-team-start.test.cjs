@@ -29,20 +29,25 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   const fn = hive.slice(at, hive.indexOf('\nexport function useHive', at));
 
   assert.match(fn, /if \(team\.length === 0 \|\| config\.businessTeamStarted\) return;/, 'runs once');
-  assert.match(fn, /if \(reg\?\.agents\?\.\[id\]\) continue;/, 'a member already in the registry is not started twice');
+  // A member the floor already holds is not started twice; one the registry
+  // knows but the floor lost comes back (office-record.test.cjs).
+  assert.match(fn, /const decision = teamMemberStart\(id, member\.folder, floorIds,[^\n]*\);\s*if \(!decision\.start\) continue;/, 'a member already on the floor is not started twice');
   assert.match(fn, /if \(!res\.ok\) \{[\s\S]{0,120}continue;\s*\}/, 'a failed start skips that member only');
-  assert.match(fn, /cwd: member\.folder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: member\.folder, role \}/, 'spawned inside its own folder');
+  assert.match(fn, /cwd: workFolder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: workFolder, role \}/, 'spawned inside its own folder');
   assert.match(fn, /goal: teamMemberGoal\(def, \{ name: config\.businessName, city: config\.businessCity \}\)/);
   assert.match(fn, /\}, \{ select: false \}\);/, 'the card appears without taking the focus');
-  assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? core;/, '"Something else" starts from the core pack');
+  assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? byTeam \?\? core;/, '"Something else" starts from the core pack');
+  assert.match(fn, /\(coverage\(p\) > coverage\(best\) \? p : best\), core\);/, 'core wins ties, so a team picked from core stays on core');
   assert.match(fn, /await window\.cth\.updateConfig\(\{ businessTeamStarted: true \}\)/);
 
-  // Michael: the Office folder when there is one, the harness folder otherwise.
-  assert.match(hive, /const godCwd = config\.officeFolder \|\| config\.harnessHome!;/);
-  assert.match(hive, /hive: \{ id: GOD_ID, name: godName, provider: godProvider, cwd: godCwd, isGod: true/);
+  // Michael: asked for in the business folder when there is one, the harness
+  // folder otherwise; the floor records wherever main actually started him.
+  assert.match(hive, /const requestedCwd = config\.businessFolder \|\| config\.harnessHome!;/);
+  assert.match(hive, /hive: \{ id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true/);
+  assert.match(hive, /const godCwd = res\.cwd \|\| requestedCwd;/);
   // The team starts only after Michael is up.
   // (The other 'ready' is the already-running path, which starts nothing.)
-  const start = hive.indexOf('void startBusinessTeam(config);');
+  const start = hive.indexOf('void rewriteTeamInstructions(config).catch(() => undefined).then(() => startBusinessTeam(config));');
   const ready = hive.lastIndexOf("useStore.getState().setGodStatus('ready');", start);
   assert.ok(ready > 0 && start > ready && start - ready < 400, 'started right after Michael is ready');
 });

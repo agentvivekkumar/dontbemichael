@@ -55,3 +55,20 @@ test('the privacy prompts macOS shows say the new name, with no dashes', () => {
     assert.doesNotMatch(p, /Munder Difflin|[-–—]/, p);
   }
 });
+
+/**
+ * Quit reads "Close Office" (owner, 2026-09-24): "Quit Don't Be Michael" put
+ * "Quit" and "Don't" together. It stays the quit role, so Cmd+Q and the quit
+ * guard are unchanged.
+ */
+test('the quit item reads Close Office and is still the quit role', () => {
+  assert.match(main, /const QUIT_LABEL = 'Close Office';/);
+  assert.match(main, /const quitItem = \{ role: 'quit' as const, label: QUIT_LABEL \};/);
+  const menu = main.slice(main.indexOf('function installAppMenu()'), main.indexOf('Menu.setApplicationMenu('));
+  assert.doesNotMatch(menu, /\{ role: 'appMenu' as const \}/, 'the default app menu would bring back "Quit <app name>"');
+  assert.doesNotMatch(menu, /\{ role: 'quit' as const \}/, 'no quit item without the label');
+  assert.equal((menu.match(/quitItem/g) || []).length, 3, 'defined once, used in the Mac app menu and the File menu');
+  // Hide gets the same treatment: "Hide Office", still the hide role (Cmd+H).
+  assert.match(main, /const HIDE_LABEL = 'Hide Office';/);
+  assert.match(menu, /\{ role: 'hide' as const, label: HIDE_LABEL \}/);
+});

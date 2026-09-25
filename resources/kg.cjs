@@ -12,7 +12,10 @@
  *
  * Pure Node (node:fs only via kg-core) — no native modules, so it runs cleanly
  * under a plain `node` outside the Electron app/asar. The main process injects:
- *   KG_ROOT  — the store directory (required)
+ *   KG_ROOT  — the store directory (required, unless --root is given)
+ *   --root <dir> — the store directory on the command line. Agents that were
+ *               already running when the owner turned company knowledge on have
+ *               no KG_ROOT, so the command they're given carries it.
  *   KG_CORE  — absolute path to kg-core.cjs (preferred resolution)
  * See docs/design/knowledge-graph.md and src/main/kg-core.cjs.
  */
@@ -60,7 +63,7 @@ function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const { positionals, flags } = parseArgs(rest);
 
-  const kgRoot = process.env.KG_ROOT;
+  const kgRoot = (typeof flags.root === 'string' && flags.root) || process.env.KG_ROOT;
   if (!kgRoot) fail('Knowledge Graph is not configured (KG_ROOT unset). It is off or unavailable.', 0);
 
   const core = loadCore();

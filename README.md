@@ -244,7 +244,11 @@ to follow a docs page.
 > [!NOTE]
 > **Hidden in this build.** Git views, the built in code editor, temporary helper agents that
 > Michael starts on his own, and the organisation trigger are switched off, because business owners
-> don't use them. The code stays in place, and each one has a single switch in
+> don't use them. So are the "auto mode" text in the header bar (the setting itself stays in
+> Settings under Autonomy & Budgets), the usage stats choice (see [Telemetry](#telemetry)), and the
+> close button on a team member, which stopped it with no way to bring it back, the buttons
+> that open a Terminal window in an agent's folder, the Auto / Pause message delivery switch in
+> Michael's Command Center, and voice: talking to Michael and dictation. The code stays in place, and each one has a single switch in
 > [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
 
 **For your business**
@@ -253,6 +257,7 @@ to follow a docs page.
 - **OFFICE, TASKS and GRAPH views.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
 - **Michael asks when no one fits.** A big job outside everyone's role goes on the Ask me board with suggestions, instead of Michael starting a new agent on his own.
 - **"We can't find your office."** If the office folder is moved or deleted, launch asks where it went instead of quietly starting an empty office.
+- **"We found your office."** If this Mac already has an office, setup offers to continue with it: the same team, in the same folders, whatever business name you type. The office keeps its own record in `office.json` in the office folder, so it is found by its folder, never by its name. Setting up a new office gives it a folder of its own.
 
 **The floor**
 - **Every terminal is a real agent.** Claude Code in this release (the other engines stay in the code; see [Supported agents](#supported-agents)). Each runs in its own `node-pty` PTY, rendered with xterm.js.
@@ -393,24 +398,17 @@ Contributions are welcome. This is pre-release software with a lot of surface ar
 `npm install && npm run dev`, keep `npm run typecheck` passing, and **base any new UI on the
 [`DESIGN.md`](./DESIGN.md) tokens**.
 
-> [!IMPORTANT]
-> **Every pull request must include a before and an after.** Use screenshots, or a recording if
-> the change involves motion, under the `### Before` and `### After` headings in the PR template.
-> A check enforces this, and a PR without them cannot merge. Changes with no UI still need
-> evidence, just in a different form. See
-> [Evidence is mandatory](./CONTRIBUTING.md#evidence-is-mandatory).
-
 Found a bug or have an idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 
 [`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone who has had a pull request merged into this project.
 
 ## Telemetry
 
-Official release builds send a **small set of anonymous usage events** (app opened, agent spawned,
-feature used). They never send prompts, code, file paths, or agent output.
-[`TELEMETRY.md`](./TELEMETRY.md) documents the complete event list, the anonymity guarantees, and
-three ways to opt out: the Settings toggle, `DO_NOT_TRACK`, or building from source. Local builds
-compile without an analytics key and send nothing.
+Don't Be Michael sends **no usage data**. The anonymous usage stats code from the original project
+is still in the source, but it is switched off (`COLLECT_USAGE_STATS` in
+[`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts)): the app neither asks nor sends. If
+that changes, it will be announced in the release notes, and
+[`TELEMETRY.md`](./TELEMETRY.md) will list exactly what is collected before anything is.
 
 ## License
 

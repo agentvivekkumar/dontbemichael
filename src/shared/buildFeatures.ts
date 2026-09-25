@@ -26,3 +26,46 @@ export const ALLOW_TEMP_WORKERS = false;
  *  from the Triggers tab and Settings → Connections, and a leftover key no
  *  longer surfaces the History tab (owner, 2026-09-24). */
 export const SHOW_ORG_TRIGGER = false;
+
+/** Anonymous usage stats (TELEMETRY.md): the "Share anonymous usage stats" row
+ *  in onboarding, the switch in Settings → General, and sending itself. Off
+ *  until the owner decides whether to collect anything at all. While off,
+ *  nothing is sent even if a release is built with a PostHog key, so the app
+ *  never sends without having shown the choice (owner, 2026-09-24). */
+export const COLLECT_USAGE_STATS = false;
+
+/** The "auto mode on / off" text in the header bar. It named a developer
+ *  setting in words owners don't use, and it wasn't clickable. The setting
+ *  itself is unchanged and stays in Settings → Autonomy & Budgets
+ *  (owner, 2026-09-24). */
+export const SHOW_AUTO_MODE_LABEL = false;
+
+/** The red close button on a team member's panel and in its full screen view.
+ *  It stopped the agent mid-task and archived it, with no button to bring it
+ *  back and no return on relaunch, behind a confirm that spoke of a "PTY"
+ *  (owner, 2026-09-24). Michael never had it. */
+export const SHOW_CLOSE_AGENT = false;
+
+/** "Open a Terminal window here": the open button next to edit on each agent,
+ *  the same button in the full screen view, and the terminal icon beside each
+ *  folder in Michael's Command Center. A developer tool owners don't use
+ *  (owner, 2026-09-24). */
+export const SHOW_OPEN_TERMINAL = false;
+
+/** The Auto / Pause switch in Michael's Command Center header, which holds
+ *  every queued message for every agent. A power-user control owners had no
+ *  use for (owner, 2026-09-24). While it is hidden, a pause saved earlier is
+ *  cleared at launch, so no one is left with messages held and no switch to
+ *  release them. */
+export const SHOW_DELIVERY_SWITCH = false;
+
+/** Hiring by voice: voice Michael's spawn_agent tool, the hiring lines in his
+ *  instructions, and the main process accepting a spawn request from him. Off
+ *  for now (owner, 2026-09-24); the rest of voice Michael is unchanged. */
+export const ALLOW_VOICE_HIRE = false;
+
+/** Voice, entirely: talking to Michael (the Talk toggle on his card and in
+ *  full screen) and dictation (the mic in the message box and hold Option in a
+ *  terminal), plus the Voice tab in Settings. Main also refuses to start a
+ *  voice session or transcribe audio while this is off (owner, 2026-09-24). */
+export const SHOW_VOICE = false;

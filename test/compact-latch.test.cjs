@@ -73,19 +73,3 @@ test('(b) a successful delivery reports true and acknowledges once', () => {
 const hive = fs.readFileSync(
   path.resolve(__dirname, '..', 'src/renderer/src/hooks/useHive.ts'), 'utf8'
 );
-
-test('(a) fire() refuses an undeliverable agent BEFORE it enqueues', () => {
-  assert.match(hive, /if \(!canDeliverToAgent\(a\.status, ptyQuietMs\(a\.ptyId, now\), QUIESCE_IDLE_MS\)\) continue;/);
-  // the gate must sit ahead of the enqueue, not after it
-  const gate = hive.indexOf("Gate #109-2");
-  const enqueue = hive.indexOf('enqueueMessage', gate);
-  assert.ok(gate > 0, 'the compaction-trigger gate is still there');
-  assert.ok(enqueue > gate, 'the gate runs before the enqueue it protects');
-});
-
-test('(b) the latch is written ONLY on a delivery that happened', () => {
-  assert.match(hive, /if \(sent && message\?\.compactUsed !== undefined\) \{/);
-  // and there is no second, ungated write that would defeat it
-  const writes = hive.match(/lastCompactUsed\.current\[[^\]]+\] = /g) ?? [];
-  assert.equal(writes.length, 1, 'exactly one place writes the latch');
-});

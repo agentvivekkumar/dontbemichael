@@ -11,7 +11,8 @@
  * Runs in the Electron main process.
  */
 import { createServer, type Server } from 'node:net';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { Notification, type WebContents } from 'electron';
 import type { HiveManager } from './hive';
 import type { HarnessConfig } from './config';
@@ -19,7 +20,16 @@ import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
 import { validateHookEvent } from '../shared/hookEvents';
+import { resolveGodName } from '../shared/godIdentity';
+import { APP_NAME } from '../shared/appName';
+
+/** Desktop notification bodies. The title is the agent's name (displayName). */
+export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
+export const NOTIFY_WAITING = 'Waiting for you.';
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
+import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
+import { folderLayoutFor } from './officeFile';
+import { handoffContext } from '../shared/safeClear';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -68,6 +78,13 @@ export class HookServer {
    *  prompt only bloats the transcript. One entry per agent is sufficient: an
    *  agent has one live session, and a new session id replaces the old entry. */
   private deliveredGoalByAgent = new Map<string, { sessionId: string | null; goal: string | null }>();
+  /** The company profile last delivered to each agent's session: same once per
+   *  session, again on change, rule as the goal. */
+  private deliveredProfileByAgent = new Map<string, { sessionId: string | null; text: string | null }>();
+  /** What roster each agent's session was last given, so it is sent again only on a change. */
+  private deliveredRosterByAgent = new Map<string, { sessionId: string | null; layoutKey: string; statusKey: string }>();
+  /** The session each agent was last given its memory index in. */
+  private deliveredMemoryByAgent = new Map<string, string | null>();
 
   constructor(
     private hive: HiveManager,
@@ -84,7 +101,12 @@ export class HookServer {
     /** Optional observer of every hook boundary (agentId, event, message). The
      *  worker inbox-wake watchdog (workerWake.ts) feeds on this to learn when an
      *  agent is parked on a permission/HITL prompt so it never types into it. */
-    private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void
+    private onEvent?: (agentId: string | undefined, event: string, message: string | undefined) => void,
+    /** Company knowledge's live state, so turning it on or off reaches running
+     *  agents on their next prompt instead of at their next start. */
+    private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string; meaning?: { bin: string; palace: string } },
+    /** The company profile as agents read it (companyProfileContext), or null. */
+    private getCompanyProfile?: () => string | null
   ) {}
 
   start(): void {
@@ -252,6 +274,11 @@ export class HookServer {
     // since a fresh session makes in-flight compaction state moot — closes it
     // down to the trailing grace (a no-op when nothing was compacting).
     if (event === 'PreCompact' && agentId) this.breaker?.recordCompactStart(agentId);
+    // Logged so compaction can be measured (tools/agent-metrics.cjs).
+    if (event === 'PreCompact' && agentId) {
+      const trigger = (p as { trigger?: unknown }).trigger;
+      try { this.hive.appendLog({ kind: 'compact', agentId, trigger: typeof trigger === 'string' ? trigger : 'unknown' }); } catch { /* best-effort */ }
+    }
     if ((event === 'PostCompact' || event === 'SessionStart') && agentId) {
       this.breaker?.recordCompactEnd(agentId);
     }
@@ -263,7 +290,7 @@ export class HookServer {
       // path bypassed terminal-draft/HITL safety and could spend credits while a
       // user was answering a question. Inbox files remain durable; the renderer
       // wakes the agent later through its guarded idle-only delivery path.
-      this.notify(agentId ?? 'Agent', 'finished and idle');
+      this.notify(agentId, NOTIFY_FINISHED);
       this.emit(agentId, event, p);
       return {};
     }
@@ -288,13 +315,13 @@ export class HookServer {
     }
 
     // Decision 48 — the harness folder is plumbing only. On a business install
-    // (one with an Office folder), a file write into it is refused unless it's a
+    // (one with a business folder), a file write into it is refused unless it's a
     // protocol file; the reason tells the agent where the work belongs instead.
     // The tool check comes first so ordinary tool calls never read config.
     if (event === 'PreToolUse' && agentId && GUARDED_TOOLS.has(p.tool_name ?? '')) {
       const cfg = this.getConfig();
       const hiveRoot = this.hive.root();
-      if (cfg.officeFolder && cfg.harnessHome && hiveRoot) {
+      if ((cfg.businessFolder || cfg.officeFolder) && cfg.harnessHome && hiveRoot) {
         const d = harnessWriteDecision({
           tool: p.tool_name ?? '',
           toolInput: p.tool_input,
@@ -319,6 +346,36 @@ export class HookServer {
       }
     }
 
+    // Folder privacy (src/shared/folderAccess.ts). The spawn's settings already
+    // deny the folders known then; this catches everything else: folders made
+    // after the agent started, and Michael's own files, which a settings rule
+    // can't hide without hiding the folders inside his.
+    const toolName = p.tool_name ?? '';
+    if (event === 'PreToolUse' && agentId && (FOLDER_READ_TOOLS.has(toolName) || FOLDER_WRITE_TOOLS.has(toolName))) {
+      const d = this.folderCheck(agentId, toolName, p.tool_input, p.cwd);
+      if (d.deny) {
+        this.emitControl(agentId, toolName, d.reason);
+        this.emit(agentId, event, p);
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: d.reason
+          }
+        };
+      }
+    }
+
+    // Memory pays off only if it's used (owner, 2026-09-25): record each time an
+    // agent opens one of its procedure files, next to the tidy-up's own counts.
+    if (event === 'PostToolUse' && agentId && toolName === 'Read') {
+      const file = folderToolTarget('Read', p.tool_input, p.cwd);
+      const root = this.hive.root();
+      if (file && root && /[\\/]memory[\\/]procedures[\\/][^\\/]+\.md$/.test(file) && file.startsWith(root)) {
+        try { this.hive.appendLog({ kind: 'memory-read', agentId, file: file.slice(root.length + 1) }); } catch { /* best-effort */ }
+      }
+    }
+
     // 7C.2 — mid-run steering: inject queued operator guidance as context on the
     // next eligible hook (no fragile typing into the TUI). Delivered once.
     // Merged with the roster line below so the two injections never displace each
@@ -339,9 +396,26 @@ export class HookServer {
     // Hand the roster the LIVE context-window occupancy (contextById) so each
     // agent line can carry a `ctx NN%` — god then sees whose context is nearly
     // full when it routes work, instead of guessing from cumulative token spend.
-    const roster = wantsRoster
-      ? this.hive.rosterContext((id) => this.contextFor(id))
-      : null;
+    // A business office (owner, 2026-09-25) sends the full roster at the start
+    // of a session and when the team changes, a one line status when only who
+    // is busy or on hold changed, and nothing otherwise. Older installs keep
+    // the live roster on every prompt.
+    let roster: string | null = null;
+    if (wantsRoster && this.getConfig().businessFolder && typeof this.hive.teamRoster === 'function') {
+      const r = this.hive.teamRoster();
+      const sessionId = p.session_id ?? null;
+      const last = this.deliveredRosterByAgent.get(agentId!);
+      if (r) {
+        if (event === 'SessionStart' || !last || last.sessionId !== sessionId || last.layoutKey !== r.layoutKey) {
+          roster = r.full;
+        } else if (last.statusKey !== r.statusKey) {
+          roster = r.status;
+        }
+        this.deliveredRosterByAgent.set(agentId!, { sessionId, layoutKey: r.layoutKey, statusKey: r.statusKey });
+      }
+    } else if (wantsRoster) {
+      roster = this.hive.rosterContext((id) => this.contextFor(id));
+    }
 
     // Standing goal (hire Briefing) — durable roster field, re-read every cycle so
     // an Edit Agent save is picked up on the next UserPromptSubmit without
@@ -370,12 +444,52 @@ export class HookServer {
       }
     }
 
-    if (steer || roster || goal) {
+    // The company profile (owner, 2026-09-25): key facts every agent, Michael
+    // included, works from. Delivered at the start of each session and again
+    // when the owner changes it, never repeated unchanged.
+    let profile: string | null = null;
+    if ((event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getCompanyProfile) {
+      const text = this.getCompanyProfile();
+      const sessionId = p.session_id ?? null;
+      const delivered = this.deliveredProfileByAgent.get(agentId);
+      const fresh = event === 'SessionStart' || !delivered || delivered.sessionId !== sessionId;
+      if (fresh || delivered.text !== text) {
+        this.deliveredProfileByAgent.set(agentId, { sessionId, text });
+        if (text) profile = text;
+        else if (!fresh && delivered?.text) profile = 'COMPANY PROFILE. The owner cleared the company profile; the facts given earlier no longer apply.';
+      }
+    }
+
+    // The agent's memory index (owner, 2026-09-25): once at the start of each
+    // session, and never again within it, so it stays in the prompt cache. The
+    // tidy-up's changes arrive with the next session.
+    let memoryIndex: string | null = null;
+    if ((event === 'SessionStart' || event === 'UserPromptSubmit') && agentId) {
+      const sessionId = p.session_id ?? null;
+      if (event === 'SessionStart' || this.deliveredMemoryByAgent.get(agentId) !== sessionId) {
+        this.deliveredMemoryByAgent.set(agentId, sessionId);
+        memoryIndex = this.hive.memoryIndexFor?.(agentId) ?? null;
+      }
+    }
+
+    // A handoff the agent wrote just before its conversation was cleared
+    // (safeClearer.ts): given once, at the start of the new conversation.
+    // Only a conversation that was really cleared takes it: a restart or a
+    // compaction mid-handoff leaves it for the clearer (review, 2026-09-25).
+    const handoffText = event === 'SessionStart' && p.source === 'clear' && agentId ? (this.hive.takeHandoff?.(agentId) ?? null) : null;
+    const handoff = handoffText ? handoffContext(handoffText) : null;
+
+    // Company knowledge turned on or off since this agent was last told.
+    const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
+      ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
+      : null;
+
+    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, goal, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
         }
       };
     }
@@ -389,7 +503,9 @@ export class HookServer {
       (p.notification_type === 'idle' ||
         (p.message ?? '').toLowerCase().includes('waiting for your input'))
     ) {
-      this.notify(agentId ?? 'Agent', p.message ?? 'needs your attention');
+      // Our own words, not Claude Code's ("Claude is waiting for your input"):
+      // the title already names the person, and owners don't know the engine.
+      this.notify(agentId, NOTIFY_WAITING);
     }
 
     // Forward everything else to the renderer so avatars reflect real activity.
@@ -400,12 +516,56 @@ export class HookServer {
   /** Fire a native desktop notification — gated on the user's `notifications`
    *  setting. Only the OS toast is gated; the hive:hookEvent emit is always sent
    *  so avatars/UI stay live regardless. Best-effort: never throw into the hook. */
-  private notify(title: string, body: string): void {
+  private notify(agentId: string | undefined, body: string): void {
     if (!this.getConfig().notifications) return;
     try {
       if (!Notification.isSupported()) return;
-      new Notification({ title, body }).show();
+      new Notification({ title: this.displayName(agentId), body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  /** The name the owner knows an agent by, for a notification title. Never the
+   *  internal id: Michael's id is `god` and nobody in the office is called that
+   *  (2026-09-24). Michael's name follows a rename; an agent the registry does
+   *  not know is announced as the app. */
+  /** One file tool call judged against the office's folder rules. Offices
+   *  without a business folder (older installs) have no rules to apply. */
+  private folderCheck(agentId: string, tool: string, input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
+    const cfg = this.getConfig();
+    if (!cfg.businessFolder) return { deny: false };
+    const target = folderToolTarget(tool, input, cwd);
+    if (!target) return { deny: false };
+    const reg = this.hive.registry();
+    const me = reg.agents[agentId];
+    if (!me?.cwd || me.isAssistant) return { deny: false };
+    const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
+    for (const a of Object.values(reg.agents)) {
+      if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+    }
+    const layout = folderLayoutFor(cfg.businessFolder, folders, cfg.harnessHome ?? undefined);
+    const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
+    const agent = { isGod: !!me.isGod, cwd: me.cwd };
+    const ci = process.platform !== 'linux';
+    // Judge the path as asked and the file it really is: a link inside the
+    // agent's own folder can point anywhere (review, 2026-09-25).
+    const asked = folderDecision(agent, layout, tool, target, ci, godName);
+    if (asked.deny) return asked;
+    const real = realPathOf(target);
+    if (!real || real === target) return asked;
+    // The folders in the layout are real paths, so the agent's own is too here.
+    return folderDecision({ ...agent, cwd: realPathOf(me.cwd) ?? me.cwd }, layout, tool, real, ci, godName);
+  }
+
+  private displayName(agentId: string | undefined): string {
+    if (!agentId) return APP_NAME;
+    try {
+      const reg = this.hive.registry();
+      const name = reg.agents?.[agentId]?.name;
+      if (agentId === (reg.godId ?? 'god')) return resolveGodName(name);
+      return name?.trim() || APP_NAME;
+    } catch {
+      return APP_NAME;
+    }
   }
 
   /** Tell the renderer a tool call was gated/denied (#7C.1) so it can surface it
@@ -429,5 +589,20 @@ export class HookServer {
       return;
     }
     this.getWebContents()?.send('hive:hookEvent', payload);
+  }
+}
+
+/** The real path of `p`, following links and taking the letter case on disk.
+ *  A file that doesn't exist yet takes the real path of its nearest existing
+ *  folder. Null when nothing along the way can be read. */
+export function realPathOf(p: string): string | null {
+  let dir = p;
+  const rest: string[] = [];
+  for (;;) {
+    try { return join(realpathSync.native(dir), ...rest); } catch { /* not there yet */ }
+    const up = dirname(dir);
+    if (up === dir) return null;
+    rest.unshift(basename(dir));
+    dir = up;
   }
 }

@@ -39,7 +39,8 @@ test('an agent\'s own work, in its own folder, is never touched', () => {
 
 test('the protocol files an agent is told to write are allowed', () => {
   for (const p of [
-    `${HIVE}/agents/oscar/memory.md`,
+    `${HIVE}/agents/oscar/memory/inbox.md`,
+    `${HIVE}/agents/oscar/memory/handoff.md`,
     `${HIVE}/agents/oscar/outbox/msg-1.json`,
     `${HIVE}/agents/oscar/inbox/.done/msg-0.json`,
     `${HIVE}/tasks.json`
@@ -66,8 +67,14 @@ test('the rest of the harness folder is off limits too, not just the hive', () =
   assert.equal(decide(`${HOME}/notes.md`).deny, true);
 });
 
+test('the memory index is the app\'s to write: an agent adds notes to its memory inbox', () => {
+  const d = decide(`${HIVE}/agents/oscar/memory.md`);
+  assert.equal(d.deny, true);
+  assert.match(d.reason, /add notes to memory\/inbox\.md instead/);
+});
+
 test('writing into ANOTHER agent\'s mailbox or memory is refused', () => {
-  assert.equal(decide(`${HIVE}/agents/pam/memory.md`).deny, true);
+  assert.equal(decide(`${HIVE}/agents/pam/memory/inbox.md`).deny, true);
   assert.equal(decide(`${HIVE}/agents/pam/inbox/sneaky.json`).deny, true);
 });
 
@@ -78,7 +85,7 @@ test('board.md is Michael\'s alone, and nobody files spawn requests in this buil
   assert.equal(decide(`${HIVE}/board.md`, god).deny, false);
   // Temporary workers are off (ALLOW_TEMP_WORKERS), so not even Michael.
   assert.equal(decide(`${HIVE}/spawn-requests/w1.json`, god).deny, true);
-  assert.equal(decide(`${HIVE}/agents/god/memory.md`, god).deny, false);
+  assert.equal(decide(`${HIVE}/agents/god/memory/inbox.md`, god).deny, false);
 });
 
 test('`..` cannot smuggle a write out of an allowed folder', () => {
@@ -88,7 +95,7 @@ test('`..` cannot smuggle a write out of an allowed folder', () => {
 
 test('changing the case of the path does not get around it on macOS', () => {
   assert.equal(decide('/Users/me/harnessagents/HIVE/shared/x.md').deny, true);
-  assert.equal(decide('/Users/me/HARNESSAGENTS/hive/agents/OSCAR/memory.md').deny, false, 'and plumbing still passes');
+  assert.equal(decide('/Users/me/HARNESSAGENTS/hive/agents/OSCAR/memory/inbox.md').deny, false, 'and plumbing still passes');
 });
 
 test('on Linux, where case matters, a different-case folder is a different folder', () => {

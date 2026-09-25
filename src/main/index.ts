@@ -15,7 +15,7 @@ import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
   readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
-  modelForRole, OPS_STANDUP_MISSION, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
+  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
@@ -28,12 +28,13 @@ import { linkWorktreeDeps, unlinkWorktreeDeps } from './worktreeDeps';
 import { HiveManager, type AgentMeta, type HiveMessage, type HiveTask } from './hive';
 import { HookServer } from './hooks';
 import { loadBundledPacks, packsResourceDir } from './packs';
-import { businessFolderRoot, defaultAgentFolder, ensureFolder, OFFICE_FOLDER } from './agentFolders';
+import { businessFolderRoot, ensureFolder, safeFolderName } from './agentFolders';
 import { CircuitBreaker, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
-import { MemoryReflector, type ReflectSettings } from './reflect';
+import { MemoryTidy } from './memoryTidy';
+import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
@@ -44,7 +45,7 @@ import {
 } from './webhook';
 import {
   classifyInboundKind, isAutoAllowed,
-  DEFAULT_CONTEXT_TRIGGER, DEFAULT_ORG_TRIGGER, DEFAULT_TRIGGER_MODE, DEFAULT_WEBHOOK_SCHEMA,
+  AUTO_COMPACT_WINDOW_TOKENS, DEFAULT_CONTEXT_TRIGGER, DEFAULT_ORG_TRIGGER, DEFAULT_TRIGGER_MODE, DEFAULT_WEBHOOK_SCHEMA,
   type ContextRule, type ContextTriggerConfig, type InboundKind, type OrgTriggerConfig,
   type TriggerHistoryEntry, type TriggerMode, type WebhookTrigger
 } from '../shared/triggers';
@@ -69,6 +70,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
+import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH, SHOW_VOICE } from '../shared/buildFeatures';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -91,6 +93,11 @@ import { claudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
+import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
+import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
+import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
+import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
+import { scheduledRunBody } from '../shared/scheduleMessage';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -316,34 +323,57 @@ const hookServer = new HookServer(
   control,
   breaker,
   standingGoalFromRoster,
-  (agentId, event, message) => workerWake.noteHook(agentId, event, message)
+  (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event, message); },
+  () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
+  companyProfileForAgents
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
-  () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; }
+  () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; },
+  // Company knowledge, indexed into the palace for searching by meaning.
+  () => knowledge.meaningMirror()
 );
+/** The company profile as every agent reads it (src/shared/companyProfile.ts).
+ *  The industry is the owner's own words when no business type fit, else the
+ *  business type's name. Read fresh on each hook, so an edit in Settings
+ *  reaches running agents on their next message. */
+const packInfoCache = new Map<string, { displayName?: string; briefing?: string }>();
+/** The office's business pack: its display name and Michael's briefing. Packs
+ *  are read from disk and the hook runs on every prompt, so it's remembered. */
+function businessPackInfo(businessType: string | undefined): { displayName?: string; briefing?: string } {
+  if (!businessType) return {};
+  if (!packInfoCache.has(businessType)) {
+    try {
+      const pack = loadBundledPacks({ packsDir }).packs.find((x) => x.pack.businessType === businessType)?.pack;
+      packInfoCache.set(businessType, { displayName: pack?.displayName, briefing: pack?.briefing });
+    } catch { return {}; }
+  }
+  return packInfoCache.get(businessType) ?? {};
+}
+function companyProfileForAgents(): string | null {
+  const cfg = readConfig();
+  const industry = businessPackInfo(cfg.businessType).displayName;
+  return companyProfileContext({ name: cfg.businessName, industry }, cleanCompanyProfile(cfg.companyProfile));
+}
+
+/** MemPalace, for agents to search company knowledge by meaning: only when it's
+ *  installed and on, and company knowledge is on. */
+function meaningSearch(): { bin: string; palace: string } | undefined {
+  const bin = memory.bin();
+  const palace = memory.palacePath();
+  return memory.active() && knowledge.active() && bin && palace ? { bin, palace } : undefined;
+}
 // Enterprise Knowledge Graph — file-backed store + agent CLI (default OFF).
 const knowledge = new KnowledgeManager();
-/** Reads the reflect tunables from config each tick (defaults baked in here so a
- *  pre-existing config.json without the keys still gets sane values). */
-function reflectSettings(): ReflectSettings {
-  const c = readConfig();
-  return {
-    enabled: c.reflectEnabled !== false,
-    intervalMs: c.reflectIntervalMs ?? 1_800_000,
-    byteTriggerPct: c.reflectByteTriggerPct ?? 50,
-    sectionTrigger: c.reflectSectionTrigger ?? 50,
-    recentKeep: c.reflectRecentKeep ?? 12,
-    minBytes: c.reflectMinBytes ?? 16_384
-  };
-}
-// Finishes the janitor's missing condense half: bounds each agent's memory.md
-// (Haiku tail-summary, backup→verify→atomic-swap) so it never grows unbounded.
-const reflector = new MemoryReflector(
+// Keeps each agent's memory index useful (owner, 2026-09-25): agents add notes
+// to memory/inbox.md and this turns them into itemised changes on Haiku, in
+// the background. It replaces the old whole-file condenser (reflect.ts).
+const memoryTidy = new MemoryTidy(
   () => readConfig().harnessHome,
   () => readConfig().defaultCommand ?? 'claude',
   () => memory.env(),
-  reflectSettings,
+  () => isFloorQuiet(300_000),
+  (id) => hive.registry().agents[id]?.name ?? id,
   (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
 );
 // Durable harness state (SQLite, main process). Phase A: window bounds (kv) +
@@ -722,21 +752,10 @@ function syncMissions(): void {
         // we deliberately do NOT add `&& m.body`, so other (dispatch) missions keep
         // their prior behaviour, including the historical empty-body send (Pam N1).
         if (m.kind !== 'compact' && hive.enabled()) {
-          hive.send({ to: m.to, act: 'request', subject: m.label, body: m.body }, 'scheduler');
+          hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
         }
-        // Auto-compact: do NOT jam /compact into busy terminals. Hand it to the
-        // renderer, which queues a /compact per agent (deduped — never two at
-        // once) and delivers it only when that agent goes idle (its drain loop),
-        // so a working agent compacts between steps, never mid-step.
-        //
-        // The CADENCE now belongs to the context trigger, not to a mission — but
-        // the legacy per-mission `autoCompact` flag keeps working, routed through
-        // the same emit so there is exactly ONE path from main to the renderer.
-        // It carries the context trigger's current rule so a mission-driven
-        // compaction obeys the same pressure thresholds as a trigger-driven one.
-        if (m.autoCompact || m.kind === 'compact') {
-          emitContextTrigger('compact', contextRule('compact'));
-        }
+        // No compaction here: that is Claude Code's own auto compact now, with its
+        // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
         const current = readConfig().missions ?? [];
         const next = current.map((x) =>
           x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x
@@ -774,7 +793,12 @@ function syncMissions(): void {
     // Honor lastFiredAt so a partially-elapsed interval is not restarted from
     // zero on reboot or when an unrelated mission is edited: wait only the time
     // remaining until the next due fire, then settle into a steady interval.
-    const remaining = Math.max(0, m.intervalMs - (Date.now() - (m.lastFiredAt ?? 0)));
+    //
+    // The standup is the exception at launch: its first fire is the one sent when
+    // Michael comes up (standupOnOfficeOpen), which restarts this timer. Until
+    // then it waits a full interval, so an overdue standup isn't sent twice.
+    const waitForOpen = m.id === OPS_STANDUP_MISSION.id && !standupFiredThisLaunch;
+    const remaining = waitForOpen ? m.intervalMs : Math.max(0, m.intervalMs - (Date.now() - (m.lastFiredAt ?? 0)));
     entry.timeout = setTimeout(() => {
       fire();
       entry.interval = setInterval(fire, m.intervalMs);
@@ -816,32 +840,6 @@ function contextRunMap(): Record<string, number> {
   return contextLastRun;
 }
 
-/** When the rule last ran. An UNRECORDED half is stamped NOW rather than read as
- *  the epoch: `remaining` would otherwise clamp to 0 and compact every terminal
- *  the instant the app boots. It is the same trap `ensureDefaultMissions` avoids
- *  by stamping `lastFiredAt` when it seeds a mission — a first launch should wait
- *  a full cadence, not open with an interruption. */
-function contextLastRunAt(action: 'compact' | 'clear'): number {
-  const map = contextRunMap();
-  const v = map[action];
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  return stampContextRun(action);
-}
-
-function stampContextRun(action: 'compact' | 'clear'): number {
-  const map = contextRunMap();
-  const at = Date.now();
-  map[action] = at;
-  try { persist.setKv(CONTEXT_LAST_RUN_KV_KEY, map); } catch { /* DB best-effort */ }
-  return at;
-}
-
-/** The live rule for one half, deep-filled. `readConfig` already fills both
- *  halves, so the default is only a belt-and-braces fallback. */
-function contextRule(action: 'compact' | 'clear'): ContextRule {
-  return readConfig().contextTrigger?.[action] ?? DEFAULT_CONTEXT_TRIGGER[action];
-}
-
 /** Clear and forget both context timers (setTimeout + setInterval handles). */
 function clearContextTimers(): void {
   for (const t of contextTimers.values()) {
@@ -851,48 +849,13 @@ function clearContextTimers(): void {
   contextTimers.clear();
 }
 
-/** Ask the renderer to run one half of the context trigger.
- *
- *  Both callers funnel through here — the legacy per-mission `autoCompact` flag
- *  and the context trigger's own timer — so there is exactly one path from main
- *  to the renderer for each action. */
-function emitContextTrigger(action: 'compact' | 'clear', rule: ContextRule): void {
-  try { liveWebContents()?.send('trigger:context', { action, rule }); } catch { /* window gone */ }
-  // TRANSITIONAL ALIAS: the renderer still carries the pre-Triggers
-  // `mission:autoCompact` listener as a fallback. Both fire for compact until
-  // every consumer has moved to `trigger:context`; then this line goes.
-  if (action === 'compact') {
-    try { liveWebContents()?.send('mission:autoCompact'); } catch { /* window gone */ }
-  }
-}
-
-/** (Re)arm both context timers from persisted config. Clear-then-arm, so calling
- *  it after a settings change, on boot, or on wake from sleep can never stack
- *  duplicates. Honors elapsed-time-since-last-run exactly like mission arming:
- *  an overdue rule fires ONCE and then settles into its steady cadence. */
 function syncContextTriggers(): void {
+  // Nothing runs on a clock any more. Compaction is Claude Code's own
+  // (AUTO_COMPACT_WINDOW_TOKENS), and a conversation is cleared only after a
+  // finished, handed-off task (safeClearer.ts), never on a timer (owner,
+  // 2026-09-25). Kept so older callers (boot, settings, wake) still stop any
+  // timer a previous version armed.
   clearContextTimers();
-  for (const action of ['compact', 'clear'] as const) {
-    const rule = contextRule(action);
-    if (!rule.enabled || !(rule.everyMs > 0)) continue;
-    const fire = (): void => {
-      try {
-        stampContextRun(action);
-        // Re-read: the operator may have edited the message/thresholds since the
-        // timer was armed, and the renderer should act on what's current.
-        emitContextTrigger(action, contextRule(action));
-      } catch (e) {
-        console.error('[triggers] context', action, e);
-      }
-    };
-    const remaining = Math.max(0, rule.everyMs - (Date.now() - contextLastRunAt(action)));
-    const entry: MissionTimer = {};
-    entry.timeout = setTimeout(() => {
-      fire();
-      entry.interval = setInterval(fire, rule.everyMs);
-    }, remaining);
-    contextTimers.set(action, entry);
-  }
 }
 
 /** Startup migration (#57/#58): archive every agent entry that is `archived:false`
@@ -923,11 +886,34 @@ function archiveOrphanedAgents(): void {
   }
 }
 
+/** The standup fires every time the office opens (owner, 2026-09-25): once per
+ *  launch, as soon as Michael is up, including a brand-new office right after
+ *  setup. The hourly timer then restarts from this fire, so the next one comes an
+ *  hour later. Only when the standup is on and runs on an interval; a standup the
+ *  owner moved to weekly slots keeps to its slots. Michael starting again later in
+ *  the same launch doesn't fire it again. */
+let standupFiredThisLaunch = false;
+function standupOnOfficeOpen(): void {
+  if (standupFiredThisLaunch || !hive.enabled()) return;
+  const m = (readConfig().missions ?? []).find((x) => x.id === OPS_STANDUP_MISSION.id);
+  if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
+  standupFiredThisLaunch = true;
+  try {
+    hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
+    const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
+    writeConfig({ missions: next });
+    try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
+    syncMissions();
+  } catch (e) {
+    console.error('[scheduler] standup on open', e);
+  }
+}
+
 /** One-time migration: ensure the built-in hourly ops standup exists for installs
  *  that predate it. Guarded by `opsStandupSeeded` so a user who later deletes the
  *  mission doesn't get it re-added on every boot. Stamps lastFiredAt = now so the
- *  first standup waits a full interval instead of firing (and compacting every
- *  terminal) immediately on launch. */
+ *  interval timer doesn't also fire it at launch: the launch standup is sent
+ *  once Michael is up (standupOnOfficeOpen). */
 function ensureDefaultMissions(): void {
   const cfg = readConfig();
   if (!cfg.opsStandupSeeded) {
@@ -1004,7 +990,7 @@ function ensureDefaultMissions(): void {
   // Strip it wherever it survives. This is a pure de-duplication, not a behaviour
   // change: contextTrigger.compact still runs, still on the user's own cadence and
   // pressure gate, and it is what actually performed every one of these
-  // compactions already — both paths have called emitContextTrigger since Triggers
+  // compactions already — both paths have called the context trigger since Triggers
   // landed. Idempotent, so it costs one no-op scan per boot once clean.
   const cfg4 = readConfig();
   const missions4 = cfg4.missions ?? [];
@@ -1017,6 +1003,19 @@ function ensureDefaultMissions(): void {
     });
     console.log('[triggers] dropped the legacy per-mission autoCompact flag —',
       'contextTrigger.compact is now the only schedule that compacts');
+  }
+
+  // The standup used to tell Michael each agent would be asked to summarise and
+  // compact. Agents get no instructions about compaction (owner, 2026-09-25), so
+  // an office still carrying that exact text gets the current one. Text the
+  // owner edited is theirs and stays. Idempotent.
+  const cfg5 = readConfig();
+  const missions5 = cfg5.missions ?? [];
+  if (missions5.some((m) => m.id === OPS_STANDUP_MISSION.id && OPS_STANDUP_BUILT_IN_BODIES.includes(m.body))) {
+    writeConfig({
+      missions: missions5.map((m) =>
+        m.id === OPS_STANDUP_MISSION.id && OPS_STANDUP_BUILT_IN_BODIES.includes(m.body) ? { ...m, body: OPS_STANDUP_MISSION.body } : m)
+    });
   }
 }
 
@@ -1260,10 +1259,10 @@ function runBreakerBeat(progressWindowMs: number): void {
     const reason = d.state.reason;
     if (d.action === 'steer') {
       hive.send({ to: d.state.agentId, act: 'request', subject: 'Circuit breaker: steer',
-        body: `Automated guardrail: ${reason}. Re-check your approach — if you're looping or stuck, STOP repeating, summarize what you've tried, and ask god for direction.` }, 'breaker');
+        body: `The app noticed a problem with this task (${reason}). If you are repeating yourself or stuck, stop, and send Michael a short summary of what you tried and what you need.` }, 'breaker');
     } else if (d.action === 'constrain') {
       hive.send({ to: d.state.agentId, act: 'request', subject: 'Circuit breaker: constrain',
-        body: `Automated guardrail escalated: ${reason}. Stop active work now: switch to read-only/plan, write a short plan of your next step, and send it to god for sign-off BEFORE running more tools.` }, 'breaker');
+        body: `The app paused this task (${reason}). Before running more tools, send Michael a short plan of your next step and wait for his go ahead.` }, 'breaker');
       breakerToast(`${name} constrained`, reason);
     } else if (d.action === 'stop') {
       const ptyId = ptyForAgent(d.state.agentId);
@@ -1396,14 +1395,16 @@ let lastSlackUrl: string | undefined;
  *  renderer keeps them split). Trailing space is intentional so the user's message
  *  reads naturally after it. */
 function buildAutonomousRequestProtocol(channel: string, threadTs: string, helperPath: string): string {
-  return `[AUTONOMOUS REQUEST PROTOCOL — this request arrived via Slack; no interactive human is watching] Handle it under this protocol:
-1. ROUTE FAST — triage and hand this to the single most-relevant agent right away. CHECK THE LIVE ROSTER FIRST (active agents in registry.json + their state in fleet.json) and prefer an EXISTING agent that fits — especially when the request names one ("ask Pam…", "have Jim…"): route to that agent and only spawn a new one if none is a sensible fit. Decompose only if it genuinely needs several. Don't sit on it.
-2. DELEGATE WITH THE REPLY HANDLE — tell that agent to do the work autonomously AND to post its result back to THIS Slack thread itself when done, using exactly: "${hive.nodeCommand()}" "${helperPath}" --channel ${channel} --thread ${threadTs} --text "<substantive result>" (that first path is the harness's bundled Node, already resolved for this machine — pass it verbatim; bare "node" is not on the hook/agent PATH on many machines.)
-3. AUTONOMOUS EXECUTION — no interactive questions. PAUSE/ask ONLY for high-severity actions: pushing to main or any remote; buying or spawning infrastructure or paid services; deleting an existing repo, file, or folder it did not create. Stay READ-ONLY at critical infrastructure and git-push-type changes unless explicitly approved.
-4. DIRECT, SUBSTANTIVE REPLY — the agent posts a real Slack-mrkdwn answer (short *bold* headline + the actual outcome/specifics/links), NEVER a bare "done"/":white_check_mark:".
-5. REPORT TO GOD — the agent then tells you (Michael) what it did.
-6. ASYNC QUESTIONS — if a decision is genuinely needed, don't block: post the question + numbered OPTIONS to the thread via that reply command, and record {q, options, askedAt (ISO + day & time), thread_ts ${threadTs}} so the threaded human reply correlates back and resumes.
-The user's message starts now: `;
+  // Slack reply rules ride the Slack request itself, not every agent's startup
+  // instructions (owner cleanup, 2026-09-25). Plain, no spawning or git.
+  return `[Slack request: nobody is watching the office live, so handle it this way.]
+1. Route it straight to the one team member whose role fits, from the roster. When the request names someone ("ask Pam"), send it to them.
+2. Tell them to do the work and post the result to this Slack thread themselves when done, with exactly: "${hive.nodeCommand()}" "${helperPath}" --channel ${channel} --thread ${threadTs} --text "<the result>". Use that Node path as it is; plain "node" is often missing.
+3. No questions in the office. Only spending money, anything public, or deleting something they did not create needs the owner first.
+4. The Slack reply is the real answer in Slack formatting: a short *bold* headline, then the outcome, specifics and links. Never just "done".
+5. They then tell you (Michael) what they did.
+6. If a decision is needed, post the question with numbered options to the thread with the same command, and record {q, options, askedAt, thread_ts ${threadTs}} so the reply in the thread finds its way back.
+The request starts now: `;
 }
 
 // ─── Slack done-notifier (Slack-origin task → done → one summary reply) ───────
@@ -1457,15 +1458,48 @@ function docTextCliPath(): string {
   return join(app.getAppPath(), 'out', 'main', 'docTextCli.js');
 }
 
-/** The shared Office folder (Decision 44): Michael's working directory, and
- *  writable by every agent. Created at onboarding; recreated here (empty) if the
- *  owner deleted it, rather than failing every spawn that depends on it.
- *  Undefined on installs that predate agent folders, which keep today's layout. */
-function officeFolderReady(): string | undefined {
-  const office = readConfig().officeFolder;
-  if (!office) return undefined;
-  const r = ensureFolder(expandTilde(office));
+/** Michael's folder (the business folder), created if the owner deleted it
+ *  rather than failing every spawn that depends on it. Undefined on installs
+ *  that predate agent folders, which keep today's layout. An office set up
+ *  before 2026-09-25 recorded only its Office folder; launch fills
+ *  businessFolder from it (migrateBusinessFolder), and until then its parent is
+ *  used here. */
+function businessFolderReady(): string | undefined {
+  const cfg = readConfig();
+  const folder = cfg.businessFolder ?? legacyBusinessFolder(cfg.officeFolder);
+  if (!folder) return undefined;
+  const r = ensureFolder(expandTilde(folder));
   return r.ok ? r.path : undefined;
+}
+
+/** One-time at launch: an office set up before 2026-09-25 recorded its shared
+ *  Office folder; Michael's folder is the one holding it. Nothing moves on
+ *  disk: the Office folder becomes an ordinary folder inside Michael's. A parent
+ *  that can't hold an office (the home folder, a system folder) keeps Michael
+ *  in the Office folder itself. Also switches the knowledge feature on once,
+ *  now that it is where company knowledge lives. */
+function migrateBusinessFolder(): void {
+  const cfg = readConfig();
+  if (!cfg.businessFolder && cfg.officeFolder) {
+    const office = expandTilde(cfg.officeFolder);
+    const parent = legacyBusinessFolder(office);
+    writeConfig({ businessFolder: parent && isUsableTeamFolder(parent) ? parent : office });
+  }
+  if (!readConfig().knowledgeOnSeeded) {
+    writeConfig({ knowledgeGraph: { ...(readConfig().knowledgeGraph ?? {}), enabled: true }, knowledgeOnSeeded: true });
+  }
+}
+
+/** Every team member's folder and Michael's, for the access rules
+ *  (folderAccess.ts): the folders picked at setup plus every hired agent's,
+ *  archived ones included (their files are still theirs). */
+function businessFolderLayout(businessFolder: string): FolderLayout {
+  const cfg = readConfig();
+  const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
+  for (const a of Object.values(hive.registry().agents)) {
+    if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+  }
+  return folderLayoutFor(businessFolder, folders, cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined);
 }
 
 /** Where the helper discovers `{ port, token }` for the loopback endpoint. Kept
@@ -2495,6 +2529,12 @@ function openFloor(): BrowserWindow | null {
  *  flag-off keeps Electron's default menu (zero behavior change). Uses standard
  *  role-based items so copy/paste/quit/etc. work per-platform, and adds the
  *  "New Floor" item (Cmd/Ctrl+Shift+N). */
+/** The quit item's label in the app menu (and File on Windows and Linux). */
+const QUIT_LABEL = 'Close Office';
+/** The hide item's label in the Mac app menu, for the same reason as Quit:
+ *  "Hide Don't Be Michael" read as a double negative (owner, 2026-09-24). */
+const HIDE_LABEL = 'Hide Office';
+
 function installAppMenu(): void {
   const isMac = process.platform === 'darwin';
   const newFloorItem = {
@@ -2502,13 +2542,33 @@ function installAppMenu(): void {
     accelerator: 'CmdOrCtrl+Shift+N',
     click: () => { openFloor(); }
   };
+  // Quit reads "Close Office" and Hide reads "Hide Office": "Quit Don't Be
+  // Michael" put "Quit" and "Don't" side by side, which read as a double
+  // negative (owner, 2026-09-24). Both keep their roles, so Cmd+Q, Cmd+H and
+  // the quit guard behave exactly as before.
+  const quitItem = { role: 'quit' as const, label: QUIT_LABEL };
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(isMac
+      ? [{
+        role: 'appMenu' as const,
+        submenu: [
+          { role: 'about' as const },
+          { type: 'separator' as const },
+          { role: 'services' as const },
+          { type: 'separator' as const },
+          { role: 'hide' as const, label: HIDE_LABEL },
+          { role: 'hideOthers' as const },
+          { role: 'unhide' as const },
+          { type: 'separator' as const },
+          quitItem
+        ]
+      }]
+      : []),
     {
       label: 'File',
       submenu: isMac
         ? [newFloorItem, { type: 'separator' as const }, { role: 'close' as const }]
-        : [newFloorItem, { type: 'separator' as const }, { role: 'quit' as const }]
+        : [newFloorItem, { type: 'separator' as const }, quitItem]
     },
     // The Edit menu is spelled out rather than `{ role: 'editMenu' }` for one
     // reason: `registerAccelerator: false` on the clipboard items.
@@ -2646,8 +2706,16 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // returned to the caller so the renderer records the same absolute path.
   opts.cwd = expandTilde(opts.cwd);
   if (opts.hive) opts.hive = { ...opts.hive, cwd: expandTilde(opts.hive.cwd) };
-  // Before anything checks the working folder: Michael's IS the Office folder.
-  const officeFolder = officeFolderReady();
+  // Before anything checks the working folder. Michael works in the business
+  // folder, private to him and the owner, which holds every team member's
+  // folder so he can read his team's work (folderAccess.ts). The renderer may
+  // ask for an older place (the retired Office folder); main decides here, where
+  // the folder checks live.
+  const businessFolder = businessFolderReady();
+  if (opts.hive?.isGod && businessFolder) {
+    opts.cwd = businessFolder;
+    opts.hive = { ...opts.hive, cwd: businessFolder };
+  }
   // Which CLI is this? Explicit wins; else inferred from the binary
   // (claude/codex/grok/agy). Non-Claude providers skip every Claude-only spawn step
   // below. Persist the resolved provider onto opts (+ hive meta) so the registry
@@ -2800,15 +2868,34 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           // expands to nothing, so every knowledge-graph instruction was dead on a
           // Windows floor. Empty when the KG is off (the line isn't emitted then).
           kgCliPath: knowledge.env().KG_CLI,
+          kgRoot: knowledge.env().KG_ROOT,
+          meaningSearch: meaningSearch(),
           theme: readConfig().terminalTheme ?? 'light',
           // W3 — default-MCP consent state + the bundled skills source dir.
           mcpDefaults: readConfig().mcpDefaults,
           skillsDir: skillsResourceDir(),
           // The shared palace is mutated by the agent's own `mempalace` calls, so
           // the OS sandbox must let it through (empty when memory is off).
-          // …and the shared Office folder, which every agent reads and writes.
-          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH, officeFolder].filter((p): p is string => !!p),
-          officeFolder,
+          extraWritableDirs: [memory.env().MEMPALACE_PALACE_PATH].filter((p): p is string => !!p),
+          businessFolder,
+          business: (() => {
+            const cfg = readConfig();
+            const pack = businessPackInfo(cfg.businessType);
+            const profile = cleanCompanyProfile(cfg.companyProfile);
+            return {
+              name: cfg.businessName,
+              city: cfg.businessCity,
+              typeName: pack.displayName ?? profile.industry,
+              briefing: pack.briefing
+            };
+          })(),
+          folderPolicy: businessFolder
+            ? folderPolicy(
+              { isGod: !!opts.hive.isGod, cwd: opts.cwd },
+              businessFolderLayout(businessFolder),
+              process.platform !== 'linux'
+            )
+            : undefined,
           docTextCliPath: docTextCliPath()
         }
       );
@@ -2877,6 +2964,13 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           console.warn(`[spawn] ${opts.hive.id}: ${pick.downgraded.from} needs Claude Code ${pick.downgraded.need}+, found ${pick.downgraded.have}; running ${pick.model}`);
         }
       }
+    }
+    // Compaction is Claude Code's own auto compact (owner, 2026-09-25): the app
+    // only moves where it fires. Claude Code clamps this to the model's window,
+    // so a 200k model is unchanged and a 1M model compacts at about 300k.
+    // An owner who set the variable themselves keeps their value.
+    if (!process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW && !opts.env?.CLAUDE_CODE_AUTO_COMPACT_WINDOW) {
+      opts.env = { ...(opts.env ?? {}), CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(AUTO_COMPACT_WINDOW_TOKENS) };
     }
     // Name the Remote Control session after the agent (Michael, Jim, Dev1…) so it
     // is identifiable in claude.ai / the mobile app. Otherwise Claude defaults the
@@ -3062,6 +3156,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   const worktreePath = worktreePaths.get(opts.id);
   // `cwd` echoes back the TILDE-EXPANDED absolute path so the renderer's agent
   // record matches what the registry and the PTY actually used.
+  if (res.ok && opts.hive?.isGod) standupOnOfficeOpen();
   return { ...res, cwd: opts.cwd, ...(worktreePath ? { worktreePath } : {}), ...(resumeNotFound ? { resumeNotFound: true } : {}), ...(didResume ? { resumed: true } : {}), ...(seedPrompt ? { seedPrompt } : {}) };
 }
 ipcMain.handle('pty:write', (_evt, id: string, data: string) => {
@@ -3250,8 +3345,16 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   const hiveWasEnabled = hive.enabled();
   const wasOnboarded = readConfig().onboardingComplete;
   const next = writeConfig(patch);
-  // Live opt-in/out from Settings → Privacy (TELEMETRY.md).
-  if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(patch.telemetryEnabled);
+  // The office describes itself in <home>/office.json, so a reinstall finds it
+  // by folder rather than by the business name typed into setup. Only a save
+  // that changes the office's own fields writes it: switching offices changes
+  // harnessHome alone, and must not copy one office's team into another.
+  if (touchesOffice(patch)) syncOfficeRecord(next);
+  // Company knowledge just turned on: index it for search by meaning now.
+  if (patch && typeof patch === 'object' && 'knowledgeGraph' in patch) memory.companyKnowledgeChanged();
+  // Live opt-in/out from Settings (TELEMETRY.md); stays off while
+  // COLLECT_USAGE_STATS is false.
+  if (typeof patch?.telemetryEnabled === 'boolean') analytics.setEnabled(COLLECT_USAGE_STATS && patch.telemetryEnabled);
   // Activation funnel (v0.4.6): onboarding just finished (false → true) — the top of
   // the launch → first-agent funnel. `provider` is the engine chosen in the wizard.
   // Fired here (main), not in the renderer, so it rides the same allowlist as the rest.
@@ -3319,7 +3422,7 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   try { stopSlackServer(); } catch (e) { console.error('[changeHome] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[changeHome] webhook.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[changeHome] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[changeHome] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[changeHome] memoryTidy.stop:', e); }
 
   if (mode === 'move' && oldHome) {
     try {
@@ -3356,6 +3459,12 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   return { ok: true as const }; // unreachable (process exits) — typed for the renderer
 });
 
+/** Setup asks what is in a folder before it creates anything: an office, and if
+ *  so its business and team (office.json, else the hive registry). */
+ipcMain.handle('office:find', (_evt, path: unknown) => {
+  const home = typeof path === 'string' && path.trim() ? resolve(expandTilde(path.trim())) : readConfig().harnessHome;
+  return home ? findOffice(home) : { path: null, hasOffice: false, record: null, source: null };
+});
 /** Is an office folder there? No path = the current home. The launch screen
  *  uses it to decide between the floor and "we can't find your office", and
  *  Settings uses it to tell an existing office from an empty folder. */
@@ -3532,6 +3641,8 @@ ipcMain.on('roster:readSync', (evt) => { evt.returnValue = roster.read(); });
 ipcMain.on('config:homeSync', (evt) => { evt.returnValue = readConfig().harnessHome ?? null; });
 ipcMain.handle('roster:read', () => roster.read());
 ipcMain.handle('roster:write', (_evt, snap: unknown) => roster.write(snap));
+ipcMain.handle('roster:backup', (_evt, reason: unknown) =>
+  ({ ok: roster.backupNow(typeof reason === 'string' && /^[a-z0-9-]{1,40}$/.test(reason) ? reason : 'manual') }));
 
 // ─── IPC: hive (multi-agent coordination) ───────────────────────────────────
 ipcMain.handle('hive:registry', () => hive.registry());
@@ -3558,6 +3669,27 @@ ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hi
 ipcMain.handle('hive:messages', (_evt, opts: unknown) =>
   hive.voiceMessages(opts && typeof opts === 'object' ? (opts as Parameters<typeof hive.voiceMessages>[0]) : {})
 );
+/** The last time the app cleared an agent's conversation (safeClearer.ts). */
+ipcMain.handle('hive:clearedState', (_evt, id: unknown) => (typeof id === 'string' ? hive.clearedState(id) : null));
+/** Undo a clear: point the agent back at its earlier conversation and restart
+ *  it into it, through the same respawn-with-resume path the app uses after
+ *  sleep (the renderer's power:resume handler). */
+ipcMain.handle('agent:restoreConversation', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return { ok: false };
+  const state = hive.clearedState(id);
+  const ptyId = ptyForAgent(id);
+  if (!state || !ptyId) return { ok: false };
+  hive.restoreSession(id, state.oldSession);
+  hive.recordClear(id, null);
+  try { liveWebContents()?.send('power:resume', { reason: 'restore-conversation', awayMs: 0, dead: [ptyId], total: 1 }); } catch { /* window gone */ }
+  return { ok: true };
+});
+/** The owner's Ask me answer, added to the raising agent's memory notes. */
+ipcMain.handle('hive:rememberOwnerAnswer', (_evt, p: unknown) => {
+  const o = (p ?? {}) as { agentId?: unknown; task?: unknown; q?: unknown; a?: unknown };
+  if (typeof o.agentId !== 'string' || typeof o.q !== 'string' || typeof o.a !== 'string') return { ok: false };
+  return { ok: hive.rememberOwnerAnswer(o.agentId, typeof o.task === 'string' ? o.task : '', o.q, o.a) };
+});
 ipcMain.handle('hive:send', (_evt, partial: Partial<HiveMessage>, from: unknown) => {
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   const sender = typeof from === 'string' ? from : 'system';
@@ -3646,23 +3778,28 @@ ipcMain.handle('packs:list', () => {
 });
 
 /** Default folders for the onboarding team screen (Decisions 44, 45):
- *  `~/Documents/<Business>/<Folder>` for each folder name, plus the shared Office.
- *  Nothing is created here. The owner can still change any of them. */
+ *  `~/Documents/<Business>/<Folder>` for each folder name. The business folder
+ *  is Michael's, and holds the team's folders. When the owner picks another one (`root`), every default follows
+ *  it; a folder that can't hold an office (the home folder, a system folder)
+ *  is refused and the default kept. Nothing is created here. */
 ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
-  const p = (payload ?? {}) as { businessName?: unknown; folders?: unknown };
+  const p = (payload ?? {}) as { businessName?: unknown; folders?: unknown; root?: unknown };
   const businessName = typeof p.businessName === 'string' ? p.businessName : '';
   const names = Array.isArray(p.folders)
     ? p.folders.filter((x): x is string => typeof x === 'string').slice(0, 50)
     : [];
   const docs = app.getPath('documents');
+  const picked = typeof p.root === 'string' && p.root.trim() ? resolve(expandTilde(p.root.trim())) : undefined;
+  const rootRefused = !!picked && (!isAbsolute(picked) || !isUsableTeamFolder(picked));
+  const root = picked && !rootRefused ? picked : businessFolderRoot(docs, businessName);
   const byFolder: Record<string, string> = {};
-  for (const n of names) byFolder[n] = defaultAgentFolder(docs, businessName, n);
+  for (const n of names) byFolder[n] = join(root, safeFolderName(n));
   return {
     // For display only: the screen shows ~/Documents/… rather than /Users/<name>/…
     home: app.getPath('home'),
-    root: businessFolderRoot(docs, businessName),
-    office: defaultAgentFolder(docs, businessName, OFFICE_FOLDER),
-    byFolder
+    root,
+    byFolder,
+    ...(rootRefused ? { rootRefused: true } : {})
   };
 });
 
@@ -3768,7 +3905,7 @@ ipcMain.handle('hive:mineNow', () => { memory.mineNow(); return { ok: true }; })
 // Condense memory.md on demand: an explicit id condenses that one agent (skips
 // the size trigger — a "condense now" button); no id runs a full threshold scan.
 ipcMain.handle('memory:reflectNow', (_evt, id: unknown) =>
-  reflector.reflectNow(typeof id === 'string' && id ? id : undefined));
+  memoryTidy.tidyNow(typeof id === 'string' && id ? id : undefined));
 
 // ─── IPC: enterprise Knowledge Graph (multimodal context for agents) ─────────
 ipcMain.handle('kg:status', () => knowledge.status());
@@ -3779,15 +3916,20 @@ ipcMain.handle('kg:search', (_evt, query: unknown, limit: unknown) => {
 });
 ipcMain.handle('kg:get', (_evt, id: unknown) =>
   (typeof id === 'string' && id ? knowledge.get(id) : null));
-ipcMain.handle('kg:remove', (_evt, id: unknown) =>
-  ({ ok: typeof id === 'string' && id ? knowledge.remove(id) : false }));
+ipcMain.handle('kg:remove', (_evt, id: unknown) => {
+  const ok = typeof id === 'string' && id ? knowledge.remove(id) : false;
+  if (ok) memory.companyKnowledgeChanged(); // drop it from search by meaning too
+  return { ok };
+});
 // Ingest one or more files from disk. Best-effort per file; returns per-file
 // results so the UI can report partial success.
 ipcMain.handle('kg:ingestFiles', async (_evt, payload: unknown) => {
   const p = (payload ?? {}) as { paths?: unknown; tags?: unknown };
   const paths = Array.isArray(p.paths) ? p.paths.filter((x): x is string => typeof x === 'string') : [];
   const tags = Array.isArray(p.tags) ? p.tags.filter((x): x is string => typeof x === 'string') : undefined;
-  return { results: await ingestSequentially(paths, tags) };
+  const results = await ingestSequentially(paths, tags);
+  if (results.some((r) => r.ok)) memory.companyKnowledgeChanged(); // index it for search by meaning
+  return { results };
 });
 // Open a multi-file picker and ingest the chosen artifacts in one round-trip.
 ipcMain.handle('kg:addFiles', async (evt) => {
@@ -3798,7 +3940,9 @@ ipcMain.handle('kg:addFiles', async (evt) => {
     title: 'Add documents to the Knowledge Graph'
   });
   if (res.canceled || res.filePaths.length === 0) return { ok: false as const, error: 'cancelled' };
-  return { ok: true as const, results: await ingestSequentially(res.filePaths) };
+  const results = await ingestSequentially(res.filePaths);
+  if (results.some((r) => r.ok)) memory.companyKnowledgeChanged(); // index it for search by meaning
+  return { ok: true as const, results };
 });
 
 /** Ingest files one at a time. Sequential on purpose: kg-core appends every
@@ -3893,7 +4037,7 @@ function teardownAndQuit(): void {
   try { stopSlackServer(); } catch (e) { console.error('[quit] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[quit] webhook.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[quit] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[quit] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[quit] memoryTidy.stop:', e); }
   try { persist.close(); } catch (e) { console.error('[quit] persist.close:', e); }
   try { hive.stopAllProxyBridges(); } catch (e) { console.error('[quit] stopAllProxyBridges:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[quit] killAll:', e); }
@@ -3953,7 +4097,7 @@ ipcMain.handle('app:resetAll', () => {
   try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[reset] slack.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[reset] memory.stop:', e); }
-  try { reflector.stop(); } catch (e) { console.error('[reset] reflector.stop:', e); }
+  try { memoryTidy.stop(); } catch (e) { console.error('[reset] memoryTidy.stop:', e); }
   try { persist.close(); } catch (e) { console.error('[reset] persist.close:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[reset] killAll:', e); }
   try { hive.removeExposedCodexData(); } catch (e) { console.error('[reset] removeExposedCodexData:', e); }
@@ -4514,6 +4658,8 @@ ipcMain.handle('freeflow:setConfig', (_evt, patch: unknown) => {
  *  in main — only the audio bytes cross IPC inbound and the transcript outbound. */
 ipcMain.handle('freeflow:transcribe', async (_evt, arg: unknown) => {
   const cfg = readConfig();
+  // Voice is off in this build (SHOW_VOICE): no dictation either.
+  if (!SHOW_VOICE) return { ok: false, error: 'Voice is off in this version.' };
   if (!cfg.freeflowEnabled) return { ok: false, error: 'Free Flow is disabled' };
   if (!cfg.groqApiKey) return { ok: false, error: 'no Groq API key set' };
   const a = (arg ?? {}) as { audio?: unknown; mimeType?: unknown; filename?: unknown; language?: unknown };
@@ -5179,6 +5325,8 @@ ipcMain.handle('workers:stop', (_evt, workerId: string): { ok: boolean; error?: 
  *  (config:changeHome tears these down before copying). No-op without a home. */
 function bootstrapHiveServices(): void {
   if (!hive.enabled()) return;
+  // A business office gets the plain PROTOCOL.md and no COMMANDS.md.
+  hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.ensureHive();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
@@ -5204,7 +5352,14 @@ function bootstrapHiveServices(): void {
     electron: process.versions.electron,
     platform: process.platform
   });
-  control.replaceAutoDeliveryPauses(readConfig().autoDeliveryPausedAgents ?? []);
+  // While the Auto / Pause switch is hidden (buildFeatures.ts), a pause saved
+  // before it was hidden is cleared rather than restored: otherwise those
+  // agents' queued messages would be held with no switch to release them.
+  if (SHOW_DELIVERY_SWITCH) {
+    control.replaceAutoDeliveryPauses(readConfig().autoDeliveryPausedAgents ?? []);
+  } else if ((readConfig().autoDeliveryPausedAgents ?? []).length > 0) {
+    writeConfig({ autoDeliveryPausedAgents: [] });
+  }
   archiveOrphanedAgents(); // #57/#58: archive stale archived:false entries with no live PTY
   hive.startRouter();
   startEphemeralWorkerWatcher(); // poll HIVE_ROOT/spawn-requests → ephemeral workers
@@ -5214,6 +5369,7 @@ function bootstrapHiveServices(): void {
     if (r.ok) console.log('[broker] integration broker listening on', integrationBroker.url());
     else console.error('[broker] failed to start:', r.error);
   });
+  migrateBusinessFolder(); // one-time: Michael's folder from the retired Office folder
   ensureDefaultMissions(); // one-time: seed the built-in hourly ops standup
   syncMissions(); // arm recurring auto-dispatch missions now the router is live
   syncContextTriggers(); // …and the context trigger's own compact/clear cadences
@@ -5232,7 +5388,7 @@ function bootstrapHiveServices(): void {
     else console.error('[telemetry] collector failed to start:', r.error);
   });
   memory.start(); // init shared palace + mine loop (no-op without mempalace)
-  reflector.start(); // bound oversized memory.md files on a timer (no-op until threshold)
+  memoryTidy.start(); // tidy agents' memory notes into their index in the background
 
   armAlwaysOnBeats();
 }
@@ -5241,6 +5397,61 @@ function bootstrapHiveServices(): void {
  *  own nudge cooldown so a throttled window is caught within ~15s of a stall. */
 const WORKER_WAKE_POLL_MS = 15_000;
 let workerWakeTimer: ReturnType<typeof setInterval> | null = null;
+let safeClearTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Type text into a terminal and submit it: text first, Enter a tick later (a
+ *  single-chunk write would land the "\r" inside the input box). */
+function typeIntoPty(ptyId: string, text: string): void {
+  const wrote = ptyManager.write(ptyId, text);
+  if (!wrote.ok) { console.warn(`[type] write failed for ${ptyId}: ${wrote.error}`); return; }
+  setTimeout(() => { try { ptyManager.write(ptyId, '\r'); } catch (e) { console.error('[type] submit threw:', e); } }, 140);
+}
+
+/** Clears a team member's conversation only when worth it and safe, after a
+ *  handoff, and undoably (safeClearer.ts, src/shared/safeClear.ts). Michael is
+ *  never a candidate. */
+const safeClearer = new SafeClearer({
+  agents: () => {
+    if (!hive.enabled()) return [];
+    const reg = hive.registry();
+    const out: ReturnType<SafeClearDeps['agents']> = [];
+    for (const [id, a] of Object.entries(reg.agents ?? {})) {
+      if (a?.archived) continue;
+      const ptyId = ptyForAgent(id);
+      if (!ptyId) continue;
+      const snap = control.snapshot(id);
+      // A conversation size recorded before the last clear is stale: the new
+      // conversation hasn't reported its size yet.
+      const ctx = hookServer.contextFor(id);
+      const cleared = hive.clearedState(id);
+      const tokens = ctx && (!cleared || ctx.ts > cleared.at) ? ctx.tokens : 0;
+      out.push({
+        id,
+        ptyId,
+        lastOutputAt: ptyManager.lastOutputAt(ptyId) ?? 0,
+        facts: {
+          isGod: id === reg.godId || !!a.isGod,
+          isAssistant: !!a.isAssistant,
+          isClaude: isClaudeProvider(a.provider ?? 'claude'),
+          held: !!a.onHold,
+          paused: snap.paused || snap.halted || snap.autoDeliveryPaused,
+          contextTokens: tokens,
+          openCards: hive.openCardsFor(id),
+          inbox: hive.inbox(id).length,
+          awaitingReplies: hive.awaitingReplies(id),
+          openQuestions: hive.openQuestionsRaisedBy(id)
+        }
+      });
+    }
+    return out;
+  },
+  handoffPath: (id) => hive.handoffPath(id),
+  memoryInboxPath: (id) => join(hive.root() ?? '', 'agents', id, 'memory', 'inbox.md'),
+  lastSession: (id) => hive.lastSession(id),
+  recordClear: (id, state) => hive.recordClear(id, state),
+  type: typeIntoPty,
+  log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
 
 /** Type the renderer's guarded nudge into one worker's PTY — text first, Enter a
  *  tick later (the exact submitToPty pattern: a single-chunk write would land the
@@ -5317,6 +5528,8 @@ function armAlwaysOnBeats(): void {
   breakerBeatTimer = setInterval(() => { try { runBreakerBeat(300_000); } catch (e) { console.error('[breaker beat]', e); } }, 30_000);
   if (workerWakeTimer) clearInterval(workerWakeTimer);
   workerWakeTimer = setInterval(() => { try { runWorkerWakeBeat(); } catch (e) { console.error('[worker-wake beat]', e); } }, WORKER_WAKE_POLL_MS);
+  if (safeClearTimer) clearInterval(safeClearTimer);
+  safeClearTimer = setInterval(() => { try { safeClearer.beat(); } catch (e) { console.error('[safe-clear beat]', e); } }, 60_000);
   runWorkerWakeBeat(); // catch-up on arm — power-resume re-arms and drains the backlog
 }
 
@@ -5411,12 +5624,13 @@ app.whenReady().then(() => {
   if (readConfig().realtimeVoiceEnabled) writeConfig({ realtimeVoiceEnabled: false });
 
   // Anonymous product analytics (PostHog) — the full contract lives in
-  // TELEMETRY.md. No-op unless a build-time key was injected (official releases
-  // only), and gated on DO_NOT_TRACK + the telemetryEnabled config (opt-out).
+  // TELEMETRY.md. Off entirely while COLLECT_USAGE_STATS (buildFeatures.ts) is
+  // false. Otherwise a no-op unless a build-time key was injected (official
+  // releases only), and gated on DO_NOT_TRACK + the telemetryEnabled config.
   analytics.init({
     stateDir: app.getPath('userData'),
     appVersion: app.getVersion(),
-    enabled: readConfig().telemetryEnabled !== false
+    enabled: COLLECT_USAGE_STATS && readConfig().telemetryEnabled !== false
   });
 
   // Warm the model catalog cache before any picker opens. The renderer reads
@@ -5448,7 +5662,12 @@ app.whenReady().then(() => {
   // folder, bootstrapping would quietly rebuild an EMPTY office at the old path;
   // instead nothing touches it and the renderer asks where it went (homeFolder.ts).
   const homeReady = homeReadyAtLaunch(readConfig());
-  if (homeReady) bootstrapHiveServices();
+  if (homeReady) {
+    bootstrapHiveServices();
+    // An office set up before office.json existed gets one now, if the config's
+    // team is really this office's team (officeFile.ts).
+    backfillOfficeRecord(readConfig());
+  }
   else console.warn('[home] office folder missing, waiting for the owner:', readConfig().harnessHome);
   // Survive sleep/lock. macOS freezes libuv timers during true system sleep, so a
   // locked/idle/slept Mac stops firing schedules and can wedge PTYs. On wake we

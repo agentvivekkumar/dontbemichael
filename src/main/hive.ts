@@ -18,6 +18,8 @@
  *
  * Everything here runs in the Electron main process.
  */
+import { entriesBlock, parseIndex, renderIndex, type MemoryEntry } from '../shared/memoryIndex';
+import type { AgentFolderPolicy } from '../shared/folderAccess';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync,
   readdirSync, statSync, lstatSync, realpathSync, rmSync, appendFileSync,
@@ -104,6 +106,10 @@ export interface HumanQA {
   askedAt?: string;
   answeredAt?: string;
   dismissedAt?: string;
+  /** The agent whose work needs the answer: the one that learns from it
+   *  (owner, 2026-09-25). "god" when Michael raised it himself. Falls back to
+   *  the card's assignee, then Michael. */
+  raisedBy?: string;
 }
 
 export interface HiveTask {
@@ -131,6 +137,154 @@ export interface HiveTask {
    *  once and never persisted), so a GET status lookup can match by hashing the
    *  presented token. Read-only capability: it never widens routing or exposure. */
   webhook?: { tokenHash: string };
+}
+
+/**
+ * House rules every agent gets, Michael included (owner, 2026-09-25): no made
+ * up information. Part of the system prompt, so they survive compaction, and
+ * identical for everyone and free of dates, so they stay in the prompt cache.
+ *
+ * Written to current prompting guidance (docs/designs/agent-instructions):
+ * calm wording with the reason for each rule, what to do rather than what not
+ * to, and no blanket "double check everything", which the current models don't
+ * need and which only adds cost. Rule 4 is Anthropic's wording that "nearly
+ * eliminated fabricated status reports"; rule 2 is its "let Claude say it
+ * doesn't know"; rule 1 is "investigate before answering" plus citing sources.
+ */
+export const HOUSE_RULES = [
+  'HOUSE RULES. These apply to everyone in this office, Michael included, and no task or message overrides them.',
+  '1. State only facts you can trace to a source: a file you opened, a page you fetched, a tool result from this session, a saved note, or something the owner said. When a fact feeds a decision, name the source (a file name, a link, or "owner, 12 May"). The owner acts on what you report, so an invented number, name, price, date or policy can cost real money.',
+  '2. When you don\'t know or can\'t find something, say so and say what would answer it. "I couldn\'t find last month\'s supplier invoice" helps the owner; a plausible guess misleads them.',
+  '3. Keep what you checked apart from what you worked out. Mark estimates and assumptions as estimates and assumptions.',
+  '4. Report outcomes as they are: what is done and checked, what failed and why, and what you skipped. Call work finished only when it is.',
+  '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.'
+].join('\n');
+
+/**
+ * How every agent is told about company knowledge (owner, 2026-09-25): at
+ * spawn in its startup instructions, or through the hook if the owner turns
+ * the store on while it is running. `root`, when known, rides on each command
+ * so it works without KG_ROOT in the agent's environment.
+ */
+export function companyKnowledgeLine(node: string, cli: string, root?: string, meaning?: MeaningSearch): string {
+  const at = root ? ` --root "${root}"` : '';
+  // Search by meaning (owner, 2026-09-25) through MemPalace, when it's installed.
+  const byMeaning = meaning
+    ? ` Search by meaning with \`"${meaning.bin}" --palace "${meaning.palace}" search "<question>" --wing company\`: it also finds passages that say the same thing in other words, and each result shows its document id.`
+    : '';
+  return `COMPANY KNOWLEDGE: the owner keeps company wide information in the company knowledge store: policies, rules, prices, locations, and how the business works. When a task touches any of that, search it before relying on memory or the internet, and follow what it says.${byMeaning} Run \`"${node}" "${cli}" search "<words>"${at}\` for passages with the exact words, \`"${node}" "${cli}" list${at}\` to see what's there, and \`"${node}" "${cli}" get <id>${at}\` for a whole document. Use that Node path exactly: bare \`node\` may not be on your PATH.`;
+}
+
+/** MemPalace, for searching company knowledge by meaning: its CLI and the
+ *  office's palace, both absolute so the command works from any agent. */
+export interface MeaningSearch {
+  bin: string;
+  palace: string;
+}
+
+/** What a running agent is told when the owner turns company knowledge off. */
+export const COMPANY_KNOWLEDGE_OFF =
+  'COMPANY KNOWLEDGE: the owner has turned the company knowledge store off. Its commands stop working until it is turned on again.';
+
+/**
+ * How an agent keeps its memory (owner, 2026-09-25): it reads its index (given
+ * at session start), adds owner instructions and corrections at once, and
+ * after a task at most three notes; the app tidies them into the index.
+ */
+function memoryRule(inboxPath: string, memDir: string): string {
+  return `Your memory: the app gives you your memory index at the start of each session; procedure files it names are in ${memDir}. Before researching something, check it and search the company knowledge store, and reuse what's there when it still fits. When the owner tells you to remember something, or corrects you, add it to ${inboxPath} straight away, with the date.`;
+}
+function memoryEndOfTask(inboxPath: string): string {
+  return `When you finish a task, add at most three short notes to ${inboxPath}, and only for things you would otherwise work out again: a fact you researched (with its source and the date you checked it), the steps that worked for a task you'll do again, or a correction or preference from the owner or Michael (with the reason). Often there's nothing worth saving, and that's fine. Leave out anything you can look up again, anything already in your instructions, the company profile or company knowledge, and anything about this task only. Don't write session logs or status updates. The app tidies your notes into your index in the background.`;
+}
+
+/** Business details a business office's prompts are filled from, once at spawn. */
+export interface PromptBusiness {
+  name?: string;
+  city?: string;
+  /** The business type's display name, e.g. "Restaurant & Food". */
+  typeName?: string;
+  /** The pack's briefing for Michael, `{Business}` and `{City}` still in it. */
+  briefing?: string;
+}
+
+/** Paths and helpers both business prompts name, fixed for the agent's life. */
+interface PromptPaths {
+  inbox: string;
+  inboxDone: string;
+  outbox: string;
+  protocol: string;
+  hiveRoot: string;
+  docText?: string;
+}
+
+const where = (b: PromptBusiness): string =>
+  `${b.name?.trim() || 'the business'}${b.city?.trim() ? ` in ${b.city.trim()}` : ''}`;
+
+/**
+ * Michael's standing instructions in a business office (agent instructions
+ * audit, 2026-09-25, README section 1), merged with what was built since: the
+ * standup, Ask me routing back to the raiser, the "michael" address. Plain,
+ * calm wording with reasons, no CAPS, no dashes; nothing volatile, so it
+ * caches. House rules, folders, memory and company knowledge are appended by
+ * injectedPrompt.
+ */
+export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPaths): string {
+  const type = b.typeName ? `, a ${b.typeName.toLowerCase()} business` : '';
+  const briefing = b.briefing
+    ? b.briefing.replace(/\{Business\}/g, b.name?.trim() || 'the business').replace(/ in \{City\}/g, b.city?.trim() ? ` in ${b.city.trim()}` : '').replace(/\{City\}/g, b.city?.trim() || '')
+    : '';
+  return [
+    '## Who you are',
+    `You are ${name}, the office manager for ${b.name?.trim() || 'the business'}${type}${b.city?.trim() ? ` in ${b.city.trim()}` : ''}. You work for the owner. Team members report to you, never to the owner, so you are the owner's one point of contact: you route work, relay results, and bring the owner only what needs them. At the start of a session, act on everything in your inbox.`,
+    ...(briefing ? ['', '## The business', briefing] : []),
+    '',
+    '## Routing work',
+    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. It is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
+    '',
+    '## Doing it yourself',
+    'Answer small things yourself: a fact you know, a short reply, a quick lookup. Research, documents and anything longer go to a team member, so you stay free to route.',
+    '',
+    '## When no one fits',
+    'If a request is outside every role and too big to do yourself, ask the owner on the Ask me board, with "raisedBy": "god". Open with a bold sentence naming the job and why nobody covers it, then offer these options and mark the one you recommend:',
+    '1. Add a team member for it (name the role; the owner uses Add agent).',
+    '2. Hand it to the closest team member (name them and what they would put aside).',
+    '3. You do it yourself this once (say roughly how long).',
+    '4. Drop it.',
+    '',
+    '## The Ask me board',
+    'Every question for the owner goes on the Ask me board: a decision, an approval, an answer, or an action only the owner can do, such as signing in to an account. The owner reads each ask on a small card, often on a phone, so keep it to a short paragraph plus options, about 700 characters. Open with one bold sentence saying exactly what you need. Give each option its own bullet or number, with a blank line between paragraphs. Put amounts, file names and account names in backticks. Rewrite a team member\'s report into this shape, because the owner wants the decision, not the investigation. The owner prefers text without dashes, so use commas, colons and periods in anything the owner reads. Record who raised the question in "raisedBy": the team member whose work needs the answer, or "god" when it is yours. The answer goes straight to them and into their memory, and you are told so you can unblock the card and route any follow-up.',
+    '',
+    '## Keeping the task board accurate',
+    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
+    '',
+    '## Scheduled runs',
+    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. The scheduler does not read replies, so do not answer it.',
+    '',
+    '## Staying cheap',
+    'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
+    '',
+    '## Files',
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To send one, write a JSON file to your outbox (${p.outbox}) with "to" (the id in brackets on the roster, or "human" for the owner at closing time), "act" (request, inform or done; only request expects a reply), "subject" and "body". Cards live in tasks.json beside board.md in ${p.hiveRoot}; to ask the owner, set a card to "blocked" and add {"q": "...", "askedAt": "<time>", "raisedBy": "<id or god>"} to its humanQA list, keeping earlier entries. The hive folder holds only messages, notes and boards, so save documents in your own folder.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+  ].join('\n');
+}
+
+/**
+ * The shared instructions every team member gets in a business office (audit
+ * README section 3), merged with what was built since. The team member's own
+ * Work style arrives separately, through the hook. House rules, folders,
+ * memory and company knowledge are appended by injectedPrompt.
+ */
+export function teamMemberInstructions(name: string, role: string, michael: string, b: PromptBusiness, p: PromptPaths): string {
+  return [
+    `You are ${name}, the ${role} on the team at ${where(b)}. ${michael} is the office manager: he gives you work and is your only link to the owner. Anything you need from the owner, such as an approval, an answer or a file, goes to ${michael}, who puts it on the owner's Ask me board.`,
+    '',
+    'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else.',
+    '',
+    `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
+    '',
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+  ].join('\n');
 }
 
 export interface AgentMeta {
@@ -365,6 +519,30 @@ export class HiveManager {
 
   private routerTimer: NodeJS.Timeout | null = null;
 
+  /** A business office (one with a business folder): its PROTOCOL.md is the
+   *  short plain version, and no COMMANDS.md is written (owner cleanup,
+   *  2026-09-25). Set by main before the hive bootstraps. */
+  private businessOffice = false;
+  setBusinessOffice(on: boolean): void { this.businessOffice = on; }
+
+  /** agentId → whether it has been told company knowledge is on, as of its
+   *  spawn or its last update. Lets an owner's toggle reach running agents
+   *  without a restart (knowledgeUpdate). */
+  private knowledgeTold = new Map<string, boolean>();
+
+  /**
+   * What a running agent should be told because the owner turned company
+   * knowledge on or off since it was last told, or null when nothing changed.
+   * Agents this app didn't start in this launch are left alone.
+   */
+  knowledgeUpdate(agentId: string, k: { active: boolean; cliPath?: string; root?: string; meaning?: MeaningSearch }): string | null {
+    const told = this.knowledgeTold.get(agentId);
+    if (told === undefined || told === k.active) return null;
+    if (k.active && !k.cliPath) return null;
+    this.knowledgeTold.set(agentId, k.active);
+    return k.active ? companyKnowledgeLine(this.nodeCommand(), k.cliPath!, k.root, k.meaning) : COMPANY_KNOWLEDGE_OFF;
+  }
+
   /** The embedded OTLP collector's loopback URL, set by the main process once the
    *  collector is bound (telemetry.ts). null = telemetry off → no OTel env is
    *  injected at spawn (the transcript reconciler remains the cost source). */
@@ -595,7 +773,7 @@ export class HiveManager {
     // the day it was initialised, so every protocol addition since had reached
     // new hives only. The file is generated, not user-authored, and agents are
     // pointed at it as the authority, so a stale copy is worse than a rewrite.
-    writeFileSync(join(root, 'PROTOCOL.md'), PROTOCOL_MD, 'utf8');
+    writeFileSync(join(root, 'PROTOCOL.md'), this.businessOffice ? PROTOCOL_BUSINESS_MD : PROTOCOL_MD, 'utf8');
 
     const registry = join(root, 'registry.json');
     if (!existsSync(registry)) {
@@ -619,7 +797,7 @@ export class HiveManager {
 
     // The Claude Code command reference Michael consults (refreshed each bootstrap
     // so it tracks the bundled list).
-    writeFileSync(join(root, 'COMMANDS.md'), COMMANDS_MD, 'utf8');
+    if (!this.businessOffice) writeFileSync(join(root, 'COMMANDS.md'), COMMANDS_MD, 'utf8');
 
     // Keep the churny/ephemeral live files out of the hive git repo.
     const gitignore = join(root, '.gitignore');
@@ -687,6 +865,13 @@ export class HiveManager {
        *  instructions were unusable on Windows. Optional: undefined degrades to the
        *  old env-var spelling. */
       kgCliPath?: string;
+      /** The company knowledge store's folder, written into the search command
+       *  so it works without KG_ROOT in the agent's environment. */
+      kgRoot?: string;
+      /** MemPalace, when installed: company knowledge searched by meaning. */
+      meaningSearch?: MeaningSearch;
+      /** The business, for a business office's prompts (name, city, type, briefing). */
+      business?: PromptBusiness;
       theme?: 'light' | 'dark';
       /** Consent state for the default-MCP bundle (W3). Threaded from the live
        *  HarnessConfig by the caller; undefined → catalog defaults apply. */
@@ -699,16 +884,20 @@ export class HiveManager {
        *  MemPalace dir, which `mempalace` mutates). Absolute paths; ignored
        *  for providers without a sandbox. */
       extraWritableDirs?: string[];
-      /** The shared Office folder (Decision 44). When set, every agent is told
-       *  where its own work belongs and that the hive is coordination only. */
-      officeFolder?: string;
+      /** Michael's folder, the business folder (Decision 44). When set, every
+       *  agent is told where its own work belongs, who can open it, and that
+       *  the hive is coordination only. */
+      businessFolder?: string;
       /** Absolute path of the agent-facing `doc-text` CLI (F6). */
       docTextCliPath?: string;
+      /** Which folders this agent may open and change (src/shared/folderAccess.ts). */
+      folderPolicy?: AgentFolderPolicy;
     } = {}
   ): Promise<SpawnInjection> {
     const root = this.root();
     if (!root) return { args: [], env: {} };
     this.ensureHive();
+    this.knowledgeTold.set(meta.id, !!opts.knowledgeGraph);
 
     const dir = this.agentDir(meta.id);
     mkdirSync(join(dir, 'inbox', '.done'), { recursive: true });
@@ -732,10 +921,11 @@ export class HiveManager {
     // partial source dir is a no-op (Kevin populates the resource dir in lp-manifest).
     if (opts.skillsDir) this.copyBundledSkills(opts.skillsDir, join(dir, '.claude', 'skills'));
 
+    // The memory index (src/shared/memoryIndex.ts): only the app writes it; the
+    // agent adds notes to memory/inbox.md, tidied in by memoryTidy.ts.
     const memory = join(dir, 'memory.md');
-    if (!existsSync(memory)) {
-      writeFileSync(memory, `# Memory — ${meta.name} (${meta.id})\n\n_Append durable facts, decisions, and context below._\n`, 'utf8');
-    }
+    if (!existsSync(memory)) writeFileSync(memory, renderIndex(meta.name, meta.id, []), 'utf8');
+    mkdirSync(join(dir, 'memory'), { recursive: true });
     ensureMineIgnore(dir); // keep settings.json / cursor / messages out of mempalace's index
     const cursor = join(dir, 'cursor.json');
     if (!existsSync(cursor)) this.writeJson(cursor, { lastProcessed: null });
@@ -818,7 +1008,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -962,7 +1152,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.officeFolder, opts.docTextCliPath));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -971,7 +1161,7 @@ export class HiveManager {
     if (sock && shim) {
       env.HIVE_SOCK = sock;
       const settingsPath = join(dir, 'settings.json');
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs)));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy));
       args.push('--settings', settingsPath);
     }
     return { args, env };
@@ -1152,7 +1342,7 @@ export class HiveManager {
     return Array.from(new Set(out));
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = []): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through `sh -c` with a stripped PATH, where `node` is often absent.
     const cmd = this.nodeRun(shim);
@@ -1195,10 +1385,27 @@ export class HiveManager {
       // Edit/Write tools; with only one the agent deadlocks on its own inbox.
       // failIfUnavailable stays false: a platform without a sandbox (Windows)
       // runs as before rather than refusing to spawn.
+      //
+      // Folder privacy (src/shared/folderAccess.ts) rides the same two layers:
+      // denyRead/denyWrite (with allowRead re-opening an agent's own folder and
+      // the Office inside Michael's) hold shell commands, and permission deny
+      // rules hold the file tools. Deny rules apply in auto mode too.
       ...(writableDirs.length
         ? {
-            sandbox: { enabled: true, filesystem: { allowWrite: writableDirs } },
-            permissions: { additionalDirectories: writableDirs }
+            sandbox: {
+              enabled: true,
+              ...(folders?.sandboxOnly ? { allowUnsandboxedCommands: false } : {}),
+              filesystem: {
+                allowWrite: writableDirs,
+                ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),
+                ...(folders?.sandbox.denyRead.length ? { denyRead: folders.sandbox.denyRead } : {}),
+                ...(folders?.sandbox.allowRead.length ? { allowRead: folders.sandbox.allowRead } : {})
+              }
+            },
+            permissions: {
+              additionalDirectories: writableDirs,
+              ...(folders?.deny.length ? { deny: folders.deny } : {})
+            }
           }
         : {}),
       hooks: {
@@ -1406,7 +1613,7 @@ export class HiveManager {
     return [
       `# ${meta.name} (${meta.id})`,
       '',
-      `- Role: ${meta.role ?? (meta.isGod ? 'orchestrator (god)' : 'agent')}`,
+      `- Role: ${meta.role ?? (meta.isGod ? 'office manager' : 'agent')}`,
       `- Capabilities: ${caps}`,
       `- Working directory: ${meta.cwd}`,
       meta.isGod ? '- You are the **god / orchestrator**. You run the floor — keep awareness of the whole team, delegate execution, and personally own only the important calls (decomposition, sign-offs, conflicts, integration), not the grunt work.' : '',
@@ -1444,17 +1651,21 @@ export class HiveManager {
     semanticMemory: boolean,
     knowledgeGraph: boolean,
     kgCliPath?: string,
-    officeFolder?: string,
-    docTextCliPath?: string
+    businessFolder?: string,
+    docTextCliPath?: string,
+    kgRoot?: string,
+    meaningSearch?: MeaningSearch,
+    business?: PromptBusiness
   ): string {
     // Native-separator path helpers — see the 🪟 note above.
     const inDir = (...parts: string[]): string => join(dir, ...parts);
     const inRoot = (...parts: string[]): string => join(root, ...parts);
     // Resolved ONCE here, at THIS agent's own spawn — same prompt-cache-stable
     // shape as name/id/dir/root above it, not a live re-read on every turn.
-    // Needed only for the PREP ASSISTANT persona below, which refers to god by
-    // name in prose; god's own prompt already gets its name via `meta.name`.
-    const godRegistry = meta.isAssistant ? this.registry() : null;
+    // Needed where another agent's prompt refers to god by name in prose: the
+    // PREP ASSISTANT persona and a team member's folder line. God's own prompt
+    // already gets its name via `meta.name`.
+    const godRegistry = meta.isGod ? null : this.registry();
     const godNameForPrompt = godRegistry
       ? resolveGodName(godRegistry.agents[godRegistry.godId ?? 'god']?.name)
       : '';
@@ -1464,7 +1675,7 @@ export class HiveManager {
       // The palace location is named, not spelled as `$MEMPALACE_PALACE_PATH`:
       // `mempalace` reads that env var itself, and the POSIX `$` form was noise
       // (or an empty expansion) for a Windows agent that tried to use it literally.
-      ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your notes in memory.md are mined into the palace automatically — write durable facts there.'
+      ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your memory index is mined into the palace automatically.'
       : '';
     // Enterprise Knowledge Graph (opt-in). Volatile-free: the bundled-node launcher
     // and the KG CLI are both fixed absolute paths for an install, so baking them
@@ -1472,9 +1683,9 @@ export class HiveManager {
     // cmd.exe/PowerShell as well as a POSIX shell.
     const hiveNode = this.nodeCommand();
     const kgCli = kgCliPath || (process.platform === 'win32' ? '%KG_CLI%' : '$KG_CLI');
-    const knowledgeLine = knowledgeGraph
-      ? `Enterprise knowledge: this organisation has a private Knowledge Graph of its own documents, policies, and business context. When a task needs that context — company-specific facts, house style, internal processes — query it instead of guessing: run \`"${hiveNode}" "${kgCli}" search "<query>"\` for ranked passages, \`"${hiveNode}" "${kgCli}" list\` to see what is available, and \`"${hiveNode}" "${kgCli}" get <id>\` for a full document. (That first path is the harness's bundled Node — use it instead of bare \`node\`, which may not be on your PATH.)`
-      : '';
+    // Company knowledge (owner, 2026-09-25): the one place company wide
+    // information, policies and rules are shared, searched by every agent.
+    const knowledgeLine = knowledgeGraph ? companyKnowledgeLine(hiveNode, kgCli, kgRoot, meaningSearch) : '';
     // Item 13: state the build. Agents had no way to tell which version, or even
     // which KIND of build, they were running inside, so anything that varies
     // between a packaged app and a local dev run (umask being the one that bit
@@ -1496,21 +1707,50 @@ export class HiveManager {
       : '';
     const godLine = meta.isGod
       ? 'You are the GOD / ORCHESTRATOR of this hive — your job is to ORCHESTRATE, not to implement: maintain live situational awareness and delegate the work. (1) AWARENESS — always know what is going on: keep an accurate picture of every agent (active vs archived/idle), the task board, and all in-flight work; drain your inbox continually and triage every other agent\'s requests, answering clarifications so the team runs autonomously. (2) DELEGATE — decompose work and fan it out to the hive agents via their inboxes (route messages and assign owners; do not do their jobs); do NOT take on grunt implementation yourself. Stay aware of who is already on the floor and delegate OPPORTUNISTICALLY: BEFORE you spawn anything, CHECK THE LIVE ROSTER (active agents in registry.json + their state in fleet.json) and prefer routing to an EXISTING agent that fits — above all when the request names one ("ask Pam to…", "have Jim…"), route to that agent instead of reflexively creating a new one. Reuse an idle or already-running agent whose role matches; only spawn a fresh agent when no existing one is a sensible fit, and say that you checked. One capable owner beats a duplicate. (3) OWN ONLY THE IMPORTANT, high-leverage things — task decomposition, dispatch decisions, sign-offs, conflict resolution, branch integration, and final QA — and remain the sole scribe of board.md. You are otherwise fully autonomous — there is NO separate approval queue. For the genuinely critical (destructive actions, spending real money, scope changes, unresolvable conflicts), ask the human directly in your own session and let the tool-permission prompt gate the action; the human approves natively, including remotely from their phone via /remote-control. Keep the team unblocked. When you DISPATCH a task, write it as a 4-part contract so the agent can run autonomously: (1) OBJECTIVE — the concrete goal; (2) OUTPUT — the expected deliverable/format; (3) TOOLS — what to use or avoid, and any references to read instead of re-deriving; (4) BOUNDARIES — scope limits + the definition of done. Pass references (file paths, message ids, board sections), not pasted content — keep dispatches short.'
-        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests — on each, review every agent via fleet.json, re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>"}; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a") AND arrives as an inbox message to you — read it, act on it, and unblock the card so work continues. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
+        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests. At the hourly ops standup, review every agent via fleet.json: who is doing what, and whether each is still running (not stalled or idle-stale); check whether in-flight tasks are on track and whether anything is blocked or unowned; re-engage anyone stalled, over-budget, or breaker-armed, flag stale agents and at-risk tasks, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives as an inbox message to you: unblock the card, and route any follow-up, so work continues. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
-    // WHERE WORK LIVES (Decisions 44, 48). Only on installs with an Office folder:
+    // WHERE WORK LIVES (Decisions 44, 48). Only on installs with a business folder:
     // an older install's Michael still runs inside the harness folder, and telling
-    // him never to write there would contradict where he actually is. Both paths
+    // him never to write there would contradict where he actually is. The paths
     // are stable for the agent's lifetime, so the prompt-cache invariant holds.
-    const folderLine = officeFolder
-      ? (meta.cwd === officeFolder
-        ? `YOUR FOLDERS: you work in ${meta.cwd}, the Office folder shared by the whole team. Company-wide documents live there: read them for context before searching the internet, and save anything meant for the whole team there. Each team member also has a folder of their own, which is where their work goes.`
-        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner puts the documents you need there, so read it for context before searching the internet, and save everything you produce there — drafts, reports, spreadsheets. ${officeFolder} is the Office folder shared by the whole team: company-wide documents live there, and anything meant for everyone goes there.`)
-        + ` The hive (${root}) is ONLY for coordination — your memory.md, inbox and outbox. NEVER save documents, drafts or other work anywhere in the hive.`
-        + (docTextCliPath ? ` You can open PDFs and images directly. To read a Word, Excel or PowerPoint file, run \`"${hiveNode}" "${docTextCliPath}" "<file>"\` — it prints the text (a reason instead, if the file can't be read).` : '')
+    const folderLine = businessFolder
+      ? (meta.isGod
+        ? `YOUR FOLDERS: you work in ${meta.cwd}, your folder. It is private: only you and the owner can open it. Each team member has a folder of their own, inside this one unless the owner put it elsewhere. You can read their files, but only they change them, so when something needs to go into a team member's folder, ask them.`
+        : `YOUR FOLDERS: you work in ${meta.cwd}. The owner keeps the documents you need there, so read it for context before searching the internet, and save everything you produce there: drafts, reports, spreadsheets. It is private: only you, anyone sharing this folder, and ${godNameForPrompt} can open it, and other team members' folders are private to them.`)
+        + ` The hive (${root}) is only for coordination: your memory notes, inbox and outbox. Save documents, drafts and other work outside it. You can open PDFs and images directly.`
       : '';
+    // A business office (one with a business folder) gets the rewritten
+    // instructions (agent instructions audit, 2026-09-25): Michael's standing
+    // instructions or the shared team member instructions, then the house
+    // rules, folders, memory and company knowledge. Older installs keep the
+    // text below.
+    if (businessFolder && !meta.isAssistant) {
+      const paths: PromptPaths = {
+        inbox: inDir('inbox'),
+        inboxDone: inDir('inbox', '.done'),
+        outbox: inDir('outbox'),
+        protocol: inRoot('PROTOCOL.md'),
+        hiveRoot: root,
+        ...(docTextCliPath ? { docText: `"${hiveNode}" "${docTextCliPath}"` } : {})
+      };
+      const b = business ?? {};
+      const roleTitle = (meta.role ?? '').split(': ')[0].trim() || 'team member';
+      return [
+        meta.isGod
+          ? michaelInstructions(meta.name, b, paths)
+          : teamMemberInstructions(meta.name, roleTitle, godNameForPrompt || 'Michael', b, paths),
+        '',
+        HOUSE_RULES,
+        '',
+        folderLine,
+        memoryRule(inDir('memory', 'inbox.md'), inDir('memory')),
+        memoryEndOfTask(inDir('memory', 'inbox.md')),
+        knowledgeLine,
+        memoryLine
+      ].filter(Boolean).join('\n');
+    }
     const guardrailsLine = 'Guardrails: a circuit breaker watches the floor — a "Circuit breaker: steer/constrain" message means you are looping or overspending, so STOP repeating, summarize what you tried, and follow it. Be token-frugal (a floor-wide or per-agent token budget can pause you). The shared plan has two parts: board.md (freeform; god is the sole scribe) and tasks.json (structured kanban — todo/doing/blocked/done).';
     const slackLine = meta.isGod
       ? 'SLACK REPLIES: When composing a Slack reply (or writing the `result` field of a Slack-origin kanban card), you MUST: (1) directly address what the user asked — never a bare "done"; (2) include the relevant specifics, outcome, and details; (3) format for Slack mrkdwn — open with a short *bold* headline, use bullet points for multiple items, wrap code/paths in `backtick` blocks, keep it concise (no walls of text). When finishing a Slack-origin task, always write a complete, user-facing, well-formatted `result` on the kanban card — the system posts it verbatim to Slack as the done reply.'
@@ -1519,11 +1759,13 @@ export class HiveManager {
       `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of Claude agents.`,
       `Your private workspace is ${dir}. The shared hive is ${root}. Full protocol: ${inRoot('PROTOCOL.md')}.`,
       '',
+      HOUSE_RULES,
+      '',
       'HIVE PROTOCOL — follow it every task:',
-      `1. At the START of a task, read ${inDir('memory.md')} and EVERY file in ${inDir('inbox')} (messages other agents sent you). After handling an inbox message, move its file into ${inDir('inbox', '.done')}.`,
-      `2. Record durable facts, decisions, and context by appending to ${inDir('memory.md')}.`,
+      `1. At the START of a task, read EVERY file in ${inDir('inbox')} (messages other agents sent you). After handling an inbox message, move its file into ${inDir('inbox', '.done')}.`,
+      `2. ${memoryRule(inDir('memory', 'inbox.md'), inDir('memory'))}`,
       `3. To ask another agent for something or share information, write ONE message JSON into ${inDir('outbox')} (schema in PROTOCOL.md). NEVER write into another agent's folder — the orchestrator delivers your outbox.`,
-      '4. At the END of a task, append what you learned to memory.md so future-you remembers.',
+      `4. ${memoryEndOfTask(inDir('memory', 'inbox.md'))}`,
       folderLine,
       guardrailsLine,
       memoryLine,
@@ -1589,7 +1831,20 @@ export class HiveManager {
     // The hive has no separate human-approval queue — approvals are native to
     // each agent's Claude Code session (and approvable remotely). A message aimed
     // at "human" is handled by the god/orchestrator, the human's proxy here.
-    const resolveTo = (to: string): string => (to === 'human' || to === 'god' ? godId : to);
+    // Michael answers to his internal id, "michael", his display name and, for
+    // the owner, "human" (agents are told to write "michael"; owner cleanup,
+    // 2026-09-25).
+    const godName = resolveGodName(reg.agents[godId]?.name).toLowerCase();
+    const resolveTo = (to: string): string => {
+      const t = to.toLowerCase();
+      return t === 'human' || t === 'god' || t === 'michael' || t === godName ? godId : to;
+    };
+    // The scheduler and heartbeat send; they don't read. A reply to one is
+    // dropped quietly instead of bouncing back to Michael as undeliverable.
+    if (msg.to === 'scheduler' || msg.to === 'heartbeat') {
+      this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: msg.from, to: msg.to, id: msg.id });
+      return;
+    }
     const targets = msg.to === 'broadcast'
       // The roster for fan-out is the ACTIVE registry: skip the send-only prep
       // assistant and any archived agent (closed tab). Hookless providers are
@@ -1871,10 +2126,142 @@ export class HiveManager {
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return false;
     try {
-      // A fresh seed is ~90 chars (one header line + the prompt). Anything
-      // meaningfully longer means the agent appended durable facts.
-      return readFileSync(p, 'utf8').trim().length > 200;
+      const text = readFileSync(p, 'utf8');
+      const { isIndex, entries } = parseIndex(text);
+      // An index has memory once it has entries; an older free-form file once
+      // it holds more than the seeded header.
+      return isIndex ? entries.length > 0 : text.trim().length > 200;
     } catch { return false; }
+  }
+
+  /**
+   * An agent's memory index as it is given the agent at the start of each
+   * session (owner, 2026-09-25): the entries only, labelled, or null when there
+   * are none yet (or the file is still in the older free-form shape, which the
+   * tidy-up migrates). Fixed for the session, so it caches.
+   */
+  /**
+   * The owner's answer to a question an agent raised on Ask me, added to that
+   * agent's memory notes as coming from the owner (owner, 2026-09-25). The
+   * tidy-up keeps the part that lasts (a rule, a preference) and drops what
+   * only mattered once. False when the agent isn't one of this office's.
+   */
+  rememberOwnerAnswer(id: string, task: string, q: string, a: string): boolean {
+    if (!/^[\w-]+$/.test(id)) return false;
+    const dir = this.agentDir(id);
+    if (!existsSync(dir)) return false;
+    const line = (v: string) => v.replace(/\s+/g, ' ').trim();
+    const today = new Date().toISOString().slice(0, 10);
+    const note = `- From the owner (${today}), answering a question on "${line(task)}": Q: ${line(q)} A: ${line(a)}\n`;
+    try {
+      mkdirSync(join(dir, 'memory'), { recursive: true });
+      appendFileSync(join(dir, 'memory', 'inbox.md'), note, 'utf8');
+      return true;
+    } catch { return false; }
+  }
+
+  // — clearing a conversation safely (src/shared/safeClear.ts) —
+
+  /** Task cards assigned to an agent that aren't done. */
+  openCardsFor(id: string): number {
+    const ledger = this.tasks() as { tasks?: HiveTask[] };
+    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    return tasks.filter((t) => t?.assignee === id && t.status !== 'done').length;
+  }
+
+  /** Ask me questions an agent raised (or, unrecorded, on its card) still unanswered. */
+  openQuestionsRaisedBy(id: string): number {
+    const ledger = this.tasks() as { tasks?: HiveTask[] };
+    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    let n = 0;
+    for (const t of tasks) {
+      for (const q of t?.humanQA ?? []) {
+        if (q && !q.a && !q.dismissedAt && (q.raisedBy ?? t.assignee) === id) n++;
+      }
+    }
+    return n;
+  }
+
+  /** Messages an agent sent in the last day that asked for a reply and haven't
+   *  had one: a message back in the same conversation, or one naming it. */
+  awaitingReplies(id: string, withinMs = 24 * 60 * 60_000): number {
+    const root = this.root();
+    if (!root) return 0;
+    const dir = this.agentDir(id);
+    const since = Date.now() - withinMs;
+    const sent = this.listMessages(join(dir, 'outbox', '.sent'))
+      .filter((m) => m?.requires_reply && m.to !== 'broadcast' && Date.parse(m.created_at) >= since);
+    if (sent.length === 0) return 0;
+    const got = [...this.listMessages(join(dir, 'inbox')), ...this.listMessages(join(dir, 'inbox', '.done'))];
+    return sent.filter((s) => !got.some((r) =>
+      r.in_reply_to === s.id || (r.conversation === s.conversation && r.from === s.to && r.created_at > s.created_at)
+    )).length;
+  }
+
+  /** Where an agent writes its handoff before a clear. */
+  handoffPath(id: string): string {
+    return join(this.agentDir(id), 'memory', 'handoff.md');
+  }
+
+  /** The handoff, taken once: returned, then archived under memory/handoffs/. */
+  takeHandoff(id: string): string | null {
+    const p = this.handoffPath(id);
+    if (!existsSync(p)) return null;
+    try {
+      const text = readFileSync(p, 'utf8').trim();
+      const archive = join(this.agentDir(id), 'memory', 'handoffs');
+      mkdirSync(archive, { recursive: true });
+      renameSync(p, join(archive, `${new Date().toISOString().replace(/[:.]/g, '-')}.md`));
+      return text || null;
+    } catch { return null; }
+  }
+
+  /** The last clear: when, the conversation it replaced, and how big it was. */
+  clearedState(id: string): { at: number; oldSession: string; tokensBefore: number } | null {
+    try {
+      const v = JSON.parse(readFileSync(join(this.agentDir(id), 'memory', 'cleared.json'), 'utf8'));
+      return typeof v?.at === 'number' && typeof v?.oldSession === 'string' ? v : null;
+    } catch { return null; }
+  }
+
+  recordClear(id: string, state: { at: number; oldSession: string; tokensBefore: number } | null): void {
+    const p = join(this.agentDir(id), 'memory', 'cleared.json');
+    try {
+      if (!state) { rmSync(p, { force: true }); return; }
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(state), 'utf8');
+    } catch { /* best-effort */ }
+  }
+
+  /** Point an agent back at an earlier conversation (undoing a clear); its
+   *  next resume restarts into it. */
+  restoreSession(id: string, sessionId: string): void {
+    const root = this.root();
+    if (!root) return;
+    try {
+      const reg = this.registry();
+      const agent = reg.agents[id];
+      if (!agent) return;
+      agent.sessionId = sessionId;
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
+      this.appendLog({ kind: 'session-restored', agentId: id, sessionId });
+    } catch { /* best-effort */ }
+  }
+
+  memoryIndexFor(id: string): string | null {
+    const p = join(this.agentDir(id), 'memory.md');
+    if (!existsSync(p)) return null;
+    let entries: MemoryEntry[] = [];
+    try {
+      const parsed = parseIndex(readFileSync(p, 'utf8'));
+      if (!parsed.isIndex) return null;
+      entries = parsed.entries;
+    } catch { return null; }
+    if (entries.length === 0) return null;
+    return [
+      'YOUR MEMORY. Notes from your past work, kept by the app. Each line: id, kind, the note, where it came from (owner means the owner said it), date, and an expiry for facts that change. Steps for recurring tasks are in the procedure files it names, under your memory folder.',
+      entriesBlock(entries)
+    ].join('\n');
   }
   inbox(id: string): HiveMessage[] {
     return this.listMessages(join(this.agentDir(id), 'inbox'));
@@ -2551,6 +2938,51 @@ export class HiveManager {
         + 'Route work to someone on this list before spawning anyone new.';
     } catch { return null; }
   }
+  /**
+   * The team roster for a business office (agent instructions audit,
+   * 2026-09-25): a fixed header and one line per team member (Michael
+   * excluded) with the Role description Michael routes by, plus a status tag
+   * only when it changes routing (busy on a card, on hold). `layoutKey` changes
+   * only when a line's name, role or description does; `statusKey` only when a
+   * tag does, so the hook can send the full roster on a team change and a
+   * short status line otherwise (hooks.ts).
+   */
+  teamRoster(): { full: string; status: string; layoutKey: string; statusKey: string } | null {
+    const root = this.root();
+    if (!root) return null;
+    try {
+      const snap = JSON.parse(readFileSync(join(root, 'fleet.json'), 'utf8')) as {
+        agents?: Array<{ id: string; name?: string; role?: string; isGod?: boolean; onHold?: boolean }>;
+      };
+      const team = (Array.isArray(snap.agents) ? snap.agents : []).filter((a) => !a.isGod);
+      if (!team.length) return null;
+      const ledger = this.tasks() as { tasks?: HiveTask[] };
+      const cards = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+      const busyOn = (id: string) => cards.find((t) => t?.assignee === id && t.status === 'doing')?.title;
+      const lines: string[] = [];
+      const tagged: string[] = [];
+      const layout: string[] = [];
+      for (const a of team) {
+        const base = `- ${a.name ?? a.id} (${a.id}), ${a.role ?? 'team member'}`;
+        layout.push(base);
+        const tags: string[] = [];
+        const busy = busyOn(a.id);
+        if (busy) { tags.push(`busy: ${busy}`); tagged.push(`${a.name ?? a.id} busy (${busy})`); }
+        if (a.onHold) { tags.push('on hold'); tagged.push(`${a.name ?? a.id} on hold`); }
+        lines.push(tags.length ? `${base} (${tags.join('; ')})` : base);
+      }
+      const status = tagged.length
+        ? `Status now: ${tagged.join(', ')}. Everyone else free.`
+        : 'Status now: everyone is free.';
+      return {
+        full: ['Team roster (address messages by the id in brackets):', ...lines].join('\n'),
+        status,
+        layoutKey: layout.join('\n'),
+        statusKey: tagged.join('\n')
+      };
+    } catch { return null; }
+  }
+
   logTail(n = 200): unknown[] {
     const root = this.root();
     if (!root || !existsSync(join(root, 'log.jsonl'))) return [];
@@ -2836,7 +3268,7 @@ const NO_FIT_CAST = Object.entries(OFFICE_ROLES)
 
 /** Michael's rule for a job nobody on the team covers (owner, 2026-09-24).
  *  Replaces starting a temporary worker: the owner decides, on the ASK ME board. */
-const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask, written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
+const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask with "raisedBy": "god", written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
 
 /** PROTOCOL.md's section on starting a temporary worker. Included only in a
  *  build that allows them (ALLOW_TEMP_WORKERS); otherwise the protocol never
@@ -2887,7 +3319,8 @@ only thing that moves messages between agents.
 
 ## Your workspace — \`agents/<your-id>/\`
 - \`identity.md\`  — who you are (read-only; the harness writes it).
-- \`memory.md\`    — your long-term memory. Read at the start of a task; append to it as you learn.
+- \`memory.md\`    — your memory index. The app keeps it and gives it to you at the start of each session.
+- \`memory/inbox.md\` — where you add notes worth keeping; the app sorts them into your index.
 - \`inbox/\`       — messages addressed to you. Read them at the start of a task.
 - \`inbox/.done/\` — move a message here once you've handled it.
 - \`outbox/\`      — drop messages here to send them. The harness delivers them.
@@ -2937,11 +3370,12 @@ When a card can only move with the human — a question to answer, or an action 
 card \`"status": "blocked"\` and appends the ask to its \`humanQA\` array:
 
 \`\`\`json
-{ "q": "the ask, in markdown", "askedAt": "<iso timestamp>" }
+{ "q": "the ask, in markdown", "askedAt": "<iso timestamp>", "raisedBy": "<agent id, or god>" }
 \`\`\`
 
-The harness shows the open ask on the ASK ME board and in the ASK ME tab, and the human's reply lands
-in the same entry as \`"a"\` plus an inbox message to god. Every past entry stays on the card — that
+The harness shows the open ask on the ASK ME board and in the ASK ME tab. The human's reply lands in
+the same entry as \`"a"\`, goes to the agent that raised it (\`raisedBy\`) and into that agent's
+memory notes, and god is told so he can unblock the card. Every past entry stays on the card — that
 trail is the decision history.
 
 **Write the ask short, and in markdown.** The card renders it, so plain-text asterisks and backticks
@@ -2984,8 +3418,45 @@ searchable MemPalace and you have the \`mempalace\` CLI:
   agent, \`--results N\` to widen.
 - \`mempalace wake-up\` — a short digest of what matters, good at the start of a task.
 
-Your \`memory.md\` is mined into the palace automatically, so the durable facts you
-write there become searchable by every agent. You don't run \`mine\` yourself.
+Your memory index is mined into the palace automatically, so what the app keeps
+there becomes searchable by every agent. You don't run \`mine\` yourself.
+`;
+
+/** PROTOCOL.md for a business office: the message format and the files, in
+ *  plain words, without the older text about git, remote control, spawning or
+ *  COMMANDS.md (owner cleanup, 2026-09-25). The instructions each agent gets at
+ *  startup carry how to work; this is the reference they point to. */
+const PROTOCOL_BUSINESS_MD = `# Message format
+
+The office coordinates through files. The app moves messages between agents; nobody writes into another agent's folder.
+
+## Your folder in the hive: \`agents/<your id>/\`
+- \`inbox/\`: messages to you. Act on each, then move it to \`inbox/.done/\`.
+- \`outbox/\`: write a message here to send it. The app delivers it and moves it to \`outbox/.sent/\`.
+- \`memory.md\`: your memory index. The app keeps it and gives it to you at the start of each session.
+- \`memory/inbox.md\`: notes worth keeping, which the app sorts into your index.
+- \`memory/handoff.md\`: written only when the app asks for a handoff before a fresh start.
+
+## A message
+One JSON file in \`outbox/\`, any name ending in \`.json\`:
+
+\`\`\`json
+{
+  "to": "michael | <team member id> | broadcast",
+  "act": "request | inform | query | done",
+  "subject": "one line",
+  "body": "the details",
+  "in_reply_to": "<id of the message you are answering> (optional)"
+}
+\`\`\`
+
+The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
+
+## The task board
+\`tasks.json\` in the hive folder holds the cards (todo, doing, blocked, done), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.
+
+## Asking the owner
+Only Michael asks the owner, on the Ask me board. He sets the card to blocked and adds \`{ "q": "...", "askedAt": "<time>", "raisedBy": "<id, or god>" }\` to its \`humanQA\` list. The owner's answer goes to whoever raised it, into their memory, and to Michael.
 `;
 
 // ─── cth-hook shim (written to <hive>/bin/cth-hook.cjs) ──────────────────────

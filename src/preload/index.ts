@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
+import type { OfficeRecord } from '../shared/officeRecord';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
 export type { HireManifest } from '../shared/hire';
@@ -269,13 +270,20 @@ export interface HarnessConfig {
   businessType?: string;
   businessName?: string;
   businessCity?: string;
-  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  /** Michael's folder: the business folder holding every team member's. */
+  businessFolder?: string;
+  /** Key facts about the business (src/shared/companyProfile.ts). */
+  companyProfile?: import('../shared/companyProfile').CompanyProfile;
+  /** Before 2026-09-25: the retired shared Office folder. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
    *  works in (Decisions 44, 47). The running office starts agents from this. */
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Set once existing team members got today's Role description and Work
+   *  style (the one-time rewrite, 2026-09-25). */
+  instructionsRewritten?: boolean;
   harnessHome: string | null;
   /** Recently-opened hive home folders (most-recent first). Mirrors src/main/config.ts. */
   recentHives?: string[];
@@ -301,7 +309,8 @@ export interface HarnessConfig {
   strongKeepalive?: boolean;
   /** Auto-update from GitHub releases (default ON; Settings → General). */
   autoUpdate?: boolean;
-  /** Anonymous product analytics (default ON, opt-out; see TELEMETRY.md).
+  /** Anonymous product analytics (see TELEMETRY.md). Ignored while
+   *  COLLECT_USAGE_STATS (buildFeatures.ts) is false, as it is in this build.
    *  Mirrors main + renderer HarnessConfig. */
   telemetryEnabled?: boolean;
   slackEnabled?: boolean;
@@ -602,10 +611,11 @@ const api = {
   }> => ipcRenderer.invoke('packs:list'),
 
   // ─── Agent folders (Decisions 44, 45) ───────────────────────────────────
-  /** Default `~/Documents/<Business>/<Folder>` paths for the team screen. Creates nothing. */
-  foldersSuggest: (businessName: string, folders: string[]): Promise<{
-    home: string; root: string; office: string; byFolder: Record<string, string>;
-  }> => ipcRenderer.invoke('folders:suggest', { businessName, folders }),
+  /** Default `~/Documents/<Business>/<Folder>` paths for the team screen, or
+   *  under `root` when the owner picked Michael's folder. Creates nothing. */
+  foldersSuggest: (businessName: string, folders: string[], root?: string): Promise<{
+    home: string; root: string; byFolder: Record<string, string>; rootRefused?: boolean;
+  }> => ipcRenderer.invoke('folders:suggest', { businessName, folders, root }),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }
@@ -708,6 +718,15 @@ const api = {
   /** Whether a folder (default: the current home) exists and holds an office. */
   homeStatus: (path?: string): Promise<{ path: string | null; exists: boolean; hasOffice: boolean }> =>
     ipcRenderer.invoke('config:homeStatus', path),
+  /** What is in a folder: an office, and if so its business and team, read from
+   *  its office.json or, for an older office, its hive registry. Setup uses it
+   *  to continue an existing office by folder, never by business name. */
+  officeFind: (path: string): Promise<{
+    path: string | null;
+    hasOffice: boolean;
+    record: OfficeRecord | null;
+    source: 'file' | 'registry' | null;
+  }> => ipcRenderer.invoke('office:find', path),
   /** Start an empty office at the current home path after it went missing.
    *  Relaunches on success (never resolves); returns { ok: false } on failure. */
   startOverHere: (): Promise<{ ok: boolean; error?: string }> =>
@@ -804,6 +823,14 @@ const api = {
   hiveBoard: (): Promise<string> => ipcRenderer.invoke('hive:board'),
   hiveTasks: (): Promise<unknown> => ipcRenderer.invoke('hive:tasks'),
   hiveLog: (n?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200),
+  /** When the app last cleared this agent's conversation, or null. */
+  hiveClearedState: (id: string): Promise<{ at: number; oldSession: string; tokensBefore: number } | null> =>
+    ipcRenderer.invoke('hive:clearedState', id),
+  /** Undo a clear: restart the agent into its earlier conversation. */
+  restoreConversation: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('agent:restoreConversation', id),
+  /** Add the owner's Ask me answer to the raising agent's memory notes. */
+  hiveRememberOwnerAnswer: (p: { agentId: string; task: string; q: string; a: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('hive:rememberOwnerAnswer', p),
   hiveMemory: (id: string): Promise<string> => ipcRenderer.invoke('hive:memory', id),
   hiveInbox: (id: string): Promise<HiveMessage[]> => ipcRenderer.invoke('hive:inbox', id),
   /** Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED in
@@ -860,10 +887,9 @@ const api = {
   memoryWakeUp: (wing?: string): Promise<{ ok: boolean; output: string; error?: string }> =>
     ipcRenderer.invoke('hive:memoryWakeUp', wing),
   mineNow: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('hive:mineNow'),
-  /** Condense agent memory.md files (the janitor's missing half). With an id,
-   *  condense that agent on demand; without, run a full threshold scan. Returns
-   *  the per-agent outcomes ({ id, condensed, reason, oldBytes?, newBytes? }). */
-  reflectNow: (id?: string): Promise<Array<{ id: string; condensed: boolean; reason: string; oldBytes?: number; newBytes?: number }>> =>
+  /** Tidy agents' memory notes into their index now (memoryTidy.ts). With an
+   *  id, that agent is tidied if it has anything to tidy. */
+  reflectNow: (id?: string): Promise<Array<{ id: string; tidied: boolean; reason: string }>> =>
     ipcRenderer.invoke('memory:reflectNow', id),
 
   // ─── Enterprise Knowledge Graph (multimodal context for agents) ───────────
@@ -1136,13 +1162,6 @@ const api = {
     const listener = (): void => cb();
     ipcRenderer.on('missions:updated', listener);
     return () => ipcRenderer.removeListener('missions:updated', listener);
-  },
-  /** Fires when an autoCompact mission ticks — the renderer queues a /compact
-   *  per agent (deduped) and delivers it when each agent is idle. */
-  onAutoCompact: (cb: () => void): (() => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on('mission:autoCompact', listener);
-    return () => ipcRenderer.removeListener('mission:autoCompact', listener);
   },
 
   // ─── Full-text search across hive files (board, tasks, memory) ─────────────
@@ -1422,6 +1441,10 @@ const api = {
    *  contents as a backup and refuses a first write that would empty a full file. */
   rosterWrite: (snap: RosterSnapshot): Promise<{ ok: boolean; skipped?: string; error?: string }> =>
     ipcRenderer.invoke('roster:write', snap),
+  /** Copy roster.json into roster-backups/ now, before a change the app makes
+   *  on its own (the instructions rewrite). */
+  rosterBackup: (reason: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('roster:backup', reason),
 
   // ─── Auto-update (v0.3.4; full state model v0.3.7) ──────────────────────────
   /** Push channel from main's updater — every stage of the pipeline, so the

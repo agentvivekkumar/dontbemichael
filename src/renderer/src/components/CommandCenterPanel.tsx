@@ -7,7 +7,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
-import { SHOW_IDE, ALLOW_TEMP_WORKERS } from '@shared/buildFeatures';
+import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
 import { TriggerCard } from './triggers/ui';
@@ -33,7 +33,7 @@ import {
   AGENT_PROVIDER_PRESETS,
   type AgentProvider
 } from '@/store/config';
-import { canReceiveInbox } from '@shared/agentProvider';
+import { BUILD_ENGINES, canReceiveInbox } from '@shared/agentProvider';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 
@@ -212,25 +212,27 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
             agent's queue), and the IDE opens from agent level, not the toolbar.
             Short labels — the tooltips carry the full explanation. */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <PixelButton
-            variant={floorDeliveryPaused ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => { void toggleFloorDelivery(); }}
-          >
-            <span
-              className="cth-tip cth-tip-wrap"
-              data-tip={floorDeliveryPaused
-                ? t('commandCenter.deliveryPausedTitle')
-                : t('commandCenter.deliveryOnTitle')}
-              aria-label={floorDeliveryPaused
-                ? t('commandCenter.deliveryResumeAria')
-                : t('commandCenter.deliveryHoldAria')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          {SHOW_DELIVERY_SWITCH && (
+            <PixelButton
+              variant={floorDeliveryPaused ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => { void toggleFloorDelivery(); }}
             >
-              <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
-              {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
-            </span>
-          </PixelButton>
+              <span
+                className="cth-tip cth-tip-wrap"
+                data-tip={floorDeliveryPaused
+                  ? t('commandCenter.deliveryPausedTitle')
+                  : t('commandCenter.deliveryOnTitle')}
+                aria-label={floorDeliveryPaused
+                  ? t('commandCenter.deliveryResumeAria')
+                  : t('commandCenter.deliveryHoldAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
+                {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
+              </span>
+            </PixelButton>
+          )}
           {/* Floor-level surface with no agent of its own: the honest target is
               whoever is selected, stated explicitly rather than left to the
               IDE's fallback so the intent is visible at the call site. */}
@@ -876,7 +878,11 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                     {agentPreset.label} · {a.model ?? 'current'}
                   </option>
                 )}
-                {modelProvidersForAgent(a.isGod).map((preset) => (
+                {/* This build's engines only (BUILD_ENGINES), plus the one the
+                    agent runs on now so its current model stays listed. */}
+                {modelProvidersForAgent(a.isGod)
+                  .filter((preset) => BUILD_ENGINES.includes(preset.id) || preset.id === agentProvider)
+                  .map((preset) => (
                   <optgroup key={preset.id} label={preset.label}>
                     {modelsForProvider(preset.id).map((model) => {
                       // `defaultModel` is a Claude model id, so it can only mark
@@ -937,7 +943,11 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                     setEngineModel(preset?.recommendedOrchestratorModel);
                   }}
                 >
-                  {AGENT_PROVIDER_PRESETS.filter((p) => canReceiveInbox(p.id)).map((p) => (
+                  {/* This build's engines only, plus Michael's current one. */}
+                  {AGENT_PROVIDER_PRESETS
+                    .filter((p) => canReceiveInbox(p.id)
+                      && (BUILD_ENGINES.includes(p.id) || p.id === agentProvider || p.id === engineProvider))
+                    .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}{p.id === 'claude' ? ' ★' : ''}
                     </option>
@@ -1010,11 +1020,13 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
         {repos.map((r) => (
           <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ flex: 1, fontSize: 12, color: 'var(--cth-ink-700)', wordBreak: 'break-all' }}>{r}</span>
-            <button
-              onClick={() => window.cth.openTerminalAt(r)}
-              title={t('commandCenter.openInTerminal')}
-              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-500)' }}
-            ><Icon name="terminal" /></button>
+            {SHOW_OPEN_TERMINAL && (
+              <button
+                onClick={() => window.cth.openTerminalAt(r)}
+                title={t('commandCenter.openInTerminal')}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-500)' }}
+              ><Icon name="terminal" /></button>
+            )}
           </div>
         ))}
       </Section>

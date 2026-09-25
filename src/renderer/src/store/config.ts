@@ -1,5 +1,6 @@
 // Mirrors src/main/config.ts. Kept as a renderer-side type-only module
 // so we don't have to reach into the preload package to type-check.
+import type { CompanyProfile } from '@shared/companyProfile';
 import {
   AGENT_PROVIDER_PRESETS,
   BUILD_ENGINES,
@@ -66,13 +67,24 @@ export interface HarnessConfig {
   /** The business's name and city as the owner typed them. Mirrors src/main/config.ts. */
   businessName?: string;
   businessCity?: string;
-  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  /** The company profile: key facts with short, definite answers, delivered
+   *  to every agent (src/shared/companyProfile.ts). */
+  companyProfile?: CompanyProfile;
+  /** Michael's folder: the business folder, private to him and the owner, that
+   *  holds every team member's folder by default (src/shared/folderAccess.ts). */
+  businessFolder?: string;
+  /** Before 2026-09-25: the shared Office folder, inside Michael's. Read once at
+   *  launch to fill businessFolder (its parent); nothing else uses it. Company
+   *  knowledge lives in the knowledge feature now. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
    *  works in (Decisions 44, 47). The running office starts agents from this. */
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Set once existing team members got today's Role description and Work
+   *  style (the one-time rewrite, 2026-09-25). */
+  instructionsRewritten?: boolean;
   harnessHome: string | null;
   /** Recently-opened office folders (most-recent first), for the missing office
    *  screen and Settings → General.
@@ -106,7 +118,8 @@ export interface HarnessConfig {
   strongKeepalive?: boolean;
   /** Auto-update from GitHub releases (default ON; Settings → General). */
   autoUpdate?: boolean;
-  /** Anonymous product analytics (default ON, opt-out; see TELEMETRY.md).
+  /** Anonymous product analytics (see TELEMETRY.md). Ignored while
+   *  COLLECT_USAGE_STATS (buildFeatures.ts) is false, as it is in this build.
    *  Mirrors the main-process field (src/main/config.ts). */
   telemetryEnabled?: boolean;
   slackEnabled?: boolean;

@@ -96,6 +96,12 @@ export interface OfficePack {
   defaultPicks: string[];
   officeHours: OfficeHours;
   starterMissions?: StarterMission[];
+  /**
+   * What Michael should know about this kind of business: how it earns, what
+   * matters, typical requests, and who handles what. `{Business}` and `{City}`
+   * are filled at spawn.
+   */
+  briefing?: string;
 }
 
 export interface OfficePackValidation {
@@ -115,7 +121,8 @@ const KNOWN_KEYS: readonly string[] = [
   'agents',
   'defaultPicks',
   'officeHours',
-  'starterMissions'
+  'starterMissions',
+  'briefing'
 ];
 
 const MIGRATIONS: Array<(raw: Record<string, unknown>) => Record<string, unknown>> = [];
@@ -222,6 +229,7 @@ export function validateOfficePack(
   if (!businessType) out.errors.push('"businessType" is required');
   const displayName = cappedString(o.displayName, 40, 'displayName', out, true);
   const tagline = cappedString(o.tagline, 80, 'tagline', out, true);
+  const briefing = cappedString(o.briefing, 1500, 'briefing', out);
   const glyph = shapedString(o.glyph, SLUG_RE, 'glyph', out);
 
   let extendsCore: 'core' | undefined;
@@ -294,7 +302,8 @@ export function validateOfficePack(
       officeHours: hours,
       ...(glyph ? { glyph } : {}),
       ...(extendsCore ? { extends: extendsCore } : {}),
-      ...(starterMissions ? { starterMissions } : {})
+      ...(starterMissions ? { starterMissions } : {}),
+      ...(briefing ? { briefing } : {})
     }
   };
 }

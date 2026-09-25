@@ -8,22 +8,17 @@ import {
   tokenizeCommand,
   type HarnessConfig
 } from '@/store/config';
-import {
-  clearCommandForProvider,
-  compactionCommandForProvider,
-  remoteControlCommandForProvider,
-  terminalReadyToReceive
-} from '../../../shared/providerAutomation';
-import { DEFAULT_CONTEXT_TRIGGER, type ContextRule } from '../../../shared/triggers';
+import { terminalReadyToReceive } from '../../../shared/providerAutomation';
 import type { AgentProvider } from '../../../shared/agentProvider';
 import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
-import { isDurableRole, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
+import { isDurableRole, MICHAEL_ROLE, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
 import { inboxNudgeText } from '../../../shared/hiveNudge';
 import { resolveGodName } from '../../../shared/godIdentity';
 import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
-import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent } from '../../../shared/teamPlan';
+import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart, rewrittenInstructions } from '../../../shared/teamPlan';
+import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
 
 const GOD_ID = 'god';
 /** Accent palette for MAIN-spawned (voice-hired) agents — picked deterministically
@@ -32,7 +27,6 @@ const GOD_ID = 'god';
 const SPAWN_ACCENTS = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'] as const;
 const GOD_PTY = `pty-${GOD_ID}`;
 
-const REMOTE_CONTROL_SETTLE_MS = 1500;
 // Provider-agnostic PTY-quiescence idle fallback (#2e). A non-Claude bridge that
 // fires a 'working' event but never its turn-end signal (Stop / session.idle /
 // agent_end) would pin the agent 'working' forever → the idle-only inbox-wake nudge
@@ -70,17 +64,6 @@ function withStandingGoal(agent: Agent, text: string): string {
   if (text.includes('<goal>')) return text;
   return `<goal>\n${goal}\n</goal>\n\n${text}`;
 }
-
-// The first thing Michael (god) is told on a fresh spawn — orient him and put
-// him to work running the floor. Kept terse and action-oriented.
-const INITIAL_GOD_PROMPT = [
-  "You're online as Michael, the orchestrator of the hive. Get oriented, then start running the floor:",
-  '1. Read your memory.md and drain every message in your inbox.',
-  '2. Review board.md + tasks.json and the current roster of agents (active vs archived).',
-  '3. Check fleet health: read fleet.json in the hive root for every agent\'s live tokens, cost, status, breaker level, and inbox backlog (`claude agents` will NOT show your hive\'s agents). Flag anyone stalled, over-budget, or breaker-armed.',
-  '4. Skim COMMANDS.md (hive root) for the Claude Code commands you can use — and run `mempalace wake-up` for a memory digest if the CLI is available.',
-  'Then begin orchestrating: triage requests, delegate work to the team, and keep everyone unblocked. You are fully autonomous — there is no approval queue, so handle tool-permission prompts in this session yourself (the human can approve them remotely from their phone).'
-].join('\n');
 
 // Per-pty submission chain. Every submitToPty for a given pty is appended here so
 // two callers (e.g. the boot sequence's /remote-control and the inbox-wake nudge)
@@ -226,48 +209,35 @@ function stationForTool(tool: string): { station: StationKind; carry?: ToolKind 
   return { station: 'desk' };
 }
 
-/** At/above this window size an agent counts as "large context" and is judged
- *  against `minContextPctLargeWindow` instead. Sits between the two real-world
- *  window sizes the app ever sees (200k and 1M) so neither lands ambiguously. */
-const LARGE_CONTEXT_WINDOW = 500_000;
-
 /**
- * How full this agent's context window is, 0-100, or null when we have no
- * reading at all.
- *
- * Two sources feed the store and only one is exact: the status-line shim pushes
- * real `contextTokens` + `contextLimit` (effect 2d), while the transcript poll
- * (2c) backfills tokens ONLY. So an agent can legitimately know its token count
- * without knowing its window — infer the window the same way 2c does rather
- * than throwing the token reading away.
+ * Give every existing team member today's Role description and Work style,
+ * ONCE (owner, 2026-09-25: "rewrite all"). roster.json is copied into
+ * roster-backups/ first; if that copy fails, nothing is changed and the rewrite
+ * is tried again next launch. The business's own pack wins for an id that more
+ * than one pack holds. The Work style reaches a running agent on its next
+ * prompt; the role in the registry reaches it at its next start.
  */
-function contextFillPct(a: Agent): number | null {
-  if (a.contextTokens === undefined || !Number.isFinite(a.contextTokens)) return null;
-  const limit = a.contextLimit && a.contextLimit > 0
-    ? a.contextLimit
-    : (/1m/i.test(a.model ?? '') ? 1_000_000 : 200_000);
-  return (a.contextTokens / limit) * 100;
-}
-
-/**
- * The context-pressure gate: is this agent full enough to be worth interrupting?
- *
- * `minContextPct` of 0 disables the gate (the rule's cadence alone fires it).
- *
- * FAIL-OPEN when we have no reading. That is the deliberate choice: context
- * telemetry arrives over the Claude status-line/hook path, so most non-Claude
- * providers report nothing at all. Failing closed there would silently reinstate
- * the very bug this replaces — a fleet that never compacts — only harder to
- * notice. An unmetered agent therefore falls back to time-only firing, which is
- * exactly the old behaviour and no worse.
- */
-function passesContextPressure(a: Agent, rule: ContextRule): boolean {
-  const large = (a.contextLimit ?? 0) >= LARGE_CONTEXT_WINDOW;
-  const bar = large ? rule.minContextPctLargeWindow : rule.minContextPct;
-  if (!(bar > 0)) return true;
-  const pct = contextFillPct(a);
-  if (pct === null) return true;
-  return pct >= bar;
+async function rewriteTeamInstructions(config: HarnessConfig): Promise<void> {
+  if (config.instructionsRewritten) return;
+  const { packs, core } = await window.cth.packsList();
+  const own = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType);
+  const defs = new Map<string, AgentDefinitionV2>();
+  for (const p of [own, ...packs.map((x) => x.pack), core]) {
+    for (const a of p?.agents ?? []) if (!defs.has(a.id)) defs.set(a.id, a);
+  }
+  const floor = useStore.getState();
+  const patches = rewrittenInstructions(
+    [...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents],
+    defs,
+    { name: config.businessName, city: config.businessCity }
+  );
+  if (patches.length > 0) {
+    const backup = await window.cth.rosterBackup('instructions-rewrite').catch(() => ({ ok: false }));
+    if (!backup.ok) return;
+    useStore.getState().rewriteInstructions(patches);
+    for (const p of patches) await window.cth.hivePatchAgentRole(p.id, p.description).catch(() => undefined);
+  }
+  await window.cth.updateConfig({ instructionsRewritten: true }).catch(() => undefined);
 }
 
 /**
@@ -276,17 +246,34 @@ function passesContextPressure(a: Agent, rule: ContextRule): boolean {
  * Each member is spawned exactly as the hire dialog spawns an agent — same
  * engine command, same hive provisioning — but inside its own folder and with
  * its pack's job description as its standing goal. `businessTeamStarted` stops
- * a second run; the registry check stops duplicates if the app died midway,
- * since registry.json survives a restart. A member that fails to start is
- * skipped rather than blocking the rest.
+ * a second run. Which members start, and in which folder, is teamMemberStart's
+ * call (teamPlan.ts): the floor decides, and a member the registry knows but the
+ * floor lost comes back in the folder it really works in. A member that fails to
+ * start is skipped rather than blocking the rest.
  */
 async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   const team = config.businessTeam ?? [];
   if (team.length === 0 || config.businessTeamStarted) return;
 
   const { packs, core } = await window.cth.packsList();
-  const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? core;
-  const defs = new Map((pack?.agents ?? []).map((a) => [a.id, a]));
+  // The business's pack; when its type is unknown (an office continued from its
+  // registry), the pack that holds the most of this team, so each member comes
+  // back with its own business's job description.
+  const teamIds = new Set(team.map((m) => m.agentId));
+  const coverage = (p: { agents?: Array<{ id: string }> } | undefined) =>
+    (p?.agents ?? []).filter((a) => teamIds.has(a.id)).length;
+  const byTeam = config.businessType
+    ? undefined
+    // Core wins ties, so "Something else" (a team picked from core) stays on core.
+    : packs.map((p) => p.pack).reduce<typeof core | undefined>((best, p) => (coverage(p) > coverage(best) ? p : best), core);
+  const pack = packs.map((p) => p.pack).find((p) => p.businessType === config.businessType) ?? byTeam ?? core;
+  // The business's own pack first, then every other pack: an office continued
+  // from its registry may not know its business type, and its members must
+  // still be found (a Kelly or a Dwight is not in the core pack).
+  const defs = new Map<string, AgentDefinitionV2>();
+  for (const p of [pack, ...packs.map((x) => x.pack), core]) {
+    for (const a of p?.agents ?? []) if (!defs.has(a.id)) defs.set(a.id, a);
+  }
   const reg = await window.cth.hiveRegistry().catch(() => null);
 
   const provider = inferAgentProvider(config.defaultCommand);
@@ -300,26 +287,31 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
     const def = defs.get(member.agentId);
     if (!def) continue;
     const id = member.agentId;
-    if (reg?.agents?.[id]) continue; // already started; the roster restores it
+    const floor = useStore.getState();
+    const floorIds = new Set([...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents].map((a) => a.id));
+    const decision = teamMemberStart(id, member.folder, floorIds, reg?.agents?.[id]?.cwd);
+    if (!decision.start) continue;
+    const workFolder = decision.cwd;
     const ptyId = `pty-${id}`;
     const name = teamMemberName(def);
     const role = teamMemberRole(def);
     const res = await window.cth.spawnPty({
       id: ptyId,
-      cwd: member.folder,
+      cwd: workFolder,
       command: exe,
       provider,
       args,
       cols: 100,
       rows: 30,
-      hive: { id, name, provider, cwd: member.folder, role }
+      hive: { id, name, provider, cwd: workFolder, role }
     });
     if (!res.ok) {
       console.warn(`[team] ${name} did not start: ${res.error ?? 'unknown error'}`);
       continue;
     }
-    const folder = res.cwd || member.folder;
-    // A new team's first start: the cards appear, the focus stays on Michael.
+    const folder = res.cwd || workFolder;
+    // A first start, or a lost member brought back: the card appears, the focus
+    // stays on Michael.
     useStore.getState().addAgent({
       id,
       name,
@@ -374,10 +366,6 @@ export function useHive(config: HarnessConfig | null): void {
   // negligible next to a stalled agent. Evicting ids that have left the inbox would
   // bound it exactly; deliberately not done here to keep this fix minimal.
   const nudged = useRef<Record<string, Set<string>>>({});
-  // Per-agent context size at the last auto-/compact queued. See the latch note
-  // in the context-trigger effect: an idle agent's token count is frozen, so
-  // without this the pressure gate re-fires on the identical number every cycle.
-  const lastCompactUsed = useRef<Record<string, number>>({});
   // Per-agent timestamp of the last queued-message we submitted. Guards against
   // re-sending the next message before the agent's hooks have flipped it to
   // 'working' (there's a short window where it still reads 'idle' right after we
@@ -476,13 +464,14 @@ export function useHive(config: HarnessConfig | null): void {
       const godModel = config.godModel;
       const command = buildSpawnCommand(config, godModel, godProvider);
       const [exe, ...args] = tokenizeCommand(command.trim());
-      // Decision 44: on a business install Michael works in the shared Office
-      // folder, not among the hive's plumbing. Older installs have no Office and
-      // keep the harness folder, exactly as before.
-      const godCwd = config.officeFolder || config.harnessHome!;
+      // Decision 44: on a business install Michael works in the business folder,
+      // his own private folder holding his team's (folderAccess.ts), not the
+      // hive's plumbing. Main makes that call and reports where he started.
+      // Older installs have none and keep the harness folder, exactly as before.
+      const requestedCwd = config.businessFolder || config.harnessHome!;
       const res = await window.cth.spawnPty({
         id: GOD_PTY,
-        cwd: godCwd,
+        cwd: requestedCwd,
         command: exe,
         provider: godProvider,
         args,
@@ -494,10 +483,11 @@ export function useHive(config: HarnessConfig | null): void {
         // fresh session. Without this the most important context on the floor —
         // the orchestrator's — was lost on every restart.
         resume: true,
-        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: godCwd, isGod: true, role: 'orchestrator (god)' }
+        hive: { id: GOD_ID, name: godName, provider: godProvider, cwd: requestedCwd, isGod: true, role: MICHAEL_ROLE }
       });
       if (cancelled) { godSpawning.current = false; return; }
       if (!res.ok) { godSpawning.current = false; useStore.getState().setGodStatus('failed'); return; }
+      const godCwd = res.cwd || requestedCwd;
       const god: Agent = {
         id: GOD_ID,
         name: godName,
@@ -522,37 +512,23 @@ export function useHive(config: HarnessConfig | null): void {
       useStore.getState().setGodStatus('ready');
       // The team picked during onboarding starts once Michael is up, each member
       // inside its own folder. After this they restore like any hired agent.
-      void startBusinessTeam(config);
+      void rewriteTeamInstructions(config).catch(() => undefined).then(() => startBusinessTeam(config));
 
-      // Kick Michael off once his TUI is up. Always re-enable remote control so
-      // the human can approve permission prompts from their phone (best-effort — a
-      // failed/unknown slash command just prints to his terminal and is harmless).
-      // Then, ONLY on a genuinely fresh spawn, hand him the orientation prompt —
-      // a RESUMED Michael already has his full context and must not be re-oriented
-      // mid-thread (that would reset the floor's situational awareness). Both go
-      // through the per-pty submit chain, so they're strictly sequential and can't
-      // jam together; the boot-grace window keeps the inbox-wake/drain loops off
-      // Michael until he's settled. The live-PTY branch above skips this entirely.
+      // Nothing is typed into Michael's terminal at start (owner cleanup,
+      // 2026-09-25): his startup instructions cover orientation, and the standup
+      // sent when the office opens (standupOnOfficeOpen) gives him his first turn
+      // through the inbox. /remote-control is no longer switched on. Only an
+      // engine that can't take its protocol on the command line (Crush) still
+      // has it typed, on a fresh spawn, because that is its instructions.
       const resumedGod = res.resumed === true;
-      bootGraceUntil.current[GOD_ID] = Date.now() + BOOT_GRACE_MS;
-      void (async () => {
-        try {
-          const remoteCommand = remoteControlCommandForProvider(godProvider, godName);
-          if (remoteCommand) {
-            // settleMs pauses the chain ~1.5s after /remote-control before the
-            // orientation prompt (fresh spawns only) is submitted next.
-            await submitToPty(GOD_PTY, remoteCommand, godProvider, REMOTE_CONTROL_SETTLE_MS);
-          }
-          if (!cancelled && !resumedGod) {
-            // A type-into-tui god (Crush) can't ride its hive protocol on argv, so the
-            // main process hands it back as seedPrompt — type it FIRST (identity), then
-            // the orientation kick. Serialized via writeChains so they can't jam. (ondev-b)
-            if (res.seedPrompt) await submitToPty(GOD_PTY, res.seedPrompt, godProvider);
-            await submitToPty(GOD_PTY, INITIAL_GOD_PROMPT, godProvider);
-          }
-        } catch { /* PTY may have died during startup */ }
-        finally { bootGraceUntil.current[GOD_ID] = 0; }
-      })();
+      if (res.seedPrompt && !resumedGod) {
+        bootGraceUntil.current[GOD_ID] = Date.now() + BOOT_GRACE_MS;
+        void (async () => {
+          try { if (!cancelled) await submitToPty(GOD_PTY, res.seedPrompt!, godProvider); }
+          catch { /* PTY may have died during startup */ }
+          finally { bootGraceUntil.current[GOD_ID] = 0; }
+        })();
+      }
     }, 1200);
     return () => { cancelled = true; clearTimeout(t); };
   }, [config?.onboardingComplete, config?.harnessHome]);
@@ -1015,11 +991,6 @@ export function useHive(config: HarnessConfig | null): void {
         if (!messageQueues[a.id]?.length) continue;
                 void dispatch(a.id, a).then(({ sent, message }) => {
           if (sent && message?.slack) void ensureSlackCard(message);
-          // Write the compact latch only once delivery genuinely happened — see
-          // the comment in fire() above.
-          if (sent && message?.compactUsed !== undefined) {
-            lastCompactUsed.current[a.id] = message.compactUsed;
-          }
         });
       }
     };
@@ -1154,100 +1125,9 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, [config?.onboardingComplete]);
 
-  // 6) CONTEXT TRIGGERS (compact / clear). Main decides WHEN — cadence, and which
-  //    half of the rule fired — and pushes `{action, rule}`; this decides WHO, then
-  //    queues the provider's own command so the drain (#4) delivers it only at an
-  //    idle prompt, never jamming a working terminal.
-  //
-  //    THE PRESSURE GATE. main/config.ts has long DOCUMENTED that auto-compact
-  //    "only compacts agents whose context has filled past a threshold (30% for
-  //    ~250k windows, 20% for ~1M windows)". No such check was ever implemented:
-  //    every live agent with a resolvable command got compacted on every tick,
-  //    hourly, however empty its window was. This makes the documented behaviour
-  //    real — `rule.minContextPct`, or `minContextPctLargeWindow` once the window
-  //    is >= LARGE_CONTEXT_WINDOW, must be met before an agent is interrupted.
-  //    (The shipped bars are now 60/40, twice the stale doc's numbers; see
-  //    DEFAULT_CONTEXT_TRIGGER. The doc comment in config.ts is still stale.)
-  //
-  //    Dedupe generalises to both actions: keyed on the command's own verb, so a
-  //    queued `/compact` blocks a second compact without blocking a `/clear`.
-  useEffect(() => {
-    if (!config?.onboardingComplete) return;
-
-       const fire = (action: 'compact' | 'clear', rule: ContextRule): void => {
-      const { agents, messageQueues, enqueueMessage } = useStore.getState();
-      const now = Date.now();
-      for (const a of agents) {
-        if (!a.ptyId) continue;
-        // Gate #109-2: don't enqueue a context command for an agent that cannot
-        // currently receive one (e.g. god 'blocked' on a human prompt). Enqueuing
-        // anyway left a stuck /compact at the head of the queue that dedupe then
-        // collapsed every subsequent hourly attempt against, forever — the exact
-        // same check the drain itself uses immediately before typing, so a
-        // command is never queued in a state the drain would refuse to deliver.
-        if (!canDeliverToAgent(a.status, ptyQuietMs(a.ptyId, now), QUIESCE_IDLE_MS)) continue;
-        const provider = inferAgentProvider(a.command, a.provider);
-        const command = action === 'clear'
-          ? clearCommandForProvider(provider, rule.message)
-          : compactionCommandForProvider(provider, rule.message);
-        // No trustworthy command for this CLI (Crush's palette-only TUI, Copilot's
-        // print mode, an unknown custom binary) — leave its terminal alone.
-        if (!command) continue;
-        if (!passesContextPressure(a, rule)) continue;
-        const verb = command.trimStart().split(/\s+/)[0];
-        const queued = messageQueues[a.id] ?? [];
-        if (queued.some((m) => m.text.trimStart().startsWith(verb))) continue;
-        // The latch, compact only. `used` reaches this gate from Claude's status
-        // line, which only reports after an API call. A /compact on an agent that
-        // has done nothing since the last one makes no call at all — Claude refuses
-        // it locally with "Not enough messages to compact" — so the count stays
-        // byte-identical and the pressure gate passes on the same number the next
-        // cycle, and the next. Seen in the wild: /compact every hour for 15 straight
-        // hours at exactly 400958 tokens, then 11 more at exactly 221772, each a
-        // no-op the agent still had to read and answer. Higher thresholds make it
-        // rarer, not absent: any agent parked above its bar repeats forever.
-        //
-        // So remember the count at the last compact queued and skip while it is
-        // byte-identical. Deliberately equality and not "hasn't grown": the rule's
-        // thresholds own that decision, and an agent still above them deserves its
-        // /compact whether the count moved up or down. A frozen count is the one
-        // state those thresholds cannot reason about, because nothing they could do
-        // would ever change it. /clear needs no equivalent — the queue drain zeroes
-        // the store reading when it lands.
-               const used = a.contextTokens ?? 0;
-        if (action === 'compact' && lastCompactUsed.current[a.id] === used) continue;
-        // The latch is written at successful DELIVERY (see the flush() dispatch
-        // callback below), not here. Writing it at enqueue time recorded
-        // "already compacted at N tokens" for a compaction that might never
-        // actually happen — e.g. blocked by the gate just above, or a failed
-        // send — silently latching out every future attempt at that count.
-        // compactUsed rides on the queued message so the delivery site knows
-        // which count to latch.
-        enqueueMessage(a.id, command, action === 'compact' ? { compactUsed: used } : undefined);
-      }
-    };
-
-    // The typed `onContextTrigger` arrives with the main-process/preload change
-    // that emits it; access it defensively so this lands independently of that.
-    const off = (window.cth as unknown as {
-      onContextTrigger?: (
-        cb: (p: { action: 'compact' | 'clear'; rule: ContextRule }) => void
-      ) => () => void;
-    }).onContextTrigger?.((p) => {
-      if (!p?.rule) return;
-      fire(p.action === 'clear' ? 'clear' : 'compact', p.rule);
-    });
-
-    // LEGACY fallback: main still emits the old parameterless auto-compact until
-    // it switches over. Treat it as the default compact rule so behaviour is
-    // continuous across that landing. Harmless if both fire — the dedupe above
-    // drops the duplicate.
-    const offLegacy = window.cth.onAutoCompact(
-      () => fire('compact', DEFAULT_CONTEXT_TRIGGER.compact)
-    );
-
-    return () => { off?.(); offLegacy?.(); };
-  }, [config?.onboardingComplete]);
+  // 6) Context upkeep has no clock-driven path here any more: compaction is
+  //    Claude Code's own, and a team member's conversation is cleared only by
+  //    main after a finished, handed-off task (safeClearer.ts; owner, 2026-09-25).
 
   // 7) Auto-revive wedged PTYs after the Mac sleeps/locks. Kevin's main-process
   //    keepalive catches up its schedules on wake and DETECTS terminals that were

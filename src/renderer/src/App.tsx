@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useStore, selectedAgent } from '@/store/store';
+import { useStore, selectedAgent, ROSTER_BOOT_HOME } from '@/store/store';
+import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
@@ -32,7 +33,7 @@ import { acquireTerminal, notifyThemeChangeAll } from '@/components/terminalPool
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
-import { SHOW_IDE } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_AUTO_MODE_LABEL } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import brandLogo from '@brand/logo.png?url';
 
@@ -264,7 +265,13 @@ export function App() {
 
   if (!config.onboardingComplete) {
     // Just-onboarded users go straight into the office they set up (homeState 'ok').
-    return <OnboardingWizard onComplete={(next) => { setConfig(next); setHomeState('ok'); }} />;
+    // If setup chose an office the store was not built for, reload first so the
+    // floor reads that office's roster instead of saving an empty one over it
+    // (rosterSource.ts, rosterNeedsReload).
+    return <OnboardingWizard onComplete={(next) => {
+      if (rosterNeedsReload(ROSTER_BOOT_HOME, next.harnessHome)) { window.location.reload(); return; }
+      setConfig(next); setHomeState('ok');
+    }} />;
   }
 
   if (homeState === 'checking') {
@@ -309,13 +316,15 @@ export function App() {
         {/* v0.3.7: the version is no longer inert text — it doubles as the
             update control (check / download / restart to update). */}
         <UpdateBadge />
-        <span style={{
-          fontFamily: 'var(--cth-font-ui)',
-          fontSize: 13,
-          color: 'var(--cth-ink-500)'
-        }}>
-          {config.autoMode ? 'auto mode on' : 'auto mode off'}
-        </span>
+        {SHOW_AUTO_MODE_LABEL && (
+          <span style={{
+            fontFamily: 'var(--cth-font-ui)',
+            fontSize: 13,
+            color: 'var(--cth-ink-500)'
+          }}>
+            {config.autoMode ? 'auto mode on' : 'auto mode off'}
+          </span>
+        )}
         {/* v0.3.4: theme + fullscreen live HERE (top right), not buried in the
             terminal header — and the theme darkens the whole app, terminals
             included (design/theme.ts + tokens.css dark block). */}

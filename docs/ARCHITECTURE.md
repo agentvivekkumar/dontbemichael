@@ -59,7 +59,7 @@ src/
     shellEnv.ts              resolve PATH and shell env for child processes
     fs.ts / git.ts           sandboxed filesystem + git bridges
     packs.ts                 loads and validates the bundled Office Packs (resources/packs/)
-    agentFolders.ts          each agent's folder under ~/Documents/<Business>, plus the shared Office folder
+    agentFolders.ts          each agent's folder under ~/Documents/<Business> (Michael's), plus the Office folder
     homeFolder.ts            office (harness home) folder checks behind the "can't find your office" screen
     harnessGuard.ts          PreToolUse guard that keeps agents from saving work in the harness folder
     docText.ts / docTextCli.ts / macOcr.ts   Word, Excel, PowerPoint, PDF and scan reading (OCR via macOS Vision)
@@ -69,6 +69,7 @@ src/
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
     officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles, business profile, team plan
     agentDefinition.ts       each agent's levels and outward capabilities
+    folderAccess.ts          who may open and change which folder: sandbox, permission rules, hook checks
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
   preload/                   contextBridge → typed window.cth API
   renderer/src/

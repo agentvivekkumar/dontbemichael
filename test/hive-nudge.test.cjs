@@ -44,6 +44,7 @@ test('prose that merely mentions the inbox is NOT a nudge', () => {
   // The queue carries operator instructions too; dropping one as a duplicate
   // nudge would silently lose real work.
   assert.equal(isInboxNudge('Please check whether you have new hive inbox message(s)'), false);
+  assert.equal(isInboxNudge('You have new hive inbox message(s) at least: x'), true, 'nudges queued before the rewrite still count');
   assert.equal(isInboxNudge('summarise your inbox'), false);
   assert.equal(isInboxNudge(''), false);
 });
@@ -59,12 +60,13 @@ test('the nudge keeps the pending inbox authoritative, not the id list', () => {
   // A nudge suppressed by the one-pending rule leaves its ids unnamed, so an
   // agent that stopped at the list would miss that mail entirely.
   const text = inboxNudgeText(['msg-1']);
-  assert.match(text, /authoritative/);
+  assert.match(text, /Work everything still pending in your inbox/);
   assert.match(text, /inbox\/\.done\//);
+  assert.doesNotMatch(text, /[\u2013\u2014]|\bgod\b/);
 });
 
 test('a nudge with no ids is still a well-formed nudge', () => {
   const text = inboxNudgeText([]);
   assert.equal(isInboxNudge(text), true);
-  assert.doesNotMatch(text, /at least:/);
+  assert.doesNotMatch(text, /: \./);
 });

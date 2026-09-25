@@ -15,12 +15,12 @@ import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
-import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
+import { CompanyProfileSettings } from './CompanyProfileSettings';
 import { SetupPanel } from './SetupPanel';
 import { Icon } from './Icon';
 import { OfficeThemePicker } from './OfficeThemePicker';
@@ -177,12 +177,15 @@ const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
 /** The 2px rule between Settings sections. */
 const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
 
-export type Section = 'General' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
-const NAV_SECTIONS: Section[] = ['General', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
+const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+/** The tabs shown: the Voice tab is hidden while voice is off (SHOW_VOICE). */
+const VISIBLE_SECTIONS: Section[] = NAV_SECTIONS.filter((s) => s !== 'Voice' || SHOW_VOICE);
 /** i18n key for each nav section's label — the Section values themselves stay
  *  as stable identifiers (tab state, deep links). */
 const NAV_SECTION_KEYS: Record<Section, string> = {
   'General': 'settings.nav.general',
+  'Company profile': 'settings.nav.companyProfile',
   'Prerequisites': 'settings.nav.prerequisites',
   'Agents & Models': 'settings.nav.agentsModels',
   'Skills': 'settings.nav.skills',
@@ -530,7 +533,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     catch { setAutoUpdateOn(!next); }
   };
 
-  // ─── Anonymous usage stats (default ON = opt-out; contract in TELEMETRY.md) ─
+  // ─── Anonymous usage stats (TELEMETRY.md). Rendered only while
+  // COLLECT_USAGE_STATS (buildFeatures.ts) is on; off in this build. ─
   const [telemetryOn, setTelemetryOn] = useState<boolean>(config.telemetryEnabled !== false);
   const toggleTelemetry = async () => {
     const next = !telemetryOn;
@@ -1000,7 +1004,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   paddingTop: 8, paddingBottom: 8,
                   background: 'var(--cth-cream-200)'
                 }}>
-                  {NAV_SECTIONS.map((section) => {
+                  {VISIBLE_SECTIONS.map((section) => {
                     const active = activeSection === section;
                     return (
                       <button
@@ -1249,24 +1253,26 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             {autoUpdateOn ? t('common.on') : t('common.off')}
                           </PixelButton>
                         </div>
-                        <div style={{ height: 10 }} />
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {t('settings.general.telemetry')}
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.general.telemetryDesc')}
-                            </span>
+                        {COLLECT_USAGE_STATS && (<>
+                          <div style={{ height: 10 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                                {t('settings.general.telemetry')}
+                              </span>
+                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                                {t('settings.general.telemetryDesc')}
+                              </span>
+                            </div>
+                            <PixelButton
+                              variant={telemetryOn ? 'primary' : 'secondary'}
+                              size="sm"
+                              onClick={toggleTelemetry}
+                            >
+                              {telemetryOn ? t('common.on') : t('common.off')}
+                            </PixelButton>
                           </div>
-                          <PixelButton
-                            variant={telemetryOn ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={toggleTelemetry}
-                          >
-                            {telemetryOn ? t('common.on') : t('common.off')}
-                          </PixelButton>
-                        </div>
+                        </>)}
                       </div>
 
                       {/* Office Theme — TV-show office maps (experimental; flag tvShowOffices, default off) */}
@@ -1351,19 +1357,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={sectionRule} />
-
-                      {/* Context upkeep: compact / clear rules. Lived in Michael's
-                          Triggers tab, but each run goes through EVERY live agent
-                          (useHive's context trigger), so it is a setting for how all
-                          agents run, not a trigger of Michael's. */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={sectionHeadTight}>{t('settings.agentsModels.contextUpkeep')}</div>
-                        <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                          {t('settings.agentsModels.contextUpkeepDesc')}
-                        </span>
-                        <ContextSection />
-                      </div>
                     </>
                   )}
 
@@ -1490,6 +1483,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   )}
 
                   {/* MEMORY & KNOWLEDGE */}
+                  {/* COMPANY PROFILE: key facts every agent works from. */}
+                  {activeSection === 'Company profile' && (
+                    <CompanyProfileSettings config={config} onOpenKnowledge={() => setActiveSection('Memory & Knowledge')} />
+                  )}
+
                   {activeSection === 'Memory & Knowledge' && (
                     <>
                       <div>
@@ -2095,7 +2093,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   )}
 
                   {/* VOICE — Free Flow dictation + Realtime Michael (v0.3.4: its own tab) */}
-                  {activeSection === 'Voice' && (
+                  {activeSection === 'Voice' && SHOW_VOICE && (
                     <>
                       {/* Free Flow (voice dictation) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

@@ -20,6 +20,9 @@ export interface HumanQA {
    *  answering — the question stays on the card (history is preserved) but
    *  openQuestion() stops returning it, so the card leaves ASK ME. */
   dismissedAt?: string;
+  /** The agent whose work needs the answer, and which learns from it; "god"
+   *  when Michael raised it himself. */
+  raisedBy?: string;
 }
 
 export interface HiveTask {

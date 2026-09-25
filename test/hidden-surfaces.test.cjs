@@ -96,19 +96,135 @@ test('webhooks live in Settings, with nothing lost from the Triggers card', () =
 });
 
 /**
- * Context upkeep (the compact / clear rules) moved from Michael's Triggers tab
- * to Settings → Agents & Models (owner, 2026-09-24): each run goes through every
- * live agent, so it is a setting for how all agents run, not Michael's trigger.
+ * Context upkeep has no setting any more (owner, 2026-09-25): compaction is
+ * Claude Code's own, and a conversation is cleared only after a finished,
+ * handed-off task (safeClearer.ts), never on a clock.
  */
-test('context upkeep lives in Settings, and it really does apply to every agent', () => {
+test('no clock-driven context upkeep is left in Settings or the Triggers tab', () => {
   assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /ContextSection/);
+  assert.doesNotMatch(read('src/renderer/src/components/SettingsModal.tsx'), /ContextSection/);
+  assert.doesNotMatch(read('src/renderer/src/hooks/useHive.ts'), /onContextTrigger/);
+});
+
+/**
+ * Anonymous usage stats are hidden until the owner decides whether to collect
+ * anything (owner, 2026-09-24): no onboarding row, no Settings switch, and no
+ * sending even from a build that carries a PostHog key. COLLECT_USAGE_STATS
+ * brings all three back together.
+ */
+test('this build collects no usage stats', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').COLLECT_USAGE_STATS, false);
+});
+
+test('the usage stats choice is hidden in onboarding and Settings', () => {
+  const wizard = read('src/renderer/src/components/OnboardingWizard.tsx');
+  const row = wizard.indexOf("label={t('onboarding.permissions.shareStats')}");
+  assert.ok(row > 0 && wizard.slice(row - 200, row).includes('{COLLECT_USAGE_STATS && ('), 'onboarding row is behind the switch');
+  assert.match(wizard, /\.\.\.\(COLLECT_USAGE_STATS \? \{ telemetryEnabled: shareStats \} : \{\}\)/);
+
   const settings = read('src/renderer/src/components/SettingsModal.tsx');
-  const agents = settings.indexOf("activeSection === 'Agents & Models'");
-  const autonomy = settings.indexOf("activeSection === 'Autonomy & Budgets'");
-  const at = settings.indexOf('<ContextSection />');
-  assert.ok(agents > 0 && at > agents && at < autonomy, 'inside Agents & Models');
-  const hive = read('src/renderer/src/hooks/useHive.ts');
-  const fire = hive.indexOf("const fire = (action: 'compact' | 'clear', rule: ContextRule): void => {");
-  assert.ok(fire > 0, 'the context trigger handler');
-  assert.match(hive.slice(fire, fire + 300), /for \(const a of agents\) \{/, 'loops over every agent, not only Michael');
+  const sw = settings.indexOf("{t('settings.general.telemetry')}");
+  assert.ok(sw > 0 && settings.slice(sw - 700, sw).includes('{COLLECT_USAGE_STATS && (<>'), 'Settings switch is behind the switch');
+});
+
+test('nothing is sent while usage stats are hidden, whatever the saved setting', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /enabled: COLLECT_USAGE_STATS && readConfig\(\)\.telemetryEnabled !== false/);
+  assert.match(main, /analytics\.setEnabled\(COLLECT_USAGE_STATS && patch\.telemetryEnabled\)/);
+});
+
+/**
+ * The header's "auto mode on / off" text is hidden (owner, 2026-09-24). The
+ * setting itself still works and stays in Settings → Autonomy & Budgets.
+ */
+test('the header hides the auto mode text', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
+  const app = read('src/renderer/src/App.tsx');
+  const label = app.indexOf("'auto mode on' : 'auto mode off'");
+  assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
+});
+
+/**
+ * The close button on a team member is hidden (owner, 2026-09-24): it stopped
+ * the agent mid-task and archived it with no way back in the app. Hidden in
+ * both places it lived, the agent panel and the full screen view.
+ */
+test('the close agent button is hidden everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_CLOSE_AGENT, false);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'),
+    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+  assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'),
+    /\{!agent\.isGod && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+});
+
+/**
+ * "Open a Terminal window here" is hidden everywhere (owner, 2026-09-24): the
+ * open button next to edit, the same button in full screen, and the terminal
+ * icon beside each folder in Michael's Command Center.
+ */
+test('the open terminal buttons are hidden everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_OPEN_TERMINAL, false);
+  const cases = [
+    ['AgentDetailPanel.tsx', "onClick={openTerminal} disabled={openTerminalState === 'opening'}"],
+    ['FullscreenTerminal.tsx', "onClick={openTerminal} disabled={openState === 'opening'}"],
+    ['CommandCenterPanel.tsx', 'onClick={() => window.cth.openTerminalAt(r)}']
+  ];
+  for (const [file, marker] of cases) {
+    const src = read(`src/renderer/src/components/${file}`);
+    const at = src.indexOf(marker);
+    assert.ok(at > 0, `${file} still has the button`);
+    assert.ok(src.slice(Math.max(0, at - 160), at).includes('{SHOW_OPEN_TERMINAL && ('), `${file}: behind SHOW_OPEN_TERMINAL`);
+  }
+});
+
+/**
+ * The floor-wide Auto / Pause delivery switch is hidden (owner, 2026-09-24).
+ * A pause is saved per agent in the config and restored at launch, so while the
+ * switch is hidden a saved pause is cleared instead: no one is left with held
+ * messages and no switch to release them.
+ */
+test('the delivery switch is hidden, and a saved pause cannot strand messages', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_DELIVERY_SWITCH, false);
+  const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  const at = cc.indexOf("variant={floorDeliveryPaused ? 'primary' : 'secondary'}");
+  assert.ok(at > 0 && cc.slice(at - 120, at).includes('{SHOW_DELIVERY_SWITCH && ('), 'switch behind SHOW_DELIVERY_SWITCH');
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(SHOW_DELIVERY_SWITCH\) \{\s*control\.replaceAutoDeliveryPauses\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\);\s*\} else if \(\(readConfig\(\)\.autoDeliveryPausedAgents \?\? \[\]\)\.length > 0\) \{\s*writeConfig\(\{ autoDeliveryPausedAgents: \[\] \}\);/);
+});
+
+/**
+ * Hiring by voice is off (owner, 2026-09-24): voice Michael is not given the
+ * spawn_agent tool, his instructions say he can't hire, and main refuses a
+ * spawn request that arrives anyway.
+ */
+test('voice Michael cannot hire', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').ALLOW_VOICE_HIRE, false);
+  const actions = read('src/renderer/src/realtime/actions.ts');
+  const at = actions.indexOf("name: 'spawn_agent'");
+  assert.ok(at > 0 && actions.slice(at - 120, at).includes('...(ALLOW_VOICE_HIRE ? ['), 'tool offered only when allowed');
+  const session = read('src/renderer/src/realtime/session.ts');
+  assert.match(session, /\$\{ALLOW_VOICE_HIRE \? 'hire a new agent, ' : ''\}/);
+  assert.match(session, /You cannot hire new team members by voice in this version/);
+  assert.match(read('src/main/realtimeActions.ts'), /if \(verb === 'spawn'\) \{[\s\S]{0,200}if \(!ALLOW_VOICE_HIRE\) \{\s*return \{ ok: false, spoken:/);
+});
+
+/**
+ * Voice is off entirely (owner, 2026-09-24): no Talk toggle, no dictation mic
+ * or hold Option, no Voice tab, and main refuses to start a voice session or
+ * transcribe audio.
+ */
+test('voice is off everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_VOICE, false);
+  for (const f of ['AgentCard.tsx', 'FullscreenTerminal.tsx']) {
+    const src = read(`src/renderer/src/components/${f}`);
+    assert.match(src, /\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/, `${f}: Talk toggle behind SHOW_VOICE`);
+    assert.doesNotMatch(src.replace(/\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/g, ''), /<RealtimeMichaelToggle \/>/, `${f}: no ungated toggle`);
+  }
+  assert.match(read('src/renderer/src/store/store.ts'), /setFreeflowEnabled: \(on\) => set\(\{ freeflowEnabled: SHOW_VOICE && on \}\)/);
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(settings, /const VISIBLE_SECTIONS: Section\[\] = NAV_SECTIONS\.filter\(\(s\) => s !== 'Voice' \|\| SHOW_VOICE\);/);
+  assert.match(settings, /\{VISIBLE_SECTIONS\.map\(\(section\) => \{/);
+  assert.match(settings, /activeSection === 'Voice' && SHOW_VOICE && \(/);
+  assert.match(read('src/main/realtime.ts'), /if \(!SHOW_VOICE\) return \{ ok: false, error: 'Voice is off in this version\.', code: 'disabled' \};/);
+  assert.match(read('src/main/index.ts'), /ipcMain\.handle\('freeflow:transcribe'[\s\S]{0,200}if \(!SHOW_VOICE\) return \{ ok: false/);
 });

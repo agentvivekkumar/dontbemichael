@@ -1,5 +1,6 @@
+import type { CompanyProfile } from '../shared/companyProfile';
 import { app } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -35,6 +36,12 @@ export interface ScheduledMission {
    *  the cadence the user had. See shared/weeklySchedule.ts. */
   weekly?: { days: number[]; minute: number };
   to: string;
+  /** A schedule says when and which job (its label); the how lives in the
+   *  agent's Work style (owner, 2026-09-25). New schedules leave this empty.
+   *  An older schedule's prompt stays here, and is sent after the standard
+   *  message (scheduleMessage.ts) until the owner moves it into the agent's
+   *  Work style from the Schedules card. The heartbeat still keeps its own
+   *  description here (see TODOS.md). */
   body: string;
   enabled: boolean;
   /** When true, the scheduler asks the renderer to compact live terminals when
@@ -59,31 +66,39 @@ export interface ScheduledMission {
   quietThresholdMs?: number;
 }
 
-/** The built-in hourly ops standup: god reviews who's doing what + whether tasks
- *  are on track and agents are running, and every terminal's context is compacted.
- *  Shipped enabled by default; users can toggle it off in the Command Center. */
+/** The built-in hourly ops standup. A schedule says when and which job
+ *  (owner, 2026-09-25): the label names the job, and what Michael does at a
+ *  standup lives in his own instructions (hive.ts), not here. Shipped enabled;
+ *  users can toggle it off in the Command Center. */
 export const OPS_STANDUP_MISSION: ScheduledMission = {
   id: 'ops-standup',
   label: 'Hourly ops standup',
   intervalMs: 3_600_000,
   to: 'god',
-  body:
-    'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
-    'is still running (not stalled or idle-stale). Check the task board — are ' +
-    'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
-    'agents and at-risk tasks, and keep the board accurate. (As part of this ' +
-    "standup each working agent is asked to summarise its current task and the " +
-    'next step, then compact and resume from the same point — so terminal ' +
-    'contexts stay bounded without losing work. The compaction is queued and ' +
-    'runs when an agent is idle, so it never interrupts work mid-step.)',
+  body: '',
   enabled: true
   // NO autoCompact. Compaction belongs to contextTrigger.compact and nothing else.
-  // This flag used to live here as well, which meant a default install asked for
-  // compaction on TWO cadences — hourly from this standup and 2-hourly from the
-  // trigger — the exact "two controls that disagree" the maint-1 retirement below
-  // was written to end. The standup's own prose still describes compaction, and
-  // that stays true: the trigger does it, just not on this mission's clock.
 };
+
+/** Standup prompts the app itself shipped. An office still carrying one of
+ *  them word for word gets the current (empty) body at launch, because its
+ *  content now lives in Michael's instructions; text the owner wrote is kept. */
+export const OPS_STANDUP_BUILT_IN_BODIES: readonly string[] = [
+  // Until 2026-09-25 (morning): told Michael each agent would compact.
+  'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
+  'is still running (not stalled or idle-stale). Check the task board \u2014 are ' +
+  'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
+  'agents and at-risk tasks, and keep the board accurate. (As part of this ' +
+  "standup each working agent is asked to summarise its current task and the " +
+  'next step, then compact and resume from the same point \u2014 so terminal ' +
+  'contexts stay bounded without losing work. The compaction is queued and ' +
+  'runs when an agent is idle, so it never interrupts work mid-step.)',
+  // 2026-09-25, before schedules stopped carrying prompts.
+  'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
+  'is still running (not stalled or idle-stale). Check the task board: are ' +
+  'in-flight tasks on track, and is anything blocked or unowned? Flag stale ' +
+  'agents and at-risk tasks, and keep the board accurate.'
+];
 
 /** The built-in heartbeat (Lane A #1). A context-aware beat that, each tick,
  *  observes live floor state and — only when the floor has gone quiet — drops a
@@ -191,13 +206,24 @@ export interface HarnessConfig {
    *  "your business". Never used as a path or an id. */
   businessName?: string;
   businessCity?: string;
-  /** The shared folder Michael works in and every agent can reach (Decision 44). */
+  /** The company profile: key facts with short, definite answers, delivered
+   *  to every agent (src/shared/companyProfile.ts). */
+  companyProfile?: CompanyProfile;
+  /** Michael's folder: the business folder, private to him and the owner, that
+   *  holds every team member's folder by default (src/shared/folderAccess.ts). */
+  businessFolder?: string;
+  /** Before 2026-09-25: the shared Office folder, inside Michael's. Read once at
+   *  launch to fill businessFolder (its parent); nothing else uses it. Company
+   *  knowledge lives in the knowledge feature now. */
   officeFolder?: string;
   /** The starter team picked during onboarding, each with the ABSOLUTE folder it
    *  works in (Decisions 44, 47). The running office starts agents from this. */
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Set once existing team members got today's Role description and Work
+   *  style (the one-time rewrite, 2026-09-25). */
+  instructionsRewritten?: boolean;
   /** Folder where the harness keeps its own state (agent metadata, logs). */
   harnessHome: string | null;
   /** Recently-opened office folders (most-recent first), offered by the missing
@@ -242,6 +268,10 @@ export interface HarnessConfig {
   /** One-time guard: has the built-in hourly ops standup been seeded into an
    *  existing install's missions? Prevents re-adding it after a user deletes it. */
   opsStandupSeeded?: boolean;
+  /** One-time guard: the knowledge feature was switched on for this install
+   *  when it became the company knowledge store (2026-09-25). An owner who
+   *  turns it off afterwards keeps it off. */
+  knowledgeOnSeeded?: boolean;
   /** One-time guard for the built-in heartbeat mission (mirrors opsStandupSeeded
    *  so a user who deletes the heartbeat doesn't get it re-added every boot). */
   heartbeatSeeded?: boolean;
@@ -324,9 +354,11 @@ export interface HarnessConfig {
    *  harness agents only; the user's global Claude theme is never touched. */
   terminalTheme?: 'light' | 'dark';
   /** Anonymous product analytics (PostHog) — the exact events/properties are
-   *  documented in TELEMETRY.md. Default ON (opt-out, like autoUpdate); builds
-   *  without an injected key and environments with DO_NOT_TRACK set never send
-   *  regardless of this flag. (Mirrored in preload + renderer config.) */
+   *  documented in TELEMETRY.md. Ignored while COLLECT_USAGE_STATS
+   *  (buildFeatures.ts) is false, as it is in this build. Otherwise default ON
+   *  (opt-out, like autoUpdate); builds without an injected key and environments
+   *  with DO_NOT_TRACK set never send regardless of this flag. (Mirrored in
+   *  preload + renderer config.) */
   telemetryEnabled?: boolean;
   /** Master flag for the TV-show office themes feature (Settings theme picker +
    *  destructive switch flow). Default false = the picker is hidden and the
@@ -419,22 +451,6 @@ export interface HarnessConfig {
   /** One-time guard for `migrateTriggersV1` (legacy webhook → webhookTriggers,
    *  1h → 2h compact cadence). Set once the migration has run to completion. */
   triggersMigratedV1?: boolean;
-
-  // ─── Memory reflection (the janitor's condense half) ───────────────────────
-  /** Master toggle for the in-process MemoryReflector. Default on. */
-  reflectEnabled?: boolean;
-  /** How often to scan agent memory.md files for condensing (default 30 min). */
-  reflectIntervalMs?: number;
-  /** Condense when bytes exceed this percent of the 128 KB budget (matches the
-   *  janitor's TRIGGER_PCT). DECIDED: 50. */
-  reflectByteTriggerPct?: number;
-  /** ...OR when `## ` section count exceeds this (AND bytes > floor). DECIDED: 50. */
-  reflectSectionTrigger?: number;
-  /** Newest K verbatim `## ` sections kept untouched on each condense. */
-  reflectRecentKeep?: number;
-  /** Never condense a file smaller than this; also the section-trigger byte floor.
-   *  DECIDED: 16 KB. */
-  reflectMinBytes?: number;
 }
 
 const DEFAULTS: HarnessConfig = {
@@ -489,20 +505,11 @@ const DEFAULTS: HarnessConfig = {
   webhookTriggers: [],
   orgTrigger: DEFAULT_ORG_TRIGGER,
   triggersMigratedV1: false,
-  // Memory reflection — preventive; nobody is over threshold today, so it sits
-  // dark until an agent's memory crosses one of these (the verify gate is the
-  // safety for the LLM step). Thresholds DECIDED by god 2026-06-06.
-  reflectEnabled: true,
-  reflectIntervalMs: 1_800_000,
-  reflectByteTriggerPct: 50,
-  reflectSectionTrigger: 50,
-  reflectRecentKeep: 12,
-  reflectMinBytes: 16_384,
-  // Enterprise Knowledge Graph — opt-in; dark until the user enables it.
-  // v0.3.4 fix: default OFF, matching the field's own documentation ("Default
-  // OFF / dark until enabled") — the true default contradicted it. Existing
-  // installs keep their persisted value.
-  knowledgeGraph: { enabled: false }
+  // Company knowledge (the knowledge feature): ON by default (owner,
+  // 2026-09-25). It is where company wide information, policies and rules live,
+  // and every agent, Michael included, searches it. Existing installs are
+  // switched on once at launch (knowledgeOnSeeded).
+  knowledgeGraph: { enabled: true }
 };
 
 function configPath(): string {
@@ -836,11 +843,20 @@ function ensureClaudeProjectTrust(home: string, cwd: string): void {
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
       c = parsed as ClaudeConfig;
     }
-    if (c.projects?.[cwd]?.hasTrustDialogAccepted !== true) {
+    // Claude Code looks the folder up by its real name on disk. On a Mac a
+    // folder typed as "MoblizeIT" opens "MoblizeIt" too, but only the real name
+    // counts as trusted, so trust that as well; otherwise the agent stops on
+    // the trust question (seen live 2026-09-25).
+    let real = cwd;
+    try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
+    let changed = false;
+    for (const key of new Set([cwd, real])) {
+      if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
       c.projects = c.projects ?? {};
-      c.projects[cwd] = { ...(c.projects[cwd] ?? {}), hasTrustDialogAccepted: true };
-      writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
+      c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
+      changed = true;
     }
+    if (changed) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
   } catch (error) {
     console.warn(
       `[config] Could not safely update Claude config at ${p}:`,

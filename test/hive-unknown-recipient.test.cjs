@@ -58,11 +58,25 @@ test('the message log records delivered targets, not intent', async (t) => {
   const { hive } = await floor(t);
 
   hive.send({ to: 'jim-1', act: 'inform', subject: 'landed' }, 'god-1');
-  hive.send({ to: 'scheduler', act: 'inform', subject: 'standup' }, 'jim-1');
+  hive.send({ to: 'nobody', act: 'inform', subject: 'standup' }, 'jim-1');
 
   const [ok, lost] = entries(hive, 'message');
   assert.deepEqual(ok.delivered, ['jim-1']);
   assert.deepEqual(lost.delivered, [], 'a message nobody received must not read as delivered');
+});
+
+test('a reply to the scheduler is dropped quietly, not bounced to Michael', async (t) => {
+  const { hive } = await floor(t);
+  hive.send({ to: 'scheduler', act: 'inform', subject: 'standup done' }, 'jim-1');
+  assert.equal(hive.inbox('god-1').length, 0);
+  const drop = entries(hive, 'drop').at(-1);
+  assert.equal(drop.reason, 'reply-to-system-sender');
+});
+
+test('Michael answers to "michael" as well as his id', async (t) => {
+  const { hive } = await floor(t);
+  hive.send({ to: 'michael', act: 'inform', subject: 'done' }, 'jim-1');
+  assert.equal(hive.inbox('god-1').length, 1);
 });
 
 test('an unknown recipient does not stop the rest of a broadcast', async (t) => {

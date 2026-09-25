@@ -131,8 +131,13 @@ export const DEFAULT_COMPACTION_FOCUS =
  * spoken confirm word. Turning it on is an explicit operator choice.
  */
 export const DEFAULT_CONTEXT_TRIGGER: ContextTriggerConfig = {
+  // RETIRED (owner, 2026-09-25): the app no longer types /compact on a clock.
+  // Compaction is Claude Code's own auto compact, with its window set per agent
+  // at spawn (AUTO_COMPACT_WINDOW_TOKENS). A clock usually fired on idle agents
+  // with a cold cache, paying full price for savings that may never come. The
+  // field stays so older configs still parse; main never arms it.
   compact: {
-    enabled: true,
+    enabled: false,
     everyMs: 7_200_000, // 2h — was 1h
     minContextPct: 60, // was a documented-but-unenforced 30
     minContextPctLargeWindow: 40, // was a documented-but-unenforced 20
@@ -307,3 +312,12 @@ function matchesType(value: unknown, type: string): boolean {
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
+
+/**
+ * Where Claude Code's own auto compact fires, in tokens, set for every Claude
+ * agent at spawn through CLAUDE_CODE_AUTO_COMPACT_WINDOW. Claude Code clamps it
+ * to the model's window, so a 200k model keeps its usual point and a 1M model
+ * compacts at about 300k instead of about 967k: every turn rereads the whole
+ * context, and quality drops as it fills (owner, 2026-09-25; to be measured).
+ */
+export const AUTO_COMPACT_WINDOW_TOKENS = 300_000;
