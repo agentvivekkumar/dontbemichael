@@ -15,7 +15,7 @@ import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { ContextSection } from './triggers/ContextSection';
 import { PixelButton } from './PixelButton';
@@ -179,6 +179,8 @@ const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
 
 export type Section = 'General' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
 const NAV_SECTIONS: Section[] = ['General', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+/** The tabs shown: the Voice tab is hidden while voice is off (SHOW_VOICE). */
+const VISIBLE_SECTIONS: Section[] = NAV_SECTIONS.filter((s) => s !== 'Voice' || SHOW_VOICE);
 /** i18n key for each nav section's label — the Section values themselves stay
  *  as stable identifiers (tab state, deep links). */
 const NAV_SECTION_KEYS: Record<Section, string> = {
@@ -1001,7 +1003,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   paddingTop: 8, paddingBottom: 8,
                   background: 'var(--cth-cream-200)'
                 }}>
-                  {NAV_SECTIONS.map((section) => {
+                  {VISIBLE_SECTIONS.map((section) => {
                     const active = activeSection === section;
                     return (
                       <button
@@ -2098,7 +2100,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   )}
 
                   {/* VOICE — Free Flow dictation + Realtime Michael (v0.3.4: its own tab) */}
-                  {activeSection === 'Voice' && (
+                  {activeSection === 'Voice' && SHOW_VOICE && (
                     <>
                       {/* Free Flow (voice dictation) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

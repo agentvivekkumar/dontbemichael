@@ -214,3 +214,24 @@ test('voice Michael cannot hire', () => {
   assert.match(session, /You cannot hire new team members by voice in this version/);
   assert.match(read('src/main/realtimeActions.ts'), /if \(verb === 'spawn'\) \{[\s\S]{0,200}if \(!ALLOW_VOICE_HIRE\) \{\s*return \{ ok: false, spoken:/);
 });
+
+/**
+ * Voice is off entirely (owner, 2026-09-24): no Talk toggle, no dictation mic
+ * or hold Option, no Voice tab, and main refuses to start a voice session or
+ * transcribe audio.
+ */
+test('voice is off everywhere', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_VOICE, false);
+  for (const f of ['AgentCard.tsx', 'FullscreenTerminal.tsx']) {
+    const src = read(`src/renderer/src/components/${f}`);
+    assert.match(src, /\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/, `${f}: Talk toggle behind SHOW_VOICE`);
+    assert.doesNotMatch(src.replace(/\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/g, ''), /<RealtimeMichaelToggle \/>/, `${f}: no ungated toggle`);
+  }
+  assert.match(read('src/renderer/src/store/store.ts'), /setFreeflowEnabled: \(on\) => set\(\{ freeflowEnabled: SHOW_VOICE && on \}\)/);
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(settings, /const VISIBLE_SECTIONS: Section\[\] = NAV_SECTIONS\.filter\(\(s\) => s !== 'Voice' \|\| SHOW_VOICE\);/);
+  assert.match(settings, /\{VISIBLE_SECTIONS\.map\(\(section\) => \{/);
+  assert.match(settings, /activeSection === 'Voice' && SHOW_VOICE && \(/);
+  assert.match(read('src/main/realtime.ts'), /if \(!SHOW_VOICE\) return \{ ok: false, error: 'Voice is off in this version\.', code: 'disabled' \};/);
+  assert.match(read('src/main/index.ts'), /ipcMain\.handle\('freeflow:transcribe'[\s\S]{0,200}if \(!SHOW_VOICE\) return \{ ok: false/);
+});

@@ -34,7 +34,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 ### Removed
 
-- **No hiring by voice.** Voice Michael no longer offers to hire; add team members in the office.
+- **No voice, for now.** Talking to Michael and dictating messages are switched off, along with
+  the Voice tab in Settings.
 
 - **No usage stats choice in setup or Settings.** The app sends no usage data, so it no longer
   asks about it.

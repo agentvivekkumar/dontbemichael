@@ -69,7 +69,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
-import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH } from '../shared/buildFeatures';
+import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH, SHOW_VOICE } from '../shared/buildFeatures';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -4555,6 +4555,8 @@ ipcMain.handle('freeflow:setConfig', (_evt, patch: unknown) => {
  *  in main — only the audio bytes cross IPC inbound and the transcript outbound. */
 ipcMain.handle('freeflow:transcribe', async (_evt, arg: unknown) => {
   const cfg = readConfig();
+  // Voice is off in this build (SHOW_VOICE): no dictation either.
+  if (!SHOW_VOICE) return { ok: false, error: 'Voice is off in this version.' };
   if (!cfg.freeflowEnabled) return { ok: false, error: 'Free Flow is disabled' };
   if (!cfg.groqApiKey) return { ok: false, error: 'no Groq API key set' };
   const a = (arg ?? {}) as { audio?: unknown; mimeType?: unknown; filename?: unknown; language?: unknown };

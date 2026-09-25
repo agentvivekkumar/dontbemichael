@@ -5,6 +5,7 @@ import { PixelBadge, StatusKind } from './PixelBadge';
 import { useHasTerminalDraft } from './terminalPool';
 import { SpritePortrait } from './SpritePortrait';
 import { RealtimeMichaelToggle } from './RealtimeMichaelToggle';
+import { SHOW_VOICE } from '@shared/buildFeatures';
 import { CostHud } from '@/realtime/CostHud';
 import { AccentColorName } from '@/design/tokens';
 import { OfficeCharacterName } from '@/scene/office/cast';
@@ -255,7 +256,7 @@ export function AgentCard({
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <RealtimeMichaelToggle />
+                {SHOW_VOICE && <RealtimeMichaelToggle />}
                 <CostHud compact />
               </div>
             ) : (

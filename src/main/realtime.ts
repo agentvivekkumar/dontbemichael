@@ -29,6 +29,7 @@ const OPENAI_KEY_REF = 'apikey:openai';
  *  user reads, so main and the UI must not be able to disagree about it. */
 export { REALTIME_MODEL } from '../shared/realtimePricing';
 import { REALTIME_MODEL } from '../shared/realtimePricing';
+import { SHOW_VOICE } from '../shared/buildFeatures';
 
 /** GA ephemeral-secret mint endpoint. If an account/tier still answers the legacy
  *  beta shape, we fall back to /v1/realtime/sessions on a 404 and normalize both
@@ -118,6 +119,8 @@ export function registerRealtimeIpc(): void {
   ipcMain.handle('realtime:hasKey', () => hasOpenAiKey());
   // Mint an ephemeral token; returns { token, sessionConfig } only.
   ipcMain.handle('realtime:mintToken', async (_evt, payload: unknown) => {
+    // Voice is off in this build (SHOW_VOICE): no session can start.
+    if (!SHOW_VOICE) return { ok: false, error: 'Voice is off in this version.', code: 'disabled' };
     const p = (payload ?? {}) as { model?: unknown };
     const model = typeof p.model === 'string' && p.model.trim() ? p.model.trim() : REALTIME_MODEL;
     return mintRealtimeToken(model);

@@ -16,7 +16,7 @@ import { DEFAULT_ORG_TRIGGER, type OrgTriggerConfig, type WebhookTrigger } from 
 import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
-import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
+import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
 
@@ -923,7 +923,9 @@ export const useStore = create<State>((set, get) => ({
   setDraft: (agentId, text) =>
     set((s) => ({ drafts: { ...s.drafts, [agentId]: text } })),
   freeflowEnabled: false,
-  setFreeflowEnabled: (on) => set({ freeflowEnabled: on }),
+  // Voice is off in this build (SHOW_VOICE): dictation stays off whatever is saved,
+  // which hides the mic button and disarms hold Option.
+  setFreeflowEnabled: (on) => set({ freeflowEnabled: SHOW_VOICE && on }),
   hasGroqKey: false,
   setHasGroqKey: (has) => set({ hasGroqKey: has }),
   hasOpenAiKey: false,

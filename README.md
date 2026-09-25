@@ -248,7 +248,7 @@ to follow a docs page.
 > Settings under Autonomy & Budgets), the usage stats choice (see [Telemetry](#telemetry)), and the
 > close button on a team member, which stopped it with no way to bring it back, the buttons
 > that open a Terminal window in an agent's folder, the Auto / Pause message delivery switch in
-> Michael's Command Center, and hiring by voice. The code stays in place, and each one has a single switch in
+> Michael's Command Center, and voice: talking to Michael and dictation. The code stays in place, and each one has a single switch in
 > [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
 
 **For your business**

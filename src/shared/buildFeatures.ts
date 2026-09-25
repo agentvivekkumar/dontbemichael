@@ -63,3 +63,9 @@ export const SHOW_DELIVERY_SWITCH = false;
  *  instructions, and the main process accepting a spawn request from him. Off
  *  for now (owner, 2026-09-24); the rest of voice Michael is unchanged. */
 export const ALLOW_VOICE_HIRE = false;
+
+/** Voice, entirely: talking to Michael (the Talk toggle on his card and in
+ *  full screen) and dictation (the mic in the message box and hold Option in a
+ *  terminal), plus the Voice tab in Settings. Main also refuses to start a
+ *  voice session or transcribe audio while this is off (owner, 2026-09-24). */
+export const SHOW_VOICE = false;

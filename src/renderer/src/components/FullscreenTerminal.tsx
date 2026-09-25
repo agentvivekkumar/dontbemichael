@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL, SHOW_VOICE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
@@ -1011,7 +1011,7 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
             god orchestrator) globally, not the agent in view, so users can start a
             voice session even while a worker's terminal fills the screen. The cost
             HUD stays Michael-only (it belongs to his card). */}
-        <RealtimeMichaelToggle />
+        {SHOW_VOICE && <RealtimeMichaelToggle />}
         {agent.isGod && <CostHud compact />}
         {SHOW_OPEN_TERMINAL && (
           <PixelButton variant="secondary" size="sm" onClick={openTerminal} disabled={openState === 'opening'}>
