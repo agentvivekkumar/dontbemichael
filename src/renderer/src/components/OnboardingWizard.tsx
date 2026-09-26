@@ -472,6 +472,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       const config = await window.cth.getConfig();
       const next = await window.cth.updateConfig({
         onboardingComplete: true,
+        // A new office starts with per-member email already: no upgrade note
+        // (docs/designs/multi-mailbox.md, design 4A).
+        emailUpgradeNotice: 'dismissed',
         // The pack drives the starter cast. '__other__' is recorded as unset: no
         // pack applies, so Michael asks rather than silently picking one.
         businessType: businessType === OTHER_BUSINESS ? undefined : businessType,

@@ -1,3 +1,4 @@
+import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -54,7 +55,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'profile' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'capabilities' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -79,6 +80,9 @@ interface GHIssue {
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
+  // Michael follows Capabilities like everyone (docs/designs/multi-mailbox.md, E3);
+  // after ASK ME, which stays second on his panel (owner, 2026-09-25).
+  { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
   // Named like every other agent's tab (owner, 2026-09-25).
   { key: 'triggers', labelKey: 'sidebar.schedules', icon: 'clock' },
@@ -355,6 +359,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
           )
         )}
         {tab === 'profile' && <ProfileTab agent={agent} />}
+        {tab === 'capabilities' && <CapabilitiesTab agent={agent} />}
         {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}

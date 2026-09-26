@@ -1,3 +1,4 @@
+import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -293,6 +294,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
         {sidebarTab === 'profile' && (
           <ProfileTab agent={agent} />
+        )}
+
+        {sidebarTab === 'capabilities' && (
+          <CapabilitiesTab agent={agent} />
         )}
 
         {sidebarTab === 'messages' && (

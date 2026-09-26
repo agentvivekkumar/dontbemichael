@@ -347,6 +347,52 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
  *   3. wakes idle agents that have unread inbox messages so collaboration
  *      doesn't stall while an agent sits at its prompt.
  */
+/** Kill an agent's PTY and start it again on its prior CLI session (--resume),
+ *  in its worktree if it has one. Shared by the sleep revive and by
+ *  restart-on-enable for email (docs/designs/multi-mailbox.md, E2): the same
+ *  flow as the "Restart & Continue" button. */
+async function respawnResumed(a: Agent, ptyId: string): Promise<{ ok: boolean; error?: string }> {
+  const cfg = await window.cth.getConfig();
+  // Isolated agents run inside their worktree (a.cwd is the base repo); re-enter
+  // it if it still exists, else fall back to the base cwd, same as restoreTeam.
+  let cwd = a.cwd;
+  if (a.worktreePath && (await window.cth.gitIsRepo(a.worktreePath))) cwd = a.worktreePath;
+  await window.cth.killPty(ptyId);
+  // Soft-reset the pooled xterm in place (no-op if none): re-arm input and
+  // clear the stale frame so the revived TUI paints clean, like the button.
+  resetTerminal(ptyId);
+  const provider = inferAgentProvider(a.command, a.provider);
+  // Prefer the agent's exact recorded command (same model/flags); fall back to
+  // a rebuilt one only if it predates the persisted `command` field.
+  const command = (a.command ?? '').trim() || buildSpawnCommand(cfg, a.model, provider);
+  const [exe, ...args] = tokenizeCommand(command);
+  const hive = a.isGod
+    ? { id: a.id, name: a.name, cwd, provider, isGod: true, role: roleForHiveSpawn(a) }
+    : a.isAssistant
+    ? { id: a.id, name: a.name, cwd, provider, isAssistant: true, role: roleForHiveSpawn(a) }
+    : { id: a.id, name: a.name, cwd, provider, role: roleForHiveSpawn(a) };
+  // Spawn at the terminal's real grid so the TUI's absolute cursor moves land
+  // in the right cells (a size mismatch scatters the redraw).
+  const entry = acquireTerminal(ptyId);
+  let cols = 100, rows = 30;
+  try { entry.fit.fit(); cols = entry.term.cols; rows = entry.term.rows; } catch { /* host not sized yet */ }
+  return window.cth.spawnPty({
+    id: ptyId,
+    cwd,
+    command: exe,
+    provider,
+    args,
+    cols,
+    rows,
+    // The worktree (if any) already exists on disk: re-enter it, do NOT
+    // re-isolate (that conflicts on the existing path/branch).
+    isolate: false,
+    // Reattach the agent's prior session so no context is lost.
+    resume: true,
+    hive
+  });
+}
+
 export function useHive(config: HarnessConfig | null): void {
   // Per-agent dedup for the inbox-wake nudge: every inbox message id we have
   // already nudged this agent about. A SET, not a high-water mark.
@@ -1154,45 +1200,7 @@ export function useHive(config: HarnessConfig | null): void {
       const a = useStore.getState().agents.find((x) => x.ptyId === deadId);
       if (!a) return;
       try {
-        const cfg = await window.cth.getConfig();
-        // Isolated agents run inside their worktree (a.cwd is the base repo); re-enter
-        // it if it still exists, else fall back to the base cwd — same as restoreTeam.
-        let cwd = a.cwd;
-        if (a.worktreePath && (await window.cth.gitIsRepo(a.worktreePath))) cwd = a.worktreePath;
-        await window.cth.killPty(deadId);
-        // Soft-reset the pooled xterm in place (no-op if none): re-arm input and
-        // clear the stale frame so the revived TUI paints clean — like the button.
-        resetTerminal(deadId);
-        const provider = inferAgentProvider(a.command, a.provider);
-        // Prefer the agent's exact recorded command (same model/flags); fall back to
-        // a rebuilt one only if it predates the persisted `command` field.
-        const command = (a.command ?? '').trim() || buildSpawnCommand(cfg, a.model, provider);
-        const [exe, ...args] = tokenizeCommand(command);
-        const hive = a.isGod
-          ? { id: a.id, name: a.name, cwd, provider, isGod: true, role: roleForHiveSpawn(a) }
-          : a.isAssistant
-          ? { id: a.id, name: a.name, cwd, provider, isAssistant: true, role: roleForHiveSpawn(a) }
-          : { id: a.id, name: a.name, cwd, provider, role: roleForHiveSpawn(a) };
-        // Spawn at the terminal's real grid so the TUI's absolute cursor moves land
-        // in the right cells (a size mismatch scatters the redraw).
-        const entry = acquireTerminal(deadId);
-        let cols = 100, rows = 30;
-        try { entry.fit.fit(); cols = entry.term.cols; rows = entry.term.rows; } catch { /* host not sized yet */ }
-        const res = await window.cth.spawnPty({
-          id: deadId,
-          cwd,
-          command: exe,
-          provider,
-          args,
-          cols,
-          rows,
-          // The worktree (if any) already exists on disk — re-enter it, do NOT
-          // re-isolate (that conflicts on the existing path/branch).
-          isolate: false,
-          // Reattach the agent's prior session so no context is lost on revive.
-          resume: true,
-          hive
-        });
+        const res = await respawnResumed(a, deadId);
         if (res.ok) {
           reviving.current[deadId] = Date.now(); // re-stamp so the debounce covers the spawn
           useStore.getState().updateAgent(a.id, { status: 'idle', action: 'revived after sleep' });
@@ -1211,5 +1219,39 @@ export function useHive(config: HarnessConfig | null): void {
       if (!dead.length) return; // healthy wake — nothing wedged, no-op
       for (const id of dead) void revive(id);
     });
+  }, [config?.onboardingComplete]);
+
+  // 8) Restart on enable (docs/designs/multi-mailbox.md, E2 + E5). Claude Code
+  //    picks up the md-mail tools only at start, so turning email on for a
+  //    running agent queues a restart. It waits until the agent is not mid-step,
+  //    then restarts with Restart & Continue (same conversation). After 10
+  //    minutes still busy it restarts anyway and says so on the floor.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const CEILING_MS = 10 * 60_000;
+    const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
+    const inFlight = new Set<string>();
+    const tick = (): void => {
+      const { pendingEmailRestart, agents, setPendingEmailRestart, updateAgent } = useStore.getState();
+      for (const [agentId, queuedAt] of Object.entries(pendingEmailRestart)) {
+        if (inFlight.has(agentId)) continue;
+        const a = agents.find((x) => x.id === agentId);
+        if (!a || !a.ptyId) { setPendingEmailRestart(agentId, undefined); continue; } // not running: the next start attaches mail
+        const overdue = Date.now() - queuedAt >= CEILING_MS;
+        if (BUSY.has(a.status) && !overdue) continue;
+        inFlight.add(agentId);
+        void respawnResumed(a, a.ptyId).then((res) => {
+          if (res.ok) {
+            setPendingEmailRestart(agentId, undefined);
+            updateAgent(agentId, { status: 'idle', action: overdue ? 'restarted after 10 minutes to turn on email' : 'restarted to turn on email' });
+          } else {
+            console.error('[email] restart failed for', agentId, res.error);
+          }
+        }).catch((e) => console.error('[email] restart threw for', agentId, e))
+          .finally(() => inFlight.delete(agentId));
+      }
+    };
+    const iv = setInterval(tick, 5_000);
+    return () => clearInterval(iv);
   }, [config?.onboardingComplete]);
 }

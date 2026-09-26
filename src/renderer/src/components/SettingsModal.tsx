@@ -1,3 +1,4 @@
+import { MailboxesSettings } from './MailboxesSettings';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { agentModels, type HarnessConfig } from '@/store/config';
@@ -1634,6 +1635,12 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       {/* Connected-services registry (generic, registry-driven).
                           Leads the section; the hardcoded Slack/Webhook/Free Flow
                           blocks below stay as-is. */}
+                      {/* Mailboxes first: the Team email switch and every connected
+                          mailbox (docs/designs/multi-mailbox.md, design 1A, 2A). */}
+                      <MailboxesSettings />
+
+                      <div style={sectionRule} />
+
                       <IntegrationsRegistry />
 
                       <div style={sectionRule} />
