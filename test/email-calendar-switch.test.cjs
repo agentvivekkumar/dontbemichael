@@ -75,41 +75,15 @@ test('with the switch off, an agent reading Gmail is refused through the hook', 
   assert.ok(f.sent.some((s) => s.c === 'control:approvalRequest' && s.p.agentId === 'pam'), 'the floor hears about it');
 });
 
-test('with the switch on, an agent with the Claude account mailbox reads Gmail; calendar and other tools never change', async (t) => {
-  // E3 (eng review): switch on alone no longer allows Gmail; the agent needs the
-  // Claude account mailbox in its Capabilities.
-  const on = await floor(t, {
-    mcpDefaults: { 'email-calendar': { enabled: true } },
-    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['claude-account'], send: true } } }
-  });
+test('with the switch on, every agent uses the Claude account Gmail and Calendar, no Capabilities needed (owner, 2026-09-26)', async (t) => {
+  const on = await floor(t, { mcpDefaults: { 'email-calendar': { enabled: true } } });
   assert.ok(!denied(await on.call('mcp__claude_ai_Gmail__search_threads')));
   assert.ok(!denied(await on.call('mcp__claude_ai_Gmail__send_message')));
-  assert.ok(!denied(await on.call('mcp__claude_ai_Google_Calendar__list_events')), 'calendar stays under the switch alone');
+  assert.ok(!denied(await on.call('mcp__claude_ai_Gmail__search_threads', 'god')), 'Michael too');
+  assert.ok(!denied(await on.call('mcp__claude_ai_Google_Calendar__list_events')));
   const off = await floor(t, {});
-  assert.ok(!denied(await off.call('mcp__claude_ai_Mailchimp__list_campaigns')));
-});
-
-test('switch on but no Capabilities: Gmail refused for team agents and Michael alike (E3)', async (t) => {
-  const f = await floor(t, { mcpDefaults: { 'email-calendar': { enabled: true } } });
-  const r = await f.call('mcp__claude_ai_Gmail__search_threads');
-  assert.ok(denied(r));
-  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Capabilities/);
-  assert.ok(denied(await f.call('mcp__claude_ai_Gmail__search_threads', 'god')), 'Michael follows Capabilities too');
-  assert.ok(denied(await f.call('mcp__claude_ai_Gmail__some_future_tool')), 'a tool added later under the prefix is gated (F-5)');
-});
-
-test('Draft only allows drafts but refuses send, reply and forward on the Claude account Gmail', async (t) => {
-  const f = await floor(t, {
-    mcpDefaults: { 'email-calendar': { enabled: true } },
-    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['claude-account'], send: false } } }
-  });
-  assert.ok(!denied(await f.call('mcp__claude_ai_Gmail__create_draft')));
-  assert.ok(!denied(await f.call('mcp__claude_ai_Gmail__get_thread')));
-  for (const tool of ['send_message', 'reply', 'forward']) {
-    const r = await f.call(`mcp__claude_ai_Gmail__${tool}`);
-    assert.ok(denied(r), tool);
-    assert.match(r.hookSpecificOutput.permissionDecisionReason, /Draft only/);
-  }
+  assert.ok(!denied(await off.call('mcp__claude_ai_Mailchimp__list_campaigns')), 'other tools never change');
+  assert.ok(denied(await off.call('mcp__claude_ai_Gmail__some_future_tool')), 'a tool added later under the prefix is gated (F-5)');
 });
 
 test('md-mail calls are checked against the named mailbox', async (t) => {
@@ -128,7 +102,7 @@ test('md-mail calls are checked against the named mailbox', async (t) => {
 test('the switch governs only the Claude account connector: md-mail mailboxes follow Capabilities alone', async (t) => {
   const f = await floor(t, {
     mailboxes: [{ id: 'sales', address: 'sales@x.com', provider: 'gmail', imap: { host: 'h', port: 993, secure: true }, smtp: { host: 'h', port: 465, secure: true }, status: 'connected', createdAt: 1, updatedAt: 1 }],
-    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['sales', 'claude-account'], send: true } } }
+    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['sales'], send: true } } }
   });
   const call = (tool, input) => f.server.handle({ agent_id: 'pam', session_id: 's1', hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, cwd: f.home });
   assert.ok(!denied(await call('mcp__md-mail__search', { mailbox: 'sales' })), 'switch off, added mailbox still works');

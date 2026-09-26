@@ -48,7 +48,7 @@ import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
 import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
-import { CLAUDE_ACCOUNT_MAILBOX, claudeAccountMailOp, mailAccess, type MailOp } from '../shared/mailboxes';
+import { mailAccess, type MailOp } from '../shared/mailboxes';
 import { handoffContext } from '../shared/safeClear';
 
 /** Why a mail or calendar tool was refused. Read by the agent (and shown on the
@@ -349,26 +349,20 @@ export class HookServer {
     if (event === 'PreToolUse' && agentId && (isEmailCalendarTool(p.tool_name ?? '') || /^mcp__md-mail__/.test(p.tool_name ?? ''))) {
       const cfg = this.getConfig();
       let reason: string | undefined;
-      if (isEmailCalendarTool(p.tool_name ?? '') && !emailCalendarAllowed(cfg.mcpDefaults)) {
-        reason = EMAIL_CALENDAR_OFF;
+      const tool = p.tool_name ?? '';
+      const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(tool);
+      if (!mdMail) {
+        // The Claude account's Gmail and Calendar: the Settings switch alone,
+        // for every agent alike (owner, 2026-09-26).
+        if (!emailCalendarAllowed(cfg.mcpDefaults)) reason = EMAIL_CALENDAR_OFF;
       } else {
-        // Team email is on: mail tools also need the agent's Capabilities (MB-3,
-        // eng E3). The Claude account Gmail is the "Claude account" mailbox;
-        // md-mail names its mailbox in the call (the broker checks it again).
-        // Calendar tools stay under the master switch alone.
-        const tool = p.tool_name ?? '';
-        const claudeOp = claudeAccountMailOp(tool);
-        const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(tool);
-        if (claudeOp) {
-          const d = mailAccess(cfg, agentId, CLAUDE_ACCOUNT_MAILBOX, claudeOp);
-          if (!d.ok) reason = d.reason;
-        } else if (mdMail) {
-          const ops: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
-          const op = ops[mdMail[1]];
-          const input = (p.tool_input ?? {}) as { mailbox?: unknown };
-          const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
-          if (!d.ok) reason = d.reason;
-        }
+        // Mailboxes added in Settings: the agent's Capabilities for the mailbox
+        // named in the call (the broker checks it again).
+        const ops: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
+        const op = ops[mdMail[1]];
+        const input = (p.tool_input ?? {}) as { mailbox?: unknown };
+        const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
+        if (!d.ok) reason = d.reason;
       }
       if (reason) {
         this.emitControl(agentId, p.tool_name, reason);

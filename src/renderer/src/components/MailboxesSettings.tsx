@@ -5,15 +5,16 @@ import { Toggle, MiniButton } from './triggers/ui';
 import { AddMailboxDialog } from './AddMailboxDialog';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore } from '@/store/store';
-import { CLAUDE_ACCOUNT_MAILBOX, PROVIDER_PRESETS, teamEmailOn, type MailboxRecord } from '@shared/mailboxes';
+import { PROVIDER_PRESETS, teamEmailOn, type MailboxRecord } from '@shared/mailboxes';
 
 /**
  * Settings > Connections > Mailboxes (docs/designs/multi-mailbox.md, design
  * review D-T1). One line per mailbox: address, service, who uses it, status,
  * then Fix or Edit; Add a mailbox sits top right. The last line is the owner's
  * Claude account, and it alone carries an on/off switch (the old Email &
- * Calendar switch): it governs only the email and calendar connected in
- * Claude, never the mailboxes added here (owner, 2026-09-26). Status is always
+ * Calendar switch): allowed lets every agent use the email and calendar
+ * connected in Claude, blocked stops everyone. It is not per agent and never
+ * touches the mailboxes added here (owner, 2026-09-26). Status is always
  * a word as well as a colour (DESIGN.md 3.4). Removing a mailbox names who
  * loses it (design 8A).
  */
@@ -108,11 +109,7 @@ export function MailboxesSettings() {
       <div style={{ ...row }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>{t('mailboxes.claudeAccount')}</div>
-          <div style={hint}>
-            {t('mailboxes.claudeAccountSub')}
-            {' · '}
-            {usersOf(CLAUDE_ACCOUNT_MAILBOX).length ? t('mailboxes.usedBy', { names: list(usersOf(CLAUDE_ACCOUNT_MAILBOX)) }) : t('mailboxes.usedByNobody')}
-          </div>
+          <div style={hint}>{t('mailboxes.claudeAccountSub')}</div>
           <div style={hint}>{t('mailboxes.claudeAccessDesc')}</div>
         </div>
         <Toggle on={teamOn} label={t('mailboxes.claudeAccessLabel')} onLabel={t('mailboxes.claudeAccessOn')} offLabel={t('mailboxes.claudeAccessOff')} onClick={() => { void setTeam(!teamOn); }} />

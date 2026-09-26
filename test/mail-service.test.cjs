@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { mailAccess, agentMailboxes, claudeAccountMailOp, emailJustEnabled, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
+const { mailAccess, agentMailboxes, emailJustEnabled, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
 const { MailService, handleMailRequest, classifyMailError } = loadTs('src/main/mail.ts');
 
 const server = { host: 'h', port: 993, secure: true };
@@ -22,7 +22,7 @@ function cfg(over = {}) {
     mailboxes: [box('sales', 'sales@x.com'), box('ceo', 'ceo@x.com', 'icloud')],
     agentCapabilities: {
       dwight: { email: { enabled: true, mailboxes: ['sales'], send: true } },
-      pam: { email: { enabled: true, mailboxes: ['ceo', 'claude-account'], send: false } }
+      pam: { email: { enabled: true, mailboxes: ['ceo'], send: false } }
     },
     ...over
   };
@@ -74,26 +74,17 @@ function setup(over = {}) {
 
 test('mailAccess: the one rule, in order', () => {
   const c = cfg();
-  // The Claude account switch governs only the Claude account mailbox (owner, 2026-09-26).
-  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'dwight', 'sales', 'read').ok, true, 'switch off does not touch added mailboxes');
-  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'pam', 'claude-account', 'read').ok, false, 'switch off blocks the Claude account');
+  // The Claude account switch does not touch added mailboxes (owner, 2026-09-26).
+  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'dwight', 'sales', 'read').ok, true);
+  assert.equal(mailAccess(c, 'pam', 'claude-account', 'read').ok, false, 'the Claude account is not a capability');
   assert.equal(mailAccess(c, 'kelly', 'sales', 'read').ok, false, 'no email capability');
   assert.equal(mailAccess(c, 'dwight', 'ceo', 'read').ok, false, 'not his mailbox');
   assert.equal(mailAccess(c, 'dwight', 'sales', 'send').ok, true);
   assert.equal(mailAccess(c, 'pam', 'ceo', 'send').ok, false, 'Draft only');
   assert.equal(mailAccess(c, 'pam', 'ceo', 'draft').ok, true);
-  assert.equal(mailAccess(c, 'pam', 'claude-account', 'read').ok, true);
   assert.equal(mailAccess({ ...c, mailboxes: [] }, 'dwight', 'sales', 'read').ok, false, 'removed in Settings');
   assert.equal(mailAccess(c, 'dwight', undefined, 'list').ok, true);
-  assert.deepEqual(agentMailboxes(c, 'pam'), ['ceo', 'claude-account']);
-});
-
-test('Claude account Gmail tools map to read, draft and send', () => {
-  assert.equal(claudeAccountMailOp('mcp__claude_ai_Gmail__search_threads'), 'read');
-  assert.equal(claudeAccountMailOp('mcp__claude_ai_Gmail__create_draft'), 'draft');
-  for (const t of ['send_message', 'reply', 'forward']) assert.equal(claudeAccountMailOp(`mcp__claude_ai_Gmail__${t}`), 'send');
-  assert.equal(claudeAccountMailOp('mcp__claude_ai_Google_Calendar__list_events'), null);
-  assert.equal(claudeAccountMailOp('mcp__md-mail__send'), null);
+  assert.deepEqual(agentMailboxes({ ...c, agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['ceo', 'claude-account'], send: false } } } }, 'pam'), ['ceo'], 'unknown ids dropped');
 });
 
 test('helpers: first enable, ids, Microsoft addresses', () => {
@@ -109,7 +100,7 @@ test('list_mailboxes shows only the agent\'s own mailboxes and its sending right
   const { call } = setup();
   const r = await call('pam', 'list_mailboxes', {});
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.mailboxes.map((m) => m.mailbox), ['ceo', 'claude-account']);
+  assert.deepEqual(r.body.mailboxes.map((m) => m.mailbox), ['ceo']);
   assert.equal(r.body.sending, 'draft only');
   assert.equal((await call('kelly', 'list_mailboxes', {})).status, 403);
 });

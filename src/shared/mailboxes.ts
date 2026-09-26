@@ -11,10 +11,6 @@
  * PreToolUse hook for the Claude account mailbox.
  */
 
-/** The owner's Claude account connector, listed as a mailbox but set up in
- *  Claude, not here. It has no record and no secret. */
-export const CLAUDE_ACCOUNT_MAILBOX = 'claude-account';
-
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
 
 export interface MailServer {
@@ -42,7 +38,7 @@ export interface MailboxRecord {
 export interface EmailCapability {
   /** "Can check email". */
   enabled: boolean;
-  /** Mailbox ids this agent may use; may include CLAUDE_ACCOUNT_MAILBOX. */
+  /** Mailbox ids (added in Settings) this agent may use. */
   mailboxes: string[];
   /** true = Can send; false = Draft only. */
   send: boolean;
@@ -122,10 +118,9 @@ export type MailAccessResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * The one access rule (MB-3, E3). Refuses unless: the agent has "Can check
- * email"; the mailbox is one of its mailboxes and still exists; for the Claude
- * account mailbox, the owner's Claude account switch is on; and, to send, the
- * agent is not Draft only. Michael follows the same rule. `list` needs only
- * "Can check email": it returns the agent's own mailboxes.
+ * email"; the mailbox is one of its mailboxes and still exists in Settings;
+ * and, to send, the agent is not Draft only. Michael follows the same rule.
+ * `list` needs only "Can check email": it returns the agent's own mailboxes.
  * Refusal reasons are read by the agent (and shown on the floor), so they say
  * what happened and what to do.
  */
@@ -138,10 +133,7 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
   if (!mailboxId || !email.mailboxes.includes(mailboxId)) {
     return { ok: false, reason: `The owner has not given you the mailbox "${mailboxId ?? ''}". Use list_mailboxes to see yours.` };
   }
-  if (mailboxId === CLAUDE_ACCOUNT_MAILBOX && !teamEmailOn(cfg.mcpDefaults)) {
-    return { ok: false, reason: 'The owner has turned off email through their Claude account in Settings. Use one of your other mailboxes, or tell Michael if the task needs it.' };
-  }
-  if (mailboxId !== CLAUDE_ACCOUNT_MAILBOX && !(cfg.mailboxes ?? []).some((m) => m.id === mailboxId)) {
+  if (!(cfg.mailboxes ?? []).some((m) => m.id === mailboxId)) {
     return { ok: false, reason: `The mailbox "${mailboxId}" was removed in Settings.` };
   }
   if (op === 'send' && !email.send) {
@@ -154,20 +146,8 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
 export function agentMailboxes(cfg: MailAccessConfig, agentId: string): string[] {
   const email = cfg.agentCapabilities?.[agentId]?.email;
   if (!email?.enabled) return [];
-  const known = new Set([CLAUDE_ACCOUNT_MAILBOX, ...(cfg.mailboxes ?? []).map((m) => m.id)]);
+  const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
   return email.mailboxes.filter((id) => known.has(id));
-}
-
-/** Tools of the owner's Claude account Gmail connector. Calendar tools and this
- *  app's own md-mail server are not included: calendar stays under the master
- *  switch alone, and md-mail is checked by the broker. */
-export function claudeAccountMailOp(toolName: string): MailOp | null {
-  const m = /^mcp__claude_ai_(Gmail|Outlook)__(.+)$/.exec(toolName);
-  if (!m) return null;
-  const tool = m[2].toLowerCase();
-  if (/(^|_)(send|reply|forward)/.test(tool)) return 'send';
-  if (/draft/.test(tool)) return 'draft';
-  return 'read';
 }
 
 /** True when the email capability changed from off to on (E2: that needs a
@@ -183,7 +163,7 @@ export function mailboxIdFor(address: string, taken: string[] = []): string {
   const base = address.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'mailbox';
   let id = SLUG_RE.test(base) ? base : `mb-${base}`.slice(0, 40).replace(/-+$/, '');
   let n = 2;
-  while (taken.includes(id) || id === CLAUDE_ACCOUNT_MAILBOX) id = `${base.slice(0, 36)}-${n++}`;
+  while (taken.includes(id)) id = `${base.slice(0, 36)}-${n++}`;
   return id;
 }
 

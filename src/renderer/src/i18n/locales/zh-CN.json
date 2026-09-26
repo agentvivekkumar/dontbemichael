@@ -1702,7 +1702,7 @@
     "claudeAccessLabel": "团队成员可以使用你 Claude 账户中的邮件和日历",
     "claudeAccessOn": "允许",
     "claudeAccessOff": "阻止",
-    "claudeAccessDesc": "允许后，权限中包含它的团队成员可以使用你 Claude 账户连接的 Gmail 和 Google 日历。阻止则所有人都不能使用。在这里添加的邮箱不受影响。"
+    "claudeAccessDesc": "允许后，每位团队成员都可以使用你 Claude 账户连接的 Gmail 和 Google 日历。阻止则所有人都不能使用。上面的邮箱是分开的：在团队成员的“权限”标签中分配。"
   },
   "capabilities": {
     "tab": "权限",
@@ -1719,7 +1719,6 @@
     "noMailboxes": "还没有可选择的邮箱。",
     "addInSettings": "在设置中添加。",
     "saveFailed": "没有保存成功，请重试。",
-    "mailboxToggle": "{{name}} 可以使用 {{address}}",
-    "claudeOff": "已在设置中对整个团队阻止"
+    "mailboxToggle": "{{name}} 可以使用 {{address}}"
   }
 }

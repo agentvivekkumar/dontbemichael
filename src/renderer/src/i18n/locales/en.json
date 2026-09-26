@@ -1702,7 +1702,7 @@
     "claudeAccessLabel": "Team members can use the email and calendar in your Claude account",
     "claudeAccessOn": "allowed",
     "claudeAccessOff": "blocked",
-    "claudeAccessDesc": "Allowed lets team members use the Gmail and Google Calendar connected to your Claude account, if their Capabilities include it. Blocked stops everyone. Mailboxes you add here are not affected."
+    "claudeAccessDesc": "Allowed lets every team member use the Gmail and Google Calendar connected to your Claude account. Blocked stops everyone. The mailboxes above are separate: give them to team members on their Capabilities tab."
   },
   "capabilities": {
     "tab": "Capabilities",
@@ -1719,7 +1719,6 @@
     "noMailboxes": "No mailboxes to choose from yet.",
     "addInSettings": "Add one in Settings.",
     "saveFailed": "Didn't save. Try again.",
-    "mailboxToggle": "{{name}} can use {{address}}",
-    "claudeOff": "blocked in Settings for the whole team"
+    "mailboxToggle": "{{name}} can use {{address}}"
   }
 }

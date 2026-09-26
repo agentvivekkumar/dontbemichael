@@ -22,7 +22,6 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import { simpleParser } from 'mailparser';
 import {
   agentMailboxes,
-  CLAUDE_ACCOUNT_MAILBOX,
   isMicrosoftAddress,
   mailAccess,
   mailboxIdFor,
@@ -454,16 +453,11 @@ export async function handleMailRequest(svc: MailService, deps: Pick<MailDeps, '
       body: {
         mailboxes: agentMailboxes(cfg, agentId).map((mid) => {
           const r = recs.find((m) => m.id === mid);
-          return mid === CLAUDE_ACCOUNT_MAILBOX
-            ? { mailbox: mid, address: 'your Claude account Gmail', note: 'Use the Gmail tools for this one, not md-mail.' }
-            : { mailbox: mid, address: r?.address, status: r?.status };
+          return { mailbox: mid, address: r?.address, status: r?.status };
         }),
         sending: email?.send ? 'can send' : 'draft only'
       }
     };
-  }
-  if (mailbox === CLAUDE_ACCOUNT_MAILBOX) {
-    return { status: 400, body: { error: 'Your Claude account mailbox is used through the Gmail tools, not md-mail.' } };
   }
 
   // MB-8: forwards and attachments only by reference, and only from the mailbox
@@ -570,7 +564,7 @@ export function removeMailbox(svc: MailService, admin: MailAdminDeps, id: string
  *  whether email just turned on (E2: that agent needs a restart to get md-mail). */
 export function setAgentCapabilities(admin: MailAdminDeps, agentId: string, next: { email?: { enabled: boolean; mailboxes: string[]; send: boolean } }): { ok: true; restartNeeded: boolean } {
   const cfg = admin.getConfig();
-  const known = new Set([CLAUDE_ACCOUNT_MAILBOX, ...(cfg.mailboxes ?? []).map((m) => m.id)]);
+  const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
   const before = cfg.agentCapabilities?.[agentId];
   const email = next.email
     ? { enabled: !!next.email.enabled, mailboxes: [...new Set(next.email.mailboxes.filter((m) => known.has(m)))], send: !!next.email.send }

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Toggle } from './triggers/ui';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
-import { CLAUDE_ACCOUNT_MAILBOX, PROVIDER_PRESETS, teamEmailOn, type EmailCapability } from '@shared/mailboxes';
+import { PROVIDER_PRESETS, type EmailCapability } from '@shared/mailboxes';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 /**
@@ -28,7 +28,6 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   if (!config) return null;
   const mailboxes = config.mailboxes ?? [];
   const email: EmailCapability = config.agentCapabilities?.[agent.id]?.email ?? { enabled: false, mailboxes: [], send: false };
-  const teamOn = teamEmailOn(config.mcpDefaults);
 
   const save = async (next: EmailCapability): Promise<void> => {
     setFailed(false);
@@ -60,9 +59,9 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   };
 
   const rows: Array<{ id: string; label: string; sub: string }> = [
-    ...mailboxes.map((m) => ({ id: m.id, label: m.address, sub: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '') })),
-    // The Claude account switch in Settings governs only this row (owner, 2026-09-26).
-    { id: CLAUDE_ACCOUNT_MAILBOX, label: t('mailboxes.claudeAccount'), sub: t('mailboxes.claudeAccountSub') + (teamOn ? '' : ` · ${t('capabilities.claudeOff')}`) }
+    // Only mailboxes added in Settings. The Claude account's Gmail is not a
+    // capability: one Settings switch covers every agent (owner, 2026-09-26).
+    ...mailboxes.map((m) => ({ id: m.id, label: m.address, sub: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '') }))
   ];
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };

@@ -1082,6 +1082,9 @@ None.
   +====================================================================+
 ```
 
+### Change after the design review (owner, 2026-09-26): the Claude account is not a capability
+The Gmail and Calendar connected to the owner's Claude account are removed from Capabilities everywhere. The Settings switch on the "Your Claude account" line alone decides: allowed lets every agent use them (the behavior before this feature), blocked stops everyone. Capabilities cover only mailboxes added in Settings. This supersedes eng E3's Claude-account part (Michael and team members now follow the switch alike) and the Draft only rule for the Claude account Gmail.
+
 ### Change after the design review (owner, 2026-09-26): no upgrade card
 Design decision 4A is withdrawn. Email being per team member is not a problem to raise, so Michael puts no card on Ask me about it. Startup clears the card if an earlier build of this branch added it.
 
