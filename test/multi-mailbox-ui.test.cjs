@@ -47,9 +47,10 @@ test('removing a used mailbox names who loses it (8A)', () => {
   assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /t\('mailboxes\.removeAffects', \{ names: list\(users\) \}\)/);
 });
 
-test('a new office is marked so it never gets the upgrade note (4A)', () => {
-  assert.match(read('src/renderer/src/components/OnboardingWizard.tsx'), /emailUpgradeNotice: 'dismissed'/);
-  assert.match(read('src/main/index.ts'), /if \(!cfg\.onboardingComplete \|\| cfg\.emailUpgradeNotice \|\| cfg\.agentCapabilities\) return;/);
+test('no Ask me card announces per-member email (owner, 2026-09-26); an old one is cleared', () => {
+  const main = read('src/main/index.ts');
+  assert.doesNotMatch(main, /Email is now set per team member/);
+  assert.match(main, /hive\.deleteTask\('email-per-team-member'\)/);
 });
 
 test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () => {

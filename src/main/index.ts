@@ -486,23 +486,10 @@ const mailAdmin = {
   deleteSecret: (ref: string) => integrations.deleteSecret(ref)
 };
 
-/** Design review 4A: an office that existed before email became per team member
- *  gets one Ask me card saying so. Fresh setups are marked at onboarding. */
-function maybeRaiseEmailNotice(): void {
-  try {
-    const cfg = readConfig();
-    if (!cfg.onboardingComplete || cfg.emailUpgradeNotice || cfg.agentCapabilities) return;
-    hive.addTask({
-      id: 'email-per-team-member',
-      title: 'Email is now set per team member',
-      status: 'blocked',
-      dependsOn: [],
-      priority: 1,
-      createdAt: new Date().toISOString(),
-      humanQA: [{ q: '**Email is now set per team member. Nobody has email until you turn it on.**\n\nOpen Settings, Connections, Mailboxes to add your mailboxes, then give each team member theirs on their Capabilities tab.', askedAt: new Date().toISOString(), raisedBy: 'god' }]
-    });
-    writeConfig({ emailUpgradeNotice: 'pending' });
-  } catch (e) { console.error('[mail] upgrade notice:', e); }
+/** Owner, 2026-09-26: email being per team member is not something to raise on
+ *  Ask me. Clear the card an earlier build of this branch may have added. */
+function clearEmailNoticeCard(): void {
+  try { hive.deleteTask('email-per-team-member'); } catch { /* not there */ }
 }
 
 /** BYOK backend model-providers whose API keys the non-Claude CLI engines
@@ -5578,7 +5565,7 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
-  maybeRaiseEmailNotice();
+  clearEmailNoticeCard();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
   hive.setRuntimeInfo({ version: app.getVersion(), packaged: app.isPackaged, appPath: app.getAppPath() });

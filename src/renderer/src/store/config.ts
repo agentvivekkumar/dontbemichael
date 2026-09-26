@@ -112,9 +112,6 @@ export interface HarnessConfig {
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
-  /** Design review 4A: one Ask me card after the update that made email per
-   *  team member. Set when the card is due; cleared when it is dismissed. */
-  emailUpgradeNotice?: 'pending' | 'dismissed';
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];

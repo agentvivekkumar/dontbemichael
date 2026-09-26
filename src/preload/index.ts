@@ -291,7 +291,6 @@ export interface HarnessConfig {
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
-  emailUpgradeNotice?: 'pending' | 'dismissed';
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
