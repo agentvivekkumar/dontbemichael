@@ -1,4 +1,4 @@
-- **Every agent has its own schedules.** Changes wait for your approval in Ask me.
-- **You talk to your team through Michael,** or 1:1 from the bar under a terminal.
-- **Profile and Memory tabs on every agent.** The job, the folder, and memory that reads like notes.
-- **Messages read like a history,** grouped by day.
+- **Every agent has its own schedules,** approved by you in Ask me.
+- **You talk to your team through Michael,** or 1:1.
+- **Profile and Memory tabs on every agent.**
+- **Messages read like a history.**
