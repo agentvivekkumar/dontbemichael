@@ -1,23 +1,22 @@
-# Don't Be Michael v0.0.5
+# Don't Be Michael v0.0.6
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.0.5
+## What's new in 0.0.6
 
-- **Every agent has its own schedules.** Each agent's panel has a Schedules tab for its own jobs, with the next run on its card. An agent can ask for a schedule change, and nothing changes until you approve it in Ask me.
-- **You talk to your team through Michael.** A team member's terminal is watch only unless you take them 1:1 from the bar under it. If one gets stuck on a prompt, Michael tells you on Ask me. Only Michael sends desktop notifications.
-- **Every agent has a Profile and a Memory tab.** The Profile shows the job, what the agent does, what it asks you first and its folder. Memory reads like notes, grouped and dated, with procedures you can open.
-- **The Messages tab reads like a history,** grouped by day, with closing time and scheduled runs counted on one line.
+- **Setup fills in your legal name.** Step 2 starts it from the business name you gave on step 1, and follows a rename until you type your own.
+- **Setup marks every required field.** Business name and your kind of business now carry a *, and the business tiles light up when you press Next without picking one.
+- **Reset and Restart closes cleanly,** with no error on the way out.
 
 ## Download
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.5-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.5-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.6-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.6-mac-universal.dmg) |
 
 This release is for Mac only. Windows and Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.5.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.5.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.6.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.6.tar.gz)
 
 ## Installing on your Mac
 

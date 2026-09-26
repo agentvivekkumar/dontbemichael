@@ -1,4 +1,3 @@
-- **Every agent has its own schedules,** approved by you in Ask me.
-- **You talk to your team through Michael,** or 1:1.
-- **Profile and Memory tabs on every agent.**
-- **Messages read like a history.**
+- **Setup fills in your legal name** from your business name. You can still change it.
+- **Setup marks every required field,** including your kind of business, and highlights what is missing.
+- **Reset and Restart closes cleanly,** with no error on the way out.
