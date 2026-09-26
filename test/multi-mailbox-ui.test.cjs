@@ -26,11 +26,12 @@ test('Capabilities is the tab after Profile, for team members and for Michael', 
   assert.match(cc, /tab === 'capabilities' && <CapabilitiesTab agent=\{agent\} \/>/);
 });
 
-test('Mailboxes leads Connections; Team email is its first line; the server list no longer carries it', () => {
+test('Mailboxes leads Connections; the Claude account row alone carries the switch; the server list no longer does', () => {
   const settings = read('src/renderer/src/components/SettingsModal.tsx');
   assert.ok(settings.indexOf('<MailboxesSettings />') < settings.indexOf('<IntegrationsRegistry />'));
   const mb = read('src/renderer/src/components/MailboxesSettings.tsx');
-  assert.ok(mb.indexOf("t('mailboxes.teamEmail')") < mb.indexOf('mailboxes.map('), 'switch before the list');
+  assert.ok(mb.indexOf("t('mailboxes.claudeAccessLabel')") > mb.indexOf("t('mailboxes.claudeAccount')"), 'switch sits on the Claude account row');
+  assert.equal((mb.match(/<Toggle /g) || []).length, 1, 'only one switch on the screen');
   assert.match(mb, /'email-calendar': \{ enabled: on \}/, 'writes the same master switch');
   assert.match(read('src/renderer/src/components/McpDefaultsSettings.tsx'), /e\.id !== 'email-calendar'/);
 });

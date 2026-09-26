@@ -1082,6 +1082,9 @@ None.
   +====================================================================+
 ```
 
+### Change after the design review (owner, 2026-09-26)
+The on/off switch governs only email and calendar through the owner's Claude account. It moved from the top of Mailboxes onto the "Your Claude account" row, labelled "Team members can use the email and calendar in your Claude account" (allowed / blocked), with the line "Mailboxes you add here are not affected." Mailboxes added in Settings depend on each agent's Capabilities alone. This replaces design decision 1A's placement; the Capabilities tab shows "blocked in Settings for the whole team" on the Claude account row only, instead of a banner.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |

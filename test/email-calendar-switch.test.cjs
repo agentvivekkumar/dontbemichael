@@ -69,7 +69,7 @@ test('with the switch off, an agent reading Gmail is refused through the hook', 
   const f = await floor(t, {});
   const r = await f.call('mcp__claude_ai_Gmail__search_threads');
   assert.ok(denied(r));
-  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Email & Calendar/);
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /through their Claude account/);
   assert.ok(denied(await f.call('mcp__claude_ai_Google_Calendar__list_events')));
   assert.ok(denied(await f.call('mcp__claude_ai_Gmail__search_threads', 'god')), 'Michael too');
   assert.ok(f.sent.some((s) => s.c === 'control:approvalRequest' && s.p.agentId === 'pam'), 'the floor hears about it');
@@ -123,4 +123,14 @@ test('md-mail calls are checked against the named mailbox', async (t) => {
   assert.ok(!denied(await call('mcp__md-mail__search', { mailbox: 'sales' })));
   assert.ok(denied(await call('mcp__md-mail__search', { mailbox: 'ceo' })));
   assert.ok(denied(await call('mcp__md-mail__send', { mailbox: 'sales' })), 'Draft only');
+});
+
+test('the switch governs only the Claude account connector: md-mail mailboxes follow Capabilities alone', async (t) => {
+  const f = await floor(t, {
+    mailboxes: [{ id: 'sales', address: 'sales@x.com', provider: 'gmail', imap: { host: 'h', port: 993, secure: true }, smtp: { host: 'h', port: 465, secure: true }, status: 'connected', createdAt: 1, updatedAt: 1 }],
+    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['sales', 'claude-account'], send: true } } }
+  });
+  const call = (tool, input) => f.server.handle({ agent_id: 'pam', session_id: 's1', hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, cwd: f.home });
+  assert.ok(!denied(await call('mcp__md-mail__search', { mailbox: 'sales' })), 'switch off, added mailbox still works');
+  assert.ok(denied(await call('mcp__claude_ai_Gmail__search_threads', {})), 'switch off, Claude account blocked');
 });

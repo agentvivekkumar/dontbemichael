@@ -74,7 +74,9 @@ function setup(over = {}) {
 
 test('mailAccess: the one rule, in order', () => {
   const c = cfg();
-  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'dwight', 'sales', 'read').ok, false, 'Team email off');
+  // The Claude account switch governs only the Claude account mailbox (owner, 2026-09-26).
+  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'dwight', 'sales', 'read').ok, true, 'switch off does not touch added mailboxes');
+  assert.equal(mailAccess({ ...c, mcpDefaults: {} }, 'pam', 'claude-account', 'read').ok, false, 'switch off blocks the Claude account');
   assert.equal(mailAccess(c, 'kelly', 'sales', 'read').ok, false, 'no email capability');
   assert.equal(mailAccess(c, 'dwight', 'ceo', 'read').ok, false, 'not his mailbox');
   assert.equal(mailAccess(c, 'dwight', 'sales', 'send').ok, true);

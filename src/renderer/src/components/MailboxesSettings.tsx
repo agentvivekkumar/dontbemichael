@@ -9,11 +9,13 @@ import { CLAUDE_ACCOUNT_MAILBOX, PROVIDER_PRESETS, teamEmailOn, type MailboxReco
 
 /**
  * Settings > Connections > Mailboxes (docs/designs/multi-mailbox.md, design
- * review D-T1). Order (design 2A): the Team email switch (design 1A, the old
- * Email & Calendar switch), then one line per mailbox: address, service, who
- * uses it, status, then Fix or Edit. Add a mailbox sits top right. Status is
- * always a word as well as a colour (DESIGN.md 3.4). Removing a mailbox names
- * who loses it (design 8A).
+ * review D-T1). One line per mailbox: address, service, who uses it, status,
+ * then Fix or Edit; Add a mailbox sits top right. The last line is the owner's
+ * Claude account, and it alone carries an on/off switch (the old Email &
+ * Calendar switch): it governs only the email and calendar connected in
+ * Claude, never the mailboxes added here (owner, 2026-09-26). Status is always
+ * a word as well as a colour (DESIGN.md 3.4). Removing a mailbox names who
+ * loses it (design 8A).
  */
 export function MailboxesSettings() {
   const { t } = useTranslation();
@@ -60,13 +62,6 @@ export function MailboxesSettings() {
         <PixelButton variant="primary" size="sm" onClick={() => setDialog({})}>{t('mailboxes.add')}</PixelButton>
       </div>
 
-      <div style={{ ...row, background: 'var(--cth-paper-100)', padding: '10px 12px', borderTop: 'none' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{t('mailboxes.teamEmail')}</div>
-          <div style={hint}>{t('mailboxes.teamEmailDesc')}</div>
-        </div>
-        <Toggle on={teamOn} label={t('mailboxes.teamEmail')} onClick={() => { void setTeam(!teamOn); }} />
-      </div>
       {failed && <div role="alert" style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>! {t('capabilities.saveFailed')}</div>}
 
       {mailboxes.length === 0 ? (
@@ -118,8 +113,9 @@ export function MailboxesSettings() {
             {' · '}
             {usersOf(CLAUDE_ACCOUNT_MAILBOX).length ? t('mailboxes.usedBy', { names: list(usersOf(CLAUDE_ACCOUNT_MAILBOX)) }) : t('mailboxes.usedByNobody')}
           </div>
+          <div style={hint}>{t('mailboxes.claudeAccessDesc')}</div>
         </div>
-        <span style={hint}>{t('mailboxes.setUpInClaude')}</span>
+        <Toggle on={teamOn} label={t('mailboxes.claudeAccessLabel')} onLabel={t('mailboxes.claudeAccessOn')} offLabel={t('mailboxes.claudeAccessOff')} onClick={() => { void setTeam(!teamOn); }} />
       </div>
 
       {dialog && (

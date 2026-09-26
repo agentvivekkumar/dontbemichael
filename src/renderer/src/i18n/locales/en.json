@@ -1657,8 +1657,6 @@
   "mailboxes": {
     "title": "Mailboxes",
     "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Capabilities tab.",
-    "teamEmail": "Team email",
-    "teamEmailDesc": "Off blocks email for every team member, whatever their Capabilities say.",
     "add": "Add a mailbox",
     "empty": "No mailboxes yet. Add sales@, support@ or your own inbox, then choose which team member works in it.",
     "needsCount": "{{count}} needs you",
@@ -1674,8 +1672,7 @@
     "keep": "keep",
     "removeAffects": "{{names}} will stop working in it.",
     "claudeAccount": "Your Claude account",
-    "claudeAccountSub": "Gmail, connected in Claude",
-    "setUpInClaude": "set up in Claude",
+    "claudeAccountSub": "Gmail and Google Calendar, connected in Claude",
     "dialogTitle": "Add a mailbox",
     "dialogFixTitle": "Fix {{address}}",
     "which": "Which email service is it?",
@@ -1701,7 +1698,11 @@
       "yahoo": "Yahoo needs an app password. Create one in Account Security, then Generate app password.",
       "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
       "other": "Your email host lists these servers in its help pages. If your normal password is refused, ask them for an app password."
-    }
+    },
+    "claudeAccessLabel": "Team members can use the email and calendar in your Claude account",
+    "claudeAccessOn": "allowed",
+    "claudeAccessOff": "blocked",
+    "claudeAccessDesc": "Allowed lets team members use the Gmail and Google Calendar connected to your Claude account, if their Capabilities include it. Blocked stops everyone. Mailboxes you add here are not affected."
   },
   "capabilities": {
     "tab": "Capabilities",
@@ -1717,8 +1718,8 @@
     "pending": "Email turns on when {{name}} finishes the current step.",
     "noMailboxes": "No mailboxes to choose from yet.",
     "addInSettings": "Add one in Settings.",
-    "teamOff": "Team email is off in Settings, so {{name}} can't use email.",
     "saveFailed": "Didn't save. Try again.",
-    "mailboxToggle": "{{name}} can use {{address}}"
+    "mailboxToggle": "{{name}} can use {{address}}",
+    "claudeOff": "blocked in Settings for the whole team"
   }
 }

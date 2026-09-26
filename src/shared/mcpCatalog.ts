@@ -167,6 +167,9 @@ export function emailCalendarAllowed(mcpDefaults: { [id: string]: { enabled: boo
 export function isEmailCalendarTool(toolName: string): boolean {
   const m = /^mcp__(.+?)__/.exec(toolName);
   if (!m) return false;
+  // This app's own mailboxes (md-mail) are governed by Capabilities alone, not
+  // by the Claude account switch (owner, 2026-09-26).
+  if (m[1] === 'md-mail') return false;
   return /(^|[_-])(gmail|google[_-]?calendar|calendar|outlook|e?mail|email[_-]calendar)([_-]|$)/i.test(m[1]);
 }
 

@@ -54,7 +54,7 @@ import { handoffContext } from '../shared/safeClear';
 /** Why a mail or calendar tool was refused. Read by the agent (and shown on the
  *  floor), so it says what to do instead. */
 const EMAIL_CALENDAR_OFF =
-  'The owner has turned off Email & Calendar in Settings, so you cannot read or act on their mail or calendar. ' +
+  'The owner has turned off email and calendar through their Claude account in Settings, so you cannot use those tools. ' +
   'Do not try another way. If the task needs email or the calendar, say so: a team member tells Michael, and Michael puts it on ASK ME for the owner.';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
@@ -340,14 +340,16 @@ export class HookServer {
       }
     }
 
-    // Settings → Connections → Email & Calendar ("Team email"). Off means no
-    // agent, Michael included, reads or acts on the owner's mail or calendar
-    // through ANY connector (owner, 2026-09-26). The name check comes first so
-    // other tools never read config.
-    if (event === 'PreToolUse' && agentId && isEmailCalendarTool(p.tool_name ?? '')) {
+    // Settings → Mailboxes → "Your Claude account" switch (stored as the old
+    // Email & Calendar switch). Off means no agent, Michael included, uses the
+    // mail or calendar connected to the owner's Claude account. It does not
+    // touch mailboxes added in Settings (md-mail), which Capabilities govern
+    // alone (owner, 2026-09-26). The name check comes first so other tools
+    // never read config.
+    if (event === 'PreToolUse' && agentId && (isEmailCalendarTool(p.tool_name ?? '') || /^mcp__md-mail__/.test(p.tool_name ?? ''))) {
       const cfg = this.getConfig();
       let reason: string | undefined;
-      if (!emailCalendarAllowed(cfg.mcpDefaults)) {
+      if (isEmailCalendarTool(p.tool_name ?? '') && !emailCalendarAllowed(cfg.mcpDefaults)) {
         reason = EMAIL_CALENDAR_OFF;
       } else {
         // Team email is on: mail tools also need the agent's Capabilities (MB-3,

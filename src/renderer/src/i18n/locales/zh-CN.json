@@ -1657,8 +1657,6 @@
   "mailboxes": {
     "title": "邮箱",
     "intro": "团队可以使用的邮箱。在每位团队成员的“权限”标签中选择谁使用哪个邮箱。",
-    "teamEmail": "团队邮件",
-    "teamEmailDesc": "关闭后，所有团队成员都不能使用邮件，无论他们的权限如何设置。",
     "add": "添加邮箱",
     "empty": "还没有邮箱。添加 sales@、support@ 或你自己的收件箱，然后选择由哪位团队成员处理。",
     "needsCount": "{{count}} 个需要你处理",
@@ -1674,8 +1672,7 @@
     "keep": "保留",
     "removeAffects": "{{names}} 将无法再使用这个邮箱。",
     "claudeAccount": "你的 Claude 账户",
-    "claudeAccountSub": "Gmail，在 Claude 中连接",
-    "setUpInClaude": "在 Claude 中设置",
+    "claudeAccountSub": "Gmail 和 Google 日历，在 Claude 中连接",
     "dialogTitle": "添加邮箱",
     "dialogFixTitle": "修复 {{address}}",
     "which": "这是哪家邮件服务？",
@@ -1701,7 +1698,11 @@
       "yahoo": "Yahoo 需要应用专用密码。在“账户安全”中选择“生成应用密码”。",
       "zoho": "Zoho 需要在“安全”中的“应用密码”创建应用专用密码，并在邮件设置中开启 IMAP。",
       "other": "你的邮件服务商会在帮助页面列出这些服务器。如果普通密码被拒绝，请向他们申请应用专用密码。"
-    }
+    },
+    "claudeAccessLabel": "团队成员可以使用你 Claude 账户中的邮件和日历",
+    "claudeAccessOn": "允许",
+    "claudeAccessOff": "阻止",
+    "claudeAccessDesc": "允许后，权限中包含它的团队成员可以使用你 Claude 账户连接的 Gmail 和 Google 日历。阻止则所有人都不能使用。在这里添加的邮箱不受影响。"
   },
   "capabilities": {
     "tab": "权限",
@@ -1717,8 +1718,8 @@
     "pending": "{{name}} 完成当前步骤后，邮件功能就会开启。",
     "noMailboxes": "还没有可选择的邮箱。",
     "addInSettings": "在设置中添加。",
-    "teamOff": "设置中的团队邮件已关闭，因此 {{name}} 无法使用邮件。",
     "saveFailed": "没有保存成功，请重试。",
-    "mailboxToggle": "{{name}} 可以使用 {{address}}"
+    "mailboxToggle": "{{name}} 可以使用 {{address}}",
+    "claudeOff": "已在设置中对整个团队阻止"
   }
 }

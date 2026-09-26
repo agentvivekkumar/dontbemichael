@@ -61,7 +61,8 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
   const rows: Array<{ id: string; label: string; sub: string }> = [
     ...mailboxes.map((m) => ({ id: m.id, label: m.address, sub: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '') })),
-    { id: CLAUDE_ACCOUNT_MAILBOX, label: t('mailboxes.claudeAccount'), sub: t('mailboxes.claudeAccountSub') }
+    // The Claude account switch in Settings governs only this row (owner, 2026-09-26).
+    { id: CLAUDE_ACCOUNT_MAILBOX, label: t('mailboxes.claudeAccount'), sub: t('mailboxes.claudeAccountSub') + (teamOn ? '' : ` · ${t('capabilities.claudeOff')}`) }
   ];
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
@@ -72,7 +73,6 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
         <div style={hint}>{t('capabilities.intro', { name })}</div>
 
         <div style={h13}>{t('capabilities.email')}</div>
-        {!teamOn && <div style={{ ...notice, background: 'var(--cth-coral-light)' }}>{t('capabilities.teamOff', { name })}</div>}
         <div style={{ ...row, borderTop: 'none' }}>
           <div style={{ flex: 1, fontSize: 14 }}>{t('capabilities.canCheck')}</div>
           <Toggle on={email.enabled} label={t('capabilities.canCheck')} onClick={toggleEmail} />

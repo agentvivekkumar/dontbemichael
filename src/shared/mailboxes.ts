@@ -103,8 +103,11 @@ export function guessServers(address: string): { imap: MailServer; smtp: MailSer
   return { imap: { host: `mail.${domain}`, port: 993, secure: true }, smtp: { host: `mail.${domain}`, port: 465, secure: true } };
 }
 
-/** Whether Settings, Email & Calendar is on: the master switch, now shown as
- *  "Team email" at the top of Mailboxes. Only an explicit yes counts. */
+/** Whether the owner lets agents use the email and calendar connected to their
+ *  Claude account (the "Your Claude account" switch in Settings > Mailboxes;
+ *  stored as the old Email & Calendar switch). It governs only that connector:
+ *  mailboxes added in Settings depend on Capabilities alone (owner, 2026-09-26).
+ *  Only an explicit yes counts. */
 export function teamEmailOn(mcpDefaults: { [id: string]: { enabled: boolean } } | undefined): boolean {
   return mcpDefaults?.['email-calendar']?.enabled === true;
 }
@@ -118,17 +121,15 @@ export interface MailAccessConfig {
 export type MailAccessResult = { ok: true } | { ok: false; reason: string };
 
 /**
- * The one access rule (MB-3, E3). Refuses unless: Team email is on; the agent
- * has "Can check email"; the mailbox is one of its mailboxes and still exists;
- * and, to send, the agent is not Draft only. Michael follows the same rule.
- * `list` needs only the first two: it returns the agent's own mailboxes.
+ * The one access rule (MB-3, E3). Refuses unless: the agent has "Can check
+ * email"; the mailbox is one of its mailboxes and still exists; for the Claude
+ * account mailbox, the owner's Claude account switch is on; and, to send, the
+ * agent is not Draft only. Michael follows the same rule. `list` needs only
+ * "Can check email": it returns the agent's own mailboxes.
  * Refusal reasons are read by the agent (and shown on the floor), so they say
  * what happened and what to do.
  */
 export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: string | undefined, op: MailOp): MailAccessResult {
-  if (!teamEmailOn(cfg.mcpDefaults)) {
-    return { ok: false, reason: 'Team email is off in Settings, so no one can use email right now. Tell Michael if the task needs it.' };
-  }
   const email = cfg.agentCapabilities?.[agentId]?.email;
   if (!email?.enabled) {
     return { ok: false, reason: 'The owner has not given you email in your Capabilities. Do not try another way; tell Michael what you need.' };
@@ -136,6 +137,9 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
   if (op === 'list') return { ok: true };
   if (!mailboxId || !email.mailboxes.includes(mailboxId)) {
     return { ok: false, reason: `The owner has not given you the mailbox "${mailboxId ?? ''}". Use list_mailboxes to see yours.` };
+  }
+  if (mailboxId === CLAUDE_ACCOUNT_MAILBOX && !teamEmailOn(cfg.mcpDefaults)) {
+    return { ok: false, reason: 'The owner has turned off email through their Claude account in Settings. Use one of your other mailboxes, or tell Michael if the task needs it.' };
   }
   if (mailboxId !== CLAUDE_ACCOUNT_MAILBOX && !(cfg.mailboxes ?? []).some((m) => m.id === mailboxId)) {
     return { ok: false, reason: `The mailbox "${mailboxId}" was removed in Settings.` };
