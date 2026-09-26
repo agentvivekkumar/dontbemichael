@@ -87,7 +87,7 @@ test('"start over here" leaves a real office behind, so the next launch goes in'
   // would loop the owner back to the missing screen.
   const main = read('src/main/index.ts');
   const handler = main.slice(main.indexOf("ipcMain.handle('config:startOverHere'"));
-  assert.match(handler.slice(0, 1200), /ensureHarnessHome\(home\)[\s\S]*hive\.ensureHive\(\)[\s\S]*app\.relaunch\(\)/);
+  assert.match(handler.slice(0, 1200), /ensureHarnessHome\(home\)[\s\S]*hive\.ensureHive\(\)[\s\S]*restartApp\(app\)/);
   // And ensureHive really writes what the launch check reads.
   const home = tmp(t);
   const { HiveManager } = loadTs('src/main/hive.ts');
