@@ -127,7 +127,8 @@ export function legacyNotes(text: string): string[] {
 
 /** "Weekly money summary" → "weekly-money-summary". */
 export function procedureSlug(name: string): string {
-  const s = name.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+  // Normalize before lowercasing: NFKD can turn a letter like ℍ into an uppercase H.
+  const s = name.normalize('NFKD').toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
   return s.slice(0, 60).replace(/-$/, '') || 'procedure';
 }
 
@@ -231,4 +232,63 @@ export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string)
 /** Archive lines for replaced or deleted entries. */
 export function archiveLines(archived: TidyOutcome['archived'], today: string): string {
   return archived.map(({ entry, reason }) => `${entryLine(entry)} | archived ${today}: ${reason.replace(/\|/g, '/')}`).join('\n');
+}
+
+// ─── Reading it: the Memory tab (docs/designs/memory-tab-readable.md) ────────
+
+/** The order the Memory tab shows the kinds in: the owner's own words first. */
+export const MEMORY_VIEW_ORDER: readonly MemoryKind[] = ['preference', 'procedure', 'fact', 'reference'];
+
+export interface MemoryView {
+  isIndex: boolean;
+  /** Non-empty groups only, in MEMORY_VIEW_ORDER. */
+  groups: Array<{ kind: MemoryKind; entries: MemoryEntry[] }>;
+  /** Lines in an index that aren't entries (a hand-written "- LESSON: ..."),
+   *  without their bullet. The parser skips them; the owner shouldn't lose them. */
+  other: string[];
+}
+
+const INDEX_NOTE = /^The app keeps this file\b/;
+
+/** An index file as the Memory tab shows it. */
+export function memoryView(text: string): MemoryView {
+  const { isIndex, entries } = parseIndex(text);
+  const groups = MEMORY_VIEW_ORDER
+    .map((kind) => ({ kind, entries: entries.filter((e) => e.kind === kind) }))
+    .filter((g) => g.entries.length > 0);
+  const other: string[] = [];
+  if (isIndex) {
+    const kept = new Set(entries.map((e) => e.id));
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#') || line === INDEX_MARKER || INDEX_NOTE.test(line)) continue;
+      const m = ENTRY.exec(line);
+      if (m && kept.has(m[1])) continue;
+      const body = line.replace(/^[-*]\s+/, '').trim();
+      if (body) other.push(body);
+    }
+  }
+  return { isIndex, groups, other };
+}
+
+/** A procedure pointer ("Shutdown protocol: steps in memory/procedures/shutdown-protocol.md")
+ *  split into the name to show and the slug to read, or null for any other text. */
+export function procedurePointer(text: string): { name: string; slug: string } | null {
+  const m = /^(.*): steps in memory\/procedures\/([a-z0-9-]{1,60})\.md$/.exec(text.trim());
+  return m && m[1].trim() ? { name: m[1].trim(), slug: m[2] } : null;
+}
+
+/** A slug in the character set procedureSlug writes (a to z, 0 to 9, hyphen),
+ *  the same one procedurePointer reads: no "/" and no ".", so it can't point
+ *  outside the folder. Looser than it looks on purpose: procedureSlug can leave
+ *  a leading hyphen ("-foo"), and that file must still open (review, 2026-09-25). */
+export function isProcedureSlug(slug: unknown): slug is string {
+  return typeof slug === 'string' && /^[a-z0-9-]{1,60}$/.test(slug);
+}
+
+/** Whether a fact's "check again" date is still ahead, or has passed. Dates are
+ *  YYYY-MM-DD, so they compare as strings; `today` is the local date. */
+export function expiryState(expires: string | undefined, today: string): 'none' | 'future' | 'passed' {
+  if (!expires || !DATE.test(expires)) return 'none';
+  return expires < today ? 'passed' : 'future';
 }

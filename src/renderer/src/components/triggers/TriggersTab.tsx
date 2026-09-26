@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SchedulesSection } from './SchedulesSection';
+import { AgentSchedules, OfficeSchedules, useGodId } from './ScheduleList';
+import { useStore } from '@/store/store';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { OrgSection } from './OrgSection';
 import { Muted, Scroll, TriggerCard } from './ui';
 import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
@@ -13,6 +15,11 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  * organisation is hidden in this build (SHOW_ORG_TRIGGER).
  * Schedules is the oldest and used to BE this tab.
  *
+ * Schedules belong to the agent that runs them (docs/designs/per-agent-schedules.md):
+ * each team member edits its own on its panel's Schedules tab. Here, Michael's
+ * own jobs are editable at the top, and below them the office schedule lists
+ * everyone else's, read only, each row a jump to that agent's tab.
+ *
  * This panel is a sidebar, so four flat forms would open as a wall. Each type is
  * a collapsed card carrying its name, a one-line "what this is", and a live
  * summary chip; schedules opens expanded because it is the incumbent and the
@@ -21,8 +28,9 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  */
 export function TriggersTab() {
   const { t } = useTranslation();
-  const [schedulesSummary, setSchedulesSummary] = useState('');
   const [orgSummary, setOrgSummary] = useState('');
+  const godName = useResolvedGodName();
+  const godId = useGodId();
 
   return (
     <Scroll>
@@ -30,12 +38,19 @@ export function TriggersTab() {
       <div style={{ height: 8 }} />
 
       <TriggerCard
-        title={t('triggersTab.schedules')}
+        title={t('schedulesSection.ownJobs', { godName })}
         blurb={t('triggersTab.schedulesBlurb')}
-        summary={schedulesSummary}
         defaultOpen
       >
-        <SchedulesSection onSummary={setSchedulesSummary} />
+        <AgentSchedules agentId={godId} agentName={godName} />
+      </TriggerCard>
+
+      <TriggerCard
+        title={t('schedulesSection.officeSchedule')}
+        blurb={t('triggersTab.officeBlurb')}
+        defaultOpen
+      >
+        <OfficeSchedules />
       </TriggerCard>
 
       {/* WEBHOOKS moved to Settings → Connections: one server and one tunnel

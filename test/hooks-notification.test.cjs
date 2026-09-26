@@ -43,7 +43,8 @@ async function floor(t) {
   const home = tmpHome();
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
-  await hive.ensureAgent({ id: 'jim-1', name: 'Jim', provider: 'claude', cwd: home });
+  // Only Michael notifies (owner, 2026-09-25), so the event tests run as him.
+  await hive.ensureAgent({ id: 'jim-1', name: 'Jim', provider: 'claude', cwd: home, isGod: true });
   const server = new HookServer(hive, () => null, () => CONFIG, undefined, undefined);
   const fire = (payload) => server.handle({ agent_id: 'jim-1', session_id: 's1', ...payload });
   notifications.length = 0;
@@ -141,12 +142,14 @@ test('a renamed manager is notified under the name the owner gave him', async (t
   assert.equal(notifications[0].title, 'Dwight Jr');
 });
 
-test('a team member is notified under its name; an unknown id never shows raw', async (t) => {
+test('only Michael notifies: a team member or an unknown id never does', async (t) => {
+  // Team members talk to Michael and at most wait on him (owner, 2026-09-25).
   const server = await office(t, '');
   await server.handle({ agent_id: 'oscar', session_id: 's1', hook_event_name: 'Stop' });
+  await server.handle({ agent_id: 'oscar', session_id: 's1', hook_event_name: 'Notification', notification_type: 'idle' });
   await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Stop' });
   await server.handle({ agent_id: 'worker-7f3a', session_id: 's1', hook_event_name: 'Stop' });
-  assert.deepEqual(notifications.map((n) => n.title), ['Oscar', 'Michael', "Don't Be Michael"]);
+  assert.deepEqual(notifications.map((n) => n.title), ['Michael']);
 });
 
 test('the message is in our words, never the engine\'s', async (t) => {

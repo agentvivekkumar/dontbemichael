@@ -462,6 +462,42 @@ third-party packs is not something the app can promise.
 
 CSS-only `.cth-tip`, 400 ms show delay. Text at 13 px (currently 11 px, §17).
 
+### 7.10 Schedule row (`triggers/ScheduleList`)
+
+A divided list, never boxed tiles: one `ink-100` hairline between rows. Row: a when
+chip (Inter 14 px, `lemon-light` when on, `cream-300` with `ink-500` text when paused),
+the job name at 14 px, and a 13 px `ink-500` sub-line ("fired 2h ago, next in 40m,
+added by you"), then the `Toggle` (`role="switch"`). The open row's editor uses the
+`inset` variant (§6.1). Delete asks first: the ghost `Delete` becomes "Sure?" with a
+`destructive` "delete it" (§7.2) and a secondary "keep". A failed save reverts the row
+and says "Didn't save. Try again." in coral with a `!`. Read-only rows (Michael's office
+schedule) end in `›` and open that agent's Schedules tab.
+
+The agent panel tab strip uses Inter 14 px labels and scrolls sideways when four tabs
+outgrow the panel.
+
+### 7.11 Memory notes (`MemoryNotes`, the Memory tab)
+
+The memory index is shown as notes, never its raw lines (the `[m3]` id, kind word and
+pipes stay in "Show the file"). Memory comes first: the agent's name in Press Start 2P
+12 px with the picker beside it, then a 13 px `ink-500` count line ("12 things
+remembered, 3 notes waiting to be sorted in"). Groups in this order, each an Inter 13 px
+semibold `ink-700` heading with its count: Your preferences, How to, Facts, Where things
+live, Other notes. Rows follow §7.10: a divided list on the panel ground, entry text
+Inter 14 px, a 13 px `ink-500` line under it ("learned on a task, Sep 25"). A future
+"check again" date is a `lemon-light` chip; a passed one is `coral-light` with a `!`.
+Procedures are disclosure buttons that open to their steps (markdown, `card` variant).
+One search box sits below the memory with an "Exact words / By meaning" switch.
+
+### 7.12 Agent profile (`ProfileTab`)
+
+The first tab on every agent. Job title in Press Start 2P 12 px, then what the job is in
+Inter 16/24 (`body-lg`), then sections with Inter 13 px semibold `ink-700` headings as in
+§7.11: "What {{name}} does"
+with a mint ✓; "Asks you first"; Key facts as a two-column definition list (13 px `ink-500`
+labels, 14 px values, the folder in mono); the full instructions collapsed behind a text
+button, rendered as markdown (`card`) on `paper-100`. 72ch measure, 16 px padding.
+
 ---
 
 ## 8. Web components [Web]

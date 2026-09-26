@@ -159,6 +159,7 @@ webhook's Format row, above.`;
 // snapshotLocalState / restoreLocalState / clearLocalState live in
 // store/localState.ts (re-exported here for existing importers).
 export { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
+import { showByokSettings } from '@shared/agentProvider';
 
 // v0.3.4 redesign: six tabs, one topic each. 'AI Engines' folded into
 // Agents & Models; MCP + Slack + webhook + REST live together in Connections;
@@ -1198,7 +1199,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               {t('settings.general.desktopNotifications')}
                             </span>
                             <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.general.desktopNotificationsDesc')}
+                              {t('settings.general.desktopNotificationsDesc', { godName })}
                             </span>
                           </div>
                           <PixelButton
@@ -1336,9 +1337,14 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                       <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
 
-                      <AiEnginesSettings config={config} />
-
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      {/* API keys and local endpoints feed only OpenCode, Crush, pi and
+                          Qwen; this build offers none of them (BUILD_ENGINES). */}
+                      {showByokSettings() && (
+                        <>
+                          <AiEnginesSettings config={config} />
+                          <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                        </>
+                      )}
 
                       {/* Advanced */}
                       <div>

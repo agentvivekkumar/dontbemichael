@@ -16,7 +16,8 @@
  * drift the moment a provider is added.
  */
 
-import { AGENT_PROVIDER_PRESETS } from './agentProvider';
+import { AGENT_PROVIDER_PRESETS, BUILD_ENGINES, type AgentProvider } from './agentProvider';
+import { SHOW_DEV_TOOLS } from './buildFeatures';
 
 export type ToolKind = 'prerequisite' | 'memory' | 'engine';
 
@@ -164,4 +165,18 @@ export function setupPrompt(missing: ToolStatus[]): string {
     'guessing or working around it. When you are done, report one line per tool: installed, already',
     'present, or failed with the reason.'
   ].join('\n');
+}
+
+/** Developer-only rows: useful when building the app, noise for an owner. */
+const DEV_TOOL_IDS = new Set(['git', 'node']);
+
+/**
+ * The rows Settings → Prerequisites shows. The full catalog stays in `tools:status`
+ * because onboarding's engine checks read every engine; the page shows only the
+ * engines this build offers, and hides the developer tools unless SHOW_DEV_TOOLS.
+ */
+export function prerequisiteRows<T extends Pick<ToolSpec, 'id' | 'kind'>>(tools: T[], showDev = SHOW_DEV_TOOLS): T[] {
+  if (showDev) return tools;
+  const offered = new Set(BUILD_ENGINES.map((id: AgentProvider) => `engine:${id}`));
+  return tools.filter((t) => (t.kind === 'engine' ? offered.has(t.id) : !DEV_TOOL_IDS.has(t.id)));
 }

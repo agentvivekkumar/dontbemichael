@@ -17,3 +17,18 @@ export function scheduledRunBody(label: string, legacy?: string): string {
   if (old) lines.push('', 'Older instructions the owner gave this schedule, until they move into your Work style:', old);
   return lines.join('\n');
 }
+
+/**
+ * A former "everyone" schedule (design 3A): it now belongs to Michael, who
+ * hands the job to each team member it applies to instead of the scheduler
+ * broadcasting it.
+ */
+export function relayRunBody(label: string, legacy?: string): string {
+  const lines = [
+    `Scheduled run for the whole team: ${label.trim()}.`,
+    'Hand this job to each team member it applies to, with a short request each. If it applies to nobody right now, stop without messaging anyone.'
+  ];
+  const old = (legacy ?? '').trim();
+  if (old) lines.push('', 'Older instructions the owner gave this schedule:', old);
+  return lines.join('\n');
+}

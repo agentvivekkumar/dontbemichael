@@ -93,7 +93,8 @@ Edit Agent.
 
 Michael is the one you brief. He sends each job to the team member whose role fits, keeps an eye
 on the task board, and brings you only what needs you. Once an hour he runs a standup with the
-team.
+team. He is the only one who sends you desktop notifications. To speak with one team member
+directly, open it and choose **Talk 1:1**; Michael sends it no work until you end the 1:1.
 
 </td>
 <td width="50%">
@@ -172,7 +173,8 @@ team. It checks what your Mac already has and offers to install anything missing
 
 **Running the office**
 - **Ask me.** When the team needs a decision, it goes on Michael's Ask me board. Your answer goes back to whoever asked, and they remember it.
-- **Schedules.** Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says.
+- **Schedules.** Each team member has a Schedules tab for its own jobs. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. A team member can ask for a schedule change, but nothing changes until you approve it in Ask me.
+- **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Messages as a day by day history, Schedules, and Memory as readable notes.
 - **Tasks and the floor.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
 - **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.

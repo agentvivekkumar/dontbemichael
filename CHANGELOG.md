@@ -6,6 +6,51 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.5] (2026-09-25)
+
+### Added
+
+- **Every agent has its own schedules.** Each agent's panel has a Schedules tab for its own jobs,
+  with the next run on its card. Agents can ask for a schedule change, but only you decide: the
+  request waits in ASK ME with Approve and Decline, and chat never changes a schedule. Closing an
+  agent pauses its schedules and says so first. Michael's Schedules tab (it was called triggers)
+  shows his own jobs and a read only view of the whole office.
+- **Every agent's first tab is its Profile:** the job, what the agent does, what it asks you about
+  first, its folder with an Open folder button, and the full instructions it works from. Michael's
+  profile shows what he does, the team (click a name to open that agent) and what he knows about
+  your business.
+- **Every agent has a Memory tab** that reads like notes: grouped into your preferences, how to,
+  facts and where things live, with where each came from and when. Procedures open to their steps,
+  a fact past its check date is flagged, and notes waiting to be sorted in are counted. Show the
+  file still shows the raw text. On Michael's tab the memory comes first, with one search box below.
+
+### Changed
+
+- **You talk to team members through Michael, except in 1:1.** Outside 1:1 a team member's terminal
+  is watch only, and a bar offers Message Michael or Talk 1:1. 1:1 lives in that bottom bar. A team
+  member stuck on a prompt in its terminal is reported to Michael, who raises it on ASK ME. The
+  agent brakes (block tools, stop after this step) are hidden.
+- **Only Michael sends desktop notifications.** Team members report to him, so their stops no longer
+  reach your desktop.
+- **The Messages tab reads like a history:** conversations grouped by day, each one line saying who
+  asked what and how it was answered, with plain words instead of message types. Closing time and
+  scheduled runs are counted on one line instead of filling the tab.
+- **A newer question on a card replaces an unanswered older one** in ASK ME.
+- **The fresh start note is a short note** with Bring back earlier chat and Hide, and it says when
+  bringing the chat back fails.
+- **Agent panel tabs** go profile, messages, schedules, memory, then the technical ones (terminal,
+  traces), and work with the arrow keys.
+- **Settings shows only what this build uses:** Prerequisites lists only Claude Code, uv and
+  MemPalace, and the API keys panel is hidden.
+
+### Fixed
+
+- A schedule longer than about 24 days no longer fires nonstop: intervals stop at 24 days, and a
+  time like 09:75 is refused instead of becoming 10:15.
+- The Messages tab no longer rereads every message file every 5 seconds.
+- The Memory tab's memory file fills the tab.
+- Small text raised to the 13px minimum on the schedule rows and hints.
+
 ## [0.0.4] (2026-09-25)
 
 ### Changed

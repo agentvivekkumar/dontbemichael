@@ -9,6 +9,7 @@ import { compareByNewestAsk } from './askMeOrder';
 import { answerMessages, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
+import { ScheduleRequestCards, useScheduleRequests } from './ScheduleRequestCards';
 
 /**
  * ASK ME — first-class human feedback through the task system.
@@ -58,6 +59,8 @@ export function AskMeTab() {
   const openTaskDetail = useStore((s) => s.openTaskDetail);
   const [sending, setSending] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Schedule changes the team asked for; they wait here for the owner (R6).
+  const { requests: scheduleRequests, refresh: refreshScheduleRequests } = useScheduleRequests();
 
   const refresh = useCallback(async () => {
     try { setTasks(parse(await window.cth.hiveTasks())); } catch { /* keep last good */ }
@@ -166,7 +169,8 @@ export function AskMeTab() {
     // memory viewer uses. Pixelify Sans (font-ui) is too chunky for prose like
     // questions and answers. Display/badge bits keep their explicit faces.
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--cth-paper-200)', padding: 10, display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--cth-font-mono)' }}>
-      {waiting.length === 0 && (
+      <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
+      {waiting.length === 0 && scheduleRequests.length === 0 && (
         <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--cth-ink-500)', fontSize: 12 }}>
           {translate('askMe.emptyTitle')}<br />
           <span style={{ fontSize: 11, color: 'var(--cth-ink-300)' }}>

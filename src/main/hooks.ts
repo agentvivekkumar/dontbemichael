@@ -23,9 +23,27 @@ import { validateHookEvent } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
 
+/** The same terminal prompt is relayed to Michael at most once in this window. */
+const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
+
 /** Desktop notification bodies. The title is the agent's name (displayName). */
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
 export const NOTIFY_WAITING = 'Waiting for you.';
+
+/** Claude Code's in-terminal question tool. Refused for team members. */
+export const ASK_TOOL = 'AskUserQuestion';
+export const ASK_TOOL_REFUSAL =
+  "Don't ask the owner here: nobody answers your terminal. Send the question to Michael through your outbox (\"to\": \"michael\", \"act\": \"query\"). He answers it, or puts it on the owner's ASK ME board.";
+
+/** A Notification that means the session is stopped on a prompt a person must
+ *  answer in the terminal: a permission request or a question dialog, never the
+ *  plain idle "waiting for your input". */
+const TERMINAL_PROMPT_TYPES = new Set(['permission_prompt', 'elicitation_dialog']);
+export function isTerminalPrompt(p: { notification_type?: string; message?: string }): boolean {
+  const type = (p.notification_type ?? '').toLowerCase();
+  if (type) return TERMINAL_PROMPT_TYPES.has(type);
+  return /needs your permission|needs your approval/i.test(p.message ?? '');
+}
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
@@ -346,6 +364,22 @@ export class HookServer {
       }
     }
 
+    // A team member never asks the owner in its own terminal: team members wait
+    // on Michael at most (docs/designs/owner-talks-via-michael.md). Refusing the
+    // question tool turns the question into a message to him; he answers it or
+    // puts it on ASK ME.
+    // In 1:1 the owner is at that terminal, so the question may go to them there.
+    if (event === 'PreToolUse' && agentId && p.tool_name === ASK_TOOL && !this.isGod(agentId) && !this.onHold(agentId)) {
+      this.emit(agentId, event, p);
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: ASK_TOOL_REFUSAL
+        }
+      };
+    }
+
     // Folder privacy (src/shared/folderAccess.ts). The spawn's settings already
     // deny the folders known then; this catches everything else: folders made
     // after the agent started, and Michael's own files, which a settings rule
@@ -508,6 +542,16 @@ export class HookServer {
       this.notify(agentId, NOTIFY_WAITING);
     }
 
+    // A team member's session stopped on a prompt only a person can answer in
+    // that terminal (a permission, a sign-in, a trust dialog). Tell Michael
+    // what it says; he can't type there, so he puts it on ASK ME for the owner
+    // to answer in a 1:1 (docs/designs/owner-talks-via-michael.md).
+    // Not in 1:1: the owner is already at that terminal to answer it. The cheap
+    // prompt check runs first; the registry is read only for a real prompt.
+    if (event === 'Notification' && agentId && isTerminalPrompt(p) && !this.isGod(agentId) && !this.onHold(agentId)) {
+      this.relayPromptToMichael(agentId, (p.message ?? '').trim());
+    }
+
     // Forward everything else to the renderer so avatars reflect real activity.
     this.emit(agentId, event, p);
     return {};
@@ -515,13 +559,53 @@ export class HookServer {
 
   /** Fire a native desktop notification — gated on the user's `notifications`
    *  setting. Only the OS toast is gated; the hive:hookEvent emit is always sent
-   *  so avatars/UI stay live regardless. Best-effort: never throw into the hook. */
+   *  so avatars/UI stay live regardless. Best-effort: never throw into the hook.
+   *
+   *  Only Michael notifies (owner, 2026-09-25): team members talk to Michael and
+   *  at most wait on him, so their stops and idles never reach the desktop.
+   *  Michael raises anything the owner must decide on ASK ME
+   *  (docs/designs/michael-only-notifications.md). */
   private notify(agentId: string | undefined, body: string): void {
     if (!this.getConfig().notifications) return;
+    if (!agentId || !this.isGod(agentId)) return;
     try {
       if (!Notification.isSupported()) return;
       new Notification({ title: this.displayName(agentId), body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  /** Is the owner in 1:1 with this agent (registry `onHold`)? */
+  private onHold(agentId: string): boolean {
+    try { return !!this.hive.registry().agents[agentId]?.onHold; } catch { return false; }
+  }
+
+  /** agentId → last prompt relayed, so one prompt isn't relayed twice. */
+  private relayedPrompts = new Map<string, { text: string; at: number }>();
+
+  private relayPromptToMichael(agentId: string, text: string): void {
+    const last = this.relayedPrompts.get(agentId);
+    if (last && last.text === text && Date.now() - last.at < PROMPT_RELAY_DEDUPE_MS) return;
+    try {
+      const name = this.displayName(agentId);
+      this.hive.send({
+        to: this.hive.registry().godId ?? 'god',
+        act: 'inform',
+        subject: `${name} is waiting on something in their terminal`,
+        body: `${name}'s session stopped on a prompt only the owner can answer in that terminal${text ? `: "${text}"` : '.'} You can't answer it there. Put it on the owner's ASK ME board (a card for ${agentId}, status "blocked", one humanQA ask with "raisedBy": "${agentId}") saying what it is waiting on and to talk 1:1 with ${name} to answer it.`
+      }, 'system');
+      // Stamped only once it went out, so a failed send is retried on the
+      // next prompt event (adversarial review, 2026-09-25).
+      this.relayedPrompts.set(agentId, { text, at: Date.now() });
+    } catch { /* best-effort: the panel offers Talk 1:1 meanwhile */ }
+  }
+
+  private isGod(agentId: string): boolean {
+    try {
+      const reg = this.hive.registry();
+      return agentId === (reg.godId ?? 'god') || !!reg.agents?.[agentId]?.isGod;
+    } catch {
+      return false;
+    }
   }
 
   /** The name the owner knows an agent by, for a notification title. Never the

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelBadge } from './PixelBadge';
@@ -7,6 +7,10 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
+import { ProfileTab } from './ProfileTab';
+import { MemoryNotes, memorySummary } from './MemoryNotes';
+import { MarkdownPreview } from '@/markdown/MarkdownPreview';
+import { memoryView } from '@shared/memoryIndex';
 import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
@@ -50,7 +54,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -69,12 +73,15 @@ interface GHIssue {
 }
 
 /** Canonical tab order. Not every entry is always shown — see `visibleTabs`.
- *  ASK ME leads: it is what the team needs from the owner, and a business owner
- *  opening Michael should land there, not on a raw terminal. */
+ *  PROFILE is first on every agent (owner, 2026-09-25), then ASK ME. The panel
+ *  still OPENS on ASK ME (`defaultTab`): it is what the team needs from the
+ *  owner, and a business owner opening Michael should land there. */
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
-  { key: 'triggers', labelKey: 'commandCenter.tabs.triggers', icon: 'clock' },
+  // Named like every other agent's tab (owner, 2026-09-25).
+  { key: 'triggers', labelKey: 'sidebar.schedules', icon: 'clock' },
   { key: 'trigger-history', labelKey: 'commandCenter.tabs.history', icon: 'ledger' },
   { key: 'memory', labelKey: 'commandCenter.tabs.memory', icon: 'sparkle' },
   { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' },
@@ -347,6 +354,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
             <Centered>{t('commandCenter.noTerminal', { name: agent.name })}</Centered>
           )
         )}
+        {tab === 'profile' && <ProfileTab agent={agent} />}
         {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}
@@ -1136,62 +1144,147 @@ function ArchivedSection() {
 
 // ─── Memory tab ──────────────────────────────────────────────────────────────
 
-function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: string; onWho?: (id: string) => void }) {
+/** Michael's Memory tab: any agent's memory (picker) and the office search.
+ *  `ownOnly`: a team member's own Memory tab, that agent only, no picker and no
+ *  office search (owner, 2026-09-25). */
+export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }: {
+  godId: string; who?: string; onWho?: (id: string) => void; ownOnly?: boolean;
+}) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   // Selection is controllable from the floor's GRAPH view (openAgentMemory); falls back to local state.
   const [internalWho, setInternalWho] = useState<string>(godId);
-  const who = controlledWho ?? internalWho;
+  const who = ownOnly ? godId : (controlledWho ?? internalWho);
   const setWho = onWho ?? setInternalWho;
-  const [mem, setMem] = useState('');
+  const name = agents.find((a) => a.id === who)?.name ?? who;
+  // undefined: first read not back yet; null: the read failed.
+  const [detail, setDetail] = useState<{ index: string; waiting: number } | null | undefined>(undefined);
+  const [showFile, setShowFile] = useState(false);
+  // One search box: exact words across the hive files, or by meaning (MemPalace).
+  const [mode, setMode] = useState<'text' | 'meaning'>('text');
   const [query, setQuery] = useState('');
-  const [searchOut, setSearchOut] = useState('');
   const [busy, setBusy] = useState(false);
-  // Full-text search across hive files (board, tasks, memory) — additive.
-  const [textQuery, setTextQuery] = useState('');
+  const [searchOut, setSearchOut] = useState('');
   const [textResults, setTextResults] = useState<Array<{ source: string; excerpt: string }>>([]);
   const [textSearched, setTextSearched] = useState(false);
-  const [textBusy, setTextBusy] = useState(false);
 
   useEffect(() => {
-    window.cth.hiveMemory(who).then(setMem).catch(() => setMem(''));
+    let alive = true;
+    setShowFile(false);
+    // Switching agents keeps the last view until the new one arrives.
+    window.cth.hiveMemoryDetail(who)
+      .then((d) => { if (alive) setDetail(d); })
+      .catch(() => { if (alive) setDetail(null); });
+    return () => { alive = false; };
   }, [who]);
 
+  const view = useMemo(() => memoryView(detail?.index ?? ''), [detail]);
+  const waiting = detail?.waiting ?? 0;
+
   const search = async () => {
-    if (!query.trim()) return;
+    const q = query.trim();
+    if (!q) return;
     setBusy(true);
     try {
-      const res = await window.cth.searchMemory(query.trim());
-      setSearchOut(res.ok ? (res.output || t('commandCenter.searchNoMatch')) : `${t('commandCenter.dispatchFailed', { error: res.error })}`);
+      if (mode === 'text') {
+        const res = await window.cth.textSearch(q);
+        setTextResults(res.ok ? res.results.slice(0, 10) : []);
+        setTextSearched(true);
+      } else {
+        const res = await window.cth.searchMemory(q);
+        setSearchOut(res.ok ? (res.output || t('commandCenter.searchNoMatch')) : `${t('commandCenter.dispatchFailed', { error: res.error })}`);
+      }
+    } catch {
+      if (mode === 'text') { setTextResults([]); setTextSearched(true); }
     } finally { setBusy(false); }
   };
 
-  const textSearch = async () => {
-    if (!textQuery.trim()) return;
-    setTextBusy(true);
-    try {
-      const res = await window.cth.textSearch(textQuery.trim());
-      setTextResults(res.ok ? res.results.slice(0, 10) : []);
-    } catch { setTextResults([]); }
-    finally { setTextBusy(false); setTextSearched(true); }
+  const linkButton: React.CSSProperties = {
+    padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+    fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)', textDecoration: 'underline', textUnderlineOffset: 2
   };
 
+  // Memory first, search below (docs/designs/memory-tab-readable.md). A flex
+  // column so the raw file view can still take the height the tab has left.
   return (
-    <Scroll>
-      <Section title={t('commandCenter.textSearch')}>
+    <div style={{
+      flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 10,
+      background: 'var(--cth-paper-200)', display: 'flex', flexDirection: 'column'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ margin: 0, flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: 'var(--cth-ink-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {t('memoryNotes.title', { name })}
+        </h2>
+        {!ownOnly && (
+          <label style={{ display: 'flex', minWidth: 0 }}>
+            <span style={srOnly}>{t('memoryNotes.whose')}</span>
+            <Select value={who} onChange={setWho}>
+              {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+            </Select>
+          </label>
+        )}
+      </div>
+
+      {detail === undefined ? (
+        <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('memoryNotes.loading')}</p>
+      ) : detail === null ? (
+        <p role="alert" style={{ margin: '12px 0 0', fontSize: 14, color: 'var(--cth-coral)' }}>! {t('memoryNotes.readFailed', { name })}</p>
+      ) : (
+        <>
+          {memorySummary(t, view, waiting) && (
+            <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)', marginTop: 2 }}>{memorySummary(t, view, waiting)}</div>
+          )}
+          {showFile ? (
+            <div style={{ flex: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
+              <Pre fill>{detail.index || t('commandCenter.noMemory')}</Pre>
+            </div>
+          ) : view.isIndex || !detail.index.trim() ? (
+            <MemoryNotes agentId={who} name={name} view={view} waiting={waiting} />
+          ) : (
+            // An older free-form memory, not yet turned into an index by its first tidy-up.
+            <div style={{ marginTop: 12, fontSize: 14, lineHeight: '20px' }}><MarkdownPreview source={detail.index} variant="card" /></div>
+          )}
+          {detail.index.trim() && (
+            <div style={{ marginTop: 10 }}>
+              <button type="button" aria-pressed={showFile} onClick={() => setShowFile((v) => !v)} style={linkButton}>
+                {showFile ? t('memoryNotes.showNotes') : t('memoryNotes.showFile')}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {!ownOnly && <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
+        <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-ink-700)' }}>{t('memoryNotes.searchTitle')}</h3>
+        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
+          {(['text', 'meaning'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => setMode(m)}
+              style={{
+                padding: '2px 10px', border: 'none', cursor: 'pointer', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px',
+                background: mode === m ? 'var(--cth-ink-900)' : 'transparent', color: mode === m ? 'var(--cth-cream-50)' : 'var(--cth-ink-900)'
+              }}
+            >{t(m === 'text' ? 'memoryNotes.exactWords' : 'memoryNotes.byMeaning')}</button>
+          ))}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <input
-            value={textQuery}
-            onChange={(e) => setTextQuery(e.target.value)}
-            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') textSearch(); }}
-            placeholder={t('commandCenter.textSearchPlaceholder')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') search(); }}
+            placeholder={t(mode === 'text' ? 'commandCenter.textSearchPlaceholder' : 'commandCenter.semanticPlaceholder')}
+            aria-label={t('memoryNotes.searchTitle')}
             style={{ ...textareaStyle, height: 30 }}
           />
-          <PixelButton variant="primary" size="sm" onClick={textSearch} disabled={textBusy || !textQuery.trim()}>
-            {textBusy ? '…' : t('common.search')}
+          <PixelButton variant="primary" size="sm" onClick={search} disabled={busy || !query.trim()}>
+            {busy ? '…' : t('common.search')}
           </PixelButton>
         </div>
-        {textResults.length > 0 && (
+        {mode === 'text' && textResults.length > 0 && (
           <div style={{ marginTop: 6 }}>
             {textResults.map((r, i) => (
               <div key={i} style={{ marginBottom: 4 }}>
@@ -1201,34 +1294,16 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
             ))}
           </div>
         )}
-        {textSearched && textResults.length === 0 && <Muted>{t('commandCenter.nothingMatched')}</Muted>}
-      </Section>
-
-      <Section title={t('commandCenter.semanticSearch')}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') search(); }}
-            placeholder={t('commandCenter.semanticPlaceholder')}
-            style={{ ...textareaStyle, height: 30 }}
-          />
-          <PixelButton variant="primary" size="sm" onClick={search} disabled={busy || !query.trim()}>
-            {busy ? '…' : t('common.search')}
-          </PixelButton>
-        </div>
-        {searchOut && <Pre>{searchOut}</Pre>}
-      </Section>
-
-      <Section title={t('commandCenter.memoryFile')}>
-        <Select value={who} onChange={setWho}>
-          {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-        </Select>
-        <Pre>{mem || t('commandCenter.noMemory')}</Pre>
-      </Section>
-    </Scroll>
+        {mode === 'text' && textSearched && textResults.length === 0 && <Muted>{t('commandCenter.nothingMatched')}</Muted>}
+        {mode === 'meaning' && searchOut && <Pre>{searchOut}</Pre>}
+      </section>}
+    </div>
   );
 }
+
+const srOnly: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0
+};
 
 // ─── Fleet telemetry bits (folded into the Floor AGENTS cards) ───────────────
 
@@ -1392,11 +1467,14 @@ function Muted({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{children}</div>;
 }
 
-function Pre({ children }: { children: React.ReactNode }) {
+/** `fill`: grow into the space its flex parent has left, instead of stopping at
+ *  200px. The memory file uses it; search results keep the cap. */
+function Pre({ children, fill = false }: { children: React.ReactNode; fill?: boolean }) {
   const rtl = useRtl();
   return (
     <pre style={{
-      margin: '6px 0 0', padding: 8, maxHeight: 200, overflow: 'auto',
+      margin: '6px 0 0', padding: 8, overflow: 'auto',
+      ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 200 }),
       background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
       fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px',
       color: 'var(--cth-ink-900)', whiteSpace: 'pre-wrap', wordBreak: 'break-word'

@@ -90,7 +90,8 @@
     "editNote": "Edit private note",
     "addNote": "Add private note",
     "editNoteAria": "Edit note for {{name}}",
-    "noteAria": "Note for {{name}}"
+    "noteAria": "Note for {{name}}",
+    "nextRun": "next job: {{time}}"
   },
   "askMe": {
     "emptyTitle": "Nothing needs you right now. 🌿",
@@ -106,7 +107,16 @@
     "viewAnswersHistory": "open the task detail with the full Q&A history",
     "blockingDownstream": "BLOCKING {{count}} DOWNSTREAM TASK",
     "blockingDownstreamPlural": "BLOCKING {{count}} DOWNSTREAM TASKS",
-    "more": "… +{{count}} more"
+    "more": "… +{{count}} more",
+    "scheduleTitle": "{{name}} asks to change a schedule",
+    "scheduleAdd": "Add: {{label}}, {{when}}",
+    "scheduleUpdate": "Change: {{before}}. To: {{after}}",
+    "schedulePause": "Pause: {{label}}",
+    "scheduleResume": "Turn back on: {{label}}",
+    "scheduleDelete": "Delete: {{label}}",
+    "scheduleStale": "This changed since {{name}} asked, so it can only be declined.",
+    "approve": "Approve",
+    "decline": "Decline"
   },
   "agentStrip": {
     "privateNote": "PRIVATE NOTE · {{name}}",
@@ -129,7 +139,10 @@
     "terminal": "terminal",
     "git": "git",
     "messages": "messages",
-    "traces": "traces"
+    "traces": "traces",
+    "schedules": "schedules",
+    "memory": "memory",
+    "profile": "profile"
   },
   "toolWaterfall": {
     "fresh": "fresh {{tokens}}t",
@@ -154,7 +167,9 @@
     "terminalTip": "Open your system terminal app in {{cwd}}: a normal shell in this agent's folder, separate from the agent's own terminal.",
     "openIde": "Open the IDE",
     "ide": "IDE",
-    "openTerminalAria": "Open a system terminal in this agent's folder"
+    "openTerminalAria": "Open a system terminal in this agent's folder",
+    "killConfirmSchedules": "Close {{name}}? {{name}} has {{count}} schedule on. It'll pause.",
+    "killConfirmSchedulesPlural": "Close {{name}}? {{name}} has {{count}} schedules on. They'll pause."
   },
   "settingsHero": {
     "sponsoredBy": "Sponsored by",
@@ -232,7 +247,7 @@
       "simpleModeDesc": "Agents brief you in plain language instead of engineering shorthand.",
       "notifications": "Notifications",
       "desktopNotifications": "Desktop notifications",
-      "desktopNotificationsDesc": "Native toasts when an agent finishes or needs your input.",
+      "desktopNotificationsDesc": "Desktop alerts from {{godName}} when he needs you, plus the app's own warnings.",
       "maintenance": "Maintenance",
       "autoCompact": "Compact on a schedule",
       "autoCompactDesc": "Queue /compact for every agent on a schedule (hourly by default; set the interval in the Triggers tab). Off by default. Agents that run for a long time may overflow their context without it.",
@@ -402,7 +417,6 @@
     "tabs": {
       "terminal": "terminal",
       "human": "ask me",
-      "triggers": "triggers",
       "history": "history",
       "memory": "memory",
       "workers": "workers",
@@ -688,7 +702,7 @@
       "keepAwake": "KEEP WORKING WHILE AWAY",
       "keepAwakeDesc": "Stops your computer from sleeping while an agent is live, so schedules and terminals fire on time even when you step away. Uses more battery, so it's best on power. Off by default.",
       "notifications": "DESKTOP NOTIFICATIONS",
-      "notificationsDesc": "Get pinged when an agent needs you or a terminal needs reviving, even while you're away. Your system may ask permission the first time one fires.",
+      "notificationsDesc": "{{godName}} pings you when something needs you, even while you're away. Your system may ask permission the first time.",
       "openAtLogin": "OPEN AT LOGIN",
       "openAtLoginDesc": "Relaunch the harness after a reboot so scheduled missions resume on their own. No prompt; applies immediately.",
       "shareStats": "SHARE ANONYMOUS USAGE STATS",
@@ -849,7 +863,7 @@
     "docs": "docs →",
     "askDesc": "{{godName}} can install the {{count}} missing recommended tool for you. This fills in his dispatch box; nothing runs until you press dispatch.",
     "askDescPlural": "{{godName}} can install the {{count}} missing recommended tools for you. This fills in his dispatch box; nothing runs until you press dispatch.",
-    "allReady": "Everything recommended is installed. Individual engines above are optional: set up only the ones you use.",
+    "allReady": "Everything is installed.",
     "askMichael": "ask {{godName}} to set up everything",
     "sections": {
       "prerequisites": {
@@ -862,7 +876,7 @@
       },
       "engine": {
         "title": "Agent engines",
-        "blurb": "The CLIs your agents run on. You need whichever ones you actually use, not all of them."
+        "blurb": "What your agents run on."
       }
     }
   },
@@ -947,9 +961,10 @@
   "triggersTab": {
     "intro": "Everything that can start work without you typing.",
     "schedules": "SCHEDULES",
-    "schedulesBlurb": "Run a prompt on a repeating clock.",
+    "schedulesBlurb": "Jobs that run on a clock.",
     "organisation": "ORGANISATION",
-    "organisationBlurb": "Let a teammate's office message yours."
+    "organisationBlurb": "Let a teammate's office message yours.",
+    "officeBlurb": "Everyone else's jobs on a clock. Open a team member to change theirs."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -961,18 +976,8 @@
     "noKey": "no key"
   },
   "schedulesSection": {
-    "justNow": "just now",
-    "ago": "{{unit}} ago",
-    "in": "in {{unit}}",
-    "summaryNone": "none",
-    "summary": "{{on}} of {{total}} on",
-    "nothingScheduled": "Nothing is scheduled yet.",
-    "addSchedule": "add a schedule",
-    "newSchedule": "NEW SCHEDULE",
     "label": "DO WHAT?",
     "labelPlaceholder": "For example: Follow up on unpaid invoices",
-    "goesTo": "GOES TO",
-    "everyone": "everyone",
     "prompt": "PROMPT",
     "promptPlaceholder": "Sent word for word on every run.",
     "fired": "fired {{time}}",
@@ -984,11 +989,34 @@
     "when": "WHEN",
     "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap.",
     "labelHint": "The agent is told this job name and does it the way its Work style says. Put how the job is done in that team member's Work style.",
-    "runsLabel": "Runs this job the way the agent's Work style says.",
     "olderInstructions": "OLDER INSTRUCTIONS",
     "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
     "moveToWorkStyle": "Move to {{name}}'s Work style",
-    "removeOlder": "Remove"
+    "removeOlder": "Remove",
+    "ownJobs": "{{godName}}'s jobs",
+    "officeSchedule": "Office schedule",
+    "officeEmpty": "No one on the team runs jobs on a clock yet.",
+    "emptyAgent": "{{name}} has no jobs on a clock yet.",
+    "addFor": "add a schedule for {{name}}",
+    "agentSummary": "{{name}} runs {{count}} job on a clock.",
+    "agentSummaryPlural": "{{name}} runs {{count}} jobs on a clock.",
+    "nextAt": "Next: {{time}}.",
+    "paused": "paused",
+    "loading": "One sec...",
+    "loadError": "Couldn't load {{name}}'s schedules.",
+    "loadErrorOffice": "Couldn't load the office schedule.",
+    "tryAgain": "Try again",
+    "saveFailed": "Didn't save. Try again.",
+    "sure": "Sure?",
+    "deleteIt": "delete it",
+    "keep": "keep",
+    "addedByYou": "added by you",
+    "addedBy": "added by {{name}}",
+    "runAria": "Run {{job}}",
+    "openRow": "Open {{name}}'s schedules: {{job}}",
+    "closedGroup": "{{name}} (closed)",
+    "closedNote": "{{name}} is closed, so these are paused.",
+    "relayHint": "{{godName}} hands this job to the team."
   },
   "webhooksSection": {
     "summaryNone": "none",
@@ -1148,12 +1176,35 @@
     "modelMultilingualDetail": "all languages · ~300 MB"
   },
   "threads": {
-    "noSubject": "(no subject)",
-    "empty": "No conversations yet. Messages this agent receives will appear here as threads.",
-    "less": "less",
-    "more": "more",
-    "replyPlaceholder": "Reply to {{name}}…",
-    "send": "Send"
+    "emptyHistory": "No messages yet. What {{name}} receives and sends shows up here.",
+    "you": "you",
+    "everyone": "everyone",
+    "noHandoffs": "No handoffs yet. Only office notices so far.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "verb": {
+      "request": "{{from}} asked {{to}}",
+      "query": "{{from}} asked {{to}}",
+      "inform": "{{from}} let {{to}} know",
+      "propose": "{{from}} suggested to {{to}}",
+      "agree": "{{from}} agreed",
+      "refuse": "{{from}} turned it down",
+      "done": "{{from}} finished",
+      "other": "{{from}} wrote to {{to}}"
+    },
+    "readMessage": "Read {{count}} message",
+    "readMessages": "Read all {{count}} messages",
+    "close": "Close",
+    "notices": "Office notices: {{list}}",
+    "listJoiner": ", ",
+    "scheduledRun": "{{count}} scheduled run",
+    "scheduledRunPlural": "{{count}} scheduled runs",
+    "closingTime": "{{count}} closing time",
+    "closingTimePlural": "{{count}} closing times",
+    "otherNotice": "{{count}} other",
+    "otherNoticePlural": "{{count}} others",
+    "show": "Show",
+    "hide": "Hide"
   },
   "skillsTab": {
     "installed": "Installed",
@@ -1310,7 +1361,8 @@
     "awaitingAnswer": "AWAITING YOUR ANSWER: ASK ME TAB",
     "dependsOn": "DEPENDS ON",
     "assign": "assign",
-    "priority": "Priority {{level}}/5"
+    "priority": "Priority {{level}}/5",
+    "askReplaced": "Replaced by a newer question."
   },
   "queueComposer": {
     "recording": "● recording. Click stop to transcribe",
@@ -1509,9 +1561,96 @@
     }
   },
   "clearedBanner": {
-    "text": "The app gave {{name}} a fresh start {{ago}}, after saving a handoff and its notes. Nothing was lost.",
-    "bringBack": "Bring back the earlier conversation",
+    "text": "{{name}} got a fresh start {{ago}}. Nothing was lost.",
+    "bringBack": "Bring back earlier chat",
     "minutesAgo": "{{count}} min ago",
-    "hoursAgo": "{{count}} h ago"
+    "hoursAgo": "{{count}} h ago",
+    "bringingBack": "Bringing back…",
+    "restoreFailed": "Couldn't bring it back. Try again.",
+    "hide": "Hide"
+  },
+  "ownerVia": {
+    "watching": "watching",
+    "aboutPrefix": "About {{name}}: ",
+    "regionAria": "Reaching {{name}}",
+    "explain": "{{name}} takes work from {{godName}}. To ask {{name}} something, tell {{godName}}, or talk to {{name}} 1:1.",
+    "stuck": "{{name}} is waiting on something in their terminal. Talk 1:1 to answer.",
+    "message": "Message {{godName}} about {{name}}",
+    "talk": "Talk 1:1",
+    "holdFailed": "Couldn't start the 1:1. Try again.",
+    "inOneOnOne": "In 1:1 with {{name}}",
+    "inOneOnOneNote": "In 1:1 with {{name}}. {{godName}} sends {{name}} no work until you end it.",
+    "endOneOnOne": "End 1:1"
+  },
+  "memoryNotes": {
+    "title": "{{name}}'s memory",
+    "whose": "Whose memory",
+    "loading": "Loading…",
+    "readFailed": "Couldn't read {{name}}'s memory.",
+    "remembered": "{{count}} thing remembered",
+    "rememberedPlural": "{{count}} things remembered",
+    "waiting": "{{count}} note waiting to be sorted in",
+    "waitingPlural": "{{count}} notes waiting to be sorted in",
+    "joiner": ", ",
+    "empty": "{{name}} hasn't remembered anything yet.",
+    "emptyWaiting": "{{count}} note is waiting to be sorted in. That happens in the background, usually within a day.",
+    "emptyWaitingPlural": "{{count}} notes are waiting to be sorted in. That happens in the background, usually within a day.",
+    "group": {
+      "preference": "Your preferences",
+      "procedure": "How to",
+      "fact": "Facts",
+      "reference": "Where things live",
+      "other": "Other notes"
+    },
+    "source": {
+      "owner": "from you",
+      "michael": "from {{godName}}",
+      "task": "learned on a task",
+      "tool": "from a tool"
+    },
+    "sourceLine": "{{source}}, {{date}}",
+    "checkAgain": "check again {{date}}",
+    "outOfDate": "may be out of date ({{date}})",
+    "stepsMissing": "The steps for this aren't saved yet.",
+    "showFile": "Show the file",
+    "showNotes": "Show as notes",
+    "searchTitle": "Search the office",
+    "exactWords": "Exact words",
+    "byMeaning": "By meaning"
+  },
+  "profile": {
+    "officeManager": "Office manager",
+    "noRole": "{{name}} has no role written yet. Add one with Edit at the top of the panel.",
+    "does": "What {{name}} does",
+    "asksFirst": "Asks you first",
+    "facts": "Key facts",
+    "folder": "Folder",
+    "connections": "Uses",
+    "firstJob": "First job",
+    "model": "Model",
+    "listJoiner": ", ",
+    "instructions": "{{name}}'s instructions",
+    "showInstructions": "Show the full instructions",
+    "hideInstructions": "Hide the instructions",
+    "god": {
+      "summary": "{{name}} is your office manager and your one point of contact. The team reports to {{name}}, never to you: {{name}} hands out the work, relays the results, and brings you only what needs you.",
+      "does": [
+        "Hands each job to the right team member, with what to send back",
+        "Answers small things right away: a quick fact, a short reply",
+        "Keeps the task board up to date, so it is right whenever you look",
+        "Checks on the team at each standup and gets anything stalled moving",
+        "Puts every question for you on Ask me, short, with options"
+      ],
+      "asksFirst": [
+        "Decisions and approvals only you can give",
+        "A job nobody on the team covers: add someone, hand it over, do it once, or drop it",
+        "Anything only you can do, like signing in to an account"
+      ],
+      "team": "The team ({{count}})",
+      "business": "What {{name}} knows about your business",
+      "businessFact": "Business"
+    },
+    "openFolder": "Open folder",
+    "openFolderFailed": "Couldn't open the folder. It may have been moved or deleted."
   }
 }

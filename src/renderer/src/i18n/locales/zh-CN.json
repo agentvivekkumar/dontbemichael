@@ -90,7 +90,8 @@
     "editNote": "编辑私人笔记",
     "addNote": "添加私人笔记",
     "editNoteAria": "编辑 {{name}} 的笔记",
-    "noteAria": "{{name}} 的笔记"
+    "noteAria": "{{name}} 的笔记",
+    "nextRun": "下次工作：{{time}}"
   },
   "askMe": {
     "emptyTitle": "现在没有需要你的事。🌿",
@@ -106,7 +107,16 @@
     "viewAnswersHistory": "打开包含完整问答历史的任务详情",
     "blockingDownstream": "阻塞 {{count}} 个下游任务",
     "blockingDownstreamPlural": "阻塞 {{count}} 个下游任务",
-    "more": "… 还有 {{count}} 个"
+    "more": "… 还有 {{count}} 个",
+    "scheduleTitle": "{{name}} 请求修改定时任务",
+    "scheduleAdd": "添加：{{label}}，{{when}}",
+    "scheduleUpdate": "修改：{{before}}。改为：{{after}}",
+    "schedulePause": "暂停：{{label}}",
+    "scheduleResume": "重新开启：{{label}}",
+    "scheduleDelete": "删除：{{label}}",
+    "scheduleStale": "{{name}} 提出请求后这项已有变化，只能拒绝。",
+    "approve": "批准",
+    "decline": "拒绝"
   },
   "agentStrip": {
     "privateNote": "私人笔记 · {{name}}",
@@ -129,7 +139,10 @@
     "terminal": "终端",
     "git": "Git",
     "messages": "消息",
-    "traces": "追踪"
+    "traces": "追踪",
+    "schedules": "定时任务",
+    "memory": "记忆",
+    "profile": "简介"
   },
   "toolWaterfall": {
     "fresh": "新计 {{tokens}}t",
@@ -154,7 +167,9 @@
     "terminalTip": "在 {{cwd}} 中打开你的系统终端应用，位于该智能体文件夹中的普通 shell，与该智能体自己的终端相互独立。",
     "openIde": "打开 IDE",
     "ide": "IDE",
-    "openTerminalAria": "在该智能体的文件夹中打开系统终端"
+    "openTerminalAria": "在该智能体的文件夹中打开系统终端",
+    "killConfirmSchedules": "关闭 {{name}}？{{name}} 有 {{count}} 个开启的定时任务，它会暂停。",
+    "killConfirmSchedulesPlural": "关闭 {{name}}？{{name}} 有 {{count}} 个开启的定时任务，它们会暂停。"
   },
   "settingsHero": {
     "sponsoredBy": "赞助方",
@@ -232,7 +247,7 @@
       "simpleModeDesc": "智能体用日常语言而不是工程术语向你汇报。",
       "notifications": "通知",
       "desktopNotifications": "桌面通知",
-      "desktopNotificationsDesc": "智能体完成或需要你输入时弹出系统通知。",
+      "desktopNotificationsDesc": "{{godName}} 需要你时会发桌面提醒，另有应用自身的警告。",
       "maintenance": "维护",
       "autoCompact": "定时自动压缩",
       "autoCompactDesc": "按计划为每个智能体排队执行 /compact（默认每小时；间隔在触发器标签页设置）。默认关闭，长期运行的智能体不开启可能会撑爆上下文。",
@@ -402,7 +417,6 @@
     "tabs": {
       "terminal": "终端",
       "human": "问我",
-      "triggers": "触发器",
       "history": "历史",
       "memory": "记忆",
       "workers": "工人",
@@ -688,7 +702,7 @@
       "keepAwake": "离开时保持工作",
       "keepAwakeDesc": "强保活：有智能体活跃时阻止电脑休眠，这样即使你离开，计划和终端也能准时触发。更耗电，最好接电源。默认关闭。",
       "notifications": "桌面通知",
-      "notificationsDesc": "智能体需要你或终端需要抢救时提醒你，即使你不在。第一次触发时你的系统可能会请求权限。",
+      "notificationsDesc": "有事需要你时，{{godName}} 会提醒你，即使你不在电脑前。第一次提醒时，系统可能会请求权限。",
       "openAtLogin": "开机启动",
       "openAtLoginDesc": "重启后自动重新启动 harness，让计划任务自行恢复。无提示，立即生效。",
       "shareStats": "共享匿名使用统计",
@@ -849,7 +863,7 @@
     "docs": "文档 →",
     "askDesc": "{{godName}} 可以为你安装 {{count}} 个缺失的推荐工具。这会填好他的派发框，在你按下派发前不会运行任何东西。",
     "askDescPlural": "{{godName}} 可以为你安装 {{count}} 个缺失的推荐工具。这会填好他的派发框，在你按下派发前不会运行任何东西。",
-    "allReady": "所有推荐项都已安装。上面的单个引擎都是可选的，只设置你实际使用的即可。",
+    "allReady": "所需工具都已安装。",
     "askMichael": "让 {{godName}} 设置一切",
     "sections": {
       "prerequisites": {
@@ -862,7 +876,7 @@
       },
       "engine": {
         "title": "智能体引擎",
-        "blurb": "你的智能体所运行的 CLI。你只需要实际使用的那些，不是全部。"
+        "blurb": "你的智能体运行所依赖的程序。"
       }
     }
   },
@@ -947,9 +961,10 @@
   "triggersTab": {
     "intro": "所有无需你输入就能启动工作的方式。",
     "schedules": "计划任务",
-    "schedulesBlurb": "按固定周期运行提示词。",
+    "schedulesBlurb": "按时间自动运行的工作。",
     "organisation": "组织",
-    "organisationBlurb": "让队友的办公室给你的办公室发消息。"
+    "organisationBlurb": "让队友的办公室给你的办公室发消息。",
+    "officeBlurb": "团队其他成员的定时工作。打开某位成员即可修改他的安排。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -961,18 +976,8 @@
     "noKey": "无密钥"
   },
   "schedulesSection": {
-    "justNow": "刚刚",
-    "ago": "{{unit}} 前",
-    "in": "{{unit}} 后",
-    "summaryNone": "无",
-    "summary": "{{on}} / {{total}} 开启",
-    "nothingScheduled": "还没有计划任务。",
-    "addSchedule": "添加计划",
-    "newSchedule": "新计划",
     "label": "做什么？",
     "labelPlaceholder": "例如：跟进未付的发票",
-    "goesTo": "发送给",
-    "everyone": "所有人",
     "prompt": "提示词",
     "promptPlaceholder": "每次运行逐字发送。",
     "fired": "{{time}} 前触发",
@@ -984,11 +989,34 @@
     "when": "何时",
     "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。",
     "labelHint": "成员会收到这个任务名称，并按照自己的工作方式去完成。任务具体怎么做，请写在该成员的工作方式里。",
-    "runsLabel": "按照成员的工作方式完成这个任务。",
     "olderInstructions": "旧的说明",
     "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
     "moveToWorkStyle": "移到 {{name}} 的工作方式",
-    "removeOlder": "删除"
+    "removeOlder": "删除",
+    "ownJobs": "{{godName}} 的工作",
+    "officeSchedule": "办公室日程",
+    "officeEmpty": "团队里还没有人按时间运行工作。",
+    "emptyAgent": "{{name}} 还没有定时工作。",
+    "addFor": "为 {{name}} 添加定时任务",
+    "agentSummary": "{{name}} 有 {{count}} 项定时工作。",
+    "agentSummaryPlural": "{{name}} 有 {{count}} 项定时工作。",
+    "nextAt": "下一次：{{time}}。",
+    "paused": "已暂停",
+    "loading": "稍等……",
+    "loadError": "无法加载 {{name}} 的定时任务。",
+    "loadErrorOffice": "无法加载办公室日程。",
+    "tryAgain": "重试",
+    "saveFailed": "没有保存成功，请重试。",
+    "sure": "确定吗？",
+    "deleteIt": "删除",
+    "keep": "保留",
+    "addedByYou": "由你添加",
+    "addedBy": "由 {{name}} 添加",
+    "runAria": "运行 {{job}}",
+    "openRow": "打开 {{name}} 的定时任务：{{job}}",
+    "closedGroup": "{{name}}（已关闭）",
+    "closedNote": "{{name}} 已关闭，所以这些已暂停。",
+    "relayHint": "{{godName}} 会把这项工作分给团队。"
   },
   "webhooksSection": {
     "summaryNone": "无",
@@ -1148,12 +1176,35 @@
     "modelMultilingualDetail": "所有语言 · 约 300 MB"
   },
   "threads": {
-    "noSubject": "（无主题）",
-    "empty": "还没有对话。该智能体收到的消息会以对话线程的形式显示在这里。",
-    "less": "收起",
-    "more": "更多",
-    "replyPlaceholder": "回复 {{name}}…",
-    "send": "发送"
+    "emptyHistory": "还没有消息。{{name}} 收到和发出的消息会显示在这里。",
+    "you": "你",
+    "everyone": "所有人",
+    "noHandoffs": "还没有交接，目前只有办公室通知。",
+    "today": "今天",
+    "yesterday": "昨天",
+    "verb": {
+      "request": "{{from}} 请 {{to}} 帮忙",
+      "query": "{{from}} 问 {{to}}",
+      "inform": "{{from}} 告诉 {{to}}",
+      "propose": "{{from}} 向 {{to}} 提议",
+      "agree": "{{from}} 同意了",
+      "refuse": "{{from}} 拒绝了",
+      "done": "{{from}} 完成了",
+      "other": "{{from}} 写信给 {{to}}"
+    },
+    "readMessage": "查看 {{count}} 条消息",
+    "readMessages": "查看全部 {{count}} 条消息",
+    "close": "收起",
+    "notices": "办公室通知：{{list}}",
+    "listJoiner": "，",
+    "scheduledRun": "{{count}} 次定时运行",
+    "scheduledRunPlural": "{{count}} 次定时运行",
+    "closingTime": "{{count}} 次下班通知",
+    "closingTimePlural": "{{count}} 次下班通知",
+    "otherNotice": "{{count}} 条其他",
+    "otherNoticePlural": "{{count}} 条其他",
+    "show": "显示",
+    "hide": "隐藏"
   },
   "skillsTab": {
     "installed": "已安装",
@@ -1310,7 +1361,8 @@
     "awaitingAnswer": "等待你的回答：「问我」标签页",
     "dependsOn": "依赖",
     "assign": "分配",
-    "priority": "优先级 {{level}}/5"
+    "priority": "优先级 {{level}}/5",
+    "askReplaced": "已被更新的问题取代。"
   },
   "queueComposer": {
     "recording": "● 录音中，点击停止转写",
@@ -1509,9 +1561,96 @@
     }
   },
   "clearedBanner": {
-    "text": "应用在保存交接说明和笔记后，于{{ago}}让 {{name}} 重新开始了对话。没有丢失任何内容。",
+    "text": "{{name}} 于{{ago}}重新开始了对话。没有丢失任何内容。",
     "bringBack": "恢复之前的对话",
     "minutesAgo": "{{count}} 分钟前",
-    "hoursAgo": "{{count}} 小时前"
+    "hoursAgo": "{{count}} 小时前",
+    "bringingBack": "正在恢复…",
+    "restoreFailed": "没能恢复。请再试一次。",
+    "hide": "隐藏"
+  },
+  "ownerVia": {
+    "watching": "仅观看",
+    "aboutPrefix": "关于 {{name}}：",
+    "regionAria": "联系 {{name}}",
+    "explain": "{{name}} 从 {{godName}} 那里接收工作。想让 {{name}} 做什么，请告诉 {{godName}}，或与 {{name}} 一对一交谈。",
+    "stuck": "{{name}} 的终端里有事在等待处理。进入一对一即可回答。",
+    "message": "就 {{name}} 给 {{godName}} 发消息",
+    "talk": "一对一交谈",
+    "holdFailed": "无法开始一对一，请重试。",
+    "inOneOnOne": "正在与 {{name}} 一对一",
+    "inOneOnOneNote": "正在与 {{name}} 一对一。结束之前，{{godName}} 不会给 {{name}} 派活。",
+    "endOneOnOne": "结束一对一"
+  },
+  "memoryNotes": {
+    "title": "{{name}} 的记忆",
+    "whose": "查看谁的记忆",
+    "loading": "加载中…",
+    "readFailed": "无法读取 {{name}} 的记忆。",
+    "remembered": "记住了 {{count}} 件事",
+    "rememberedPlural": "记住了 {{count}} 件事",
+    "waiting": "{{count}} 条笔记等待整理",
+    "waitingPlural": "{{count}} 条笔记等待整理",
+    "joiner": "，",
+    "empty": "{{name}} 还没有记住任何事。",
+    "emptyWaiting": "有 {{count}} 条笔记等待整理。整理在后台进行，通常一天之内完成。",
+    "emptyWaitingPlural": "有 {{count}} 条笔记等待整理。整理在后台进行，通常一天之内完成。",
+    "group": {
+      "preference": "你的偏好",
+      "procedure": "做法",
+      "fact": "事实",
+      "reference": "东西放在哪里",
+      "other": "其他笔记"
+    },
+    "source": {
+      "owner": "来自你",
+      "michael": "来自 {{godName}}",
+      "task": "在任务中学到",
+      "tool": "来自工具"
+    },
+    "sourceLine": "{{source}}，{{date}}",
+    "checkAgain": "{{date}} 再核对",
+    "outOfDate": "可能已过时（{{date}}）",
+    "stepsMissing": "这项的步骤还没有保存。",
+    "showFile": "显示文件",
+    "showNotes": "显示为笔记",
+    "searchTitle": "搜索办公室",
+    "exactWords": "精确词语",
+    "byMeaning": "按含义"
+  },
+  "profile": {
+    "officeManager": "办公室经理",
+    "noRole": "{{name}} 还没有写好职责。可以用面板顶部的“编辑”添加。",
+    "does": "{{name}} 做什么",
+    "asksFirst": "先问你的事",
+    "facts": "关键信息",
+    "folder": "文件夹",
+    "connections": "使用",
+    "firstJob": "第一项工作",
+    "model": "模型",
+    "listJoiner": "、",
+    "instructions": "{{name}} 的工作说明",
+    "showInstructions": "显示完整说明",
+    "hideInstructions": "隐藏说明",
+    "god": {
+      "summary": "{{name}} 是你的办公室经理，也是你唯一的联系人。团队向 {{name}} 汇报，而不是向你：{{name}} 分派工作、转达结果，只把需要你处理的事带给你。",
+      "does": [
+        "把每项工作交给合适的团队成员，并说明要交回什么",
+        "马上处理小事：简单的事实、简短的回复",
+        "随时更新任务看板，你什么时候看都是准的",
+        "每次站会检查团队进展，推动停滞的工作",
+        "把所有要问你的问题放到“问我”，简短并附选项"
+      ],
+      "asksFirst": [
+        "只有你能做的决定和批准",
+        "团队里没人负责的工作：加人、转交、做一次，或放弃",
+        "只有你能做的事，比如登录某个账户"
+      ],
+      "team": "团队（{{count}}）",
+      "business": "{{name}} 对你的业务了解什么",
+      "businessFact": "业务"
+    },
+    "openFolder": "打开文件夹",
+    "openFolderFailed": "无法打开文件夹，它可能已被移动或删除。"
   }
 }

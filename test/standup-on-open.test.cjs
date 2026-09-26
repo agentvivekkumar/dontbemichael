@@ -26,6 +26,10 @@ test('Michael coming up sends the standup, once per launch', () => {
 });
 
 test('the interval timer never sends a second standup at launch', () => {
-  assert.match(main, /const waitForOpen = m\.id === OPS_STANDUP_MISSION\.id && !standupFiredThisLaunch;/);
-  assert.match(main, /const remaining = waitForOpen \? m\.intervalMs : Math\.max\(0,/);
+  // The decision moved into shared/missions.ts (armPlan); missions.test.cjs
+  // checks the waits themselves with fake clocks.
+  assert.match(main, /armPlan\(m, Date\.now\(\), \{ standupId: OPS_STANDUP_MISSION\.id, standupFiredThisLaunch \}\)/);
+  const shared = fs.readFileSync(path.resolve(__dirname, '../src/shared/missions.ts'), 'utf8');
+  assert.match(shared, /const waitForOpen = m\.id === ctx\.standupId && !ctx\.standupFiredThisLaunch;/);
+  assert.match(shared, /const firstDelayMs = waitForOpen \? everyMs : Math\.min\(MAX_TIMER_MS, Math\.max\(0,/);
 });

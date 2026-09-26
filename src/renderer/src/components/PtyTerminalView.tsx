@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { Icon } from './Icon';
-import { acquireTerminal, attachTerminal, detachTerminal, reflowTerminal } from './terminalPool';
+import { acquireTerminal, attachTerminal, detachTerminal, reflowTerminal, setTerminalInputLocked } from './terminalPool';
+import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   MAX_TERMINAL_FONT_SIZE,
@@ -122,9 +123,15 @@ export interface PtyTerminalViewProps {
   fullscreen?: boolean;
   /** Edge-to-edge mode for the sidebar tab: no outer chrome/border. */
   embedded?: boolean;
+  /** Watch only: the owner's typing, pasting and dropping never reach this
+   *  terminal. A team member outside 1:1 (docs/designs/owner-talks-via-michael.md). */
+  inputLocked?: boolean;
 }
 
-export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFullscreen, fullscreen, embedded }: PtyTerminalViewProps) {
+export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFullscreen, fullscreen, embedded, inputLocked = false }: PtyTerminalViewProps) {
+  const { t } = useTranslation();
+  // Re-applied whenever the pty or the lock changes; the entry outlives this view.
+  useEffect(() => { setTerminalInputLocked(ptyId, inputLocked); }, [ptyId, inputLocked]);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onStreamDataRef = useRef(onStreamData);
   onStreamDataRef.current = onStreamData;
@@ -302,6 +309,8 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
     }
   };
   const onDrop = (e: React.DragEvent) => {
+    // Watch only: a dropped file would be typed into the agent's prompt.
+    if (inputLocked) { e.preventDefault(); return; }
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (files.length === 0) return; // not a file drop — let xterm handle it
     e.preventDefault();
@@ -378,7 +387,11 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
           animation: 'cth-pulse 1200ms steps(2, end) infinite'
         }} />
         live · pty {ptyId}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
+        {inputLocked && (
+          <span style={{ marginInlineStart: 'auto', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('ownerVia.watching')}</span>
+        )}
+        {/* The watching tag takes the auto margin when shown, so it sits beside these. */}
+        <div style={{ marginInlineStart: inputLocked ? 8 : 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
           {/* v0.3.4: the theme + enter-fullscreen buttons moved to the TITLE BAR
               (top right) — more accessible, and the theme now darkens the whole
               app. Only the EXIT affordance stays here, in fullscreen. */}

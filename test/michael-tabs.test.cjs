@@ -14,11 +14,13 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/CommandCenterPanel.tsx'), 'utf8');
 
-test('ASK ME is the first tab in Michael\'s panel', () => {
+// PROFILE is first on every agent (owner, 2026-09-25); ASK ME right after it,
+// and the panel still opens on ASK ME (next test).
+test('PROFILE then ASK ME lead Michael\'s panel', () => {
   const block = src.match(/const TABS:[^=]*= \[([\s\S]*?)\n\];/);
   assert.ok(block, 'could not find the TABS list');
   const keys = [...block[1].matchAll(/key: '([a-z-]+)'/g)].map((m) => m[1]);
-  assert.equal(keys[0], 'human');
+  assert.deepEqual(keys.slice(0, 2), ['profile', 'human']);
   assert.ok(keys.includes('terminal'), 'the terminal is still there, just not first');
 });
 
@@ -79,4 +81,12 @@ test('Michael\'s panel has no Tasks tab; a request for it opens the floor\'s Tas
   assert.doesNotMatch(src, /<TasksKanban/);
   // 'tasks' and 'graph' both became floor views.
   assert.match(src, /if \(ccTabRequest\.tab === 'tasks' \|\| ccTabRequest\.tab === 'graph'\) \{ useStore\.getState\(\)\.setFloorView\(ccTabRequest\.tab\); return; \}/);
+});
+
+test("Michael's schedule tab is called schedules, like every other agent's", () => {
+  assert.match(src, /\{ key: 'triggers', labelKey: 'sidebar\.schedules', icon: 'clock' \}/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(fs.readFileSync(require('node:path').resolve(__dirname, `../src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
+    assert.equal(d.commandCenter.tabs.triggers, undefined, `${loc}: the old label is gone`);
+  }
 });

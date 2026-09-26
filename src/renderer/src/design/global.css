@@ -265,6 +265,11 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
 /* ─── Markdown preview (v0.3.4) ──────────────────────────────────────────────
    Shared by the IDE split/preview view and the fullscreen file overlay. All
    colors ride the tokens, so light + dark themes come for free. */
+/* Memory tab rows (MemoryNotes): a divided list, one hairline between rows (DESIGN.md §7.10). */
+.cth-memory-row + .cth-memory-row { border-top: 1px solid var(--cth-ink-100); }
+/* Messages tab conversation rows (ThreadsPanel), the same divided list. */
+.cth-thread-row + .cth-thread-row { border-top: 1px solid var(--cth-ink-100); }
+
 .cth-md-preview {
   font-family: var(--cth-font-ui);
   font-size: 14px; line-height: 1.65;

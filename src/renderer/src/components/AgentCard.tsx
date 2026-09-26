@@ -35,6 +35,8 @@ export interface AgentCardProps {
   /** Number of ledger tasks this agent is actively DOING — rendered as a blue
    *  sticky note stuck to the card. Clicking it opens the first task's detail. */
   doingCount?: number;
+  /** When this agent's next scheduled job runs (ms), if it has one on. */
+  nextRunAt?: number;
   onTaskNoteClick?: () => void;
   draggable?: boolean; // must sit on the <button> itself — Chromium won't start a drag on an ancestor from inside a form control
   /** Private note — rendered as the card's own row (v0.3.4) so it can never
@@ -55,7 +57,7 @@ const fmtK = (n: number): string => `${Math.round(n / 1000)}k`;
 export function AgentCard({
   name, character, accent, status, ptyId, project, action, progress = 0,
   contextTokens, contextLimit, selected, isGod, onClick,
-  doingCount = 0, onTaskNoteClick, draggable, note, onEditNote
+  doingCount = 0, onTaskNoteClick, draggable, note, onEditNote, nextRunAt
 }: AgentCardProps) {
   const { t } = useTranslation();
   const [hover, setHover] = useState(false);
@@ -123,7 +125,12 @@ export function AgentCard({
     .filter(Boolean).join(', ') || 'none';
 
   // One context line: what it's DOING while working, WHERE it lives while idle.
-  const infoLine = (status !== 'idle' && action) ? action : project;
+  // An idle agent with a job on a clock says when it runs next (design D2);
+  // that tells an owner more than the folder it lives in.
+  const nextLine = nextRunAt
+    ? t('agentCard.nextRun', { time: new Date(nextRunAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) })
+    : null;
+  const infoLine = (status !== 'idle' && action) ? action : (nextLine ?? project);
   const noteFirstLine = (note ?? '').split('\n').find((l) => l.trim()) ?? '';
 
   return (

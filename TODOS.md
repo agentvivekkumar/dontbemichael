@@ -26,6 +26,57 @@
 **Priority:** P2
 **Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
 
+## Schedules
+
+### Starter jobs in an agent's empty Schedules tab
+
+**What:** Show up to three suggested jobs from the office pack's `starterMissions` in an agent's empty Schedules tab, each added paused with one click (design decision 5A in `docs/designs/per-agent-schedules.md`).
+
+**Why:** An empty tab is where an owner first learns an agent can run jobs on its own. A suggestion turns that into one click instead of inventing a job.
+
+**Context:** Deferred while building per-agent schedules (2026-09-25) because no shipped pack in `resources/packs/` has `starterMissions`, and its `schedule` field is a free string with no defined format (`src/shared/officePack.ts:76`). The empty tab ships with its copy and add button. To build: define the schedule format (reuse `parseWhen` in `src/shared/missions.ts`), write starters into the packs, map pack agent ids to hive agent ids, and add the suggestion rows.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** starter jobs written into the shipped packs.
+
+## Agents and 1:1
+
+### One rule for "stuck at a prompt" in main and the panel
+
+**What:** Put the terminal prompt check (`isTerminalPrompt` in `src/main/hooks.ts`) in shared code
+and use it in the renderer's status parsing (`src/renderer/src/hooks/useHive.ts`), passing
+`notification_type` through the hook event.
+
+**Why:** Michael is told an agent is stuck from the prompt's type; the panel decides from words
+in the message. For a dialog without those words, Michael hears "stuck" while the panel shows the
+agent idle, with no coral bar and Talk 1:1 not leading. Found by the red team in the pre-landing
+review of feat/per-agent-schedules (2026-09-25); the owner chose a follow-up.
+
+**Priority:** P2
+
+### Block mouse and focus reports in a watch-only terminal
+
+**What:** While a team member's terminal is locked (outside 1:1), drop mouse report and focus
+report sequences in `term.onData` (`src/renderer/src/components/terminalPool.ts`), letting the
+terminal's own query replies through.
+
+**Why:** The lock covers keys, paste, drop and composition. If the agent's program turns on mouse
+tracking, a click in the watch-only terminal still reaches it. Low confidence in the pre-landing
+review (2026-09-25); needs a check with a mouse-aware prompt.
+
+**Priority:** P3
+
+### Label messages with no usable date
+
+**What:** In the Messages tab, give conversations whose messages have no valid `created_at` a
+heading ("Undated") instead of an empty one (`src/shared/messageView.ts` localDay returns '').
+
+**Why:** Only malformed files hit it, but the section then has no heading. Found by the local
+model review (2026-09-25).
+
+**Priority:** P4
+
 ## Business mode (deferred from plan, v0.0.1 ship)
 
 Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "ship, defer as P1 TODOs" on 2026-09-24).
@@ -208,7 +259,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 **Why:** An owner who edits the box expects Michael to receive it. Every other schedule stopped carrying a prompt on 2026-09-25 (the label names the job and the agent's Work style says how), so the heartbeat is the one card left with a box, and it's a box that does nothing.
 
-**Context:** Found in the 2026-09-25 agent instructions audit; the owner chose to leave the heartbeat as it is for now (it ships off). `SchedulesSection.tsx` keeps the box for `kind: 'heartbeat'` only.
+**Context:** Found in the 2026-09-25 agent instructions audit; the owner chose to leave the heartbeat as it is for now (it ships off). `src/renderer/src/components/triggers/ScheduleList.tsx` keeps the box for `kind: 'heartbeat'` only.
 
 **Effort:** S
 **Priority:** P3

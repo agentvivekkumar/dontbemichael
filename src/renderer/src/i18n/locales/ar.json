@@ -90,7 +90,8 @@
     "editNote": "تحرير ملاحظة خاصة",
     "addNote": "إضافة ملاحظة خاصة",
     "editNoteAria": "تحرير ملاحظة {{name}}",
-    "noteAria": "ملاحظة {{name}}"
+    "noteAria": "ملاحظة {{name}}",
+    "nextRun": "العمل التالي: {{time}}"
   },
   "askMe": {
     "emptyTitle": "لا شيء يحتاجك الآن. 🌿",
@@ -106,7 +107,16 @@
     "viewAnswersHistory": "افتح تفاصيل المهمة مع سجلّ الأسئلة والأجوبة كاملًا",
     "blockingDownstream": "يعطّل {{count}} مهمة لاحقة",
     "blockingDownstreamPlural": "يعطّل {{count}} مهام لاحقة",
-    "more": "… +{{count}} أخرى"
+    "more": "… +{{count}} أخرى",
+    "scheduleTitle": "{{name}} يطلب تغيير موعد",
+    "scheduleAdd": "إضافة: {{label}}، {{when}}",
+    "scheduleUpdate": "تغيير: {{before}}. إلى: {{after}}",
+    "schedulePause": "إيقاف مؤقت: {{label}}",
+    "scheduleResume": "إعادة التشغيل: {{label}}",
+    "scheduleDelete": "حذف: {{label}}",
+    "scheduleStale": "تغيّر هذا منذ أن طلبه {{name}}، لذا يمكن رفضه فقط.",
+    "approve": "موافقة",
+    "decline": "رفض"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",
@@ -129,7 +139,10 @@
     "terminal": "الطرفية",
     "git": "git",
     "messages": "الرسائل",
-    "traces": "التتبّع"
+    "traces": "التتبّع",
+    "schedules": "المواعيد",
+    "memory": "الذاكرة",
+    "profile": "الملف"
   },
   "toolWaterfall": {
     "fresh": "جديد {{tokens}}ر",
@@ -154,7 +167,9 @@
     "terminalTip": "افتح تطبيق الطرفية في نظامك عند {{cwd}}، صدفة عادية داخل مجلد هذا الوكيل، منفصلة عن طرفيته الخاصة.",
     "openIde": "افتح بيئة التطوير",
     "ide": "بيئة التطوير",
-    "openTerminalAria": "افتح طرفية نظام في مجلد هذا الوكيل"
+    "openTerminalAria": "افتح طرفية نظام في مجلد هذا الوكيل",
+    "killConfirmSchedules": "إغلاق {{name}}؟ لدى {{name}} موعد مفعل واحد ({{count}}). سيتوقف مؤقتًا.",
+    "killConfirmSchedulesPlural": "إغلاق {{name}}؟ لدى {{name}} {{count}} مواعيد مفعلة. ستتوقف مؤقتًا."
   },
   "settingsHero": {
     "sponsoredBy": "برعاية",
@@ -232,7 +247,7 @@
       "simpleModeDesc": "يوجز لك الوكلاء بلغة واضحة بدل المصطلحات الهندسية المختصرة.",
       "notifications": "الإشعارات",
       "desktopNotifications": "إشعارات سطح المكتب",
-      "desktopNotificationsDesc": "إشعارات أصلية عندما ينتهي وكيل أو يحتاج إلى ردّك.",
+      "desktopNotificationsDesc": "تنبيهات على سطح المكتب من {{godName}} عندما يحتاج إليك، إضافة إلى تحذيرات التطبيق نفسه.",
       "maintenance": "الصيانة",
       "autoCompact": "ضغط تلقائي مجدوَل",
       "autoCompactDesc": "يضيف ‎/compact إلى طابور كل وكيل وفق جدول (كل ساعة افتراضيًا؛ الفاصل في تبويب المشغّلات). معطّل افتراضيًا، قد تفيض ذاكرة الوكلاء طويلة العمل من دونه.",
@@ -402,7 +417,6 @@
     "tabs": {
       "terminal": "الطرفية",
       "human": "اسألني",
-      "triggers": "المشغّلات",
       "history": "السجل",
       "memory": "الذاكرة",
       "workers": "العمّال",
@@ -688,7 +702,7 @@
       "keepAwake": "واصِل العمل أثناء غيابك",
       "keepAwakeDesc": "إبقاء قوي على الاستيقاظ: يمنع جهازك من النوم ما دام وكيل نشطًا، لتعمل الجداول والطرفيات في وقتها حتى حين تبتعد. يستهلك بطارية أكثر، والأفضل عند التوصيل بالكهرباء. معطّل افتراضيًا.",
       "notifications": "إشعارات سطح المكتب",
-      "notificationsDesc": "تصلك تنبيهات حين يحتاجك وكيل أو تحتاج طرفية إلى إنعاش، حتى وأنت بعيد. قد يطلب نظامك الإذن عند أول إشعار.",
+      "notificationsDesc": "ينبّهك {{godName}} عندما يحتاج أمر ما إليك، حتى وأنت بعيد. قد يطلب نظامك الإذن في المرة الأولى.",
       "openAtLogin": "الفتح عند تسجيل الدخول",
       "openAtLoginDesc": "أعِد تشغيل المنصّة بعد إقلاع الجهاز لتستأنف المهام المجدولة وحدها. بلا سؤال، ويسري فورًا.",
       "shareStats": "شارك إحصاءات استخدام مجهولة",
@@ -849,7 +863,7 @@
     "docs": "التوثيق ←",
     "askDesc": "يستطيع {{godName}} تثبيت الأداة الموصى بها الناقصة البالغ عددها {{count}} نيابةً عنك. هذا يملأ صندوق الإرسال لديه، ولا يعمل شيء حتى تضغط \"أرسل\".",
     "askDescPlural": "يستطيع {{godName}} تثبيت الأدوات الموصى بها الناقصة البالغ عددها {{count}} نيابةً عنك. هذا يملأ صندوق الإرسال لديه، ولا يعمل شيء حتى تضغط \"أرسل\".",
-    "allReady": "كل ما هو موصى به مثبَّت. المحرّكات المفردة أعلاه اختيارية، أعِدّ ما تستخدمه فقط.",
+    "allReady": "كل شيء مثبت.",
     "askMichael": "اطلب من {{godName}} إعداد كل شيء",
     "sections": {
       "prerequisites": {
@@ -862,7 +876,7 @@
       },
       "engine": {
         "title": "محرّكات الوكلاء",
-        "blurb": "أدوات الـCLI التي يعمل عليها وكلاؤك. تحتاج ما تستخدمه فعلًا منها، لا كلها."
+        "blurb": "ما يعمل عليه وكلاؤك."
       }
     }
   },
@@ -947,9 +961,10 @@
   "triggersTab": {
     "intro": "كل ما يمكنه بدء العمل دون أن تكتب أنت شيئًا.",
     "schedules": "الجدولة",
-    "schedulesBlurb": "شغّل مطالبة على ساعة متكرّرة.",
+    "schedulesBlurb": "أعمال تعمل حسب الساعة.",
     "organisation": "المؤسسة",
-    "organisationBlurb": "دع مكتب زميلك يراسل مكتبك."
+    "organisationBlurb": "دع مكتب زميلك يراسل مكتبك.",
+    "officeBlurb": "أعمال بقية الفريق المجدولة. افتح عضوًا في الفريق لتغيير مواعيده."
   },
   "orgSection": {
     "acceptMessages": "قبول الرسائل من مؤسستك",
@@ -961,18 +976,8 @@
     "noKey": "بلا مفتاح"
   },
   "schedulesSection": {
-    "justNow": "الآن",
-    "ago": "قبل {{unit}}",
-    "in": "خلال {{unit}}",
-    "summaryNone": "لا شيء",
-    "summary": "{{on}} من {{total}} مفعّل",
-    "nothingScheduled": "لا شيء مجدول بعد.",
-    "addSchedule": "أضف جدولًا",
-    "newSchedule": "جدول جديد",
     "label": "ماذا يُنجز؟",
     "labelPlaceholder": "مثلًا: متابعة الفواتير غير المدفوعة",
-    "goesTo": "يذهب إلى",
-    "everyone": "الجميع",
     "prompt": "الموجّه",
     "promptPlaceholder": "يُرسَل حرفيًا في كل تشغيل.",
     "fired": "عمل {{time}}",
@@ -984,11 +989,34 @@
     "when": "متى",
     "beatCeiling": "تتكيّف النبضة مع هدوء الأرضية، فهذا هو الحدّ الأعلى لا الفاصل الدقيق.",
     "labelHint": "يصل اسم المهمة إلى العضو فينجزها كما يصف أسلوب عمله. اكتب طريقة إنجاز المهمة في أسلوب عمل ذلك العضو.",
-    "runsLabel": "ينجز هذه المهمة كما يصف أسلوب عمل العضو.",
     "olderInstructions": "تعليمات قديمة",
     "olderInstructionsHint": "أُعدّ هذا الجدول بتعليمات خاصة به، وما زالت تُرسل في كل تشغيل. طريقة إنجاز المهمة مكانها أسلوب عمل {{name}}، فانقلها إليه أو احذفها.",
     "moveToWorkStyle": "انقلها إلى أسلوب عمل {{name}}",
-    "removeOlder": "حذف"
+    "removeOlder": "حذف",
+    "ownJobs": "أعمال {{godName}}",
+    "officeSchedule": "جدول المكتب",
+    "officeEmpty": "لا أحد في الفريق لديه أعمال مجدولة بعد.",
+    "emptyAgent": "ليس لدى {{name}} أعمال مجدولة بعد.",
+    "addFor": "أضف موعدًا لـ {{name}}",
+    "agentSummary": "لدى {{name}} عمل مجدول واحد ({{count}}).",
+    "agentSummaryPlural": "لدى {{name}} {{count}} أعمال مجدولة.",
+    "nextAt": "التالي: {{time}}.",
+    "paused": "متوقف مؤقتًا",
+    "loading": "لحظة...",
+    "loadError": "تعذر تحميل مواعيد {{name}}.",
+    "loadErrorOffice": "تعذر تحميل جدول المكتب.",
+    "tryAgain": "حاول مجددًا",
+    "saveFailed": "لم يُحفظ. حاول مجددًا.",
+    "sure": "متأكد؟",
+    "deleteIt": "احذفه",
+    "keep": "أبقه",
+    "addedByYou": "أضفته أنت",
+    "addedBy": "أضافه {{name}}",
+    "runAria": "تشغيل {{job}}",
+    "openRow": "افتح مواعيد {{name}}: {{job}}",
+    "closedGroup": "{{name}} (مغلق)",
+    "closedNote": "{{name}} مغلق، لذا هذه المواعيد متوقفة مؤقتًا.",
+    "relayHint": "يوزع {{godName}} هذا العمل على الفريق."
   },
   "webhooksSection": {
     "summaryNone": "لا شيء",
@@ -1148,12 +1176,35 @@
     "modelMultilingualDetail": "كل اللغات · ~300 م.ب"
   },
   "threads": {
-    "noSubject": "(بلا موضوع)",
-    "empty": "لا محادثات بعد. ستظهر هنا الرسائل التي يستقبلها هذا الوكيل على شكل مواضيع.",
-    "less": "أقل",
-    "more": "المزيد",
-    "replyPlaceholder": "ردّ على {{name}}…",
-    "send": "إرسال"
+    "emptyHistory": "لا رسائل بعد. ما يستلمه {{name}} ويرسله يظهر هنا.",
+    "you": "أنت",
+    "everyone": "الجميع",
+    "noHandoffs": "لا تسليمات بعد. توجد إشعارات المكتب فقط حتى الآن.",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "verb": {
+      "request": "طلب {{from}} من {{to}}",
+      "query": "سأل {{from}} {{to}}",
+      "inform": "أبلغ {{from}} {{to}}",
+      "propose": "اقترح {{from}} على {{to}}",
+      "agree": "وافق {{from}}",
+      "refuse": "رفض {{from}}",
+      "done": "أنهى {{from}}",
+      "other": "كتب {{from}} إلى {{to}}"
+    },
+    "readMessage": "اقرأ {{count}} رسالة",
+    "readMessages": "اقرأ كل الرسائل ({{count}})",
+    "close": "إغلاق",
+    "notices": "إشعارات المكتب: {{list}}",
+    "listJoiner": "، ",
+    "scheduledRun": "{{count}} تشغيل مجدول",
+    "scheduledRunPlural": "{{count}} تشغيلات مجدولة",
+    "closingTime": "{{count}} إشعار إغلاق",
+    "closingTimePlural": "{{count}} إشعارات إغلاق",
+    "otherNotice": "{{count}} أخرى",
+    "otherNoticePlural": "{{count}} أخرى",
+    "show": "اعرض",
+    "hide": "أخفِ"
   },
   "skillsTab": {
     "installed": "المثبَّتة",
@@ -1310,7 +1361,8 @@
     "awaitingAnswer": "بانتظار إجابتك: تبويب اسألني",
     "dependsOn": "يعتمد على",
     "assign": "إسناد",
-    "priority": "الأولوية {{level}}/5"
+    "priority": "الأولوية {{level}}/5",
+    "askReplaced": "استُبدل بسؤال أحدث."
   },
   "queueComposer": {
     "recording": "● يسجّل، انقر إيقاف للتفريغ النصي",
@@ -1509,9 +1561,96 @@
     }
   },
   "clearedBanner": {
-    "text": "بدأ التطبيق محادثة جديدة لـ{{name}} {{ago}}، بعد حفظ ملاحظة التسليم وملاحظاته. لم يضع شيء.",
+    "text": "بدأ {{name}} من جديد {{ago}}. لم يضع شيء.",
     "bringBack": "أعد المحادثة السابقة",
     "minutesAgo": "قبل {{count}} دقيقة",
-    "hoursAgo": "قبل {{count}} ساعة"
+    "hoursAgo": "قبل {{count}} ساعة",
+    "bringingBack": "جارٍ الإعادة…",
+    "restoreFailed": "تعذّرت الإعادة. حاول مرة أخرى.",
+    "hide": "إخفاء"
+  },
+  "ownerVia": {
+    "watching": "مشاهدة فقط",
+    "aboutPrefix": "بخصوص {{name}}: ",
+    "regionAria": "التواصل مع {{name}}",
+    "explain": "يتلقى {{name}} العمل من {{godName}}. لتطلب شيئًا من {{name}}، أخبر {{godName}}، أو تحدث مع {{name}} على انفراد.",
+    "stuck": "ينتظر {{name}} أمرًا في الطرفية الخاصة به. تحدث على انفراد للرد.",
+    "message": "راسل {{godName}} بخصوص {{name}}",
+    "talk": "حديث على انفراد",
+    "holdFailed": "تعذر بدء الحديث على انفراد. حاول مجددًا.",
+    "inOneOnOne": "على انفراد مع {{name}}",
+    "inOneOnOneNote": "على انفراد مع {{name}}. لن يرسل {{godName}} عملًا إلى {{name}} حتى تنهي ذلك.",
+    "endOneOnOne": "إنهاء الحديث على انفراد"
+  },
+  "memoryNotes": {
+    "title": "ذاكرة {{name}}",
+    "whose": "ذاكرة من",
+    "loading": "جارٍ التحميل…",
+    "readFailed": "تعذّرت قراءة ذاكرة {{name}}.",
+    "remembered": "{{count}} شيء محفوظ",
+    "rememberedPlural": "{{count}} أشياء محفوظة",
+    "waiting": "{{count}} ملاحظة بانتظار الفرز",
+    "waitingPlural": "{{count}} ملاحظات بانتظار الفرز",
+    "joiner": "، ",
+    "empty": "لم يحفظ {{name}} أي شيء بعد.",
+    "emptyWaiting": "هناك {{count}} ملاحظة بانتظار الفرز. يتم ذلك في الخلفية، عادةً خلال يوم.",
+    "emptyWaitingPlural": "هناك {{count}} ملاحظات بانتظار الفرز. يتم ذلك في الخلفية، عادةً خلال يوم.",
+    "group": {
+      "preference": "تفضيلاتك",
+      "procedure": "طريقة العمل",
+      "fact": "حقائق",
+      "reference": "أماكن الأشياء",
+      "other": "ملاحظات أخرى"
+    },
+    "source": {
+      "owner": "منك",
+      "michael": "من {{godName}}",
+      "task": "تعلّمه أثناء مهمة",
+      "tool": "من أداة"
+    },
+    "sourceLine": "{{source}}، {{date}}",
+    "checkAgain": "راجِعه مجددًا في {{date}}",
+    "outOfDate": "قد يكون قديمًا ({{date}})",
+    "stepsMissing": "لم تُحفظ خطوات هذا بعد.",
+    "showFile": "اعرض الملف",
+    "showNotes": "اعرض كملاحظات",
+    "searchTitle": "ابحث في المكتب",
+    "exactWords": "كلمات مطابقة",
+    "byMeaning": "حسب المعنى"
+  },
+  "profile": {
+    "officeManager": "مدير المكتب",
+    "noRole": "لم يُكتب دور لـ{{name}} بعد. أضفه من زر التعديل أعلى اللوحة.",
+    "does": "ما يقوم به {{name}}",
+    "asksFirst": "يسألك أولًا",
+    "facts": "معلومات أساسية",
+    "folder": "المجلد",
+    "connections": "يستخدم",
+    "firstJob": "أول مهمة",
+    "model": "النموذج",
+    "listJoiner": "، ",
+    "instructions": "تعليمات {{name}}",
+    "showInstructions": "اعرض التعليمات كاملة",
+    "hideInstructions": "أخفِ التعليمات",
+    "god": {
+      "summary": "{{name}} هو مدير مكتبك ونقطة التواصل الوحيدة معك. يرفع الفريق تقاريره إلى {{name}} لا إليك: يوزّع {{name}} العمل وينقل النتائج ولا يعرض عليك إلا ما يحتاجك.",
+      "does": [
+        "يسند كل مهمة إلى العضو المناسب ويحدد ما يجب إرساله",
+        "ينجز الأمور الصغيرة فورًا: معلومة سريعة أو رد قصير",
+        "يحدّث لوحة المهام لتكون دقيقة متى نظرت إليها",
+        "يتابع الفريق في كل اجتماع قصير ويحرّك ما توقف",
+        "يضع كل سؤال لك في «اسألني» باختصار ومع خيارات"
+      ],
+      "asksFirst": [
+        "القرارات والموافقات التي لا يعطيها غيرك",
+        "مهمة لا يتولاها أحد في الفريق: إضافة عضو أو تحويلها أو إنجازها مرة أو تركها",
+        "ما لا يستطيعه غيرك، مثل تسجيل الدخول إلى حساب"
+      ],
+      "team": "الفريق ({{count}})",
+      "business": "ما يعرفه {{name}} عن عملك",
+      "businessFact": "العمل"
+    },
+    "openFolder": "افتح المجلد",
+    "openFolderFailed": "تعذّر فتح المجلد. ربما نُقل أو حُذف."
   }
 }

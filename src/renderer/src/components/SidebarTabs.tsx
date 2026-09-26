@@ -1,15 +1,25 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type SidebarTab } from '@/store/store';
 import { type AccentColorName } from '@/design/tokens';
 import { Icon, type IconName } from './Icon';
 import { SHOW_GIT } from '@shared/buildFeatures';
+import { useRtl } from '@/i18n/useDirection';
 
 // v0.3.4: the files tab is gone — the per-agent IDE button (header) opens the
 // full Monaco editor + file tree, which superseded the read-only browser.
 const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
+  // Owner-facing tabs first; the technical ones (terminal, git, traces) last
+  // (owner, 2026-09-25).
+  // Who this agent is: job, what to send them, key facts (docs/designs/agent-profile.md).
+  { key: 'profile',  labelKey: 'sidebar.profile',  icon: 'info' },
+  { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
+  // The agent's own jobs on a clock (docs/designs/per-agent-schedules.md).
+  { key: 'schedules', labelKey: 'sidebar.schedules', icon: 'clock' },
+  // What the agent has learned, as notes (docs/designs/memory-tab-readable.md).
+  { key: 'memory',    labelKey: 'sidebar.memory',    icon: 'ledger' },
   { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },
   { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
-  { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
   { key: 'traces',   labelKey: 'sidebar.traces',   icon: 'web' }
 ];
 /** GIT is hidden in this build (src/shared/buildFeatures.ts). */
@@ -23,22 +33,54 @@ export interface SidebarTabsProps {
 
 export function SidebarTabs({ current, accent, onChange }: SidebarTabsProps) {
   const { t } = useTranslation();
+  // Bring the selected tab into view when it changes (a jump from Michael's
+  // office schedule can select one that is scrolled off), not on every render,
+  // which would fight the owner scrolling the strip.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const rtl = useRtl();
+  /** The ARIA tabs keyboard model: arrows move between tabs (mirrored in RTL),
+   *  Home and End jump to the ends, and only the selected tab is in the Tab order. */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const i = TABS.findIndex((tab) => tab.key === current);
+    const forward = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const back = rtl ? 'ArrowRight' : 'ArrowLeft';
+    let next = -1;
+    if (e.key === forward) next = (i + 1) % TABS.length;
+    else if (e.key === back) next = (i - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(TABS[next].key);
+    requestAnimationFrame(() => stripRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus());
+  };
+  useEffect(() => {
+    stripRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [current]);
   return (
-    <div style={{
+    // Labels are 14px (the floor for text an owner reads, design 14C). Four of
+    // them can outgrow a narrow panel, so the strip scrolls sideways instead of
+    // clipping, and the selected tab scrolls itself into view.
+    <div ref={stripRef} role="tablist" onKeyDown={onKeyDown} style={{
       display: 'flex',
       gap: 0,
       background: 'var(--cth-cream-200)',
       boxShadow: 'inset 0 -2px 0 var(--cth-ink-900)',
-      flexShrink: 0
+      flexShrink: 0,
+      overflowX: 'auto',
+      scrollbarWidth: 'thin'
     }}>
       {TABS.map(tab => {
         const active = current === tab.key;
         return (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.key)}
             style={{
-              flex: 1,
+              flex: '1 0 auto',
               height: 36,
               padding: '0 10px',
               border: 'none',
@@ -47,17 +89,18 @@ export function SidebarTabs({ current, accent, onChange }: SidebarTabsProps) {
               boxShadow: active
                 ? `inset 0 -3px 0 var(--cth-${accent}), inset 1px 0 0 var(--cth-ink-900), inset -1px 0 0 var(--cth-ink-900)`
                 : 'inset 0 0 0 0',
-              fontFamily: 'var(--cth-font-display)',
-              fontSize: 10,
-              lineHeight: '14px',
+              fontFamily: 'var(--cth-font-ui)',
+              fontSize: 14,
+              lineHeight: '20px',
+              whiteSpace: 'nowrap',
               color: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6
+              gap: 4
             }}
           >
-            <Icon name={tab.icon} /> {t(tab.labelKey).toUpperCase()}
+            <Icon name={tab.icon} /> {t(tab.labelKey)}
           </button>
         );
       })}

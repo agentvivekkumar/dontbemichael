@@ -7,10 +7,11 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { terminalInstanceKey } from './terminalRecovery';
 import { MessageQueueComposer } from './MessageQueueComposer';
-import { CommandCenterPanel } from './CommandCenterPanel';
+import { CommandCenterPanel, MemoryTab } from './CommandCenterPanel';
 import { disposeTerminal } from './terminalPool';
 import { SidebarTabs } from './SidebarTabs';
 import { ThreadsPanel } from './ThreadsPanel';
+import { ProfileTab } from './ProfileTab';
 import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
 import { ClearedBanner } from './ClearedBanner';
@@ -20,6 +21,8 @@ import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@share
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
+import { AgentSchedules, closeConfirmText } from './triggers/ScheduleList';
+import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 export interface AgentDetailPanelProps {
   agent: Agent;
@@ -117,7 +120,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
   const onKill = async () => {
     if (!agent.ptyId) return;
-    if (!confirm(t('agentDetail.killConfirm', { name: agent.name }))) return;
+    if (!confirm(closeConfirmText(agent.id, agent.name, t))) return;
+    // The owner is closing this agent on purpose: its schedules pause (design
+    // 6A). A crash or a quit only archives it and leaves them running.
+    await window.cth.closeAgentByOwner(agent.id).catch(() => undefined);
     await window.cth.killPty(agent.ptyId);
     disposeTerminal(agent.ptyId);
     archiveAgent(agent.id);
@@ -266,9 +272,12 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
                   onToggleFullscreen={() => setFullscreen(agent.id)}
                   fullscreen={false}
                   embedded
+                  // Team members take work from Michael; the owner types to
+                  // one only in 1:1 (docs/designs/owner-talks-via-michael.md).
+                  inputLocked={!agent.onHold}
                 />
               </div>
-              <MessageQueueComposer agent={agent} />
+              {agent.onHold ? <><OneOnOneLine agent={agent} /><MessageQueueComposer agent={agent} /></> : <OwnerViaMichaelBar agent={agent} />}
             </div>
             )
           ) : (
@@ -282,8 +291,22 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           <GitTab cwd={agent.cwd} />
         )}
 
+        {sidebarTab === 'profile' && (
+          <ProfileTab agent={agent} />
+        )}
+
         {sidebarTab === 'messages' && (
           <ThreadsPanel agentId={agent.id} />
+        )}
+
+        {sidebarTab === 'schedules' && (
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 12 }}>
+            <AgentSchedules agentId={agent.id} agentName={agent.name} />
+          </div>
+        )}
+
+        {sidebarTab === 'memory' && (
+          <MemoryTab key={agent.id} godId={agent.id} ownOnly />
         )}
 
         {sidebarTab === 'traces' && (

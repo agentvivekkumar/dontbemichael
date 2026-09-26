@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
-import { AgentHoldButton } from './AgentHoldButton';
+import { useStore } from '@/store/store';
 import { isComposingKey } from '@shared/imeGuard';
+import { SHOW_AGENT_BRAKES } from '@shared/buildFeatures';
 
 /**
  * Operator control for one agent (#7C.1-7C.3) — pause (deny tools at the next
@@ -37,6 +38,9 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [steer, setSteer] = useState('');
+  // The steer note is a message to the agent, so it is only offered in 1:1
+  // (docs/designs/owner-talks-via-michael.md). The two brakes stay in every mode.
+  const inOneOnOne = useStore((s) => !!s.agents.find((a) => a.id === agentId)?.onHold);
   const [note, setNote] = useState('');
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,13 +75,17 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
     flash(t('agentControl.flashSteer'));
   };
 
+  // With the brakes hidden (SHOW_AGENT_BRAKES) only the 1:1 steer note is left,
+  // so outside 1:1 the strip has nothing to show.
+  if (!SHOW_AGENT_BRAKES && !inOneOnOne) return null;
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 6,
       padding: '6px 8px', background: 'var(--cth-paper-100)',
       borderBottom: '1px solid var(--cth-ink-300)', flexShrink: 0
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {SHOW_AGENT_BRAKES && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {/* Neither of these kills anything, and the old two-word labels never
             said so — the difference is WHEN the agent stops and whether it keeps
             its session. Say the consequence on the button, the detail on hover. */}
@@ -101,11 +109,8 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
             {t('agentControl.stopAfterStep')}
           </span>
         </PixelButton>
-        {/* Sits with them at the founder's call. It is a different KIND of
-            control — the two above restrain the agent, this one restrains
-            Michael — so the tooltip carries that distinction now that the
-            grouping no longer does. */}
-        <AgentHoldButton agentId={agentId} />
+        {/* 1:1 moved to the bar under the terminal (Talk 1:1 / End 1:1), which every
+            team member has (owner, 2026-09-25). */}
         {/* v0.3.4: the auto-delivery switch moved to the god's Command Center
             header — ONE floor-wide control instead of a per-agent toggle. */}
         {snap?.autoDeliveryPaused && (
@@ -113,8 +118,8 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
         )}
         {snap?.halted && <span style={{ fontSize: 11, color: 'var(--cth-coral)' }}>{t('agentControl.halting')}</span>}
         {!!snap?.pendingSteers && <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{t('agentControl.steersQueued', { count: snap.pendingSteers })}</span>}
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
+      </div>}
+      {inOneOnOne && <div style={{ display: 'flex', gap: 6 }}>
         <input
           className="cth-input"
           value={steer}
@@ -134,7 +139,7 @@ export function AgentControlStrip({ agentId }: { agentId: string }) {
             aria-label={t('agentControl.steerAria')}
           >{t('agentControl.steer')}</span>
         </PixelButton>
-      </div>
+      </div>}
       {note && <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{note}</span>}
     </div>
   );

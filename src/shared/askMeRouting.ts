@@ -67,3 +67,30 @@ export function answerMessages(p: {
     }
   ];
 }
+
+/**
+ * A card has at most one open ask: its NEWEST ask, while unanswered and not
+ * dismissed (owner, 2026-09-25). A newer ask on the same card replaces an older
+ * unanswered one, which then counts as withdrawn: ASK ME never shows it, it can't
+ * be answered, and it never holds an agent open. Before this, ASK ME showed only
+ * the newest but the older one stayed "open" forever, hidden from the owner.
+ */
+export interface AskEntry { q?: unknown; a?: unknown; dismissedAt?: unknown }
+
+/** Index of the card's open ask, or -1. */
+export function openAskIndex(qa: readonly (AskEntry | null | undefined)[] | undefined): number {
+  if (!Array.isArray(qa)) return -1;
+  for (let i = qa.length - 1; i >= 0; i--) {
+    const e = qa[i];
+    if (!e || typeof e.q !== 'string') continue;
+    return !e.a && !e.dismissedAt ? i : -1;
+  }
+  return -1;
+}
+
+/** An older ask a newer one on the same card replaced before it was answered. */
+export function isReplacedAsk(qa: readonly (AskEntry | null | undefined)[] | undefined, i: number): boolean {
+  const e = qa?.[i];
+  if (!e || typeof e.q !== 'string' || e.a || e.dismissedAt) return false;
+  return openAskIndex(qa) !== i;
+}

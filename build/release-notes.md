@@ -1,3 +1,4 @@
-- **The new brand in the app.** New logo, app icon and loading screen.
-- **Names change only in Edit Agent.** No more accidental renames.
-- **Renames reach the whole team.** A name already in use is refused.
+- **Every agent has its own schedules,** approved by you in Ask me.
+- **You talk to your team through Michael,** or 1:1.
+- **Profile and Memory tabs on every agent.**
+- **Messages read like a history.**

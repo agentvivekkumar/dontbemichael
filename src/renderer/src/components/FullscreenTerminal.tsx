@@ -23,6 +23,8 @@ import { useHasTerminalDraft, disposeTerminal, reflowTerminal, notifyThemeChange
 import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import type { HarnessConfig } from '@/store/config';
 import { useRtl } from '@/i18n/useDirection';
+import { closeConfirmText } from './triggers/ScheduleList';
+import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 /** Roster rail width. A fixed 232px is right on a 14" laptop but reads as a
  *  sliver on a 27" display, where names truncate for no reason — so it tracks
@@ -601,9 +603,11 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                     }}
                     onToggleFullscreen={() => setFullscreen(null)}
                     fullscreen
+                    // Owner types to a team member only in 1:1.
+                    inputLocked={!agent.onHold}
                   />
                 </div>
-                <MessageQueueComposer agent={agent} />
+                {agent.onHold ? <><OneOnOneLine agent={agent} /><MessageQueueComposer agent={agent} /></> : <OwnerViaMichaelBar agent={agent} />}
               </div>
             </>
           )}
@@ -942,7 +946,9 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
    *  button would read as "restart Michael" while looking like "close". */
   const onKill = async () => {
     if (!agent.ptyId) return;
-    if (!confirm(t('agentDetail.killConfirm', { name: agent.name }))) return;
+    if (!confirm(closeConfirmText(agent.id, agent.name, t))) return;
+    // Closing on purpose pauses the agent's schedules (design 6A).
+    await window.cth.closeAgentByOwner(agent.id).catch(() => undefined);
     await window.cth.killPty(agent.ptyId);
     disposeTerminal(agent.ptyId);
     // archiveAgent re-homes focus mode to the next agent, and only leaves it when

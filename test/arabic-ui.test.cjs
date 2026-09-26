@@ -120,7 +120,7 @@ test('content direction in components is gated, never content-sniffed', () => {
     'components/CommandCenterPanel', 'components/FullscreenTerminal',
     'components/MessageQueueComposer',
     'components/TasksKanban', 'components/ThreadsPanel',
-    'components/triggers/SchedulesSection',
+    'components/triggers/ScheduleList',
     'components/triggers/TriggerHistoryTab'
   ];
   let gated = 0;
@@ -139,8 +139,9 @@ test('content direction in components is gated, never content-sniffed', () => {
   // 16, not 17: the floating memory panel (and its search result site) was
   // removed on 2026-09-24; memory search lives on Michael's Memory tab. 15: the
   // context settings card (its message box) went on 2026-09-25, when no context
-  // upkeep ran on a clock any more.
-  assert.ok(gated >= 15, `expected the PR's dir sites to be carried over, found ${gated}`);
+  // upkeep ran on a clock any more. 14: the Messages tab's reply box went on
+  // 2026-09-25 (the tab is a read only handoff history now).
+  assert.ok(gated >= 14, `expected the PR's dir sites to be carried over, found ${gated}`);
 });
 
 test('the markdown auto-direction plugin only runs for an RTL language', () => {

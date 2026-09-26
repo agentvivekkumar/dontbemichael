@@ -7,6 +7,8 @@ import { useStore, type Agent } from '@/store/store';
 import { type HarnessConfig } from '@/store/config';
 import { useRestoreTeam } from '@/hooks/useRestoreTeam';
 import { useRtl } from '@/i18n/useDirection';
+import { useMissions } from './triggers/ScheduleList';
+import { missionsFor, nextRunAt } from '@shared/missions';
 
 export interface AgentStripProps {
   /** Needed to rebuild a spawn command when a restorable agent predates the
@@ -60,6 +62,15 @@ export function AgentStrip({ config }: AgentStripProps) {
   // Each worker's actively-DOING ledger tasks, polled from hive/tasks.json —
   // rendered as a sticky note on the avatar card (click → task detail).
   const [doingByAgent, setDoingByAgent] = useState<Record<string, string[]>>({});
+  // Each card's next scheduled run (design D2). Recomputed on every render, which
+  // the strip already does as statuses change, so the time stays current.
+  const { missions } = useMissions();
+  const godId = agents.find((a) => a.isGod)?.id ?? 'god';
+  const nextRunFor = (id: string): number | undefined => {
+    const now = Date.now();
+    const times = missionsFor(missions, id, godId).map((m) => nextRunAt(m, now)).filter((x): x is number => x !== null);
+    return times.length ? Math.min(...times) : undefined;
+  };
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
@@ -152,6 +163,7 @@ export function AgentStrip({ config }: AgentStripProps) {
             }}
             note={a.note}
             onEditNote={a.isGod ? undefined : () => setNoteEditId(a.id)}
+            nextRunAt={nextRunFor(a.id)}
           />
           {/* The note itself lives INSIDE the card (its own row above the gauge).
               This is the transient EDITOR: a fixed popover ABOVE the card —
