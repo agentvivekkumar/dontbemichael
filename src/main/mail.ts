@@ -185,7 +185,14 @@ export class MailService {
     const client = this.createImap(rec.imap, rec.address, this.password(id));
     client.on?.('error', () => this.drop(id));
     client.on?.('close', () => this.drop(id));
-    await withTimeout(client.connect(), CALL_TIMEOUT_MS, 'Connecting to the mailbox');
+    try {
+      await withTimeout(client.connect(), CALL_TIMEOUT_MS, 'Connecting to the mailbox');
+    } catch (e) {
+      // A failed login leaves a half-open socket: close it, or every failed
+      // attempt leaks a connection.
+      try { client.close?.(); } catch { /* already gone */ }
+      throw e;
+    }
     const box: OpenBox = { client, lastUsed: Date.now() };
     this.boxes.set(id, box);
     this.touch(id, box);
