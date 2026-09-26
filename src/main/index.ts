@@ -68,6 +68,8 @@ import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
+import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, type AddMailboxInput } from './mail';
+import { PROVIDER_PRESETS, secretRefForMailbox } from '../shared/mailboxes';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { buildWorkerLaunch } from './workerLaunch';
@@ -430,10 +432,78 @@ const liveWorkers = new Map<string, WorkerRec>();
  *  it without ever seeing a credential. getRecord/getSecret are injected so the broker
  *  stays electron-free + unit-testable. Started in bootstrapHiveServices; each worker is
  *  granted a per-worker capability token at spawn (revoked in teardownPty). */
+/** Mailboxes (docs/designs/multi-mailbox.md). One IMAP connection per mailbox,
+ *  shared by every agent that may use it; passwords stay in the secret store. */
+const mailService = new MailService({
+  getConfig: () => readConfig(),
+  getPassword: (id) => integrations.getSecret(secretRefForMailbox(id)),
+  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason)
+});
+
+/** MB-7: a mailbox that stops accepting its password is marked "needs you" in
+ *  Settings and raises one Ask me card; a later success clears both. */
+function markMailboxStatus(id: string, status: 'connected' | 'needs-attention', reason?: string): void {
+  const cfg = readConfig();
+  const list = cfg.mailboxes ?? [];
+  const rec = list.find((m) => m.id === id);
+  if (!rec || (rec.status === status && rec.statusReason === reason)) return;
+  writeConfig({ mailboxes: list.map((m) => (m.id === id ? { ...m, status, statusReason: status === 'needs-attention' ? reason : undefined, updatedAt: Date.now() } : m)) });
+  const cardId = `mailbox-attention-${id}`;
+  try {
+    if (status === 'needs-attention') {
+      const card = {
+        id: cardId,
+        title: `${rec.address} needs you`,
+        status: 'blocked' as const,
+        dependsOn: [],
+        priority: 1,
+        createdAt: new Date().toISOString(),
+        humanQA: [{ q: `**${rec.address} stopped working: ${reason ?? 'the mail server refused the password'}**\n\nOpen Settings, Connections, Mailboxes and choose Fix to enter a new app password.`, askedAt: new Date().toISOString(), raisedBy: 'god' }]
+      };
+      if (!hive.addTask(card)) hive.patchTask(cardId, { status: 'blocked', humanQA: card.humanQA });
+    } else if (rec.status === 'needs-attention') {
+      hive.patchTask(cardId, { status: 'done', result: `${rec.address} is connected again.` });
+    }
+  } catch (e) { console.error('[mail] ask me card:', e); }
+}
+
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
-  getSecret: integrations.getSecret
+  getSecret: integrations.getSecret,
+  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig() }, agentId, op, body)
 });
+
+/** Absolute path to the bundled md-mail MCP server (same resolution as the
+ *  Slack helper below). */
+function mdMailScriptPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'md-mail-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-mail-mcp.cjs');
+}
+
+const mailAdmin = {
+  getConfig: () => readConfig(),
+  saveConfig: (patch: Partial<HarnessConfig>) => { writeConfig(patch); },
+  setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
+  deleteSecret: (ref: string) => integrations.deleteSecret(ref)
+};
+
+/** Design review 4A: an office that existed before email became per team member
+ *  gets one Ask me card saying so. Fresh setups are marked at onboarding. */
+function maybeRaiseEmailNotice(): void {
+  try {
+    const cfg = readConfig();
+    if (!cfg.onboardingComplete || cfg.emailUpgradeNotice || cfg.agentCapabilities) return;
+    hive.addTask({
+      id: 'email-per-team-member',
+      title: 'Email is now set per team member',
+      status: 'blocked',
+      dependsOn: [],
+      priority: 1,
+      createdAt: new Date().toISOString(),
+      humanQA: [{ q: '**Email is now set per team member. Nobody has email until you turn it on.**\n\nOpen Settings, Connections, Mailboxes to add your mailboxes, then give each team member theirs on their Capabilities tab.', askedAt: new Date().toISOString(), raisedBy: 'god' }]
+    });
+    writeConfig({ emailUpgradeNotice: 'pending' });
+  } catch (e) { console.error('[mail] upgrade notice:', e); }
+}
 
 /** BYOK backend model-providers whose API keys the non-Claude CLI engines
  *  (OpenCode/Crush/pi/qwen) read from standard env vars. Keys are stored
@@ -3250,6 +3320,24 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   if (provider === 'codex' && opts.hive?.id) {
     await enableCodexRemoteForSpawn(opts, opts.hive.id);
   }
+  // Mail tools (docs/designs/multi-mailbox.md, eng E1): an agent whose
+  // Capabilities include email gets the md-mail MCP server, which Claude Code
+  // starts outside the Bash sandbox, holding this agent's own broker token.
+  // Revoked in teardownPty with the rest of this PTY's grants. `--mcp-config`
+  // takes several values, so it must stay the last argument.
+  if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
+    const agentId = opts.hive.id;
+    const root = hive.root();
+    if (root && readConfig().agentCapabilities?.[agentId]?.email?.enabled) {
+      try {
+        const token = integrationBroker.grant(opts.id, [], agentId);
+        const file = join(root, 'agents', agentId, 'md-mail.mcp.json');
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, JSON.stringify({ mcpServers: { 'md-mail': { command: hive.nodeCommand(), args: [mdMailScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } } } }, null, 2), { mode: 0o600 });
+        opts.args = [...(opts.args ?? []), '--mcp-config', file];
+      } catch (e) { console.error('[mail] md-mail config:', e); }
+    }
+  }
   const res = ptyManager.spawn(opts, owner);
   if (res.ok) analytics.track('agent_spawned', { provider });
   else analytics.track('agent_spawn_failed', { provider, reason: spawnFailReason(res.error) });
@@ -3522,6 +3610,7 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   try { stopWebhookDoneObserver(); } catch (e) { console.error('[changeHome] stopWebhookDoneObserver:', e); }
   try { stopEphemeralWorkerWatcher(); } catch (e) { console.error('[changeHome] stopWorkerWatcher:', e); }
   try { integrationBroker.stop(); } catch (e) { console.error('[changeHome] broker.stop:', e); }
+  try { mailService.closeAll(); } catch (e) { console.error('[changeHome] mail.closeAll:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[changeHome] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[changeHome] hookServer.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[changeHome] slack.stop:', e); }
@@ -3769,6 +3858,19 @@ ipcMain.handle('hive:memoryDetail', (_evt, id: unknown) => (typeof id === 'strin
 ipcMain.handle('hive:procedure', (_evt, id: unknown, slug: unknown) =>
   (typeof id === 'string' && typeof slug === 'string' ? hive.procedure(id, slug) : null));
 ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hive.inbox(id) : []));
+
+// ─── IPC: mailboxes and Capabilities (docs/designs/multi-mailbox.md) ─────────
+// Records carry no password; the renderer only ever sends one, to save it.
+ipcMain.handle('mail:list', () => readConfig().mailboxes ?? []);
+ipcMain.handle('mail:save', async (_evt, input: unknown) => {
+  if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
+  return saveMailbox(mailService, mailAdmin, PROVIDER_PRESETS, input as AddMailboxInput);
+});
+ipcMain.handle('mail:remove', (_evt, id: unknown) => (typeof id === 'string' ? removeMailbox(mailService, mailAdmin, id) : { ok: false, affected: [] }));
+ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
+  if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
+  return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean } });
+});
 /** An agent's handoff history, received and sent, for its Messages tab. */
 ipcMain.handle('hive:history', (_evt, id: unknown) => (typeof id === 'string' ? hive.messageHistory(id) : []));
 // Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED
@@ -4139,6 +4241,7 @@ function teardownAndQuit(): void {
   try { stopWebhookDoneObserver(); } catch (e) { console.error('[quit] stopWebhookDoneObserver:', e); }
   try { stopEphemeralWorkerWatcher(); } catch (e) { console.error('[quit] stopWorkerWatcher:', e); }
   try { integrationBroker.stop(); } catch (e) { console.error('[quit] broker.stop:', e); }
+  try { mailService.closeAll(); } catch (e) { console.error('[quit] mail.closeAll:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[quit] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[quit] hookServer.stop:', e); }
   try { telemetry.stop(); } catch (e) { console.error('[quit] telemetry.stop:', e); }
@@ -4200,6 +4303,7 @@ ipcMain.handle('app:resetAll', () => {
   try { stopWebhookDoneObserver(); } catch (e) { console.error('[reset] stopWebhookDoneObserver:', e); }
   try { stopEphemeralWorkerWatcher(); } catch (e) { console.error('[reset] stopWorkerWatcher:', e); }
   try { integrationBroker.stop(); } catch (e) { console.error('[reset] broker.stop:', e); }
+  try { mailService.closeAll(); } catch (e) { console.error('[reset] mail.closeAll:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[reset] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[reset] hookServer.stop:', e); }
   try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
@@ -5474,6 +5578,7 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
+  maybeRaiseEmailNotice();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
   hive.setRuntimeInfo({ version: app.getVersion(), packaged: app.isPackaged, appPath: app.getAppPath() });

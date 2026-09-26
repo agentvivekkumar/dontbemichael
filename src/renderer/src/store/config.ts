@@ -1,5 +1,6 @@
 // Mirrors src/main/config.ts. Kept as a renderer-side type-only module
 // so we don't have to reach into the preload package to type-check.
+import type { MailboxRecord, AgentCapabilities } from '@shared/mailboxes';
 import type { CompanyProfile } from '@shared/companyProfile';
 import {
   AGENT_PROVIDER_PRESETS,
@@ -105,6 +106,15 @@ export interface HarnessConfig {
   /** Per-server consent for the default MCP bundle, keyed by catalog id (mirrors
    *  src/main/config.ts; seeded from MCP_CATALOG). */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
+  /** Mailboxes connected in Settings (docs/designs/multi-mailbox.md). Metadata
+   *  only; each app password lives in the secret store under `mail:<id>`. */
+  mailboxes?: MailboxRecord[];
+  /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
+   *  no capabilities: every agent starts with email off (MB-6). */
+  agentCapabilities?: { [agentId: string]: AgentCapabilities };
+  /** Design review 4A: one Ask me card after the update that made email per
+   *  team member. Set when the card is due; cleared when it is dismissed. */
+  emailUpgradeNotice?: 'pending' | 'dismissed';
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];

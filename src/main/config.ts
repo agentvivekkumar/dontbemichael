@@ -1,3 +1,4 @@
+import type { MailboxRecord, AgentCapabilities } from '../shared/mailboxes';
 import type { CompanyProfile } from '../shared/companyProfile';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import { app } from 'electron';
@@ -223,6 +224,15 @@ export interface HarnessConfig {
    *  Seeded from MCP_CATALOG (safe-readonly ON, write/secret OFF); the user flips
    *  these in Settings. A server is wired into an agent only when enabled here. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
+  /** Mailboxes connected in Settings (docs/designs/multi-mailbox.md). Metadata
+   *  only; each app password lives in the secret store under `mail:<id>`. */
+  mailboxes?: MailboxRecord[];
+  /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
+   *  no capabilities: every agent starts with email off (MB-6). */
+  agentCapabilities?: { [agentId: string]: AgentCapabilities };
+  /** Design review 4A: one Ask me card after the update that made email per
+   *  team member. Set when the card is due; cleared when it is dismissed. */
+  emailUpgradeNotice?: 'pending' | 'dismissed';
   /** Enable semantic memory (MemPalace CLI). No-op if mempalace isn't installed. */
   semanticMemory: boolean;
   /** Embedding model for the palace: lightweight 'minilm' or multilingual 'embeddinggemma'. */
