@@ -417,7 +417,6 @@
     "tabs": {
       "terminal": "终端",
       "human": "问我",
-      "triggers": "触发器",
       "history": "历史",
       "memory": "记忆",
       "workers": "工人",

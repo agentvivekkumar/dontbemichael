@@ -80,7 +80,8 @@ const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['na
   { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
-  { key: 'triggers', labelKey: 'commandCenter.tabs.triggers', icon: 'clock' },
+  // Named like every other agent's tab (owner, 2026-09-25).
+  { key: 'triggers', labelKey: 'sidebar.schedules', icon: 'clock' },
   { key: 'trigger-history', labelKey: 'commandCenter.tabs.history', icon: 'ledger' },
   { key: 'memory', labelKey: 'commandCenter.tabs.memory', icon: 'sparkle' },
   { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' },

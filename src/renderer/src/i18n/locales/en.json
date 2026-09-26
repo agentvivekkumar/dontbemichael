@@ -417,7 +417,6 @@
     "tabs": {
       "terminal": "terminal",
       "human": "ask me",
-      "triggers": "triggers",
       "history": "history",
       "memory": "memory",
       "workers": "workers",
