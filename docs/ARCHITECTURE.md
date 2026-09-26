@@ -73,16 +73,23 @@ src/
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
     missions.ts              schedules: ownership, next run, the scheduler's arm plan, one-schedule edits,
                              and agent schedule requests the owner approves in Ask me
+    agentProfile.ts          splits an agent's role line into the parts its Profile tab shows
+    messageView.ts           the Messages tab as a day-grouped history, office notices counted on one line
+    askMeRouting.ts          where an owner's Ask me answer goes: the agent that raised the question
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring
     design/                  tokens.css / tokens.ts / global.css (design source of truth)
     components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, OnboardingWizard, …
-    CommandCenterPanel,      Michael's control surface (Ask me/Terminal/Triggers/History/Memory/Advanced tabs;
-                             Advanced holds Monitor and Activity). Triggers holds Michael's own schedules
+    CommandCenterPanel,      Michael's control surface (Profile/Ask me/Terminal/Schedules/History/Memory/Advanced
+                             tabs; Advanced holds Monitor and Activity). Schedules holds Michael's own schedules
                              plus a read-only office schedule; Ask me also shows agents' schedule requests
     triggers/ScheduleList,   per-agent schedules: the Schedules tab on every agent panel (agent mode) and
                              Michael's office schedule (office mode); rules live in shared/missions.ts
+    ScheduleRequestCards,    Ask me cards for schedule changes an agent asked for (Approve / Decline)
+    ProfileTab,              the first tab on every agent: job, folder (Open folder), full instructions
+    MemoryNotes,             an agent's Memory tab as grouped notes; "Show the file" keeps the raw text
+    OwnerViaMichaelBar,      replaces a team member's message box outside 1:1 (Message Michael / Talk 1:1)
     FloorViewToggle,         the floor's OFFICE / TASKS / GRAPH switch
     OfficeFolderMissing,     launch screen shown only when the office folder is missing
     ToolWaterfall,           per-agent tool-span waterfall for the observability view

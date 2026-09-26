@@ -259,7 +259,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 **Why:** An owner who edits the box expects Michael to receive it. Every other schedule stopped carrying a prompt on 2026-09-25 (the label names the job and the agent's Work style says how), so the heartbeat is the one card left with a box, and it's a box that does nothing.
 
-**Context:** Found in the 2026-09-25 agent instructions audit; the owner chose to leave the heartbeat as it is for now (it ships off). `SchedulesSection.tsx` keeps the box for `kind: 'heartbeat'` only.
+**Context:** Found in the 2026-09-25 agent instructions audit; the owner chose to leave the heartbeat as it is for now (it ships off). `src/renderer/src/components/triggers/ScheduleList.tsx` keeps the box for `kind: 'heartbeat'` only.
 
 **Effort:** S
 **Priority:** P3
