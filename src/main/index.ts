@@ -75,7 +75,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
-import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH, SHOW_VOICE } from '../shared/buildFeatures';
+import { COLLECT_USAGE_STATS, SHOW_DELIVERY_SWITCH, SHOW_VOICE, SHOW_SLACK } from '../shared/buildFeatures';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -1834,6 +1834,8 @@ function stopSlackDoneObserver(): void {
  *  URL the user pastes into Slack). No-op + error result when the integration is
  *  disabled or the signing secret is unset. */
 async function startSlackServer(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  // Hidden in this build (buildFeatures.ts): no listener the owner can't see or stop.
+  if (!SHOW_SLACK) return { ok: false, error: 'Slack is not available in this build' };
   const cfg = readConfig();
   if (!cfg.slackEnabled || !cfg.slackSigningSecret) {
     return { ok: false, error: 'slack disabled or missing signing secret' };
