@@ -277,10 +277,12 @@ export function procedurePointer(text: string): { name: string; slug: string } |
   return m && m[1].trim() ? { name: m[1].trim(), slug: m[2] } : null;
 }
 
-/** A slug the app could have written (procedureSlug output): the only names the
- *  procedure read accepts, so it can't be pointed outside the folder. */
+/** A slug in the character set procedureSlug writes (a to z, 0 to 9, hyphen),
+ *  the same one procedurePointer reads: no "/" and no ".", so it can't point
+ *  outside the folder. Looser than it looks on purpose: procedureSlug can leave
+ *  a leading hyphen ("-foo"), and that file must still open (review, 2026-09-25). */
 export function isProcedureSlug(slug: unknown): slug is string {
-  return typeof slug === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) && slug.length <= 60;
+  return typeof slug === 'string' && /^[a-z0-9-]{1,60}$/.test(slug);
 }
 
 /** Whether a fact's "check again" date is still ahead, or has passed. Dates are

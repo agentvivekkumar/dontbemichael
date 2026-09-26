@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScheduleList } from './ScheduleList';
+import { AgentSchedules, OfficeSchedules, useGodId } from './ScheduleList';
 import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { OrgSection } from './OrgSection';
@@ -30,7 +30,7 @@ export function TriggersTab() {
   const { t } = useTranslation();
   const [orgSummary, setOrgSummary] = useState('');
   const godName = useResolvedGodName();
-  const godId = useStore((s) => s.agents.find((a) => a.isGod)?.id) ?? 'god';
+  const godId = useGodId();
 
   return (
     <Scroll>
@@ -42,7 +42,7 @@ export function TriggersTab() {
         blurb={t('triggersTab.schedulesBlurb')}
         defaultOpen
       >
-        <ScheduleList mode="agent" agentId={godId} agentName={godName} />
+        <AgentSchedules agentId={godId} agentName={godName} />
       </TriggerCard>
 
       <TriggerCard
@@ -50,7 +50,7 @@ export function TriggersTab() {
         blurb={t('triggersTab.officeBlurb')}
         defaultOpen
       >
-        <ScheduleList mode="office" />
+        <OfficeSchedules />
       </TriggerCard>
 
       {/* WEBHOOKS moved to Settings → Connections: one server and one tunnel

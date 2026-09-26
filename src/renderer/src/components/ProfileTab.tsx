@@ -214,8 +214,8 @@ function List({ items, mark, markColor }: { items: string[]; mark: string; markC
   const rtl = useRtl();
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {items.map((it) => (
-        <li key={it} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+      {items.map((it, i) => (
+        <li key={`${i}:${it}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
           <span aria-hidden style={{ width: 12, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: markColor }}>{mark}</span>
           <span dir={rtl ? 'auto' : undefined}>{it}</span>
         </li>

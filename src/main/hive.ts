@@ -59,6 +59,21 @@ type McpDefaultsMap = { [id: string]: { enabled: boolean } } | undefined;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/** The schedules section of the protocol, the same in both protocol files. */
+const SCHEDULES_PROTOCOL = `## Your schedules
+A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
+
+\`\`\`json
+{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
+  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
+\`\`\`
+
+- \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
+- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
+- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
+`;
+
 export type MessageAct = 'request' | 'inform' | 'propose' | 'query' | 'agree' | 'refuse' | 'done';
 
 export interface HiveMessage {
@@ -286,7 +301,7 @@ export function teamMemberInstructions(name: string, role: string, michael: stri
     '',
     `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
     '',
-    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone. Never ask the owner in your terminal (nobody answers it): send your question to ${michael} with "act": "query".${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone. Its replies about your schedule requests (subject "Schedule request", "Schedule change approved" or "Schedule change declined") are notices, not jobs: read them and do nothing else. Never ask the owner in your terminal (nobody answers it): send your question to ${michael} with "act": "query".${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
   ].join('\n');
 }
 
@@ -2436,11 +2451,12 @@ export class HiveManager {
     let owners: string[];
     try { owners = readdirSync(agentsDir).filter((id) => !id.startsWith('.') && existsSync(this.agentDir(id))); } catch { return []; }
     const seen = new Set<string>();
+    const live = new Set<string>();
     const out: Array<VoiceMessage & { dir: 'in' | 'out' }> = [];
     for (const owner of owners) {
       const base = this.agentDir(owner);
       for (const [dir, archived] of [[join(base, 'inbox'), false], [join(base, 'inbox', '.done'), true]] as const) {
-        for (const m of this.listMessages(dir)) {
+        for (const m of this.cachedMessages(dir, live)) {
           if (!m || typeof m.id !== 'string' || seen.has(m.id)) continue;
           const received = owner === agentId;
           const sent = m.from === agentId;
@@ -2455,8 +2471,36 @@ export class HiveManager {
         }
       }
     }
+    // Forget files that are gone (moved to .done has a new path, so it's re-read once).
+    for (const path of this.historyCache.keys()) if (!live.has(path)) this.historyCache.delete(path);
     out.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
     return out.slice(0, Math.max(1, Math.min(1000, Math.round(limit))));
+  }
+
+  /** Parsed message files by path, for messageHistory: the Messages tab polls it
+   *  every 5s over every agent's inbox and inbox/.done, which only grow, so each
+   *  file is parsed once and re-read only if its mtime changes (review, 2026-09-25). */
+  private historyCache = new Map<string, { mtimeMs: number; msg: HiveMessage | null }>();
+
+  private cachedMessages(dir: string, live: Set<string>): HiveMessage[] {
+    let files: string[];
+    try { files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch { return []; }
+    const out: HiveMessage[] = [];
+    for (const f of files) {
+      const path = join(dir, f);
+      live.add(path);
+      let mtimeMs: number;
+      try { mtimeMs = statSync(path).mtimeMs; } catch { continue; }
+      let hit = this.historyCache.get(path);
+      if (!hit || hit.mtimeMs !== mtimeMs) {
+        let msg: HiveMessage | null = null;
+        try { msg = JSON.parse(readFileSync(path, 'utf8')) as HiveMessage; } catch { /* half-written or bad file */ }
+        hit = { mtimeMs, msg };
+        this.historyCache.set(path, hit);
+      }
+      if (hit.msg) out.push(hit.msg);
+    }
+    return out;
   }
 
   /** Count undrained inbox messages for an agent (cheap — for the fleet snapshot). */
@@ -3451,19 +3495,7 @@ Write one JSON file into \`outbox/\` (any filename ending in \`.json\`):
 
 The harness fills in \`id\`, \`from\`, \`hops\`, and timestamps.
 
-## Your schedules
-A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
-
-\`\`\`json
-{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
-  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
-\`\`\`
-
-- \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
-- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
-- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
-- You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
-
+${SCHEDULES_PROTOCOL}
 ## Rules of the road
 - Only \`request\`, \`query\`, and \`propose\` expect a reply. \`inform\` and \`done\` are terminal —
   don't reply to them, or two agents will loop forever.
@@ -3572,19 +3604,7 @@ One JSON file in \`outbox/\`, any name ending in \`.json\`:
 
 The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
 
-## Your schedules
-A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
-
-\`\`\`json
-{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
-  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
-\`\`\`
-
-- \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
-- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
-- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
-- You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
-
+${SCHEDULES_PROTOCOL}
 ## The task board
 \`tasks.json\` in the hive folder holds the cards (todo, doing, blocked, done), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.
 

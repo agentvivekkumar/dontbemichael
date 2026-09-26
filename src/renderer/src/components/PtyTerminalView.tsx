@@ -388,9 +388,10 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
         }} />
         live · pty {ptyId}
         {inputLocked && (
-          <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('ownerVia.watching')}</span>
+          <span style={{ marginInlineStart: 'auto', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('ownerVia.watching')}</span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
+        {/* The watching tag takes the auto margin when shown, so it sits beside these. */}
+        <div style={{ marginInlineStart: inputLocked ? 8 : 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
           {/* v0.3.4: the theme + enter-fullscreen buttons moved to the TITLE BAR
               (top right) — more accessible, and the theme now darkens the whole
               app. Only the EXIT affordance stays here, in fullscreen. */}

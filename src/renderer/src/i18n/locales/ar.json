@@ -976,9 +976,6 @@
     "noKey": "بلا مفتاح"
   },
   "schedulesSection": {
-    "justNow": "الآن",
-    "ago": "قبل {{unit}}",
-    "in": "خلال {{unit}}",
     "label": "ماذا يُنجز؟",
     "labelPlaceholder": "مثلًا: متابعة الفواتير غير المدفوعة",
     "prompt": "الموجّه",

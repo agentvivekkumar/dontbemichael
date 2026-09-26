@@ -140,3 +140,16 @@ test('agent panel tabs: messages, schedules, then the technical ones', () => {
   const order = [...tabs.matchAll(/\{ key: '(\w+)',/g)].map((m) => m[1]);
   assert.deepEqual(order, ['profile', 'messages', 'schedules', 'memory', 'terminal', 'git', 'traces']);
 });
+
+// Pre-landing review, 2026-09-25: in 1:1 the owner is at that terminal.
+test('in 1:1 a prompt is not relayed to Michael and the agent may ask the owner in its terminal', async (t) => {
+  const { hive, server } = await office(t);
+  hive.setAgentHold('pam', true);
+  await server.handle({ agent_id: 'pam', session_id: 's', hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'needs your permission to use Bash' });
+  assert.equal(hive.inbox('god').length, 0, 'the owner answers it there');
+  const res = await server.handle({ agent_id: 'pam', session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_input: {} });
+  assert.notEqual(res?.hookSpecificOutput?.permissionDecision, 'deny');
+  hive.setAgentHold('pam', false);
+  const denied = await server.handle({ agent_id: 'pam', session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_input: {} });
+  assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny', 'outside 1:1 it still goes to Michael');
+});

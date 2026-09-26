@@ -120,8 +120,9 @@ export function armPlan(m: ScheduledMission, now: number, ctx: ArmContext): ArmP
   // zero. The standup waits a full interval until the office opens, because its
   // launch fire is sent by standupOnOfficeOpen.
   const waitForOpen = m.id === ctx.standupId && !ctx.standupFiredThisLaunch;
-  const firstDelayMs = waitForOpen ? m.intervalMs : Math.max(0, m.intervalMs - (now - (m.lastFiredAt ?? 0)));
-  return { type: 'interval', firstDelayMs, everyMs: m.intervalMs };
+  const everyMs = Math.min(m.intervalMs, MAX_TIMER_MS);
+  const firstDelayMs = waitForOpen ? everyMs : Math.min(MAX_TIMER_MS, Math.max(0, m.intervalMs - (now - (m.lastFiredAt ?? 0))));
+  return { type: 'interval', firstDelayMs, everyMs };
 }
 
 /** What one run sends, or null for a compaction-only mission (no dispatch). */
@@ -207,6 +208,12 @@ const LABEL_MAX = 80;
 
 /** Read an agent's `when`: `{ every: "30m" | "2h" | "1d" }` or
  *  `{ days: ["mon", "fri"] | ["weekdays"], at: "09:00" }`. Null if unusable. */
+/** Node timers can't wait longer than 2^31-1 ms (about 24.8 days): a longer
+ *  delay is clamped to 1 ms, so the job would fire nonstop (review, 2026-09-25).
+ *  Intervals stay at or under 24 days, and armPlan never arms a longer wait. */
+export const MAX_INTERVAL_MS = 24 * 86_400_000;
+const MAX_TIMER_MS = 2_147_483_647;
+
 export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days: number[]; minute: number } } | null {
   if (!when || typeof when !== 'object') return null;
   const w = when as { every?: unknown; days?: unknown; at?: unknown };
@@ -216,11 +223,12 @@ export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days:
     const n = Number(hit[1]);
     const unit = hit[2].toLowerCase()[0];
     const ms = n * (unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000);
-    return ms >= 60_000 ? { intervalMs: ms } : null;
+    return ms >= 60_000 && ms <= MAX_INTERVAL_MS ? { intervalMs: ms } : null;
   }
   if (Array.isArray(w.days) && typeof w.at === 'string') {
     const t = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(w.at);
-    if (!t) return null;
+    // "09:75" is not a time: refuse it instead of rolling it over to 10:15.
+    if (!t || Number(t[1]) > 23 || Number(t[2]) > 59) return null;
     const minute = Number(t[1]) * 60 + Number(t[2]);
     const days = new Set<number>();
     for (const raw of w.days) {
@@ -255,7 +263,7 @@ export function buildScheduleRequest(
   const p = payload as { op?: unknown; id?: unknown; label?: unknown; when?: unknown };
   const op = p.op;
   if (op !== 'add' && op !== 'update' && op !== 'pause' && op !== 'resume' && op !== 'delete') {
-    return { ok: false, reason: 'Unknown op. Use add, update, pause, resume or delete.' };
+    return { ok: false, reason: 'Unknown op. Use add, update, pause, resume, delete or list.' };
   }
   const label = typeof p.label === 'string' ? p.label.trim() : '';
   if (label.length > LABEL_MAX) return { ok: false, reason: `Keep the label under ${LABEL_MAX} characters.` };
@@ -263,13 +271,13 @@ export function buildScheduleRequest(
   if (op === 'add') {
     if (!label) return { ok: false, reason: 'An add needs a "label" naming the job.' };
     const when = parseWhen(p.when);
-    if (!when) return { ok: false, reason: 'An add needs a usable "when": {"every": "2h"} or {"days": ["mon"], "at": "09:00"}.' };
+    if (!when) return { ok: false, reason: 'An add needs a usable "when": {"every": "2h"} (1 minute to 24 days) or {"days": ["mon"], "at": "09:00"}.' };
     return { ok: true, request: { id, agentId: actor, op, draft: { label, ...when }, createdAt: now } };
   }
 
   const missionId = typeof p.id === 'string' ? p.id : '';
   const target = missions.find((m) => m.id === missionId);
-  if (!target) return { ok: false, reason: 'No schedule has that "id". Your schedules are listed in your briefing.' };
+  if (!target) return { ok: false, reason: 'No schedule has that "id". Send {"op": "list"} to see your schedules and their ids.' };
   if (!canEdit(actor, target, godId)) return { ok: false, reason: 'That schedule belongs to another team member. You can only ask about your own.' };
 
   const base: ScheduleRequest = { id, agentId: actor, op, missionId, snapshot: missionFingerprint(target), createdAt: now };

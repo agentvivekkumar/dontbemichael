@@ -64,7 +64,7 @@ test('procedure pointers give a name and a slug; anything else is null', () => {
 
 test('only app-written slugs are readable', () => {
   assert.equal(isProcedureSlug('weekly-money-summary'), true);
-  for (const bad of ['../x', 'a/b', '', '-a', 'A', 'a..b', 'x'.repeat(61), null]) assert.equal(isProcedureSlug(bad), false, String(bad));
+  for (const bad of ['../x', 'a/b', '', 'A', 'a..b', 'a.md', 'x'.repeat(61), null]) assert.equal(isProcedureSlug(bad), false, String(bad));
 });
 
 test('expiry: ahead, passed, or none', () => {
@@ -149,4 +149,13 @@ test('every agent has its own Memory tab; Michael keeps the picker and the offic
   assert.match(src, /\{!ownOnly && <section/, 'no office search on a team member tab');
   assert.match(src, /<MemoryTab godId=\{agent\.id\} who=\{selectedMemoryAgent \?\? undefined\} onWho=\{setSelectedMemoryAgent\} \/>/, "Michael's tab unchanged");
   for (const loc of ['en', 'zh-CN', 'ar']) assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).sidebar.memory, loc);
+});
+
+test('every slug the app writes can be read back', () => {
+  const { procedureSlug } = loadTs('src/shared/memoryIndex.ts');
+  for (const name of ['-foo', 'Shutdown protocol', 'Weekly money: summary!', '  spaced  out  ']) {
+    const slug = procedureSlug(name);
+    assert.equal(isProcedureSlug(slug), true, `${name} -> ${slug}`);
+    assert.deepEqual(procedurePointer(`${name.trim()}: steps in memory/procedures/${slug}.md`)?.slug, slug);
+  }
 });

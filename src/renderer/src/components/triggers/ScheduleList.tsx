@@ -58,22 +58,65 @@ export function useMissions(): { missions: ScheduledMission[]; status: 'loading'
 }
 
 /** The god agent's id on the floor, for ownership (schedules say 'god'). */
-function useGodId(): string {
+export function useGodId(): string {
   return useStore((s) => s.agents.find((a) => a.isGod)?.id) ?? GOD_ALIAS;
+}
+
+/** One save at a time: `busy` while it runs, `failed` if it didn't land (7A).
+ *  `after` runs only on success. Shared by a row, the add form and ASK ME. */
+export function useSaveOp(): {
+  busy: boolean; failed: boolean; setFailed: (v: boolean) => void;
+  run: (op: () => Promise<{ ok: boolean }>, after?: () => void) => Promise<void>;
+} {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const run = async (op: () => Promise<{ ok: boolean }>, after?: () => void) => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const res = await op();
+      if (!res.ok) { setFailed(true); return; }
+      after?.();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, failed, setFailed, run };
+}
+
+/** The loading line, or the load error with Try again, while nothing has loaded. */
+function loadState(status: string, empty: boolean, errorText: string, retry: () => void, t: TFunction): ReactNode | null {
+  if (!empty) return null;
+  if (status === 'loading') return <Line>{t('schedulesSection.loading')}</Line>;
+  if (status === 'error') {
+    return (
+      <div>
+        <Line tone="error">{errorText}</Line>
+        <PixelButton variant="secondary" size="sm" onClick={retry}>{t('schedulesSection.tryAgain')}</PixelButton>
+      </div>
+    );
+  }
+  return null;
 }
 
 /* ─────────────────────────────── helpers ─────────────────────────────── */
 
 const DEFAULT_INTERVAL_MS = 3_600_000;
 
-/** Relative-time label ("just now", "in 40m", "2h ago"). */
-function relTime(ms: number, t: TFunction): string {
-  const past = ms >= 0;
+/** Relative-time label ("now", "in 40 min", "2 hr. ago"), in the app language:
+ *  `ms` is how long ago (positive) or how far ahead (negative). */
+function relTime(ms: number, lang: string): string {
   const a = Math.abs(ms);
-  if (a < 45_000) return t('schedulesSection.justNow');
   const mins = Math.round(a / 60_000);
-  const unit = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.round(mins / 60)}h` : `${Math.round(mins / 1440)}d`;
-  return past ? t('schedulesSection.ago', { unit }) : t('schedulesSection.in', { unit });
+  const [n, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    a < 45_000 ? [0, 'second'] : mins < 60 ? [mins, 'minute'] : mins < 1440 ? [Math.round(mins / 60), 'hour'] : [Math.round(mins / 1440), 'day'];
+  try {
+    return new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' }).format(ms >= 0 ? -n : n, unit);
+  } catch {
+    return new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' }).format(ms >= 0 ? -n : n, unit);
+  }
 }
 
 /** What the when chip says: the calendar, the interval, or the heartbeat. */
@@ -123,7 +166,7 @@ interface RowProps {
 }
 
 function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, onMoveToWorkStyle, ownerName }: RowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
   const [open, setOpen] = useState(false);
@@ -132,8 +175,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
   const [weekly, setWeekly] = useState<WeeklyDraft | null>(weeklyDraft(mission.weekly));
   const [body, setBody] = useState(mission.body);
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const { busy, failed, setFailed, run } = useSaveOp();
   const [confirming, setConfirming] = useState(false);
   const deleteRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
@@ -173,25 +215,10 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
     ? t('schedulesSection.addedByYou')
     : t('schedulesSection.addedBy', { name: nameOf(mission.createdBy) });
   const sub = [
-    mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, t) }) : t('schedulesSection.notFired'),
-    nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, t) }) : null,
+    mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) }) : t('schedulesSection.notFired'),
+    nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, i18n.language) }) : null,
     creator
   ].filter(Boolean).join(', ');
-
-  /** Run one operation; on failure keep the draft and say so (7A). */
-  const run = async (op: () => Promise<{ ok: boolean }>, after?: () => void) => {
-    setBusy(true);
-    setFailed(false);
-    try {
-      const res = await op();
-      if (!res.ok) { setFailed(true); return; }
-      after?.();
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const save = () => {
     const trimmed = label.trim();
@@ -334,34 +361,24 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
   const [label, setLabel] = useState('');
   const [intervalMs, setIntervalMs] = useState<number>(DEFAULT_INTERVAL_MS);
   const [weekly, setWeekly] = useState<WeeklyDraft | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const { busy, failed, setFailed, run } = useSaveOp();
   const whenIsUsable = !weekly || weeklyIsUsable(weekly);
   const reset = () => { setAdding(false); setLabel(''); setWeekly(null); setFailed(false); };
 
   const add = async () => {
     if (!label.trim() || !whenIsUsable) return;
-    setBusy(true);
-    setFailed(false);
-    try {
-      const res = await window.cth.upsertMission({
-        id: `m_${Date.now().toString(36)}`,
-        label: label.trim(),
-        // The interval rides along even in weekly mode, so flipping back to
-        // "every..." later restores the cadence rather than a default.
-        intervalMs,
-        ...(weekly ? { weekly } : {}),
-        to,
-        body: '',
-        enabled: true,
-        createdBy: OWNER
-      });
-      if (res.ok) reset(); else setFailed(true);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
+    await run(() => window.cth.upsertMission({
+      id: `m_${Date.now().toString(36)}`,
+      label: label.trim(),
+      // The interval rides along even in weekly mode, so flipping back to
+      // "every..." later restores the cadence rather than a default.
+      intervalMs,
+      ...(weekly ? { weekly } : {}),
+      to,
+      body: '',
+      enabled: true,
+      createdBy: OWNER
+    }), reset);
   };
 
   if (!adding) {
@@ -401,18 +418,6 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
 
 /* ───────────────────────────── the list modes ───────────────────────────── */
 
-export type ScheduleListProps =
-  /** One agent's own schedules, editable. `agentId` is its floor id. */
-  | { mode: 'agent'; agentId: string; agentName: string }
-  /** Every other agent's schedules, read only, grouped by agent. */
-  | { mode: 'office' };
-
-export function ScheduleList(props: ScheduleListProps) {
-  return props.mode === 'agent'
-    ? <AgentSchedules agentId={props.agentId} agentName={props.agentName} />
-    : <OfficeSchedules />;
-}
-
 function useNameOf(): (id: string) => string {
   const agents = useStore((s) => s.agents);
   const godName = useResolvedGodName();
@@ -428,7 +433,8 @@ function useNameOf(): (id: string) => string {
   };
 }
 
-function AgentSchedules({ agentId, agentName }: { agentId: string; agentName: string }) {
+/** One agent's own schedules, editable. `agentId` is its floor id. */
+export function AgentSchedules({ agentId, agentName }: { agentId: string; agentName: string }) {
   const { t } = useTranslation();
   const { missions, status, retry } = useMissions();
   const godId = useGodId();
@@ -441,15 +447,8 @@ function AgentSchedules({ agentId, agentName }: { agentId: string; agentName: st
   // Michael's schedules keep the 'god' alias the router understands.
   const to = isGod ? GOD_ALIAS : agentId;
 
-  if (status === 'loading' && missions.length === 0) return <Line>{t('schedulesSection.loading')}</Line>;
-  if (status === 'error' && missions.length === 0) {
-    return (
-      <div>
-        <Line tone="error">{t('schedulesSection.loadError', { name: agentName })}</Line>
-        <PixelButton variant="secondary" size="sm" onClick={retry}>{t('schedulesSection.tryAgain')}</PixelButton>
-      </div>
-    );
-  }
+  const waiting = loadState(status, missions.length === 0, t('schedulesSection.loadError', { name: agentName }), retry, t);
+  if (waiting) return waiting;
 
   const on = mine.filter((m) => m.enabled);
   const next = on.map((m) => nextRunAt(m, Date.now())).filter((x): x is number => x !== null).sort((a, b) => a - b)[0];
@@ -491,7 +490,8 @@ function AgentSchedules({ agentId, agentName }: { agentId: string; agentName: st
   );
 }
 
-function OfficeSchedules() {
+/** Every other agent's schedules, read only, grouped by agent. */
+export function OfficeSchedules() {
   const { t } = useTranslation();
   const { missions, status, retry } = useMissions();
   const godId = useGodId();
@@ -505,15 +505,8 @@ function OfficeSchedules() {
       .catch(() => { /* no closed groups */ });
   }, [missions]);
 
-  if (status === 'loading' && missions.length === 0) return <Line>{t('schedulesSection.loading')}</Line>;
-  if (status === 'error' && missions.length === 0) {
-    return (
-      <div>
-        <Line tone="error">{t('schedulesSection.loadErrorOffice')}</Line>
-        <PixelButton variant="secondary" size="sm" onClick={retry}>{t('schedulesSection.tryAgain')}</PixelButton>
-      </div>
-    );
-  }
+  const waiting = loadState(status, missions.length === 0, t('schedulesSection.loadErrorOffice'), retry, t);
+  if (waiting) return waiting;
 
   // Group by owner, Michael excluded (his jobs are the editable section above).
   // Roster order first, then anyone off the floor, so a closed agent still shows.
@@ -561,7 +554,10 @@ function OfficeSchedules() {
 /** The close confirmation. When the agent has schedules running, it says they
  *  will pause (design 6A); otherwise it is the plain close question. */
 export function closeConfirmText(agentId: string, name: string, t: TFunction): string {
-  const count = useStore.getState().missions.filter((m) => m.enabled && m.to === agentId).length;
+  // The same ownership rule the close uses to pause them (pauseMissionsOf).
+  const st = useStore.getState();
+  const godId = st.agents.find((a) => a.isGod)?.id ?? GOD_ALIAS;
+  const count = missionsFor(st.missions, agentId, godId).filter((m) => m.enabled).length;
   return count > 0
     ? t(count === 1 ? 'agentDetail.killConfirmSchedules' : 'agentDetail.killConfirmSchedulesPlural', { name, count })
     : t('agentDetail.killConfirm', { name });

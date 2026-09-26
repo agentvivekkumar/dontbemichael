@@ -976,9 +976,6 @@
     "noKey": "no key"
   },
   "schedulesSection": {
-    "justNow": "just now",
-    "ago": "{{unit}} ago",
-    "in": "in {{unit}}",
     "label": "DO WHAT?",
     "labelPlaceholder": "For example: Follow up on unpaid invoices",
     "prompt": "PROMPT",

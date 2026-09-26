@@ -21,7 +21,7 @@ import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTi
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
-  migrateMissions, buildScheduleRequest, applyScheduleRequest, requestIsStale, missionsFor,
+  migrateMissions, buildScheduleRequest, applyScheduleRequest, missionsFor,
   type ScheduleRequest
 } from '../shared/missions';
 import {
@@ -951,12 +951,9 @@ function receiveScheduleRequest(actor: string, payload: unknown): string {
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
   // ASK ME has no badge, so Michael tells the owner there is something to
   // decide. Only Michael notifies (docs/designs/michael-only-notifications.md).
-  if (readConfig().notifications) {
-    try {
-      const name = hive.registry().agents[actor]?.name?.trim() || 'A team member';
-      if (Notification.isSupported()) new Notification({ title: michaelName(), body: `${name} asked to change a schedule. It's waiting for you in ASK ME.` }).show();
-    } catch { /* best-effort */ }
-  }
+  let name = 'A team member';
+  try { name = hive.registry().agents[actor]?.name?.trim() || name; } catch { /* keep the fallback */ }
+  ownerToast(michaelName(), `${name} asked to change a schedule. It's waiting for you in ASK ME.`);
   return 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
 }
 
@@ -966,12 +963,17 @@ function decideScheduleRequest(id: string, approve: boolean): { ok: true } | { o
   const cfg = readConfig();
   const req = (cfg.scheduleRequests ?? []).find((r) => r.id === id);
   if (!req) return { ok: false, error: 'not found' };
-  const missions = cfg.missions ?? [];
+  // Name the schedule before the change: after an approved delete it's gone.
+  const described = describeScheduleRequest(req, cfg.missions ?? []);
   if (approve) {
-    if (requestIsStale(req, missions)) return { ok: false, error: 'stale' };
-    const applied = applyScheduleRequest(req, missions, `m_${Date.now().toString(36)}`);
-    if (!applied.ok) return { ok: false, error: applied.error };
-    const res = applyMissions(() => applied.missions);
+    let refused = '';
+    // Apply against the list as it is when written (applyMissions reads it fresh).
+    const res = applyMissions((list) => {
+      const applied = applyScheduleRequest(req, list, `m_${Date.now().toString(36)}`);
+      if (!applied.ok) { refused = applied.error; return null; }
+      return applied.missions;
+    });
+    if (refused) return { ok: false, error: refused };
     if (!res.ok) return res;
   }
   writeConfig({ scheduleRequests: (readConfig().scheduleRequests ?? []).filter((r) => r.id !== id) });
@@ -980,14 +982,14 @@ function decideScheduleRequest(id: string, approve: boolean): { ok: true } | { o
     hive.send({
       to: req.agentId, act: 'inform',
       subject: approve ? 'Schedule change approved' : 'Schedule change declined',
-      body: `${approve ? 'Approved' : 'Declined'}: ${describeScheduleRequest(req)}. ${approve ? 'It is in place now.' : 'Nothing changed.'}`
+      body: `${approve ? 'Approved' : 'Declined'}: ${described}. ${approve ? 'It is in place now.' : 'Nothing changed.'}`
     }, 'scheduler');
   }
   return { ok: true };
 }
 
-function describeScheduleRequest(req: ScheduleRequest): string {
-  const target = (readConfig().missions ?? []).find((m) => m.id === req.missionId);
+function describeScheduleRequest(req: ScheduleRequest, missions: ScheduledMission[]): string {
+  const target = missions.find((m) => m.id === req.missionId);
   const name = req.draft?.label ?? target?.label ?? 'a schedule';
   return `${req.op} "${name}"`;
 }
@@ -1281,8 +1283,9 @@ function michaelName(): string {
   }
 }
 
-/** A native toast for a breaker stop or an app warning, gated on the notifications setting. */
-function breakerToast(title: string, body: string): void {
+/** A native toast for the owner: Michael's word (a breaker stop, a schedule
+ *  request) or an app warning, gated on the notifications setting. */
+function ownerToast(title: string, body: string): void {
   if (!readConfig().notifications) return;
   try { if (Notification.isSupported()) new Notification({ title, body }).show(); }
   catch { /* unsupported platform */ }
@@ -1363,7 +1366,7 @@ function runBreakerBeat(progressWindowMs: number): void {
       const ptyId = ptyForAgent(d.state.agentId);
       if (ptyId) { try { ptyManager.kill(ptyId); } catch { /* already gone */ } teardownPty(ptyId); }
       // A stop halts that agent's work, so the owner hears it, from Michael.
-      breakerToast(michaelName(), `I stopped ${name}: ${reason}`);
+      ownerToast(michaelName(), `I stopped ${name}: ${reason}`);
     }
   }
 }
@@ -3000,7 +3003,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
       // A degraded spawn (proxy bridge never bound) is told to the user the same
       // way breaker escalations are: a native toast, gated on the notifications
       // setting. The hive already logged it and pushed hive:degraded to the floor.
-      if (inj.degraded) breakerToast('Agent running degraded', inj.degraded);
+      if (inj.degraded) ownerToast('Agent running degraded', inj.degraded);
       // Point the agent's mempalace CLI at the shared palace + the `kg` CLI at the
       // enterprise knowledge store (both no-ops / empty when their flags are off).
       opts.env = { ...(opts.env ?? {}), ...inj.env, ...memory.env(), ...knowledge.env() };
@@ -4896,7 +4899,8 @@ registerRealtimeActionIpc({
   listMissions: () => readConfig().missions ?? [],
   // The spec carries lastFiredAt through from listMissions(), so a wholesale write
   // preserves the scheduler's stamps; edit_schedule is deliberate + rare.
-  saveMissions: (missions) => { writeConfig({ missions }); },
+  // Through the single writer, so a voice edit re-arms the timers and refreshes the UI.
+  saveMissions: (missions) => { applyMissions(() => missions); },
   // rt-12: register each voice dispatch so the watcher can detect its completion.
   trackDispatch: (d) => { try { completionWatcher.track({ ...d, kind: 'dispatch' }); } catch { /* watcher unavailable */ } },
   // ── v0.3.4 full-control extensions ──
@@ -5697,7 +5701,7 @@ function healthCheckPtys(reason: string, awayMs: number | null): void {
   const away = awayMs != null ? ` (away ~${Math.round(awayMs / 1000)}s)` : '';
   if (dead.length) {
     console.warn(`[power] ${reason}${away}: ${dead.length}/${ptys.length} PTY(s) look wedged (process gone):`, dead.join(', '));
-    breakerToast('Agents need a restart', `${dead.length} agent terminal(s) didn't survive sleep. Open them again to resume.`);
+    ownerToast('Agents need a restart', `${dead.length} agent terminal(s) didn't survive sleep. Open them again to resume.`);
   } else {
     console.log(`[power] ${reason}${away}: ${ptys.length} PTY(s) healthy`);
   }

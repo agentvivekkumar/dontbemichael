@@ -108,8 +108,11 @@ test('the renderer can only change one schedule at a time', () => {
 test('approving a request goes through the stale check and the one-schedule write', () => {
   const main = read('src/main/index.ts');
   const fn = main.slice(main.indexOf('function decideScheduleRequest('), main.indexOf('function describeScheduleRequest('));
-  assert.match(fn, /if \(requestIsStale\(req, missions\)\) return \{ ok: false, error: 'stale' \};/);
-  assert.match(fn, /applyScheduleRequest\(req, missions,/);
+  // Applied inside the single writer, against the list as it is when written;
+  // applyScheduleRequest refuses a stale request itself.
+  assert.match(fn, /applyMissions\(\(list\) => \{\s*const applied = applyScheduleRequest\(req, list,/);
+  assert.match(fn, /if \(refused\) return \{ ok: false, error: refused \};/);
+  assert.ok(fn.indexOf('describeScheduleRequest(req, cfg.missions') < fn.indexOf('if (approve)'), 'the schedule is named before a delete removes it');
   assert.ok(fn.indexOf('if (approve)') < fn.indexOf('applyMissions('), 'decline never writes schedules');
 });
 
@@ -131,7 +134,9 @@ test('new schedule strings exist in every language', () => {
 
 test('agents are told how to ask, in both protocols', () => {
   const hive = read('src/main/hive.ts');
-  assert.equal((hive.match(/## Your schedules/g) ?? []).length, 2);
+  // One copy, used by both protocol files (simplification review, 2026-09-25).
+  assert.equal((hive.match(/## Your schedules/g) ?? []).length, 1);
+  assert.equal((hive.match(/\$\{SCHEDULES_PROTOCOL\}/g) ?? []).length, 2);
   assert.match(hive, /You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME\./);
 });
 
@@ -140,11 +145,11 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   const main = read('src/main/index.ts');
   const titles = [...main.matchAll(/new Notification\(\{ title: ([^,]+),/g)].map((m) => m[1].trim());
   for (const t of titles) assert.ok(['michaelName()', 'title'].includes(t), `unexpected toast title ${t}`);
-  const toasts = [...main.matchAll(/breakerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
-  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()'].sort());
+  const toasts = [...main.matchAll(/ownerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
+  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()'].sort());
   assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
-  assert.match(main, /breakerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
-  assert.match(main, /title: michaelName\(\), body: `\$\{name\} asked to change a schedule\. It's waiting for you in ASK ME\.`/);
+  assert.match(main, /ownerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
+  assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\} asked to change a schedule\. It's waiting for you in ASK ME\.`\);/);
   assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return;/);
 });
 

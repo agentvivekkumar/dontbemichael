@@ -50,3 +50,28 @@ test('the tab reads the history and is read only', () => {
     assert.equal(d.replyPlaceholder, undefined, `${loc}: reply box strings are gone`);
   }
 });
+
+test('history parses each file once and still sees new and moved mail', async (t) => {
+  const fs2 = require('node:fs'); const os2 = require('node:os'); const path2 = require('node:path');
+  const { HiveManager } = require('./load-ts.cjs')('src/main/hive.ts');
+  const home = fs2.mkdtempSync(path2.join(os2.tmpdir(), 'md-hist-cache-'));
+  t.after(() => fs2.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
+  const inbox = path2.join(home, 'hive', 'agents', 'pam', 'inbox');
+  fs2.mkdirSync(path2.join(inbox, '.done'), { recursive: true });
+  const write = (dir, id) => fs2.writeFileSync(path2.join(dir, `${id}.json`), JSON.stringify({ id, from: 'dwight', to: 'pam', act: 'request', subject: id, body: '', created_at: new Date().toISOString() }));
+  write(inbox, 'a');
+  const aPath = path2.join(inbox, 'a.json');
+  const pinned = new Date(2026, 8, 25, 12, 0, 0); // a whole second, so it round-trips exactly
+  fs2.utimesSync(aPath, pinned, pinned);
+  assert.deepEqual(hive.messageHistory('pam').map((m) => m.id), ['a']);
+  // Rewrite a.json but keep its mtime: a cached read still shows the old subject.
+  fs2.writeFileSync(aPath, JSON.stringify({ id: 'a', from: 'dwight', to: 'pam', act: 'request', subject: 'changed', body: '', created_at: new Date().toISOString() }));
+  fs2.utimesSync(aPath, pinned, pinned);
+  assert.equal(hive.messageHistory('pam')[0].subject, 'a', 'an unchanged file (same mtime) is not parsed again');
+  write(inbox, 'b');
+  fs2.renameSync(path2.join(inbox, 'a.json'), path2.join(inbox, '.done', 'a.json'));
+  const ids = hive.messageHistory('pam').map((m) => m.id).sort();
+  assert.deepEqual(ids, ['a', 'b'], 'new mail and mail moved to .done both show');
+});

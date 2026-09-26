@@ -976,9 +976,6 @@
     "noKey": "无密钥"
   },
   "schedulesSection": {
-    "justNow": "刚刚",
-    "ago": "{{unit}} 前",
-    "in": "{{unit}} 后",
     "label": "做什么？",
     "labelPlaceholder": "例如：跟进未付的发票",
     "prompt": "提示词",

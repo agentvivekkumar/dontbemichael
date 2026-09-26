@@ -21,7 +21,7 @@ import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@share
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
-import { ScheduleList, closeConfirmText } from './triggers/ScheduleList';
+import { AgentSchedules, closeConfirmText } from './triggers/ScheduleList';
 import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 export interface AgentDetailPanelProps {
@@ -301,7 +301,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
         {sidebarTab === 'schedules' && (
           <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 12 }}>
-            <ScheduleList mode="agent" agentId={agent.id} agentName={agent.name} />
+            <AgentSchedules agentId={agent.id} agentName={agent.name} />
           </div>
         )}
 

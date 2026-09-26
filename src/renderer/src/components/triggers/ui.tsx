@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TRIGGER_MODES, type TriggerMode } from '@shared/triggers';
+import { MAX_INTERVAL_MS } from '@shared/missions';
 import {
   WEEKDAY_INITIALS, WEEKDAY_LABELS, formatMinute, normalizeWeekly,
   type WeeklySchedule
@@ -51,7 +52,8 @@ export function Muted({ children }: { children: ReactNode }) {
 /** One line of explanation under a control. Smaller than Muted, never a tooltip —
  *  a sidebar hides tooltips behind the window edge half the time. */
 export function Hint({ children }: { children: ReactNode }) {
-  return <div style={{ fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-500)', marginTop: 3 }}>{children}</div>;
+  // 13px: the floor for text an owner reads (DESIGN.md §4.2).
+  return <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)', marginTop: 3 }}>{children}</div>;
 }
 
 export function Chip({ children, tone = 'plain' }: { children: ReactNode; tone?: 'plain' | 'on' | 'off' }) {
@@ -101,7 +103,7 @@ export function Toggle({ on, onClick, onLabel, offLabel, label, disabled }: {
         opacity: disabled ? 0.6 : 1,
         background: on ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
         boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
-        fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)'
+        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)'
       }}
     >{on ? (onLabel ?? t('common.on')) : (offLabel ?? t('common.off'))}</button>
   );
@@ -309,7 +311,7 @@ const CUSTOM = '__custom';
  * put a label on screen that the saved value does not match. Schedules take any
  * interval and pass the default range.
  */
-export function IntervalPicker({ value, onChange, minMs = MINUTE, maxMs = Number.POSITIVE_INFINITY }: {
+export function IntervalPicker({ value, onChange, minMs = MINUTE, maxMs = MAX_INTERVAL_MS }: {
   value: number; onChange: (ms: number) => void; minMs?: number; maxMs?: number;
 }) {
   const { t } = useTranslation();

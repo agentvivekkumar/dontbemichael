@@ -24,6 +24,9 @@ import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
 
 /** Desktop notification bodies. The title is the agent's name (displayName). */
+/** The same terminal prompt is relayed to Michael at most once in this window. */
+const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
+
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
 export const NOTIFY_WAITING = 'Waiting for you.';
 
@@ -365,7 +368,8 @@ export class HookServer {
     // on Michael at most (docs/designs/owner-talks-via-michael.md). Refusing the
     // question tool turns the question into a message to him; he answers it or
     // puts it on ASK ME.
-    if (event === 'PreToolUse' && agentId && p.tool_name === ASK_TOOL && !this.isGod(agentId)) {
+    // In 1:1 the owner is at that terminal, so the question may go to them there.
+    if (event === 'PreToolUse' && agentId && p.tool_name === ASK_TOOL && !this.isGod(agentId) && !this.onHold(agentId)) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
@@ -542,7 +546,9 @@ export class HookServer {
     // that terminal (a permission, a sign-in, a trust dialog). Tell Michael
     // what it says; he can't type there, so he puts it on ASK ME for the owner
     // to answer in a 1:1 (docs/designs/owner-talks-via-michael.md).
-    if (event === 'Notification' && agentId && !this.isGod(agentId) && isTerminalPrompt(p)) {
+    // Not in 1:1: the owner is already at that terminal to answer it. The cheap
+    // prompt check runs first; the registry is read only for a real prompt.
+    if (event === 'Notification' && agentId && isTerminalPrompt(p) && !this.isGod(agentId) && !this.onHold(agentId)) {
       this.relayPromptToMichael(agentId, (p.message ?? '').trim());
     }
 
@@ -568,12 +574,17 @@ export class HookServer {
     } catch { /* notifications unsupported on this platform — ignore */ }
   }
 
+  /** Is the owner in 1:1 with this agent (registry `onHold`)? */
+  private onHold(agentId: string): boolean {
+    try { return !!this.hive.registry().agents[agentId]?.onHold; } catch { return false; }
+  }
+
   /** agentId → last prompt relayed, so one prompt isn't relayed twice. */
   private relayedPrompts = new Map<string, { text: string; at: number }>();
 
   private relayPromptToMichael(agentId: string, text: string): void {
     const last = this.relayedPrompts.get(agentId);
-    if (last && last.text === text && Date.now() - last.at < 10 * 60_000) return;
+    if (last && last.text === text && Date.now() - last.at < PROMPT_RELAY_DEDUPE_MS) return;
     try {
       const name = this.displayName(agentId);
       this.hive.send({

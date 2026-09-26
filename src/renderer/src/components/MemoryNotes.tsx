@@ -4,6 +4,7 @@ import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useRtl } from '@/i18n/useDirection';
 import { expiryState, procedurePointer, type MemoryEntry, type MemoryView } from '@shared/memoryIndex';
+import { localDay } from '@shared/messageView';
 
 /**
  * An agent's memory as notes, not the raw index (docs/designs/memory-tab-readable.md).
@@ -12,12 +13,6 @@ import { expiryState, procedurePointer, type MemoryEntry, type MemoryView } from
  * The ids, kind words and pipes of the file are never shown here: the Memory
  * tab's "Show the file" is where the raw text lives.
  */
-
-/** Today as YYYY-MM-DD in local time, the way the index writes dates. */
-export function localToday(now = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
-}
 
 /** "2026-09-25" as "Sep 25" in the app language, read as a local date. */
 function shortDate(ymd: string, lang: string): string {
@@ -109,7 +104,7 @@ function EntryRow({ agentId, entry }: { agentId: string; entry: MemoryEntry }) {
   const lang = i18n.language;
   const proc = entry.kind === 'procedure' ? procedurePointer(entry.text) : null;
   const source = t(`memoryNotes.source.${entry.source}`, { godName });
-  const expiry = expiryState(entry.expires, localToday());
+  const expiry = expiryState(entry.expires, localDay(new Date().toISOString()));
 
   return (
     <Row>

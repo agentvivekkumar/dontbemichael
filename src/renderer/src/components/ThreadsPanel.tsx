@@ -41,7 +41,8 @@ export function ThreadsPanel({ agentId }: ThreadsPanelProps) {
     const load = async () => {
       try {
         const history = await window.cth.hiveHistory(agentId);
-        if (alive) setMessages(history);
+        // The same messages as last time: keep the old array, so nothing re-renders.
+        if (alive) setMessages((prev) => (prev.length === history.length && prev.every((m, i) => m.id === history[i].id) ? prev : history));
       } catch { /* keep last good state */ }
     };
     load();

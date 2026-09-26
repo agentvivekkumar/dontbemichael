@@ -4,6 +4,7 @@ import { type SidebarTab } from '@/store/store';
 import { type AccentColorName } from '@/design/tokens';
 import { Icon, type IconName } from './Icon';
 import { SHOW_GIT } from '@shared/buildFeatures';
+import { useRtl } from '@/i18n/useDirection';
 
 // v0.3.4: the files tab is gone — the per-agent IDE button (header) opens the
 // full Monaco editor + file tree, which superseded the read-only browser.
@@ -36,6 +37,23 @@ export function SidebarTabs({ current, accent, onChange }: SidebarTabsProps) {
   // office schedule can select one that is scrolled off), not on every render,
   // which would fight the owner scrolling the strip.
   const stripRef = useRef<HTMLDivElement>(null);
+  const rtl = useRtl();
+  /** The ARIA tabs keyboard model: arrows move between tabs (mirrored in RTL),
+   *  Home and End jump to the ends, and only the selected tab is in the Tab order. */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const i = TABS.findIndex((tab) => tab.key === current);
+    const forward = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const back = rtl ? 'ArrowRight' : 'ArrowLeft';
+    let next = -1;
+    if (e.key === forward) next = (i + 1) % TABS.length;
+    else if (e.key === back) next = (i - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(TABS[next].key);
+    requestAnimationFrame(() => stripRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus());
+  };
   useEffect(() => {
     stripRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [current]);
@@ -43,7 +61,7 @@ export function SidebarTabs({ current, accent, onChange }: SidebarTabsProps) {
     // Labels are 14px (the floor for text an owner reads, design 14C). Four of
     // them can outgrow a narrow panel, so the strip scrolls sideways instead of
     // clipping, and the selected tab scrolls itself into view.
-    <div ref={stripRef} role="tablist" style={{
+    <div ref={stripRef} role="tablist" onKeyDown={onKeyDown} style={{
       display: 'flex',
       gap: 0,
       background: 'var(--cth-cream-200)',
@@ -59,6 +77,7 @@ export function SidebarTabs({ current, accent, onChange }: SidebarTabsProps) {
             key={tab.key}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.key)}
             style={{
               flex: '1 0 auto',

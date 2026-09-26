@@ -1201,7 +1201,7 @@ export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }:
 
   const linkButton: React.CSSProperties = {
     padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
-    fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-sky)', textDecoration: 'underline'
+    fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)', textDecoration: 'underline', textUnderlineOffset: 2
   };
 
   // Memory first, search below (docs/designs/memory-tab-readable.md). A flex
@@ -1255,7 +1255,7 @@ export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }:
       )}
 
       {!ownOnly && <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
-        <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', fontWeight: 400, color: 'var(--cth-ink-500)' }}>{t('memoryNotes.searchTitle')}</h3>
+        <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-ink-700)' }}>{t('memoryNotes.searchTitle')}</h3>
         <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
           {(['text', 'meaning'] as const).map((m) => (
             <button
