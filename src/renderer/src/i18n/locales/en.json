@@ -1180,15 +1180,35 @@
     "modelMultilingualDetail": "all languages · ~300 MB"
   },
   "threads": {
-    "noSubject": "(no subject)",
-    "less": "less",
-    "more": "more",
     "emptyHistory": "No messages yet. What {{name}} receives and sends shows up here.",
     "you": "you",
     "everyone": "everyone",
-    "routine": "routine",
-    "sentTo": "To {{to}}",
-    "receivedFrom": "From {{from}}"
+    "noHandoffs": "No handoffs yet. Only office notices so far.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "verb": {
+      "request": "{{from}} asked {{to}}",
+      "query": "{{from}} asked {{to}}",
+      "inform": "{{from}} let {{to}} know",
+      "propose": "{{from}} suggested to {{to}}",
+      "agree": "{{from}} agreed",
+      "refuse": "{{from}} turned it down",
+      "done": "{{from}} finished",
+      "other": "{{from}} wrote to {{to}}"
+    },
+    "readMessage": "Read {{count}} message",
+    "readMessages": "Read all {{count}} messages",
+    "close": "Close",
+    "notices": "Office notices: {{list}}",
+    "listJoiner": ", ",
+    "scheduledRun": "{{count}} scheduled run",
+    "scheduledRunPlural": "{{count}} scheduled runs",
+    "closingTime": "{{count}} closing time",
+    "closingTimePlural": "{{count}} closing times",
+    "otherNotice": "{{count}} other",
+    "otherNoticePlural": "{{count}} others",
+    "show": "Show",
+    "hide": "Hide"
   },
   "skillsTab": {
     "installed": "Installed",

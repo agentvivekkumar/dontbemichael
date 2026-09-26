@@ -40,16 +40,13 @@ test('history holds received and sent mail, handled or not, newest first', async
   assert.ok(h[0].created_at >= h[1].created_at, 'newest first');
 });
 
-test('the tab reads the history, is read only, and dims routine traffic', () => {
+test('the tab reads the history and is read only', () => {
   const panel = read('src/renderer/src/components/ThreadsPanel.tsx');
   assert.match(panel, /window\.cth\.hiveHistory\(agentId\)/);
   assert.doesNotMatch(panel, /hiveSend|<textarea/, 'no reply box: talk through Michael or in 1:1');
-  const { isRoutine } = { isRoutine: (m) => new Set(['scheduler', 'heartbeat', 'system', 'breaker']).has(m.from) || /closing[\s_-]*time/i.test(m.subject ?? '') };
-  assert.match(panel, /return SYSTEM_SENDERS\.has\(m\.from\) \|\| \/closing\[\\s_-\]\*time\/i\.test\(m\.subject \?\? ''\);/);
-  assert.equal(isRoutine({ from: 'pam', subject: 'CLOSING-TIME-ACK' }), true);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).threads;
-    for (const k of ['emptyHistory', 'you', 'routine', 'sentTo', 'receivedFrom']) assert.ok(d[k], `${loc} ${k}`);
+    for (const k of ['emptyHistory', 'you']) assert.ok(d[k], `${loc} ${k}`);
     assert.equal(d.replyPlaceholder, undefined, `${loc}: reply box strings are gone`);
   }
 });

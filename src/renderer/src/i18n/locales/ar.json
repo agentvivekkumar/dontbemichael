@@ -1180,15 +1180,35 @@
     "modelMultilingualDetail": "كل اللغات · ~300 م.ب"
   },
   "threads": {
-    "noSubject": "(بلا موضوع)",
-    "less": "أقل",
-    "more": "المزيد",
-    "emptyHistory": "لا رسائل بعد. ما يستلمه {{name}} وما يرسله يظهر هنا.",
+    "emptyHistory": "لا رسائل بعد. ما يستلمه {{name}} ويرسله يظهر هنا.",
     "you": "أنت",
     "everyone": "الجميع",
-    "routine": "روتيني",
-    "sentTo": "إلى {{to}}",
-    "receivedFrom": "من {{from}}"
+    "noHandoffs": "لا تسليمات بعد. توجد إشعارات المكتب فقط حتى الآن.",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "verb": {
+      "request": "طلب {{from}} من {{to}}",
+      "query": "سأل {{from}} {{to}}",
+      "inform": "أبلغ {{from}} {{to}}",
+      "propose": "اقترح {{from}} على {{to}}",
+      "agree": "وافق {{from}}",
+      "refuse": "رفض {{from}}",
+      "done": "أنهى {{from}}",
+      "other": "كتب {{from}} إلى {{to}}"
+    },
+    "readMessage": "اقرأ {{count}} رسالة",
+    "readMessages": "اقرأ كل الرسائل ({{count}})",
+    "close": "إغلاق",
+    "notices": "إشعارات المكتب: {{list}}",
+    "listJoiner": "، ",
+    "scheduledRun": "{{count}} تشغيل مجدول",
+    "scheduledRunPlural": "{{count}} تشغيلات مجدولة",
+    "closingTime": "{{count}} إشعار إغلاق",
+    "closingTimePlural": "{{count}} إشعارات إغلاق",
+    "otherNotice": "{{count}} أخرى",
+    "otherNoticePlural": "{{count}} أخرى",
+    "show": "اعرض",
+    "hide": "أخفِ"
   },
   "skillsTab": {
     "installed": "المثبَّتة",

@@ -54,18 +54,17 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const does = card?.does ?? [];
   const asksFirst = card?.wontDo ?? [];
   const connections = card?.connections ?? [];
-  const dir = rtl ? 'auto' : undefined;
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', background: 'var(--cth-paper-200)' }}>
       <div style={{ padding: '16px 16px 24px', maxWidth: '72ch' }}>
         {title && (
-          <h2 dir={dir} style={{ margin: 0, fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: 'var(--cth-ink-900)' }}>
+          <h2 dir={rtl ? 'auto' : undefined} style={{ margin: 0, fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: 'var(--cth-ink-900)' }}>
             {title}
           </h2>
         )}
         {summary ? (
-          <p dir={dir} style={{ margin: '8px 0 0', fontSize: 16, lineHeight: '24px', color: 'var(--cth-ink-900)' }}>{summary}</p>
+          <p dir={rtl ? 'auto' : undefined} style={{ margin: '8px 0 0', fontSize: 16, lineHeight: '24px', color: 'var(--cth-ink-900)' }}>{summary}</p>
         ) : (
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)' }}>{t('profile.noRole', { name })}</p>
         )}
@@ -74,14 +73,14 @@ export function ProfileTab({ agent }: { agent: Agent }) {
           <Section title={t('profile.sendFor', { name })}>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {role.sendFor.map((s) => (
-                <li key={s} dir={dir} style={{
+                <li key={s} dir={rtl ? 'auto' : undefined} style={{
                   padding: '2px 8px', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)',
                   background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
                 }}>{s}</li>
               ))}
             </ul>
             {role.notFor && (
-              <p dir={dir} style={{ margin: '8px 0 0', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{role.notFor}</p>
+              <p dir={rtl ? 'auto' : undefined} style={{ margin: '8px 0 0', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{role.notFor}</p>
             )}
           </Section>
         )}

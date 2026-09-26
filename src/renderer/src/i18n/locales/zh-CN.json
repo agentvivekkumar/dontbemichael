@@ -1180,15 +1180,35 @@
     "modelMultilingualDetail": "所有语言 · 约 300 MB"
   },
   "threads": {
-    "noSubject": "（无主题）",
-    "less": "收起",
-    "more": "更多",
     "emptyHistory": "还没有消息。{{name}} 收到和发出的消息会显示在这里。",
     "you": "你",
     "everyone": "所有人",
-    "routine": "例行",
-    "sentTo": "发给 {{to}}",
-    "receivedFrom": "来自 {{from}}"
+    "noHandoffs": "还没有交接，目前只有办公室通知。",
+    "today": "今天",
+    "yesterday": "昨天",
+    "verb": {
+      "request": "{{from}} 请 {{to}} 帮忙",
+      "query": "{{from}} 问 {{to}}",
+      "inform": "{{from}} 告诉 {{to}}",
+      "propose": "{{from}} 向 {{to}} 提议",
+      "agree": "{{from}} 同意了",
+      "refuse": "{{from}} 拒绝了",
+      "done": "{{from}} 完成了",
+      "other": "{{from}} 写信给 {{to}}"
+    },
+    "readMessage": "查看 {{count}} 条消息",
+    "readMessages": "查看全部 {{count}} 条消息",
+    "close": "收起",
+    "notices": "办公室通知：{{list}}",
+    "listJoiner": "，",
+    "scheduledRun": "{{count}} 次定时运行",
+    "scheduledRunPlural": "{{count}} 次定时运行",
+    "closingTime": "{{count}} 次下班通知",
+    "closingTimePlural": "{{count}} 次下班通知",
+    "otherNotice": "{{count}} 条其他",
+    "otherNoticePlural": "{{count}} 条其他",
+    "show": "显示",
+    "hide": "隐藏"
   },
   "skillsTab": {
     "installed": "已安装",
