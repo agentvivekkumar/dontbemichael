@@ -1659,6 +1659,8 @@
       "team": "The team ({{count}})",
       "business": "What {{name}} knows about your business",
       "businessFact": "Business"
-    }
+    },
+    "openFolder": "Open folder",
+    "openFolderFailed": "Couldn't open the folder. It may have been moved or deleted."
   }
 }

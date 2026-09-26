@@ -88,3 +88,11 @@ test('strings in every language, no dashes, no literal Michael', () => {
     assert.equal(d.profile.god.does.length, en.profile.god.does.length, `${loc} same number of duties`);
   }
 });
+
+test("every profile can open the agent's work folder, and says so when it can't", () => {
+  const src = read('src/renderer/src/components/ProfileTab.tsx');
+  assert.match(src, /window\.cth\.revealPath\(agent\.cwd\)/, 'reuses the reveal that never launches a file');
+  assert.match(src, /onClick=\{openFolder\}>\{t\('profile\.openFolder'\)\}/);
+  assert.match(src, /if \(!r\.ok\) setFolderError\(true\);/);
+  assert.match(src, /! \{t\('profile\.openFolderFailed'\)\}/);
+});

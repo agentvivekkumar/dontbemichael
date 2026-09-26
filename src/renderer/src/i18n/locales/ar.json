@@ -1659,6 +1659,8 @@
       "team": "الفريق ({{count}})",
       "business": "ما يعرفه {{name}} عن عملك",
       "businessFact": "العمل"
-    }
+    },
+    "openFolder": "افتح المجلد",
+    "openFolderFailed": "تعذّر فتح المجلد. ربما نُقل أو حُذف."
   }
 }

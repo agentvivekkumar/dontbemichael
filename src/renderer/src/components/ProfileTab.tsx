@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
+import { PixelButton } from './PixelButton';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useRtl } from '@/i18n/useDirection';
 import { parseRoleLine, workStyleBody } from '@shared/agentProfile';
@@ -53,10 +54,20 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const [office, setOffice] = useState<OfficeInfo | null>(null);
   const agents = useStore((s) => s.agents);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [folderError, setFolderError] = useState(false);
+  /** The agent's work folder in Finder (or the OS file browser). fs:revealPath
+   *  opens a folder and never launches a file. */
+  const openFolder = () => {
+    setFolderError(false);
+    window.cth.revealPath(agent.cwd)
+      .then((r) => { if (!r.ok) setFolderError(true); })
+      .catch(() => setFolderError(true));
+  };
 
   useEffect(() => {
     let alive = true;
     setShowInstructions(false);
+    setFolderError(false);
     loadOfficeInfo().then((o) => { if (alive) { setOffice(o); setCard(o.cards.get(agent.id)); } });
     return () => { alive = false; };
   }, [agent.id]);
@@ -155,7 +166,15 @@ export function ProfileTab({ agent }: { agent: Agent }) {
         <Section title={t('profile.facts')}>
           <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 6 }}>
             {god && businessLine && <Fact label={t('profile.god.businessFact')}>{businessLine}</Fact>}
-            {agent.cwd && <Fact label={t('profile.folder')}><span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, wordBreak: 'break-all' }}>{agent.cwd}</span></Fact>}
+            {agent.cwd && (
+              <Fact label={t('profile.folder')}>
+                <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, wordBreak: 'break-all' }}>{agent.cwd}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                  <PixelButton variant="secondary" size="sm" onClick={openFolder}>{t('profile.openFolder')}</PixelButton>
+                  {folderError && <span role="alert" style={{ fontSize: 13, color: 'var(--cth-coral)' }}>! {t('profile.openFolderFailed')}</span>}
+                </span>
+              </Fact>
+            )}
             {connections.length > 0 && (
               <Fact label={t('profile.connections')}>
                 {connections.map((c) => t(`onboarding.team.conn.${c.id}`, { defaultValue: c.id })).join(t('profile.listJoiner'))}
