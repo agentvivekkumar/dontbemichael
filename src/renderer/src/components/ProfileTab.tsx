@@ -80,7 +80,6 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   // Michael has no pack card: his profile says what his instructions tell him
   // to do (hive.ts godPrompt), in the owner's words.
   const summary = god ? t('profile.god.summary', { name }) : (role.summary || card?.summary || '');
-  const sendFor = god ? (t('profile.god.sendFor', { returnObjects: true }) as string[]) : role.sendFor;
   const does = god ? (t('profile.god.does', { returnObjects: true, name }) as string[]) : (card?.does ?? []);
   const asksFirst = god ? (t('profile.god.asksFirst', { returnObjects: true }) as string[]) : (card?.wontDo ?? []);
   const team = god ? agents.filter((a) => !a.isGod && !a.isAssistant && !a.archived) : [];
@@ -103,22 +102,8 @@ export function ProfileTab({ agent }: { agent: Agent }) {
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)' }}>{t('profile.noRole', { name })}</p>
         )}
 
-        {sendFor.length > 0 && (
-          <Section title={t('profile.sendFor', { name })}>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {sendFor.map((s) => (
-                <li key={s} dir={rtl ? 'auto' : undefined} style={{
-                  padding: '2px 8px', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)',
-                  background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
-                }}>{s}</li>
-              ))}
-            </ul>
-            {role.notFor && (
-              <p dir={rtl ? 'auto' : undefined} style={{ margin: '8px 0 0', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{role.notFor}</p>
-            )}
-          </Section>
-        )}
-
+        {/* No "send them" section: Michael decides who gets what (owner, 2026-09-25).
+            parseRoleLine still takes the routing sentences out of the summary. */}
         {does.length > 0 && (
           <Section title={t('profile.does', { name })}>
             <List items={does} mark="✓" markColor="var(--cth-mint)" />

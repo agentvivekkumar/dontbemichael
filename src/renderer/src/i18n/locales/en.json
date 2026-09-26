@@ -1624,7 +1624,6 @@
   "profile": {
     "officeManager": "Office manager",
     "noRole": "{{name}} has no role written yet. Add one with Edit at the top of the panel.",
-    "sendFor": "Send {{name}}",
     "does": "What {{name}} does",
     "asksFirst": "Asks you first",
     "facts": "Key facts",
@@ -1638,12 +1637,6 @@
     "hideInstructions": "Hide the instructions",
     "god": {
       "summary": "{{name}} is your office manager and your one point of contact. The team reports to {{name}}, never to you: {{name}} hands out the work, relays the results, and brings you only what needs you.",
-      "sendFor": [
-        "anything for the team",
-        "who is working on what",
-        "a job nobody covers yet",
-        "a quick fact or a short reply"
-      ],
       "does": [
         "Hands each job to the right team member, with what to send back",
         "Answers small things right away: a quick fact, a short reply",

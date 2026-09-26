@@ -57,7 +57,7 @@ test('Profile is the first tab on every agent, and new windows open on it', () =
 test('the profile reads the pack card for this office, with sections an owner scans', () => {
   const src = read('src/renderer/src/components/ProfileTab.tsx');
   assert.match(src, /res\.packs\.find\(\(p\) => p\.pack\.businessType === c\.businessType\)\?\.pack \?\? res\.core/);
-  for (const k of ['profile.sendFor', 'profile.does', 'profile.asksFirst', 'profile.facts', 'profile.instructions']) assert.ok(src.includes(`t('${k}'`), k);
+  for (const k of ['profile.does', 'profile.asksFirst', 'profile.facts', 'profile.instructions']) assert.ok(src.includes(`t('${k}'`), k);
   assert.match(src, /aria-expanded=\{showInstructions\}/);
   assert.match(src, /<dl style/);
 });
@@ -69,7 +69,7 @@ test("Michael's profile says what his instructions tell him to do, his team and 
   assert.match(src, /onClick=\{\(\) => useStore\.getState\(\)\.select\(a\.id\)\}/, 'a team member chip opens that agent');
   assert.match(src, /briefing: pack\?\.briefing \? fillBusiness\(pack\.briefing, business\) : ''/);
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).profile.god;
-  for (const k of ['sendFor', 'does', 'asksFirst']) assert.ok(Array.isArray(en[k]) && en[k].length >= 3, k);
+  for (const k of ['does', 'asksFirst']) assert.ok(Array.isArray(en[k]) && en[k].length >= 3, k);
 });
 
 test('strings in every language, no dashes, no literal Michael', () => {
@@ -95,4 +95,16 @@ test("every profile can open the agent's work folder, and says so when it can't"
   assert.match(src, /onClick=\{openFolder\}>\{t\('profile\.openFolder'\)\}/);
   assert.match(src, /if \(!r\.ok\) setFolderError\(true\);/);
   assert.match(src, /! \{t\('profile\.openFolderFailed'\)\}/);
+});
+
+test("no profile says what to send the agent: Michael decides who gets what", () => {
+  const src = read('src/renderer/src/components/ProfileTab.tsx');
+  assert.doesNotMatch(src, /profile\.sendFor|profile\.god\.sendFor|role\.notFor/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).profile;
+    assert.equal(d.sendFor, undefined, loc);
+    assert.equal(d.god.sendFor, undefined, loc);
+  }
+  // The routing sentences stay out of the summary too.
+  assert.doesNotMatch(parseRoleLine(PAM).summary, /Send here for|Not for/);
 });

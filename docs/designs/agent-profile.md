@@ -16,8 +16,8 @@ From what the app already stores: the agent's role line (`description`, the regi
 
 1. **Job title** (Press Start 2P 12 px) and **what the job is** (Inter 16/24), split out of
    the role line by `parseRoleLine` (`src/shared/agentProfile.ts`).
-2. **Send {{name}}**: the "Send here for ..." requests as chips, with the "Not for ...;
-   that goes to ..." sentence under them in 13 px `ink-500`.
+2. ~~Send {{name}}~~: removed (owner, 2026-09-25: "overall it's Michael who decides and
+   drives"). The routing sentences are still kept out of the summary.
 3. **What {{name}} does** (pack `does`, mint ✓) and **Asks you first** (pack `wontDo`).
 4. **Key facts**: folder, what it uses (pack connections), first job, model.
 5. **{{name}}'s instructions**: the work style as markdown, collapsed by default; its first
@@ -36,8 +36,8 @@ needs from the owner stays the first thing seen.
 
 Michael has no pack card, so his profile is written from what his instructions tell him to
 do (`hive.ts`, the office manager prompt), in the owner's words: a summary (your one point
-of contact; the team reports to him), what to send him, what he does, what he asks you
-first. Then **The team (N)**: every live team member as a chip with their job title, which
+of contact; the team reports to him), what he does, what he asks you
+first. (What to send him was removed with every agent's Send section.) Then **The team (N)**: every live team member as a chip with their job title, which
 opens that agent. Then **What {{name}} knows about your business**: the pack's briefing
 with the business filled in, the same text he is given. Key facts add the business name
 and city. Office hours are not shown: the pack lists them but nothing in the app runs on

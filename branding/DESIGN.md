@@ -493,7 +493,7 @@ One search box sits below the memory with an "Exact words / By meaning" switch.
 
 The first tab on every agent. Job title in Press Start 2P 12 px, then what the job is in
 Inter 16/24 (`body-lg`), then sections with Inter 13 px semibold `ink-700` headings as in
-§7.11: "Send {{name}}" as `cream-100` chips with an `ink-300` hairline; "What {{name}} does"
+§7.11: "What {{name}} does"
 with a mint ✓; "Asks you first"; Key facts as a two-column definition list (13 px `ink-500`
 labels, 14 px values, the folder in mono); the full instructions collapsed behind a text
 button, rendered as markdown (`card`) on `paper-100`. 72ch measure, 16 px padding.
