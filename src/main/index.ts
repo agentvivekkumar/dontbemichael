@@ -21,7 +21,7 @@ import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTi
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
-  migrateMissions, buildScheduleRequest, applyScheduleRequest, missionsFor,
+  migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor,
   type ScheduleRequest
 } from '../shared/missions';
 import {
@@ -909,6 +909,9 @@ function standupOnOfficeOpen(): void {
  *  paused: `archived` is set for every agent without a terminal at boot, so it
  *  says nothing about what the owner wants (eng review R1). */
 function migrateMissionOwners(): void {
+  // Every load, before the one-time part: cap intervals the timer can't hold.
+  const clamped = clampIntervals(readConfig().missions ?? []);
+  if (clamped.changed) writeConfig({ missions: clamped.missions });
   const cfg = readConfig();
   if (cfg.missionsOwnersMigrated) return;
   const { missions, changed } = migrateMissions(cfg.missions ?? []);

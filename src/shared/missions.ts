@@ -81,10 +81,20 @@ export function migrateMissions(missions: ScheduledMission[]): { missions: Sched
     let next = m;
     if (next.to === 'broadcast') { next = { ...next, to: GOD_ALIAS, relay: true }; changed = true; }
     if (!next.createdBy) { next = { ...next, createdBy: OWNER }; changed = true; }
-    // Saved before the 24 day ceiling: the timer can't wait longer, so the stored
-    // value, the Schedules tab and the timer all say 24 days (review, 2026-09-25).
-    if (next.intervalMs > MAX_INTERVAL_MS) { next = { ...next, intervalMs: MAX_INTERVAL_MS }; changed = true; }
     return next;
+  });
+  return { missions: out, changed };
+}
+
+/** Saved before the 24 day ceiling: the timer can't wait longer, so the stored
+ *  value, the Schedules tab and the timer all say 24 days. Runs on every load,
+ *  not once (review, 2026-09-25). */
+export function clampIntervals(missions: ScheduledMission[]): { missions: ScheduledMission[]; changed: boolean } {
+  let changed = false;
+  const out = missions.map((m) => {
+    if (!(m.intervalMs > MAX_INTERVAL_MS)) return m;
+    changed = true;
+    return { ...m, intervalMs: MAX_INTERVAL_MS };
   });
   return { missions: out, changed };
 }
@@ -217,7 +227,6 @@ const MAX_TIMER_MS = 2_147_483_647;
 
 /** Read an agent's `when`: `{ every: "30m" | "2h" | "1d" }` or
  *  `{ days: ["mon", "fri"] | ["weekdays"], at: "09:00" }`. Null if unusable. */
-
 export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days: number[]; minute: number } } | null {
   if (!when || typeof when !== 'object') return null;
   const w = when as { every?: unknown; days?: unknown; at?: unknown };
@@ -311,7 +320,7 @@ export function applyScheduleRequest(
   if (requestIsStale(req, missions)) return { ok: false, error: 'stale' };
   if (req.op === 'add' && req.draft) {
     const m: ScheduledMission = {
-      id: newId, label: req.draft.label, intervalMs: req.draft.intervalMs,
+      id: newId, label: req.draft.label, intervalMs: Math.min(req.draft.intervalMs, MAX_INTERVAL_MS),
       ...(req.draft.weekly ? { weekly: req.draft.weekly } : {}),
       to: req.agentId, body: '', enabled: true, createdBy: req.agentId
     };
