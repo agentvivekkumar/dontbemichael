@@ -47,7 +47,14 @@ export function isTerminalPrompt(p: { notification_type?: string; message?: stri
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
+import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
 import { handoffContext } from '../shared/safeClear';
+
+/** Why a mail or calendar tool was refused. Read by the agent (and shown on the
+ *  floor), so it says what to do instead. */
+const EMAIL_CALENDAR_OFF =
+  'The owner has turned off Email & Calendar in Settings, so you cannot read or act on their mail or calendar. ' +
+  'Do not try another way. If the task needs email or the calendar, say so: a team member tells Michael, and Michael puts it on ASK ME for the owner.';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -330,6 +337,24 @@ export class HookServer {
           }
         };
       }
+    }
+
+    // Settings → Connections → Email & Calendar. Off means no agent, Michael
+    // included, reads or acts on the owner's mail or calendar through ANY
+    // connector: the switch used to control only the app's own server, while
+    // the Claude account's Gmail and Calendar connectors stayed open (owner,
+    // 2026-09-26). The name check comes first so other tools never read config.
+    if (event === 'PreToolUse' && agentId && isEmailCalendarTool(p.tool_name ?? '')
+        && !emailCalendarAllowed(this.getConfig().mcpDefaults)) {
+      this.emitControl(agentId, p.tool_name, EMAIL_CALENDAR_OFF);
+      this.emit(agentId, event, p);
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: EMAIL_CALENDAR_OFF
+        }
+      };
     }
 
     // Decision 48 — the harness folder is plumbing only. On a business install

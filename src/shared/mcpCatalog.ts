@@ -152,6 +152,24 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   }
 ];
 
+/** Whether the owner turned Settings → Connections → Email & Calendar ON.
+ *  A secret tier server, so only an explicit yes counts (the catalog ships it
+ *  off and a missing entry means off). */
+export function emailCalendarAllowed(mcpDefaults: { [id: string]: { enabled: boolean } } | undefined): boolean {
+  return mcpDefaults?.['email-calendar']?.enabled === true;
+}
+
+/** An MCP tool that reads or acts on the owner's mail or calendar, from any
+ *  server: the Claude account connectors agents inherit
+ *  (mcp__claude_ai_Gmail__*, mcp__claude_ai_Google_Calendar__*), an Outlook
+ *  connector, or this app's own munder-email-calendar. Matched on whole words
+ *  of the server name, so Mailchimp and the like are not caught. */
+export function isEmailCalendarTool(toolName: string): boolean {
+  const m = /^mcp__(.+?)__/.exec(toolName);
+  if (!m) return false;
+  return /(^|[_-])(gmail|google[_-]?calendar|calendar|outlook|e?mail|email[_-]calendar)([_-]|$)/i.test(m[1]);
+}
+
 /** Look up a catalog entry by id. */
 export function mcpCatalogEntry(id: string): McpCatalogEntry | undefined {
   return MCP_CATALOG.find((e) => e.id === id);
