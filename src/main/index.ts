@@ -111,6 +111,7 @@ import {
   codexRemoteSocketFits,
   withCodexRemoteArgs
 } from '../shared/codexRemote';
+import { restartApp } from './restart';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -3556,8 +3557,7 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   allowQuit = true;
   writeConfig({ harnessHome: newHome });
   try { ptyManager.killAll(); } catch (e) { console.error('[changeHome] killAll:', e); }
-  app.relaunch();
-  app.exit(0);
+  restartApp(app);
   return { ok: true as const }; // unreachable (process exits) — typed for the renderer
 });
 
@@ -3588,8 +3588,7 @@ ipcMain.handle('config:startOverHere', () => {
   try { hive.ensureHive(); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   allowQuit = true;
   try { ptyManager.killAll(); } catch (e) { console.error('[startOverHere] killAll:', e); }
-  app.relaunch();
-  app.exit(0);
+  restartApp(app);
   return { ok: true as const }; // unreachable (process exits)
 });
 
@@ -4225,8 +4224,7 @@ ipcMain.handle('app:resetAll', () => {
   // Back to first-run defaults, then relaunch clean so all in-memory services
   // re-bootstrap from scratch and the renderer lands on onboarding.
   resetConfig();
-  app.relaunch();
-  app.exit(0);
+  restartApp(app);
 });
 
 // ─── IPC: token telemetry (real usage + est. cost from CC transcripts) ───────

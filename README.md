@@ -161,12 +161,22 @@ message each other. Click any desk to see that team member's work live.
 
 ### Set up once
 
-Setup asks for your business name, where you are and your kind of business, then suggests a
-team. It checks what your Mac already has and offers to install anything missing.
+Setup asks for your business name, your kind of business, the owner and your headquarters
+address. Contact details, hours and prices are optional and can wait for Settings. Michael then
+shows you around the office and suggests a starter team: you pick who joins and where each one
+works. Setup checks what your Mac already has and offers to install anything missing.
 
 </td>
 <td width="50%">
-  <a href="https://github.com/agentvivekkumar/dontbemichael/raw/main/docs/media/demo/setup.mp4"><img src="./docs/media/demo/setup-poster.jpg" alt="The setup wizard" width="100%"></a>
+  <img src="./docs/screenshots/setup-business.png" alt="Setup step 1: your business name, kind of business, owner and headquarters address" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+  <img src="./docs/screenshots/setup-office.png" alt="Setup step 3: Michael explains the starter team, the floor, memory and approvals" width="100%">
+</td>
+<td width="50%">
+  <img src="./docs/screenshots/setup-team.png" alt="Setup step 4: pick your starter team and the folder each one works in" width="100%">
 </td>
 </tr>
 </table>

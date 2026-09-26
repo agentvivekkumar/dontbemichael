@@ -1631,6 +1631,7 @@ export class HiveManager {
    * surfaced exactly once (no infinite loop).
    */
   drainForStop(agentId: string): { block: boolean; reason?: string } {
+    if (!this.root()) return { block: false };
     const dir = this.agentDir(agentId);
     if (!existsSync(dir)) return { block: false };
     const cursorPath = join(dir, 'cursor.json');
@@ -1854,6 +1855,7 @@ export class HiveManager {
    *  Returns false when the recipient has no inbox, so the caller can bounce and
    *  log the drop rather than let the message vanish. */
   private deliver(msg: HiveMessage, toId: string): boolean {
+    if (!this.root()) return false;
     const inbox = join(this.agentDir(toId), 'inbox');
     if (!existsSync(inbox)) return false; // unknown recipient — the caller reports it
     this.atomicWriteJson(join(inbox, `${msg.id}.json`), msg);
@@ -2177,6 +2179,7 @@ export class HiveManager {
     return true;
   }
   memory(id: string): string {
+    if (!this.root()) return '';
     const p = join(this.agentDir(id), 'memory.md');
     return existsSync(p) ? readFileSync(p, 'utf8') : '';
   }
@@ -2203,6 +2206,7 @@ export class HiveManager {
    *  but most of the floor's history lives in a handful of them). Cheap: reads a
    *  small markdown file; never throws. Works for ANY id, active OR archived. */
   hasMemory(id: string): boolean {
+    if (!this.root()) return false;
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return false;
     try {
@@ -2227,7 +2231,7 @@ export class HiveManager {
    * only mattered once. False when the agent isn't one of this office's.
    */
   rememberOwnerAnswer(id: string, task: string, q: string, a: string): boolean {
-    if (!/^[\w-]+$/.test(id)) return false;
+    if (!/^[\w-]+$/.test(id) || !this.root()) return false;
     const dir = this.agentDir(id);
     if (!existsSync(dir)) return false;
     const line = (v: string) => v.replace(/\s+/g, ' ').trim();
@@ -2331,6 +2335,7 @@ export class HiveManager {
   }
 
   memoryIndexFor(id: string): string | null {
+    if (!this.root()) return null;
     const p = join(this.agentDir(id), 'memory.md');
     if (!existsSync(p)) return null;
     let entries: MemoryEntry[] = [];
@@ -2346,12 +2351,15 @@ export class HiveManager {
     ].join('\n');
   }
   inbox(id: string): HiveMessage[] {
+    // No home (e.g. mid reset, after resetConfig) means no hive: nothing to read.
+    if (!this.root()) return [];
     return this.listMessages(join(this.agentDir(id), 'inbox'));
   }
   /** Read an agent's OUTBOX (messages it has authored/sent). Symmetric with
    *  inbox(); the router drains live outbox files into recipients' inboxes and
    *  archives the original under outbox/.sent, so a sent message survives there. */
   outbox(id: string): HiveMessage[] {
+    if (!this.root()) return [];
     return this.listMessages(join(this.agentDir(id), 'outbox'));
   }
 
@@ -2505,6 +2513,7 @@ export class HiveManager {
 
   /** Count undrained inbox messages for an agent (cheap — for the fleet snapshot). */
   inboxBacklog(id: string): number {
+    if (!this.root()) return 0;
     const dir = join(this.agentDir(id), 'inbox');
     if (!existsSync(dir)) return 0;
     try { return readdirSync(dir).filter((f) => f.endsWith('.json')).length; } catch { return 0; }
