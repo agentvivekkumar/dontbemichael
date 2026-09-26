@@ -1,6 +1,6 @@
 import { CompanyProfileFields, localCurrency, localTimeZone } from './CompanyProfileFields';
-import { cityLine, cleanCompanyProfile, missingProfileFields, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
-import { useEffect, useState } from 'react';
+import { cityLine, cleanCompanyProfile, missingProfileFields, prefillLegalName, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
+import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
@@ -128,6 +128,18 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // 1, everything else optional on step 2. Time zone and currency start from
   // the Mac's own settings.
   const [profile, setProfile] = useState<CompanyProfile>(() => ({ timeZone: localTimeZone(), currency: localCurrency() }));
+  // Step 2's legal name starts as the step 1 business name, and follows a
+  // rename on step 1 until the owner types a legal name of their own.
+  const legalNameFilled = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (step !== 'details') return;
+    const next = prefillLegalName(profile, businessName, legalNameFilled.current);
+    legalNameFilled.current = next.filled;
+    if (next.profile !== profile) setProfile(next.profile);
+    // Only on arriving at step 2: re-running on every keystroke would refill a
+    // field the owner just cleared.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
   // The city line older parts of the app still read (businessCity).
   const businessCity = cityLine(profile.address) ?? '';
   // Name, type, CEO and the headquarters address are required (businessProfile.ts,
@@ -587,7 +599,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 12, color: 'var(--cth-ink-700)' }}>
-                      {t('onboarding.business.nameLabel')}
+                      {t('onboarding.business.nameLabel')} *
                     </span>
                     <input
                       value={businessName}
@@ -602,7 +614,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
 
                 <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
-                  {t('onboarding.business.ask')}
+                  {t('onboarding.business.ask')} *
                 </div>
 
                 {/* Tiles come from the pack registry, so a community pack appears
@@ -616,6 +628,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       title={p.displayName}
                       subtitle={p.tagline}
                       selected={businessType === p.businessType}
+                      missing={gapShown('type')}
                       onClick={() => { setBusinessType(p.businessType); setError(undefined); }}
                     />
                   ))}
@@ -625,6 +638,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     title={t('onboarding.business.otherTitle')}
                     subtitle={t('onboarding.business.otherDesc', { godName })}
                     selected={businessType === OTHER_BUSINESS}
+                    missing={gapShown('type')}
                     onClick={() => { setBusinessType(OTHER_BUSINESS); setError(undefined); }}
                   />
                 </div>
@@ -1249,11 +1263,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
 /** One business type on the first onboarding screen (DESIGN.md 7.11). The glyph
  *  is emoji from the pack, NOT an `<Icon>` — see DESIGN.md 10.3 for why. */
-function PackTile({ glyph, title, subtitle, selected, onClick }: {
+function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
   glyph: string;
   title: string;
   subtitle: string;
   selected: boolean;
+  /** No type picked after the owner tried Next: the same coral as a missing field. */
+  missing?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1264,7 +1280,9 @@ function PackTile({ glyph, title, subtitle, selected, onClick }: {
         textAlign: 'left', cursor: 'pointer', border: 'none',
         padding: 10, display: 'flex', gap: 10, alignItems: 'flex-start',
         background: selected ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
-        boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
+        boxShadow: missing && !selected
+          ? 'inset 0 0 0 2px var(--cth-coral)'
+          : `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
       }}
     >
       <span style={{

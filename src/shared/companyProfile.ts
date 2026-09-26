@@ -79,6 +79,21 @@ const clean = (v: unknown): string | undefined => {
 };
 
 /** A profile from anywhere (config, office.json, a form), with junk dropped. */
+/** Setup step 2 starts the legal name from the step 1 business name. It keeps
+ *  following the business name while it is empty or still the value we filled
+ *  in last time (`lastFilled`); once the owner types their own, it is theirs. */
+export function prefillLegalName(
+  profile: CompanyProfile,
+  businessName: string,
+  lastFilled: string | undefined
+): { profile: CompanyProfile; filled: string | undefined } {
+  const name = businessName.trim();
+  const current = profile.legalName;
+  const ours = !current || current === lastFilled;
+  if (!name || !ours || current === name) return { profile, filled: ours ? current : lastFilled };
+  return { profile: { ...profile, legalName: name }, filled: name };
+}
+
 export function cleanCompanyProfile(raw: unknown): CompanyProfile {
   if (!raw || typeof raw !== 'object') return {};
   const o = raw as Record<string, unknown>;
