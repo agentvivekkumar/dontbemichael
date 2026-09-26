@@ -428,6 +428,27 @@ export function onboardingEngineChoices(offered: readonly AgentProvider[] = BUIL
   return { eligible, workersOnly };
 }
 
+/** Setup asks for Michael's engine and model only, and the team follows it
+ *  (owner, 2026-09-26). The config patch that makes his pick the team default:
+ *  the engine's command (kept as is when it already runs that engine, so extra
+ *  flags survive) and the model, in `defaultModel` for Claude or in
+ *  `providerDefaultModels` for any other engine, the same fields the hire
+ *  dialog and the starter team read. No model means the engine's own default,
+ *  so nothing is written for it. */
+export function teamDefaultsFromMichael(
+  config: Pick<HarnessConfig, 'defaultCommand' | 'providerDefaultModels'>,
+  provider: AgentProvider,
+  model: string | undefined
+): Partial<Pick<HarnessConfig, 'defaultCommand' | 'defaultModel' | 'providerDefaultModels'>> {
+  const patch: Partial<Pick<HarnessConfig, 'defaultCommand' | 'defaultModel' | 'providerDefaultModels'>> = {};
+  if (inferAgentProvider(config.defaultCommand) !== provider) patch.defaultCommand = providerPreset(provider).defaultCommand;
+  if (model) {
+    if (isClaudeProvider(provider)) patch.defaultModel = model;
+    else patch.providerDefaultModels = { ...(config.providerDefaultModels ?? {}), [provider]: model };
+  }
+  return patch;
+}
+
 /** Native <select> values must carry both provider and model because each
  *  provider has its own "default" option and model namespace. */
 export function encodeProviderModel(provider: AgentProvider, model?: string): string {

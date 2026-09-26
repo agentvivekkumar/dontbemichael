@@ -687,7 +687,7 @@
       "workersOnly": "WORKERS ONLY",
       "workersOnlyHint": "Can't drain hive mail yet, so it can't run your office. Still available when hiring workers.",
       "model": "Model",
-      "modelNote": "This sets the model {{godName}} uses. You can change it later.",
+      "modelNote": "This sets the model {{godName}} and your whole team use. You can change it later in Settings.",
       "maxPlan": "<strong>You'll need a Claude Max plan</strong> to keep your office running full time. Smaller plans reach their usage limit during the day, and the office pauses until the limit resets.",
       "seePlans": "See Claude plans"
     },

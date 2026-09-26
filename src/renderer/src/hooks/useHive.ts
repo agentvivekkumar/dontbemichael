@@ -278,7 +278,9 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   const reg = await window.cth.hiveRegistry().catch(() => null);
 
   const provider = inferAgentProvider(config.defaultCommand);
-  const model = isClaudeProvider(provider) ? config.defaultModel : undefined;
+  // Same seed as the hire dialog: Claude reads defaultModel, other engines their
+  // own entry (setup writes whichever Michael's pick needs).
+  const model = isClaudeProvider(provider) ? config.defaultModel : config.providerDefaultModels?.[provider];
   const command = buildSpawnCommand(config, model, provider);
   const [exe, ...args] = tokenizeCommand(command.trim());
   const castName = (c?: string): OfficeCharacterName =>
