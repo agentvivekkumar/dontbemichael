@@ -4900,7 +4900,11 @@ registerRealtimeActionIpc({
   // The spec carries lastFiredAt through from listMissions(), so a wholesale write
   // preserves the scheduler's stamps; edit_schedule is deliberate + rare.
   // Through the single writer, so a voice edit re-arms the timers and refreshes the UI.
-  saveMissions: (missions) => { applyMissions(() => missions); },
+  saveMissions: (missions) => {
+    // A failed save throws, so the voice action says it failed instead of "done".
+    const res = applyMissions(() => missions);
+    if (!res.ok) throw new Error(res.error);
+  },
   // rt-12: register each voice dispatch so the watcher can detect its completion.
   trackDispatch: (d) => { try { completionWatcher.track({ ...d, kind: 'dispatch' }); } catch { /* watcher unavailable */ } },
   // ── v0.3.4 full-control extensions ──

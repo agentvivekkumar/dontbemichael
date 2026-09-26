@@ -159,3 +159,8 @@ test('every slug the app writes can be read back', () => {
     assert.deepEqual(procedurePointer(`${name.trim()}: steps in memory/procedures/${slug}.md`)?.slug, slug);
   }
 });
+
+test('a name with letters NFKD turns uppercase still gives a readable slug', () => {
+  const { procedureSlug } = loadTs('src/shared/memoryIndex.ts');
+  for (const name of ['ℍow to ship', 'Deploy ℝ']) assert.equal(isProcedureSlug(procedureSlug(name)), true, procedureSlug(name));
+});

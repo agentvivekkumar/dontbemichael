@@ -127,7 +127,8 @@ export function legacyNotes(text: string): string[] {
 
 /** "Weekly money summary" → "weekly-money-summary". */
 export function procedureSlug(name: string): string {
-  const s = name.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+  // Normalize before lowercasing: NFKD can turn a letter like ℍ into an uppercase H.
+  const s = name.normalize('NFKD').toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
   return s.slice(0, 60).replace(/-$/, '') || 'procedure';
 }
 

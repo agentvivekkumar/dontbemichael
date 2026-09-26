@@ -66,12 +66,17 @@ test('history parses each file once and still sees new and moved mail', async (t
   const pinned = new Date(2026, 8, 25, 12, 0, 0); // a whole second, so it round-trips exactly
   fs2.utimesSync(aPath, pinned, pinned);
   assert.deepEqual(hive.messageHistory('pam').map((m) => m.id), ['a']);
-  // Rewrite a.json but keep its mtime: a cached read still shows the old subject.
-  fs2.writeFileSync(aPath, JSON.stringify({ id: 'a', from: 'dwight', to: 'pam', act: 'request', subject: 'changed', body: '', created_at: new Date().toISOString() }));
+  // Rewrite a.json with the same size and mtime: a cached read still shows the old subject.
+  fs2.writeFileSync(aPath, JSON.stringify({ id: 'a', from: 'dwight', to: 'pam', act: 'request', subject: 'z', body: '', created_at: JSON.parse(fs2.readFileSync(aPath, 'utf8')).created_at }));
   fs2.utimesSync(aPath, pinned, pinned);
   assert.equal(hive.messageHistory('pam')[0].subject, 'a', 'an unchanged file (same mtime) is not parsed again');
   write(inbox, 'b');
   fs2.renameSync(path2.join(inbox, 'a.json'), path2.join(inbox, '.done', 'a.json'));
   const ids = hive.messageHistory('pam').map((m) => m.id).sort();
   assert.deepEqual(ids, ['a', 'b'], 'new mail and mail moved to .done both show');
+});
+
+test('voice schedule edits go through the single writer and report a failed save', () => {
+  const main = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../src/main/index.ts'), 'utf8');
+  assert.match(main, /saveMissions: \(missions\) => \{[\s\S]{0,200}const res = applyMissions\(\(\) => missions\);\s*if \(!res\.ok\) throw new Error\(res\.error\);/);
 });

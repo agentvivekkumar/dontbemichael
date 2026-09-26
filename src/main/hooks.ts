@@ -23,10 +23,10 @@ import { validateHookEvent } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
 
-/** Desktop notification bodies. The title is the agent's name (displayName). */
 /** The same terminal prompt is relayed to Michael at most once in this window. */
 const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
 
+/** Desktop notification bodies. The title is the agent's name (displayName). */
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
 export const NOTIFY_WAITING = 'Waiting for you.';
 

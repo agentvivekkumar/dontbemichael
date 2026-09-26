@@ -234,3 +234,9 @@ test('parseWhen clock edges', () => {
   assert.equal(M.parseWhen({ days: ['mon'], at: '00:00' }).weekly.minute, 0);
   assert.equal(M.parseWhen({ days: ['mon'], at: '0:05' }).weekly.minute, 5);
 });
+
+test('a schedule saved longer than 24 days is brought down to 24 on load', () => {
+  const r = M.migrateMissions([{ id: 'x', label: 'x', to: 'pam', body: '', enabled: true, createdBy: 'owner', intervalMs: 30 * 86_400_000 }]);
+  assert.equal(r.changed, true);
+  assert.equal(r.missions[0].intervalMs, M.MAX_INTERVAL_MS);
+});

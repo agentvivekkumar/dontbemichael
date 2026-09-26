@@ -2480,7 +2480,7 @@ export class HiveManager {
   /** Parsed message files by path, for messageHistory: the Messages tab polls it
    *  every 5s over every agent's inbox and inbox/.done, which only grow, so each
    *  file is parsed once and re-read only if its mtime changes (review, 2026-09-25). */
-  private historyCache = new Map<string, { mtimeMs: number; msg: HiveMessage | null }>();
+  private historyCache = new Map<string, { stamp: string; msg: HiveMessage }>();
 
   private cachedMessages(dir: string, live: Set<string>): HiveMessage[] {
     let files: string[];
@@ -2489,16 +2489,16 @@ export class HiveManager {
     for (const f of files) {
       const path = join(dir, f);
       live.add(path);
-      let mtimeMs: number;
-      try { mtimeMs = statSync(path).mtimeMs; } catch { continue; }
-      let hit = this.historyCache.get(path);
-      if (!hit || hit.mtimeMs !== mtimeMs) {
-        let msg: HiveMessage | null = null;
-        try { msg = JSON.parse(readFileSync(path, 'utf8')) as HiveMessage; } catch { /* half-written or bad file */ }
-        hit = { mtimeMs, msg };
-        this.historyCache.set(path, hit);
-      }
-      if (hit.msg) out.push(hit.msg);
+      // mtime and size together: a coarse mtime alone can miss the end of a write.
+      let stamp: string;
+      try { const st = statSync(path); stamp = `${st.mtimeMs}:${st.size}`; } catch { continue; }
+      const hit = this.historyCache.get(path);
+      if (hit && hit.stamp === stamp) { out.push(hit.msg); continue; }
+      try {
+        const msg = JSON.parse(readFileSync(path, 'utf8')) as HiveMessage;
+        this.historyCache.set(path, { stamp, msg });
+        out.push(msg);
+      } catch { /* half-written or bad: not cached, so the next poll reads it again */ }
     }
     return out;
   }

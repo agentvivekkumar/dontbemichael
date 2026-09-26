@@ -81,6 +81,9 @@ export function migrateMissions(missions: ScheduledMission[]): { missions: Sched
     let next = m;
     if (next.to === 'broadcast') { next = { ...next, to: GOD_ALIAS, relay: true }; changed = true; }
     if (!next.createdBy) { next = { ...next, createdBy: OWNER }; changed = true; }
+    // Saved before the 24 day ceiling: the timer can't wait longer, so the stored
+    // value, the Schedules tab and the timer all say 24 days (review, 2026-09-25).
+    if (next.intervalMs > MAX_INTERVAL_MS) { next = { ...next, intervalMs: MAX_INTERVAL_MS }; changed = true; }
     return next;
   });
   return { missions: out, changed };
@@ -206,13 +209,14 @@ export interface ScheduleRequest {
 const DAY_NAMES: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 const LABEL_MAX = 80;
 
-/** Read an agent's `when`: `{ every: "30m" | "2h" | "1d" }` or
- *  `{ days: ["mon", "fri"] | ["weekdays"], at: "09:00" }`. Null if unusable. */
 /** Node timers can't wait longer than 2^31-1 ms (about 24.8 days): a longer
  *  delay is clamped to 1 ms, so the job would fire nonstop (review, 2026-09-25).
  *  Intervals stay at or under 24 days, and armPlan never arms a longer wait. */
 export const MAX_INTERVAL_MS = 24 * 86_400_000;
 const MAX_TIMER_MS = 2_147_483_647;
+
+/** Read an agent's `when`: `{ every: "30m" | "2h" | "1d" }` or
+ *  `{ days: ["mon", "fri"] | ["weekdays"], at: "09:00" }`. Null if unusable. */
 
 export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days: number[]; minute: number } } | null {
   if (!when || typeof when !== 'object') return null;
