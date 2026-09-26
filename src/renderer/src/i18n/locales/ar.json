@@ -1544,10 +1544,13 @@
     }
   },
   "clearedBanner": {
-    "text": "بدأ التطبيق محادثة جديدة لـ{{name}} {{ago}}، بعد حفظ ملاحظة التسليم وملاحظاته. لم يضع شيء.",
+    "text": "بدأ {{name}} من جديد {{ago}}. لم يضع شيء.",
     "bringBack": "أعد المحادثة السابقة",
     "minutesAgo": "قبل {{count}} دقيقة",
-    "hoursAgo": "قبل {{count}} ساعة"
+    "hoursAgo": "قبل {{count}} ساعة",
+    "bringingBack": "جارٍ الإعادة…",
+    "restoreFailed": "تعذّرت الإعادة. حاول مرة أخرى.",
+    "hide": "إخفاء"
   },
   "ownerVia": {
     "watching": "مشاهدة فقط",

@@ -1544,10 +1544,13 @@
     }
   },
   "clearedBanner": {
-    "text": "应用在保存交接说明和笔记后，于{{ago}}让 {{name}} 重新开始了对话。没有丢失任何内容。",
+    "text": "{{name}} 于{{ago}}重新开始了对话。没有丢失任何内容。",
     "bringBack": "恢复之前的对话",
     "minutesAgo": "{{count}} 分钟前",
-    "hoursAgo": "{{count}} 小时前"
+    "hoursAgo": "{{count}} 小时前",
+    "bringingBack": "正在恢复…",
+    "restoreFailed": "没能恢复。请再试一次。",
+    "hide": "隐藏"
   },
   "ownerVia": {
     "watching": "仅观看",

@@ -1544,10 +1544,13 @@
     }
   },
   "clearedBanner": {
-    "text": "The app gave {{name}} a fresh start {{ago}}, after saving a handoff and its notes. Nothing was lost.",
-    "bringBack": "Bring back the earlier conversation",
+    "text": "{{name}} got a fresh start {{ago}}. Nothing was lost.",
+    "bringBack": "Bring back earlier chat",
     "minutesAgo": "{{count}} min ago",
-    "hoursAgo": "{{count}} h ago"
+    "hoursAgo": "{{count}} h ago",
+    "bringingBack": "Bringing back…",
+    "restoreFailed": "Couldn't bring it back. Try again.",
+    "hide": "Hide"
   },
   "ownerVia": {
     "watching": "watching",
