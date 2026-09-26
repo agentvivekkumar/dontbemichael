@@ -11,6 +11,7 @@ import { CommandCenterPanel, MemoryTab } from './CommandCenterPanel';
 import { disposeTerminal } from './terminalPool';
 import { SidebarTabs } from './SidebarTabs';
 import { ThreadsPanel } from './ThreadsPanel';
+import { ProfileTab } from './ProfileTab';
 import { ToolWaterfall } from './ToolWaterfall';
 import { AgentControlStrip } from './AgentControlStrip';
 import { ClearedBanner } from './ClearedBanner';
@@ -288,6 +289,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
         {SHOW_GIT && sidebarTab === 'git' && (
           <GitTab cwd={agent.cwd} />
+        )}
+
+        {sidebarTab === 'profile' && (
+          <ProfileTab agent={agent} />
         )}
 
         {sidebarTab === 'messages' && (

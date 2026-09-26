@@ -10,6 +10,8 @@ import { SHOW_GIT } from '@shared/buildFeatures';
 const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
   // Owner-facing tabs first; the technical ones (terminal, git, traces) last
   // (owner, 2026-09-25).
+  // Who this agent is: job, what to send them, key facts (docs/designs/agent-profile.md).
+  { key: 'profile',  labelKey: 'sidebar.profile',  icon: 'info' },
   { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
   // The agent's own jobs on a clock (docs/designs/per-agent-schedules.md).
   { key: 'schedules', labelKey: 'sidebar.schedules', icon: 'clock' },

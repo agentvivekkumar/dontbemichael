@@ -14,11 +14,13 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/CommandCenterPanel.tsx'), 'utf8');
 
-test('ASK ME is the first tab in Michael\'s panel', () => {
+// PROFILE is first on every agent (owner, 2026-09-25); ASK ME right after it,
+// and the panel still opens on ASK ME (next test).
+test('PROFILE then ASK ME lead Michael\'s panel', () => {
   const block = src.match(/const TABS:[^=]*= \[([\s\S]*?)\n\];/);
   assert.ok(block, 'could not find the TABS list');
   const keys = [...block[1].matchAll(/key: '([a-z-]+)'/g)].map((m) => m[1]);
-  assert.equal(keys[0], 'human');
+  assert.deepEqual(keys.slice(0, 2), ['profile', 'human']);
   assert.ok(keys.includes('terminal'), 'the terminal is still there, just not first');
 });
 

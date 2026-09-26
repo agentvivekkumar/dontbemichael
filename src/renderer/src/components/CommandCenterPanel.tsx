@@ -7,6 +7,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
 import { AskMeTab } from './AskMeTab';
+import { ProfileTab } from './ProfileTab';
 import { MemoryNotes, memorySummary } from './MemoryNotes';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { memoryView } from '@shared/memoryIndex';
@@ -53,7 +54,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -72,9 +73,11 @@ interface GHIssue {
 }
 
 /** Canonical tab order. Not every entry is always shown — see `visibleTabs`.
- *  ASK ME leads: it is what the team needs from the owner, and a business owner
- *  opening Michael should land there, not on a raw terminal. */
+ *  PROFILE is first on every agent (owner, 2026-09-25), then ASK ME. The panel
+ *  still OPENS on ASK ME (`defaultTab`): it is what the team needs from the
+ *  owner, and a business owner opening Michael should land there. */
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
   { key: 'triggers', labelKey: 'commandCenter.tabs.triggers', icon: 'clock' },
@@ -350,6 +353,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
             <Centered>{t('commandCenter.noTerminal', { name: agent.name })}</Centered>
           )
         )}
+        {tab === 'profile' && <ProfileTab agent={agent} />}
         {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}

@@ -138,5 +138,5 @@ test('the stuck bar keys on the team member prompt marker, and the Michael prefi
 test('agent panel tabs: messages, schedules, then the technical ones', () => {
   const tabs = read('src/renderer/src/components/SidebarTabs.tsx');
   const order = [...tabs.matchAll(/\{ key: '(\w+)',/g)].map((m) => m[1]);
-  assert.deepEqual(order, ['messages', 'schedules', 'memory', 'terminal', 'git', 'traces']);
+  assert.deepEqual(order, ['profile', 'messages', 'schedules', 'memory', 'terminal', 'git', 'traces']);
 });

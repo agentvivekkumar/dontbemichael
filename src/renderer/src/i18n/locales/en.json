@@ -141,7 +141,8 @@
     "messages": "messages",
     "traces": "traces",
     "schedules": "schedules",
-    "memory": "memory"
+    "memory": "memory",
+    "profile": "profile"
   },
   "toolWaterfall": {
     "fresh": "fresh {{tokens}}t",
@@ -1600,5 +1601,21 @@
     "searchTitle": "Search the office",
     "exactWords": "Exact words",
     "byMeaning": "By meaning"
+  },
+  "profile": {
+    "officeManager": "Office manager",
+    "noRole": "{{name}} has no role written yet. Add one with Edit at the top of the panel.",
+    "sendFor": "Send {{name}}",
+    "does": "What {{name}} does",
+    "asksFirst": "Asks you first",
+    "facts": "Key facts",
+    "folder": "Folder",
+    "connections": "Uses",
+    "firstJob": "First job",
+    "model": "Model",
+    "listJoiner": ", ",
+    "instructions": "{{name}}'s instructions",
+    "showInstructions": "Show the full instructions",
+    "hideInstructions": "Hide the instructions"
   }
 }
