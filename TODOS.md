@@ -40,6 +40,43 @@
 **Priority:** P2
 **Depends on:** starter jobs written into the shipped packs.
 
+## Agents and 1:1
+
+### One rule for "stuck at a prompt" in main and the panel
+
+**What:** Put the terminal prompt check (`isTerminalPrompt` in `src/main/hooks.ts`) in shared code
+and use it in the renderer's status parsing (`src/renderer/src/hooks/useHive.ts`), passing
+`notification_type` through the hook event.
+
+**Why:** Michael is told an agent is stuck from the prompt's type; the panel decides from words
+in the message. For a dialog without those words, Michael hears "stuck" while the panel shows the
+agent idle, with no coral bar and Talk 1:1 not leading. Found by the red team in the pre-landing
+review of feat/per-agent-schedules (2026-09-25); the owner chose a follow-up.
+
+**Priority:** P2
+
+### Block mouse and focus reports in a watch-only terminal
+
+**What:** While a team member's terminal is locked (outside 1:1), drop mouse report and focus
+report sequences in `term.onData` (`src/renderer/src/components/terminalPool.ts`), letting the
+terminal's own query replies through.
+
+**Why:** The lock covers keys, paste, drop and composition. If the agent's program turns on mouse
+tracking, a click in the watch-only terminal still reaches it. Low confidence in the pre-landing
+review (2026-09-25); needs a check with a mouse-aware prompt.
+
+**Priority:** P3
+
+### Label messages with no usable date
+
+**What:** In the Messages tab, give conversations whose messages have no valid `created_at` a
+heading ("Undated") instead of an empty one (`src/shared/messageView.ts` localDay returns '').
+
+**Why:** Only malformed files hit it, but the section then has no heading. Found by the local
+model review (2026-09-25).
+
+**Priority:** P4
+
 ## Business mode (deferred from plan, v0.0.1 ship)
 
 Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "ship, defer as P1 TODOs" on 2026-09-24).
