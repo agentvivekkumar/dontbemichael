@@ -81,3 +81,31 @@ export const ALLOW_VOICE_HIRE = false;
  *  terminal), plus the Voice tab in Settings. Main also refuses to start a
  *  voice session or transcribe audio while this is off (owner, 2026-09-24). */
 export const SHOW_VOICE = false;
+
+/** Office Theme in Settings → General: the switch that turns on TV show
+ *  office maps and the map picker. Hidden (owner, 2026-09-26). While it is
+ *  hidden the floor always shows the office, so a theme picked earlier cannot
+ *  stay on with no way to turn it off. */
+export const SHOW_OFFICE_THEME = false;
+
+/** The Automatic updates switch in Settings → General. Hidden (owner,
+ *  2026-09-26): Check for updates at the top of Settings covers it. The
+ *  setting itself is unchanged: background checks still follow the saved
+ *  value, which is on unless the owner turned it off before this build. */
+export const SHOW_AUTO_UPDATE_SWITCH = false;
+
+/** Slack: the Slack block in Settings → Connections (switch, signing secret,
+ *  bot token, channel, port, posting, Start and Stop, setup steps). Hidden
+ *  (owner, 2026-09-26). While hidden the Slack listener never starts, even
+ *  with a connection saved earlier, so nothing runs that the owner cannot see
+ *  or stop. Webhooks are separate and unchanged. */
+export const SHOW_SLACK = false;
+
+/** The "Safe & read only" list in Settings → Connections (Sequential
+ *  Thinking, Time, Fetch, Context7 Docs, Filesystem, Git). Hidden (owner,
+ *  2026-09-26): none of it is a choice a business owner can make, and none of
+ *  it does anything today. Claude Code ignores `mcpServers` in the settings
+ *  file each agent starts with, so these servers never load (agents use their
+ *  built in file and web tools instead). The servers that need an explicit yes
+ *  are listed below it and stay. */
+export const SHOW_READONLY_SERVERS = false;

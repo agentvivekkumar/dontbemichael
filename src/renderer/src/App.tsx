@@ -33,7 +33,7 @@ import { acquireTerminal, notifyThemeChangeAll } from '@/components/terminalPool
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
-import { SHOW_IDE, SHOW_AUTO_MODE_LABEL } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_AUTO_MODE_LABEL, SHOW_OFFICE_THEME } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 // The header shows the brand kit's horizontal lockup (branding/logo/lockup):
 // ink on the light theme, cream on the dark one. CSS in tokens.css shows one.
@@ -112,7 +112,8 @@ export function App() {
       useStore.getState().setHasGroqKey(!!c.groqApiKey);
       // Mirror the active office theme so OfficeFloor renders it (gated on the
       // tvShowOffices flag; off = always the office). Settings keeps this synced.
-      useStore.getState().setOfficeTheme(c.tvShowOffices ? (c.officeTheme ?? 'office') : 'office');
+      // With the picker hidden (SHOW_OFFICE_THEME) it is always the office.
+      useStore.getState().setOfficeTheme(SHOW_OFFICE_THEME && c.tvShowOffices ? (c.officeTheme ?? 'office') : 'office');
       // Mirror the triggers so Settings → Connections and the Command Center's
       // Triggers tab read one list, not two copies that drift — whichever surface
       // saves calls these same setters and the other repaints. No extra IPC: main
