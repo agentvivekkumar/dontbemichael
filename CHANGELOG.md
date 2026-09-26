@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.6] (2026-09-26)
+
+### Changed
+
+- **Setup fills in your legal name.** Step 2's legal name starts from the step 1 business name and
+  follows a rename there, until you type a legal name of your own.
+- **Setup marks every required field.** Business name and your kind of business carry a *, and the
+  business tiles get the same red highlight as a missing field when you press Next without one.
+
+### Fixed
+
+- **Reset and Restart no longer throws while closing.** The inbox check that runs every few seconds
+  could reach the office after reset had cleared its folder.
+- **Reset and Restart in development no longer opens a blank window.** Under npm run dev the app
+  now exits and says to run npm run dev again, since the dev server stops with the first window.
+
 ## [0.0.5] (2026-09-25)
 
 ### Added
