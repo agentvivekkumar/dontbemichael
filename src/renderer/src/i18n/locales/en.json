@@ -1636,6 +1636,30 @@
     "listJoiner": ", ",
     "instructions": "{{name}}'s instructions",
     "showInstructions": "Show the full instructions",
-    "hideInstructions": "Hide the instructions"
+    "hideInstructions": "Hide the instructions",
+    "god": {
+      "summary": "{{name}} is your office manager and your one point of contact. The team reports to {{name}}, never to you: {{name}} hands out the work, relays the results, and brings you only what needs you.",
+      "sendFor": [
+        "anything for the team",
+        "who is working on what",
+        "a job nobody covers yet",
+        "a quick fact or a short reply"
+      ],
+      "does": [
+        "Hands each job to the right team member, with what to send back",
+        "Answers small things right away: a quick fact, a short reply",
+        "Keeps the task board up to date, so it is right whenever you look",
+        "Checks on the team at each standup and gets anything stalled moving",
+        "Puts every question for you on Ask me, short, with options"
+      ],
+      "asksFirst": [
+        "Decisions and approvals only you can give",
+        "A job nobody on the team covers: add someone, hand it over, do it once, or drop it",
+        "Anything only you can do, like signing in to an account"
+      ],
+      "team": "The team ({{count}})",
+      "business": "What {{name}} knows about your business",
+      "businessFact": "Business"
+    }
   }
 }

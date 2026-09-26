@@ -56,21 +56,35 @@ test('Profile is the first tab on every agent, and new windows open on it', () =
 
 test('the profile reads the pack card for this office, with sections an owner scans', () => {
   const src = read('src/renderer/src/components/ProfileTab.tsx');
-  assert.match(src, /res\.packs\.find\(\(p\) => p\.pack\.businessType === type\)\?\.pack \?\? res\.core/);
+  assert.match(src, /res\.packs\.find\(\(p\) => p\.pack\.businessType === c\.businessType\)\?\.pack \?\? res\.core/);
   for (const k of ['profile.sendFor', 'profile.does', 'profile.asksFirst', 'profile.facts', 'profile.instructions']) assert.ok(src.includes(`t('${k}'`), k);
   assert.match(src, /aria-expanded=\{showInstructions\}/);
   assert.match(src, /<dl style/);
 });
 
+test("Michael's profile says what his instructions tell him to do, his team and the business", () => {
+  const src = read('src/renderer/src/components/ProfileTab.tsx');
+  assert.match(src, /god \? t\('profile\.god\.summary', \{ name \}\)/);
+  assert.match(src, /agents\.filter\(\(a\) => !a\.isGod && !a\.isAssistant && !a\.archived\)/, 'the live team, not archived agents');
+  assert.match(src, /onClick=\{\(\) => useStore\.getState\(\)\.select\(a\.id\)\}/, 'a team member chip opens that agent');
+  assert.match(src, /briefing: pack\?\.briefing \? fillBusiness\(pack\.briefing, business\) : ''/);
+  const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).profile.god;
+  for (const k of ['sendFor', 'does', 'asksFirst']) assert.ok(Array.isArray(en[k]) && en[k].length >= 3, k);
+});
+
 test('strings in every language, no dashes, no literal Michael', () => {
+  const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flat(v, `${p}${k}.`) : [[`${p}${k}`, v]]));
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
-    assert.deepEqual(Object.keys(d.profile).sort(), Object.keys(en.profile).sort(), loc);
+    assert.deepEqual(flat(d.profile).map(([k]) => k).sort(), flat(en.profile).map(([k]) => k).sort(), loc);
     assert.ok(d.sidebar.profile, loc);
-    for (const [k, v] of Object.entries(d.profile)) {
-      assert.doesNotMatch(v, /[–—]| - /, `${loc} ${k}`);
-      assert.doesNotMatch(v, /Michael/, `${loc} ${k}`);
+    for (const [k, v] of flat(d.profile)) {
+      for (const s of [].concat(v)) {
+        assert.doesNotMatch(s, /[\u2013\u2014]| - /, `${loc} ${k}`);
+        assert.doesNotMatch(s, /Michael/, `${loc} ${k}`);
+      }
     }
+    assert.equal(d.profile.god.does.length, en.profile.god.does.length, `${loc} same number of duties`);
   }
 });

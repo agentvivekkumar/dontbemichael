@@ -31,3 +31,14 @@ Sections with nothing to show are left out. Section headings match the Memory ta
 First tab on every team member's panel; a first visit opens on it. In Michael's panel it
 is first too, but his panel still opens on ASK ME (owner, 2026-09-23), so what the team
 needs from the owner stays the first thing seen.
+
+## Michael's profile (owner, 2026-09-25: "needs to say some more, looks very blank")
+
+Michael has no pack card, so his profile is written from what his instructions tell him to
+do (`hive.ts`, the office manager prompt), in the owner's words: a summary (your one point
+of contact; the team reports to him), what to send him, what he does, what he asks you
+first. Then **The team (N)**: every live team member as a chip with their job title, which
+opens that agent. Then **What {{name}} knows about your business**: the pack's briefing
+with the business filled in, the same text he is given. Key facts add the business name
+and city. Office hours are not shown: the pack lists them but nothing in the app runs on
+them yet.

@@ -4,8 +4,9 @@ import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useRtl } from '@/i18n/useDirection';
 import { parseRoleLine, workStyleBody } from '@shared/agentProfile';
+import { fillBusiness } from '@shared/teamPlan';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
-import type { Agent } from '@/store/store';
+import { useStore, type Agent } from '@/store/store';
 
 /**
  * PROFILE: who this agent is, the first tab on every agent (owner, 2026-09-25;
@@ -17,19 +18,31 @@ import type { Agent } from '@/store/store';
  * work style, and its card in the office's business pack (read once per launch).
  */
 
-/** The agent's card in this office's pack, by id. Loaded once and shared. */
-let packCards: Promise<Map<string, AgentDefinitionV2>> | null = null;
-function loadPackCards(): Promise<Map<string, AgentDefinitionV2>> {
-  if (!packCards) {
-    packCards = Promise.all([window.cth.packsList(), window.cth.getConfig()])
+/** What the office's pack and settings say: each agent's card by id, and for
+ *  Michael the business and what he's told about it. Loaded once and shared. */
+interface OfficeInfo {
+  cards: Map<string, AgentDefinitionV2>;
+  business: { name?: string; city?: string };
+  /** The pack's briefing with the business filled in; Michael gets it at start. */
+  briefing: string;
+}
+let officeInfo: Promise<OfficeInfo> | null = null;
+function loadOfficeInfo(): Promise<OfficeInfo> {
+  if (!officeInfo) {
+    officeInfo = Promise.all([window.cth.packsList(), window.cth.getConfig()])
       .then(([res, config]) => {
-        const type = (config as { businessType?: string }).businessType;
-        const pack = res.packs.find((p) => p.pack.businessType === type)?.pack ?? res.core;
-        return new Map((pack?.agents ?? []).map((a) => [a.id, a]));
+        const c = config as { businessType?: string; businessName?: string; companyProfile?: { address?: { city?: string } } };
+        const pack = res.packs.find((p) => p.pack.businessType === c.businessType)?.pack ?? res.core;
+        const business = { name: c.businessName?.trim() || undefined, city: c.companyProfile?.address?.city?.trim() || undefined };
+        return {
+          cards: new Map((pack?.agents ?? []).map((a) => [a.id, a])),
+          business,
+          briefing: pack?.briefing ? fillBusiness(pack.briefing, business) : ''
+        };
       })
-      .catch(() => { packCards = null; return new Map(); });
+      .catch(() => { officeInfo = null; return { cards: new Map(), business: {}, briefing: '' }; });
   }
-  return packCards;
+  return officeInfo;
 }
 
 export function ProfileTab({ agent }: { agent: Agent }) {
@@ -37,12 +50,14 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const rtl = useRtl();
   const godName = useResolvedGodName();
   const [card, setCard] = useState<AgentDefinitionV2 | undefined>(undefined);
+  const [office, setOffice] = useState<OfficeInfo | null>(null);
+  const agents = useStore((s) => s.agents);
   const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setShowInstructions(false);
-    loadPackCards().then((m) => { if (alive) setCard(m.get(agent.id)); });
+    loadOfficeInfo().then((o) => { if (alive) { setOffice(o); setCard(o.cards.get(agent.id)); } });
     return () => { alive = false; };
   }, [agent.id]);
 
@@ -50,9 +65,17 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const instructions = workStyleBody(agent.goal);
   const name = agent.isGod ? godName : agent.name;
   const title = role.title || card?.role || (agent.isGod ? t('profile.officeManager') : '');
-  const summary = role.summary || card?.summary || '';
-  const does = card?.does ?? [];
-  const asksFirst = card?.wontDo ?? [];
+  const god = !!agent.isGod;
+  // Michael has no pack card: his profile says what his instructions tell him
+  // to do (hive.ts godPrompt), in the owner's words.
+  const summary = god ? t('profile.god.summary', { name }) : (role.summary || card?.summary || '');
+  const sendFor = god ? (t('profile.god.sendFor', { returnObjects: true }) as string[]) : role.sendFor;
+  const does = god ? (t('profile.god.does', { returnObjects: true, name }) as string[]) : (card?.does ?? []);
+  const asksFirst = god ? (t('profile.god.asksFirst', { returnObjects: true }) as string[]) : (card?.wontDo ?? []);
+  const team = god ? agents.filter((a) => !a.isGod && !a.isAssistant && !a.archived) : [];
+  const businessLine = office?.business.name
+    ? [office.business.name, office.business.city].filter(Boolean).join(t('profile.listJoiner'))
+    : '';
   const connections = card?.connections ?? [];
 
   return (
@@ -69,10 +92,10 @@ export function ProfileTab({ agent }: { agent: Agent }) {
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)' }}>{t('profile.noRole', { name })}</p>
         )}
 
-        {role.sendFor.length > 0 && (
+        {sendFor.length > 0 && (
           <Section title={t('profile.sendFor', { name })}>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {role.sendFor.map((s) => (
+              {sendFor.map((s) => (
                 <li key={s} dir={rtl ? 'auto' : undefined} style={{
                   padding: '2px 8px', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)',
                   background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
@@ -97,8 +120,41 @@ export function ProfileTab({ agent }: { agent: Agent }) {
           </Section>
         )}
 
+        {team.length > 0 && (
+          <Section title={t('profile.god.team', { count: team.length })}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {team.map((a) => {
+                const job = parseRoleLine(a.description).title;
+                return (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => useStore.getState().select(a.id)}
+                      style={{
+                        padding: '2px 8px', border: 'none', cursor: 'pointer', fontFamily: 'var(--cth-font-ui)',
+                        fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)', textAlign: 'start',
+                        background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{a.name}</span>
+                      {job && <span style={{ color: 'var(--cth-ink-500)' }}>{t('profile.listJoiner')}{job}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Section>
+        )}
+
+        {god && office?.briefing && (
+          <Section title={t('profile.god.business', { name })}>
+            <p dir={rtl ? 'auto' : undefined} style={{ margin: 0, fontSize: 14, lineHeight: '22px', color: 'var(--cth-ink-900)' }}>{office.briefing}</p>
+          </Section>
+        )}
+
         <Section title={t('profile.facts')}>
           <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 6 }}>
+            {god && businessLine && <Fact label={t('profile.god.businessFact')}>{businessLine}</Fact>}
             {agent.cwd && <Fact label={t('profile.folder')}><span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, wordBreak: 'break-all' }}>{agent.cwd}</span></Fact>}
             {connections.length > 0 && (
               <Fact label={t('profile.connections')}>
