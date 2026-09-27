@@ -90,3 +90,14 @@ test('the model list starts on the default for agents from Settings, marked defa
   assert.match(modal, /m\.id === defaultModel \? tr\('addAgent\.wizard\.modelDefault', \{ model: m\.label \}\) : m\.label/);
   assert.doesNotMatch(modal, /'best' \| 'fast'/, 'no Best or Fast');
 });
+
+test('work style is required, when hiring and when editing (owner, 2026-09-27)', () => {
+  assert.match(modal, /if \(!workStyle\.trim\(\)\) \{ setError\(tr\('addAgent\.wizard\.errWorkStyle'\)\); return; \}/);
+  const edit = read('src/renderer/src/components/EditAgentModal.tsx');
+  assert.match(edit, /if \(!agent\.isGod && !agent\.isAssistant && !goal\.trim\(\)\) \{ setGoalError\(true\); return; \}/);
+  assert.doesNotMatch(edit, /Work style \(optional\)/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const a = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).addAgent;
+    assert.doesNotMatch(a.workStyle, /optional|可选|اختياري/, loc);
+  }
+});

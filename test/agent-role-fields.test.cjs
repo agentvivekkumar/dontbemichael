@@ -45,7 +45,7 @@ test('joining uses whichever field is filled, and nothing when both are empty', 
 test('Edit Agent shows Role, Role description and Work style, with plain notes', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/EditAgentModal.tsx'), 'utf8');
   const briefing = src.slice(src.indexOf('<Section label="Briefing"'), src.indexOf('</Section>', src.indexOf('<Section label="Briefing"')));
-  for (const label of ['<Row label="Role">', '<Row label="Role description">', '<Row label="Work style (optional)">']) {
+  for (const label of ['<Row label="Role">', '<Row label="Role description">', '<Row label="Work style">']) {
     assert.ok(briefing.includes(label), label);
   }
   assert.doesNotMatch(briefing, /label="Description"|label="Goal/, 'the old labels are gone');

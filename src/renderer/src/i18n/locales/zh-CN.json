@@ -527,7 +527,7 @@
     "rolePlaceholder": "例如：财务",
     "roleDescriptionPlaceholder": "例如：记录每一笔收入和支出，每周发一份汇总",
     "roleHelp": "{{godName}} 会根据角色和角色说明决定把哪些工作交给这位成员。",
-    "workStyle": "工作方式（可选）",
+    "workStyle": "工作方式",
     "workStylePlaceholder": "例如：每个数字都核对两遍。完成后发一份简短汇总。",
     "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式，包括按日程运行的任务：按什么步骤做，结束前检查什么。",
     "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
@@ -626,7 +626,8 @@
       "showFamily": "只显示{{role}}工作",
       "modelDefault": "{{model}}（默认）",
       "cliDefault": "Claude 自带的默认模型",
-      "sameWork": "无论职位名称如何，要交给他的事读起来是同一份工作。"
+      "sameWork": "无论职位名称如何，要交给他的事读起来是同一份工作。",
+      "errWorkStyle": "工作方式为必填：请写明这位团队成员如何完成工作。"
     }
   },
   "onboarding": {

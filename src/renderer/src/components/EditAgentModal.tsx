@@ -49,6 +49,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const [role, setRole] = useState(() => splitAgentRole(agent.description).role);
   const [roleDescription, setRoleDescription] = useState(() => splitAgentRole(agent.description).roleDescription);
   const [goal, setGoal] = useState(agent.goal ?? '');
+  const [goalError, setGoalError] = useState(false);
 
   useEffect(() => {
     void window.cth.getConfig().then(setConfig).catch(() => setConfig(null));
@@ -91,6 +92,10 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       if (!renamed.ok) { setNameError(renamed.error ?? 'Could not rename agent'); return; }
     }
     setNameError(undefined);
+    // Work style is required for a team member (owner, 2026-09-27); Michael and
+    // his assistant have none.
+    if (!agent.isGod && !agent.isAssistant && !goal.trim()) { setGoalError(true); return; }
+    setGoalError(false);
     // Both fields cleared keeps the role it had, rather than saving a blank.
     const trimmedDescription = joinAgentRole(role, roleDescription) || agent.description;
     const trimmedGoal = goal.trim();
@@ -280,15 +285,21 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 Michael reads the role and role description to decide which work to give this team member.
               </span>
 
-              <Row label="Work style (optional)">
+              <Row label="Work style">
                 <textarea
                   value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
+                  onChange={(e) => { setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
+                  aria-invalid={goalError || undefined}
                   placeholder="For example: Check every number twice. Send a short summary when you finish."
                   rows={4}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
                 />
               </Row>
+              {goalError && (
+                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-900)' }}>
+                  ! Work style is required: write how {agent.name} does the job.
+                </span>
+              )}
               <span style={helperStyle}>
                 Michael doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.
               </span>

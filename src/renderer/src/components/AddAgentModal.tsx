@@ -412,6 +412,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     setError(undefined);
     if (whoError) { setError(whoError); setStep('who'); return; }
     if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob')); return; }
+    // Work style is required: it is how the new hire does the job (owner, 2026-09-27).
+    if (!workStyle.trim()) { setError(tr('addAgent.wizard.errWorkStyle')); return; }
     if (!cwd) { setError(tr('addAgent.errFolder')); return; }
     // Michael's folder is private to him (src/shared/folderAccess.ts).
     if (michaelFolder && samePath(michaelFolder, cwd)) { setError(tr('addAgent.errFolderShared', { godName })); return; }

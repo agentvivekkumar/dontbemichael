@@ -527,7 +527,7 @@
     "rolePlaceholder": "For example: Finance",
     "roleDescriptionPlaceholder": "For example: Keeps track of money in and money out, and sends a weekly summary",
     "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
-    "workStyle": "Work style (optional)",
+    "workStyle": "Work style",
     "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
     "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
     "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
@@ -626,7 +626,8 @@
       "showFamily": "show only {{role}} jobs",
       "modelDefault": "{{model}} (default)",
       "cliDefault": "Claude's own default",
-      "sameWork": "What to send reads like the same work, whatever the job title says."
+      "sameWork": "What to send reads like the same work, whatever the job title says.",
+      "errWorkStyle": "Work style is required: write how this team member does the job."
     }
   },
   "onboarding": {
