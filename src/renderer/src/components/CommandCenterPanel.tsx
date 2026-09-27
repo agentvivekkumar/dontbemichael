@@ -127,7 +127,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
   const ccTabRequest = useStore((s) => s.ccTabRequest);
   // Which ADVANCED card a request asked for. seq doubles as the tab's key, so a
   // request made while ADVANCED is already showing still opens that card.
-  const [advancedFocus, setAdvancedFocus] = useState<{ card: AdvancedCard; seq: number }>({ card: 'monitor', seq: 0 });
+  const [advancedFocus, setAdvancedFocus] = useState<{ card: AdvancedCard | null; seq: number }>({ card: null, seq: 0 });
   useEffect(() => {
     if (!ccTabRequest) return;
     if (ccTabRequest.tab === 'tasks' || ccTabRequest.tab === 'graph') { useStore.getState().setFloorView(ccTabRequest.tab); return; }
@@ -380,10 +380,11 @@ type AdvancedCard = 'monitor' | 'activity';
 
 /**
  * ADVANCED: the floor's inner workings, as collapsible cards in the TRIGGERS
- * tab's style. MONITOR opens by default (it holds the box for sending Michael
- * a task, which "assign" and setup deep link to); ACTIVITY starts closed.
+ * tab's style. Both start closed, like every section on every agent tab
+ * (owner, 2026-09-26). A deep link opens its card: "assign" and setup ask for
+ * MONITOR, where the box for sending Michael a task lives.
  */
-function AdvancedTab({ focus, seed }: { focus: AdvancedCard; seed: { text: string; seq: number } }) {
+function AdvancedTab({ focus, seed }: { focus: AdvancedCard | null; seed: { text: string; seq: number } }) {
   const { t } = useTranslation();
   const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'Michael';
   return (

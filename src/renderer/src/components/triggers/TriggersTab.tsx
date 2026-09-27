@@ -21,8 +21,8 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  *
  * This panel is a sidebar, so four flat forms would open as a wall. Each type is
  * a collapsed card carrying its name, a one-line "what this is", and a live
- * summary chip; schedules opens expanded because it is the incumbent and the
- * office calendar deep-links here. Inside a card, each row collapses the same
+ * summary chip. Every card starts closed, like every section on every agent
+ * tab (owner, 2026-09-26). Inside a card, each row collapses the same
  * way, so nothing is more than two disclosures from legible.
  */
 export function TriggersTab() {
@@ -38,7 +38,6 @@ export function TriggersTab() {
       <TriggerCard
         title={t('schedulesSection.officeSchedule')}
         blurb={t('triggersTab.officeBlurb', { godName })}
-        defaultOpen
       >
         <OfficeSchedules />
       </TriggerCard>

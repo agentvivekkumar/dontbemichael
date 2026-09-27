@@ -9,26 +9,14 @@ import { missionsFor } from '@shared/missions';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 type SectionKey = 'email' | 'schedules';
-const LS_COLLAPSED = 'cth.capabilities.collapsed';
 let handledFocusSeq: number | undefined;
-
-/** Which sections this viewer folded away. A convenience only: every section
- *  opens when storage is missing or blocked. */
-function readCollapsed(): Record<SectionKey, boolean> {
-  try {
-    const v = JSON.parse(window.localStorage.getItem(LS_COLLAPSED) ?? '{}') as Partial<Record<SectionKey, boolean>>;
-    return { email: v.email === true, schedules: v.schedules === true };
-  } catch { return { email: false, schedules: false }; }
-}
-function writeCollapsed(v: Record<SectionKey, boolean>): void {
-  try { window.localStorage.setItem(LS_COLLAPSED, JSON.stringify(v)); } catch { /* noop */ }
-}
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
  * (docs/designs/multi-mailbox.md, design review D-T3; schedules merged in by the
  * owner, 2026-09-26). Its own tab after Profile on every agent, Michael included.
- * Two sections, each folds away and the fold is remembered per viewer:
+ * Two sections, both closed whenever the tab opens, like every section on
+ * every agent tab (owner, 2026-09-26); the header chip says what is inside:
  *
  * - Email (design 2A): "Can check email", one Toggle row per mailbox (5A),
  *   Sending as two radio rows with Draft only first chosen (6A), one note, then
@@ -52,12 +40,8 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { missions } = useMissions();
   const mine = missionsFor(missions, agent.id, godId);
   const schedulesOn = mine.filter((m) => m.enabled).length;
-  const [collapsed, setCollapsed] = useState(readCollapsed);
-  const setFold = (key: SectionKey, open: boolean): void => {
-    const next = { ...collapsed, [key]: !open };
-    setCollapsed(next);
-    writeCollapsed(next);
-  };
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, schedules: true });
+  const setFold = (key: SectionKey, open: boolean): void => setCollapsed({ ...collapsed, [key]: !open });
   // A jump to one of this agent's schedules unfolds the section in the same
   // render, so the row can take focus (its effect runs before ours would).
   // The tab usually mounts because of the jump, so the last handled jump is
@@ -175,10 +159,6 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           </>
         )}
 
-        <div aria-live="polite">
-          {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-lemon-light)' }}>{t('capabilities.pending', { name })}</div>}
-          {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-light)' }}>! {t('capabilities.saveFailed')}</div>}
-        </div>
         </TriggerCard>
 
         <TriggerCard
@@ -190,6 +170,12 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
         >
           <AgentSchedules agentId={agent.id} agentName={name} />
         </TriggerCard>
+
+        {/* Outside the sections, so a closed Email section still shows them. */}
+        <div aria-live="polite">
+          {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-lemon-light)' }}>{t('capabilities.pending', { name })}</div>}
+          {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-light)' }}>! {t('capabilities.saveFailed')}</div>}
+        </div>
       </div>
     </div>
   );
