@@ -9,7 +9,7 @@
 
 **[dontbemichael.com](https://dontbemichael.com)**
 
-<img src="./docs/media/floor.png" alt="The office floor: team members at their desks, with Michael's Command Center and a live terminal on the right" width="1240">
+<img src="./docs/media/command-center.jpg" alt="The office floor: eight team members at their desks, with Michael's Command Center on the right showing his profile and the team" width="1240">
 
 Pick your kind of business, pick your team, and Michael, your office manager, runs the floor
 while you run the business. Every team member is an AI agent with a job, its own folder and its
