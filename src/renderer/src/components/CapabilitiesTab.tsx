@@ -56,18 +56,19 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     } catch { setFailed(true); }
   };
 
-  // One mailbox per agent (owner, 2026-09-26). Turning email on keeps the
-  // agent's earlier mailbox if it still exists and otherwise leaves it unpicked;
-  // with no mailbox it starts Draft only (design 6A).
+  // One mailbox per agent (owner, 2026-09-26). Turning email on or off always
+  // leaves the mailbox unpicked and sending on Draft only (design 6A).
   const known = new Set(mailboxes.map((m) => m.id));
   const current = email.mailboxes.find((id) => known.has(id));
   const toggleEmail = (): void => {
-    if (email.enabled) { void save({ ...email, enabled: false }); return; }
+    // Off clears the mailbox and sending too, so turning email on again starts
+    // from nothing picked (owner, 2026-09-26).
+    if (email.enabled) { void save({ enabled: false, mailboxes: [], send: false }); return; }
     // Turning email on opens the section, so the mailbox and sending show.
     setCollapsed({ ...collapsed, email: false });
     // No mailbox is chosen for the owner (owner, 2026-09-26): the list starts on
-    // "Pick a mailbox". A mailbox picked before, still set up, is kept.
-    void save({ enabled: true, mailboxes: current ? [current] : [], send: current ? email.send : false });
+    // "Pick a mailbox", and sending starts Draft only.
+    void save({ enabled: true, mailboxes: [], send: false });
   };
   const pickMailbox = (id: string): void => { if (id !== current) void save({ ...email, mailboxes: [id] }); };
   const setSend = (send: boolean): void => { if (send !== email.send) void save({ ...email, send }); };
