@@ -57,6 +57,9 @@ src/
     db.ts                    SQLite durable store (window bounds + history) + durable cost ledger
     github.ts                GitHub issue + CI run ingestion via the gh CLI
     shellEnv.ts              resolve PATH and shell env for child processes
+    mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
+    integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
+    closingTime.ts           Closing Time shutdown protocol (the office reopens on next launch, shared/officeOpen.ts)
     fs.ts / git.ts           sandboxed filesystem + git bridges
     packs.ts                 loads and validates the bundled Office Packs (resources/packs/)
     agentFolders.ts          each agent's folder under ~/Documents/<Business> (Michael's), plus the Office folder
@@ -69,6 +72,8 @@ src/
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
     officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles, business profile, team plan
     agentDefinition.ts       each agent's levels and outward capabilities
+    mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule)
+    officeOpen.ts            the Office open message each agent gets after closing time
     folderAccess.ts          who may open and change which folder: sandbox, permission rules, hook checks
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
     missions.ts              schedules: ownership, next run, the scheduler's arm plan, one-schedule edits,
@@ -81,11 +86,14 @@ src/
     App.tsx                  top-level layout + wiring
     design/                  tokens.css / tokens.ts / global.css (design source of truth)
     components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, OnboardingWizard, …
-    CommandCenterPanel,      Michael's control surface (Profile/Ask me/Terminal/Schedules/History/Memory/Advanced
-                             tabs; Advanced holds Monitor and Activity). Schedules holds Michael's own schedules
-                             plus a read-only office schedule; Ask me also shows agents' schedule requests
-    triggers/ScheduleList,   per-agent schedules: the Schedules tab on every agent panel (agent mode) and
-                             Michael's office schedule (office mode); rules live in shared/missions.ts
+    CommandCenterPanel,      Michael's control surface (Profile/Ask me/Capabilities/Terminal/Office schedule/History/
+                             Memory/Advanced tabs; Advanced holds Monitor and Activity). Office schedule is a read-only
+                             list of every enabled job; Ask me also shows agents' schedule requests
+    CapabilitiesTab,         every agent's Capabilities tab (Michael included): the Email section (on/off switch,
+                             one mailbox, Can send / Draft only) and the On a schedule section
+    MailboxesSettings,       Settings > Connections > Mailboxes, AddMailboxDialog, and the Claude account email switch
+    triggers/ScheduleList,   per-agent schedules: the On a schedule section of Capabilities (agent mode) and
+                             Michael's Office schedule tab (office mode); rules live in shared/missions.ts
     ScheduleRequestCards,    Ask me cards for schedule changes an agent asked for (Approve / Decline)
     ProfileTab,              the first tab on every agent: job, folder (Open folder), full instructions
     MemoryNotes,             an agent's Memory tab as grouped notes; "Show the file" keeps the raw text
@@ -100,6 +108,7 @@ src/
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
     assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)
+resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarded to the broker
 docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime), `logo.png`, `banner.png`
 docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
                              (the old project's website files still here are tracked for removal in TODOS.md)
