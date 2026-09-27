@@ -258,11 +258,23 @@ const styleTurban: HairFn = (buf, color) => {
   for (const [x, y] of [[6, 0], [7, 0], [5, 1], [6, 1], [4, 2], [5, 2], [4, 3]] as const) set(buf, x, y, hi);
 };
 
-const HAIR_FNS = { styleShort, styleFloppy, styleFrame, styleBun, styleCurly, styleMessy, styleRecede, styleSpiky, styleBald, styleTurban };
+// Close-cropped hair (Darryl, owner 2026-09-27): a short, even, rounded cap with
+// a straight hairline and no part, textured with a few darker flecks.
+const styleCrop: HairFn = (buf, color) => {
+  const [hi, base, sh] = shades(color, 1.3, 0.7);
+  for (let x = 6; x <= 11; x++) set(buf, x, 2, base);
+  for (let x = HX0; x <= HX1; x++) { set(buf, x, 3, base); set(buf, x, 4, base); set(buf, x, 5, base); }
+  for (let y = 4; y <= 8; y++) { set(buf, HX0 - 1, y, base); set(buf, HX1 + 1, y, base); }
+  for (let y = 6; y <= 8; y++) { set(buf, HX0, y, base); set(buf, HX1, y, base); }
+  for (const [x, y] of [[6, 3], [9, 3], [11, 4], [5, 4], [8, 5], [12, 5]] as const) set(buf, x, y, sh);
+  for (const [x, y] of [[7, 2], [8, 2], [6, 2]] as const) set(buf, x, y, hi);
+};
+
+const HAIR_FNS = { styleShort, styleFloppy, styleFrame, styleBun, styleCurly, styleMessy, styleRecede, styleSpiky, styleBald, styleTurban, styleCrop };
 type HairStyle = keyof typeof HAIR_FNS;
 
 // ─── facial hair ─────────────────────────────────────────────────────────────
-type Facial = 'mustache' | 'mustacheSm' | 'stubble' | 'goatee' | 'beard';
+type Facial = 'mustache' | 'mustacheSm' | 'stubble' | 'goatee' | 'beard' | 'beardFull';
 function drawFacial(buf: Buf, kind: Facial, color: RGB): void {
   const [, base, sh] = shades(color);
   if (kind === 'mustache') {
@@ -281,6 +293,12 @@ function drawFacial(buf: Buf, kind: Facial, color: RGB): void {
       set(buf, x, y, base);
     for (const [x, y] of [[5, 13], [6, 15], [11, 15], [12, 13], [8, 15], [9, 15]] as const) set(buf, x, y, sh, 150);
     for (const x of [7, 10]) set(buf, x, 13, sh, 120);
+  } else if (kind === 'beardFull') {
+    // full short beard with a mustache: jaw, chin and upper lip, mouth clear
+    for (const [x, y] of [[4, 11], [4, 12], [4, 13], [5, 13], [5, 14], [5, 15], [6, 15], [6, 16], [7, 16], [8, 16], [9, 16], [10, 16], [11, 16], [11, 15], [12, 15], [12, 14], [12, 13], [13, 11], [13, 12], [13, 13], [8, 15], [9, 15]] as const)
+      set(buf, x, y, base);
+    for (const x of [6, 7, 8, 9, 10, 11]) set(buf, x, 13, base);
+    for (const [x, y] of [[7, 15], [10, 15], [5, 12], [12, 12]] as const) set(buf, x, y, sh, 170);
   } else if (kind === 'goatee') {
     for (const x of [8, 9]) set(buf, x, 15, base);
     set(buf, 8, 14, base); set(buf, 9, 14, base);
@@ -440,7 +458,7 @@ function drawHeadBack(buf: Buf, r: Recipe): void {
   // crown sheen (rounded top catching the light) + subtle center part
   for (const [x, y] of [[7, 2], [8, 2], [9, 2], [10, 2], [7, 3], [8, 3], [9, 3]] as const) set(buf, x, y, hi);
   for (let y = 4; y <= 11; y++) set(buf, 9, y, hi);   // sheen down the crown
-  for (let y = 4; y <= 12; y++) set(buf, 8, y, sh);   // part line
+  if (r.hair !== 'styleCrop') for (let y = 4; y <= 12; y++) set(buf, 8, y, sh);   // part line
   // nape + neck (skin)
   rect(buf, 7, 14, 10, 14, sh);
   rect(buf, 7, 15, 10, 17, s.sh);
@@ -553,7 +571,8 @@ const RECIPES: Record<OfficeCharacterName, Recipe> = {
   nick:     { skin: 'light', hairc: [46, 34, 26],   hair: 'styleCurly',  cloth: 'polo', c1: [96, 128, 106], c2: [80, 110, 90], brow: 'raised', mouth: 'neutral' },
   // Red turban, short dark beard, dark cardigan over a navy shirt (owner, 2026-09-27).
   sadiq:    { skin: 'brown', hairc: [150, 32, 44],  hair: 'styleTurban', facial: 'beard', facialc: [30, 24, 22], cloth: 'cardigan', c1: [64, 64, 72], c2: [40, 54, 100], brow: 'flat', mouth: 'neutral' },
-  darryl:   { skin: 'dark',  hairc: [28, 24, 22],   hair: 'styleBald',   cloth: 'polo', c1: [74, 98, 128], c2: [60, 82, 110], facial: 'goatee', brow: 'flat', mouth: 'smile' },
+  // Short black hair, full short beard, grey collared work shirt (owner, 2026-09-27).
+  darryl:   { skin: 'dark',  hairc: [24, 20, 20],   hair: 'styleCrop',   cloth: 'dressshirt', c1: [146, 150, 158], facial: 'beardFull', brow: 'flat', mouth: 'neutral' },
 };
 
 /** The face/hair group (head → face → facial hair → hair → glasses), no clothing. */
