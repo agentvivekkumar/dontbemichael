@@ -274,3 +274,18 @@ test('Add Agent hides import hire and its AI prompt; the button says hire (owner
   }
   assert.equal(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.spawn, 'hire');
 });
+
+test('Add Agent shows each character with its job from the show (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(src, /tr\(`addAgent\.castRole\.\$\{c\.name\}`\)/);
+  const cast = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/scene/office/cast.ts'), 'utf8');
+  const names = [...cast.matchAll(/\{ name: '(\w+)'/g)].map((m) => m[1]);
+  assert.ok(names.length >= 18);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
+    for (const n of names) assert.ok(d.addAgent.castRole?.[n], `${loc}: ${n} has a role`);
+  }
+  const en = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.castRole;
+  assert.equal(en.jim, 'Sales');
+  assert.equal(en.toby, 'HR');
+});

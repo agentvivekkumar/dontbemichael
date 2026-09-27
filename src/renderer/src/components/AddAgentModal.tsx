@@ -756,13 +756,15 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                                 : 'inset 0 0 0 1px var(--cth-ink-100)',
                               cursor: 'pointer',
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                              border: 'none', width: 56
+                              border: 'none', width: 72
                             }}
                           >
                             <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
                               <SpritePortrait character={c.name} scale={2} />
                             </div>
-                            <span style={{ fontSize: 11, color: 'var(--cth-ink-700)' }}>{c.displayName}</span>
+                            <span style={{ fontSize: 11, color: 'var(--cth-ink-900)' }}>{c.displayName}</span>
+                            {/* Each character's job in the show (owner, 2026-09-27). */}
+                            <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
                           </button>
                         ))}
                       </div>

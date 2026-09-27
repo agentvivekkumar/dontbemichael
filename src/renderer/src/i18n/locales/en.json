@@ -610,7 +610,27 @@
     "errFolder": "Pick a folder first",
     "errCommand": "Command is required",
     "hireProgress": "hire {{current}} of {{total}}",
-    "skipHire": "skip hire"
+    "skipHire": "skip hire",
+    "castRole": {
+      "michael": "Manager",
+      "jim": "Sales",
+      "pam": "Admin",
+      "dwight": "Sales",
+      "kevin": "Accounting",
+      "angela": "Accounting",
+      "oscar": "Finance",
+      "stanley": "Sales",
+      "phyllis": "Sales",
+      "andy": "Sales",
+      "kelly": "Customer Support",
+      "ryan": "Marketing",
+      "toby": "HR",
+      "creed": "Quality Control",
+      "meredith": "Supply Chain",
+      "nick": "IT",
+      "sadiq": "IT Security",
+      "darryl": "Warehouse"
+    }
   },
   "onboarding": {
     "titles": {
