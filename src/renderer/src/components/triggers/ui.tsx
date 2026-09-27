@@ -1,5 +1,6 @@
 import { useId, useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRtl } from '@/i18n/useDirection';
 import { TRIGGER_MODES, type TriggerMode } from '@shared/triggers';
 import { MAX_INTERVAL_MS } from '@shared/missions';
 import {
@@ -181,6 +182,18 @@ export function Scroll({ children }: { children: ReactNode }) {
  * the summary chip is fed by the section itself and would go blank the moment
  * you closed it, and a section's own open rows survive collapsing its parent.
  */
+/** The one open/closed sign for every section and row that folds (owner,
+ *  2026-09-26: a row with no sign could not be found). Readable size and dark
+ *  ink; points toward the text in right-to-left. */
+export function Disclosure({ open }: { open: boolean }) {
+  const rtl = useRtl();
+  return (
+    <span aria-hidden="true" style={{ flexShrink: 0, width: 14, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)', textAlign: 'center' }}>
+      {open ? '▾' : rtl ? '◂' : '▸'}
+    </span>
+  );
+}
+
 export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: openProp, onToggle, children }: {
   title: string; blurb: string; summary?: ReactNode; defaultOpen?: boolean;
   /** Controlled use: the parent owns open/closed (e.g. remembers it, or opens it on a jump). */
@@ -202,9 +215,7 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: 
           background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
         }}
       >
-        <span style={{ flexShrink: 0, width: 8, fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)' }}>
-          {open ? '▾' : '▸'}
-        </span>
+        <Disclosure open={open} />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',

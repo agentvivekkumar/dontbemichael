@@ -97,3 +97,12 @@ test('every section on every agent tab starts closed (owner, 2026-09-26)', () =>
   const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
   assert.match(cc, /useState<\{ card: AdvancedCard \| null; seq: number \}>\(\{ card: null, seq: 0 \}\)/, 'Advanced opens with no card open');
 });
+
+test('a schedule row shows it opens and closes, and the editor has a way out (owner, 2026-09-26)', () => {
+  const ui = read('src/renderer/src/components/triggers/ui.tsx');
+  assert.match(ui, /export function Disclosure/);
+  assert.match(ui, /<Disclosure open=\{open\} \/>/, 'sections use the shared sign');
+  const rows = read('src/renderer/src/components/triggers/ScheduleList.tsx');
+  assert.match(rows, /\{!onJump && !readOnly && <Disclosure open=\{open\} \/>\}/, 'editable rows show the sign');
+  assert.match(rows, /\{dirty \? t\('common\.cancel'\) : t\('common\.close'\)\}/, 'cancel or close beside save');
+});

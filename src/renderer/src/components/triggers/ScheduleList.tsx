@@ -6,7 +6,7 @@ import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { isComposingKey } from '@shared/imeGuard';
 import {
-  Field, Hint, MiniButton, SchedulePicker, Toggle, fmtInterval, inputStyle, textareaStyle,
+  Disclosure, Field, Hint, MiniButton, SchedulePicker, Toggle, fmtInterval, inputStyle, textareaStyle,
   weeklyDraft, weeklyIsUsable, type WeeklyDraft
 } from './ui';
 import { formatWeekly } from '@shared/weeklySchedule';
@@ -240,6 +240,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
   } as const;
   const headerBody = (
     <>
+      {!onJump && !readOnly && <Disclosure open={open} />}
       <WhenChip on={mission.enabled}>{whenText(mission, t)}</WhenChip>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
@@ -344,6 +345,10 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
               <MiniButton tone="danger" onClick={() => setConfirming(true)} buttonRef={deleteRef}>{t('common.delete')}</MiniButton>
             )}
             <span style={{ flex: 1 }} />
+            {/* Closing drops unsaved edits: the draft is reseeded on the next open. */}
+            <MiniButton onClick={() => { setOpen(false); headerRef.current?.focus(); }}>
+              {dirty ? t('common.cancel') : t('common.close')}
+            </MiniButton>
             <PixelButton variant="primary" size="sm" onClick={save} disabled={busy || !dirty || !label.trim() || !whenIsUsable}>
               {saved && !dirty ? t('schedulesSection.saved') : t('common.save')}
             </PixelButton>
