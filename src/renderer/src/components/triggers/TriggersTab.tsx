@@ -22,7 +22,8 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  * This panel is a sidebar, so four flat forms would open as a wall. Each type is
  * a collapsed card carrying its name, a one-line "what this is", and a live
  * summary chip. Every card starts closed, like every section on every agent
- * tab (owner, 2026-09-26). Inside a card, each row collapses the same
+ * tab (owner, 2026-09-26). The office schedule is not a card: it is the one
+ * section here, so it shows straight away under a one line description. Inside a card, each row collapses the same
  * way, so nothing is more than two disclosures from legible.
  */
 export function TriggersTab() {
@@ -32,15 +33,11 @@ export function TriggersTab() {
 
   return (
     <Scroll>
-      <Muted>{t('triggersTab.intro')}</Muted>
-      <div style={{ height: 8 }} />
-
-      <TriggerCard
-        title={t('schedulesSection.officeSchedule')}
-        blurb={t('triggersTab.officeBlurb', { godName })}
-      >
-        <OfficeSchedules />
-      </TriggerCard>
+      {/* The only section on this tab, so no fold and no heading: the tab is
+          already called Office schedule (owner, 2026-09-26). */}
+      <Muted>{t('triggersTab.officeBlurb', { godName })}</Muted>
+      <OfficeSchedules />
+      <div style={{ height: 12 }} />
 
       {/* WEBHOOKS moved to Settings → Connections: one server and one tunnel
           serve the whole office, and everything that arrives goes to Michael

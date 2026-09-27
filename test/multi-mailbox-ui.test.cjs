@@ -117,3 +117,9 @@ test('a schedule row shows it opens and closes, and the editor has a way out (ow
   assert.match(rows, /\{!onJump && !readOnly && <Disclosure open=\{open\} \/>\}/, 'editable rows show the sign');
   assert.match(rows, /\{dirty \? t\('common\.cancel'\) : t\('common\.close'\)\}/, 'cancel or close beside save');
 });
+
+test('the office schedule is the one section on its tab, so it does not fold (owner, 2026-09-26)', () => {
+  const tab = read('src/renderer/src/components/triggers/TriggersTab.tsx');
+  assert.match(tab, /<Muted>\{t\('triggersTab\.officeBlurb', \{ godName \}\)\}<\/Muted>\s*<OfficeSchedules \/>/);
+  assert.doesNotMatch(tab, /title=\{t\('schedulesSection\.officeSchedule'\)\}/);
+});

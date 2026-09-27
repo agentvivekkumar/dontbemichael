@@ -960,7 +960,6 @@
     "manualDownloadingBody": "下载完成后，退出本应用，将新版本覆盖安装到当前版本之上，重新打开并选择同一个项目。在 {{os}} 上："
   },
   "triggersTab": {
-    "intro": "所有无需你输入就能启动工作的方式。",
     "schedules": "计划任务",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
