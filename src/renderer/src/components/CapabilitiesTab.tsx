@@ -9,7 +9,6 @@ import { missionsFor } from '@shared/missions';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 type SectionKey = 'email' | 'schedules';
-let handledFocusSeq: number | undefined;
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
@@ -23,8 +22,7 @@ let handledFocusSeq: number | undefined;
  *   from a list (or a link to Settings when none is set up), then Sending with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
- *   the same list and editor the Schedules tab had. A jump from the office
- *   schedule opens this section even if it was folded.
+ *   the same list and editor the Schedules tab had.
  *
  * Every change saves at once through main, which checks it and says whether
  * email just turned on; if it did and the agent is running, it is queued for a
@@ -43,15 +41,6 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const schedulesOn = mine.filter((m) => m.enabled).length;
   const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, schedules: true });
   const setFold = (key: SectionKey, open: boolean): void => setCollapsed({ ...collapsed, [key]: !open });
-  // A jump to one of this agent's schedules unfolds the section in the same
-  // render, so the row can take focus (its effect runs before ours would).
-  // The tab usually mounts because of the jump, so the last handled jump is
-  // kept outside the component.
-  const focus = useStore((s) => s.scheduleFocus);
-  if (focus && focus.seq !== handledFocusSeq) {
-    handledFocusSeq = focus.seq;
-    if (collapsed.schedules && mine.some((m) => m.id === focus.missionId)) setCollapsed({ ...collapsed, schedules: false });
-  }
 
   if (!config) return null;
   const mailboxes = config.mailboxes ?? [];

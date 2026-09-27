@@ -963,7 +963,7 @@
     "schedules": "SCHEDULES",
     "organisation": "ORGANISATION",
     "organisationBlurb": "Let a teammate's office message yours.",
-    "officeBlurb": "Every job that is on, {{godName}}'s included. Paused jobs stay on each team member's Capabilities tab. Open a row to change it there."
+    "officeBlurb": "Every job that is on, {{godName}}'s included. To change a job, open that team member and go to their Capabilities tab."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -1011,7 +1011,6 @@
     "addedByYou": "added by you",
     "addedBy": "added by {{name}}",
     "runAria": "Run {{job}}",
-    "openRow": "Open {{name}}'s schedules: {{job}}",
     "closedGroup": "{{name}} (closed)",
     "closedNote": "{{name}} is closed, so these are paused.",
     "relayHint": "{{godName}} hands this job to the team."

@@ -17,7 +17,7 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  * Schedules belong to the agent that runs them (docs/designs/per-agent-schedules.md):
  * each agent, Michael included, edits its own in the On a schedule section of
  * its Capabilities tab (owner, 2026-09-26). This tab, named Office schedule, is
- * the read only list of everyone's, each row a jump to that agent's section.
+ * the read only list of everyone's jobs that are on; rows do not link anywhere.
  *
  * This panel is a sidebar, so four flat forms would open as a wall. Each type is
  * a collapsed card carrying its name, a one-line "what this is", and a live

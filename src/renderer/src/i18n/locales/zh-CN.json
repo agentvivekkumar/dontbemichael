@@ -963,7 +963,7 @@
     "schedules": "计划任务",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
-    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。暂停的工作留在每位成员的能力页里。打开某一行即可在那里修改。"
+    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。要修改某项工作，请打开该成员，进入其能力页。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -1011,7 +1011,6 @@
     "addedByYou": "由你添加",
     "addedBy": "由 {{name}} 添加",
     "runAria": "运行 {{job}}",
-    "openRow": "打开 {{name}} 的定时任务：{{job}}",
     "closedGroup": "{{name}}（已关闭）",
     "closedNote": "{{name}} 已关闭，所以这些已暂停。",
     "relayHint": "{{godName}} 会把这项工作分给团队。"

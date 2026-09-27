@@ -91,10 +91,12 @@ test('schedules live in Capabilities: Email and On a schedule fold separately, c
   assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);
 });
 
-test('a jump from the office schedule opens that agent\'s Capabilities; Michael\'s jobs are listed too', () => {
+test('the office schedule lists Michael\'s jobs too, as plain rows', () => {
   const store = read('src/renderer/src/store/store.ts');
   assert.match(store, /if \(v === 'schedules'\) return 'capabilities';/, 'a saved Schedules tab opens Capabilities');
-  assert.match(store, /sidebarTab: 'capabilities',\s*ccTabRequest: isGod \? \{ tab: 'capabilities'/);
+  // Office schedule rows are plain text: no arrow, no jump (owner, 2026-09-26).
+  assert.doesNotMatch(store, /openAgentSchedule|scheduleFocus/);
+  assert.doesNotMatch(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /onJump|openAgentSchedule/);
   assert.match(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /const others = missions\.filter\(\(m\) => m\.enabled\);/, 'only jobs that are on');
   assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /AgentSchedules/);
 });
@@ -114,7 +116,7 @@ test('a schedule row shows it opens and closes, and the editor has a way out (ow
   assert.match(ui, /export function Disclosure/);
   assert.match(ui, /<Disclosure open=\{open\} \/>/, 'sections use the shared sign');
   const rows = read('src/renderer/src/components/triggers/ScheduleList.tsx');
-  assert.match(rows, /\{!onJump && !readOnly && <Disclosure open=\{open\} \/>\}/, 'editable rows show the sign');
+  assert.match(rows, /\{!readOnly && <Disclosure open=\{open\} \/>\}/, 'editable rows show the sign');
   assert.match(rows, /\{dirty \? t\('common\.cancel'\) : t\('common\.close'\)\}/, 'cancel or close beside save');
 });
 

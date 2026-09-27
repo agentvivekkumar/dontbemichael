@@ -261,11 +261,6 @@ interface State {
   missions: ScheduledMission[];
   missionsStatus: 'loading' | 'ready' | 'error';
   setMissions: (missions: ScheduledMission[], status?: 'ready' | 'error') => void;
-  /** Open an agent's Capabilities tab on one schedule, in its On a schedule
-   *  section (the office schedule jumps here; Michael included). seq makes
-   *  repeated identical requests distinct. */
-  scheduleFocus: { missionId: string; seq: number } | null;
-  openAgentSchedule: (agentId: string, missionId: string) => void;
   /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
    *  the tab, and names the agent. The floor's GRAPH view uses it, since the
    *  graph no longer sits next to that tab. seq-keyed like ccTabRequest. */
@@ -757,22 +752,6 @@ export const useStore = create<State>((set, get) => ({
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
-  scheduleFocus: null,
-  openAgentSchedule: (agentId, missionId) => {
-    try { window.localStorage.setItem(LS_SIDEBAR_TAB, 'capabilities'); } catch { /* noop */ }
-    set((s) => {
-      persistAgents(s.agents, agentId);
-      // Michael's panel has its own tab strip, so it gets a tab request.
-      const isGod = s.agents.some((a) => a.id === agentId && a.isGod);
-      return {
-        selectedId: agentId,
-        sidebarTab: 'capabilities',
-        ccTabRequest: isGod ? { tab: 'capabilities', seq: (s.ccTabRequest?.seq ?? 0) + 1 } : null,
-        memoryFocusRequest: null,
-        scheduleFocus: { missionId, seq: (s.scheduleFocus?.seq ?? 0) + 1 }
-      };
-    });
-  },
   fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
   prefersFocusMode: initialPrefersFocusMode,
   floorView: initialFloorView,
