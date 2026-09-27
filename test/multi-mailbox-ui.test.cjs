@@ -46,7 +46,7 @@ test('Draft only is chosen the first time email is turned on (6A); Sending is a 
   assert.match(cap, /<Select label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current \?\? ''\}/);
   assert.match(cap, /\{!current && <option value="">\{t\('capabilities\.pickMailbox'\)\}<\/option>\}/);
   assert.match(cap, /mailboxes\.length === 0 \? \(/, 'no mailbox set up: the Settings link instead');
-  assert.match(cap, /<button type="button" onClick=\{openSettings\} style=\{link\}>\{t\('capabilities\.addMailbox'\)\}<\/button>/, 'add new mailbox beside the list');
+  assert.match(cap, /<button type="button" onClick=\{openSettings\} style=\{\{ \.\.\.link, marginInlineStart: 'auto' \}\}>\{t\('capabilities\.addMailbox'\)\}<\/button>/, 'add new mailbox beside the list');
   // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
   assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'one switch');
   assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);

@@ -120,7 +120,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                     {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
                     {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
                   </Select>
-                  <button type="button" onClick={openSettings} style={link}>{t('capabilities.addMailbox')}</button>
+                  <button type="button" onClick={openSettings} style={{ ...link, marginInlineStart: 'auto' }}>{t('capabilities.addMailbox')}</button>
                 </div>
               )}
 
