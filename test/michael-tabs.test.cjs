@@ -83,8 +83,8 @@ test('Michael\'s panel has no Tasks tab; a request for it opens the floor\'s Tas
   assert.match(src, /if \(ccTabRequest\.tab === 'tasks' \|\| ccTabRequest\.tab === 'graph'\) \{ useStore\.getState\(\)\.setFloorView\(ccTabRequest\.tab\); return; \}/);
 });
 
-test("Michael's schedule tab is called schedules, like every other agent's", () => {
-  assert.match(src, /\{ key: 'triggers', labelKey: 'sidebar\.schedules', icon: 'clock' \}/);
+test("Michael's schedule tab is the office schedule; his own jobs are on Capabilities (owner, 2026-09-26)", () => {
+  assert.match(src, /\{ key: 'triggers', labelKey: 'commandCenter\.tabs\.officeSchedule', icon: 'clock' \}/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(fs.readFileSync(require('node:path').resolve(__dirname, `../src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
     assert.equal(d.commandCenter.tabs.triggers, undefined, `${loc}: the old label is gone`);

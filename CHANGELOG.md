@@ -6,6 +6,42 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.7] (2026-09-26)
+
+### Added
+
+- **Give each agent its own mailbox.** Settings, Connections, Mailboxes connects Gmail, Google
+  Workspace, iCloud, Yahoo, Zoho or any IMAP mailbox with an app password. The password is tested
+  before it is saved and stays in this Mac's keychain. Outlook is not supported yet.
+- **A Capabilities tab on every agent.** Turn email on in the Email section's header, pick the one
+  mailbox that agent may use, and choose Can send or Draft only (replies wait in that mailbox's
+  Drafts). An agent restarts once, when it is not mid step, to pick up its mail tools.
+- **Agents read, search and draft mail through their own mail tools**, refused for any mailbox
+  you did not give them. A mailbox that stops accepting its password shows "needs you" in Settings
+  and raises one Ask me card, closed once you fix or remove it.
+- **The office opens again after closing time.** The next launch tells each agent the office is
+  open, so held work and scheduled jobs run again. A job missed overnight runs once on opening,
+  not once per missed hour. Cancelling closing time now tells every agent, not only Michael.
+
+### Changed
+
+- **Schedules live in Capabilities.** Each agent's jobs on a clock are the On a schedule section of
+  its Capabilities tab. Michael's Schedules tab is now Office schedule: every job that is on, as a
+  plain list, with a hint to change jobs on each agent's Capabilities tab.
+- **Sections start closed** on every agent tab, and schedule rows show an open or closed arrow. An
+  open schedule has a close or cancel button beside save.
+- **Email through your Claude account is one switch** on the Your Claude account line in Mailboxes:
+  allowed lets every agent use it, blocked stops everyone. It no longer affects the mailboxes you add.
+- **Setup makes Michael's engine and model the team default.**
+- **Settings is simpler.** Office theme, automatic updates, Slack and the read only server list are
+  hidden in this build; the manual update check stays at the top.
+
+### Fixed
+
+- **Turning Email and Calendar off now blocks agents' mail and calendar tools**, not just the
+  setting.
+- **The Slack listener no longer starts while Slack is hidden.**
+
 ## [0.0.6] (2026-09-26)
 
 ### Changed

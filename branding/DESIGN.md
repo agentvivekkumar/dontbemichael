@@ -476,6 +476,16 @@ schedule) end in `›` and open that agent's Schedules tab.
 The agent panel tab strip uses Inter 14 px labels and scrolls sideways when four tabs
 outgrow the panel.
 
+### 7.10a Radio row (`CapabilitiesTab`, Sending)
+
+For a choice between a few options where each option needs its reason beside it
+(first use: Can send or Draft only). Rows follow §7.10: a divided list, one `ink-100`
+hairline between rows. Each row: a 16 px circle (`paper-100` fill, 1 px `ink-500`
+inset; the chosen one gets an 8 px `ink-900` dot), the option at 14 px, and a 13 px
+`ink-500` line under it saying what it does. The rows form one `role="radiogroup"`
+with a name; only the chosen row is in the Tab order, and the arrow keys move the
+choice (§12). No pill or segmented control.
+
 ### 7.11 Memory notes (`MemoryNotes`, the Memory tab)
 
 The memory index is shown as notes, never its raw lines (the `[m3]` id, kind word and

@@ -1,3 +1,4 @@
+import { MailboxesSettings } from './MailboxesSettings';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { agentModels, type HarnessConfig } from '@/store/config';
@@ -15,7 +16,7 @@ import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_OFFICE_THEME, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
@@ -1236,24 +1237,26 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             {autoCompactOn ? t('common.on') : t('common.off')}
                           </PixelButton>
                         </div>
-                        <div style={{ height: 10 }} />
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {t('settings.general.autoUpdate')}
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.general.autoUpdateDesc')}
-                            </span>
+                        {SHOW_AUTO_UPDATE_SWITCH && (<>
+                          <div style={{ height: 10 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                                {t('settings.general.autoUpdate')}
+                              </span>
+                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                                {t('settings.general.autoUpdateDesc')}
+                              </span>
+                            </div>
+                            <PixelButton
+                              variant={autoUpdateOn ? 'primary' : 'secondary'}
+                              size="sm"
+                              onClick={toggleAutoUpdate}
+                            >
+                              {autoUpdateOn ? t('common.on') : t('common.off')}
+                            </PixelButton>
                           </div>
-                          <PixelButton
-                            variant={autoUpdateOn ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={toggleAutoUpdate}
-                          >
-                            {autoUpdateOn ? t('common.on') : t('common.off')}
-                          </PixelButton>
-                        </div>
+                        </>)}
                         {COLLECT_USAGE_STATS && (<>
                           <div style={{ height: 10 }} />
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -1276,8 +1279,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </>)}
                       </div>
 
-                      {/* Office Theme — TV-show office maps (experimental; flag tvShowOffices, default off) */}
-                      <OfficeThemePicker config={config} />
+                      {/* Office Theme: TV show office maps (flag tvShowOffices, default off).
+                          Hidden in this build (SHOW_OFFICE_THEME). */}
+                      {SHOW_OFFICE_THEME && <OfficeThemePicker config={config} />}
                     </>
                   )}
 
@@ -1628,184 +1632,192 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                   {activeSection === 'Connections' && (
                     <>
-                      {/* Connected-services registry (generic, registry-driven).
-                          Leads the section; the hardcoded Slack/Webhook/Free Flow
-                          blocks below stay as-is. */}
+                      {/* Mailboxes first: every connected mailbox, then the
+                          Your Claude account switch (docs/designs/multi-mailbox.md). */}
+                      <MailboxesSettings />
+
+                      <div style={sectionRule} />
+
+                      {/* Connected-services registry (generic, registry-driven);
+                          the hardcoded Slack/Webhook/Free Flow blocks below stay as-is. */}
                       <IntegrationsRegistry />
 
                       <div style={sectionRule} />
 
-                      {/* Slack integration */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <div style={sectionHeadTight}>
-                          {t('settings.connections.slack')}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {t('settings.connections.slackIntegration')}
-                              {/* i - toggles the step-by-step connect guide. */}
-                              <button
-                                type="button"
-                                aria-label={t('settings.connections.showSlackHelp')}
-                                aria-expanded={showSlackHelp}
-                                onClick={() => setShowSlackHelp((v) => !v)}
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  width: 16, height: 16, padding: 0, cursor: 'pointer',
-                                  border: 'none', borderRadius: '50%',
-                                  background: showSlackHelp ? 'var(--cth-ink-700)' : 'var(--cth-ink-300)',
-                                  color: showSlackHelp ? 'var(--cth-paper-100)' : 'var(--cth-ink-900)',
-                                  fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '16px'
-                                }}
-                              >i</button>
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.connections.slackDesc', { godName })}
-                            </span>
+                      {/* Slack: hidden in this build (SHOW_SLACK). */}
+                      {SHOW_SLACK && (<>
+                        {/* Slack integration */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={sectionHeadTight}>
+                            {t('settings.connections.slack')}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {/* Connection status: clear, always-visible. */}
-                            <span style={{
-                              fontSize: 12, lineHeight: '16px',
-                              color: running ? 'var(--cth-mint-700, #1f7a4d)' : 'var(--cth-ink-500)'
-                            }}>
-                              {running ? t('settings.connections.connected') : t('settings.connections.notConnected')}
-                            </span>
-                            <PixelButton
-                              variant={slackEnabled ? 'primary' : 'secondary'}
-                              size="sm"
-                              onClick={() => setSlackEnabled((v) => !v)}
-                            >
-                              {slackEnabled ? t('common.on') : t('common.off')}
-                            </PixelButton>
-                          </div>
-                        </div>
-
-                        {/* Step-by-step connect guide. Includes the both-lists
-                            bot-event subscription requirement (steps 6 & 7). */}
-                        {showSlackHelp && (
-                          <pre style={{
-                            margin: 0, padding: 10, whiteSpace: 'pre-wrap',
-                            background: 'var(--cth-paper-100)',
-                            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-                            fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
-                            color: 'var(--cth-ink-700)'
-                          }}>{SLACK_CONNECT_STEPS}</pre>
-                        )}
-
-                        {slackEnabled && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {/* Signing secret + bot token side-by-side in the wider layout */}
-                            <div style={{ display: 'flex', gap: 16 }}>
-                              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                                <span style={slackLabelStyle}>{t('settings.connections.signingSecret')}</span>
-                                <input
-                                  type="password"
-                                  value={slackSecret}
-                                  onChange={(e) => setSlackSecret(e.target.value)}
-                                  placeholder={t('settings.connections.signingSecretPlaceholder')}
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
-                                />
-                              </label>
-                              {/* Bot token: stays in main; never leaves the main process. */}
-                              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                                <span style={slackLabelStyle}>{t('settings.connections.botToken')}</span>
-                                <input
-                                  type="password"
-                                  value={slackBotToken}
-                                  onChange={(e) => setSlackBotToken(e.target.value)}
-                                  placeholder="xoxb-..."
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
-                                />
-                              </label>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                                {t('settings.connections.slackIntegration')}
+                                {/* i - toggles the step-by-step connect guide. */}
+                                <button
+                                  type="button"
+                                  aria-label={t('settings.connections.showSlackHelp')}
+                                  aria-expanded={showSlackHelp}
+                                  onClick={() => setShowSlackHelp((v) => !v)}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    width: 16, height: 16, padding: 0, cursor: 'pointer',
+                                    border: 'none', borderRadius: '50%',
+                                    background: showSlackHelp ? 'var(--cth-ink-700)' : 'var(--cth-ink-300)',
+                                    color: showSlackHelp ? 'var(--cth-paper-100)' : 'var(--cth-ink-900)',
+                                    fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '16px'
+                                  }}
+                                >i</button>
+                              </span>
+                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                                {t('settings.connections.slackDesc', { godName })}
+                              </span>
                             </div>
-
-                            <div style={{ display: 'flex', gap: 16 }}>
-                              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                                <span style={slackLabelStyle}>{t('settings.connections.channelId')}</span>
-                                <input
-                                  value={slackChannel}
-                                  onChange={(e) => setSlackChannel(e.target.value)}
-                                  placeholder={t('settings.connections.channelPlaceholder')}
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
-                                />
-                              </label>
-                              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 100 }}>
-                                <span style={slackLabelStyle}>{t('settings.connections.port')}</span>
-                                <input
-                                  type="number"
-                                  value={slackPort}
-                                  onChange={(e) => setSlackPort(e.target.value)}
-                                  placeholder="3847"
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
-                                />
-                              </label>
-                            </div>
-
-                            {/* App/voice-INITIATED proactive posting — OFF by
-                                default ("stop posting into Slack by default").
-                                Gates ONLY the renderer's "queued" ack; the
-                                Slack-ORIGIN done-reply round-trip is never gated. */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                              <span style={slackLabelStyle}>
-                                {t('settings.connections.proactivePosting')}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {/* Connection status: clear, always-visible. */}
+                              <span style={{
+                                fontSize: 12, lineHeight: '16px',
+                                color: running ? 'var(--cth-mint-700, #1f7a4d)' : 'var(--cth-ink-500)'
+                              }}>
+                                {running ? t('settings.connections.connected') : t('settings.connections.notConnected')}
                               </span>
                               <PixelButton
-                                variant={slackProactivePosting ? 'primary' : 'secondary'}
+                                variant={slackEnabled ? 'primary' : 'secondary'}
                                 size="sm"
-                                onClick={() => setSlackProactivePosting((v) => !v)}
+                                onClick={() => setSlackEnabled((v) => !v)}
                               >
-                                {slackProactivePosting ? t('common.on') : t('common.off')}
+                                {slackEnabled ? t('common.on') : t('common.off')}
                               </PixelButton>
                             </div>
-
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              {/* Start disabled once connected; Stop only when running. */}
-                              <PixelButton variant="primary" size="sm" onClick={startSlack} disabled={slackBusy || !slackSecret.trim() || running}>
-                                {slackBusy ? '...' : running ? t('settings.connections.connectedBtn') : t('settings.connections.start')}
-                              </PixelButton>
-                              <PixelButton variant="secondary" size="sm" onClick={stopSlack} disabled={slackBusy || !running}>
-                                {t('settings.connections.stop')}
-                              </PixelButton>
-                              <PixelButton variant="ghost" size="sm" onClick={saveSlack} disabled={slackBusy}>
-                                {t('common.save')}
-                              </PixelButton>
-                              {slackNote && (
-                                <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{slackNote}</span>
-                              )}
-                            </div>
-
-                            {/* Keep the Request URL visible while connected even after a
-                                modal reopen; when stopped, show the last URL greyed
-                                since Slack reuses it until the next Start. */}
-                            {(running || tunnelUrl) && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, opacity: running ? 1 : 0.55 }}>
-                                <span style={slackLabelStyle}>
-                                  {running
-                                    ? t('settings.connections.requestUrl')
-                                    : t('settings.connections.lastRequestUrl')}
-                                </span>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  <input
-                                    readOnly
-                                    value={tunnelUrl}
-                                    onFocus={(e) => e.currentTarget.select()}
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
-                                  />
-                                  <PixelButton variant="secondary" size="sm" onClick={copyTunnel} disabled={!tunnelUrl}>{t('common.copy')}</PixelButton>
-                                </div>
-                              </div>
-                            )}
-
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.connections.slackHint')}
-                            </span>
                           </div>
-                        )}
-                      </div>
 
-                      <div style={sectionRule} />
+                          {/* Step-by-step connect guide. Includes the both-lists
+                              bot-event subscription requirement (steps 6 & 7). */}
+                          {showSlackHelp && (
+                            <pre style={{
+                              margin: 0, padding: 10, whiteSpace: 'pre-wrap',
+                              background: 'var(--cth-paper-100)',
+                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                              fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
+                              color: 'var(--cth-ink-700)'
+                            }}>{SLACK_CONNECT_STEPS}</pre>
+                          )}
+
+                          {slackEnabled && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {/* Signing secret + bot token side-by-side in the wider layout */}
+                              <div style={{ display: 'flex', gap: 16 }}>
+                                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                                  <span style={slackLabelStyle}>{t('settings.connections.signingSecret')}</span>
+                                  <input
+                                    type="password"
+                                    value={slackSecret}
+                                    onChange={(e) => setSlackSecret(e.target.value)}
+                                    placeholder={t('settings.connections.signingSecretPlaceholder')}
+                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  />
+                                </label>
+                                {/* Bot token: stays in main; never leaves the main process. */}
+                                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                                  <span style={slackLabelStyle}>{t('settings.connections.botToken')}</span>
+                                  <input
+                                    type="password"
+                                    value={slackBotToken}
+                                    onChange={(e) => setSlackBotToken(e.target.value)}
+                                    placeholder="xoxb-..."
+                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  />
+                                </label>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 16 }}>
+                                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                                  <span style={slackLabelStyle}>{t('settings.connections.channelId')}</span>
+                                  <input
+                                    value={slackChannel}
+                                    onChange={(e) => setSlackChannel(e.target.value)}
+                                    placeholder={t('settings.connections.channelPlaceholder')}
+                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  />
+                                </label>
+                                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 100 }}>
+                                  <span style={slackLabelStyle}>{t('settings.connections.port')}</span>
+                                  <input
+                                    type="number"
+                                    value={slackPort}
+                                    onChange={(e) => setSlackPort(e.target.value)}
+                                    placeholder="3847"
+                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  />
+                                </label>
+                              </div>
+
+                              {/* App/voice-INITIATED proactive posting — OFF by
+                                  default ("stop posting into Slack by default").
+                                  Gates ONLY the renderer's "queued" ack; the
+                                  Slack-ORIGIN done-reply round-trip is never gated. */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                                <span style={slackLabelStyle}>
+                                  {t('settings.connections.proactivePosting')}
+                                </span>
+                                <PixelButton
+                                  variant={slackProactivePosting ? 'primary' : 'secondary'}
+                                  size="sm"
+                                  onClick={() => setSlackProactivePosting((v) => !v)}
+                                >
+                                  {slackProactivePosting ? t('common.on') : t('common.off')}
+                                </PixelButton>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                {/* Start disabled once connected; Stop only when running. */}
+                                <PixelButton variant="primary" size="sm" onClick={startSlack} disabled={slackBusy || !slackSecret.trim() || running}>
+                                  {slackBusy ? '...' : running ? t('settings.connections.connectedBtn') : t('settings.connections.start')}
+                                </PixelButton>
+                                <PixelButton variant="secondary" size="sm" onClick={stopSlack} disabled={slackBusy || !running}>
+                                  {t('settings.connections.stop')}
+                                </PixelButton>
+                                <PixelButton variant="ghost" size="sm" onClick={saveSlack} disabled={slackBusy}>
+                                  {t('common.save')}
+                                </PixelButton>
+                                {slackNote && (
+                                  <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{slackNote}</span>
+                                )}
+                              </div>
+
+                              {/* Keep the Request URL visible while connected even after a
+                                  modal reopen; when stopped, show the last URL greyed
+                                  since Slack reuses it until the next Start. */}
+                              {(running || tunnelUrl) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, opacity: running ? 1 : 0.55 }}>
+                                  <span style={slackLabelStyle}>
+                                    {running
+                                      ? t('settings.connections.requestUrl')
+                                      : t('settings.connections.lastRequestUrl')}
+                                  </span>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <input
+                                      readOnly
+                                      value={tunnelUrl}
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
+                                    />
+                                    <PixelButton variant="secondary" size="sm" onClick={copyTunnel} disabled={!tunnelUrl}>{t('common.copy')}</PixelButton>
+                                  </div>
+                                </div>
+                              )}
+
+                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
+                                {t('settings.connections.slackHint')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={sectionRule} />
+                      </>)}
 
                       {/* Webhook triggers — a LIST of endpoints, one per caller.
                           Everything renders off the store mirror, so a change made

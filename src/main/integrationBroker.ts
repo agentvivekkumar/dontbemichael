@@ -54,15 +54,25 @@ const STRIP_RESPONSE = new Set([
 
 interface Capability {
   workerId: string;
+  /** The agent this token speaks for (team agents); falls back to workerId. */
+  agentId?: string;
   allowedIds: Set<string>;
   grantedAt: number;
 }
+
+/** Mail route handler (injected; src/main/mail.ts). The broker has already
+ *  authenticated the token, so `agentId` is trusted. */
+export type MailRouteHandler = (agentId: string, op: string, body: Record<string, unknown>) => Promise<{ status: number; body: Record<string, unknown> }>;
+
+const MAIL_BODY_MAX = 1_000_000;
 
 export interface IntegrationBrokerDeps {
   /** Resolve an integration record by id (injected — the registry). */
   getRecord: (id: string) => IntegrationRecord | undefined;
   /** Decrypt a secret by ref (injected — the secret store). Main-internal. */
   getSecret: (secretRef: string | undefined) => string | undefined;
+  /** md-mail tool calls, `POST /mail/<tool>` (docs/designs/multi-mailbox.md). */
+  mail?: MailRouteHandler;
 }
 
 /** True for IPv4 loopback (127.0.0.0/8) and IPv6 ::1 (incl. v4-mapped). Mirrors slack.ts. */
@@ -126,10 +136,10 @@ export class IntegrationBroker {
   /** Mint a per-worker capability token granting access to `allowedIds`. Any prior
    *  token for this worker is revoked first. The token is a random handle — never a
    *  secret, never persisted. */
-  grant(workerId: string, allowedIds: string[]): string {
+  grant(workerId: string, allowedIds: string[], agentId?: string): string {
     this.revoke(workerId);
     const token = randomBytes(32).toString('base64url');
-    this.byToken.set(token, { workerId, allowedIds: new Set(allowedIds), grantedAt: Date.now() });
+    this.byToken.set(token, { workerId, agentId, allowedIds: new Set(allowedIds), grantedAt: Date.now() });
     this.byWorker.set(workerId, token);
     return token;
   }
@@ -178,8 +188,18 @@ export class IntegrationBroker {
     const cap = this.resolveCapability(IntegrationBroker.tokenFrom(req));
     if (!cap) return IntegrationBroker.sendError(res, 401, 'unauthorized', 'missing or invalid capability token');
 
-    // 3) Parse /i/<integrationId>/<path...>.
     const rawUrl = req.url ?? '';
+    // 3a) Mail tools: POST /mail/<tool> with a JSON body. Access is checked per
+    //     call against the agent's Capabilities (mailAccess), not the token's
+    //     integration list.
+    const mailMatch = /^\/mail\/([a-z_]{1,32})$/.exec(rawUrl);
+    if (mailMatch) {
+      if (!this.deps.mail) return IntegrationBroker.sendError(res, 404, 'not_found', 'mail is not available');
+      if (req.method !== 'POST') return IntegrationBroker.sendError(res, 405, 'method', 'use POST');
+      void this.mail(req, res, cap.agentId ?? cap.workerId, mailMatch[1]);
+      return;
+    }
+    // 3) Parse /i/<integrationId>/<path...>.
     const m = /^\/i\/([^/?#]+)(?:\/([^?#]*))?(\?[^#]*)?$/.exec(rawUrl);
     if (!m) return IntegrationBroker.sendError(res, 404, 'not_found', 'expected /i/<integrationId>/<path>');
     const integrationId = decodeURIComponent(m[1]);
@@ -207,6 +227,26 @@ export class IntegrationBroker {
     }
 
     void this.forward(req, res, rec, upstream, secret);
+  }
+
+  private async mail(req: IncomingMessage, res: ServerResponse, agentId: string, op: string): Promise<void> {
+    let raw = '';
+    let tooBig = false;
+    req.setEncoding('utf8');
+    req.on('data', (d: string) => { raw += d; if (raw.length > MAIL_BODY_MAX) { tooBig = true; req.destroy(); } });
+    await new Promise<void>((resolve) => { req.on('end', resolve); req.on('close', resolve); req.on('error', resolve); });
+    if (tooBig) return IntegrationBroker.sendError(res, 413, 'too_large', 'request too large');
+    let body: Record<string, unknown> = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch { return IntegrationBroker.sendError(res, 400, 'bad_request', 'body must be JSON'); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return IntegrationBroker.sendError(res, 400, 'bad_request', 'body must be a JSON object');
+    try {
+      const out = await this.deps.mail!(agentId, op, body);
+      if (res.headersSent) return;
+      res.writeHead(out.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(out.body));
+    } catch (e) {
+      IntegrationBroker.sendError(res, 500, 'mail_error', e instanceof Error ? e.message : String(e));
+    }
   }
 
   private async forward(

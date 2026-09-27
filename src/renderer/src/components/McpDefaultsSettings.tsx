@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HarnessConfig } from '@/store/config';
 import { MCP_CATALOG, type McpTier } from '@shared/mcpCatalog';
+import { SHOW_READONLY_SERVERS } from '@shared/buildFeatures';
 
 export interface McpDefaultsSettingsProps {
   config: HarnessConfig;
 }
 
-const TIER_ORDER: McpTier[] = ['safe-readonly', 'write', 'secret'];
+// The safe and read only list is hidden in this build (buildFeatures.ts).
+const TIER_ORDER: McpTier[] = (['safe-readonly', 'write', 'secret'] as McpTier[])
+  .filter((tier) => tier !== 'safe-readonly' || SHOW_READONLY_SERVERS);
 const TIER_LABEL_KEY: Record<McpTier, string> = {
   'safe-readonly': 'mcpDefaults.tiers.safeReadonly',
   'write': 'mcpDefaults.tiers.write',
@@ -48,7 +51,9 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
     }
   };
 
-  const byTier = (tier: McpTier) => MCP_CATALOG.filter((e) => e.tier === tier);
+  // Email & Calendar is the "Your Claude account" switch at the end of
+  // Mailboxes now (docs/designs/multi-mailbox.md), not a row in this list.
+  const byTier = (tier: McpTier) => MCP_CATALOG.filter((e) => e.tier === tier && e.id !== 'email-calendar');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

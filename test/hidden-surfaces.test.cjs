@@ -228,3 +228,37 @@ test('voice is off everywhere', () => {
   assert.match(read('src/main/realtime.ts'), /if \(!SHOW_VOICE\) return \{ ok: false, error: 'Voice is off in this version\.', code: 'disabled' \};/);
   assert.match(read('src/main/index.ts'), /ipcMain\.handle\('freeflow:transcribe'[\s\S]{0,200}if \(!SHOW_VOICE\) return \{ ok: false/);
 });
+
+test('this build hides the office theme, and a theme picked earlier falls back to the office', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_OFFICE_THEME, false);
+  assert.match(read('src/renderer/src/components/SettingsModal.tsx'), /\{SHOW_OFFICE_THEME && <OfficeThemePicker config=\{config\} \/>\}/);
+  assert.match(read('src/renderer/src/App.tsx'), /setOfficeTheme\(SHOW_OFFICE_THEME && c\.tvShowOffices \?/);
+});
+
+test('this build hides the automatic updates switch; Check for updates stays', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_UPDATE_SWITCH, false);
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  const open = settings.indexOf('{SHOW_AUTO_UPDATE_SWITCH && (<>');
+  const close = settings.indexOf('</>)}', open);
+  assert.ok(open > 0 && close > open, 'switch wrapped in SHOW_AUTO_UPDATE_SWITCH');
+  assert.ok(settings.slice(open, close).includes("t('settings.general.autoUpdate')"));
+});
+
+test('this build hides Slack, and a Slack connection saved earlier does not start', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_SLACK, false);
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  const open = settings.indexOf('{SHOW_SLACK && (<>');
+  const close = settings.indexOf('</>)}', open);
+  assert.ok(open > 0 && close > open, 'Slack block wrapped in SHOW_SLACK');
+  const block = settings.slice(open, close);
+  for (const piece of ["t('settings.connections.slack')", 'startSlack', 'SLACK_CONNECT_STEPS', "t('settings.connections.slackHint')"]) {
+    assert.ok(block.includes(piece), `${piece} is inside the hidden block`);
+  }
+  assert.match(read('src/main/index.ts'), /async function startSlackServer\(\)[\s\S]{0,200}?\n  if \(!SHOW_SLACK\) return \{ ok: false/);
+});
+
+test('this build hides the safe and read only server list; the switches that need a yes stay', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_READONLY_SERVERS, false);
+  const src = read('src/renderer/src/components/McpDefaultsSettings.tsx');
+  assert.match(src, /const TIER_ORDER: McpTier\[\] = \(\['safe-readonly', 'write', 'secret'\] as McpTier\[\]\)\s*\.filter\(\(tier\) => tier !== 'safe-readonly' \|\| SHOW_READONLY_SERVERS\);/);
+});

@@ -159,12 +159,14 @@ export class ClosingTimeController {
     this.control?.clearSteers(this.godId);
     for (const id of this.workers) this.control?.clearSteers(id);
     this.emitState('cancelled');
+    // Everyone, not only Michael: a team member who already acknowledged was
+    // told not to start new work (office open, owner 2026-09-26).
     try {
       this.hive.send({
-        to: 'god',
+        to: 'broadcast',
         act: 'inform',
         subject: 'Closing time cancelled',
-        body: 'The owner cancelled closing time. Carry on as normal; anything already saved stays saved.'
+        body: 'The owner cancelled closing time. The office stays open: carry on as normal, and do anything you held because of closing time. Anything already saved stays saved.'
       }, 'human');
     } catch { /* best-effort */ }
   }

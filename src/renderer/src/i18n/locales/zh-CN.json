@@ -140,9 +140,9 @@
     "git": "Git",
     "messages": "消息",
     "traces": "追踪",
-    "schedules": "定时任务",
     "memory": "记忆",
-    "profile": "简介"
+    "profile": "简介",
+    "capabilities": "权限"
   },
   "toolWaterfall": {
     "fresh": "新计 {{tokens}}t",
@@ -420,7 +420,8 @@
       "history": "历史",
       "memory": "记忆",
       "workers": "工人",
-      "advanced": "高级"
+      "advanced": "高级",
+      "officeSchedule": "办公室日程"
     },
     "terminalFullscreen": "终端已全屏打开。按 Esc 返回。",
     "noTerminal": "{{name}} 没有实时终端。",
@@ -687,7 +688,7 @@
       "workersOnly": "仅限雇员",
       "workersOnlyHint": "暂时无法接收蜂巢邮件，因此不能打理您的办公室，但雇佣工作智能体时仍然可用。",
       "model": "模型",
-      "modelNote": "这里设置 {{godName}} 使用的模型，之后可以随时更改。",
+      "modelNote": "这里设置 {{godName}} 和整个团队使用的模型，之后可以在设置中更改。",
       "maxPlan": "<strong>需要 Claude Max 套餐</strong>，办公室才能全天运转。较小的套餐会在白天用完额度，办公室将暂停，直到额度重置。",
       "seePlans": "查看 Claude 套餐"
     },
@@ -959,12 +960,10 @@
     "manualDownloadingBody": "下载完成后，退出本应用，将新版本覆盖安装到当前版本之上，重新打开并选择同一个项目。在 {{os}} 上："
   },
   "triggersTab": {
-    "intro": "所有无需你输入就能启动工作的方式。",
     "schedules": "计划任务",
-    "schedulesBlurb": "按时间自动运行的工作。",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
-    "officeBlurb": "团队其他成员的定时工作。打开某位成员即可修改他的安排。"
+    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。要修改某项工作，请打开该成员，进入其能力页。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -993,9 +992,7 @@
     "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
     "moveToWorkStyle": "移到 {{name}} 的工作方式",
     "removeOlder": "删除",
-    "ownJobs": "{{godName}} 的工作",
-    "officeSchedule": "办公室日程",
-    "officeEmpty": "团队里还没有人按时间运行工作。",
+    "officeEmpty": "团队里还没有人开启定时工作。",
     "emptyAgent": "{{name}} 还没有定时工作。",
     "addFor": "为 {{name}} 添加定时任务",
     "agentSummary": "{{name}} 有 {{count}} 项定时工作。",
@@ -1013,7 +1010,6 @@
     "addedByYou": "由你添加",
     "addedBy": "由 {{name}} 添加",
     "runAria": "运行 {{job}}",
-    "openRow": "打开 {{name}} 的定时任务：{{job}}",
     "closedGroup": "{{name}}（已关闭）",
     "closedNote": "{{name}} 已关闭，所以这些已暂停。",
     "relayHint": "{{godName}} 会把这项工作分给团队。"
@@ -1652,5 +1648,78 @@
     },
     "openFolder": "打开文件夹",
     "openFolderFailed": "无法打开文件夹，它可能已被移动或删除。"
+  },
+  "mailboxes": {
+    "title": "邮箱",
+    "intro": "团队可以使用的邮箱。在每位团队成员的“权限”标签中选择谁使用哪个邮箱。",
+    "add": "添加邮箱",
+    "empty": "还没有邮箱。添加 sales@、support@ 或你自己的收件箱，然后选择由哪位团队成员处理。",
+    "needsCount": "{{count}} 个需要你处理",
+    "usedBy": "使用者：{{names}}",
+    "usedByNobody": "暂无使用者",
+    "statusConnected": "已连接",
+    "statusNeeds": "需要你处理",
+    "fix": "修复",
+    "edit": "编辑",
+    "remove": "移除",
+    "sure": "确定吗？",
+    "removeIt": "移除",
+    "keep": "保留",
+    "removeAffects": "{{names}} 将无法再使用这个邮箱。",
+    "claudeAccount": "你的 Claude 账户",
+    "claudeAccountSub": "Gmail 和 Google 日历，在 Claude 中连接",
+    "dialogTitle": "添加邮箱",
+    "dialogFixTitle": "修复 {{address}}",
+    "which": "这是哪家邮件服务？",
+    "other": "其他",
+    "address": "邮箱地址",
+    "password": "应用专用密码",
+    "show": "显示",
+    "hide": "隐藏",
+    "incoming": "收件服务器",
+    "outgoing": "发件服务器",
+    "moreSettings": "更多设置",
+    "incomingPort": "收件端口",
+    "outgoingPort": "发件端口",
+    "tls": "从一开始就加密",
+    "cancel": "取消",
+    "save": "测试并保存",
+    "testing": "正在测试 {{address}}，请稍候。",
+    "tryAgain": "重试",
+    "help": {
+      "gmail": "Gmail 需要应用专用密码，而不是普通密码。先开启两步验证，然后在 myaccount.google.com/apppasswords 创建。",
+      "google-workspace": "请使用 myaccount.google.com/apppasswords 中的应用专用密码。如果找不到该页面，说明你的 Workspace 管理员关闭了应用专用密码。",
+      "icloud": "iCloud 需要应用专用密码。在 account.apple.com 的“登录与安全”中创建。",
+      "yahoo": "Yahoo 需要应用专用密码。在“账户安全”中选择“生成应用密码”。",
+      "zoho": "Zoho 需要在“安全”中的“应用密码”创建应用专用密码，并在邮件设置中开启 IMAP。",
+      "other": "你的邮件服务商会在帮助页面列出这些服务器。如果普通密码被拒绝，请向他们申请应用专用密码。"
+    },
+    "claudeAccessLabel": "团队成员可以使用你 Claude 账户中的邮件和日历",
+    "claudeAccessOn": "允许",
+    "claudeAccessOff": "阻止",
+    "claudeAccessDesc": "允许后，每位团队成员都可以使用你 Claude 账户连接的 Gmail 和 Google 日历。阻止则所有人都不能使用。上面的邮箱是分开的：在团队成员的“权限”标签中分配。"
+  },
+  "capabilities": {
+    "intro": "{{name}} 无需询问就可以做的事，以及 {{name}} 按时间运行的工作。",
+    "email": "邮件",
+    "emailBlurb": "{{name}} 查看的邮箱，以及回复是直接发出还是先存为草稿。",
+    "emailOff": "{{name}} 不查看邮件。",
+    "canCheck": "{{name}} 可以查看邮件",
+    "mailbox": "{{name}} 的邮箱",
+    "sending": "发送",
+    "canSend": "可以发送",
+    "canSendDesc": "回复会立即发出。",
+    "draftOnly": "仅草稿",
+    "draftOnlyDesc": "回复会保存在该邮箱的草稿箱中，等你发送。",
+    "pending": "{{name}} 完成当前步骤后，邮件功能就会开启。",
+    "noMailboxes": "还没有可选择的邮箱。",
+    "addInSettings": "在设置中添加。",
+    "saveFailed": "没有保存成功，请重试。",
+    "schedules": "定时工作",
+    "schedulesBlurb": "{{name}} 在固定时间自动开始的工作。通常一个定期检查加上几项定时工作就够了；每次运行都会消耗用量。",
+    "schedulesOn": "{{count}} 项开启",
+    "schedulesNone": "无",
+    "pickMailbox": "选择一个邮箱",
+    "addMailbox": "添加新邮箱"
   }
 }

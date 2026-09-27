@@ -1,3 +1,4 @@
+import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -54,7 +55,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'profile' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'capabilities' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -79,9 +80,13 @@ interface GHIssue {
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
   { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
+  // Michael follows Capabilities like everyone (docs/designs/multi-mailbox.md, E3);
+  // after ASK ME, which stays second on his panel (owner, 2026-09-25).
+  { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
-  // Named like every other agent's tab (owner, 2026-09-25).
-  { key: 'triggers', labelKey: 'sidebar.schedules', icon: 'clock' },
+  // Everyone's jobs on a clock, read only. Michael's own are on his
+  // Capabilities tab like everyone's (owner, 2026-09-26).
+  { key: 'triggers', labelKey: 'commandCenter.tabs.officeSchedule', icon: 'clock' },
   { key: 'trigger-history', labelKey: 'commandCenter.tabs.history', icon: 'ledger' },
   { key: 'memory', labelKey: 'commandCenter.tabs.memory', icon: 'sparkle' },
   { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' },
@@ -122,7 +127,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
   const ccTabRequest = useStore((s) => s.ccTabRequest);
   // Which ADVANCED card a request asked for. seq doubles as the tab's key, so a
   // request made while ADVANCED is already showing still opens that card.
-  const [advancedFocus, setAdvancedFocus] = useState<{ card: AdvancedCard; seq: number }>({ card: 'monitor', seq: 0 });
+  const [advancedFocus, setAdvancedFocus] = useState<{ card: AdvancedCard | null; seq: number }>({ card: null, seq: 0 });
   useEffect(() => {
     if (!ccTabRequest) return;
     if (ccTabRequest.tab === 'tasks' || ccTabRequest.tab === 'graph') { useStore.getState().setFloorView(ccTabRequest.tab); return; }
@@ -355,6 +360,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
           )
         )}
         {tab === 'profile' && <ProfileTab agent={agent} />}
+        {tab === 'capabilities' && <CapabilitiesTab agent={agent} />}
         {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}
@@ -374,10 +380,11 @@ type AdvancedCard = 'monitor' | 'activity';
 
 /**
  * ADVANCED: the floor's inner workings, as collapsible cards in the TRIGGERS
- * tab's style. MONITOR opens by default (it holds the box for sending Michael
- * a task, which "assign" and setup deep link to); ACTIVITY starts closed.
+ * tab's style. Both start closed, like every section on every agent tab
+ * (owner, 2026-09-26). A deep link opens its card: "assign" and setup ask for
+ * MONITOR, where the box for sending Michael a task lives.
  */
-function AdvancedTab({ focus, seed }: { focus: AdvancedCard; seed: { text: string; seq: number } }) {
+function AdvancedTab({ focus, seed }: { focus: AdvancedCard | null; seed: { text: string; seq: number } }) {
   const { t } = useTranslation();
   const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'Michael';
   return (

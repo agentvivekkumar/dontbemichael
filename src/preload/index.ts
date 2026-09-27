@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
+import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
@@ -288,6 +289,8 @@ export interface HarnessConfig {
   /** Per-server consent for the default MCP bundle, keyed by catalog id. Mirrors
    *  src/main/config.ts. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
+  mailboxes?: MailboxRecord[];
+  agentCapabilities?: { [agentId: string]: AgentCapabilities };
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
@@ -825,6 +828,13 @@ const api = {
   hiveMemoryDetail: (id: string): Promise<{ index: string; waiting: number }> => ipcRenderer.invoke('hive:memoryDetail', id),
   hiveProcedure: (id: string, slug: string): Promise<string | null> => ipcRenderer.invoke('hive:procedure', id, slug),
   hiveInbox: (id: string): Promise<HiveMessage[]> => ipcRenderer.invoke('hive:inbox', id),
+  // Mailboxes and Capabilities (docs/designs/multi-mailbox.md). A password
+  // crosses the bridge only once, to be tested and stored in main.
+  mailSave: (input: { id?: string; provider: MailProvider; address: string; password: string; imap?: MailServer; smtp?: MailServer }): Promise<{ ok: true; record: MailboxRecord } | { ok: false; kind: string; reason: string }> =>
+    ipcRenderer.invoke('mail:save', input),
+  mailRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> => ipcRenderer.invoke('mail:remove', id),
+  mailSetCapabilities: (agentId: string, caps: AgentCapabilities): Promise<{ ok: boolean; restartNeeded: boolean }> =>
+    ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),
   /** Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED in

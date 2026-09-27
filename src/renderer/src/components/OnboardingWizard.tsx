@@ -7,7 +7,7 @@ import { PixelButton } from './PixelButton';
 import { Icon, type IconName } from './Icon';
 import { SpritePortrait } from './SpritePortrait';
 import { ProviderLogo } from './ProviderLogo';
-import { modelsForProvider, onboardingEngineChoices, type AgentProvider, type HarnessConfig } from '@/store/config';
+import { modelsForProvider, onboardingEngineChoices, teamDefaultsFromMichael, type AgentProvider, type HarnessConfig } from '@/store/config';
 import { providerPreset } from '@shared/agentProvider';
 import {
   classifyEngineAvailability, engineAvailabilityBadge, engineAvailabilityMessage, engineBlocksOnboarding
@@ -467,6 +467,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         setError(t('onboarding.team.errFolder', { path: tildePath(failed.path), reason: failed.reason }));
         setBusy(false); setStep('team'); return;
       }
+      // Michael's engine and model become the team's default too: the starter
+      // team and later hires start on what the owner picked here.
+      const config = await window.cth.getConfig();
       const next = await window.cth.updateConfig({
         onboardingComplete: true,
         // The pack drives the starter cast. '__other__' is recorded as unset: no
@@ -485,6 +488,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         autoMode,
         godProvider,
         godModel,
+        ...teamDefaultsFromMichael(config, godProvider, godModel),
         // Only written when the choice was shown (buildFeatures.ts).
         ...(COLLECT_USAGE_STATS ? { telemetryEnabled: shareStats } : {})
       });

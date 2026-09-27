@@ -47,7 +47,15 @@ export function isTerminalPrompt(p: { notification_type?: string; message?: stri
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
+import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
+import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { handoffContext } from '../shared/safeClear';
+
+/** Why a mail or calendar tool was refused. Read by the agent (and shown on the
+ *  floor), so it says what to do instead. */
+const EMAIL_CALENDAR_OFF =
+  'The owner has turned off email and calendar through their Claude account in Settings, so you cannot use those tools. ' +
+  'Do not try another way. If the task needs email or the calendar, say so: a team member tells Michael, and Michael puts it on ASK ME for the owner.';
 
 /** Maximum JSON payload bytes in one newline-delimited hook frame. */
 const MAX_HOOK_FRAME_BYTES = 256 * 1024;
@@ -327,6 +335,42 @@ export class HookServer {
             hookEventName: 'PreToolUse',
             permissionDecision: 'deny',
             permissionDecisionReason: d.reason ?? 'Denied by operator.'
+          }
+        };
+      }
+    }
+
+    // Settings → Mailboxes → "Your Claude account" switch (stored as the old
+    // Email & Calendar switch). Off means no agent, Michael included, uses the
+    // mail or calendar connected to the owner's Claude account. It does not
+    // touch mailboxes added in Settings (md-mail), which Capabilities govern
+    // alone (owner, 2026-09-26). The name check comes first so other tools
+    // never read config.
+    if (event === 'PreToolUse' && agentId && (isEmailCalendarTool(p.tool_name ?? '') || /^mcp__md-mail__/.test(p.tool_name ?? ''))) {
+      const cfg = this.getConfig();
+      let reason: string | undefined;
+      const tool = p.tool_name ?? '';
+      const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(tool);
+      if (!mdMail) {
+        // The Claude account's Gmail and Calendar: the Settings switch alone,
+        // for every agent alike (owner, 2026-09-26).
+        if (!emailCalendarAllowed(cfg.mcpDefaults)) reason = EMAIL_CALENDAR_OFF;
+      } else {
+        // Mailboxes added in Settings: the agent's Capabilities for the mailbox
+        // named in the call (the broker checks it again).
+        const op = MAIL_TOOL_OPS[mdMail[1]];
+        const input = (p.tool_input ?? {}) as { mailbox?: unknown };
+        const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
+        if (!d.ok) reason = d.reason;
+      }
+      if (reason) {
+        this.emitControl(agentId, p.tool_name, reason);
+        this.emit(agentId, event, p);
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: reason
           }
         };
       }

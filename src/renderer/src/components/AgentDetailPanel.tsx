@@ -1,3 +1,4 @@
+import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
@@ -21,7 +22,7 @@ import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@share
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
-import { AgentSchedules, closeConfirmText } from './triggers/ScheduleList';
+import { closeConfirmText } from './triggers/ScheduleList';
 import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
 
 export interface AgentDetailPanelProps {
@@ -295,14 +296,12 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           <ProfileTab agent={agent} />
         )}
 
-        {sidebarTab === 'messages' && (
-          <ThreadsPanel agentId={agent.id} />
+        {sidebarTab === 'capabilities' && (
+          <CapabilitiesTab agent={agent} />
         )}
 
-        {sidebarTab === 'schedules' && (
-          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 12 }}>
-            <AgentSchedules agentId={agent.id} agentName={agent.name} />
-          </div>
+        {sidebarTab === 'messages' && (
+          <ThreadsPanel agentId={agent.id} />
         )}
 
         {sidebarTab === 'memory' && (

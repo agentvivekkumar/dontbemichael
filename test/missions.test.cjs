@@ -225,3 +225,13 @@ test('a request whose schedule changed since is stale and never applies', () => 
   assert.equal(M.requestIsStale(req, []), true, 'deleted since');
   assert.equal(M.requestIsStale(req, list), false);
 });
+
+test('armPlan: an hourly job closed overnight fires once on opening, never once per missed hour (owner, 2026-09-26)', () => {
+  const H = 3_600_000;
+  const closedAt = Date.UTC(2026, 8, 27, 2, 0);            // 9:00 pm Central
+  const openedAt = closedAt + 10 * H + 15 * 60_000;        // 7:15 am next day
+  const plan = M.armPlan(mk({ id: 'check-mail', intervalMs: H, lastFiredAt: closedAt }), openedAt, { standupId: 'ops-standup', standupFiredThisLaunch: false });
+  assert.equal(plan.type, 'interval');
+  assert.equal(plan.firstDelayMs, 0, 'one catch-up run at 7:15');
+  assert.equal(plan.everyMs, H, 'then every hour from 7:15, with no backlog of the ten missed runs');
+});

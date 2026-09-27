@@ -6,7 +6,7 @@ import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { isComposingKey } from '@shared/imeGuard';
 import {
-  Field, Hint, MiniButton, SchedulePicker, Toggle, fmtInterval, inputStyle, textareaStyle,
+  Disclosure, Field, Hint, MiniButton, SchedulePicker, Toggle, fmtInterval, inputStyle, textareaStyle,
   weeklyDraft, weeklyIsUsable, type WeeklyDraft
 } from './ui';
 import { formatWeekly } from '@shared/weeklySchedule';
@@ -19,10 +19,11 @@ import { useRtl } from '@/i18n/useDirection';
  * A schedule belongs to the agent that runs it, so there is no "goes to"
  * picker: a schedule added on Pam's tab is Pam's. Two modes share one row:
  *
- * - `agent`: that agent's own schedules, editable. Lives in the agent panel's
- *   Schedules tab, and at the top of Michael's Triggers tab for his own jobs.
- * - `office`: every other agent's schedules, read only, grouped by agent. A row
- *   jumps to that agent's tab with the row open (design 1A).
+ * - `agent`: that agent's own schedules, editable. Lives in the On a schedule
+ *   section of every agent's Capabilities tab, Michael's included.
+ * - `office`: everyone's schedules that are on, read only plain rows grouped
+ *   by agent, on Michael's Office schedule tab. Edits happen on each agent's
+ *   Capabilities tab (owner, 2026-09-26).
  *
  * Each change is one operation on one schedule (upsert, delete, setEnabled), and
  * the row waits for main's answer: on a failure it goes back to what is saved
@@ -153,19 +154,15 @@ interface RowProps {
   mission: ScheduledMission;
   /** Who a `createdBy` agent id is, for "added by Pam". */
   nameOf: (id: string) => string;
-  /** Read only: no toggle and no editor. With `onJump`, the row jumps to the
-   *  owner's tab; without it (a closed agent) the row is plain text. */
+  /** Read only: plain text, no toggle, no editor and no link (the office
+   *  schedule; owner, 2026-09-26). */
   readOnly?: boolean;
-  onJump?: () => void;
-  jumpLabel?: string;
-  /** Open on mount (a jump from Michael's list landed here). */
-  focusSeq?: number;
   /** Move an older schedule's instructions into the owner's Work style. */
   onMoveToWorkStyle?: () => void;
   ownerName: string;
 }
 
-function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, onMoveToWorkStyle, ownerName }: RowProps) {
+function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }: RowProps) {
   const { t, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
@@ -179,14 +176,6 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
   const [confirming, setConfirming] = useState(false);
   const deleteRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
-
-  // A jump from Michael's list opens this row and brings it into view.
-  useEffect(() => {
-    if (!focusSeq) return;
-    setOpen(true);
-    headerRef.current?.scrollIntoView({ block: 'nearest' });
-    headerRef.current?.focus();
-  }, [focusSeq]);
 
   // Seed the draft when the row opens, never on every render, or the scheduler
   // stamping lastFiredAt mid-edit would wipe what you are typing.
@@ -239,6 +228,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
   } as const;
   const headerBody = (
     <>
+      {!readOnly && <Disclosure open={open} />}
       <WhenChip on={mission.enabled}>{whenText(mission, t)}</WhenChip>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
@@ -250,18 +240,16 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>{mission.enabled ? sub : `${t('schedulesSection.paused')}, ${creator}`}</span>
       </span>
-      {onJump && <span aria-hidden style={{ flexShrink: 0, fontSize: 14, color: 'var(--cth-ink-500)' }}>{rtl ? '‹' : '›'}</span>}
     </>
   );
-  const header = readOnly && !onJump
+  const header = readOnly
     ? <div style={headerStyle}>{headerBody}</div>
     : (
       <button
         ref={headerRef}
         type="button"
-        onClick={onJump ?? (() => setOpen((o) => !o))}
-        aria-expanded={onJump ? undefined : open}
-        aria-label={onJump ? jumpLabel : undefined}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="cth-schedule-row"
         style={{ ...headerStyle, cursor: 'pointer' }}
       >{headerBody}</button>
@@ -343,6 +331,10 @@ function ScheduleRow({ mission, nameOf, readOnly, onJump, jumpLabel, focusSeq, o
               <MiniButton tone="danger" onClick={() => setConfirming(true)} buttonRef={deleteRef}>{t('common.delete')}</MiniButton>
             )}
             <span style={{ flex: 1 }} />
+            {/* Closing drops unsaved edits: the draft is reseeded on the next open. */}
+            <MiniButton onClick={() => { setOpen(false); headerRef.current?.focus(); }}>
+              {dirty ? t('common.cancel') : t('common.close')}
+            </MiniButton>
             <PixelButton variant="primary" size="sm" onClick={save} disabled={busy || !dirty || !label.trim() || !whenIsUsable}>
               {saved && !dirty ? t('schedulesSection.saved') : t('common.save')}
             </PixelButton>
@@ -441,7 +433,6 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   const nameOf = useNameOf();
   const agents = useStore((s) => s.agents);
   const updateAgent = useStore((s) => s.updateAgent);
-  const focus = useStore((s) => s.scheduleFocus);
   const mine = useMemo(() => missionsFor(missions, agentId, godId), [missions, agentId, godId]);
   const isGod = agentId === godId;
   // Michael's schedules keep the 'god' alias the router understands.
@@ -480,7 +471,6 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
             mission={m}
             nameOf={nameOf}
             ownerName={agentName}
-            focusSeq={focus?.missionId === m.id ? focus.seq : undefined}
             onMoveToWorkStyle={agents.some((a) => a.id === agentId) ? () => moveToWorkStyle(m) : undefined}
           />
         ))}
@@ -497,7 +487,6 @@ export function OfficeSchedules() {
   const godId = useGodId();
   const nameOf = useNameOf();
   const agents = useStore((s) => s.agents);
-  const openAgentSchedule = useStore((s) => s.openAgentSchedule);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   useEffect(() => {
     window.cth.hiveRegistry()
@@ -508,9 +497,11 @@ export function OfficeSchedules() {
   const waiting = loadState(status, missions.length === 0, t('schedulesSection.loadErrorOffice'), retry, t);
   if (waiting) return waiting;
 
-  // Group by owner, Michael excluded (his jobs are the editable section above).
-  // Roster order first, then anyone off the floor, so a closed agent still shows.
-  const others = missions.filter((m) => ownerOf(m, godId) !== godId);
+  // Only jobs that are on (owner, 2026-09-26); paused ones live on each
+  // agent's Capabilities tab. Grouped by owner, Michael included: his jobs are
+  // edited on his Capabilities tab like everyone's. Roster order first, then
+  // anyone off the floor.
+  const others = missions.filter((m) => m.enabled);
   const owners = [...new Set(others.map((m) => ownerOf(m, godId)))];
   const rosterIndex = (id: string) => { const i = agents.findIndex((a) => a.id === id); return i < 0 ? Infinity : i; };
   owners.sort((a, b) => rosterIndex(a) - rosterIndex(b));
@@ -538,9 +529,6 @@ export function OfficeSchedules() {
                   nameOf={nameOf}
                   ownerName={name}
                   readOnly
-                  // A closed agent has no panel to jump to, so its rows only read.
-                  onJump={isClosed || !agents.some((a) => a.id === owner) ? undefined : () => openAgentSchedule(owner, m.id)}
-                  jumpLabel={t('schedulesSection.openRow', { name, job: m.label })}
                 />
               ))}
             </div>

@@ -1,0 +1,157 @@
+'use strict';
+
+/**
+ * Multi-mailbox UI wiring (docs/designs/multi-mailbox.md, design review):
+ * Capabilities is a tab after Profile on every agent and on Michael (D2, E3);
+ * Mailboxes leads Settings > Connections with the Team email switch (1A, 2A);
+ * the Email & Calendar row left the server list; a new office never gets the
+ * upgrade note (4A); the restart-on-enable watcher has its 10 minute ceiling (E5).
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = (rel) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+
+test('Capabilities is the tab after Profile, for team members and for Michael', () => {
+  const side = read('src/renderer/src/components/SidebarTabs.tsx');
+  assert.ok(side.indexOf("key: 'capabilities'") > side.indexOf("key: 'profile'"));
+  assert.ok(side.indexOf("key: 'capabilities'") < side.indexOf("key: 'messages'"));
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'capabilities' && \(\s*<CapabilitiesTab agent=\{agent\} \/>/);
+  const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  // On Michael, ASK ME stays second (owner, 2026-09-25); Capabilities follows it.
+  assert.ok(cc.indexOf("key: 'capabilities'") > cc.indexOf("key: 'human'") && cc.indexOf("key: 'capabilities'") < cc.indexOf("key: 'terminal'"));
+  assert.match(cc, /tab === 'capabilities' && <CapabilitiesTab agent=\{agent\} \/>/);
+});
+
+test('Mailboxes leads Connections; the Claude account row alone carries the switch; the server list no longer does', () => {
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.ok(settings.indexOf('<MailboxesSettings />') < settings.indexOf('<IntegrationsRegistry />'));
+  const mb = read('src/renderer/src/components/MailboxesSettings.tsx');
+  assert.ok(mb.indexOf("t('mailboxes.claudeAccessLabel')") > mb.indexOf("t('mailboxes.claudeAccount')"), 'switch sits on the Claude account row');
+  assert.equal((mb.match(/<Toggle /g) || []).length, 1, 'only one switch on the screen');
+  assert.match(mb, /'email-calendar': \{ enabled: on \}/, 'writes the same master switch');
+  assert.match(read('src/renderer/src/components/McpDefaultsSettings.tsx'), /e\.id !== 'email-calendar'/);
+});
+
+test('Draft only is chosen the first time email is turned on (6A); Sending is a radio group (7A)', () => {
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  // Turning email on never picks a mailbox, and turning it off clears the pick (owner, 2026-09-26).
+  assert.match(cap, /void save\(\{ enabled: true, mailboxes: \[\], send: false \}\);/);
+  assert.match(cap, /if \(email\.enabled\) \{ void save\(\{ enabled: false, mailboxes: \[\], send: false \}\); return; \}/);
+  assert.doesNotMatch(cap, /mailboxes\[0\]\?\.id/);
+  assert.match(cap, /role="radiogroup"/);
+  assert.match(cap, /ArrowUp/);
+  // One mailbox per agent (owner, 2026-09-26): picked from radio rows, no per-mailbox switch.
+  // The mailbox is picked from a list, with a prompt until one is chosen (owner, 2026-09-26).
+  assert.match(cap, /<Select label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current \?\? ''\}/);
+  assert.match(cap, /\{!current && <option value="">\{t\('capabilities\.pickMailbox'\)\}<\/option>\}/);
+  assert.match(cap, /mailboxes\.length === 0 \? \(/, 'no mailbox set up: the Settings link instead');
+  assert.match(cap, /<button type="button" onClick=\{openSettings\} style=\{\{ \.\.\.link, marginInlineStart: 'auto' \}\}>\{t\('capabilities\.addMailbox'\)\}<\/button>/, 'add new mailbox beside the list');
+  // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
+  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'one switch');
+  assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);
+  assert.doesNotMatch(cap, /PROVIDER_PRESETS/, 'no service name under the address');
+  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /\{action !== undefined && <div/, 'the switch sits beside the fold button, not inside it');
+});
+
+test('removing a used mailbox names who loses it (8A)', () => {
+  assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /t\('mailboxes\.removeAffects', \{ names: list\(users\) \}\)/);
+});
+
+test('no Ask me card announces per-member email (owner, 2026-09-26)', () => {
+  assert.doesNotMatch(read('src/main/index.ts'), /Email is now set per team member|email-per-team-member/);
+});
+
+test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () => {
+  const hive = read('src/renderer/src/hooks/useHive.ts');
+  assert.match(hive, /const CEILING_MS = 10 \* 60_000;/);
+  assert.match(hive, /if \(BUSY\.has\(a\.status\) && !overdue\) continue;/);
+  assert.match(hive, /respawnResumed\(a, a\.ptyId\)/);
+  // Ship audit: an agent that is not running is dropped from the queue (its next start attaches mail),
+  // a failed restart stays queued, and one restart runs per agent at a time.
+  assert.match(hive, /if \(!a \|\| !a\.ptyId\) \{ setPendingEmailRestart\(agentId, undefined\); continue; \}/);
+  assert.match(hive, /if \(inFlight\.has\(agentId\)\) continue;/);
+  assert.match(hive, /if \(res\.ok\) \{\s*setPendingEmailRestart\(agentId, undefined\);/);
+  // Only a running agent is queued; turning email off clears a queued restart.
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  assert.match(cap, /if \(res\.restartNeeded && agent\.ptyId\) useStore\.getState\(\)\.setPendingEmailRestart\(agent\.id, Date\.now\(\)\);/);
+  assert.match(cap, /if \(!next\.enabled\) useStore\.getState\(\)\.setPendingEmailRestart\(agent\.id, undefined\);/);
+  assert.match(read('src/renderer/src/store/store.ts'), /if \(at === undefined\) delete next\[agentId\]; else next\[agentId\] = at;/);
+  // Add mailbox: nothing is saved until main tests the login; a thrown IPC is a plain failure, not a crash.
+  const dlg = read('src/renderer/src/components/AddMailboxDialog.tsx');
+  assert.match(dlg, /\.catch\(\(e: unknown\) => \(\{ ok: false as const, kind: 'unknown'/);
+  assert.match(dlg, /disabled=\{busy \|\| !address\.trim\(\) \|\| !password\.trim\(\)\}/);
+  assert.match(dlg, /if \(e\.key === 'Escape' && !e\.nativeEvent\.isComposing\)/);
+  // MB-7 in main: a status change raises or closes one Ask me card, and a repeat of the same status writes nothing.
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(!rec \|\| \(rec\.status === status && rec\.statusReason === reason\)\) return;/);
+  assert.match(main, /closeMailboxCard\(id, `\$\{rec\.address\} is connected again\.`\)/);
+  assert.match(main, /ipcMain\.handle\('mail:save', async \(_evt, input: unknown\) => \{\s*if \(!input \|\| typeof input !== 'object'\) return \{ ok: false, kind: 'invalid'/);
+});
+
+test('md-mail is attached at spawn only for agents with email, as the last arguments', () => {
+  const main = read('src/main/index.ts');
+  const at = main.indexOf("opts.args = [...(opts.args ?? []), '--mcp-config', file];");
+  assert.ok(at > 0);
+  assert.ok(at < main.indexOf('const res = ptyManager.spawn(opts, owner);', at), 'right before the spawn');
+  assert.match(main, /readConfig\(\)\.agentCapabilities\?\.\[agentId\]\?\.email\?\.enabled/);
+  assert.match(read('electron-builder.yml'), /from: resources\/md-mail-mcp\.cjs/);
+});
+
+test('schedules live in Capabilities: Email and On a schedule fold separately, closed by default (owner, 2026-09-26)', () => {
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  assert.ok(cap.indexOf("title={t('capabilities.email')}") < cap.indexOf("title={t('capabilities.schedules')}"), 'Email first, then schedules');
+  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|schedules)', open\)\}/g) || []).length, 2, 'both sections fold');
+  assert.match(cap, /<AgentSchedules agentId=\{agent\.id\} agentName=\{name\} \/>/);
+  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, schedules: true \}\)/, 'both start closed');
+  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /aria-expanded=\{open\}/);
+  assert.doesNotMatch(read('src/renderer/src/components/SidebarTabs.tsx'), /key: 'schedules'/);
+  assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);
+});
+
+test('the office schedule lists Michael\'s jobs too, as plain rows', () => {
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /if \(v === 'schedules'\) return 'capabilities';/, 'a saved Schedules tab opens Capabilities');
+  // Office schedule rows are plain text: no arrow, no jump (owner, 2026-09-26).
+  assert.doesNotMatch(store, /openAgentSchedule|scheduleFocus/);
+  assert.doesNotMatch(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /onJump|openAgentSchedule/);
+  assert.match(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /const others = missions\.filter\(\(m\) => m\.enabled\);/, 'only jobs that are on');
+  assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /AgentSchedules/);
+});
+
+test('every section on every agent tab starts closed (owner, 2026-09-26)', () => {
+  const comps = path.resolve(__dirname, '../src/renderer/src/components');
+  const files = [];
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (p.endsWith('.tsx')) files.push(p); } };
+  walk(comps);
+  for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /<TriggerCard[^>]*\sdefaultOpen(\s|>|=\{true\})/, `${path.basename(f)} opens a section by default`);
+  const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  assert.match(cc, /useState<\{ card: AdvancedCard \| null; seq: number \}>\(\{ card: null, seq: 0 \}\)/, 'Advanced opens with no card open');
+});
+
+test('a schedule row shows it opens and closes, and the editor has a way out (owner, 2026-09-26)', () => {
+  const ui = read('src/renderer/src/components/triggers/ui.tsx');
+  assert.match(ui, /export function Disclosure/);
+  assert.match(ui, /<Disclosure open=\{open\} \/>/, 'sections use the shared sign');
+  const rows = read('src/renderer/src/components/triggers/ScheduleList.tsx');
+  assert.match(rows, /\{!readOnly && <Disclosure open=\{open\} \/>\}/, 'editable rows show the sign');
+  assert.match(rows, /\{dirty \? t\('common\.cancel'\) : t\('common\.close'\)\}/, 'cancel or close beside save');
+});
+
+test('the office schedule is the one section on its tab, so it does not fold (owner, 2026-09-26)', () => {
+  const tab = read('src/renderer/src/components/triggers/TriggersTab.tsx');
+  assert.match(tab, /<Muted>\{t\('triggersTab\.officeBlurb', \{ godName \}\)\}<\/Muted>\s*<OfficeSchedules \/>/);
+  assert.doesNotMatch(tab, /title=\{t\('schedulesSection\.officeSchedule'\)\}/);
+});
+
+test('fixing or removing a mailbox that needed the owner closes its Ask me card (MB-7)', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(res\.ok && before\?\.status === 'needs-attention'\) closeMailboxCard\(res\.record\.id,/);
+  assert.match(main, /if \(res\.ok && rec\?\.status === 'needs-attention'\) closeMailboxCard\(id,/);
+  const dialog = read('src/renderer/src/components/AddMailboxDialog.tsx');
+  assert.match(dialog, /button:not\(\[disabled\]\):not\(\[tabindex="-1"\]\)/, 'the Tab trap ends on the chosen service, not a skipped tile');
+  assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /refocus\(ok \? 'add' : `remove-\$\{id\}`\);/);
+});

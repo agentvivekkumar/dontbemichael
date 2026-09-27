@@ -1,5 +1,6 @@
-import { useState, type CSSProperties, type ReactNode, type Ref } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRtl } from '@/i18n/useDirection';
 import { TRIGGER_MODES, type TriggerMode } from '@shared/triggers';
 import { MAX_INTERVAL_MS } from '@shared/missions';
 import {
@@ -103,7 +104,8 @@ export function Toggle({ on, onClick, onLabel, offLabel, label, disabled }: {
         opacity: disabled ? 0.6 : 1,
         background: on ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
         boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
-        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)'
+        // Text on the lemon fill uses on-accent, readable in both themes (DESIGN.md 3.3).
+        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: on ? 'var(--cth-on-accent)' : 'var(--cth-ink-900)'
       }}
     >{on ? (onLabel ?? t('common.on')) : (offLabel ?? t('common.off'))}</button>
   );
@@ -135,11 +137,12 @@ export function MiniButton({ children, onClick, tone = 'plain', disabled, autoFo
   );
 }
 
-export function Select({ value, onChange, children, style }: {
-  value: string; onChange: (v: string) => void; children: ReactNode; style?: CSSProperties;
+export function Select({ value, onChange, children, style, label }: {
+  value: string; onChange: (v: string) => void; children: ReactNode; style?: CSSProperties; label?: string;
 }) {
   return (
     <select
+      aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       style={{ ...selectStyle, ...style }}
@@ -181,23 +184,43 @@ export function Scroll({ children }: { children: ReactNode }) {
  * the summary chip is fed by the section itself and would go blank the moment
  * you closed it, and a section's own open rows survive collapsing its parent.
  */
-export function TriggerCard({ title, blurb, summary, defaultOpen = false, children }: {
-  title: string; blurb: string; summary?: ReactNode; defaultOpen?: boolean; children: ReactNode;
+/** The one open/closed sign for every section and row that folds (owner,
+ *  2026-09-26: a row with no sign could not be found). Readable size and dark
+ *  ink; points toward the text in right-to-left. */
+export function Disclosure({ open }: { open: boolean }) {
+  const rtl = useRtl();
+  return (
+    <span aria-hidden="true" style={{ flexShrink: 0, width: 14, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)', textAlign: 'center' }}>
+      {open ? '▾' : rtl ? '◂' : '▸'}
+    </span>
+  );
+}
+
+export function TriggerCard({ title, blurb, summary, action, defaultOpen = false, open: openProp, onToggle, children }: {
+  title: string; blurb: string; summary?: ReactNode;
+  /** A control that sits in the header beside the fold button (not inside it),
+   *  e.g. the section's own on/off switch. Replaces the summary chip. */
+  action?: ReactNode; defaultOpen?: boolean;
+  /** Controlled use: the parent owns open/closed (e.g. opens it when email turns on). */
+  open?: boolean; onToggle?: (open: boolean) => void; children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [openState, setOpenState] = useState(defaultOpen);
+  const open = openProp ?? openState;
+  const bodyId = useId();
   return (
     <div style={{ marginBottom: 8, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => { const next = !open; if (openProp === undefined) setOpenState(next); onToggle?.(next); }}
         style={{
-          width: '100%', display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'left',
-          padding: '8px 10px', border: 'none', cursor: 'pointer',
-          background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
+          flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'start',
+          padding: '8px 10px', border: 'none', cursor: 'pointer', background: 'transparent'
         }}
       >
-        <span style={{ flexShrink: 0, width: 8, fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)' }}>
-          {open ? '▾' : '▸'}
-        </span>
+        <Disclosure open={open} />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',
@@ -207,9 +230,11 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, childr
             {blurb}
           </span>
         </span>
-        {summary !== undefined && <Chip>{summary}</Chip>}
+        {summary !== undefined && action === undefined && <Chip>{summary}</Chip>}
       </button>
-      <div style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
+      {action !== undefined && <div style={{ flexShrink: 0, paddingBlockStart: 8, paddingInlineEnd: 10 }}>{action}</div>}
+      </div>
+      <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
     </div>
   );
 }

@@ -723,3 +723,20 @@ Where the build differs from the plan, and why:
 - **VERDICT:** DESIGN CLEARED. Eng review is ISSUES OPEN by the log rule (29 issues found, every one resolved in the plan and mapped to tasks E1 to E9, 0 unresolved, 0 critical gaps); eng review required to show CLEAR.
 
 NO UNRESOLVED DECISIONS
+
+## Change: schedules merged into Capabilities (owner, 2026-09-26)
+
+Research on comparable products (Copilot Studio, Paperclip, Relevance AI, Lindy)
+and on how scheduled agents are run in practice (one regular check plus a few
+exact-time jobs per agent, since every run costs usage) showed a schedule is set
+next to the agent's tools, not on its own tab. Owner chose option A:
+
+- The per-agent Schedules tab is gone. Every agent's Capabilities tab has two
+  sections, **Email** and **On a schedule**, each folding separately; the fold is
+  remembered per viewer in localStorage (convenience only). The schedule list and
+  editor are unchanged.
+- Michael's own jobs moved to his Capabilities tab like everyone's. His old
+  Schedules tab is now **Office schedule**: the read-only list of everyone's jobs,
+  Michael's included. The wall calendar still opens it.
+- An office schedule row opens that agent's Capabilities tab with On a schedule
+  unfolded and the row focused. A saved Schedules tab reopens as Capabilities.

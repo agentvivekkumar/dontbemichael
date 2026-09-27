@@ -161,7 +161,7 @@ export interface QueuedMessage {
 // 'files' retired in v0.3.4 (the per-agent IDE button superseded it) — a
 // persisted 'files' selection falls back to 'terminal' on load. 'git' added in
 // v0.3.4: at-a-glance branch/status/log without opening the IDE.
-export type SidebarTab = 'profile' | 'terminal' | 'messages' | 'schedules' | 'memory' | 'traces' | 'git';
+export type SidebarTab = 'profile' | 'capabilities' | 'terminal' | 'messages' | 'memory' | 'traces' | 'git';
 
 /** Lifecycle of the god agent ("Michael") bootstrap on launch.
  *  'booting' until his PTY is confirmed live, then 'ready' (or 'failed' if the
@@ -261,10 +261,6 @@ interface State {
   missions: ScheduledMission[];
   missionsStatus: 'loading' | 'ready' | 'error';
   setMissions: (missions: ScheduledMission[], status?: 'ready' | 'error') => void;
-  /** Open an agent's Schedules tab with one schedule expanded (Michael's office
-   *  list jumps here). seq makes repeated identical requests distinct. */
-  scheduleFocus: { missionId: string; seq: number } | null;
-  openAgentSchedule: (agentId: string, missionId: string) => void;
   /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
    *  the tab, and names the agent. The floor's GRAPH view uses it, since the
    *  graph no longer sits next to that tab. seq-keyed like ccTabRequest. */
@@ -291,6 +287,10 @@ interface State {
    *  mic button reactively (set by App on config load and by Settings on save). */
   freeflowEnabled: boolean;
   setFreeflowEnabled: (on: boolean) => void;
+  /** Agents waiting for a restart so email turns on (docs/designs/multi-mailbox.md,
+   *  E2/E5): agent id -> when it was queued. Cleared once restarted. */
+  pendingEmailRestart: Record<string, number>;
+  setPendingEmailRestart: (agentId: string, at: number | undefined) => void;
   /** Mirror of `!!config.groqApiKey` — boolean presence ONLY; the key value never
    *  enters the store. Lets the composer show the voice button disabled (with a
    *  "add a Groq key" tooltip) instead of hiding it. Set by App on config load and
@@ -673,7 +673,9 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'profile' || v === 'terminal' || v === 'messages' || v === 'schedules' || v === 'memory' || v === 'traces') return v;
+    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory' || v === 'traces') return v;
+    // Schedules is a section of Capabilities now (owner, 2026-09-26).
+    if (v === 'schedules') return 'capabilities';
     // A saved GIT tab opens on the terminal while this build hides git.
     if (v === 'git') return SHOW_GIT ? v : 'terminal';
   } catch { /* noop */ }
@@ -750,20 +752,6 @@ export const useStore = create<State>((set, get) => ({
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
-  scheduleFocus: null,
-  openAgentSchedule: (agentId, missionId) => {
-    try { window.localStorage.setItem(LS_SIDEBAR_TAB, 'schedules'); } catch { /* noop */ }
-    set((s) => {
-      persistAgents(s.agents, agentId);
-      return {
-        selectedId: agentId,
-        sidebarTab: 'schedules',
-        ccTabRequest: null,
-        memoryFocusRequest: null,
-        scheduleFocus: { missionId, seq: (s.scheduleFocus?.seq ?? 0) + 1 }
-      };
-    });
-  },
   fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
   prefersFocusMode: initialPrefersFocusMode,
   floorView: initialFloorView,
@@ -975,6 +963,12 @@ export const useStore = create<State>((set, get) => ({
   setDraft: (agentId, text) =>
     set((s) => ({ drafts: { ...s.drafts, [agentId]: text } })),
   freeflowEnabled: false,
+  pendingEmailRestart: {},
+  setPendingEmailRestart: (agentId, at) => set((s) => {
+    const next = { ...s.pendingEmailRestart };
+    if (at === undefined) delete next[agentId]; else next[agentId] = at;
+    return { pendingEmailRestart: next };
+  }),
   // Voice is off in this build (SHOW_VOICE): dictation stays off whatever is saved,
   // which hides the mic button and disarms hold Option.
   setFreeflowEnabled: (on) => set({ freeflowEnabled: SHOW_VOICE && on }),

@@ -67,6 +67,10 @@ extraResources:
     to: LICENSE
   - from: resources/md-slack-reply.cjs
     to: md-slack-reply.cjs
+  # md-mail: the MCP server team members use for mail (docs/designs/multi-mailbox.md).
+  # Claude Code starts it with the bundled node, outside the asar.
+  - from: resources/md-mail-mcp.cjs
+    to: md-mail-mcp.cjs
   # Knowledge Graph agent CLI + its pure-JS core. Agents invoke `node
   # <resources>/kg.cjs` out-of-process; kg-core.cjs ships beside it so the CLI's
   # `require('./kg-core.cjs')` resolves outside the asar.
