@@ -522,7 +522,7 @@
       },
       "workspace": {
         "label": "Workspace",
-        "hint": "folder · isolation · resume"
+        "hint": "folder · projects"
       },
       "engine": {
         "label": "Engine",

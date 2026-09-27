@@ -31,7 +31,7 @@ import {
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { joinAgentRole, splitAgentRole } from '@shared/agentRole';
 import { useRtl } from '@/i18n/useDirection';
-import { SHOW_IMPORT_HIRE } from '@shared/buildFeatures';
+import { SHOW_IMPORT_HIRE, SHOW_WORKSPACE_DEV_OPTIONS } from '@shared/buildFeatures';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -257,7 +257,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   };
   const preset = providerPreset(provider);
   const [goal, setGoal] = useState(pendingHire?.goal ?? '');
-  const [isolate, setIsolate] = useState(pendingHire?.isolate ?? false);
+  const [isolate, setIsolate] = useState(SHOW_WORKSPACE_DEV_OPTIONS && (pendingHire?.isolate ?? false));
   // #2 — optional Claude session id to continue. When set, the spawn seeds that
   // session's transcript into the cwd's project dir and launches `--resume`.
   const [resumeSessionId, setResumeSessionId] = useState('');
@@ -389,7 +389,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     setRole(split.role);
     setRoleDescription(split.roleDescription);
     setGoal(m.goal ?? '');
-    setIsolate(m.isolate ?? false);
+    setIsolate(SHOW_WORKSPACE_DEV_OPTIONS && (m.isolate ?? false));
     setResumeSessionId('');
     setFolderNote(undefined);
     setSection('identity');
@@ -893,7 +893,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                           {cwdAuto ? tr('addAgent.folderInsideMichael') : tr('addAgent.folderPrivate')}
                         </span>
                       )}
-                      {cwd.trim() && !repos.includes(cwd.trim()) && (
+                      {SHOW_WORKSPACE_DEV_OPTIONS && cwd.trim() && !repos.includes(cwd.trim()) && (
                         <button
                           onClick={() => registerProject(cwd)}
                           title={tr('addAgent.saveAsProjectTitle')}
@@ -910,6 +910,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       )}
                     </Row>
 
+                    {/* Git isolation and resume session are developer options,
+                        hidden with SHOW_WORKSPACE_DEV_OPTIONS (owner, 2026-09-27). */}
+                    {SHOW_WORKSPACE_DEV_OPTIONS && <>
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: resuming ? 'not-allowed' : 'pointer', opacity: resuming ? 0.5 : 1 }}>
                       <input
                         type="checkbox"
@@ -942,6 +945,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                         </span>
                       )}
                     </Row>
+                    </>}
                   </>
                 )}
 

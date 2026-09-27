@@ -522,7 +522,7 @@
       },
       "workspace": {
         "label": "工作区",
-        "hint": "文件夹 · 隔离 · 恢复"
+        "hint": "文件夹 · 项目"
       },
       "engine": {
         "label": "引擎",

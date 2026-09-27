@@ -294,3 +294,13 @@ test('Add Agent groups the characters by their job in the show (owner, 2026-09-2
     for (const n of grouped) assert.ok(d.addAgent.castRole?.[n], `${loc}: ${n} names its own job`);
   }
 });
+
+test('Add Agent Workspace hides Git isolation, save as project and resume session (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(fs.readFileSync(path.resolve(__dirname, '..', 'src/shared/buildFeatures.ts'), 'utf8'), /export const SHOW_WORKSPACE_DEV_OPTIONS = false;/);
+  assert.match(src, /\{SHOW_WORKSPACE_DEV_OPTIONS && cwd\.trim\(\) && !repos\.includes\(cwd\.trim\(\)\) && \(/, 'save as project is gated');
+  assert.match(src, /\{SHOW_WORKSPACE_DEV_OPTIONS && <>\s*<label[\s\S]*?addAgent\.gitIsolation[\s\S]*?addAgent\.resumeSession[\s\S]*?<\/>\}/, 'isolation and resume are gated');
+  assert.match(src, /useState\(SHOW_WORKSPACE_DEV_OPTIONS && \(pendingHire\?\.isolate \?\? false\)\)/, 'no hidden worktree');
+  const en = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8'));
+  assert.doesNotMatch(en.addAgent.sections.workspace.hint, /isolation|resume/);
+});

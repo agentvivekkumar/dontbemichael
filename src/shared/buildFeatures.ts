@@ -114,3 +114,9 @@ export const SHOW_READONLY_SERVERS = false;
  *  "generate one with AI…" prompt. Hidden (owner, 2026-09-27); adding a team
  *  member is the form alone. The import code stays for when it comes back. */
 export const SHOW_IMPORT_HIRE = false;
+
+/** Developer options in Add Agent's Workspace step: Git isolation (its own
+ *  worktree), "save as project" and "resume session". Hidden (owner,
+ *  2026-09-27): not useful to a business owner. With them hidden a new team
+ *  member never gets a worktree and always starts a fresh session. */
+export const SHOW_WORKSPACE_DEV_OPTIONS = false;
