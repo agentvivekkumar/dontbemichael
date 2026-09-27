@@ -514,10 +514,11 @@ export function OfficeSchedules() {
   const waiting = loadState(status, missions.length === 0, t('schedulesSection.loadErrorOffice'), retry, t);
   if (waiting) return waiting;
 
-  // Group by owner, Michael included: his jobs are edited on his Capabilities
-  // tab like everyone's (owner, 2026-09-26). Roster order first, then anyone
-  // off the floor, so a closed agent still shows.
-  const others = missions;
+  // Only jobs that are on (owner, 2026-09-26); paused ones live on each
+  // agent's Capabilities tab. Grouped by owner, Michael included: his jobs are
+  // edited on his Capabilities tab like everyone's. Roster order first, then
+  // anyone off the floor.
+  const others = missions.filter((m) => m.enabled);
   const owners = [...new Set(others.map((m) => ownerOf(m, godId)))];
   const rosterIndex = (id: string) => { const i = agents.findIndex((a) => a.id === id); return i < 0 ? Infinity : i; };
   owners.sort((a, b) => rosterIndex(a) - rosterIndex(b));

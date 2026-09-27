@@ -84,7 +84,7 @@ test('a jump from the office schedule opens that agent\'s Capabilities; Michael\
   const store = read('src/renderer/src/store/store.ts');
   assert.match(store, /if \(v === 'schedules'\) return 'capabilities';/, 'a saved Schedules tab opens Capabilities');
   assert.match(store, /sidebarTab: 'capabilities',\s*ccTabRequest: isGod \? \{ tab: 'capabilities'/);
-  assert.match(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /const others = missions;/);
+  assert.match(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /const others = missions\.filter\(\(m\) => m\.enabled\);/, 'only jobs that are on');
   assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /AgentSchedules/);
 });
 

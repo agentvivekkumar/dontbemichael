@@ -964,7 +964,7 @@
     "schedules": "计划任务",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
-    "officeBlurb": "每个人的定时工作，包括 {{godName}} 的。打开某一行，即可在该成员的能力页里修改。"
+    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。暂停的工作留在每位成员的能力页里。打开某一行即可在那里修改。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -994,7 +994,7 @@
     "moveToWorkStyle": "移到 {{name}} 的工作方式",
     "removeOlder": "删除",
     "officeSchedule": "办公室日程",
-    "officeEmpty": "团队里还没有人按时间运行工作。",
+    "officeEmpty": "团队里还没有人开启定时工作。",
     "emptyAgent": "{{name}} 还没有定时工作。",
     "addFor": "为 {{name}} 添加定时任务",
     "agentSummary": "{{name}} 有 {{count}} 项定时工作。",

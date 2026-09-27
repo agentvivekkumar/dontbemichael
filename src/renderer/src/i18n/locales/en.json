@@ -964,7 +964,7 @@
     "schedules": "SCHEDULES",
     "organisation": "ORGANISATION",
     "organisationBlurb": "Let a teammate's office message yours.",
-    "officeBlurb": "Everyone's jobs on a clock, {{godName}}'s included. Open a row to change it on that team member's Capabilities tab."
+    "officeBlurb": "Every job that is on, {{godName}}'s included. Paused jobs stay on each team member's Capabilities tab. Open a row to change it there."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -994,7 +994,7 @@
     "moveToWorkStyle": "Move to {{name}}'s Work style",
     "removeOlder": "Remove",
     "officeSchedule": "Office schedule",
-    "officeEmpty": "No one on the team runs jobs on a clock yet.",
+    "officeEmpty": "No one on the team has a job on a clock turned on.",
     "emptyAgent": "{{name}} has no jobs on a clock yet.",
     "addFor": "add a schedule for {{name}}",
     "agentSummary": "{{name}} runs {{count}} job on a clock.",
