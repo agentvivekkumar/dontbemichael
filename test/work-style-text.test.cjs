@@ -56,3 +56,14 @@ test('the wizard shows the plain description and writes instructions only when i
   assert.match(main, /const INSTRUCTIONS_MODEL = 'claude-sonnet-5';/);
   assert.match(main, /noTools: true,/);
 });
+
+test('Edit Agent shows the plain description and rewrites instructions only when it changed', () => {
+  const edit = read('src/renderer/src/components/EditAgentModal.tsx');
+  assert.match(edit, /describe\(agent\.goal \?\? ''\);/, 'opens on the plain description');
+  assert.match(edit, /let trimmedGoal = \(agent\.goal \?\? ''\)\.trim\(\);/, 'unchanged keeps the instructions as they are');
+  assert.match(edit, /else if \(goal\.trim\(\) !== plainOfGoal\.trim\(\)\) \{/);
+  assert.match(edit, /to: 'instructions',[\s\S]{0,300}previous: agent\.goal \|\| undefined/);
+  const save = edit.slice(edit.indexOf('const save = async'));
+  assert.ok(save.indexOf("to: 'instructions'") < save.indexOf('renameAgent('), 'written before anything is saved');
+  assert.doesNotMatch(edit, /Check every number twice/, 'no prompt-style placeholder');
+});

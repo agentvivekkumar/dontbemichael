@@ -50,7 +50,8 @@ test('Edit Agent shows Role, Role description and Work style, with plain notes',
   }
   assert.doesNotMatch(briefing, /label="Description"|label="Goal/, 'the old labels are gone');
   assert.match(briefing, /Michael reads the role and role description to decide which work to give this team member\./);
-  assert.match(briefing, /Michael doesn't see this\. It's how this team member gets their work done/);
+  assert.match(briefing, /Write it the way you would explain the job to a new employee, jobs it runs on a schedule included\./);
+  assert.match(briefing, /Michael doesn't see this\./);
 });
 
 test('saving joins the fields, keeps the old role when both are empty, and tells the registry', () => {
