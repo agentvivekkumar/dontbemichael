@@ -43,6 +43,8 @@ export interface HireJob {
   fromName?: string;
   /** Pack display name, for card jobs ("Restaurant & Food"). */
   business?: string;
+  /** The teammate's character, for office jobs. */
+  character?: string;
 }
 
 export const NEW_JOB_KEY = 'new';
@@ -155,7 +157,8 @@ export function teamJobs(agents: Teammate[], cards: HireJob[] = []): HireJob[] {
       folder: cardJob?.folder ?? (role || undefined),
       modelTier: cardJob?.modelTier,
       sourceCard: card,
-      fromName: t.name
+      fromName: t.name,
+      character: t.character
     });
   }
   return out;
@@ -170,9 +173,22 @@ export function teamJobs(agents: Teammate[], cards: HireJob[] = []): HireJob[] {
 export function ownJob(character: string, team: HireJob[], cards: HireJob[]): HireJob | undefined {
   const cardId = CHARACTER_CARD[character];
   if (!cardId) return undefined;
-  const mate = team.find((j) => j.sourceCard?.split('/')[1] === cardId);
+  const mate = team.find((j) => sameFamily(j, character));
   if (mate) return mate;
   return cards.find((c) => c.sourceCard?.split('/')[1] === cardId);
+}
+
+/**
+ * True when an office job is in the character's job family (owner, 2026-09-27:
+ * picking Erin, an Executive Admin, lists only the office's admin jobs). It
+ * matches the card the job traces back to, or the teammate's own character, so
+ * a job the owner wrote for Jim still lists under Jim's Sales family.
+ */
+export function sameFamily(job: HireJob, character: string): boolean {
+  const cardId = CHARACTER_CARD[character];
+  if (!cardId) return false;
+  if (job.sourceCard?.split('/')[1] === cardId) return true;
+  return !!job.character && CHARACTER_CARD[job.character] === cardId;
 }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

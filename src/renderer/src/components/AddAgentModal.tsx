@@ -36,6 +36,7 @@ import {
   jobFor,
   overlapsByRules,
   ownJob,
+  sameFamily,
   teamJobs,
   type DistinctVerdict,
   type HireJob,
@@ -179,6 +180,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   }, [config.businessType, business]);
   const officeJobs = useMemo(() => teamJobs(team, cards), [team, cards]);
   const theirJob = useMemo(() => ownJob(character, officeJobs, cards), [character, officeJobs, cards]);
+  // Only the office's jobs in this character's family (owner, 2026-09-27).
+  const familyJobs = useMemo(() => officeJobs.filter((j) => j.key !== theirJob?.key && sameFamily(j, character)), [officeJobs, theirJob, character]);
   const [jobKey, setJobKey] = useState<string | null>(null);
   const allJobs = useMemo(() => [...officeJobs, ...cards], [officeJobs, cards]);
   const chosenKey = jobKey ?? theirJob?.key ?? NEW_JOB_KEY;
@@ -656,9 +659,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       <JobRow job={theirJob} tag={theirJob.source === 'team' ? tr('addAgent.wizard.likeTeammate', { name: theirJob.fromName }) : theirJob.business} selected={chosenKey === theirJob.key} onPick={() => setJobKey(theirJob.key)} />
                     </JobGroup>
                   )}
-                  {officeJobs.filter((j) => j.key !== theirJob?.key).length > 0 && (
+                  {familyJobs.length > 0 && (
                     <JobGroup label={tr('addAgent.wizard.yourOffice')}>
-                      {officeJobs.filter((j) => j.key !== theirJob?.key).map((j) => (
+                      {familyJobs.map((j) => (
                         <JobRow key={j.key} job={j} tag={j.fromName} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
                       ))}
                     </JobGroup>

@@ -106,3 +106,17 @@ test('the check prompt names every teammate and asks for JSON', () => {
   assert.match(p, /mailbox ceo@x\.com/);
   assert.match(p, /ONE JSON object/);
 });
+
+test('office jobs are listed only in the character\'s family (owner, 2026-09-27)', () => {
+  const cards = H.cardJobs(packs, core, 'restaurant-food', business);
+  const team = H.teamJobs([
+    { id: 'pam', name: 'Pam', character: 'pam', description: 'Executive Admin: Pam sorts the inbox.' },
+    { id: 'ryan', name: 'Ryan', character: 'ryan', description: 'Marketing: Ryan writes posts.' },
+    { id: 'jim-1', name: 'Jim', character: 'jim', description: 'Social Media Manager: Jim follows Instagram.' }
+  ], cards);
+  const forErin = team.filter((j) => H.sameFamily(j, 'erin')).map((j) => j.fromName);
+  assert.deepEqual(forErin, ['Pam']);
+  // A job the owner wrote for Jim stays in Jim's Sales family.
+  assert.deepEqual(team.filter((j) => H.sameFamily(j, 'stanley')).map((j) => j.fromName), ['Jim']);
+  assert.equal(H.sameFamily(team[0], 'michael'), false);
+});
