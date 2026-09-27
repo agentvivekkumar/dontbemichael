@@ -1,17 +1,41 @@
 import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Toggle } from './triggers/ui';
+import { Toggle, TriggerCard } from './triggers/ui';
+import { AgentSchedules, useGodId, useMissions } from './triggers/ScheduleList';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
 import { PROVIDER_PRESETS, type EmailCapability } from '@shared/mailboxes';
+import { missionsFor } from '@shared/missions';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
+type SectionKey = 'email' | 'schedules';
+const LS_COLLAPSED = 'cth.capabilities.collapsed';
+let handledFocusSeq: number | undefined;
+
+/** Which sections this viewer folded away. A convenience only: every section
+ *  opens when storage is missing or blocked. */
+function readCollapsed(): Record<SectionKey, boolean> {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(LS_COLLAPSED) ?? '{}') as Partial<Record<SectionKey, boolean>>;
+    return { email: v.email === true, schedules: v.schedules === true };
+  } catch { return { email: false, schedules: false }; }
+}
+function writeCollapsed(v: Record<SectionKey, boolean>): void {
+  try { window.localStorage.setItem(LS_COLLAPSED, JSON.stringify(v)); } catch { /* noop */ }
+}
+
 /**
- * What a team member may do without asking (docs/designs/multi-mailbox.md,
- * design review D-T3). Its own tab after Profile on every agent, Michael
- * included. Order (design 2A): Email heading and "Can check email", one Toggle
- * row per mailbox (design 5A), Sending as two radio rows with Draft only first
- * chosen (design 6A), one note, then the pending restart note (E2/E5).
+ * What a team member may do without asking, and the jobs it runs on a clock
+ * (docs/designs/multi-mailbox.md, design review D-T3; schedules merged in by the
+ * owner, 2026-09-26). Its own tab after Profile on every agent, Michael included.
+ * Two sections, each folds away and the fold is remembered per viewer:
+ *
+ * - Email (design 2A): "Can check email", one Toggle row per mailbox (5A),
+ *   Sending as two radio rows with Draft only first chosen (6A), one note, then
+ *   the pending restart note (E2/E5).
+ * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
+ *   the same list and editor the Schedules tab had. A jump from the office
+ *   schedule opens this section even if it was folded.
  *
  * Every change saves at once through main, which checks it and says whether
  * email just turned on; if it did and the agent is running, it is queued for a
@@ -24,6 +48,25 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const pending = useStore((s) => s.pendingEmailRestart[agent.id]);
   const [failed, setFailed] = useState(false);
   const name = agent.isGod ? godName : agent.name;
+  const godId = useGodId();
+  const { missions } = useMissions();
+  const mine = missionsFor(missions, agent.id, godId);
+  const schedulesOn = mine.filter((m) => m.enabled).length;
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const setFold = (key: SectionKey, open: boolean): void => {
+    const next = { ...collapsed, [key]: !open };
+    setCollapsed(next);
+    writeCollapsed(next);
+  };
+  // A jump to one of this agent's schedules unfolds the section in the same
+  // render, so the row can take focus (its effect runs before ours would).
+  // The tab usually mounts because of the jump, so the last handled jump is
+  // kept outside the component.
+  const focus = useStore((s) => s.scheduleFocus);
+  if (focus && focus.seq !== handledFocusSeq) {
+    handledFocusSeq = focus.seq;
+    if (collapsed.schedules && mine.some((m) => m.id === focus.missionId)) setCollapsed({ ...collapsed, schedules: false });
+  }
 
   if (!config) return null;
   const mailboxes = config.mailboxes ?? [];
@@ -71,7 +114,14 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
       <div style={{ maxWidth: '72ch' }}>
         <div style={hint}>{t('capabilities.intro', { name })}</div>
 
-        <div style={h13}>{t('capabilities.email')}</div>
+        <div style={{ height: 8 }} />
+        <TriggerCard
+          title={t('capabilities.email')}
+          blurb={t('capabilities.emailBlurb', { name })}
+          summary={email.enabled ? t('capabilities.on') : t('capabilities.off')}
+          open={!collapsed.email}
+          onToggle={(open) => setFold('email', open)}
+        >
         <div style={{ ...row, borderTop: 'none' }}>
           <div style={{ flex: 1, fontSize: 14 }}>{t('capabilities.canCheck')}</div>
           <Toggle on={email.enabled} label={t('capabilities.canCheck')} onClick={toggleEmail} />
@@ -129,6 +179,17 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-lemon-light)' }}>{t('capabilities.pending', { name })}</div>}
           {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-light)' }}>! {t('capabilities.saveFailed')}</div>}
         </div>
+        </TriggerCard>
+
+        <TriggerCard
+          title={t('capabilities.schedules')}
+          blurb={t('capabilities.schedulesBlurb', { name })}
+          summary={schedulesOn ? t('capabilities.schedulesOn', { count: schedulesOn }) : t('capabilities.schedulesNone')}
+          open={!collapsed.schedules}
+          onToggle={(open) => setFold('schedules', open)}
+        >
+          <AgentSchedules agentId={agent.id} agentName={name} />
+        </TriggerCard>
       </div>
     </div>
   );

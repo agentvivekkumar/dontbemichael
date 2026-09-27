@@ -68,3 +68,22 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
   assert.match(main, /readConfig\(\)\.agentCapabilities\?\.\[agentId\]\?\.email\?\.enabled/);
   assert.match(read('electron-builder.yml'), /from: resources\/md-mail-mcp\.cjs/);
 });
+
+test('schedules live in Capabilities: Email and On a schedule fold separately (owner, 2026-09-26)', () => {
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  assert.ok(cap.indexOf("title={t('capabilities.email')}") < cap.indexOf("title={t('capabilities.schedules')}"), 'Email first, then schedules');
+  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|schedules)', open\)\}/g) || []).length, 2, 'both sections fold');
+  assert.match(cap, /<AgentSchedules agentId=\{agent\.id\} agentName=\{name\} \/>/);
+  assert.match(cap, /try \{ window\.localStorage\.setItem\(LS_COLLAPSED/, 'the fold is remembered, guarded');
+  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /aria-expanded=\{open\}/);
+  assert.doesNotMatch(read('src/renderer/src/components/SidebarTabs.tsx'), /key: 'schedules'/);
+  assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);
+});
+
+test('a jump from the office schedule opens that agent\'s Capabilities; Michael\'s jobs are listed too', () => {
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /if \(v === 'schedules'\) return 'capabilities';/, 'a saved Schedules tab opens Capabilities');
+  assert.match(store, /sidebarTab: 'capabilities',\s*ccTabRequest: isGod \? \{ tab: 'capabilities'/);
+  assert.match(read('src/renderer/src/components/triggers/ScheduleList.tsx'), /const others = missions;/);
+  assert.doesNotMatch(read('src/renderer/src/components/triggers/TriggersTab.tsx'), /AgentSchedules/);
+});

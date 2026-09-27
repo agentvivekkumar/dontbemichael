@@ -19,10 +19,11 @@ import { useRtl } from '@/i18n/useDirection';
  * A schedule belongs to the agent that runs it, so there is no "goes to"
  * picker: a schedule added on Pam's tab is Pam's. Two modes share one row:
  *
- * - `agent`: that agent's own schedules, editable. Lives in the agent panel's
- *   Schedules tab, and at the top of Michael's Triggers tab for his own jobs.
- * - `office`: every other agent's schedules, read only, grouped by agent. A row
- *   jumps to that agent's tab with the row open (design 1A).
+ * - `agent`: that agent's own schedules, editable. Lives in the On a schedule
+ *   section of every agent's Capabilities tab, Michael's included.
+ * - `office`: everyone's schedules, read only, grouped by agent, on Michael's
+ *   Office schedule tab. A row jumps to that agent's section with the row open
+ *   (design 1A).
  *
  * Each change is one operation on one schedule (upsert, delete, setEnabled), and
  * the row waits for main's answer: on a failure it goes back to what is saved
@@ -508,9 +509,10 @@ export function OfficeSchedules() {
   const waiting = loadState(status, missions.length === 0, t('schedulesSection.loadErrorOffice'), retry, t);
   if (waiting) return waiting;
 
-  // Group by owner, Michael excluded (his jobs are the editable section above).
-  // Roster order first, then anyone off the floor, so a closed agent still shows.
-  const others = missions.filter((m) => ownerOf(m, godId) !== godId);
+  // Group by owner, Michael included: his jobs are edited on his Capabilities
+  // tab like everyone's (owner, 2026-09-26). Roster order first, then anyone
+  // off the floor, so a closed agent still shows.
+  const others = missions;
   const owners = [...new Set(others.map((m) => ownerOf(m, godId)))];
   const rosterIndex = (id: string) => { const i = agents.findIndex((a) => a.id === id); return i < 0 ? Infinity : i; };
   owners.sort((a, b) => rosterIndex(a) - rosterIndex(b));

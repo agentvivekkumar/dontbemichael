@@ -161,7 +161,7 @@ export interface QueuedMessage {
 // 'files' retired in v0.3.4 (the per-agent IDE button superseded it) — a
 // persisted 'files' selection falls back to 'terminal' on load. 'git' added in
 // v0.3.4: at-a-glance branch/status/log without opening the IDE.
-export type SidebarTab = 'profile' | 'capabilities' | 'terminal' | 'messages' | 'schedules' | 'memory' | 'traces' | 'git';
+export type SidebarTab = 'profile' | 'capabilities' | 'terminal' | 'messages' | 'memory' | 'traces' | 'git';
 
 /** Lifecycle of the god agent ("Michael") bootstrap on launch.
  *  'booting' until his PTY is confirmed live, then 'ready' (or 'failed' if the
@@ -261,8 +261,9 @@ interface State {
   missions: ScheduledMission[];
   missionsStatus: 'loading' | 'ready' | 'error';
   setMissions: (missions: ScheduledMission[], status?: 'ready' | 'error') => void;
-  /** Open an agent's Schedules tab with one schedule expanded (Michael's office
-   *  list jumps here). seq makes repeated identical requests distinct. */
+  /** Open an agent's Capabilities tab on one schedule, in its On a schedule
+   *  section (the office schedule jumps here; Michael included). seq makes
+   *  repeated identical requests distinct. */
   scheduleFocus: { missionId: string; seq: number } | null;
   openAgentSchedule: (agentId: string, missionId: string) => void;
   /** Open Michael's Memory tab on one agent's memory: selects Michael, asks for
@@ -677,7 +678,9 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'schedules' || v === 'memory' || v === 'traces') return v;
+    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory' || v === 'traces') return v;
+    // Schedules is a section of Capabilities now (owner, 2026-09-26).
+    if (v === 'schedules') return 'capabilities';
     // A saved GIT tab opens on the terminal while this build hides git.
     if (v === 'git') return SHOW_GIT ? v : 'terminal';
   } catch { /* noop */ }
@@ -756,13 +759,15 @@ export const useStore = create<State>((set, get) => ({
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
   scheduleFocus: null,
   openAgentSchedule: (agentId, missionId) => {
-    try { window.localStorage.setItem(LS_SIDEBAR_TAB, 'schedules'); } catch { /* noop */ }
+    try { window.localStorage.setItem(LS_SIDEBAR_TAB, 'capabilities'); } catch { /* noop */ }
     set((s) => {
       persistAgents(s.agents, agentId);
+      // Michael's panel has its own tab strip, so it gets a tab request.
+      const isGod = s.agents.some((a) => a.id === agentId && a.isGod);
       return {
         selectedId: agentId,
-        sidebarTab: 'schedules',
-        ccTabRequest: null,
+        sidebarTab: 'capabilities',
+        ccTabRequest: isGod ? { tab: 'capabilities', seq: (s.ccTabRequest?.seq ?? 0) + 1 } : null,
         memoryFocusRequest: null,
         scheduleFocus: { missionId, seq: (s.scheduleFocus?.seq ?? 0) + 1 }
       };

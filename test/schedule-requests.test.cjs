@@ -118,17 +118,18 @@ test('approving a request goes through the stale check and the one-schedule writ
 
 test('new schedule strings exist in every language', () => {
   const keys = {
-    schedulesSection: ['ownJobs', 'officeSchedule', 'officeEmpty', 'emptyAgent', 'addFor', 'agentSummary', 'agentSummaryPlural', 'loading',
+    schedulesSection: ['officeSchedule', 'officeEmpty', 'emptyAgent', 'addFor', 'agentSummary', 'agentSummaryPlural', 'loading',
       'loadError', 'saveFailed', 'sure', 'deleteIt', 'keep', 'addedByYou', 'addedBy', 'runAria', 'openRow', 'closedGroup', 'closedNote', 'relayHint'],
     askMe: ['scheduleTitle', 'scheduleAdd', 'scheduleUpdate', 'schedulePause', 'scheduleResume', 'scheduleDelete', 'scheduleStale', 'approve', 'decline'],
     agentDetail: ['killConfirmSchedules', 'killConfirmSchedulesPlural'],
     agentCard: ['nextRun'],
-    sidebar: ['schedules']
+    capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'on', 'off']
   };
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
     for (const [sec, ks] of Object.entries(keys)) for (const k of ks) assert.ok(d[sec]?.[k], `${loc} ${sec}.${k}`);
     assert.equal(d.schedulesSection.goesTo, undefined, `${loc}: GOES TO is gone`);
+    assert.ok(d.commandCenter.tabs.officeSchedule, `${loc} commandCenter.tabs.officeSchedule`);
   }
 });
 

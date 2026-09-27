@@ -140,7 +140,6 @@
     "git": "Git",
     "messages": "消息",
     "traces": "追踪",
-    "schedules": "定时任务",
     "memory": "记忆",
     "profile": "简介",
     "capabilities": "权限"
@@ -421,7 +420,8 @@
       "history": "历史",
       "memory": "记忆",
       "workers": "工人",
-      "advanced": "高级"
+      "advanced": "高级",
+      "officeSchedule": "办公室日程"
     },
     "terminalFullscreen": "终端已全屏打开。按 Esc 返回。",
     "noTerminal": "{{name}} 没有实时终端。",
@@ -962,10 +962,9 @@
   "triggersTab": {
     "intro": "所有无需你输入就能启动工作的方式。",
     "schedules": "计划任务",
-    "schedulesBlurb": "按时间自动运行的工作。",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
-    "officeBlurb": "团队其他成员的定时工作。打开某位成员即可修改他的安排。"
+    "officeBlurb": "每个人的定时工作，包括 {{godName}} 的。打开某一行，即可在该成员的能力页里修改。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -994,7 +993,6 @@
     "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
     "moveToWorkStyle": "移到 {{name}} 的工作方式",
     "removeOlder": "删除",
-    "ownJobs": "{{godName}} 的工作",
     "officeSchedule": "办公室日程",
     "officeEmpty": "团队里还没有人按时间运行工作。",
     "emptyAgent": "{{name}} 还没有定时工作。",
@@ -1706,8 +1704,11 @@
   },
   "capabilities": {
     "tab": "权限",
-    "intro": "{{name}} 无需询问就可以做的事。",
+    "intro": "{{name}} 无需询问就可以做的事，以及 {{name}} 按时间运行的工作。",
     "email": "邮件",
+    "emailBlurb": "{{name}} 可以查看哪些邮箱，以及回复是直接发出还是先存为草稿。",
+    "on": "开",
+    "off": "关",
     "canCheck": "可以查看邮件",
     "sending": "发送",
     "canSend": "可以发送",
@@ -1719,6 +1720,10 @@
     "noMailboxes": "还没有可选择的邮箱。",
     "addInSettings": "在设置中添加。",
     "saveFailed": "没有保存成功，请重试。",
-    "mailboxToggle": "{{name}} 可以使用 {{address}}"
+    "mailboxToggle": "{{name}} 可以使用 {{address}}",
+    "schedules": "定时工作",
+    "schedulesBlurb": "{{name}} 在固定时间自动开始的工作。通常一个定期检查加上几项定时工作就够了；每次运行都会消耗用量。",
+    "schedulesOn": "{{count}} 项开启",
+    "schedulesNone": "无"
   }
 }

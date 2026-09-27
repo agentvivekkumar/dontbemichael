@@ -140,7 +140,6 @@
     "git": "git",
     "messages": "messages",
     "traces": "traces",
-    "schedules": "schedules",
     "memory": "memory",
     "profile": "profile",
     "capabilities": "Capabilities"
@@ -421,7 +420,8 @@
       "history": "history",
       "memory": "memory",
       "workers": "workers",
-      "advanced": "advanced"
+      "advanced": "advanced",
+      "officeSchedule": "office schedule"
     },
     "terminalFullscreen": "Terminal is open in fullscreen. Press Esc to bring it back.",
     "noTerminal": "{{name}} has no live terminal.",
@@ -962,10 +962,9 @@
   "triggersTab": {
     "intro": "Everything that can start work without you typing.",
     "schedules": "SCHEDULES",
-    "schedulesBlurb": "Jobs that run on a clock.",
     "organisation": "ORGANISATION",
     "organisationBlurb": "Let a teammate's office message yours.",
-    "officeBlurb": "Everyone else's jobs on a clock. Open a team member to change theirs."
+    "officeBlurb": "Everyone's jobs on a clock, {{godName}}'s included. Open a row to change it on that team member's Capabilities tab."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -994,7 +993,6 @@
     "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
     "moveToWorkStyle": "Move to {{name}}'s Work style",
     "removeOlder": "Remove",
-    "ownJobs": "{{godName}}'s jobs",
     "officeSchedule": "Office schedule",
     "officeEmpty": "No one on the team runs jobs on a clock yet.",
     "emptyAgent": "{{name}} has no jobs on a clock yet.",
@@ -1706,8 +1704,11 @@
   },
   "capabilities": {
     "tab": "Capabilities",
-    "intro": "What {{name}} is allowed to do without asking.",
+    "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
     "email": "Email",
+    "emailBlurb": "Which mailboxes {{name}} can check, and whether replies go out or wait as drafts.",
+    "on": "On",
+    "off": "Off",
     "canCheck": "Can check email",
     "sending": "Sending",
     "canSend": "Can send",
@@ -1719,6 +1720,10 @@
     "noMailboxes": "No mailboxes to choose from yet.",
     "addInSettings": "Add one in Settings.",
     "saveFailed": "Didn't save. Try again.",
-    "mailboxToggle": "{{name}} can use {{address}}"
+    "mailboxToggle": "{{name}} can use {{address}}",
+    "schedules": "On a schedule",
+    "schedulesBlurb": "Jobs {{name}} starts by itself at set times. One regular check plus a few timed jobs is usually enough; every run costs usage.",
+    "schedulesOn": "{{count}} on",
+    "schedulesNone": "None"
   }
 }

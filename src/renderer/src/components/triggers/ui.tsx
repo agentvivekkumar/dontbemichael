@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode, type Ref } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TRIGGER_MODES, type TriggerMode } from '@shared/triggers';
 import { MAX_INTERVAL_MS } from '@shared/missions';
@@ -181,14 +181,21 @@ export function Scroll({ children }: { children: ReactNode }) {
  * the summary chip is fed by the section itself and would go blank the moment
  * you closed it, and a section's own open rows survive collapsing its parent.
  */
-export function TriggerCard({ title, blurb, summary, defaultOpen = false, children }: {
-  title: string; blurb: string; summary?: ReactNode; defaultOpen?: boolean; children: ReactNode;
+export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: openProp, onToggle, children }: {
+  title: string; blurb: string; summary?: ReactNode; defaultOpen?: boolean;
+  /** Controlled use: the parent owns open/closed (e.g. remembers it, or opens it on a jump). */
+  open?: boolean; onToggle?: (open: boolean) => void; children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [openState, setOpenState] = useState(defaultOpen);
+  const open = openProp ?? openState;
+  const bodyId = useId();
   return (
     <div style={{ marginBottom: 8, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => { const next = !open; if (openProp === undefined) setOpenState(next); onToggle?.(next); }}
         style={{
           width: '100%', display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'left',
           padding: '8px 10px', border: 'none', cursor: 'pointer',
@@ -209,7 +216,7 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, childr
         </span>
         {summary !== undefined && <Chip>{summary}</Chip>}
       </button>
-      <div style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
+      <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
     </div>
   );
 }

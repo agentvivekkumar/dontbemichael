@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AgentSchedules, OfficeSchedules, useGodId } from './ScheduleList';
-import { useStore } from '@/store/store';
+import { OfficeSchedules } from './ScheduleList';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { OrgSection } from './OrgSection';
 import { Muted, Scroll, TriggerCard } from './ui';
@@ -16,9 +15,9 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  * Schedules is the oldest and used to BE this tab.
  *
  * Schedules belong to the agent that runs them (docs/designs/per-agent-schedules.md):
- * each team member edits its own on its panel's Schedules tab. Here, Michael's
- * own jobs are editable at the top, and below them the office schedule lists
- * everyone else's, read only, each row a jump to that agent's tab.
+ * each agent, Michael included, edits its own in the On a schedule section of
+ * its Capabilities tab (owner, 2026-09-26). This tab, named Office schedule, is
+ * the read only list of everyone's, each row a jump to that agent's section.
  *
  * This panel is a sidebar, so four flat forms would open as a wall. Each type is
  * a collapsed card carrying its name, a one-line "what this is", and a live
@@ -30,7 +29,6 @@ export function TriggersTab() {
   const { t } = useTranslation();
   const [orgSummary, setOrgSummary] = useState('');
   const godName = useResolvedGodName();
-  const godId = useGodId();
 
   return (
     <Scroll>
@@ -38,16 +36,8 @@ export function TriggersTab() {
       <div style={{ height: 8 }} />
 
       <TriggerCard
-        title={t('schedulesSection.ownJobs', { godName })}
-        blurb={t('triggersTab.schedulesBlurb')}
-        defaultOpen
-      >
-        <AgentSchedules agentId={godId} agentName={godName} />
-      </TriggerCard>
-
-      <TriggerCard
         title={t('schedulesSection.officeSchedule')}
-        blurb={t('triggersTab.officeBlurb')}
+        blurb={t('triggersTab.officeBlurb', { godName })}
         defaultOpen
       >
         <OfficeSchedules />

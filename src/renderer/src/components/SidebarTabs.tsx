@@ -13,11 +13,10 @@ const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
   // (owner, 2026-09-25).
   // Who this agent is: job, what to send them, key facts (docs/designs/agent-profile.md).
   { key: 'profile',  labelKey: 'sidebar.profile',  icon: 'info' },
-  // What this agent may do without asking: email for now (docs/designs/multi-mailbox.md).
+  // What this agent may do without asking (email) and its jobs on a clock
+  // (docs/designs/multi-mailbox.md; schedules merged in, owner 2026-09-26).
   { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
   { key: 'messages', labelKey: 'sidebar.messages', icon: 'bell' },
-  // The agent's own jobs on a clock (docs/designs/per-agent-schedules.md).
-  { key: 'schedules', labelKey: 'sidebar.schedules', icon: 'clock' },
   // What the agent has learned, as notes (docs/designs/memory-tab-readable.md).
   { key: 'memory',    labelKey: 'sidebar.memory',    icon: 'ledger' },
   { key: 'terminal', labelKey: 'sidebar.terminal', icon: 'terminal' },

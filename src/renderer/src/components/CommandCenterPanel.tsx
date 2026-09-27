@@ -84,8 +84,9 @@ const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['na
   // after ASK ME, which stays second on his panel (owner, 2026-09-25).
   { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
   { key: 'terminal', labelKey: 'commandCenter.tabs.terminal', icon: 'terminal' },
-  // Named like every other agent's tab (owner, 2026-09-25).
-  { key: 'triggers', labelKey: 'sidebar.schedules', icon: 'clock' },
+  // Everyone's jobs on a clock, read only. Michael's own are on his
+  // Capabilities tab like everyone's (owner, 2026-09-26).
+  { key: 'triggers', labelKey: 'commandCenter.tabs.officeSchedule', icon: 'clock' },
   { key: 'trigger-history', labelKey: 'commandCenter.tabs.history', icon: 'ledger' },
   { key: 'memory', labelKey: 'commandCenter.tabs.memory', icon: 'sparkle' },
   { key: 'workers', labelKey: 'commandCenter.tabs.workers', icon: 'gear' },
