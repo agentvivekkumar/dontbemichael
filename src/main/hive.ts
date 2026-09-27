@@ -51,6 +51,7 @@ import { resolveGodName } from '../shared/godIdentity';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { OFFICE_ROLES } from '../shared/officeRoles';
 import { APP_NAME } from '../shared/appName';
+import { isPeerAssignment, rerouteToMichael, hopDropNotice } from '../shared/handoffRule';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
  *  Kept as a local shape so hive.ts never imports the foundation-owned config
@@ -258,7 +259,7 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     ...(briefing ? ['', '## The business', briefing] : []),
     '',
     '## Routing work',
-    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. It is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
+    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. You are the only one who assigns work: a team member never hands a job to another, and when one asks another to do something, the app delivers it to you marked as a handoff, so decide who does it. Team members may ask each other for facts directly. The roster is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
     '',
     '## Doing it yourself',
     'Answer small things yourself: a fact you know, a short reply, a quick lookup. Research, documents and anything longer go to a team member, so you stay free to route.',
@@ -300,6 +301,8 @@ export function teamMemberInstructions(name: string, role: string, michael: stri
     'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else.',
     '',
     `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
+    '',
+    `Only ${michael} assigns work. If you need a fact from a teammate to do your job, ask them directly: write to their id (listed in registry.json in ${p.hiveRoot}) with "act": "query", and answer a teammate's query the same way with "act": "inform". If they cannot help, or you need someone else to do something, tell ${michael} and he hands it off. Never give a teammate work yourself.`,
     '',
     `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone. Its replies about your schedule requests (subject "Schedule request", "Schedule change approved" or "Schedule change declined") are notices, not jobs: read them and do nothing else. Never ask the owner in your terminal (nobody answers it): send your question to ${michael} with "act": "query".${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
   ].join('\n');
@@ -1873,8 +1876,16 @@ export class HiveManager {
   private routeMessage(msg: HiveMessage): void {
     if (msg.hops > HOP_CAP) {
       // loop guard — drop a runaway message rather than let agents ping-pong.
-      // There's no human queue to fall back on; the god agent owns conflicts.
+      // There's no human queue to fall back on; the god agent owns conflicts,
+      // so he is told rather than the drop being silent (owner, 2026-09-27).
       this.appendLog({ kind: 'drop', reason: 'hop-cap', from: msg.from, to: msg.to, id: msg.id });
+      try {
+        const r = this.registry();
+        const god = r.godId ?? 'god';
+        if (msg.from !== 'system') {
+          this.deliver(this.normalize({ to: god, act: 'inform', ...hopDropNotice(msg, r.agents) }, 'system'), god);
+        }
+      } catch { /* best-effort notice */ }
       return;
     }
     const reg = this.registry();
@@ -1890,6 +1901,12 @@ export class HiveManager {
       const t = to.toLowerCase();
       return t === 'human' || t === 'god' || t === 'michael' || t === godName ? godId : to;
     };
+    // Only Michael assigns work (owner, 2026-09-27, src/shared/handoffRule.ts):
+    // a teammate handing another teammate a job goes to Michael instead.
+    if (isPeerAssignment(msg, reg.agents, godId, resolveTo(msg.to))) {
+      this.appendLog({ kind: 'reroute', reason: 'only-michael-assigns', from: msg.from, to: msg.to, id: msg.id });
+      msg = rerouteToMichael(msg, reg.agents, godId);
+    }
     // The scheduler and heartbeat send; they don't read. A reply to one is
     // dropped quietly instead of bouncing back to Michael as undeliverable.
     if (msg.to === 'scheduler' || msg.to === 'heartbeat') {
@@ -3611,7 +3628,7 @@ One JSON file in \`outbox/\`, any name ending in \`.json\`:
 }
 \`\`\`
 
-The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
+The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Only Michael assigns work: a \`request\` from one team member to another is delivered to Michael, who decides who does it. Ask a teammate for a fact with \`query\`; they answer with \`inform\`. Messages from the scheduler name a job and need no reply.
 
 ${SCHEDULES_PROTOCOL}
 ## The task board
