@@ -612,18 +612,12 @@
     "hireProgress": "hire 第 {{current}} / {{total}} 项",
     "skipHire": "跳过 hire",
     "castGroup": {
-      "manager": "经理",
-      "admin": "行政",
-      "sales": "销售",
+      "office": "管理与行政",
+      "sales": "销售与市场",
       "accounting": "会计",
-      "support": "客户支持",
-      "marketing": "市场营销",
-      "hr": "人力资源",
-      "it": "IT",
-      "security": "IT 安全",
-      "quality": "质量控制",
-      "supply": "供应链",
-      "warehouse": "仓库"
+      "people": "人力资源与支持",
+      "it": "IT 与安全",
+      "operations": "运营"
     }
   },
   "onboarding": {

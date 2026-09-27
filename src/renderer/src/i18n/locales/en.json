@@ -612,18 +612,12 @@
     "hireProgress": "hire {{current}} of {{total}}",
     "skipHire": "skip hire",
     "castGroup": {
-      "manager": "Manager",
-      "admin": "Admin",
-      "sales": "Sales",
+      "office": "Management & Admin",
+      "sales": "Sales & Marketing",
       "accounting": "Accounting",
-      "support": "Customer Support",
-      "marketing": "Marketing",
-      "hr": "HR",
-      "it": "IT",
-      "security": "IT Security",
-      "quality": "Quality Control",
-      "supply": "Supply Chain",
-      "warehouse": "Warehouse"
+      "people": "HR & Support",
+      "it": "IT & Security",
+      "operations": "Operations"
     }
   },
   "onboarding": {

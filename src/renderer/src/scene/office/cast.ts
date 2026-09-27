@@ -51,21 +51,16 @@ export const OFFICE_CAST: CastMember[] = [
   { name: 'darryl',   displayName: 'Darryl',   shirt: '#4a6280', blurb: 'Warehouse foreman' },
 ];
 
-/** The cast grouped by the job each had in the show, in the order Add Agent
- *  shows them (owner, 2026-09-27). Every cast member is in exactly one group. */
+/** The cast grouped by the kind of work each did in the show, in the order Add
+ *  Agent shows them. Related jobs share a group so no group is a lone tile
+ *  (owner, 2026-09-27). Every cast member is in exactly one group. */
 export const CAST_GROUPS: { key: string; members: OfficeCharacterName[] }[] = [
-  { key: 'manager',    members: ['michael'] },
-  { key: 'admin',      members: ['pam', 'erin'] },
-  { key: 'sales',      members: ['dwight', 'jim', 'stanley', 'phyllis', 'andy'] },
+  { key: 'office',     members: ['michael', 'pam', 'erin'] },
+  { key: 'sales',      members: ['dwight', 'jim', 'stanley', 'phyllis', 'andy', 'ryan'] },
   { key: 'accounting', members: ['oscar', 'angela', 'kevin'] },
-  { key: 'support',    members: ['kelly'] },
-  { key: 'marketing',  members: ['ryan'] },
-  { key: 'hr',         members: ['toby'] },
-  { key: 'it',         members: ['nick'] },
-  { key: 'security',   members: ['sadiq'] },
-  { key: 'quality',    members: ['creed'] },
-  { key: 'supply',     members: ['meredith'] },
-  { key: 'warehouse',  members: ['darryl'] }
+  { key: 'people',     members: ['toby', 'kelly'] },
+  { key: 'it',         members: ['nick', 'sadiq'] },
+  { key: 'operations', members: ['creed', 'meredith', 'darryl'] }
 ];
 
 export const CAST_BY_NAME: Record<OfficeCharacterName, CastMember> =

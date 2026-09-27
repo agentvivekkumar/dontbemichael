@@ -743,9 +743,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
 
                     <Row label={tr('addAgent.character')}>
                       {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
                         {CAST_GROUPS.map((g) => (
-                          <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)}>
+                          <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', marginBottom: 4 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                               {g.members.map((name) => CAST_BY_NAME[name]).map((c) => (
