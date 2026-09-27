@@ -76,6 +76,7 @@ const BY_CHARACTER: Partial<Record<OfficeCharacterName, readonly string[]>> = {
   toby:     ['I should write that up…', 'HR-wise this break is fine', 'no one ever sits with me'],
   creed:    ['which one of you is the new guy?', 'I’ve eaten worse out of that fridge', 'mung beans. under my desk.'],
   meredith: ['is it 5 o’clock yet?', 'someone spike the coffee?'],
+  erin:     ['is there cake? I love when there’s cake', 'I made a new friend at the coffee machine'],
 };
 
 /** A solo break-room line. Character flavour ~60% of the time, else the line

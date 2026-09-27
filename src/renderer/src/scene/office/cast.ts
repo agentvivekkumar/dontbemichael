@@ -15,7 +15,9 @@ export type OfficeCharacterName =
   | 'toby' | 'creed' | 'meredith'
   // Added so every Office Pack role has its own character: IT, IT security,
   // and the warehouse (inventory & shipping).
-  | 'nick' | 'sadiq' | 'darryl';
+  | 'nick' | 'sadiq' | 'darryl'
+  // Erin, the receptionist after Pam: same job as Pam (owner, 2026-09-27).
+  | 'erin';
 
 export interface CastMember {
   name: OfficeCharacterName;
@@ -31,6 +33,7 @@ export const OFFICE_CAST: CastMember[] = [
   { name: 'michael',  displayName: 'Michael',  shirt: '#5a6b8c', blurb: "World's best boss" },
   { name: 'jim',      displayName: 'Jim',      shirt: '#6fa8dc', blurb: 'Salesman, prankster' },
   { name: 'pam',      displayName: 'Pam',      shirt: '#9caf88', blurb: 'Receptionist, artist' },
+  { name: 'erin',     displayName: 'Erin',     shirt: '#2f3a5c', blurb: 'Receptionist' },
   { name: 'dwight',   displayName: 'Dwight',   shirt: '#b89b3e', blurb: 'Assistant (to the) RM' },
   { name: 'kevin',    displayName: 'Kevin',    shirt: '#4a7ab5', blurb: 'Accounting' },
   { name: 'angela',   displayName: 'Angela',   shirt: '#8a86a6', blurb: 'Head of accounting' },
