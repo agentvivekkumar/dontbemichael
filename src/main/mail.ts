@@ -567,7 +567,7 @@ export function setAgentCapabilities(admin: MailAdminDeps, agentId: string, next
   const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
   const before = cfg.agentCapabilities?.[agentId];
   const email = next.email
-    ? { enabled: !!next.email.enabled, mailboxes: [...new Set(next.email.mailboxes.filter((m) => known.has(m)))], send: !!next.email.send }
+    ? { enabled: !!next.email.enabled, mailboxes: next.email.mailboxes.filter((m) => known.has(m)).slice(0, 1), send: !!next.email.send }
     : undefined;
   admin.saveConfig({ agentCapabilities: { ...(cfg.agentCapabilities ?? {}), [agentId]: { ...(before ?? {}), email } } });
   return { ok: true, restartNeeded: !before?.email?.enabled && !!email?.enabled };

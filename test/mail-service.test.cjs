@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
 const { mailAccess, agentMailboxes, emailJustEnabled, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
-const { MailService, handleMailRequest, classifyMailError } = loadTs('src/main/mail.ts');
+const { MailService, handleMailRequest, classifyMailError, setAgentCapabilities } = loadTs('src/main/mail.ts');
 
 const server = { host: 'h', port: 993, secure: true };
 const box = (id, address, provider = 'gmail') => ({ id, address, provider, imap: server, smtp: server, status: 'connected', createdAt: 1, updatedAt: 1 });
@@ -85,6 +85,17 @@ test('mailAccess: the one rule, in order', () => {
   assert.equal(mailAccess({ ...c, mailboxes: [] }, 'dwight', 'sales', 'read').ok, false, 'removed in Settings');
   assert.equal(mailAccess(c, 'dwight', undefined, 'list').ok, true);
   assert.deepEqual(agentMailboxes({ ...c, agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['ceo', 'claude-account'], send: false } } } }, 'pam'), ['ceo'], 'unknown ids dropped');
+});
+
+test('one mailbox per agent: only the first counts, and a save keeps one (owner, 2026-09-26)', () => {
+  const c = cfg({ agentCapabilities: { dwight: { email: { enabled: true, mailboxes: ['sales', 'ceo'], send: true } } } });
+  assert.equal(mailAccess(c, 'dwight', 'sales', 'read').ok, true);
+  assert.equal(mailAccess(c, 'dwight', 'ceo', 'read').ok, false, 'a second mailbox from an older record is ignored');
+  assert.deepEqual(agentMailboxes(c, 'dwight'), ['sales']);
+  let saved;
+  const admin = { getConfig: () => c, saveConfig: (patch) => { saved = patch; } };
+  setAgentCapabilities(admin, 'dwight', { email: { enabled: true, mailboxes: ['ceo', 'sales'], send: false } });
+  assert.deepEqual(saved.agentCapabilities.dwight.email.mailboxes, ['ceo']);
 });
 
 test('helpers: first enable, ids, Microsoft addresses', () => {

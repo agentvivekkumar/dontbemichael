@@ -18,8 +18,9 @@ let handledFocusSeq: number | undefined;
  * Two sections, both closed whenever the tab opens, like every section on
  * every agent tab (owner, 2026-09-26); the header chip says what is inside:
  *
- * - Email (design 2A): "Can check email", one Toggle row per mailbox (5A),
- *   Sending as two radio rows with Draft only first chosen (6A), one note, then
+ * - Email (design 2A): "Can check email" is the only switch. An agent has at
+ *   most one mailbox (owner, 2026-09-26), picked from radio rows, then Sending
+ *   as two radio rows with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had. A jump from the office
@@ -66,30 +67,24 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     } catch { setFailed(true); }
   };
 
+  // One mailbox per agent (owner, 2026-09-26). Turning email on picks the
+  // agent's mailbox if it still exists, else the first one, and starts Draft
+  // only when that is a new pick (design 6A).
+  const known = new Set(mailboxes.map((m) => m.id));
+  const current = email.mailboxes.find((id) => known.has(id));
   const toggleEmail = (): void => {
-    // Design 6A: Draft only is chosen the first time email is turned on.
-    void save(email.enabled ? { ...email, enabled: false } : { enabled: true, mailboxes: email.mailboxes, send: email.mailboxes.length ? email.send : false });
+    if (email.enabled) { void save({ ...email, enabled: false }); return; }
+    const pick = current ?? mailboxes[0]?.id;
+    void save({ enabled: true, mailboxes: pick ? [pick] : [], send: current ? email.send : false });
   };
-  const toggleMailbox = (id: string): void => {
-    const has = email.mailboxes.includes(id);
-    void save({ ...email, mailboxes: has ? email.mailboxes.filter((m) => m !== id) : [...email.mailboxes, id] });
-  };
+  const pickMailbox = (id: string): void => { if (id !== current) void save({ ...email, mailboxes: [id] }); };
   const setSend = (send: boolean): void => { if (send !== email.send) void save({ ...email, send }); };
 
-  // Arrow keys move between the two sending choices (design 7A).
-  const onRadioKey = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    e.preventDefault();
-    setSend(!email.send);
-    const target = e.currentTarget.querySelector<HTMLElement>(`[data-send="${!email.send}"]`);
-    target?.focus();
-  };
-
-  const rows: Array<{ id: string; label: string; sub: string }> = [
-    // Only mailboxes added in Settings. The Claude account's Gmail is not a
-    // capability: one Settings switch covers every agent (owner, 2026-09-26).
-    ...mailboxes.map((m) => ({ id: m.id, label: m.address, sub: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '') }))
-  ];
+  const mailboxOptions = mailboxes.map((m) => ({
+    value: m.id,
+    label: m.address,
+    desc: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '')
+  }));
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
 
@@ -119,43 +114,20 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                 <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
               </div>
             )}
-            <div role="list">
-              {rows.map((r) => (
-                <div key={r.id} role="listitem" style={row}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, wordBreak: 'break-all' }}>{r.label}</div>
-                    <div style={hint}>{r.sub}</div>
-                  </div>
-                  <Toggle on={email.mailboxes.includes(r.id)} label={t('capabilities.mailboxToggle', { name, address: r.label })} onClick={() => toggleMailbox(r.id)} />
-                </div>
-              ))}
-            </div>
+            {mailboxes.length > 0 && (
+              <>
+                <div style={h13}>{t('capabilities.mailbox')}</div>
+                <RadioRows label={t('capabilities.mailbox')} value={current} options={mailboxOptions} onChange={pickMailbox} breakAll />
+              </>
+            )}
 
             <div style={h13}>{t('capabilities.sending')}</div>
-            <div role="radiogroup" aria-label={t('capabilities.sending')} onKeyDown={onRadioKey}>
-              {[{ send: true, label: t('capabilities.canSend'), desc: t('capabilities.canSendDesc') }, { send: false, label: t('capabilities.draftOnly'), desc: t('capabilities.draftOnlyDesc') }].map((o, i) => (
-                <button
-                  key={String(o.send)}
-                  type="button"
-                  role="radio"
-                  data-send={String(o.send)}
-                  aria-checked={email.send === o.send}
-                  tabIndex={email.send === o.send ? 0 : -1}
-                  onClick={() => setSend(o.send)}
-                  style={{ ...row, borderTop: i === 0 ? 'none' : row.borderTop, width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)' }}
-                >
-                  <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, boxShadow: 'inset 0 0 0 1px var(--cth-ink-500)', background: 'var(--cth-paper-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {email.send === o.send && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cth-ink-900)' }} />}
-                  </span>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 14 }}>{o.label}</span>
-                    <span style={{ display: 'block', ...hint }}>{o.desc}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div style={{ ...hint, marginTop: 10 }}>{t('capabilities.note', { name })}</div>
+            <RadioRows
+              label={t('capabilities.sending')}
+              value={String(email.send)}
+              options={[{ value: 'true', label: t('capabilities.canSend'), desc: t('capabilities.canSendDesc') }, { value: 'false', label: t('capabilities.draftOnly'), desc: t('capabilities.draftOnlyDesc') }]}
+              onChange={(v) => setSend(v === 'true')}
+            />
           </>
         )}
 
@@ -177,6 +149,50 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-light)' }}>! {t('capabilities.saveFailed')}</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A one-choice list (DESIGN.md 7.10a Radio row): arrow keys move and choose,
+ *  only the chosen row is in the tab order (the first when none is chosen). */
+function RadioRows({ label, value, options, onChange, breakAll }: {
+  label: string; value: string | undefined; options: Array<{ value: string; label: string; desc: string }>;
+  onChange: (value: string) => void; breakAll?: boolean;
+}) {
+  const at = options.findIndex((o) => o.value === value);
+  const onKey = (e: KeyboardEvent<HTMLDivElement>): void => {
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step || options.length === 0) return;
+    e.preventDefault();
+    const next = options[(Math.max(at, 0) + step + options.length) % options.length];
+    onChange(next.value);
+    e.currentTarget.querySelector<HTMLElement>(`[data-value="${CSS.escape(next.value)}"]`)?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={label} onKeyDown={onKey}>
+      {options.map((o, i) => {
+        const checked = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            data-value={o.value}
+            aria-checked={checked}
+            tabIndex={checked || (at < 0 && i === 0) ? 0 : -1}
+            onClick={() => onChange(o.value)}
+            style={{ ...row, borderTop: i === 0 ? 'none' : row.borderTop, width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)' }}
+          >
+            <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, boxShadow: 'inset 0 0 0 1px var(--cth-ink-500)', background: 'var(--cth-paper-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              {checked && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cth-ink-900)' }} />}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 14, wordBreak: breakAll ? 'break-all' : undefined }}>{o.label}</span>
+              <span style={{ display: 'block', ...hint }}>{o.desc}</span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

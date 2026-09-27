@@ -38,9 +38,12 @@ test('Mailboxes leads Connections; the Claude account row alone carries the swit
 
 test('Draft only is chosen the first time email is turned on (6A); Sending is a radio group (7A)', () => {
   const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
-  assert.match(cap, /\{ enabled: true, mailboxes: email\.mailboxes, send: email\.mailboxes\.length \? email\.send : false \}/);
+  assert.match(cap, /void save\(\{ enabled: true, mailboxes: pick \? \[pick\] : \[\], send: current \? email\.send : false \}\);/);
   assert.match(cap, /role="radiogroup"/);
   assert.match(cap, /ArrowUp/);
+  // One mailbox per agent (owner, 2026-09-26): picked from radio rows, no per-mailbox switch.
+  assert.match(cap, /<RadioRows label=\{t\('capabilities\.mailbox'\)\} value=\{current\}/);
+  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'Can check email is the only switch');
 });
 
 test('removing a used mailbox names who loses it (8A)', () => {

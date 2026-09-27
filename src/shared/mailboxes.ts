@@ -6,9 +6,9 @@
  *
  * A mailbox is connected once, in Settings, with an address and an app password
  * held only by the broker's secret store. Each agent's Capabilities say which
- * mailboxes it may use and whether it may send or only draft. `mailAccess` is the
- * one rule both enforcement points call: the broker for IMAP mailboxes and the
- * PreToolUse hook for the Claude account mailbox.
+ * one mailbox it may use (at most one, owner 2026-09-26) and whether it may send
+ * or only draft. `mailAccess` is the one rule both enforcement points call: the
+ * broker and the PreToolUse hook for md-mail tools.
  */
 
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
@@ -38,7 +38,8 @@ export interface MailboxRecord {
 export interface EmailCapability {
   /** "Can check email". */
   enabled: boolean;
-  /** Mailbox ids (added in Settings) this agent may use. */
+  /** The mailbox id (added in Settings) this agent may use: at most one
+   *  (owner, 2026-09-26). Kept a list so older records still read. */
   mailboxes: string[];
   /** true = Can send; false = Draft only. */
   send: boolean;
@@ -130,7 +131,8 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
     return { ok: false, reason: 'The owner has not given you email in your Capabilities. Do not try another way; tell Michael what you need.' };
   }
   if (op === 'list') return { ok: true };
-  if (!mailboxId || !email.mailboxes.includes(mailboxId)) {
+  // One mailbox per agent (owner, 2026-09-26): only the first listed counts.
+  if (!mailboxId || email.mailboxes[0] !== mailboxId) {
     return { ok: false, reason: `The owner has not given you the mailbox "${mailboxId ?? ''}". Use list_mailboxes to see yours.` };
   }
   if (!(cfg.mailboxes ?? []).some((m) => m.id === mailboxId)) {
@@ -142,12 +144,14 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
   return { ok: true };
 }
 
-/** The mailboxes an agent may use, in Settings order (list_mailboxes). */
+/** The mailbox an agent may use, as a list of at most one (list_mailboxes).
+ *  An agent has one mailbox at most (owner, 2026-09-26); an older record with
+ *  more keeps only its first. */
 export function agentMailboxes(cfg: MailAccessConfig, agentId: string): string[] {
   const email = cfg.agentCapabilities?.[agentId]?.email;
   if (!email?.enabled) return [];
   const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
-  return email.mailboxes.filter((id) => known.has(id));
+  return email.mailboxes.slice(0, 1).filter((id) => known.has(id));
 }
 
 /** True when the email capability changed from off to on (E2: that needs a

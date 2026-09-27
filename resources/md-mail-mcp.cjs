@@ -42,7 +42,7 @@ const compose = {
 const TOOLS = [
   {
     name: 'list_mailboxes',
-    description: 'The mailboxes the owner has given you, and whether you can send or only draft. Call this first.',
+    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first.',
     inputSchema: { type: 'object', properties: {} }
   },
   {

@@ -1105,3 +1105,15 @@ The on/off switch governs only email and calendar through the owner's Claude acc
 - **VERDICT:** DESIGN CLEAR (9/10, no open decisions). CEO and eng reviews complete with no open decisions; eng status is ISSUES OPEN because its findings were mapped into required work, with 1 owner-accepted gap (copied text across mailboxes). eng review required to show CLEAR before shipping.
 
 NO UNRESOLVED DECISIONS
+
+## Change: at most one mailbox per agent (owner, 2026-09-26)
+
+An agent may use at most one mailbox. On the Capabilities tab, "Can check email"
+is the only switch; the per-mailbox switches are gone. With email on, the agent's
+mailbox is picked from radio rows (one row per mailbox added in Settings), then
+Sending. Turning email on picks the agent's mailbox if it still exists, else the
+first one. The cross-mailbox note is gone with the second mailbox.
+
+Enforced in main, not just the screen: `setAgentCapabilities` keeps only the first
+known id, and `mailAccess` / `agentMailboxes` honour only the first id, so an older
+record listing two still reaches one. The stored shape stays a list so old configs read.
