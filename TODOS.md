@@ -26,6 +26,89 @@
 **Priority:** P2
 **Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
 
+## Mailboxes (deferred from ship of feat/multi-mailbox, 2026-09-26)
+
+### Keep each agent's mail pass out of other agents' reach
+
+**What:** Move each agent's `md-mail.mcp.json` (it holds that agent's broker token) out of the shared hive folder, or block other agents from reading `<hive>/agents/<other>/md-mail.mcp.json`, and delete it when the agent's terminal closes.
+
+**Why:** Sandboxed team agents cannot reach the broker, but Michael runs unsandboxed and could read a Can send agent's token and send from its mailbox. Found in the pre-landing security review (`src/main/index.ts`, the md-mail block before `ptyManager.spawn`).
+
+**Effort:** S
+**Priority:** P1
+
+### Log every mail call
+
+**What:** One broker log line per md-mail call: agent, mailbox, operation, result and duration.
+
+**Why:** Plan Section 8. Today there is no record of which agent used which mailbox. `MailDeps.log` exists in `src/main/mail.ts` and is never called.
+
+**Context:** Deferred from plan: docs/designs/multi-mailbox.md
+
+**Effort:** S
+**Priority:** P1
+
+### Say "cannot check email" beside a schedule
+
+**What:** When a schedule's agent has email off, show a short note on that schedule ("Pam cannot check email") in the On a schedule section and the office schedule.
+
+**Why:** Plan CEO Section 4. A mail check schedule on an agent without email is silently ignored.
+
+**Context:** Deferred from plan: docs/designs/multi-mailbox.md
+
+**Effort:** S
+**Priority:** P1
+
+### A build switch for the mailbox feature
+
+**What:** A `buildFeatures.ts` flag that hides Mailboxes and the Email section, with the hook falling back to the Claude account switch alone when off.
+
+**Why:** Plan Section 9 rollout.
+
+**Context:** Deferred from plan: docs/designs/multi-mailbox.md
+
+**Effort:** S
+**Priority:** P1
+
+### Note the Microsoft plan change in the office packs doc
+
+**What:** Update Decision 8 in `docs/designs/business-mode-office-packs.md` to say MB-0 replaced the Microsoft app id in builds.
+
+**Context:** Deferred from plan: docs/designs/multi-mailbox.md
+
+**Effort:** XS
+**Priority:** P1
+
+### Read one email without downloading its attachments
+
+**What:** `MailService.read` fetches the whole message, attachments included, before trimming the text to 50K. Fetch the body structure plus the text part only, and take attachment names and sizes from the structure.
+
+**Why:** A 25 MB message is held in memory in the main process for one read.
+
+**Effort:** M
+**Priority:** P2
+
+### Page a search without searching again
+
+**What:** Each search page re-runs the full IMAP SEARCH (ALL with no filters) and sorts every UID. Cache the UID list per mailbox and query for a short time, or default an unfiltered search to a recent window.
+
+**Effort:** S
+**Priority:** P2
+
+### Back the Claude account switch with more than the hook
+
+**What:** The Your Claude account switch is enforced only by the PreToolUse hook, which lets calls through when the hook cannot reach the app, and matches connectors by server name. Also keep the connectors out at spawn when the switch is off, and match on tool names.
+
+**Effort:** M
+**Priority:** P2
+
+### Close a stale "needs you" card after an edit race
+
+**What:** In `mail:save` (`src/main/index.ts`), close the mailbox's Ask me card whenever a fix succeeds, not only when the mailbox was needs-attention before the login test. A failure during the test can open the card and leave it open.
+
+**Effort:** XS
+**Priority:** P3
+
 ## Schedules
 
 ### Starter jobs in an agent's empty Schedules tab
