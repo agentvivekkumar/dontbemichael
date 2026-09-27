@@ -51,8 +51,8 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
     }
   };
 
-  // Email & Calendar is the Team email switch at the top of Mailboxes now
-  // (docs/designs/multi-mailbox.md, design 1A), not a row in this list.
+  // Email & Calendar is the "Your Claude account" switch at the end of
+  // Mailboxes now (docs/designs/multi-mailbox.md), not a row in this list.
   const byTier = (tier: McpTier) => MCP_CATALOG.filter((e) => e.tier === tier && e.id !== 'email-calendar');
 
   return (

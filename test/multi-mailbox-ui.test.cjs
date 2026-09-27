@@ -61,10 +61,8 @@ test('removing a used mailbox names who loses it (8A)', () => {
   assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /t\('mailboxes\.removeAffects', \{ names: list\(users\) \}\)/);
 });
 
-test('no Ask me card announces per-member email (owner, 2026-09-26); an old one is cleared', () => {
-  const main = read('src/main/index.ts');
-  assert.doesNotMatch(main, /Email is now set per team member/);
-  assert.match(main, /hive\.deleteTask\('email-per-team-member'\)/);
+test('no Ask me card announces per-member email (owner, 2026-09-26)', () => {
+  assert.doesNotMatch(read('src/main/index.ts'), /Email is now set per team member|email-per-team-member/);
 });
 
 test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () => {
@@ -72,6 +70,26 @@ test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () =
   assert.match(hive, /const CEILING_MS = 10 \* 60_000;/);
   assert.match(hive, /if \(BUSY\.has\(a\.status\) && !overdue\) continue;/);
   assert.match(hive, /respawnResumed\(a, a\.ptyId\)/);
+  // Ship audit: an agent that is not running is dropped from the queue (its next start attaches mail),
+  // a failed restart stays queued, and one restart runs per agent at a time.
+  assert.match(hive, /if \(!a \|\| !a\.ptyId\) \{ setPendingEmailRestart\(agentId, undefined\); continue; \}/);
+  assert.match(hive, /if \(inFlight\.has\(agentId\)\) continue;/);
+  assert.match(hive, /if \(res\.ok\) \{\s*setPendingEmailRestart\(agentId, undefined\);/);
+  // Only a running agent is queued; turning email off clears a queued restart.
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  assert.match(cap, /if \(res\.restartNeeded && agent\.ptyId\) useStore\.getState\(\)\.setPendingEmailRestart\(agent\.id, Date\.now\(\)\);/);
+  assert.match(cap, /if \(!next\.enabled\) useStore\.getState\(\)\.setPendingEmailRestart\(agent\.id, undefined\);/);
+  assert.match(read('src/renderer/src/store/store.ts'), /if \(at === undefined\) delete next\[agentId\]; else next\[agentId\] = at;/);
+  // Add mailbox: nothing is saved until main tests the login; a thrown IPC is a plain failure, not a crash.
+  const dlg = read('src/renderer/src/components/AddMailboxDialog.tsx');
+  assert.match(dlg, /\.catch\(\(e: unknown\) => \(\{ ok: false as const, kind: 'unknown'/);
+  assert.match(dlg, /disabled=\{busy \|\| !address\.trim\(\) \|\| !password\.trim\(\)\}/);
+  assert.match(dlg, /if \(e\.key === 'Escape' && !e\.nativeEvent\.isComposing\)/);
+  // MB-7 in main: a status change raises or closes one Ask me card, and a repeat of the same status writes nothing.
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(!rec \|\| \(rec\.status === status && rec\.statusReason === reason\)\) return;/);
+  assert.match(main, /hive\.patchTask\(cardId, \{ status: 'done', result:/);
+  assert.match(main, /ipcMain\.handle\('mail:save', async \(_evt, input: unknown\) => \{\s*if \(!input \|\| typeof input !== 'object'\) return \{ ok: false, kind: 'invalid'/);
 });
 
 test('md-mail is attached at spawn only for agents with email, as the last arguments', () => {

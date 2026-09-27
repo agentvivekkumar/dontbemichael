@@ -992,7 +992,6 @@
     "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
     "moveToWorkStyle": "移到 {{name}} 的工作方式",
     "removeOlder": "删除",
-    "officeSchedule": "办公室日程",
     "officeEmpty": "团队里还没有人开启定时工作。",
     "emptyAgent": "{{name}} 还没有定时工作。",
     "addFor": "为 {{name}} 添加定时任务",
@@ -1701,7 +1700,6 @@
     "claudeAccessDesc": "允许后，每位团队成员都可以使用你 Claude 账户连接的 Gmail 和 Google 日历。阻止则所有人都不能使用。上面的邮箱是分开的：在团队成员的“权限”标签中分配。"
   },
   "capabilities": {
-    "tab": "权限",
     "intro": "{{name}} 无需询问就可以做的事，以及 {{name}} 按时间运行的工作。",
     "email": "邮件",
     "emailBlurb": "{{name}} 查看的邮箱，以及回复是直接发出还是先存为草稿。",

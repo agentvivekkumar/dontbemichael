@@ -108,3 +108,20 @@ test('the switch governs only the Claude account connector: md-mail mailboxes fo
   assert.ok(!denied(await call('mcp__md-mail__search', { mailbox: 'sales' })), 'switch off, added mailbox still works');
   assert.ok(denied(await call('mcp__claude_ai_Gmail__search_threads', {})), 'switch off, Claude account blocked');
 });
+
+test('an md-mail tool the gate does not know is refused, and md-mail never reads the Claude account switch (ship audit)', async (t) => {
+  const f = await floor(t, {
+    mcpDefaults: { 'email-calendar': { enabled: false } },
+    mailboxes: [{ id: 'sales', address: 'sales@x.com', provider: 'gmail', imap: { host: 'h', port: 993, secure: true }, smtp: { host: 'h', port: 465, secure: true }, status: 'connected', createdAt: 1, updatedAt: 1 }],
+    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['sales'], send: true } } }
+  });
+  const call = (tool, input, agent = 'pam') => f.server.handle({ agent_id: agent, session_id: 's1', hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, cwd: f.home });
+  const unknown = await call('mcp__md-mail__delete_everything', { mailbox: 'sales' });
+  assert.ok(denied(unknown));
+  assert.match(unknown.hookSpecificOutput.permissionDecisionReason, /Unknown mail tool/);
+  assert.ok(denied(await call('mcp__md-mail__search', {})), 'no mailbox named');
+  assert.ok(denied(await call('mcp__md-mail__search', { mailbox: 42 })), 'a mailbox that is not a string');
+  assert.ok(!denied(await call('mcp__md-mail__send', { mailbox: 'sales' })), 'Can send, switch off: still allowed');
+  assert.ok(denied(await call('mcp__md-mail__list_mailboxes', {}, 'god')), 'Michael follows the same rule: no capability, no mail');
+  assert.ok(f.sent.some((s) => s.c === 'control:approvalRequest' && /Unknown mail tool/.test(JSON.stringify(s.p))), 'the floor hears about the refusal');
+});

@@ -51,37 +51,44 @@ export interface AgentCapabilities {
 
 export type MailOp = 'list' | 'read' | 'draft' | 'send';
 
-/** Settings each service fills in, so an owner never types a server name. */
-export const PROVIDER_PRESETS: Record<Exclude<MailProvider, 'other'>, { label: string; imap: MailServer; smtp: MailServer; help: string }> = {
+/** Each md-mail tool and the access it needs. The broker and the PreToolUse
+ *  hook both check tools against this one map. */
+export const MAIL_TOOL_OPS: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
+
+/** Standard mail ports: IMAP over TLS, SMTP over TLS, and SMTP submission
+ *  (STARTTLS). */
+export const IMAPS_PORT = 993;
+export const SMTPS_PORT = 465;
+export const SUBMISSION_PORT = 587;
+
+/** Server settings each service fills in, so an owner never types a server
+ *  name. The help text shown for each service lives in the locale files
+ *  (mailboxes.help.<provider>). */
+export const PROVIDER_PRESETS: Record<Exclude<MailProvider, 'other'>, { label: string; imap: MailServer; smtp: MailServer }> = {
   gmail: {
     label: 'Gmail',
-    imap: { host: 'imap.gmail.com', port: 993, secure: true },
-    smtp: { host: 'smtp.gmail.com', port: 465, secure: true },
-    help: 'Gmail needs an app password, not your normal one. Turn on 2-Step Verification, then create one at myaccount.google.com/apppasswords.'
+    imap: { host: 'imap.gmail.com', port: IMAPS_PORT, secure: true },
+    smtp: { host: 'smtp.gmail.com', port: SMTPS_PORT, secure: true }
   },
   'google-workspace': {
     label: 'Google Workspace',
-    imap: { host: 'imap.gmail.com', port: 993, secure: true },
-    smtp: { host: 'smtp.gmail.com', port: 465, secure: true },
-    help: 'Use an app password from myaccount.google.com/apppasswords. If that page is missing, your Workspace admin has turned app passwords off.'
+    imap: { host: 'imap.gmail.com', port: IMAPS_PORT, secure: true },
+    smtp: { host: 'smtp.gmail.com', port: SMTPS_PORT, secure: true }
   },
   icloud: {
     label: 'iCloud Mail',
-    imap: { host: 'imap.mail.me.com', port: 993, secure: true },
-    smtp: { host: 'smtp.mail.me.com', port: 587, secure: false },
-    help: 'iCloud needs an app-specific password. Create one at account.apple.com under Sign-In and Security.'
+    imap: { host: 'imap.mail.me.com', port: IMAPS_PORT, secure: true },
+    smtp: { host: 'smtp.mail.me.com', port: SUBMISSION_PORT, secure: false }
   },
   yahoo: {
     label: 'Yahoo',
-    imap: { host: 'imap.mail.yahoo.com', port: 993, secure: true },
-    smtp: { host: 'smtp.mail.yahoo.com', port: 465, secure: true },
-    help: 'Yahoo needs an app password. Create one in Account Security, then Generate app password.'
+    imap: { host: 'imap.mail.yahoo.com', port: IMAPS_PORT, secure: true },
+    smtp: { host: 'smtp.mail.yahoo.com', port: SMTPS_PORT, secure: true }
   },
   zoho: {
     label: 'Zoho',
-    imap: { host: 'imap.zoho.com', port: 993, secure: true },
-    smtp: { host: 'smtp.zoho.com', port: 465, secure: true },
-    help: 'Zoho needs an app-specific password from Security, then App Passwords, and IMAP turned on in Mail settings.'
+    imap: { host: 'imap.zoho.com', port: IMAPS_PORT, secure: true },
+    smtp: { host: 'smtp.zoho.com', port: SMTPS_PORT, secure: true }
   }
 };
 
@@ -97,16 +104,7 @@ export function isMicrosoftAddress(address: string): boolean {
 /** "Other" guesses (design review 10A): mail.<domain> for both servers. */
 export function guessServers(address: string): { imap: MailServer; smtp: MailServer } {
   const domain = address.split('@')[1]?.trim().toLowerCase() || 'example.com';
-  return { imap: { host: `mail.${domain}`, port: 993, secure: true }, smtp: { host: `mail.${domain}`, port: 465, secure: true } };
-}
-
-/** Whether the owner lets agents use the email and calendar connected to their
- *  Claude account (the "Your Claude account" switch in Settings > Mailboxes;
- *  stored as the old Email & Calendar switch). It governs only that connector:
- *  mailboxes added in Settings depend on Capabilities alone (owner, 2026-09-26).
- *  Only an explicit yes counts. */
-export function teamEmailOn(mcpDefaults: { [id: string]: { enabled: boolean } } | undefined): boolean {
-  return mcpDefaults?.['email-calendar']?.enabled === true;
+  return { imap: { host: `mail.${domain}`, port: IMAPS_PORT, secure: true }, smtp: { host: `mail.${domain}`, port: SMTPS_PORT, secure: true } };
 }
 
 export interface MailAccessConfig {

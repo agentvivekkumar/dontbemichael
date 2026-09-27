@@ -57,8 +57,8 @@ const TOOLS = [
         subject: { type: 'string' },
         since: { type: 'string', description: 'A date, for example 2026-09-01.' },
         unread: { type: 'boolean' },
-        limit: { type: 'number' },
-        page: { type: 'number' }
+        limit: { type: 'number', description: 'How many messages per page: 20 if left out, at most 50.' },
+        page: { type: 'number', description: 'Which page, counting from 0 (0 is the newest messages).' }
       },
       required: ['mailbox']
     }

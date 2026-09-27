@@ -43,7 +43,7 @@ function rpc(child) {
   };
 }
 
-test('md-mail relays tool calls to the broker with the agent token', async (t) => {
+test('md-mail relays tool calls to the broker with the agent token', { timeout: 15_000 }, async (t) => {
   const calls = [];
   const broker = new IntegrationBroker({
     getRecord: () => undefined,
@@ -85,7 +85,7 @@ test('md-mail relays tool calls to the broker with the agent token', async (t) =
   assert.ok(still.result.tools.length, 'still answering after a bad line');
 });
 
-test('without a broker token every call is a plain tool error, not a crash', async (t) => {
+test('without a broker token every call is a plain tool error, not a crash', { timeout: 15_000 }, async (t) => {
   const child = spawn(process.execPath, [SCRIPT], { env: { ...process.env, MD_BROKER_URL: '', MD_BROKER_TOKEN: '' }, stdio: ['pipe', 'pipe', 'pipe'] });
   t.after(() => child.kill());
   const c = rpc(child);
@@ -94,7 +94,7 @@ test('without a broker token every call is a plain tool error, not a crash', asy
   assert.match(r.result.content[0].text, /not connected/);
 });
 
-test('a token the broker does not know is refused before mail runs', async (t) => {
+test('a token the broker does not know is refused before mail runs', { timeout: 15_000 }, async (t) => {
   let ran = false;
   const broker = new IntegrationBroker({ getRecord: () => undefined, getSecret: () => undefined, mail: async () => { ran = true; return { status: 200, body: {} }; } });
   await broker.start();

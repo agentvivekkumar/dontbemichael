@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
-import { Toggle } from './triggers/ui';
+import { Disclosure, Toggle } from './triggers/ui';
+import { useRtl } from '@/i18n/useDirection';
 import {
-  PROVIDER_ORDER, PROVIDER_PRESETS, guessServers,
+  IMAPS_PORT, PROVIDER_ORDER, PROVIDER_PRESETS, SMTPS_PORT, SUBMISSION_PORT, guessServers,
   type MailProvider, type MailServer, type MailboxRecord
 } from '@shared/mailboxes';
 
@@ -32,8 +33,8 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
   const guessed = guessServers(address);
   const [imapHost, setImapHost] = useState(fix?.provider === 'other' ? fix.imap.host : '');
   const [smtpHost, setSmtpHost] = useState(fix?.provider === 'other' ? fix.smtp.host : '');
-  const [imapPort, setImapPort] = useState(String(fix?.imap.port ?? 993));
-  const [smtpPort, setSmtpPort] = useState(String(fix?.smtp.port ?? 465));
+  const [imapPort, setImapPort] = useState(String(fix?.imap.port ?? IMAPS_PORT));
+  const [smtpPort, setSmtpPort] = useState(String(fix?.smtp.port ?? SMTPS_PORT));
   const [tls, setTls] = useState(fix?.imap.secure ?? true);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,7 +47,8 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
   useEffect(() => { (fix ? passRef.current : firstRef.current)?.focus(); }, [fix]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key === 'Escape' && !e.nativeEvent.isComposing) { e.stopPropagation(); onClose(); return; }
+    // Escape waits for a running login test, like the backdrop and Cancel.
+    if (e.key === 'Escape' && !e.nativeEvent.isComposing) { e.stopPropagation(); if (!busy) onClose(); return; }
     if (e.key !== 'Tab' || !boxRef.current) return;
     const items = [...boxRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])')];
     if (!items.length) return;
@@ -61,7 +63,7 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
       ({ host: host.trim() || fallback.host, port: Number(port) || fallback.port, secure: tls });
     const res = await window.cth.mailSave({
       id: fix?.id, provider, address: address.trim(), password,
-      ...(provider === 'other' ? { imap: server(imapHost, imapPort, guessed.imap), smtp: server(smtpHost, smtpPort, { ...guessed.smtp, port: tls ? 465 : 587 }) } : {})
+      ...(provider === 'other' ? { imap: server(imapHost, imapPort, guessed.imap), smtp: server(smtpHost, smtpPort, { ...guessed.smtp, port: tls ? SMTPS_PORT : SUBMISSION_PORT }) } : {})
     }).catch((e: unknown) => ({ ok: false as const, kind: 'unknown', reason: e instanceof Error ? e.message : String(e) }));
     setBusy(false);
     if (res.ok) onSaved(res.record);
@@ -69,6 +71,21 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
   };
 
   const label = (p: MailProvider): string => (p === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[p].label);
+
+  // Arrow keys move and choose within the service tiles (DESIGN.md 7.10a);
+  // left and right follow reading direction.
+  const rtl = useRtl();
+  const onProviderKey = (e: KeyboardEvent<HTMLDivElement>): void => {
+    const fwd = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const back = rtl ? 'ArrowRight' : 'ArrowLeft';
+    const step = e.key === fwd || e.key === 'ArrowDown' ? 1 : e.key === back || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = PROVIDER_ORDER.indexOf(provider);
+    const next = PROVIDER_ORDER[(at + step + PROVIDER_ORDER.length) % PROVIDER_ORDER.length];
+    setProvider(next);
+    e.currentTarget.querySelector<HTMLElement>(`[data-provider="${next}"]`)?.focus();
+  };
 
   return (
     <div
@@ -90,14 +107,16 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
         {!fix && (
           <>
             <div style={hint}>{t('mailboxes.which')}</div>
-            <div role="radiogroup" aria-label={t('mailboxes.which')} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 }}>
-              {PROVIDER_ORDER.map((p, i) => (
+            <div role="radiogroup" aria-label={t('mailboxes.which')} onKeyDown={onProviderKey} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 }}>
+              {PROVIDER_ORDER.map((p) => (
                 <button
                   key={p}
-                  ref={i === 0 ? firstRef : undefined}
+                  ref={provider === p ? firstRef : undefined}
                   type="button"
                   role="radio"
+                  data-provider={p}
                   aria-checked={provider === p}
+                  tabIndex={provider === p ? 0 : -1}
                   onClick={() => setProvider(p)}
                   style={{
                     border: 'none', cursor: 'pointer', padding: '8px 6px', fontSize: 13, lineHeight: '18px',
@@ -133,12 +152,12 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
             <Field label={t('mailboxes.outgoing')}>
               <input value={smtpHost} placeholder={guessed.smtp.host} disabled={busy} onChange={(e) => setSmtpHost(e.target.value)} style={input} spellCheck={false} />
             </Field>
-            <button type="button" aria-expanded={more} onClick={() => setMore((v) => !v)} style={linkButton}>{t('mailboxes.moreSettings')}</button>
+            <button type="button" aria-expanded={more} onClick={() => setMore((v) => !v)} style={{ ...linkButton, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Disclosure open={more} />{t('mailboxes.moreSettings')}</button>
             {more && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <Field label={t('mailboxes.incomingPort')}><input inputMode="numeric" value={imapPort} onChange={(e) => setImapPort(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 100 }} /></Field>
                 <Field label={t('mailboxes.outgoingPort')}><input inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 100 }} /></Field>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 30, fontSize: 13 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-end', paddingBottom: 6, fontSize: 13 }}>
                   <span>{t('mailboxes.tls')}</span>
                   <Toggle on={tls} label={t('mailboxes.tls')} onClick={() => setTls((v) => !v)} />
                 </div>

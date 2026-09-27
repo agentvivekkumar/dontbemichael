@@ -830,7 +830,6 @@ const api = {
   hiveInbox: (id: string): Promise<HiveMessage[]> => ipcRenderer.invoke('hive:inbox', id),
   // Mailboxes and Capabilities (docs/designs/multi-mailbox.md). A password
   // crosses the bridge only once, to be tested and stored in main.
-  mailList: (): Promise<MailboxRecord[]> => ipcRenderer.invoke('mail:list'),
   mailSave: (input: { id?: string; provider: MailProvider; address: string; password: string; imap?: MailServer; smtp?: MailServer }): Promise<{ ok: true; record: MailboxRecord } | { ok: false; kind: string; reason: string }> =>
     ipcRenderer.invoke('mail:save', input),
   mailRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> => ipcRenderer.invoke('mail:remove', id),

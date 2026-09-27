@@ -107,7 +107,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
               ) : (
                 // A list to pick from (owner, 2026-09-26); "Pick a mailbox" until one is chosen.
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%' }}>
+                  <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%', fontSize: 14, lineHeight: '20px' }}>
                     {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
                     {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
                   </Select>
@@ -174,7 +174,7 @@ function RadioRows({ label, value, options, onChange }: {
             aria-checked={checked}
             tabIndex={checked || (at < 0 && i === 0) ? 0 : -1}
             onClick={() => onChange(o.value)}
-            style={{ ...row, borderTop: i === 0 ? 'none' : row.borderTop, width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)' }}
+            style={{ ...row, width: '100%', border: 'none', borderTop: i === 0 ? 'none' : row.borderTop, background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)' }}
           >
             <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, boxShadow: 'inset 0 0 0 1px var(--cth-ink-500)', background: 'var(--cth-paper-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               {checked && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cth-ink-900)' }} />}

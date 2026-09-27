@@ -48,7 +48,7 @@ import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
 import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
-import { mailAccess, type MailOp } from '../shared/mailboxes';
+import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { handoffContext } from '../shared/safeClear';
 
 /** Why a mail or calendar tool was refused. Read by the agent (and shown on the
@@ -358,8 +358,7 @@ export class HookServer {
       } else {
         // Mailboxes added in Settings: the agent's Capabilities for the mailbox
         // named in the call (the broker checks it again).
-        const ops: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
-        const op = ops[mdMail[1]];
+        const op = MAIL_TOOL_OPS[mdMail[1]];
         const input = (p.tool_input ?? {}) as { mailbox?: unknown };
         const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
         if (!d.ok) reason = d.reason;

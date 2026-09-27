@@ -1632,15 +1632,14 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                   {activeSection === 'Connections' && (
                     <>
-                      {/* Connected-services registry (generic, registry-driven).
-                          Leads the section; the hardcoded Slack/Webhook/Free Flow
-                          blocks below stay as-is. */}
-                      {/* Mailboxes first: the Team email switch and every connected
-                          mailbox (docs/designs/multi-mailbox.md, design 1A, 2A). */}
+                      {/* Mailboxes first: every connected mailbox, then the
+                          Your Claude account switch (docs/designs/multi-mailbox.md). */}
                       <MailboxesSettings />
 
                       <div style={sectionRule} />
 
+                      {/* Connected-services registry (generic, registry-driven);
+                          the hardcoded Slack/Webhook/Free Flow blocks below stay as-is. */}
                       <IntegrationsRegistry />
 
                       <div style={sectionRule} />

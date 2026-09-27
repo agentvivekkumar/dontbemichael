@@ -152,7 +152,9 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   }
 ];
 
-/** Whether the owner turned Settings → Connections → Email & Calendar ON.
+/** Whether the owner allows the email and calendar connected to their Claude
+ *  account: the "Your Claude account" switch in Settings > Connections >
+ *  Mailboxes (stored as mcpDefaults['email-calendar']).
  *  A secret tier server, so only an explicit yes counts (the catalog ships it
  *  off and a missing entry means off). */
 export function emailCalendarAllowed(mcpDefaults: { [id: string]: { enabled: boolean } } | undefined): boolean {

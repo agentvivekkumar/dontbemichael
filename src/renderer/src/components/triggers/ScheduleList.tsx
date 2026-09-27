@@ -21,9 +21,9 @@ import { useRtl } from '@/i18n/useDirection';
  *
  * - `agent`: that agent's own schedules, editable. Lives in the On a schedule
  *   section of every agent's Capabilities tab, Michael's included.
- * - `office`: everyone's schedules, read only, grouped by agent, on Michael's
- *   Office schedule tab. A row jumps to that agent's section with the row open
- *   (design 1A).
+ * - `office`: everyone's schedules that are on, read only plain rows grouped
+ *   by agent, on Michael's Office schedule tab. Edits happen on each agent's
+ *   Capabilities tab (owner, 2026-09-26).
  *
  * Each change is one operation on one schedule (upsert, delete, setEnabled), and
  * the row waits for main's answer: on a failure it goes back to what is saved

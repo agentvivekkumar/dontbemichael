@@ -21,14 +21,15 @@ import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { simpleParser } from 'mailparser';
 import {
+  MAIL_TOOL_OPS,
   agentMailboxes,
+  emailJustEnabled,
   isMicrosoftAddress,
   mailAccess,
   mailboxIdFor,
   secretRefForMailbox,
   type MailAccessConfig,
   type MailboxRecord,
-  type MailOp,
   type MailServer
 } from '../shared/mailboxes';
 
@@ -142,10 +143,13 @@ export interface ComposeInput {
   attachFrom?: MailRef[];
 }
 
-interface OpenBox { client: ImapLike; lastUsed: number; timer?: ReturnType<typeof setTimeout> }
+interface OpenBox { client: ImapLike; timer?: ReturnType<typeof setTimeout> }
 
 export class MailService {
   private readonly boxes = new Map<string, OpenBox>();
+  /** Last status written per mailbox, so a working call does not rewrite
+   *  config on every tool call. */
+  private readonly lastStatus = new Map<string, 'connected' | 'needs-attention'>();
   private readonly sent = new Map<string, { at: number; result: { messageId: string } }>();
   private readonly createImap: NonNullable<MailDeps['createImap']>;
   private readonly createSmtp: NonNullable<MailDeps['createSmtp']>;
@@ -171,8 +175,14 @@ export class MailService {
    *  provider-blocked mark it; a network blip does not. */
   private note(id: string, err?: MailError): void {
     try {
-      if (!err) this.deps.markStatus(id, 'connected');
-      else if (err.kind === 'auth' || err.kind === 'provider-blocked') this.deps.markStatus(id, 'needs-attention', err.message);
+      if (!err) {
+        if (this.lastStatus.get(id) === 'connected') return;
+        this.deps.markStatus(id, 'connected');
+        this.lastStatus.set(id, 'connected');
+      } else if (err.kind === 'auth' || err.kind === 'provider-blocked') {
+        this.deps.markStatus(id, 'needs-attention', err.message);
+        this.lastStatus.set(id, 'needs-attention');
+      }
     } catch { /* status is best-effort */ }
   }
 
@@ -192,14 +202,13 @@ export class MailService {
       try { client.close?.(); } catch { /* already gone */ }
       throw e;
     }
-    const box: OpenBox = { client, lastUsed: Date.now() };
+    const box: OpenBox = { client };
     this.boxes.set(id, box);
     this.touch(id, box);
     return client;
   }
 
   private touch(id: string, box: OpenBox): void {
-    box.lastUsed = Date.now();
     if (box.timer) clearTimeout(box.timer);
     box.timer = setTimeout(() => this.drop(id), IDLE_CLOSE_MS);
     (box.timer as { unref?: () => void }).unref?.();
@@ -219,14 +228,14 @@ export class MailService {
 
   /** Run `fn` with the folder locked; one reconnect after a dropped socket
    *  (sleep and wake), then a classified error. */
-  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike) => Promise<T>, what: string): Promise<T> {
+  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike, path: string) => Promise<T>, what: string): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const client = await this.imap(id);
         const path = await folder(client);
         const lock = await withTimeout(client.getMailboxLock(path), CALL_TIMEOUT_MS, what);
         try {
-          const out = await withTimeout(fn(client), CALL_TIMEOUT_MS, what);
+          const out = await withTimeout(fn(client, path), CALL_TIMEOUT_MS, what);
           this.note(id);
           return out;
         } finally { lock.release(); }
@@ -345,7 +354,7 @@ export class MailService {
     const rec = this.record(id);
     const msg = await this.compose(id, rec.address, input, MailService.newMessageId(rec.address));
     const raw = await MailService.build(msg);
-    await this.inFolder(id, MailService.drafts, async (c) => { await c.append(await MailService.drafts(c), raw, ['\\Draft', '\\Seen']); }, 'Saving the draft');
+    await this.inFolder(id, MailService.drafts, async (c, path) => { await c.append(path, raw, ['\\Draft', '\\Seen']); }, 'Saving the draft');
     return { saved: true, messageId: String(msg.messageId) };
   }
 
@@ -379,7 +388,7 @@ export class MailService {
     // Gmail files sent mail itself; other services need the copy appended.
     if (rec.provider !== 'gmail' && rec.provider !== 'google-workspace') {
       const raw = await MailService.build(msg).catch(() => null);
-      if (raw) await this.inFolder(id, MailService.sentBox, async (c) => { await c.append(await MailService.sentBox(c), raw, ['\\Seen']); }, 'Saving to Sent').catch(() => undefined);
+      if (raw) await this.inFolder(id, MailService.sentBox, async (c, path) => { await c.append(path, raw, ['\\Seen']); }, 'Saving to Sent').catch(() => undefined);
     }
     return { sent: true, messageId };
   }
@@ -438,8 +447,7 @@ function ref(v: unknown): MailRef | undefined {
  */
 export async function handleMailRequest(svc: MailService, deps: Pick<MailDeps, 'getConfig'>, agentId: string, op: string, body: Record<string, unknown>): Promise<MailRequestResult> {
   const cfg = deps.getConfig();
-  const allowedOps: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
-  const mop = allowedOps[op];
+  const mop = MAIL_TOOL_OPS[op];
   if (!mop) return { status: 404, body: { error: `Unknown mail tool "${op}".` } };
   const mailbox = str(body.mailbox, 100);
   const access = mailAccess(cfg, agentId, mailbox, mop);
@@ -525,14 +533,17 @@ export async function saveMailbox(svc: MailService, admin: MailAdminDeps, preset
   if (!imap?.host || !smtp?.host) return { ok: false, kind: 'invalid', reason: 'Enter the incoming and outgoing mail servers.' };
   const cfg = admin.getConfig();
   const existing = cfg.mailboxes ?? [];
-  if (!input.id && existing.some((m) => m.address.toLowerCase() === address.toLowerCase())) {
+  // Fixing a mailbox keeps its id; any other save (including a made up id)
+  // must not add a second record for an address that is already connected.
+  const fixing = input.id ? existing.find((m) => m.id === input.id) : undefined;
+  if (existing.some((m) => m.address.toLowerCase() === address.toLowerCase() && m.id !== fixing?.id)) {
     return { ok: false, kind: 'invalid', reason: `${address} is already connected.` };
   }
   const password = input.password.replace(/\s+/g, '');
   const tested = await svc.test({ address, imap, smtp }, password);
   if (!tested.ok) return { ok: false, kind: tested.kind, reason: tested.reason };
 
-  const id = input.id && existing.some((m) => m.id === input.id) ? input.id : mailboxIdFor(address, existing.map((m) => m.id));
+  const id = fixing ? fixing.id : mailboxIdFor(address, existing.map((m) => m.id));
   const stored = admin.setSecret(secretRefForMailbox(id), password);
   if (!stored.ok) return { ok: false, kind: 'unknown', reason: stored.error ?? "Couldn't store the password securely on this Mac." };
   const now = Date.now();
@@ -550,8 +561,10 @@ export function removeMailbox(svc: MailService, admin: MailAdminDeps, id: string
   const caps = { ...(cfg.agentCapabilities ?? {}) };
   for (const [agentId, c] of Object.entries(caps)) {
     if (c.email?.mailboxes.includes(id)) {
-      affected.push(agentId);
-      caps[agentId] = { ...c, email: { ...c.email, mailboxes: c.email.mailboxes.filter((m) => m !== id) } };
+      // Only the first listed mailbox is ever in use (one per agent), so an
+      // older record listing two must not fall through to the second one.
+      if (c.email.mailboxes[0] === id) affected.push(agentId);
+      caps[agentId] = { ...c, email: { ...c.email, mailboxes: c.email.mailboxes.slice(0, 1).filter((m) => m !== id) } };
     }
   }
   admin.saveConfig({ mailboxes: (cfg.mailboxes ?? []).filter((m) => m.id !== id), agentCapabilities: caps });
@@ -566,9 +579,12 @@ export function setAgentCapabilities(admin: MailAdminDeps, agentId: string, next
   const cfg = admin.getConfig();
   const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
   const before = cfg.agentCapabilities?.[agentId];
+  // The renderer is not trusted with the shape: anything that is not a list of
+  // strings becomes no mailbox.
+  const picked = Array.isArray(next.email?.mailboxes) ? next.email.mailboxes.filter((m): m is string => typeof m === 'string') : [];
   const email = next.email
-    ? { enabled: !!next.email.enabled, mailboxes: next.email.mailboxes.filter((m) => known.has(m)).slice(0, 1), send: !!next.email.send }
+    ? { enabled: next.email.enabled === true, mailboxes: picked.filter((m) => known.has(m)).slice(0, 1), send: next.email.send === true }
     : undefined;
   admin.saveConfig({ agentCapabilities: { ...(cfg.agentCapabilities ?? {}), [agentId]: { ...(before ?? {}), email } } });
-  return { ok: true, restartNeeded: !before?.email?.enabled && !!email?.enabled };
+  return { ok: true, restartNeeded: emailJustEnabled(before, email ? { email } : undefined) };
 }

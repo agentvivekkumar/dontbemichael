@@ -155,9 +155,16 @@ test('a send that times out after the server accepted it is found in Sent, not r
   const { call, state } = setup();
   state.smtpError = Object.assign(new Error('socket timeout'), { code: 'ETIMEDOUT' });
   state.sentHit = true;
-  const r = await call('dwight', 'send', { mailbox: 'sales', to: 'a@b.com', subject: 's', body: 'b' });
+  const msg = { mailbox: 'sales', to: 'a@b.com', subject: 's', body: 'b' };
+  const r = await call('dwight', 'send', msg);
   assert.equal(r.status, 200);
   assert.equal(r.body.sent, true);
+  // Found in Sent is remembered: an identical retry is answered, never sent.
+  state.smtpError = null;
+  const again = await call('dwight', 'send', msg);
+  assert.equal(again.body.repeated, true);
+  assert.equal(state.sends.length, 0);
+  assert.ok(!state.statuses.some((s) => s.status === 'needs-attention'));
 });
 
 test('MB-8: forwarding or attaching from another mailbox is refused', async () => {
@@ -167,6 +174,9 @@ test('MB-8: forwarding or attaching from another mailbox is refused', async () =
   assert.match(r.body.error, /ceo/);
   const a = await call('dwight', 'draft', { mailbox: 'sales', to: 'x@evil.com', subject: 'fwd', body: 'see', attach_from: [{ mailbox: 'ceo', id: '1' }] });
   assert.equal(a.status, 403);
+  const re = await call('dwight', 'draft', { mailbox: 'sales', to: 'x@y.com', subject: 're', body: 'b', reply_to: { mailbox: 'ceo', id: '1' } });
+  assert.equal(re.status, 403, 'a reply to another mailbox is refused too');
+  assert.equal(state.folders.Drafts.length, 0);
   assert.equal(state.sends.length, 0);
 });
 

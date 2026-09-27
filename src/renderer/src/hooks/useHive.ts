@@ -1229,6 +1229,7 @@ export function useHive(config: HarnessConfig | null): void {
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const CEILING_MS = 10 * 60_000;
+    const POLL_MS = 5_000;
     const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
     const inFlight = new Set<string>();
     const tick = (): void => {
@@ -1243,7 +1244,7 @@ export function useHive(config: HarnessConfig | null): void {
         void respawnResumed(a, a.ptyId).then((res) => {
           if (res.ok) {
             setPendingEmailRestart(agentId, undefined);
-            updateAgent(agentId, { status: 'idle', action: overdue ? 'restarted after 10 minutes to turn on email' : 'restarted to turn on email' });
+            updateAgent(agentId, { status: 'idle', action: overdue ? `restarted after ${Math.round(CEILING_MS / 60_000)} minutes to turn on email` : 'restarted to turn on email' });
           } else {
             console.error('[email] restart failed for', agentId, res.error);
           }
@@ -1251,7 +1252,7 @@ export function useHive(config: HarnessConfig | null): void {
           .finally(() => inFlight.delete(agentId));
       }
     };
-    const iv = setInterval(tick, 5_000);
+    const iv = setInterval(tick, POLL_MS);
     return () => clearInterval(iv);
   }, [config?.onboardingComplete]);
 }

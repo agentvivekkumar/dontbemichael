@@ -104,7 +104,8 @@ export function Toggle({ on, onClick, onLabel, offLabel, label, disabled }: {
         opacity: disabled ? 0.6 : 1,
         background: on ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
         boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
-        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)'
+        // Text on the lemon fill uses on-accent, readable in both themes (DESIGN.md 3.3).
+        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: on ? 'var(--cth-on-accent)' : 'var(--cth-ink-900)'
       }}
     >{on ? (onLabel ?? t('common.on')) : (offLabel ?? t('common.off'))}</button>
   );
@@ -200,7 +201,7 @@ export function TriggerCard({ title, blurb, summary, action, defaultOpen = false
   /** A control that sits in the header beside the fold button (not inside it),
    *  e.g. the section's own on/off switch. Replaces the summary chip. */
   action?: ReactNode; defaultOpen?: boolean;
-  /** Controlled use: the parent owns open/closed (e.g. remembers it, or opens it on a jump). */
+  /** Controlled use: the parent owns open/closed (e.g. opens it when email turns on). */
   open?: boolean; onToggle?: (open: boolean) => void; children: ReactNode;
 }) {
   const [openState, setOpenState] = useState(defaultOpen);
@@ -231,7 +232,7 @@ export function TriggerCard({ title, blurb, summary, action, defaultOpen = false
         </span>
         {summary !== undefined && action === undefined && <Chip>{summary}</Chip>}
       </button>
-      {action !== undefined && <div style={{ flexShrink: 0, padding: '8px 10px 0 0' }}>{action}</div>}
+      {action !== undefined && <div style={{ flexShrink: 0, paddingBlockStart: 8, paddingInlineEnd: 10 }}>{action}</div>}
       </div>
       <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
     </div>

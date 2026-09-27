@@ -487,12 +487,6 @@ const mailAdmin = {
   deleteSecret: (ref: string) => integrations.deleteSecret(ref)
 };
 
-/** Owner, 2026-09-26: email being per team member is not something to raise on
- *  Ask me. Clear the card an earlier build of this branch may have added. */
-function clearEmailNoticeCard(): void {
-  try { hive.deleteTask('email-per-team-member'); } catch { /* not there */ }
-}
-
 /** BYOK backend model-providers whose API keys the non-Claude CLI engines
  *  (OpenCode/Crush/pi/qwen) read from standard env vars. Keys are stored
  *  WRITE-ONLY in the same encrypted secret broker as integrations, under
@@ -3870,7 +3864,6 @@ ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hi
 
 // ─── IPC: mailboxes and Capabilities (docs/designs/multi-mailbox.md) ─────────
 // Records carry no password; the renderer only ever sends one, to save it.
-ipcMain.handle('mail:list', () => readConfig().mailboxes ?? []);
 ipcMain.handle('mail:save', async (_evt, input: unknown) => {
   if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
   return saveMailbox(mailService, mailAdmin, PROVIDER_PRESETS, input as AddMailboxInput);
@@ -5587,7 +5580,6 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
-  clearEmailNoticeCard();
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
   hive.setRuntimeInfo({ version: app.getVersion(), packaged: app.isPackaged, appPath: app.getAppPath() });
