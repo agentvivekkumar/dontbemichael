@@ -6,7 +6,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { useStore, type Agent } from '@/store/store';
-import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
+import { OFFICE_CAST, CAST_BY_NAME, CAST_GROUPS, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
 import type { HireManifest } from '@shared/hire';
 import { hireQueueProgress } from '@shared/hireQueue';
@@ -742,30 +742,37 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     </Row>
 
                     <Row label={tr('addAgent.character')}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {OFFICE_CAST.map(c => (
-                          <button
-                            key={c.name}
-                            onClick={() => { setCharacter(c.name); setName(c.displayName); }}
-                            title={c.blurb}
-                            style={{
-                              padding: 4,
-                              background: character === c.name ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                              boxShadow: character === c.name
-                                ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                                : 'inset 0 0 0 1px var(--cth-ink-100)',
-                              cursor: 'pointer',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                              border: 'none', width: 72
-                            }}
-                          >
-                            <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
-                              <SpritePortrait character={c.name} scale={2} />
+                      {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {CAST_GROUPS.map((g) => (
+                          <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', marginBottom: 4 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {g.members.map((name) => CAST_BY_NAME[name]).map((c) => (
+                                <button
+                                  key={c.name}
+                                  type="button"
+                                  onClick={() => { setCharacter(c.name); setName(c.displayName); }}
+                                  title={c.blurb}
+                                  style={{
+                                    padding: 4,
+                                    background: character === c.name ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
+                                    boxShadow: character === c.name
+                                      ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
+                                      : 'inset 0 0 0 1px var(--cth-ink-100)',
+                                    cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                                    border: 'none', width: 56
+                                  }}
+                                >
+                                  <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
+                                    <SpritePortrait character={c.name} scale={2} />
+                                  </div>
+                                  <span style={{ fontSize: 11, color: 'var(--cth-ink-700)' }}>{c.displayName}</span>
+                                </button>
+                              ))}
                             </div>
-                            <span style={{ fontSize: 11, color: 'var(--cth-ink-900)' }}>{c.displayName}</span>
-                            {/* Each character's job in the show (owner, 2026-09-27). */}
-                            <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </Row>

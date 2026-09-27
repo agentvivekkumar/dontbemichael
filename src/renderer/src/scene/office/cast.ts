@@ -51,6 +51,23 @@ export const OFFICE_CAST: CastMember[] = [
   { name: 'darryl',   displayName: 'Darryl',   shirt: '#4a6280', blurb: 'Warehouse foreman' },
 ];
 
+/** The cast grouped by the job each had in the show, in the order Add Agent
+ *  shows them (owner, 2026-09-27). Every cast member is in exactly one group. */
+export const CAST_GROUPS: { key: string; members: OfficeCharacterName[] }[] = [
+  { key: 'manager',    members: ['michael'] },
+  { key: 'admin',      members: ['pam', 'erin'] },
+  { key: 'sales',      members: ['dwight', 'jim', 'stanley', 'phyllis', 'andy'] },
+  { key: 'accounting', members: ['oscar', 'angela', 'kevin'] },
+  { key: 'support',    members: ['kelly'] },
+  { key: 'marketing',  members: ['ryan'] },
+  { key: 'hr',         members: ['toby'] },
+  { key: 'it',         members: ['nick'] },
+  { key: 'security',   members: ['sadiq'] },
+  { key: 'quality',    members: ['creed'] },
+  { key: 'supply',     members: ['meredith'] },
+  { key: 'warehouse',  members: ['darryl'] }
+];
+
 export const CAST_BY_NAME: Record<OfficeCharacterName, CastMember> =
   Object.fromEntries(OFFICE_CAST.map((c) => [c.name, c])) as Record<OfficeCharacterName, CastMember>;
 
