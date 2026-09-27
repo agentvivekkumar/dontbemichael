@@ -626,7 +626,10 @@
       "bind": "bind",
       "topicPlaceholder": "For example: catering enquiries",
       "editToFix": "Editing what to send and checking again works too.",
-      "mailboxScope": "the {{address}} mailbox"
+      "mailboxScope": "the {{address}} mailbox",
+      "familyJobs": "{{role}} jobs from every kind of business",
+      "showAll": "show all jobs ({{count}} more)",
+      "showFamily": "show only {{role}} jobs"
     }
   },
   "onboarding": {

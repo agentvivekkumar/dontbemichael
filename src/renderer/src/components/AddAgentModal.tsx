@@ -37,6 +37,7 @@ import {
   overlapsByRules,
   ownJob,
   sameFamily,
+  CHARACTER_CARD,
   teamJobs,
   type DistinctVerdict,
   type HireJob,
@@ -180,8 +181,23 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   }, [config.businessType, business]);
   const officeJobs = useMemo(() => teamJobs(team, cards), [team, cards]);
   const theirJob = useMemo(() => ownJob(character, officeJobs, cards), [character, officeJobs, cards]);
-  // Only the office's jobs in this character's family (owner, 2026-09-27).
-  const familyJobs = useMemo(() => officeJobs.filter((j) => j.key !== theirJob?.key && sameFamily(j, character)), [officeJobs, theirJob, character]);
+  // Every job list opens on the character's own family, office and packs alike;
+  // "show all jobs" opens the rest (owner, 2026-09-27). A character with no
+  // family shows everything.
+  const family = CHARACTER_CARD[character];
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => { setShowAll(false); }, [character]);
+  const listAll = showAll || !family;
+  const inFamily = (j: HireJob) => !family || sameFamily(j, character);
+  const familyJobs = useMemo(
+    () => officeJobs.filter((j) => j.key !== theirJob?.key && (listAll || sameFamily(j, character))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [officeJobs, theirJob, character, listAll]
+  );
+  const hiddenCount = family
+    ? officeJobs.filter((j) => j.key !== theirJob?.key && !sameFamily(j, character)).length
+      + cards.filter((j) => j.key !== theirJob?.key && !sameFamily(j, character)).length
+    : 0;
   const [jobKey, setJobKey] = useState<string | null>(null);
   const allJobs = useMemo(() => [...officeJobs, ...cards], [officeJobs, cards]);
   const chosenKey = jobKey ?? theirJob?.key ?? NEW_JOB_KEY;
@@ -504,13 +520,14 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const stepIndex = STEPS.indexOf(step);
   const jobGroups = useMemo(() => {
     const byTitle = new Map<string, HireJob[]>();
-    for (const c of cards) {
+    for (const c of cards.filter((j) => listAll || inFamily(j))) {
       const list = byTitle.get(c.title) ?? [];
       list.push(c);
       byTitle.set(c.title, list);
     }
     return [...byTitle.entries()];
-  }, [cards]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, listAll, character]);
 
   return (
     <div
@@ -669,7 +686,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   <JobGroup label={tr('addAgent.wizard.newJob')}>
                     <JobRow job={{ key: NEW_JOB_KEY, source: 'new', title: tr('addAgent.wizard.newJobTitle'), routing: '', workStyle: '', summary: tr('addAgent.wizard.newJobSummary') }} selected={chosenKey === NEW_JOB_KEY} onPick={() => setJobKey(NEW_JOB_KEY)} />
                   </JobGroup>
-                  <JobGroup label={tr('addAgent.wizard.allJobs')}>
+                  <JobGroup label={listAll ? tr('addAgent.wizard.allJobs') : tr('addAgent.wizard.familyJobs', { role: tr(`addAgent.castRole.${character}`) })}>
                     {jobGroups.map(([jobTitle, list]) => (
                       <div key={jobTitle} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {list.filter((j) => j.key !== theirJob?.key).map((j) => (
@@ -678,6 +695,21 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       </div>
                     ))}
                   </JobGroup>
+                  {family && hiddenCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Closing the list again drops a pick it no longer shows.
+                        if (showAll && chosenJob && !inFamily(chosenJob) && chosenJob.key !== theirJob?.key) setJobKey(null);
+                        setShowAll(!showAll);
+                      }}
+                      style={{ ...linkStyle, alignSelf: 'flex-start' }}
+                    >
+                      {showAll
+                        ? tr('addAgent.wizard.showFamily', { role: tr(`addAgent.castRole.${character}`) })
+                        : tr('addAgent.wizard.showAll', { count: hiddenCount })}
+                    </button>
+                  )}
                 </div>
               )}
 

@@ -626,7 +626,10 @@
       "bind": "绑定",
       "topicPlaceholder": "例如：宴会订单咨询",
       "editToFix": "也可以修改要交给他的事，然后重新检查。",
-      "mailboxScope": "{{address}} 邮箱"
+      "mailboxScope": "{{address}} 邮箱",
+      "familyJobs": "所有行业的{{role}}工作",
+      "showAll": "显示所有工作（另有 {{count}} 个）",
+      "showFamily": "只显示{{role}}工作"
     }
   },
   "onboarding": {

@@ -626,7 +626,10 @@
       "bind": "اربط",
       "topicPlaceholder": "مثال: طلبات تقديم الطعام",
       "editToFix": "يمكنك أيضًا تعديل ما يُرسل إليه ثم التحقق مرة أخرى.",
-      "mailboxScope": "صندوق البريد {{address}}"
+      "mailboxScope": "صندوق البريد {{address}}",
+      "familyJobs": "وظائف {{role}} من كل أنواع الأعمال",
+      "showAll": "عرض كل الوظائف ({{count}} أخرى)",
+      "showFamily": "عرض وظائف {{role}} فقط"
     }
   },
   "onboarding": {

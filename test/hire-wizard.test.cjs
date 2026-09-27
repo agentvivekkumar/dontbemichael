@@ -24,7 +24,10 @@ test('three steps, Who then Job then Review; a queued hire opens on Review', () 
 test('the job list offers the character\'s own job, the office\'s jobs, a new job and every pack\'s', () => {
   assert.match(modal, /ownJob\(character, officeJobs, cards\)/);
   assert.match(modal, /teamJobs\(team, cards\)/);
-  assert.match(modal, /officeJobs\.filter\(\(j\) => j\.key !== theirJob\?\.key && sameFamily\(j, character\)\)/, 'only the office jobs in the character\'s family');
+  assert.match(modal, /officeJobs\.filter\(\(j\) => j\.key !== theirJob\?\.key && \(listAll \|\| sameFamily\(j, character\)\)\)/, 'office jobs open on the character\'s family');
+  assert.match(modal, /for \(const c of cards\.filter\(\(j\) => listAll \|\| inFamily\(j\)\)\)/, 'pack jobs too');
+  assert.match(modal, /useEffect\(\(\) => \{ setShowAll\(false\); \}, \[character\]\);/, 'a new character closes the list again');
+  assert.match(modal, /tr\('addAgent\.wizard\.showAll', \{ count: hiddenCount \}\)/);
   assert.match(modal, /\{familyJobs\.map\(\(j\) => \(/);
   assert.match(modal, /cardJobs\(res\.packs\.map\(\(p\) => p\.pack\), res\.core, config\.businessType, business\)/);
   assert.match(modal, /const copy = jobFor\(chosenJob, name\.trim\(\)\);/, 'the name is swapped in');
