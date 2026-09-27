@@ -599,12 +599,6 @@
       "folder": "Folder",
       "folderDefault": "use the suggested folder",
       "folderInside": "Its own folder inside {{godName}}'s: {{path}}. Only this team member and {{godName}} can open it.",
-      "tier": {
-        "best": "Best",
-        "fast": "Fast",
-        "bestTitle": "The model set in Settings",
-        "fastTitle": "A quicker, cheaper model for simple jobs"
-      },
       "back": "back",
       "next": "next",
       "checking": "checking...",
@@ -629,7 +623,9 @@
       "mailboxScope": "the {{address}} mailbox",
       "familyJobs": "{{role}} jobs from every kind of business",
       "showAll": "show all jobs ({{count}} more)",
-      "showFamily": "show only {{role}} jobs"
+      "showFamily": "show only {{role}} jobs",
+      "modelDefault": "{{model}} (default)",
+      "cliDefault": "Claude's own default"
     }
   },
   "onboarding": {

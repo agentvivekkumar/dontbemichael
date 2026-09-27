@@ -302,5 +302,5 @@ test('the hire wizard has no worktree, resume, projects or engine choices (owner
   assert.doesNotMatch(src, /resumeSessionId|registerProject|gitIsolation/, 'no resume or project list');
   assert.match(flags, /export const SHOW_ENGINE_PICKER = false;/);
   assert.match(src, /\{SHOW_ENGINE_PICKER && <>[\s\S]*?addAgent\.provider[\s\S]*?addAgent\.command[\s\S]*?<\/>\}/, 'engine and command are gated');
-  assert.match(src, /\(\['best', 'fast'\] as const\)/, 'Best or Fast instead');
+  assert.match(src, /const model = customModel \?\? defaultModel;/, 'the model starts on the Settings default');
 });

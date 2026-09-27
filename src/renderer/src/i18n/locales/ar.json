@@ -599,12 +599,6 @@
       "folder": "المجلد",
       "folderDefault": "استخدم المجلد المقترح",
       "folderInside": "مجلد خاص به داخل مجلد {{godName}}: {{path}}. لا يفتحه إلا عضو الفريق هذا و{{godName}}.",
-      "tier": {
-        "best": "الأفضل",
-        "fast": "سريع",
-        "bestTitle": "النموذج المحدد في الإعدادات",
-        "fastTitle": "نموذج أسرع وأرخص للمهام البسيطة"
-      },
       "back": "رجوع",
       "next": "التالي",
       "checking": "جارٍ التحقق...",
@@ -629,7 +623,9 @@
       "mailboxScope": "صندوق البريد {{address}}",
       "familyJobs": "وظائف {{role}} من كل أنواع الأعمال",
       "showAll": "عرض كل الوظائف ({{count}} أخرى)",
-      "showFamily": "عرض وظائف {{role}} فقط"
+      "showFamily": "عرض وظائف {{role}} فقط",
+      "modelDefault": "{{model}} (افتراضي)",
+      "cliDefault": "النموذج الافتراضي في Claude"
     }
   },
   "onboarding": {

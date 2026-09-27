@@ -79,6 +79,11 @@ test('every wizard string exists in all three languages, without dashes', () => 
       assert.doesNotMatch(v, /[–—]| - /, `${loc}: wizard.${k} has a dash`);
     }
     for (const s of ['who', 'job', 'review']) assert.ok(w.step[s] && w.stepHint[s], `${loc}: step ${s}`);
-    for (const k of ['best', 'fast', 'bestTitle', 'fastTitle']) assert.ok(w.tier[k], `${loc}: tier ${k}`);
   }
+});
+
+test('the model list starts on the default for agents from Settings, marked default', () => {
+  assert.match(modal, /const defaultModel = isClaudeProvider\(provider\) \? config\.defaultModel : config\.providerDefaultModels\?\.\[provider\];/);
+  assert.match(modal, /m\.id === defaultModel \? tr\('addAgent\.wizard\.modelDefault', \{ model: m\.label \}\) : m\.label/);
+  assert.doesNotMatch(modal, /'best' \| 'fast'/, 'no Best or Fast');
 });

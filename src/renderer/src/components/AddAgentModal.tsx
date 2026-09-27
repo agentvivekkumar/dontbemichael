@@ -25,6 +25,7 @@ import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole } from '@shared/agentRole';
 import { teamAccent } from '@shared/teamPlan';
 import { mailboxHolder } from '@shared/mailboxes';
+import { Select } from './triggers/ui';
 import {
   NEW_JOB_KEY,
   activeTeam,
@@ -147,12 +148,17 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   // ── Engine: the Settings engine; Best or Fast model on Review (D3) ──
   const initialProvider = inferAgentProvider(config.defaultCommand);
   const [provider, setProvider] = useState<AgentProvider>(pendingHire?.provider ?? initialProvider);
-  const claudeModels = modelsForProvider('claude');
-  const fastModel = claudeModels.find((m) => m.id?.includes('sonnet'))?.id;
-  const bestModel = isClaudeProvider(provider) ? config.defaultModel : config.providerDefaultModels?.[provider];
-  const [tier, setTier] = useState<'best' | 'fast'>('best');
+  // The model starts on the default for agents set in Settings, and the owner
+  // can pick any other from the same list (owner, 2026-09-27: Best or Fast told
+  // them nothing).
+  const defaultModel = isClaudeProvider(provider) ? config.defaultModel : config.providerDefaultModels?.[provider];
   const [customModel, setCustomModel] = useState<string | undefined>(pendingHire?.model);
-  const model = customModel ?? (tier === 'fast' && isClaudeProvider(provider) ? fastModel : bestModel);
+  const model = customModel ?? defaultModel;
+  const modelOptions = (() => {
+    const known = modelsForProvider(provider).filter((m) => !!m.id) as Array<{ id: string; label: string }>;
+    const extra = [defaultModel, customModel].filter((id): id is string => !!id && !known.some((m) => m.id === id));
+    return [...known, ...extra.map((id) => ({ id, label: id }))];
+  })();
   const hireCommand = (m: HireManifest): string => {
     const prov: AgentProvider = m.provider ?? initialProvider;
     const base = buildSpawnCommand(config, m.model, prov);
@@ -217,13 +223,12 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (applied.current === 'manifest' && jobKey === null) return;
     applied.current = sig;
     setBinding(null);
-    if (!chosenJob) { setTitle(''); setRouting(''); setWorkStyle(''); setSourceCard(undefined); setTier('best'); return; }
+    if (!chosenJob) { setTitle(''); setRouting(''); setWorkStyle(''); setSourceCard(undefined); return; }
     const copy = jobFor(chosenJob, name.trim());
     setTitle(copy.title);
     setRouting(copy.routing);
     setWorkStyle(copy.workStyle);
     setSourceCard(chosenJob.sourceCard);
-    setTier(chosenJob.modelTier === 'fast' ? 'fast' : 'best');
   };
 
   // ── Folder: its own, suffixed with the name on a clash (point 2) ──
@@ -803,21 +808,19 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     </div>
                     <div style={{ flex: '0 0 auto' }}>
                       <Row label={tr('addAgent.model')}>
-                        <div role="radiogroup" aria-label={tr('addAgent.model')} style={{ display: 'flex', gap: 6 }}>
-                          {(['best', 'fast'] as const).filter((k) => k === 'best' || (fastModel && isClaudeProvider(provider))).map((k) => (
-                            <button
-                              key={k}
-                              type="button"
-                              role="radio"
-                              aria-checked={!customModel && tier === k}
-                              onClick={() => { setCustomModel(undefined); setCommandEdit(undefined); setTier(k); }}
-                              title={tr(`addAgent.wizard.tier.${k}Title`)}
-                              style={chip(!customModel && tier === k)}
-                            >
-                              {tr(`addAgent.wizard.tier.${k}`)}
-                            </button>
+                        <Select
+                          label={tr('addAgent.model')}
+                          value={model ?? ''}
+                          onChange={(v) => { setCommandEdit(undefined); setCustomModel(v && v !== defaultModel ? v : undefined); }}
+                          style={{ fontSize: 14, lineHeight: '20px' }}
+                        >
+                          {!defaultModel && <option value="">{tr('addAgent.wizard.modelDefault', { model: tr('addAgent.wizard.cliDefault') })}</option>}
+                          {modelOptions.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.id === defaultModel ? tr('addAgent.wizard.modelDefault', { model: m.label }) : m.label}
+                            </option>
                           ))}
-                        </div>
+                        </Select>
                       </Row>
                     </div>
                   </div>
