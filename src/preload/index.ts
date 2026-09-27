@@ -833,7 +833,9 @@ const api = {
   mailSave: (input: { id?: string; provider: MailProvider; address: string; password: string; imap?: MailServer; smtp?: MailServer }): Promise<{ ok: true; record: MailboxRecord } | { ok: false; kind: string; reason: string }> =>
     ipcRenderer.invoke('mail:save', input),
   mailRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> => ipcRenderer.invoke('mail:remove', id),
-  mailSetCapabilities: (agentId: string, caps: AgentCapabilities): Promise<{ ok: boolean; restartNeeded: boolean }> =>
+  /** `move: true` confirms taking a mailbox another agent holds (one agent per
+   *  mailbox); without it main answers `heldBy` and changes nothing. */
+  mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),

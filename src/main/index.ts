@@ -3887,7 +3887,7 @@ ipcMain.handle('mail:remove', (_evt, id: unknown) => {
 });
 ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
-  return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean } });
+  return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean });
 });
 /** An agent's handoff history, received and sent, for its Messages tab. */
 ipcMain.handle('hive:history', (_evt, id: unknown) => (typeof id === 'string' ? hive.messageHistory(id) : []));

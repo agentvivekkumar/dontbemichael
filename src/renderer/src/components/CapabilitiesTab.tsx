@@ -1,10 +1,10 @@
 import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, Toggle, TriggerCard } from './triggers/ui';
+import { Select, Toggle, TriggerCard, MiniButton } from './triggers/ui';
 import { AgentSchedules, useGodId, useMissions } from './triggers/ScheduleList';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
-import { type EmailCapability } from '@shared/mailboxes';
+import { type EmailCapability, mailboxHolder } from '@shared/mailboxes';
 import { missionsFor } from '@shared/missions';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
@@ -34,6 +34,9 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const godName = useResolvedGodName();
   const pending = useStore((s) => s.pendingEmailRestart[agent.id]);
   const [failed, setFailed] = useState(false);
+  // A mailbox another agent holds, waiting for the owner to confirm the move.
+  const [moving, setMoving] = useState<string | null>(null);
+  const agents = useStore((s) => s.agents);
   const name = agent.isGod ? godName : agent.name;
   const godId = useGodId();
   const { missions } = useMissions();
@@ -46,11 +49,14 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const mailboxes = config.mailboxes ?? [];
   const email: EmailCapability = config.agentCapabilities?.[agent.id]?.email ?? { enabled: false, mailboxes: [], send: false };
 
-  const save = async (next: EmailCapability): Promise<void> => {
+  const save = async (next: EmailCapability, move = false): Promise<void> => {
     setFailed(false);
     try {
-      const res = await window.cth.mailSetCapabilities(agent.id, { email: next });
+      const res = await window.cth.mailSetCapabilities(agent.id, { email: next, ...(move ? { move: true } : {}) });
+      // Someone took the mailbox since the list was drawn: ask to move it.
+      if (!res.ok && res.heldBy && next.mailboxes[0]) { setMoving(next.mailboxes[0]); return; }
       if (!res.ok) { setFailed(true); return; }
+      setMoving(null);
       if (res.restartNeeded && agent.ptyId) useStore.getState().setPendingEmailRestart(agent.id, Date.now());
       if (!next.enabled) useStore.getState().setPendingEmailRestart(agent.id, undefined);
     } catch { setFailed(true); }
@@ -70,15 +76,29 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     // "Pick a mailbox", and sending starts Draft only.
     void save({ enabled: true, mailboxes: [], send: false });
   };
-  const pickMailbox = (id: string): void => { if (id !== current) void save({ ...email, mailboxes: [id] }); };
+  // One agent per mailbox (owner, 2026-09-27): a mailbox another agent holds
+  // is moved only after the owner confirms, and the holder's email goes off.
+  const holderOf = (id: string): string | undefined => mailboxHolder(config.agentCapabilities, id, agent.id);
+  const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? id;
+  const pickMailbox = (id: string): void => {
+    if (id === current) return;
+    if (holderOf(id)) { setMoving(id); return; }
+    void save({ ...email, mailboxes: [id] });
+  };
+  const movingHolder = moving ? holderOf(moving) : undefined;
+  const movingAddress = moving ? mailboxes.find((m) => m.id === moving)?.address ?? moving : '';
   const setSend = (send: boolean): void => { if (send !== email.send) void save({ ...email, send }); };
 
   // Just the address; a word only when the mailbox needs the owner.
-  const mailboxOptions = mailboxes.map((m) => ({
-    value: m.id,
-    label: m.address,
-    desc: m.status === 'needs-attention' ? t('mailboxes.statusNeeds') : undefined
-  }));
+  const mailboxOptions = mailboxes.map((m) => {
+    const holder = holderOf(m.id);
+    return {
+      value: m.id,
+      label: m.address,
+      desc: [holder ? t('capabilities.heldBy', { name: nameOf(holder) }) : '', m.status === 'needs-attention' ? t('mailboxes.statusNeeds') : '']
+        .filter(Boolean).join(t('profile.listJoiner')) || undefined
+    };
+  });
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
 
@@ -112,6 +132,15 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                     {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
                   </Select>
                   <button type="button" onClick={openSettings} style={{ ...link, marginInlineStart: 'auto' }}>{t('capabilities.addMailbox')}</button>
+                </div>
+              )}
+              {moving && (
+                <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap', fontSize: 13 }}>
+                  <span>{movingHolder
+                    ? t('capabilities.moveMailbox', { address: movingAddress, from: nameOf(movingHolder), to: name })
+                    : t('capabilities.moveMailboxFree', { address: movingAddress })}</span>
+                  <MiniButton autoFocus onClick={() => { void save({ ...email, mailboxes: [moving] }, true); }}>{t('capabilities.moveIt')}</MiniButton>
+                  <MiniButton onClick={() => setMoving(null)}>{t('capabilities.keepIt')}</MiniButton>
                 </div>
               )}
 

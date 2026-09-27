@@ -1749,6 +1749,11 @@
     "schedulesOn": "{{count}} 项开启",
     "schedulesNone": "无",
     "pickMailbox": "选择一个邮箱",
-    "addMailbox": "添加新邮箱"
+    "addMailbox": "添加新邮箱",
+    "heldBy": "{{name}} 正在使用",
+    "moveMailbox": "{{from}} 正在查看 {{address}}。改给 {{to}} 吗？{{from}} 将不再查看邮件。",
+    "moveMailboxFree": "使用 {{address}}？",
+    "moveIt": "改给他",
+    "keepIt": "保持不变"
   }
 }

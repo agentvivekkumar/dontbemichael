@@ -125,6 +125,31 @@
 
 ## Agents and 1:1
 
+### Clean up a "Not for" clause when its teammate leaves
+
+**What:** When a hire is bound to a mailbox or topic, overlapping teammates' routing lines gain "Not for <scope>; that goes to <Name>." If that teammate is later renamed or removed, rewrite or drop the clause.
+
+**Why:** A stale clause sends Michael to a name that no longer exists, and the work bounces.
+
+**Context:** Found by the spec review of the hire wizard redesign (2026-09-27). The clause format is `bindingLines` in `src/shared/hireTemplates.ts`; hook the rename path in `hive.ts` and agent removal in the renderer.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** the hire wizard redesign.
+
+### Hire through Michael
+
+**What:** The owner tells Michael "hire another admin for catering" and Michael asks the app to open the hire wizard on Review, prefilled with a job he adjusted. The owner still presses Hire; Michael can never hire on his own.
+
+**Why:** The owner runs the office by talking to Michael, so hiring from chat fits how the app is used.
+
+**Context:** Deferred in /plan-ceo-review of the hire wizard redesign (2026-09-27, D5.5) because it needs the wizard first (`docs/designs/hire-redesign.md`). To build: a Michael to app message (an MCP tool, since sandboxed Bash cannot reach the app), a prefill path into the Review step that runs the same distinct job check, and a guard that no agent message can press Hire.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** the hire wizard redesign.
+
+
 ### One rule for "stuck at a prompt" in main and the panel
 
 **What:** Put the terminal prompt check (`isTerminalPrompt` in `src/main/hooks.ts`) in shared code

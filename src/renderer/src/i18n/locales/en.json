@@ -1749,6 +1749,11 @@
     "schedulesOn": "{{count}} on",
     "schedulesNone": "None",
     "pickMailbox": "Pick a mailbox",
-    "addMailbox": "Add new mailbox"
+    "addMailbox": "Add new mailbox",
+    "heldBy": "{{name}} has this",
+    "moveMailbox": "{{from}} checks {{address}}. Move it to {{to}}? {{from}} stops checking email.",
+    "moveMailboxFree": "Use {{address}}?",
+    "moveIt": "Move it",
+    "keepIt": "Keep it"
   }
 }

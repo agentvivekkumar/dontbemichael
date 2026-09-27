@@ -154,6 +154,22 @@ export function agentMailboxes(cfg: MailAccessConfig, agentId: string): string[]
 
 /** True when the email capability changed from off to on (E2: that needs a
  *  restart, because the md-mail server is attached only at spawn). */
+/**
+ * The agent holding a mailbox, other than `except` (one agent per mailbox:
+ * owner, 2026-09-27, so no inbox is ever worked twice). An agent holds a
+ * mailbox while its email is on with that mailbox picked.
+ */
+export function mailboxHolder(
+  caps: { [agentId: string]: AgentCapabilities } | undefined,
+  mailboxId: string,
+  except?: string
+): string | undefined {
+  for (const [id, c] of Object.entries(caps ?? {})) {
+    if (id !== except && c?.email?.enabled && c.email.mailboxes[0] === mailboxId) return id;
+  }
+  return undefined;
+}
+
 export function emailJustEnabled(before: AgentCapabilities | undefined, after: AgentCapabilities | undefined): boolean {
   return !before?.email?.enabled && !!after?.email?.enabled;
 }

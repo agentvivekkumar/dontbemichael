@@ -25,6 +25,7 @@ import {
   agentMailboxes,
   emailJustEnabled,
   isMicrosoftAddress,
+  mailboxHolder,
   mailAccess,
   mailboxIdFor,
   secretRefForMailbox,
@@ -575,7 +576,11 @@ export function removeMailbox(svc: MailService, admin: MailAdminDeps, id: string
 
 /** Save one agent's Capabilities. Unknown mailbox ids are dropped. Returns
  *  whether email just turned on (E2: that agent needs a restart to get md-mail). */
-export function setAgentCapabilities(admin: MailAdminDeps, agentId: string, next: { email?: { enabled: boolean; mailboxes: string[]; send: boolean } }): { ok: true; restartNeeded: boolean } {
+export function setAgentCapabilities(
+  admin: MailAdminDeps,
+  agentId: string,
+  next: { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean }
+): { ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string } {
   const cfg = admin.getConfig();
   const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
   const before = cfg.agentCapabilities?.[agentId];
@@ -585,6 +590,19 @@ export function setAgentCapabilities(admin: MailAdminDeps, agentId: string, next
   const email = next.email
     ? { enabled: next.email.enabled === true, mailboxes: picked.filter((m) => known.has(m)).slice(0, 1), send: next.email.send === true }
     : undefined;
-  admin.saveConfig({ agentCapabilities: { ...(cfg.agentCapabilities ?? {}), [agentId]: { ...(before ?? {}), email } } });
-  return { ok: true, restartNeeded: emailJustEnabled(before, email ? { email } : undefined) };
+  // One agent per mailbox (owner, 2026-09-27). Giving a held mailbox to another
+  // agent is refused unless the owner confirmed the move, which turns the
+  // holder's email off in the same write.
+  const caps = { ...(cfg.agentCapabilities ?? {}) };
+  let movedFrom: string | undefined;
+  if (email?.enabled && email.mailboxes[0]) {
+    const holder = mailboxHolder(caps, email.mailboxes[0], agentId);
+    if (holder && next.move !== true) return { ok: false, restartNeeded: false, heldBy: holder };
+    if (holder) {
+      caps[holder] = { ...caps[holder], email: { enabled: false, mailboxes: [], send: false } };
+      movedFrom = holder;
+    }
+  }
+  admin.saveConfig({ agentCapabilities: { ...caps, [agentId]: { ...(before ?? {}), email } } });
+  return { ok: true, restartNeeded: emailJustEnabled(before, email ? { email } : undefined), ...(movedFrom ? { movedFrom } : {}) };
 }
