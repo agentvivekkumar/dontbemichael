@@ -309,6 +309,7 @@ export const INTERVAL_OPTS: { ms: number; label: string }[] = [
   { ms: 30 * MINUTE, label: '30m' },
   { ms: HOUR, label: '1h' },
   { ms: 2 * HOUR, label: '2h' },
+  { ms: 4 * HOUR, label: '4h' },
   { ms: 6 * HOUR, label: '6h' },
   { ms: 12 * HOUR, label: '12h' },
   { ms: DAY, label: '24h' },
