@@ -262,3 +262,15 @@ test('this build hides the safe and read only server list; the switches that nee
   const src = read('src/renderer/src/components/McpDefaultsSettings.tsx');
   assert.match(src, /const TIER_ORDER: McpTier\[\] = \(\['safe-readonly', 'write', 'secret'\] as McpTier\[\]\)\s*\.filter\(\(tier\) => tier !== 'safe-readonly' \|\| SHOW_READONLY_SERVERS\);/);
 });
+
+test('Add Agent hides import hire and its AI prompt; the button says hire (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(fs.readFileSync(path.resolve(__dirname, '..', 'src/shared/buildFeatures.ts'), 'utf8'), /export const SHOW_IMPORT_HIRE = false;/);
+  assert.match(src, /\{SHOW_IMPORT_HIRE && <div style=\{\{/, 'the explainer and generate with AI are gated');
+  assert.match(src, /\{SHOW_IMPORT_HIRE && \(\s*<PixelButton[\s\S]*?onClick=\{importHire\}/, 'the import hire button is gated');
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
+    assert.doesNotMatch(d.addAgent.spawn, /spawn|生成|إنشاء/i, `${loc}: the button hires`);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.spawn, 'hire');
+});

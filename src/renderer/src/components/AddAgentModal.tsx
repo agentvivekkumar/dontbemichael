@@ -31,6 +31,7 @@ import {
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { joinAgentRole, splitAgentRole } from '@shared/agentRole';
 import { useRtl } from '@/i18n/useDirection';
+import { SHOW_IMPORT_HIRE } from '@shared/buildFeatures';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -1156,8 +1157,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               </div>
             )}
 
-            {/* Import-hire explainer + AI prompt generator (item 7) */}
-            <div style={{
+            {/* Import-hire explainer + AI prompt generator (item 7); hidden with
+                SHOW_IMPORT_HIRE (owner, 2026-09-27). */}
+            {SHOW_IMPORT_HIRE && <div style={{
               padding: '8px 10px',
               background: 'var(--cth-cream-100)',
               boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
@@ -1204,18 +1206,20 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-              <PixelButton
-                variant="secondary"
-                size="md"
-                onClick={importHire}
-                disabled={busy}
-                title={tr('addAgent.importHireBtnTitle')}
-              >
-                {tr('addAgent.importHireBtn')}
-              </PixelButton>
+              {SHOW_IMPORT_HIRE && (
+                <PixelButton
+                  variant="secondary"
+                  size="md"
+                  onClick={importHire}
+                  disabled={busy}
+                  title={tr('addAgent.importHireBtnTitle')}
+                >
+                  {tr('addAgent.importHireBtn')}
+                </PixelButton>
+              )}
               <div style={{ flex: 1 }} />
               {pendingHire && (
                 <PixelButton variant="secondary" size="md" onClick={skipHire} disabled={busy}>{tr('addAgent.skipHire')}</PixelButton>

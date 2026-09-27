@@ -109,3 +109,8 @@ export const SHOW_SLACK = false;
  *  built in file and web tools instead). The servers that need an explicit yes
  *  are listed below it and stay. */
 export const SHOW_READONLY_SERVERS = false;
+
+/** Import hire in Add Agent: the "import hire…" button, its explainer and the
+ *  "generate one with AI…" prompt. Hidden (owner, 2026-09-27); adding a team
+ *  member is the form alone. The import code stays for when it comes back. */
+export const SHOW_IMPORT_HIRE = false;
