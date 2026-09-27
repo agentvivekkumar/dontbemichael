@@ -75,10 +75,11 @@ test('a hire gets its own folder, suffixed with its name on a clash', () => {
   assert.equal(H.hireFolderName('Admin', 'Erin', (f) => taken.has(f)), 'Admin_Erin_2');
 });
 
-test('the rules flag a same title or a near copy of a routing line, not a different job', () => {
+test('the rules flag a near copy of what to send, not a title', () => {
   const pam = { name: 'Pam', title: 'Executive Admin', routing: 'Pam sorts the business inbox: customer orders, catering enquiries, supplier mail and bills.' };
   const ryan = { name: 'Ryan', title: 'Marketing', routing: 'Ryan writes the daily special, promotions and social posts.' };
-  assert.deepEqual(H.overlapsByRules({ name: 'Erin', title: 'Executive Admin', routing: 'x' }, [pam, ryan]), ['Pam']);
+  // The title alone decides nothing: same title with different work is not flagged.
+  assert.deepEqual(H.overlapsByRules({ name: 'Erin', title: 'Executive Admin', routing: 'Erin books travel and keeps the owner calendar.' }, [pam, ryan]), []);
   assert.deepEqual(H.overlapsByRules({ name: 'Erin', title: 'Receptionist', routing: 'Erin sorts the business inbox: customer orders, catering enquiries, supplier mail and bills.' }, [pam, ryan]), ['Pam']);
   assert.deepEqual(H.overlapsByRules({ name: 'Jim', title: 'Social Media', routing: 'Jim follows the company Instagram feed and answers comments.' }, [pam, ryan]), []);
 });
@@ -119,4 +120,13 @@ test('office jobs are listed only in the character\'s family (owner, 2026-09-27)
   // A job the owner wrote for Jim stays in Jim's Sales family.
   assert.deepEqual(team.filter((j) => H.sameFamily(j, 'stanley')).map((j) => j.fromName), ['Jim']);
   assert.equal(H.sameFamily(team[0], 'michael'), false);
+});
+
+test('renaming the job title never clears an overlap (owner, 2026-09-27)', () => {
+  const dwight = { name: 'Dwight', title: 'Sales Director', routing: 'Dwight runs the sales pipeline: leads, open deals and their stages, draft proposals and quotes, prospect follow ups, and the monthly forecast.' };
+  const jim = (title) => ({ name: 'Jim', title, routing: H.swapName(dwight.routing, 'Dwight', 'Jim') });
+  for (const title of ['Sales Director', 'Sales Director1', 'Head of Growth', '']) {
+    assert.deepEqual(H.overlapsByRules(jim(title), [dwight]), ['Dwight'], title);
+  }
+  assert.match(H.distinctPrompt(jim('x'), [dwight]), /The job title and the person's name never make a job distinct/);
 });

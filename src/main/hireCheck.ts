@@ -64,7 +64,12 @@ export async function checkDistinct(job: JobProfile, teamIn: JobProfile[], deps:
       timeoutMs: CHECK_TIMEOUT_MS
     });
     const verdict = result.ok && result.text ? parseDistinctAnswer(result.text, team.map((m) => m.name)) : null;
-    if (verdict) return verdict;
+    // The rules always count too, so the model can't be talked past a job
+    // whose what to send reads like a teammate's.
+    if (verdict) {
+      const overlapsWith = [...new Set([...verdict.overlapsWith, ...overlapsByRules(job, team)])];
+      return { ...verdict, distinct: overlapsWith.length === 0, overlapsWith };
+    }
     deps.log?.({ kind: 'hire-check-fallback', reason: result.ok ? 'no verdict' : (result.error ?? 'failed') });
   } catch (e) {
     deps.log?.({ kind: 'hire-check-fallback', reason: String(e).slice(0, 200) });

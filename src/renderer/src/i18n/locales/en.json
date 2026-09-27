@@ -625,7 +625,8 @@
       "showAll": "show all jobs ({{count}} more)",
       "showFamily": "show only {{role}} jobs",
       "modelDefault": "{{model}} (default)",
-      "cliDefault": "Claude's own default"
+      "cliDefault": "Claude's own default",
+      "sameWork": "What to send reads like the same work, whatever the job title says."
     }
   },
   "onboarding": {

@@ -625,7 +625,8 @@
       "showAll": "عرض كل الوظائف ({{count}} أخرى)",
       "showFamily": "عرض وظائف {{role}} فقط",
       "modelDefault": "{{model}} (افتراضي)",
-      "cliDefault": "النموذج الافتراضي في Claude"
+      "cliDefault": "النموذج الافتراضي في Claude",
+      "sameWork": "ما يُرسل إليه يبدو العمل نفسه، مهما كان مسمى الوظيفة."
     }
   },
   "onboarding": {

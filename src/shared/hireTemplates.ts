@@ -261,18 +261,17 @@ export function lineSimilarity(a: string, b: string): number {
 
 export const SIMILAR_LINES = 0.5;
 
-/** Teammates the new job overlaps by the instant rules: same title, or routing
- *  lines that share most of their words. Names are compared without the new
- *  hire's and teammate's own names so "Pam sorts" and "Erin sorts" match. */
+/** Teammates the new job overlaps by the instant rules: what to send lines that
+ *  share most of their words. The title is never compared: a job is the work
+ *  it takes, so renaming "Sales Director" to "Sales Director1" changes nothing
+ *  (owner, 2026-09-27). Names are left out so "Dwight runs" and "Jim runs"
+ *  match. */
 export function overlapsByRules(job: JobProfile, team: JobProfile[]): string[] {
-  const title = job.title.trim().toLowerCase();
   const strip = (text: string, ...names: string[]) =>
     names.filter((n) => n.trim()).reduce((t, n) => t.replace(nameRe(n.trim()), ' '), text);
   const out: string[] = [];
   for (const m of team) {
-    const sameTitle = !!title && m.title.trim().toLowerCase() === title;
-    const similar = lineSimilarity(strip(job.routing, job.name, m.name), strip(m.routing, job.name, m.name)) >= SIMILAR_LINES;
-    if (sameTitle || similar) out.push(m.name);
+    if (lineSimilarity(strip(job.routing, job.name, m.name), strip(m.routing, job.name, m.name)) >= SIMILAR_LINES) out.push(m.name);
   }
   return out;
 }
@@ -316,6 +315,7 @@ export function distinctPrompt(job: JobProfile, team: JobProfile[]): string {
     'You check whether a new team member\'s job overlaps anyone already on a small business\'s AI team.',
     'The office manager routes each piece of work by reading every teammate\'s "what to send" line, so two teammates whose lines cover the same work make routing a coin toss and double the work.',
     'A job is distinct when a request could only sensibly go to one of them: a different area of work, or the same area bound to something particular such as its own mailbox, a named channel, a customer group, a location or a topic.',
+    'Judge only by what to send and the work style. The job title and the person\'s name never make a job distinct: the same work under another title is an overlap.',
     '',
     'The team today:',
     ...(lines.length ? lines : ['- (nobody yet)']),

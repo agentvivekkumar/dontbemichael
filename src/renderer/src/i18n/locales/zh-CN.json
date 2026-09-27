@@ -625,7 +625,8 @@
       "showAll": "显示所有工作（另有 {{count}} 个）",
       "showFamily": "只显示{{role}}工作",
       "modelDefault": "{{model}}（默认）",
-      "cliDefault": "Claude 自带的默认模型"
+      "cliDefault": "Claude 自带的默认模型",
+      "sameWork": "无论职位名称如何，要交给他的事读起来是同一份工作。"
     }
   },
   "onboarding": {

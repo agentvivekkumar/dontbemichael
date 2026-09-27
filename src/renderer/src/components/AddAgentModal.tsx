@@ -267,7 +267,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     name: name.trim(), title: title.trim(), routing: routing.trim(), workStyle,
     mailbox: mailboxAddress(binding?.mailboxId)
   };
-  const checkSig = `${profile.name}\n${profile.title}\n${profile.routing}`;
+  // The check judges what to send, never the title: renaming "Sales Director"
+  // to "Sales Director1" must not clear an overlap (owner, 2026-09-27).
+  const checkSig = `${profile.name}\n${profile.routing}`;
   const [check, setCheck] = useState<{ sig: string; verdict: DistinctVerdict } | null>(null);
   const [checking, setChecking] = useState(false);
   const checkSeq = useRef(0);
@@ -295,7 +297,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (step === 'review' && profile.name && (profile.title || profile.routing) && !verdict && !checking) void runCheck();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
-  const overlapNames = verdict ? [...new Set([...verdict.overlapsWith, ...(verdict.source === 'rules' ? ruleOverlaps : [])])] : [];
+  // The instant rules always count, live on every edit, so a job whose what to
+  // send reads like a teammate's is flagged even before or after the AI check.
+  const overlapNames = [...new Set([...(verdict?.overlapsWith ?? []), ...ruleOverlaps])];
   const cleared = !!verdict && (overlapNames.length === 0 || !!binding);
 
   const [bindMode, setBindMode] = useState<'mailbox' | 'topic' | null>(null);
@@ -417,7 +421,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     let v = verdict;
     if (!v) v = await runCheck();
     if (!v) return;
-    const overlaps = [...new Set([...v.overlapsWith, ...(v.source === 'rules' ? overlapsByRules(profile, teamProfiles) : [])])];
+    const overlaps = [...new Set([...v.overlapsWith, ...overlapsByRules(profile, teamProfiles)])];
     if (overlaps.length > 0 && !binding) { setError(tr('addAgent.wizard.errOverlap')); return; }
 
     setBusy(true);
@@ -751,7 +755,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   <DistinctBox
                     checking={checking}
                     verdict={verdict ?? (binding ? shownVerdict : null)}
-                    overlapNames={verdict ? overlapNames : (binding?.others ?? [])}
+                    overlapNames={binding ? [...new Set([...overlapNames, ...binding.others])] : overlapNames}
                     binding={binding}
                     name={name.trim()}
                     team={team}
@@ -895,7 +899,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               {step !== 'review' ? (
                 <PixelButton variant="primary" size="md" onClick={() => goTo(STEPS[stepIndex + 1])} disabled={step === 'who' && !!whoError}>{tr('addAgent.wizard.next')}</PixelButton>
               ) : (
-                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || (!!verdict && !cleared)}>
+                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || (overlapNames.length > 0 && !binding)}>
                   {busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
                 </PixelButton>
               )}
@@ -969,7 +973,7 @@ function DistinctBox(p: DistinctBoxProps) {
   const { t } = useTranslation();
   const listJoin = t('profile.listJoiner');
   if (p.checking) return <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)' }}>{t('addAgent.wizard.checkingTeam')}</div>;
-  if (!p.verdict) {
+  if (!p.verdict && p.overlapNames.length === 0) {
     return (
       <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span>{t('addAgent.wizard.notChecked')}</span>
@@ -977,7 +981,7 @@ function DistinctBox(p: DistinctBoxProps) {
       </div>
     );
   }
-  const fallback = p.verdict.source === 'rules' ? <div style={helperStyle}>{t('addAgent.wizard.fullCheckFailed')}</div> : null;
+  const fallback = p.verdict?.source === 'rules' ? <div style={helperStyle}>{t('addAgent.wizard.fullCheckFailed')}</div> : null;
   if (p.overlapNames.length === 0) {
     return (
       <div aria-live="polite" style={{ ...box, background: 'var(--cth-mint-light)' }}>
@@ -990,7 +994,7 @@ function DistinctBox(p: DistinctBoxProps) {
   return (
     <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-mint-light)' : 'var(--cth-lemon-light)', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <strong style={{ fontSize: 13 }}>{t('addAgent.wizard.overlaps', { names: p.overlapNames.join(listJoin) })}</strong>
-      {p.verdict.why && <span>{p.verdict.why}</span>}
+      <span>{p.verdict?.why || t('addAgent.wizard.sameWork')}</span>
       {p.binding ? (
         <>
           <span>{t('addAgent.wizard.boundTo', { name: p.name, scope: p.binding.scope })}</span>
@@ -1002,7 +1006,7 @@ function DistinctBox(p: DistinctBoxProps) {
       ) : (
         <>
           <span>{t('addAgent.wizard.makeParticular', { name: p.name })}</span>
-          {p.verdict.suggestion && <span style={helperStyle}>{t('addAgent.wizard.suggestion', { text: p.verdict.suggestion })}</span>}
+          {p.verdict?.suggestion && <span style={helperStyle}>{t('addAgent.wizard.suggestion', { text: p.verdict.suggestion })}</span>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => p.setBindMode('mailbox')} style={chip(p.bindMode === 'mailbox')} disabled={p.freeMailboxes.length === 0} title={p.freeMailboxes.length === 0 ? t('addAgent.wizard.noFreeMailbox') : undefined}>{t('addAgent.wizard.bindMailbox')}</button>
             <button type="button" onClick={() => p.setBindMode('topic')} style={chip(p.bindMode === 'topic')}>{t('addAgent.wizard.bindTopic')}</button>

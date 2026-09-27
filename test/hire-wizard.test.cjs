@@ -39,7 +39,9 @@ test('Hire needs a distinct job or a binding, checked again after any edit', () 
   assert.match(flow, /if \(!v\) v = await runCheck\(\);/);
   assert.match(flow, /if \(overlaps\.length > 0 && !binding\) \{ setError\(tr\('addAgent\.wizard\.errOverlap'\)\); return; \}/);
   assert.ok(flow.indexOf('runCheck') < flow.indexOf('spawnPty'), 'checked before spawning');
-  assert.match(modal, /const checkSig = `\$\{profile\.name\}\\n\$\{profile\.title\}\\n\$\{profile\.routing\}`;/);
+  assert.match(modal, /const checkSig = `\$\{profile\.name\}\\n\$\{profile\.routing\}`;/, 'a title edit does not reset the check');
+  assert.match(modal, /const overlapNames = \[\.\.\.new Set\(\[\.\.\.\(verdict\?\.overlapsWith \?\? \[\]\), \.\.\.ruleOverlaps\]\)\];/, 'the rules always count, live');
+  assert.match(modal, /disabled=\{busy \|\| checking \|\| \(overlapNames\.length > 0 && !binding\)\}/);
 });
 
 test('a binding updates the overlapping teammates\' lines and a mailbox binding is set before the spawn', () => {
@@ -65,8 +67,9 @@ test('main checks with Haiku and no tools, and falls back to the rules', () => {
   const { rulesVerdict, readJobProfile } = loadTs('src/main/hireCheck.ts');
   assert.equal(readJobProfile({ name: '' }), null);
   assert.equal(readJobProfile({ name: 'Erin', title: 5 }).title, '');
-  const v = rulesVerdict({ name: 'Erin', title: 'Admin', routing: 'x' }, [{ name: 'Pam', title: 'admin', routing: 'y' }]);
+  const v = rulesVerdict({ name: 'Erin', title: 'Admin', routing: 'Erin sorts the business inbox and supplier mail.' }, [{ name: 'Pam', title: 'Receptionist', routing: 'Pam sorts the business inbox and supplier mail.' }]);
   assert.deepEqual(v, { distinct: false, overlapsWith: ['Pam'], why: '', source: 'rules' });
+  assert.match(main, /overlapsWith = \[\.\.\.new Set\(\[\.\.\.verdict\.overlapsWith, \.\.\.overlapsByRules\(job, team\)\]\)\]/, 'the AI cannot clear what the rules flag');
 });
 
 test('every wizard string exists in all three languages, without dashes', () => {
