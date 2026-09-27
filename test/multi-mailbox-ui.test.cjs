@@ -88,7 +88,7 @@ test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () =
   // MB-7 in main: a status change raises or closes one Ask me card, and a repeat of the same status writes nothing.
   const main = read('src/main/index.ts');
   assert.match(main, /if \(!rec \|\| \(rec\.status === status && rec\.statusReason === reason\)\) return;/);
-  assert.match(main, /hive\.patchTask\(cardId, \{ status: 'done', result:/);
+  assert.match(main, /closeMailboxCard\(id, `\$\{rec\.address\} is connected again\.`\)/);
   assert.match(main, /ipcMain\.handle\('mail:save', async \(_evt, input: unknown\) => \{\s*if \(!input \|\| typeof input !== 'object'\) return \{ ok: false, kind: 'invalid'/);
 });
 
@@ -145,4 +145,13 @@ test('the office schedule is the one section on its tab, so it does not fold (ow
   const tab = read('src/renderer/src/components/triggers/TriggersTab.tsx');
   assert.match(tab, /<Muted>\{t\('triggersTab\.officeBlurb', \{ godName \}\)\}<\/Muted>\s*<OfficeSchedules \/>/);
   assert.doesNotMatch(tab, /title=\{t\('schedulesSection\.officeSchedule'\)\}/);
+});
+
+test('fixing or removing a mailbox that needed the owner closes its Ask me card (MB-7)', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(res\.ok && before\?\.status === 'needs-attention'\) closeMailboxCard\(res\.record\.id,/);
+  assert.match(main, /if \(res\.ok && rec\?\.status === 'needs-attention'\) closeMailboxCard\(id,/);
+  const dialog = read('src/renderer/src/components/AddMailboxDialog.tsx');
+  assert.match(dialog, /button:not\(\[disabled\]\):not\(\[tabindex="-1"\]\)/, 'the Tab trap ends on the chosen service, not a skipped tile');
+  assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /refocus\(ok \? 'add' : `remove-\$\{id\}`\);/);
 });

@@ -463,9 +463,14 @@ function markMailboxStatus(id: string, status: 'connected' | 'needs-attention', 
       };
       if (!hive.addTask(card)) hive.patchTask(cardId, { status: 'blocked', humanQA: card.humanQA });
     } else if (rec.status === 'needs-attention') {
-      hive.patchTask(cardId, { status: 'done', result: `${rec.address} is connected again.` });
+      closeMailboxCard(id, `${rec.address} is connected again.`);
     }
   } catch (e) { console.error('[mail] ask me card:', e); }
+}
+
+/** Close a mailbox's "needs you" Ask me card (MB-7), if one is open. */
+function closeMailboxCard(id: string, result: string): void {
+  try { hive.patchTask(`mailbox-attention-${id}`, { status: 'done', result }); } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
 const integrationBroker = new IntegrationBroker({
@@ -3866,9 +3871,20 @@ ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hi
 // Records carry no password; the renderer only ever sends one, to save it.
 ipcMain.handle('mail:save', async (_evt, input: unknown) => {
   if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
-  return saveMailbox(mailService, mailAdmin, PROVIDER_PRESETS, input as AddMailboxInput);
+  const fixId = (input as { id?: unknown }).id;
+  const before = typeof fixId === 'string' ? (readConfig().mailboxes ?? []).find((m) => m.id === fixId) : undefined;
+  const res = await saveMailbox(mailService, mailAdmin, PROVIDER_PRESETS, input as AddMailboxInput);
+  // Fixing a mailbox that needed the owner closes its Ask me card (MB-7).
+  if (res.ok && before?.status === 'needs-attention') closeMailboxCard(res.record.id, `${res.record.address} is connected again.`);
+  return res;
 });
-ipcMain.handle('mail:remove', (_evt, id: unknown) => (typeof id === 'string' ? removeMailbox(mailService, mailAdmin, id) : { ok: false, affected: [] }));
+ipcMain.handle('mail:remove', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return { ok: false, affected: [] };
+  const rec = (readConfig().mailboxes ?? []).find((m) => m.id === id);
+  const res = removeMailbox(mailService, mailAdmin, id);
+  if (res.ok && rec?.status === 'needs-attention') closeMailboxCard(id, `${rec.address} was removed in Settings.`);
+  return res;
+});
 ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
   return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean } });

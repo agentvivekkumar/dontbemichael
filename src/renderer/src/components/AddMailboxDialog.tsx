@@ -50,7 +50,7 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
     // Escape waits for a running login test, like the backdrop and Cancel.
     if (e.key === 'Escape' && !e.nativeEvent.isComposing) { e.stopPropagation(); if (!busy) onClose(); return; }
     if (e.key !== 'Tab' || !boxRef.current) return;
-    const items = [...boxRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])')];
+    const items = [...boxRef.current.querySelectorAll<HTMLElement>('button:not([disabled]):not([tabindex="-1"]), input:not([disabled])')];
     if (!items.length) return;
     const first = items[0], last = items[items.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

@@ -53,10 +53,15 @@ export function MailboxesSettings() {
 
   const remove = async (id: string): Promise<void> => {
     setConfirming(null);
+    let ok = false;
     try {
       const res = await window.cth.mailRemove(id);
-      if (!res.ok) setFailed(true);
-    } catch { setFailed(true); }
+      ok = res.ok;
+    } catch { /* reported below */ }
+    if (!ok) setFailed(true);
+    // The row is gone after a removal, so focus goes to Add; after a failure it
+    // goes back to that row's Remove.
+    refocus(ok ? 'add' : `remove-${id}`);
   };
 
   return (
