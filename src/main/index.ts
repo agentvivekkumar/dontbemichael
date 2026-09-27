@@ -105,6 +105,7 @@ import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
 import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
 import { scheduledRunBody } from '../shared/scheduleMessage';
+import { OFFICE_OPEN_SUBJECT, officeClosedInLog, officeOpenBody } from '../shared/officeOpen';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
@@ -946,6 +947,26 @@ function archiveOrphanedAgents(): void {
  *  owner moved to weekly slots keeps to its slots. Michael starting again later in
  *  the same launch doesn't fire it again. */
 let standupFiredThisLaunch = false;
+
+/** Office open (src/shared/officeOpen.ts): read once per launch from the log,
+ *  then each agent is told as it starts. Per agent, not a broadcast, because
+ *  at launch every team member is archived until its terminal spawns and a
+ *  broadcast skips archived agents. */
+let officeClosedAtLaunch: boolean | null = null;
+const toldOfficeOpen = new Set<string>();
+function tellOfficeOpen(agentId: string): void {
+  try {
+    if (!hive.enabled()) return;
+    if (officeClosedAtLaunch === null) officeClosedAtLaunch = officeClosedInLog(hive.logTail(5000));
+    if (!officeClosedAtLaunch || toldOfficeOpen.has(agentId)) return;
+    const a = hive.registry().agents[agentId];
+    if (!a || a.isAssistant) return;
+    toldOfficeOpen.add(agentId);
+    hive.send({ to: agentId, act: 'inform', subject: OFFICE_OPEN_SUBJECT, body: officeOpenBody() }, 'human');
+  } catch (e) {
+    console.error('[office-open]', e);
+  }
+}
 function standupOnOfficeOpen(): void {
   if (standupFiredThisLaunch || !hive.enabled()) return;
   const m = (readConfig().missions ?? []).find((x) => x.id === OPS_STANDUP_MISSION.id);
@@ -3336,6 +3357,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   const worktreePath = worktreePaths.get(opts.id);
   // `cwd` echoes back the TILDE-EXPANDED absolute path so the renderer's agent
   // record matches what the registry and the PTY actually used.
+  if (res.ok && opts.hive?.id) tellOfficeOpen(opts.hive.id);
   if (res.ok && opts.hive?.isGod) standupOnOfficeOpen();
   return { ...res, cwd: opts.cwd, ...(worktreePath ? { worktreePath } : {}), ...(resumeNotFound ? { resumeNotFound: true } : {}), ...(didResume ? { resumed: true } : {}), ...(seedPrompt ? { seedPrompt } : {}) };
 }
