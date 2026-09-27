@@ -21,7 +21,7 @@ const BROKER = process.env.MD_BROKER_URL || '';
 const TOKEN = process.env.MD_BROKER_TOKEN || '';
 const CALL_TIMEOUT_MS = 90_000;
 
-const mailbox = { type: 'string', description: 'Mailbox id from list_mailboxes, for example "sales-moblize-it".' };
+const mailbox = { type: 'string', description: 'Mailbox id from list_mailboxes, for example "sales-example-com".' };
 const ref = {
   type: 'object',
   description: 'A message in a mailbox: {mailbox, id} where id comes from search.',

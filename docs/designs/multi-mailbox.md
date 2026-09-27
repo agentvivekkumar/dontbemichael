@@ -925,7 +925,7 @@ Target: this file; screens: Settings > Connections > Mailboxes, the Add a mailbo
 
 | Screen/Section | Mockup Path | Direction | Notes |
 |----------------|-------------|-----------|-------|
-| Mailboxes, Add a mailbox, Capabilities | /Users/moblizeit/.gstack/projects/agentvivekkumar-dontbemichael/designs/mailboxes-settings-20260926/wireframes.html | Capabilities as its own tab (D2 A); Team email switch tops Mailboxes; Toggle rows; radio rows for sending | HTML wireframe, not final visuals; the "Section in Profile" panel in it is marked not chosen |
+| Mailboxes, Add a mailbox, Capabilities | ~/.gstack/projects/agentvivekkumar-dontbemichael/designs/mailboxes-settings-20260926/wireframes.html | Capabilities as its own tab (D2 A); Team email switch tops Mailboxes; Toggle rows; radio rows for sending | HTML wireframe, not final visuals; the "Section in Profile" panel in it is marked not chosen |
 
 ### Decisions
 
@@ -952,8 +952,8 @@ Settings > Connections > MAILBOXES                          [Add a mailbox]
   Team email                                   (On/Off switch)
   Off blocks email for every team member, whatever their Capabilities say.
   ------------------------------------------------------------------------
-  sales@moblize.it            Gmail · used by Dwight, Kelly     connected   Edit
-  ceo@moblize.it              Google Workspace · used by Pam    needs you   Fix
+  sales@example.com            Gmail · used by Dwight, Kelly     connected   Edit
+  ceo@example.com              Google Workspace · used by Pam    needs you   Fix
     ! Google stopped accepting this app password.
   Your Claude account         Gmail, connected in Claude        connected   (set up in Claude)
 
@@ -961,8 +961,8 @@ Agent panel tabs: Profile | Capabilities | Messages | Schedules | Memory ...
   CAPABILITIES
   Email
     Can check email                                   (switch)
-    sales@moblize.it  (Gmail)                          (switch)
-    support@moblize.it (iCloud Mail)                   (switch)
+    sales@example.com  (Gmail)                          (switch)
+    support@example.com (iCloud Mail)                   (switch)
   Sending
     (o) Can send     Replies go out straight away.
     ( ) Draft only   Replies wait in that mailbox's Drafts folder for you.
@@ -1001,7 +1001,7 @@ STEP | OWNER DOES                                | OWNER FEELS            | PLAN
 
 ### Accessibility and layout (7A)
 - Everything reachable with Tab; focus ring 2px ink-900 with 2px offset (DESIGN.md 12); inputs 2px ink-700 inset.
-- Each mailbox toggle is named for the agent and mailbox ("Dwight can use sales@moblize.it"); Can check email and Team email have names.
+- Each mailbox toggle is named for the agent and mailbox ("Dwight can use sales@example.com"); Can check email and Team email have names.
 - Sending is one radiogroup; arrow keys move between Can send and Draft only.
 - Add a mailbox traps focus, closes with Escape, has a show/hide button on the app password.
 - Test results and "needs you" changes announce through a polite live region.

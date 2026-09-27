@@ -101,8 +101,8 @@ test('one mailbox per agent: only the first counts, and a save keeps one (owner,
 test('helpers: first enable, ids, Microsoft addresses', () => {
   assert.equal(emailJustEnabled(undefined, { email: { enabled: true, mailboxes: [], send: false } }), true);
   assert.equal(emailJustEnabled({ email: { enabled: true, mailboxes: [], send: false } }, { email: { enabled: true, mailboxes: ['a'], send: false } }), false);
-  assert.equal(mailboxIdFor('Sales@Moblize.it'), 'sales-moblize-it');
-  assert.equal(mailboxIdFor('sales@moblize.it', ['sales-moblize-it']), 'sales-moblize-it-2');
+  assert.equal(mailboxIdFor('Sales@Example.com'), 'sales-example-com');
+  assert.equal(mailboxIdFor('sales@example.com', ['sales-example-com']), 'sales-example-com-2');
   assert.equal(isMicrosoftAddress('a@outlook.com'), true);
   assert.equal(isMicrosoftAddress('a@gmail.com'), false);
 });

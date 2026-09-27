@@ -160,7 +160,7 @@ export function emailJustEnabled(before: AgentCapabilities | undefined, after: A
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
 
-/** A mailbox id from its address: sales@moblize.it -> sales-moblize-it. */
+/** A mailbox id from its address: sales@example.com -> sales-example-com. */
 export function mailboxIdFor(address: string, taken: string[] = []): string {
   const base = address.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'mailbox';
   let id = SLUG_RE.test(base) ? base : `mb-${base}`.slice(0, 40).replace(/-+$/, '');
