@@ -4,7 +4,7 @@ import { Toggle, TriggerCard } from './triggers/ui';
 import { AgentSchedules, useGodId, useMissions } from './triggers/ScheduleList';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
-import { PROVIDER_PRESETS, type EmailCapability } from '@shared/mailboxes';
+import { type EmailCapability } from '@shared/mailboxes';
 import { missionsFor } from '@shared/missions';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
@@ -18,9 +18,9 @@ let handledFocusSeq: number | undefined;
  * Two sections, both closed whenever the tab opens, like every section on
  * every agent tab (owner, 2026-09-26); the header chip says what is inside:
  *
- * - Email (design 2A): "Can check email" is the only switch. An agent has at
- *   most one mailbox (owner, 2026-09-26), picked from radio rows, then Sending
- *   as two radio rows with Draft only first chosen (6A), then
+ * - Email: the section header carries the one on/off switch (owner,
+ *   2026-09-26). With email on, the body is the agent's one mailbox as radio
+ *   rows (address only), then Sending with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had. A jump from the office
@@ -74,16 +74,19 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const current = email.mailboxes.find((id) => known.has(id));
   const toggleEmail = (): void => {
     if (email.enabled) { void save({ ...email, enabled: false }); return; }
+    // Turning email on opens the section, so the mailbox and sending show.
+    setCollapsed({ ...collapsed, email: false });
     const pick = current ?? mailboxes[0]?.id;
     void save({ enabled: true, mailboxes: pick ? [pick] : [], send: current ? email.send : false });
   };
   const pickMailbox = (id: string): void => { if (id !== current) void save({ ...email, mailboxes: [id] }); };
   const setSend = (send: boolean): void => { if (send !== email.send) void save({ ...email, send }); };
 
+  // Just the address; a word only when the mailbox needs the owner.
   const mailboxOptions = mailboxes.map((m) => ({
     value: m.id,
     label: m.address,
-    desc: (m.provider === 'other' ? t('mailboxes.other') : PROVIDER_PRESETS[m.provider].label) + (m.status === 'needs-attention' ? ` · ${t('mailboxes.statusNeeds')}` : '')
+    desc: m.status === 'needs-attention' ? t('mailboxes.statusNeeds') : undefined
   }));
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
@@ -97,40 +100,32 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
         <TriggerCard
           title={t('capabilities.email')}
           blurb={t('capabilities.emailBlurb', { name })}
-          summary={email.enabled ? t('capabilities.on') : t('capabilities.off')}
+          action={<Toggle on={email.enabled} label={t('capabilities.canCheck', { name })} onClick={toggleEmail} />}
           open={!collapsed.email}
           onToggle={(open) => setFold('email', open)}
         >
-        <div style={{ ...row, borderTop: 'none' }}>
-          <div style={{ flex: 1, fontSize: 14 }}>{t('capabilities.canCheck')}</div>
-          <Toggle on={email.enabled} label={t('capabilities.canCheck')} onClick={toggleEmail} />
-        </div>
+          {!email.enabled ? (
+            <div style={hint}>{t('capabilities.emailOff', { name })}</div>
+          ) : (
+            <>
+              {mailboxes.length === 0 ? (
+                <div style={{ ...notice, marginTop: 0, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+                  {t('capabilities.noMailboxes')}{' '}
+                  <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
+                </div>
+              ) : (
+                <RadioRows label={t('capabilities.mailbox', { name })} value={current} options={mailboxOptions} onChange={pickMailbox} breakAll />
+              )}
 
-        {email.enabled && (
-          <>
-            {mailboxes.length === 0 && (
-              <div style={{ ...notice, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
-                {t('capabilities.noMailboxes')}{' '}
-                <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
-              </div>
-            )}
-            {mailboxes.length > 0 && (
-              <>
-                <div style={h13}>{t('capabilities.mailbox')}</div>
-                <RadioRows label={t('capabilities.mailbox')} value={current} options={mailboxOptions} onChange={pickMailbox} breakAll />
-              </>
-            )}
-
-            <div style={h13}>{t('capabilities.sending')}</div>
-            <RadioRows
-              label={t('capabilities.sending')}
-              value={String(email.send)}
-              options={[{ value: 'true', label: t('capabilities.canSend'), desc: t('capabilities.canSendDesc') }, { value: 'false', label: t('capabilities.draftOnly'), desc: t('capabilities.draftOnlyDesc') }]}
-              onChange={(v) => setSend(v === 'true')}
-            />
-          </>
-        )}
-
+              <div style={h13}>{t('capabilities.sending')}</div>
+              <RadioRows
+                label={t('capabilities.sending')}
+                value={String(email.send)}
+                options={[{ value: 'true', label: t('capabilities.canSend'), desc: t('capabilities.canSendDesc') }, { value: 'false', label: t('capabilities.draftOnly'), desc: t('capabilities.draftOnlyDesc') }]}
+                onChange={(v) => setSend(v === 'true')}
+              />
+            </>
+          )}
         </TriggerCard>
 
         <TriggerCard
@@ -156,7 +151,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 /** A one-choice list (DESIGN.md 7.10a Radio row): arrow keys move and choose,
  *  only the chosen row is in the tab order (the first when none is chosen). */
 function RadioRows({ label, value, options, onChange, breakAll }: {
-  label: string; value: string | undefined; options: Array<{ value: string; label: string; desc: string }>;
+  label: string; value: string | undefined; options: Array<{ value: string; label: string; desc?: string }>;
   onChange: (value: string) => void; breakAll?: boolean;
 }) {
   const at = options.findIndex((o) => o.value === value);
@@ -188,7 +183,7 @@ function RadioRows({ label, value, options, onChange, breakAll }: {
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 14, wordBreak: breakAll ? 'break-all' : undefined }}>{o.label}</span>
-              <span style={{ display: 'block', ...hint }}>{o.desc}</span>
+              {o.desc && <span style={{ display: 'block', ...hint }}>{o.desc}</span>}
             </span>
           </button>
         );

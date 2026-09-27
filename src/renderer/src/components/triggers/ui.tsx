@@ -194,8 +194,11 @@ export function Disclosure({ open }: { open: boolean }) {
   );
 }
 
-export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: openProp, onToggle, children }: {
-  title: string; blurb: string; summary?: ReactNode; defaultOpen?: boolean;
+export function TriggerCard({ title, blurb, summary, action, defaultOpen = false, open: openProp, onToggle, children }: {
+  title: string; blurb: string; summary?: ReactNode;
+  /** A control that sits in the header beside the fold button (not inside it),
+   *  e.g. the section's own on/off switch. Replaces the summary chip. */
+  action?: ReactNode; defaultOpen?: boolean;
   /** Controlled use: the parent owns open/closed (e.g. remembers it, or opens it on a jump). */
   open?: boolean; onToggle?: (open: boolean) => void; children: ReactNode;
 }) {
@@ -204,15 +207,15 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: 
   const bodyId = useId();
   return (
     <div style={{ marginBottom: 8, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => { const next = !open; if (openProp === undefined) setOpenState(next); onToggle?.(next); }}
         style={{
-          width: '100%', display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'left',
-          padding: '8px 10px', border: 'none', cursor: 'pointer',
-          background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
+          flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'start',
+          padding: '8px 10px', border: 'none', cursor: 'pointer', background: 'transparent'
         }}
       >
         <Disclosure open={open} />
@@ -225,8 +228,10 @@ export function TriggerCard({ title, blurb, summary, defaultOpen = false, open: 
             {blurb}
           </span>
         </span>
-        {summary !== undefined && <Chip>{summary}</Chip>}
+        {summary !== undefined && action === undefined && <Chip>{summary}</Chip>}
       </button>
+      {action !== undefined && <div style={{ flexShrink: 0, padding: '8px 10px 0 0' }}>{action}</div>}
+      </div>
       <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
     </div>
   );

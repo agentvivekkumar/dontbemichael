@@ -42,8 +42,12 @@ test('Draft only is chosen the first time email is turned on (6A); Sending is a 
   assert.match(cap, /role="radiogroup"/);
   assert.match(cap, /ArrowUp/);
   // One mailbox per agent (owner, 2026-09-26): picked from radio rows, no per-mailbox switch.
-  assert.match(cap, /<RadioRows label=\{t\('capabilities\.mailbox'\)\} value=\{current\}/);
-  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'Can check email is the only switch');
+  assert.match(cap, /<RadioRows label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current\}/);
+  // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
+  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'one switch');
+  assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);
+  assert.doesNotMatch(cap, /PROVIDER_PRESETS/, 'no service name under the address');
+  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /\{action !== undefined && <div/, 'the switch sits beside the fold button, not inside it');
 });
 
 test('removing a used mailbox names who loses it (8A)', () => {

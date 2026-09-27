@@ -123,7 +123,7 @@ test('new schedule strings exist in every language', () => {
     askMe: ['scheduleTitle', 'scheduleAdd', 'scheduleUpdate', 'schedulePause', 'scheduleResume', 'scheduleDelete', 'scheduleStale', 'approve', 'decline'],
     agentDetail: ['killConfirmSchedules', 'killConfirmSchedulesPlural'],
     agentCard: ['nextRun'],
-    capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'on', 'off']
+    capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'emailOff', 'canCheck', 'mailbox']
   };
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
