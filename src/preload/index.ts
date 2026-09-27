@@ -609,6 +609,15 @@ const api = {
   foldersSuggest: (businessName: string, folders: string[], root?: string): Promise<{
     home: string; root: string; byFolder: Record<string, string>; rootRefused?: boolean;
   }> => ipcRenderer.invoke('folders:suggest', { businessName, folders, root }),
+  /** Which of `names` already exist as folders under `root`. Reads only. */
+  foldersExist: (root: string, names: string[]): Promise<Record<string, boolean>> =>
+    ipcRenderer.invoke('folders:exists', { root, names }),
+  /** The hire wizard's distinct job check against every teammate (design D6). */
+  hireCheckDistinct: (
+    job: { name: string; title: string; routing: string; workStyle?: string; mailbox?: string },
+    team: Array<{ name: string; title: string; routing: string; workStyle?: string; mailbox?: string }>
+  ): Promise<{ distinct: boolean; overlapsWith: string[]; why: string; suggestion?: string; source: 'ai' | 'rules' }> =>
+    ipcRenderer.invoke('hire:checkDistinct', { job, team }),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }

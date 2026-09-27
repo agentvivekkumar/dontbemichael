@@ -515,93 +515,26 @@
     "mcpSafe": "MCP 服务器（安全、预启用）：",
     "mcpConsent": "⚠️ MCP（需要你同意，不会自动启用）：",
     "mcpEnableInSettings": "（审核后可在设置 → MCP 中启用）",
-    "sections": {
-      "identity": {
-        "label": "身份",
-        "hint": "名字 · 角色 · 颜色"
-      },
-      "workspace": {
-        "label": "工作区",
-        "hint": "文件夹 · 项目"
-      },
-      "engine": {
-        "label": "引擎",
-        "hint": "提供商 · 模型 · 命令"
-      },
-      "briefing": {
-        "label": "任务简报",
-        "hint": "描述 · 目标"
-      }
-    },
     "name": "名字",
     "namePlaceholder": "Ada",
     "character": "角色",
-    "color": "颜色",
-    "project": "项目",
-    "pickProject": "选择项目，或添加新项目：",
-    "noProjects": "还没有项目，添加一个开始：",
-    "addProject": "添加项目",
-    "addProjectTitle": "选择一个文件夹并注册为项目",
     "projectPlaceholder": "/path/to/your/project",
     "pick": "选择",
-    "saveAsProject": "另存为项目",
-    "saveAsProjectTitle": "把这个文件夹保存到你的项目里，下次一键选择",
-    "gitIsolation": "Git 隔离（独立工作树）",
-    "resumeSession": "恢复会话 ID（可选）",
-    "resumePlaceholder": "粘贴 Claude 会话 ID 以继续其对话",
-    "folderFromSession": "已根据会话设置文件夹：{{path}}",
-    "resumeNote": "将在所选文件夹中恢复该会话（Git 隔离已禁用）。",
     "provider": "提供商",
-    "providerAntigravity": "使用 Gemini 模型启动 Antigravity CLI（agy）",
-    "providerCodex": "启动 Codex CLI（codex），不带 Claude 专属标志",
-    "providerCustom": "运行任意命令，不带 Claude 专属标志",
     "model": "模型",
-    "cliDefaultModel": "CLI 默认模型",
-    "fromHire": "{{model}}（来自 hire）",
-    "ossModels": "开源模型",
-    "ossLocal": "本地 · 无需密钥（Ollama / LM Studio）",
-    "ossByok": "通过 OSS 提供商 · BYOK",
-    "ossLocalTitle": "{{slug}} · 约需 {{ram}} 内存，拉取：ollama pull {{tag}}",
-    "ossByokTitle": "{{slug}} · 在设置 → AI 引擎中设置 {{keyEnv}}",
-    "byokNote": "该引擎的 BYOK 密钥和本地端点位于 设置 → AI 引擎。本地模型新手？请阅读 在开源模型上运行 或 在 Mac Mini 上配置。端到端实测仍在等待真实模型调用（请在设备上验证）。",
     "command": "命令",
-    "commandAuto": "命令（自动模式已开）",
-    "templates": "模板",
-    "templatesHint": {
-      "repoJanitor": {
-        "label": "仓库清洁工"
-      },
-      "docsWriter": {
-        "label": "文档写手"
-      },
-      "bugTriager": {
-        "label": "缺陷分诊员"
-      },
-      "researchAssistant": {
-        "label": "研究助理"
-      },
-      "releaseManager": {
-        "label": "发布经理"
-      }
-    },
     "role": "角色",
     "rolePlaceholder": "例如：财务",
-    "roleDescription": "角色说明",
     "roleDescriptionPlaceholder": "例如：记录每一笔收入和支出，每周发一份汇总",
     "roleHelp": "{{godName}} 会根据角色和角色说明决定把哪些工作交给这位成员。",
     "workStyle": "工作方式（可选）",
     "workStylePlaceholder": "例如：每个数字都核对两遍。完成后发一份简短汇总。",
     "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式，包括按日程运行的任务：按什么步骤做，结束前检查什么。",
-    "folderInsideMichael": "放在 {{godName}} 的文件夹里，以角色命名。只有这位成员、同一角色的成员和 {{godName}} 能打开。",
     "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
     "errFolderShared": "这是 {{godName}} 的文件夹。请为这位成员选择一个自己的文件夹。",
-    "importHire": "导入 hire",
     "importHireDesc": "导入 hire 会从一个 .json 清单加载现成的智能体，它会填好下方所有字段供你检查。不点 生成 就不会启动任何东西。",
     "generateWithAI": "用 AI 生成一个…",
     "hideAIPrompt": "隐藏 AI 提示词",
-    "aiPromptHint": "把它复制到 Claude/ChatGPT/Gemini，填写底部的详细信息，然后把它的 JSON 回复保存为 .json 文件，在这里导入。",
-    "copied": "已复制 ✓",
-    "copyPrompt": "复制提示词",
     "importHireBtn": "导入 hire…",
     "importHireBtnTitle": "导入 hire 清单（.json）",
     "spawn": "招聘",
@@ -639,6 +572,61 @@
       "creed": "质量控制",
       "meredith": "供应链",
       "darryl": "仓库"
+    },
+    "wizard": {
+      "steps": "招聘步骤",
+      "step": {
+        "who": "人选",
+        "job": "工作",
+        "review": "确认"
+      },
+      "stepHint": {
+        "who": "选一个人",
+        "job": "原本的工作或其他",
+        "review": "检查后招聘"
+      },
+      "nameTaken": "团队里已经有人叫 {{name}}。请换一个名字。",
+      "errJob": "请给这份工作一个职位名称，或写明要交给他的事。",
+      "errOverlap": "这份工作与某位同事重叠。请绑定到一个邮箱或一个主题，或修改要交给他的事。",
+      "theirJob": "{{name}} 的工作",
+      "likeTeammate": "按 {{name}} 现在的做法",
+      "yourOffice": "你办公室里的工作",
+      "newJob": "新的工作",
+      "newJobTitle": "写一份新工作",
+      "newJobSummary": "从空白的职位名称、要交给他的事和工作方式开始。",
+      "allJobs": "所有行业的所有工作",
+      "whatToSend": "要交给 {{name}} 的事",
+      "folder": "文件夹",
+      "folderDefault": "使用建议的文件夹",
+      "folderInside": "{{godName}} 文件夹内属于他自己的文件夹：{{path}}。只有这位团队成员和 {{godName}} 能打开。",
+      "tier": {
+        "best": "最佳",
+        "fast": "快速",
+        "bestTitle": "设置中选定的模型",
+        "fastTitle": "更快更省的模型，适合简单的工作"
+      },
+      "back": "上一步",
+      "next": "下一步",
+      "checking": "检查中...",
+      "checkingTeam": "正在把这份工作与你的团队比对...",
+      "notChecked": "这份工作还没有与团队比对。",
+      "checkNow": "立即检查",
+      "fullCheckFailed": "完整检查未能运行，所以只比较了职位名称和措辞。",
+      "distinct": "与团队中每个人都不同。",
+      "overlaps": "这与 {{names}} 重叠。",
+      "boundTo": "{{name}} 只负责 {{scope}}。",
+      "otherLine": "{{name}} 的说明将加上：{{line}}",
+      "unbind": "取消绑定",
+      "makeParticular": "{{name}} 需要有自己的工作才能加入。请绑定到具体的东西，或修改要交给他的事。",
+      "suggestion": "建议：{{text}}",
+      "bindMailbox": "绑定到邮箱",
+      "bindTopic": "绑定到主题",
+      "checkAgain": "重新检查",
+      "noFreeMailbox": "每个邮箱都已有人使用。请在设置中添加一个，或在能力页面移交一个。",
+      "bind": "绑定",
+      "topicPlaceholder": "例如：宴会订单咨询",
+      "editToFix": "也可以修改要交给他的事，然后重新检查。",
+      "mailboxScope": "{{address}} 邮箱"
     }
   },
   "onboarding": {

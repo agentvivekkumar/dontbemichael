@@ -39,6 +39,7 @@ import type { UsageProvider } from './usage';
 import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
+import { checkDistinct, readJobProfile } from './hireCheck';
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
@@ -4029,6 +4030,37 @@ ipcMain.handle('folders:suggest', (_evt, payload: unknown) => {
     byFolder,
     ...(rootRefused ? { rootRefused: true } : {})
   };
+});
+
+/** Which folder names already exist under `root` (Michael's folder), so the
+ *  hire wizard can give a new hire its own folder (hire redesign, point 2).
+ *  Reads only; creates nothing. */
+ipcMain.handle('folders:exists', (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { root?: unknown; names?: unknown };
+  if (typeof p.root !== 'string' || !p.root.trim()) return {};
+  const root = resolve(expandTilde(p.root.trim()));
+  const names = Array.isArray(p.names) ? p.names.filter((x): x is string => typeof x === 'string').slice(0, 200) : [];
+  const out: Record<string, boolean> = {};
+  for (const n of names) {
+    try { out[n] = existsSync(join(root, safeFolderName(n))); } catch { out[n] = false; }
+  }
+  return out;
+});
+
+/** The hire wizard's distinct job check (design D6): a hidden Haiku call that
+ *  compares the new job with every teammate's, the instant rules when it can't. */
+ipcMain.handle('hire:checkDistinct', async (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { job?: unknown; team?: unknown };
+  const job = readJobProfile(p.job);
+  if (!job) return { distinct: false, overlapsWith: [], why: '', source: 'rules' };
+  const team = Array.isArray(p.team) ? p.team.map(readJobProfile).filter((m): m is NonNullable<typeof m> => !!m) : [];
+  const cfg = readConfig();
+  return checkDistinct(job, team, {
+    cwd: cfg.harnessHome ?? app.getPath('home'),
+    command: cfg.defaultCommand ?? 'claude',
+    env: memory.env(),
+    log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+  });
 });
 
 /** Create the team's folders when onboarding finishes. Only ever ADDS a missing

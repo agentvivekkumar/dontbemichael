@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
@@ -12,12 +12,6 @@ import type { HireManifest } from '@shared/hire';
 import { hireQueueProgress } from '@shared/hireQueue';
 import { MCP_CATALOG } from '@shared/mcpCatalog';
 import {
-  OSS_LOCAL_PICKS,
-  OSS_PROVIDER_PICKS,
-  localSlugFor,
-  hasOssQuickPicks
-} from '@shared/ossModels';
-import {
   type AgentProvider,
   type HarnessConfig,
   AGENT_PROVIDER_PRESETS,
@@ -25,141 +19,106 @@ import {
   tokenizeCommand,
   modelsForProvider,
   inferAgentProvider,
-  providerPreset,
   isClaudeProvider
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
-import { joinAgentRole, splitAgentRole } from '@shared/agentRole';
+import { splitAgentRole } from '@shared/agentRole';
+import { teamAccent } from '@shared/teamPlan';
+import { mailboxHolder } from '@shared/mailboxes';
+import {
+  NEW_JOB_KEY,
+  activeTeam,
+  appendOnce,
+  bindingLines,
+  cardJobs,
+  hireFolderName,
+  hireRole,
+  jobFor,
+  overlapsByRules,
+  ownJob,
+  teamJobs,
+  type DistinctVerdict,
+  type HireJob,
+  type JobProfile
+} from '@shared/hireTemplates';
 import { useRtl } from '@/i18n/useDirection';
-import { SHOW_IMPORT_HIRE, SHOW_WORKSPACE_DEV_OPTIONS } from '@shared/buildFeatures';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { SHOW_IMPORT_HIRE, SHOW_ENGINE_PICKER } from '@shared/buildFeatures';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
-// OSS quick-pick chip styling (ondev-c) — mirrors the model-picker chips.
-const ossChip = (active: boolean, accent: AccentColorName): CSSProperties => ({
-  padding: '3px 8px 1px',
-  background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-  boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-  fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-  color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-});
-const ossGroupHead: CSSProperties = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
-  color: 'var(--cth-ink-500)', textTransform: 'uppercase', marginBottom: 4
-};
-
-// One-click briefing templates — fill Description + Goal with a sharp, ready-to-run
-// role so a user isn't staring at a blank field (item 7). The template BRIEFINGS
-// stay English (they become agent prompts — see the i18n report); only the
-// picker labels are translated.
-const DESCRIPTION_TEMPLATES: { labelKey: string; description: string; goal: string }[] = [
-  {
-    labelKey: 'addAgent.templatesHint.repoJanitor.label',
-    description: 'keeps the codebase tidy and healthy',
-    goal: 'Continuously hunt for dead code, lint errors, flaky tests, and small safe refactors. Fix the safe ones and leave a note for anything risky. Never change behavior without flagging it.'
-  },
-  {
-    labelKey: 'addAgent.templatesHint.docsWriter.label',
-    description: 'keeps docs in sync with the code',
-    goal: 'Watch for code changes that outdate the README and docs, then update them. Write for newcomers and prefer concrete examples over prose.'
-  },
-  {
-    labelKey: 'addAgent.templatesHint.bugTriager.label',
-    description: 'investigates and root-causes bugs',
-    goal: 'For each reported issue: reproduce it, find the root cause, then propose a minimal fix with evidence. No fixes without a confirmed root cause.'
-  },
-  {
-    labelKey: 'addAgent.templatesHint.researchAssistant.label',
-    description: 'gathers and summarizes information',
-    goal: 'Research the questions you are given across multiple sources, verify the key claims, and return a concise, cited summary.'
-  },
-  {
-    labelKey: 'addAgent.templatesHint.releaseManager.label',
-    description: 'prepares and ships releases',
-    goal: 'Track what has shipped since the last release, update the changelog and version, and draft clear release notes.'
-  }
-];
-
 // Copy-paste prompt the user hands to any AI to generate a hire manifest. It pins
-// the exact JSON shape the importer accepts and ends with a fill-in section so the
-// user adds their own details (item 7). Kept in sync with the HireManifest schema
-// (src/shared/hire.ts) — provider allowlist is claude | codex | antigravity | cursor.
+// the exact JSON shape the importer accepts (src/shared/hire.ts). Shown only with
+// SHOW_IMPORT_HIRE.
 const HIRE_PROMPT = `You are designing a "hire": a ready to spawn AI agent for Don't Be Michael, an app that runs a team of AI agents. Output ONE JSON object (a hire manifest) and nothing else.
-
-Make the agent genuinely useful: give it a sharp role, a concrete standing goal, and a description that makes it behave like an expert operator of its CLI engine (Claude Code, Codex, or Antigravity/Gemini). It should know how to use the terminal, read and edit files, run and inspect commands, lean on available skills and MCP tools, keep notes in memory, and work autonomously toward its goal without needing guidance.
 
 Return EXACTLY this shape (omit optional fields you don't need; keep the spec string verbatim):
 
 {
   "spec": "munder-difflin/hire@1",
   "name": "Jim",
-  "description": "one line role: what this agent is for",
-  "goal": "standing directive injected on every prompt; specific and focused on outcomes",
+  "description": "Job title: what to send this agent",
+  "goal": "work style: how the agent does the job",
   "provider": "claude",
-  "model": "claude-opus-4-8[1m]",
-  "capabilities": ["code-review", "docs"],
-  "isolate": false,
   "tokenCap": 2000000,
   "author": "your name"
 }
 
-Rules:
-- "provider" MUST be one of: cursor | claude | codex | antigravity. "model" must be a real model id for that provider (e.g. gpt-5.6-luna-high, claude-opus-4-8[1m], gpt-5-codex, "Gemini 3.1 Pro (High)").
-- Do NOT include shell commands or any flags beyond these fields.
-- Make "description" + "goal" concrete enough that the agent knows exactly what to do on its first turn.
-
 --- ADD YOUR DETAILS BELOW (the AI should use these) ---
 Role / what I want this agent to do:
-Preferred engine (claude / codex / antigravity), if any:
-Repos, tools, style, or constraints to respect:
 `;
 
-// The Add Agent form has 11+ fields, so it's grouped into sections the user jumps
-// between via a left sidebar index (one section shown at a time). Engine carries
-// Command (it's the spawn command assembled from provider+model+flags); Workspace
-// clusters Folder + Git isolation + Resume (all "where/how it runs"). Capabilities
-// isn't a field here — it rides an imported hire manifest (the pinned banner).
-type SectionKey = 'identity' | 'workspace' | 'engine' | 'briefing';
-const SECTIONS: { key: SectionKey; labelKey: string; hintKey: string }[] = [
-  { key: 'identity',  labelKey: 'addAgent.sections.identity.label',  hintKey: 'addAgent.sections.identity.hint' },
-  { key: 'workspace', labelKey: 'addAgent.sections.workspace.label', hintKey: 'addAgent.sections.workspace.hint' },
-  { key: 'engine',    labelKey: 'addAgent.sections.engine.label',    hintKey: 'addAgent.sections.engine.hint' },
-  { key: 'briefing',  labelKey: 'addAgent.sections.briefing.label',  hintKey: 'addAgent.sections.briefing.hint' }
-];
-
-function basename(path: string): string {
-  return path.split('/').filter(Boolean).pop() ?? path;
-}
+/**
+ * Hire a team member (docs/designs/hire-redesign.md). Three steps:
+ *
+ *   Who     the character tiles, grouped by job; the name follows the tile.
+ *   Job     the character's own job (a teammate doing it today, else the pack
+ *           card), every teammate's job ("Your office"), every pack's jobs, or
+ *           a new one.
+ *   Review  everything editable: name, job title, what to send, work style,
+ *           folder (its own, suffixed on a clash) and model (Best or Fast).
+ *           The job is checked against every teammate before Hire (D6): it is
+ *           allowed only when distinct, or bound to its own mailbox or topic.
+ *
+ * A queued hire (deep link, import) opens on Review, prefilled from its manifest.
+ */
+type Step = 'who' | 'job' | 'review';
+const STEPS: Step[] = ['who', 'job', 'review'];
 
 /** Same folder, ignoring a trailing slash and (as macOS and Windows do) case. */
 function samePath(a: string, b: string): boolean {
   const n = (p: string) => p.trim().replace(/[\\/]+$/, '').toLowerCase();
   return n(a) === n(b);
 }
-
-/** A plain note under a field: what it is for, in the owner's words. */
-const helperStyle: CSSProperties = {
-  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-500)'
-};
+const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
+const joinPath = (root: string, name: string) => `${root.replace(/[\\/]+$/, '')}/${name}`;
 
 function uniqueId(name: string): string {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
 }
 
+const TOPIC_MAX = 120;
+
+/** A binding that makes an overlapping job particular (D6). */
+interface Binding { scope: string; mailboxId?: string; others: string[] }
+
 export interface AddAgentModalProps {
   onClose: () => void;
   config: HarnessConfig;
-  /** Lift config changes (e.g. a project registered from this modal) back up to
-   *  App so the rest of the UI — and the next time this modal opens — sees them. */
+  /** Lift config changes back up to App so the rest of the UI sees them. */
   onConfigChange?: (config: HarnessConfig) => void;
 }
 
 export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModalProps) {
   const { t: tr } = useTranslation();
   const rtl = useRtl();
+  const godName = useResolvedGodName();
   const addAgent = useStore(s => s.addAgent);
+  const updateAgent = useStore(s => s.updateAgent);
+  const setSidebarTab = useStore(s => s.setSidebarTab);
+  const agents = useStore(s => s.agents);
   // Deep links and file batches share one FIFO. The head alone seeds the form;
-  // every item still requires an explicit spawn or skip.
+  // every item still requires an explicit hire or skip.
   const hireQueue = useStore(s => s.hireQueue);
   const enqueuePendingHires = useStore(s => s.enqueuePendingHires);
   const finishPendingHire = useStore(s => s.finishPendingHire);
@@ -168,119 +127,206 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
 
   const knownCharacter = (c?: string): OfficeCharacterName =>
     (OFFICE_CAST.some(m => m.name === c) ? (c as OfficeCharacterName) : DEFAULT_CHARACTER);
-  const knownAccent = (a?: string): AccentColorName =>
-    (ACCENTS.includes(a as AccentColorName) ? (a as AccentColorName) : 'sky');
-  /** The cast member a typed name refers to, if any.
-   *
-   *  The character tiles already set the name (clicking Meredith names the agent
-   *  Meredith), but the coupling ran ONE WAY, so typing "Meredith" left the
-   *  avatar on whatever was selected, in practice the Jim default. Same missing
-   *  default as issue #191 from the other direction, where a manifest that omits
-   *  `character` always lands on Jim.
-   *
-   *  Returns null on no match, and the caller leaves the avatar alone, so a
-   *  deliberate pick is never overwritten by continuing to type. */
+  const knownAccent = (a?: string): AccentColorName | undefined =>
+    (ACCENTS.includes(a as AccentColorName) ? (a as AccentColorName) : undefined);
+  /** The cast member a typed name refers to, if any (typing "Meredith" picks her
+   *  tile; no match leaves the pick alone). */
   const characterForName = (n: string): OfficeCharacterName | null => {
     const q = n.trim().toLowerCase();
     if (!q) return null;
     const hit = OFFICE_CAST.find(c => c.displayName.toLowerCase() === q || c.name === q);
     return hit ? hit.name : null;
   };
-  /** The locally-built spawn command for a manifest: provider preset + model
-   *  from the LOCAL config builder, with the manifest's validated flags
-   *  appended. A manifest can never name the binary itself. */
+
+  const team = useMemo(() => activeTeam(agents), [agents]);
+  const michaelFolder = config.businessFolder;
+  const business = useMemo(() => ({ name: config.businessName, city: config.businessCity }), [config.businessName, config.businessCity]);
+
+  // ── Engine: the Settings engine; Best or Fast model on Review (D3) ──
+  const initialProvider = inferAgentProvider(config.defaultCommand);
+  const [provider, setProvider] = useState<AgentProvider>(pendingHire?.provider ?? initialProvider);
+  const claudeModels = modelsForProvider('claude');
+  const fastModel = claudeModels.find((m) => m.id?.includes('sonnet'))?.id;
+  const bestModel = isClaudeProvider(provider) ? config.defaultModel : config.providerDefaultModels?.[provider];
+  const [tier, setTier] = useState<'best' | 'fast'>('best');
+  const [customModel, setCustomModel] = useState<string | undefined>(pendingHire?.model);
+  const model = customModel ?? (tier === 'fast' && isClaudeProvider(provider) ? fastModel : bestModel);
   const hireCommand = (m: HireManifest): string => {
-    const prov: AgentProvider = m.provider ?? inferAgentProvider(config.defaultCommand);
+    const prov: AgentProvider = m.provider ?? initialProvider;
     const base = buildSpawnCommand(config, m.model, prov);
     return m.commandFlags?.length ? `${base} ${m.commandFlags.join(' ')}` : base;
   };
+  const [commandEdit, setCommandEdit] = useState<string | undefined>(pendingHire ? hireCommand(pendingHire) : undefined);
+  const command = commandEdit ?? buildSpawnCommand(config, model, provider);
 
-  // Default provider follows whatever the global default command is (claude
-  // unless the user reconfigured it); the model only carries over for Claude.
-  const initialProvider = inferAgentProvider(config.defaultCommand);
-  const initialModel = isClaudeProvider(initialProvider) ? config.defaultModel : undefined;
+  // ── Who ──
+  const firstCharacter = pendingHire?.character
+    ? knownCharacter(pendingHire.character)
+    : (characterForName(pendingHire?.name ?? '') ?? DEFAULT_CHARACTER);
+  const [step, setStep] = useState<Step>(pendingHire ? 'review' : 'who');
+  const [character, setCharacter] = useState<OfficeCharacterName>(firstCharacter);
+  const [name, setName] = useState(pendingHire?.name ?? CAST_BY_NAME[firstCharacter].displayName);
+  const [hireMeta, setHireMeta] = useState<HireManifest | null>(pendingHire ?? null);
 
-  const [name, setName] = useState(pendingHire?.name ?? 'Jim');
-  const [character, setCharacter] = useState<OfficeCharacterName>(knownCharacter(pendingHire?.character));
-  const [accent, setAccent] = useState<AccentColorName>(knownAccent(pendingHire?.accent));
-  // On a business install a new team member's folder goes inside Michael's (the
-  // business folder), named after its role, and is private to it and Michael
-  // (src/shared/folderAccess.ts). It follows the Role field until the owner
-  // picks a folder; any pick below turns that off.
-  const michaelFolder = config.businessFolder;
-  const [cwdAuto, setCwdAuto] = useState<boolean>(!!michaelFolder);
-  const [cwd, setCwdRaw] = useState<string>(michaelFolder ? '' : (config.registeredRepos[0] ?? ''));
-  const setCwd = (path: string) => { setCwdAuto(false); setCwdRaw(path); };
-  // Local mirror of the registered projects so one added from here shows as a
-  // quick-pick immediately (the `config` prop is a snapshot taken at open time).
-  const [repos, setRepos] = useState<string[]>(config.registeredRepos);
-  const [provider, setProvider] = useState<AgentProvider>(pendingHire?.provider ?? initialProvider);
-  const [model, setModel] = useState<string | undefined>(
-    pendingHire ? pendingHire.model : initialModel
-  );
-  const [command, setCommand] = useState(
-    pendingHire ? hireCommand(pendingHire) : buildSpawnCommand(config, initialModel, initialProvider)
-  );
-  // The stored role is `Role: description` (joinAgentRole), as in Edit Agent.
-  const [role, setRole] = useState(() => splitAgentRole(pendingHire?.description).role);
-  const [roleDescription, setRoleDescription] = useState(() => splitAgentRole(pendingHire?.description).roleDescription);
-  const description = joinAgentRole(role, roleDescription);
-  const [hireMeta, setHireMeta] = useState<HireManifest | null>(pendingHire);
+  // ── Job ──
+  const [cards, setCards] = useState<HireJob[]>([]);
+  useEffect(() => {
+    let alive = true;
+    window.cth.packsList()
+      .then((res) => { if (alive) setCards(cardJobs(res.packs.map((p) => p.pack), res.core, config.businessType, business)); })
+      .catch(() => { /* the owner can still write a new job */ });
+    return () => { alive = false; };
+  }, [config.businessType, business]);
+  const officeJobs = useMemo(() => teamJobs(team, cards), [team, cards]);
+  const theirJob = useMemo(() => ownJob(character, officeJobs, cards), [character, officeJobs, cards]);
+  const [jobKey, setJobKey] = useState<string | null>(null);
+  const allJobs = useMemo(() => [...officeJobs, ...cards], [officeJobs, cards]);
+  const chosenKey = jobKey ?? theirJob?.key ?? NEW_JOB_KEY;
+  const chosenJob = allJobs.find((j) => j.key === chosenKey);
 
-  // Picking a model rebuilds the command; the command field stays editable for
-  // power users (it's the source of truth for the actual spawn).
-  const pickModel = (id?: string) => {
-    setModel(id);
-    setCommand(buildSpawnCommand(config, id, provider));
+  // ── Review fields; filled from the chosen job each time the job or the name
+  //    changes, so edits survive going back and forth otherwise ──
+  const [title, setTitle] = useState(() => splitAgentRole(pendingHire?.description).role);
+  const [routing, setRouting] = useState(() => splitAgentRole(pendingHire?.description).roleDescription);
+  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ?? '');
+  const [sourceCard, setSourceCard] = useState<string | undefined>(undefined);
+  const applied = useRef<string | null>(pendingHire ? 'manifest' : null);
+  const applyJob = (): void => {
+    const sig = `${chosenKey}|${name.trim()}`;
+    if (applied.current === sig) return;
+    // A queued hire keeps its manifest's job until the owner picks another.
+    if (applied.current === 'manifest' && jobKey === null) return;
+    applied.current = sig;
+    setBinding(null);
+    if (!chosenJob) { setTitle(''); setRouting(''); setWorkStyle(''); setSourceCard(undefined); setTier('best'); return; }
+    const copy = jobFor(chosenJob, name.trim());
+    setTitle(copy.title);
+    setRouting(copy.routing);
+    setWorkStyle(copy.workStyle);
+    setSourceCard(chosenJob.sourceCard);
+    setTier(chosenJob.modelTier === 'fast' ? 'fast' : 'best');
   };
-  // Switching provider resets the model to that CLI's default and rebuilds the
-  // command from the provider's preset binary (so Antigravity spawns `agy` and
-  // Codex spawns `codex`, not the configured `claude`). For 'custom' we keep the
-  // user's typed command rather than blanking it.
-  const pickProvider = (id: AgentProvider) => {
-    setProvider(id);
-    // Seed the model: Claude from the global defaultModel; other engines from the
-    // per-engine default set in Settings → AI Engines (providerDefaultModels), else
-    // the CLI default. This is what makes that Settings field live (Dwight NIT-1).
-    const nextModel = isClaudeProvider(id) ? config.defaultModel : config.providerDefaultModels?.[id];
-    setModel(nextModel);
-    const nextPreset = providerPreset(id);
-    if (!isClaudeProvider(id) && !nextPreset.resumeFlag && !nextPreset.resumeSubcommand) {
-      setResumeSessionId('');
-      setFolderNote(undefined);
-    }
-    if (id === 'custom') {
-      setCommand(command.trim() || config.defaultCommand || '');
-      return;
-    }
-    setCommand(buildSpawnCommand(config, nextModel, id));
+
+  // ── Folder: its own, suffixed with the name on a clash (point 2) ──
+  const [folderName, setFolderName] = useState('');
+  const [customCwd, setCustomCwd] = useState<string | undefined>(
+    michaelFolder ? undefined : (config.registeredRepos[0] ?? '')
+  );
+  const cwd = customCwd ?? (michaelFolder && folderName.trim() ? joinPath(michaelFolder, folderName.trim()) : '');
+  const suggestFolder = async (): Promise<void> => {
+    if (!michaelFolder) return;
+    const base = (chosenJob?.folder ?? title).trim() || name.trim();
+    const n = name.trim();
+    const candidates = [base, `${base}_${n}`, ...Array.from({ length: 8 }, (_, i) => `${base}_${n}_${i + 2}`)];
+    const onDisk = await window.cth.foldersExist(michaelFolder, candidates).catch(() => ({} as Record<string, boolean>));
+    const used = new Set(team.map((a) => basename(a.cwd ?? '').toLowerCase()));
+    setFolderName(hireFolderName(base, n, (f) => !!onDisk[f] || used.has(f.toLowerCase())));
   };
-  const preset = providerPreset(provider);
-  const [goal, setGoal] = useState(pendingHire?.goal ?? '');
-  const [isolate, setIsolate] = useState(SHOW_WORKSPACE_DEV_OPTIONS && (pendingHire?.isolate ?? false));
-  // #2 — optional Claude session id to continue. When set, the spawn seeds that
-  // session's transcript into the cwd's project dir and launches `--resume`.
-  const [resumeSessionId, setResumeSessionId] = useState('');
-  const resuming = resumeSessionId.trim().length > 0;
-  // Note shown when the folder was auto-filled from the pasted session id.
-  const [folderNote, setFolderNote] = useState<string | undefined>();
+
+  // ── The distinct job check (D6) ──
+  const mailboxes = config.mailboxes ?? [];
+  const mailboxAddress = (id?: string) => mailboxes.find((m) => m.id === id)?.address;
+  const teamProfiles: JobProfile[] = useMemo(() => team.map((a) => {
+    const split = splitAgentRole(a.description);
+    const email = config.agentCapabilities?.[a.id]?.email;
+    return {
+      name: a.name,
+      title: split.role,
+      routing: split.roleDescription,
+      workStyle: a.goal,
+      mailbox: email?.enabled ? mailboxAddress(email.mailboxes[0]) : undefined
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [team, config.agentCapabilities, mailboxes]);
+  const [binding, setBinding] = useState<Binding | null>(null);
+  const profile: JobProfile = {
+    name: name.trim(), title: title.trim(), routing: routing.trim(), workStyle,
+    mailbox: mailboxAddress(binding?.mailboxId)
+  };
+  const checkSig = `${profile.name}\n${profile.title}\n${profile.routing}`;
+  const [check, setCheck] = useState<{ sig: string; verdict: DistinctVerdict } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const checkSeq = useRef(0);
+  const ruleOverlaps = overlapsByRules(profile, teamProfiles);
+  const verdict = check && check.sig === checkSig ? check.verdict : null;
+  const runCheck = async (): Promise<DistinctVerdict | null> => {
+    const seq = ++checkSeq.current;
+    const sig = checkSig;
+    setChecking(true);
+    try {
+      const v = await window.cth.hireCheckDistinct(profile, teamProfiles);
+      if (seq !== checkSeq.current) return null;
+      setCheck({ sig, verdict: v });
+      return v;
+    } catch {
+      const v: DistinctVerdict = { distinct: ruleOverlaps.length === 0, overlapsWith: ruleOverlaps, why: '', source: 'rules' };
+      if (seq === checkSeq.current) setCheck({ sig, verdict: v });
+      return v;
+    } finally {
+      if (seq === checkSeq.current) setChecking(false);
+    }
+  };
+  // Run once when Review opens with a job to check.
+  useEffect(() => {
+    if (step === 'review' && profile.name && (profile.title || profile.routing) && !verdict && !checking) void runCheck();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+  const overlapNames = verdict ? [...new Set([...verdict.overlapsWith, ...(verdict.source === 'rules' ? ruleOverlaps : [])])] : [];
+  const cleared = !!verdict && (overlapNames.length === 0 || !!binding);
+
+  const [bindMode, setBindMode] = useState<'mailbox' | 'topic' | null>(null);
+  const [topic, setTopic] = useState('');
+  const [bindMailbox, setBindMailbox] = useState('');
+  const freeMailboxes = mailboxes.filter((m) => !mailboxHolder(config.agentCapabilities, m.id));
+  const applyBinding = (scope: string, mailboxId?: string): void => {
+    const s = scope.trim().slice(0, TOPIC_MAX);
+    if (!s) return;
+    const lines = bindingLines(s, name.trim());
+    setRouting((r) => appendOnce(binding ? r.replace(bindingLines(binding.scope, name.trim()).own, '').trim() : r, lines.own));
+    setBinding({ scope: s, mailboxId, others: overlapNames });
+    setBindMode(null);
+  };
+  const clearBinding = (): void => {
+    if (binding) setRouting((r) => r.replace(bindingLines(binding.scope, name.trim()).own, '').trim());
+    setBinding(null);
+  };
+  // The routing line changes when a binding is applied; keep the verdict that
+  // led to it so the overlap box stays in view.
+  const [shownVerdict, setShownVerdict] = useState<DistinctVerdict | null>(null);
+  useEffect(() => { if (verdict) setShownVerdict(verdict); }, [verdict]);
+
+  // ── Queue: re-seed every field when the queue head changes ──
+  const applyManifest = (m: HireManifest) => {
+    setHireMeta(m);
+    setName(m.name);
+    setCharacter(m.character ? knownCharacter(m.character) : (characterForName(m.name ?? '') ?? knownCharacter(undefined)));
+    setProvider(m.provider ?? initialProvider);
+    setCustomModel(m.model);
+    setCommandEdit(hireCommand(m));
+    const split = splitAgentRole(m.description);
+    setTitle(split.role);
+    setRouting(split.roleDescription);
+    setWorkStyle(m.goal ?? '');
+    setSourceCard(undefined);
+    setBinding(null);
+    applied.current = 'manifest';
+    setStep('review');
+  };
+  useLayoutEffect(() => {
+    if (pendingHire) applyManifest(pendingHire);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingHire]);
+  const advanceHireReview = () => {
+    const next = hireQueue.pending[1];
+    finishPendingHire();
+    if (!next) onClose();
+  };
+
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
-  // Which config section the left sidebar index is showing.
-  const [section, setSection] = useState<SectionKey>('identity');
-  // "Generate a hire with AI" helper — reveals a copy-paste prompt (item 7).
   const [showHirePrompt, setShowHirePrompt] = useState(false);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const copyHirePrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(HIRE_PROMPT);
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 1500);
-    } catch { /* clipboard blocked — the textarea below is selectable as a fallback */ }
-  };
 
-  // Close only the modal on Esc. Capture prevents the fullscreen terminal's
-  // window-level handler from also closing the view underneath.
+  // Close only the modal on Esc.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
@@ -291,126 +337,6 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
-
-  // The default folder: <Michael's folder>/<Role>, or the agent's name while no
-  // role is typed. Main cleans the name into a safe folder name. Agents with the
-  // same role share a folder by default (owner, 2026-09-25).
-  const folderLabel = role.trim() || name.trim();
-  useEffect(() => {
-    if (!michaelFolder || !cwdAuto) return;
-    if (!folderLabel) { setCwdRaw(''); return; }
-    let cancelled = false;
-    window.cth.foldersSuggest(config.businessName ?? '', [folderLabel], michaelFolder)
-      .then((sug) => {
-        if (cancelled) return;
-        if (sug.rootRefused) { setCwdAuto(false); setCwdRaw(''); return; }
-        setCwdRaw(sug.byFolder[folderLabel] ?? '');
-      })
-      .catch(() => { /* the owner can still pick a folder */ });
-    return () => { cancelled = true; };
-  }, [michaelFolder, cwdAuto, folderLabel, config.businessName]);
-
-  // Zero-step resume: when a session id is entered, look up the cwd it originally
-  // ran in (from the transcript) and pre-fill the Folder so the user doesn't have
-  // to find the worktree. They can still override the folder afterwards. Runs on
-  // blur so we don't hit the resolver on every keystroke.
-  const resolveFolderFromSession = async () => {
-    const sid = resumeSessionId.trim();
-    if (!sid) { setFolderNote(undefined); return; }
-    const resolved = await window.cth.resolveSessionCwd(sid);
-    if (resolved) { setCwd(resolved); setFolderNote(tr('addAgent.folderFromSession', { path: resolved })); }
-    else setFolderNote(undefined);
-  };
-
-  const pickFolder = async () => {
-    setError(undefined);
-    const res = await window.cth.chooseFolder();
-    if (res.ok) setCwd(res.path);
-    else if (res.error !== 'cancelled') setError(res.error);
-  };
-
-  /** Register `path` as a project (folder quick-pick) right now: dedupe-prepend,
-   *  select it, persist to config, and lift the change up so it sticks. */
-  const registerProject = async (path: string) => {
-    const p = path.trim();
-    if (!p) return;
-    const next = [p, ...repos.filter((r) => r !== p)];
-    setRepos(next);
-    setCwd(p);
-    try {
-      const updated = await window.cth.updateConfig({ registeredRepos: next });
-      // Main expands `~` when it persists registeredRepos, so adopt the stored
-      // (absolute) list — otherwise a typed "~/dev/foo" stays literal in this
-      // modal's state and rides along into the spawn.
-      const stored = updated.registeredRepos ?? next;
-      setRepos(stored);
-      if (stored[0]) setCwd(stored[0]);
-      onConfigChange?.(updated);
-    } catch { /* best-effort persist */ }
-  };
-
-  /** Drop `path` from the project quick-picks.
-   *
-   *  Removes it from the LISTING only. The folder on disk is never touched, which
-   *  is the whole point: a project you are done with should stop cluttering the
-   *  picker without anything being deleted. */
-  const unregisterProject = async (path: string) => {
-    const next = repos.filter((r) => r !== path);
-    setRepos(next);
-    try {
-      const updated = await window.cth.updateConfig({ registeredRepos: next });
-      setRepos(updated.registeredRepos ?? next);
-      onConfigChange?.(updated);
-    } catch { /* best-effort persist */ }
-  };
-
-  /** Pick a brand-new folder and register it as a project in one step. */
-  const addProject = async () => {
-    setError(undefined);
-    const res = await window.cth.chooseFolder();
-    if (res.ok) await registerProject(res.path);
-    else if (res.error !== 'cancelled') setError(res.error);
-  };
-
-  /** Apply an imported manifest to every form field (file import path). The
-   *  command is rebuilt locally from the provider preset + validated flags — a
-   *  manifest can never inject the spawn binary. Import never spawns. */
-  const applyManifest = (m: HireManifest) => {
-    setHireMeta(m);
-    setName(m.name);
-    // A manifest that names an agent but omits `character` should get the
-    // matching avatar rather than the Jim default (issue #191).
-    setCharacter(m.character ? knownCharacter(m.character) : (characterForName(m.name ?? '') ?? knownCharacter(undefined)));
-    setAccent(knownAccent(m.accent));
-    setProvider(m.provider ?? initialProvider);
-    setModel(m.model);
-    setCommand(hireCommand(m));
-    const split = splitAgentRole(m.description);
-    setRole(split.role);
-    setRoleDescription(split.roleDescription);
-    setGoal(m.goal ?? '');
-    setIsolate(SHOW_WORKSPACE_DEV_OPTIONS && (m.isolate ?? false));
-    setResumeSessionId('');
-    setFolderNote(undefined);
-    setSection('identity');
-  };
-
-  // Advancing a batch keeps this modal mounted. Re-seed every form field when
-  // the queue head changes so edits made while reviewing one hire cannot leak
-  // into the next.
-  useLayoutEffect(() => {
-    if (pendingHire) applyManifest(pendingHire);
-  // applyManifest intentionally closes over the config snapshot used by this
-  // open modal; queue advances do not replace that snapshot.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingHire]);
-
-  const advanceHireReview = () => {
-    const next = hireQueue.pending[1];
-    // The pendingHire effect re-seeds every form field from the new queue head.
-    finishPendingHire();
-    if (!next) onClose();
-  };
 
   const importHire = async () => {
     setError(undefined);
@@ -430,36 +356,65 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     advanceHireReview();
   };
 
+  const nameTaken = (n: string) => agents.some((a) => a.name.trim().toLowerCase() === n.trim().toLowerCase());
+  const whoError = !name.trim() ? tr('addAgent.errName') : nameTaken(name) ? tr('addAgent.wizard.nameTaken', { name: name.trim() }) : undefined;
+
+  const goTo = (next: Step): void => {
+    setError(undefined);
+    if (next !== 'who' && whoError) { setError(whoError); setStep('who'); return; }
+    if (next === 'review' && step !== 'review') {
+      applyJob();
+      setFolderName('');
+    }
+    setStep(next);
+  };
+  // After the job is applied, suggest the folder for it.
+  useEffect(() => { if (step === 'review') void suggestFolder(); },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [step === 'review' ? `${title}|${chosenKey}|${name}` : '']);
+
+  const pickFolder = async () => {
+    setError(undefined);
+    const res = await window.cth.chooseFolder();
+    if (res.ok) setCustomCwd(res.path);
+    else if (res.error !== 'cancelled') setError(res.error);
+  };
+
   const submit = async () => {
     setError(undefined);
-    // A required field can live in a section the user hasn't opened, so jump to
-    // the offending section as we surface the error — the field is never hidden.
-    if (!name.trim()) { setError(tr('addAgent.errName')); setSection('identity'); return; }
-    if (!cwd) { setError(tr('addAgent.errFolder')); setSection('workspace'); return; }
-    // Michael's folder is private to him, so it can't be a team member's own
-    // folder (src/shared/folderAccess.ts).
-    if (michaelFolder && samePath(michaelFolder, cwd)) {
-      setError(tr('addAgent.errFolderShared')); setSection('workspace'); return;
-    }
-    if (!command.trim()) { setError(tr('addAgent.errCommand')); setSection('engine'); return; }
+    if (whoError) { setError(whoError); setStep('who'); return; }
+    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob')); return; }
+    if (!cwd) { setError(tr('addAgent.errFolder')); return; }
+    // Michael's folder is private to him (src/shared/folderAccess.ts).
+    if (michaelFolder && samePath(michaelFolder, cwd)) { setError(tr('addAgent.errFolderShared', { godName })); return; }
+    if (!command.trim()) { setError(tr('addAgent.errCommand')); return; }
+    // The job must be distinct from every teammate's, or bound (D6). A job
+    // edited since the last check is checked again first.
+    let v = verdict;
+    if (!v) v = await runCheck();
+    if (!v) return;
+    const overlaps = [...new Set([...v.overlapsWith, ...(v.source === 'rules' ? overlapsByRules(profile, teamProfiles) : [])])];
+    if (overlaps.length > 0 && !binding) { setError(tr('addAgent.wizard.errOverlap')); return; }
 
     setBusy(true);
-    // A team member's default folder is made here, the first time it's needed.
-    // Only ever adds a missing folder; an existing one is left as it is.
-    if (michaelFolder && cwdAuto) {
+    // The folder is made here, the first time it's needed; an existing one is
+    // left exactly as it is.
+    if (michaelFolder && !customCwd) {
       const [made] = await window.cth.foldersEnsure([cwd]).catch(() => [undefined]);
       if (!made || !made.ok) {
         setBusy(false);
         setError(made && !made.ok ? made.reason : tr('addAgent.errFolder'));
-        setSection('workspace');
         return;
       }
     }
     const id = uniqueId(name);
     const ptyId = `pty-${id}`;
-    // Split the editable command field into argv-style pieces for node-pty.
-    // Quote-aware so an agy model label like "Gemini 3.1 Pro (High)" — or any
-    // auto-mode flags appended to the command — stays one argument.
+    const description = hireRole(title, routing);
+    // A mailbox binding is set before the spawn, so the agent starts with it.
+    if (binding?.mailboxId) {
+      const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false } }).catch(() => null);
+      if (!res?.ok) { setBusy(false); setError(tr('capabilities.saveFailed')); return; }
+    }
     const [exe, ...args] = tokenizeCommand(command.trim());
     const spawnRes = await window.cth.spawnPty({
       id: ptyId,
@@ -469,85 +424,63 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       args,
       cols: 100,
       rows: 30,
-      // When set, the main process spawns this agent in its own git worktree.
-      // Forced OFF when resuming a session — `--resume` needs the real cwd's
-      // transcript, not a fresh worktree with a different (empty) project dir.
-      isolate: resuming ? false : isolate,
-      // #2 — continue an existing Claude session in this agent's cwd.
-      resumeSessionId: resuming ? resumeSessionId.trim() : undefined,
-      // Provision this agent in the hive (memory + mailbox + identity/protocol).
+      isolate: false,
       hive: {
         id,
         name: name.trim(),
         provider,
         cwd,
-        role: description.trim() || undefined,
+        role: description || undefined,
         // A hire manifest may carry validated capability tags (routing hints).
         capabilities: hireMeta?.capabilities
       }
     });
     if (!spawnRes.ok) {
+      // Give back a mailbox the failed hire was holding.
+      if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
       setBusy(false);
       setError(spawnRes.error ?? 'spawn failed');
       return;
     }
-    // #2 — the requested resume session id wasn't found anywhere; main fell back
-    // to a fresh session. Don't block the spawn, but make it visible.
-    if (resuming && spawnRes.resumeNotFound) {
-      console.warn(`[add-agent] resume session "${resumeSessionId.trim()}" not found — started a fresh session`);
-    }
-
-    // Main expands `~` at ingestion and echoes back the absolute path it actually
-    // spawned into — record THAT, so this agent's cwd matches the hive registry
-    // (and survives a restart, where nothing re-expands it).
     const spawnedCwd = spawnRes.cwd || cwd;
-    // With git isolation the agent RUNS in its own worktree, but its PROJECT is
-    // still the folder the user picked. Labelling the agent with the worktree's
-    // name was the visible half; the damaging half was promoting that worktree
-    // into registeredRepos below, which turned the project quick-picks into a
-    // list of throwaway worktrees. Mirrors the `isolate` sent to main, which is
-    // forced off while resuming.
-    const projectCwd = (!resuming && isolate) ? cwd.trim() : spawnedCwd;
     const agent: Agent = {
       id,
       name: name.trim(),
       character,
-      accent,
-      description: description.trim() || 'a fresh harness',
-      project: basename(projectCwd),
+      accent: knownAccent(hireMeta?.accent) ?? teamAccent(team.length),
+      description: description || 'a fresh harness',
+      project: basename(spawnedCwd),
       tmuxTarget: '',
       cwd: spawnedCwd,
-      goal: goal.trim() || undefined,
+      goal: workStyle.trim() || undefined,
+      sourceCard,
       status: 'idle',
-      action: resuming && spawnRes.resumeNotFound ? 'session not found, starting fresh' : 'starting up',
+      action: 'starting up',
       progress: 0,
       currentStation: 'desk',
       ptyId,
       command: command.trim(),
       provider,
       model,
-      // Persist the resolved worktree path (set only when isolation provisioned
-      // one) so a restart can re-enter this exact worktree — see restoreTeam.
-      worktreePath: spawnRes.worktreePath,
-      // Crush (seedDelivery:'type-into-tui') hands its hive protocol back here
-      // instead of on argv; useHive types it into the TUI after boot. (ondev-b)
       seedPrompt: spawnRes.seedPrompt,
       recentTextTs: Date.now()
     };
     addAgent(agent);
-    // Remember the folder for the next hire: promote it to the front of the
-    // registeredRepos quick-picks (the modal's default cwd) so back-to-back
-    // hires land in the same project without re-picking.
-    if (projectCwd && repos[0] !== projectCwd) {
-      const nextRepos = [projectCwd, ...repos.filter((r) => r !== projectCwd && r !== cwd)];
-      try {
-        const updated = await window.cth.updateConfig({ registeredRepos: nextRepos });
-        onConfigChange?.(updated);
-      } catch { /* best-effort */ }
+    // A binding hands the bound work back from every overlapping teammate:
+    // their line gains "Not for ...; that goes to <Name>." (D6).
+    if (binding) {
+      const others = bindingLines(binding.scope, name.trim()).others;
+      for (const mate of team) {
+        if (!binding.others.includes(mate.name)) continue;
+        const split = splitAgentRole(mate.description);
+        const next = hireRole(split.role, appendOnce(split.roleDescription, others));
+        if (next === mate.description) continue;
+        updateAgent(mate.id, { description: next });
+        void window.cth.hivePatchAgentRole(mate.id, next).catch(() => undefined);
+      }
     }
-    // A hire manifest may carry a per-agent token budget — apply it to the
-    // latest agentTokenCaps map in main. Await it before advancing a batch: the
-    // next hire reuses this mounted modal and must not race a stale config write.
+    // A hire manifest may carry a per-agent token budget. Await it before
+    // advancing a batch: the next hire reuses this mounted modal.
     if (hireMeta?.tokenCap) {
       try {
         const updated = await window.cth.setAgentTokenCap(id, hireMeta.tokenCap);
@@ -558,9 +491,23 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (pendingHire) {
       advanceHireReview();
     } else {
+      // The new hire opens on Capabilities: mailbox and schedules are not
+      // copied from anyone, so that is the next thing to set (E4).
+      setSidebarTab('capabilities');
       onClose();
     }
   };
+
+  const stepIndex = STEPS.indexOf(step);
+  const jobGroups = useMemo(() => {
+    const byTitle = new Map<string, HireJob[]>();
+    for (const c of cards) {
+      const list = byTitle.get(c.title) ?? [];
+      list.push(c);
+      byTitle.set(c.title, list);
+    }
+    return [...byTitle.entries()];
+  }, [cards]);
 
   return (
     <div
@@ -569,32 +516,17 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
         position: 'fixed', inset: 0,
         background: 'rgba(26, 19, 32, 0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        // Must sit above fullscreen terminal/file overlays (250/280) and their
-        // hover popovers. The fullscreen Add Agent button uses this same modal.
+        // Must sit above fullscreen terminal/file overlays (250/280).
         zIndex: 500
       }}
     >
       <div onClick={(e) => e.stopPropagation()} style={{ width: 940, maxWidth: '95vw' }}>
-        <PixelPanel
-          variant="dialog"
-          title={tr('addAgent.title')}
-          style={{ padding: 16 }}
-          noPadding
-        >
-          {/* Sectioned config with a left sidebar index. The form has 11+ fields,
-              so they're grouped into 4 sections (Identity / Workspace / Engine /
-              Briefing) shown one at a time; the sidebar jumps between them. The
-              hire-import review banner, the error, and the footer stay pinned
-              around the section pane. maxHeight keeps the dialog within the
-              viewport (title bar stays pinned). */}
+        <PixelPanel variant="dialog" title={tr('addAgent.title')} style={{ padding: 16 }} noPadding>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxHeight: '86vh', overflowY: 'auto' }}>
             {hireMeta && (
               <div style={{
-                padding: '6px 10px',
-                background: 'var(--cth-lemon-light, #fdf3cf)',
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                fontSize: 12,
-                color: 'var(--cth-ink-900)',
+                padding: '6px 10px', background: 'var(--cth-lemon-light, #fdf3cf)',
+                boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontSize: 12, color: 'var(--cth-ink-900)',
                 display: 'flex', flexDirection: 'column', gap: 2
               }}>
                 <span>
@@ -604,81 +536,28 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 </span>
                 <span>{tr('addAgent.reviewFields')}</span>
                 {hireMeta.commandFlags && hireMeta.commandFlags.length > 0 && (
-                  <span style={{ display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap', marginTop: 2 }}>
+                  <span style={chipRow}>
                     <span style={{ fontSize: 12 }}>{tr('addAgent.hireFlags')}</span>
-                    {hireMeta.commandFlags.map((f, i) => (
-                      <code
-                        key={`${f}-${i}`}
-                        style={{
-                          fontFamily: 'var(--cth-font-mono)',
-                          fontSize: 12,
-                          padding: '0 4px',
-                          background: 'var(--cth-paprika-light, #f6d3c4)',
-                          boxShadow: 'inset 0 0 0 1px var(--cth-paprika-700, #b3502e)',
-                          color: 'var(--cth-ink-900)'
-                        }}
-                      >
-                        {f}
-                      </code>
-                    ))}
+                    {hireMeta.commandFlags.map((f, i) => <code key={`${f}-${i}`} style={codeChip('paprika')}>{f}</code>)}
                   </span>
                 )}
                 {hireMeta.skills && hireMeta.skills.length > 0 && (
-                  <span style={{ display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap', marginTop: 2 }}>
+                  <span style={chipRow}>
                     <span style={{ fontSize: 12 }}>{tr('addAgent.hireSkills')}</span>
-                    {hireMeta.skills.map((s) => (
-                      <code
-                        key={s}
-                        style={{
-                          fontFamily: 'var(--cth-font-mono)',
-                          fontSize: 12,
-                          padding: '0 4px',
-                          background: 'var(--cth-mint-light, #d0f0e0)',
-                          boxShadow: 'inset 0 0 0 1px var(--cth-mint-700, #1f7a4d)',
-                          color: 'var(--cth-ink-900)'
-                        }}
-                      >
-                        {s}
-                      </code>
-                    ))}
+                    {hireMeta.skills.map((s) => <code key={s} style={codeChip('mint')}>{s}</code>)}
                   </span>
                 )}
                 {hireMeta.mcpServers && hireMeta.mcpServers.length > 0 && (() => {
-                  const safe = hireMeta.mcpServers!.filter(
-                    (id) => MCP_CATALOG.find((e) => e.id === id)?.tier === 'safe-readonly'
-                  );
-                  const consent = hireMeta.mcpServers!.filter(
-                    (id) => MCP_CATALOG.find((e) => e.id === id)?.tier !== 'safe-readonly'
-                  );
+                  const safe = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier === 'safe-readonly');
+                  const consent = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier !== 'safe-readonly');
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
-                      {safe.length > 0 && (
-                        <span style={{ display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12 }}>{tr('addAgent.mcpSafe')}:</span>
-                          {safe.map((id) => (
-                            <code key={id} style={{
-                              fontFamily: 'var(--cth-font-mono)', fontSize: 12, padding: '0 4px',
-                              background: 'var(--cth-sky-light, #d0e8f8)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-sky-700, #1f5a8a)',
-                              color: 'var(--cth-ink-900)'
-                            }}>{id}</code>
-                          ))}
-                        </span>
-                      )}
+                      {safe.length > 0 && <span style={chipRow}><span style={{ fontSize: 12 }}>{tr('addAgent.mcpSafe')}:</span>{safe.map((mid) => <code key={mid} style={codeChip('sky')}>{mid}</code>)}</span>}
                       {consent.length > 0 && (
-                        <span style={{ display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                        <span style={chipRow}>
                           <span style={{ fontSize: 12 }}>{tr('addAgent.mcpConsent')}:</span>
-                          {consent.map((id) => (
-                            <code key={id} style={{
-                              fontFamily: 'var(--cth-font-mono)', fontSize: 12, padding: '0 4px',
-                              background: 'var(--cth-paprika-light, #f6d3c4)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-paprika-700, #b3502e)',
-                              color: 'var(--cth-ink-900)'
-                            }}>{id}</code>
-                          ))}
-                          <span style={{ fontSize: 11, color: 'var(--cth-ink-700)' }}>
-                            {tr('addAgent.mcpEnableInSettings')}
-                          </span>
+                          {consent.map((mid) => <code key={mid} style={codeChip('paprika')}>{mid}</code>)}
+                          <span style={{ fontSize: 11, color: 'var(--cth-ink-700)' }}>{tr('addAgent.mcpEnableInSettings')}</span>
                         </span>
                       )}
                     </div>
@@ -687,539 +566,271 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               </div>
             )}
 
-            {/* sidebar index + the active section's fields */}
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-              {/* LEFT — section index. Capabilities isn't a nav item: it isn't a
-                  user field, it rides the imported hire manifest (banner above). */}
-              <nav style={{ width: 168, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {SECTIONS.map((s, i) => {
-                  const active = section === s.key;
-                  return (
-                    <button
-                      key={s.key}
-                      onClick={() => setSection(s.key)}
-                      style={{
-                        textAlign: 'left', padding: '6px 9px 5px', border: 'none', cursor: 'pointer',
-                        background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                        boxShadow: active
-                          ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                          : 'inset 0 0 0 1px var(--cth-ink-100)',
-                        display: 'flex', flexDirection: 'column', gap: 1
-                      }}
-                    >
-                      <span style={{
-                        fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '13px',
-                        color: 'var(--cth-ink-900)', textTransform: 'uppercase',
-                        display: 'flex', alignItems: 'baseline', gap: 6
-                      }}>
-                        <span style={{ color: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)' }}>{i + 1}</span>
-                        {tr(s.labelKey)}
-                      </span>
-                      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 11, color: 'var(--cth-ink-500)' }}>
-                        {tr(s.hintKey)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </nav>
+            {/* Step bar: go back to any step; forward through Next. */}
+            <nav aria-label={tr('addAgent.wizard.steps')} style={{ display: 'flex', gap: 6 }}>
+              {STEPS.map((s, i) => {
+                const active = s === step;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-current={active ? 'step' : undefined}
+                    disabled={i > stepIndex}
+                    onClick={() => goTo(s)}
+                    style={{
+                      flex: 1, textAlign: 'start', padding: '6px 9px 5px', border: 'none',
+                      cursor: i > stepIndex ? 'default' : 'pointer',
+                      background: active ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
+                      boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+                      opacity: i > stepIndex ? 0.6 : 1
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '13px', textTransform: 'uppercase', color: 'var(--cth-ink-900)' }}>
+                      {i + 1} {tr(`addAgent.wizard.step.${s}`)}
+                    </span>
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--cth-ink-500)' }}>{tr(`addAgent.wizard.stepHint.${s}`)}</span>
+                  </button>
+                );
+              })}
+            </nav>
 
-              {/* RIGHT — the active section's fields */}
-              <div style={{ flex: 1, minWidth: 0, minHeight: 260, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {section === 'identity' && (
-                  <>
-                    <Row label={tr('addAgent.name')}>
-                      <input
-                        value={name}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setName(next);
-                          const match = characterForName(next);
-                          if (match) setCharacter(match);
-                        }}
-                        placeholder={tr('addAgent.namePlaceholder')}
-                        style={inputStyle}
-                      />
-                    </Row>
-
-                    <Row label={tr('addAgent.character')}>
-                      {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
-                        {CAST_GROUPS.map((g) => (
-                          <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', marginBottom: 4 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {g.members.map((name) => CAST_BY_NAME[name]).map((c) => (
-                                <button
-                                  key={c.name}
-                                  type="button"
-                                  onClick={() => { setCharacter(c.name); setName(c.displayName); }}
-                                  title={c.blurb}
-                                  style={{
-                                    padding: 4,
-                                    background: character === c.name ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                                    boxShadow: character === c.name
-                                      ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                                      : 'inset 0 0 0 1px var(--cth-ink-100)',
-                                    cursor: 'pointer',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                                    border: 'none', width: 72
-                                  }}
-                                >
-                                  <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
-                                    <SpritePortrait character={c.name} scale={2} />
-                                  </div>
-                                  <span style={{ fontSize: 11, color: 'var(--cth-ink-900)' }}>{c.displayName}</span>
-                                  {/* Groups club related jobs, so each tile names its own (owner, 2026-09-27). */}
-                                  <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
-                                </button>
-                              ))}
-                            </div>
+            <div style={{ minHeight: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {step === 'who' && (
+                <>
+                  <Row label={tr('addAgent.character')}>
+                    {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
+                      {CAST_GROUPS.map((g) => (
+                        <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', marginBottom: 4 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {g.members.map((m) => CAST_BY_NAME[m]).map((c) => (
+                              <button
+                                key={c.name}
+                                type="button"
+                                onClick={() => { setCharacter(c.name); setName(c.displayName); setJobKey(null); }}
+                                title={c.blurb}
+                                aria-pressed={character === c.name}
+                                style={{
+                                  padding: 4,
+                                  background: character === c.name ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
+                                  boxShadow: character === c.name ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+                                  cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                                  border: 'none', width: 72
+                                }}
+                              >
+                                <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
+                                  <SpritePortrait character={c.name} scale={2} />
+                                </div>
+                                <span style={{ fontSize: 11, color: 'var(--cth-ink-900)' }}>{c.displayName}</span>
+                                {/* Groups club related jobs, so each tile names its own (owner, 2026-09-27). */}
+                                <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
+                              </button>
+                            ))}
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Row>
+                  <Row label={tr('addAgent.name')}>
+                    <input
+                      value={name}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setName(next);
+                        const match = characterForName(next);
+                        if (match) { setCharacter(match); setJobKey(null); }
+                      }}
+                      placeholder={tr('addAgent.namePlaceholder')}
+                      style={inputStyle}
+                    />
+                    {name.trim() && nameTaken(name) && <span role="alert" style={helperStyle}>{tr('addAgent.wizard.nameTaken', { name: name.trim() })}</span>}
+                  </Row>
+                </>
+              )}
+
+              {step === 'job' && (
+                <div role="radiogroup" aria-label={tr('addAgent.wizard.step.job')} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '58vh', overflowY: 'auto', paddingInlineEnd: 4 }}>
+                  {theirJob && (
+                    <JobGroup label={tr('addAgent.wizard.theirJob', { name: name.trim() || CAST_BY_NAME[character].displayName })}>
+                      <JobRow job={theirJob} tag={theirJob.source === 'team' ? tr('addAgent.wizard.likeTeammate', { name: theirJob.fromName }) : theirJob.business} selected={chosenKey === theirJob.key} onPick={() => setJobKey(theirJob.key)} />
+                    </JobGroup>
+                  )}
+                  {officeJobs.filter((j) => j.key !== theirJob?.key).length > 0 && (
+                    <JobGroup label={tr('addAgent.wizard.yourOffice')}>
+                      {officeJobs.filter((j) => j.key !== theirJob?.key).map((j) => (
+                        <JobRow key={j.key} job={j} tag={j.fromName} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
+                      ))}
+                    </JobGroup>
+                  )}
+                  <JobGroup label={tr('addAgent.wizard.newJob')}>
+                    <JobRow job={{ key: NEW_JOB_KEY, source: 'new', title: tr('addAgent.wizard.newJobTitle'), routing: '', workStyle: '', summary: tr('addAgent.wizard.newJobSummary') }} selected={chosenKey === NEW_JOB_KEY} onPick={() => setJobKey(NEW_JOB_KEY)} />
+                  </JobGroup>
+                  <JobGroup label={tr('addAgent.wizard.allJobs')}>
+                    {jobGroups.map(([jobTitle, list]) => (
+                      <div key={jobTitle} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {list.filter((j) => j.key !== theirJob?.key).map((j) => (
+                          <JobRow key={j.key} job={j} tag={j.business} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
                         ))}
                       </div>
-                    </Row>
+                    ))}
+                  </JobGroup>
+                </div>
+              )}
 
-                    <Row label={tr('addAgent.color')}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {ACCENTS.map(a => (
-                          <button
-                            key={a}
-                            onClick={() => setAccent(a)}
-                            style={{
-                              width: 32, height: 32,
-                              background: `var(--cth-${a})`,
-                              boxShadow: accent === a
-                                ? 'inset 0 0 0 1.5px var(--cth-ink-500), 0 0 0 2px var(--cth-ink-900)'
-                                : 'inset 0 0 0 1px var(--cth-ink-300)',
-                              cursor: 'pointer',
-                              border: 'none'
-                            }}
-                            aria-label={a}
-                          />
-                        ))}
-                      </div>
-                    </Row>
-                  </>
-                )}
+              {step === 'review' && (
+                <>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                    <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                      <SpritePortrait character={character} scale={2} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Row label={tr('addAgent.name')}>
+                        <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+                      </Row>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Row label={tr('addAgent.role')}>
+                        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tr('addAgent.rolePlaceholder')} style={inputStyle} />
+                      </Row>
+                    </div>
+                  </div>
 
-                {section === 'workspace' && (
-                  <>
-                    <Row label={tr('addAgent.project')}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>
-                          {repos.length > 0 ? tr('addAgent.pickProject') : tr('addAgent.noProjects')}
+                  <Row label={tr('addAgent.wizard.whatToSend', { name: name.trim() })}>
+                    <textarea
+                      dir={rtl ? 'auto' : undefined}
+                      value={routing}
+                      onChange={(e) => setRouting(e.target.value)}
+                      placeholder={tr('addAgent.roleDescriptionPlaceholder')}
+                      rows={3}
+                      style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
+                    />
+                    <span style={helperStyle}>{tr('addAgent.roleHelp', { godName })}</span>
+                  </Row>
+
+                  <DistinctBox
+                    checking={checking}
+                    verdict={verdict ?? (binding ? shownVerdict : null)}
+                    overlapNames={verdict ? overlapNames : (binding?.others ?? [])}
+                    binding={binding}
+                    name={name.trim()}
+                    team={team}
+                    onRecheck={() => { void runCheck(); }}
+                    bindMode={bindMode}
+                    setBindMode={setBindMode}
+                    freeMailboxes={freeMailboxes.map((m) => ({ id: m.id, address: m.address }))}
+                    bindMailbox={bindMailbox}
+                    setBindMailbox={setBindMailbox}
+                    topic={topic}
+                    setTopic={setTopic}
+                    onBindMailbox={() => { const a = mailboxAddress(bindMailbox); if (a) applyBinding(tr('addAgent.wizard.mailboxScope', { address: a }), bindMailbox); }}
+                    onBindTopic={() => applyBinding(topic)}
+                    onClearBinding={clearBinding}
+                  />
+
+                  <Row label={tr('addAgent.workStyle')}>
+                    <textarea
+                      dir={rtl ? 'auto' : undefined}
+                      value={workStyle}
+                      onChange={(e) => setWorkStyle(e.target.value)}
+                      placeholder={tr('addAgent.workStylePlaceholder')}
+                      rows={6}
+                      style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', fontSize: 14, resize: 'vertical' }}
+                    />
+                    <span style={helperStyle}>{tr('addAgent.workStyleHelp', { godName })}</span>
+                  </Row>
+
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ flex: '1 1 380px', minWidth: 0 }}>
+                      <Row label={tr('addAgent.wizard.folder')}>
+                        {michaelFolder && !customCwd ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input value={folderName} onChange={(e) => setFolderName(e.target.value)} style={{ ...inputStyle, flex: 1 }} aria-label={tr('addAgent.wizard.folder')} />
+                            <PixelButton variant="secondary" size="md" onClick={pickFolder}>
+                              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
+                            </PixelButton>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input value={customCwd ?? ''} onChange={(e) => setCustomCwd(e.target.value)} style={{ ...inputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)', fontSize: 13 }} aria-label={tr('addAgent.wizard.folder')} />
+                            <PixelButton variant="secondary" size="md" onClick={pickFolder}>
+                              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
+                            </PixelButton>
+                            {michaelFolder && <button type="button" onClick={() => setCustomCwd(undefined)} style={linkStyle}>{tr('addAgent.wizard.folderDefault')}</button>}
+                          </div>
+                        )}
+                        <span style={helperStyle}>
+                          {michaelFolder && !customCwd
+                            ? tr('addAgent.wizard.folderInside', { godName, path: cwd || michaelFolder })
+                            : tr('addAgent.folderPrivate', { godName })}
                         </span>
-                        <button
-                          onClick={addProject}
-                          title={tr('addAgent.addProjectTitle')}
-                          style={{
-                            flexShrink: 0, padding: '2px 8px 1px', border: 'none', cursor: 'pointer',
-                            background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                            fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
-                            display: 'inline-flex', alignItems: 'center', gap: 4
-                          }}
-                        >
-                          <Icon name="plus" /> {tr('addAgent.addProject')}
-                        </button>
-                      </div>
-                      {repos.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                          {repos.map((r) => (
-                            /* Two buttons per chip: pick the project, or drop it
-                               from this list. Nested in a span rather than one
-                               button so the remove control is not a button inside
-                               a button. */
-                            <span
-                              key={r}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'stretch',
-                                background: cwd === r ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                                boxShadow: cwd === r
-                                  ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                                  : 'inset 0 0 0 1px var(--cth-ink-100)'
-                              }}
+                      </Row>
+                    </div>
+                    <div style={{ flex: '0 0 auto' }}>
+                      <Row label={tr('addAgent.model')}>
+                        <div role="radiogroup" aria-label={tr('addAgent.model')} style={{ display: 'flex', gap: 6 }}>
+                          {(['best', 'fast'] as const).filter((k) => k === 'best' || (fastModel && isClaudeProvider(provider))).map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              role="radio"
+                              aria-checked={!customModel && tier === k}
+                              onClick={() => { setCustomModel(undefined); setCommandEdit(undefined); setTier(k); }}
+                              title={tr(`addAgent.wizard.tier.${k}Title`)}
+                              style={chip(!customModel && tier === k)}
                             >
-                              <button
-                                onClick={() => setCwd(r)}
-                                title={r}
-                                style={{
-                                  padding: '3px 4px 1px 8px',
-                                  background: 'transparent',
-                                  fontFamily: 'var(--cth-font-ui)',
-                                  fontSize: 12,
-                                  cursor: 'pointer',
-                                  border: 'none'
-                                }}
-                              >
-                                {basename(r)}
-                              </button>
-                              <button
-                                onClick={() => unregisterProject(r)}
-                                title={`Remove ${basename(r)} from this list. The folder itself is left alone.`}
-                                aria-label={`Remove ${basename(r)} from the project list`}
-                                style={{
-                                  padding: '3px 6px 1px 2px',
-                                  background: 'transparent',
-                                  fontFamily: 'var(--cth-font-ui)',
-                                  fontSize: 12,
-                                  lineHeight: 1,
-                                  color: 'var(--cth-ink-500)',
-                                  cursor: 'pointer',
-                                  border: 'none'
-                                }}
-                              >
-                                ×
-                              </button>
-                            </span>
+                              {tr(`addAgent.wizard.tier.${k}`)}
+                            </button>
                           ))}
                         </div>
-                      )}
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <input
-                          value={cwd}
-                          onChange={(e) => setCwd(e.target.value)}
-                          placeholder={tr('addAgent.projectPlaceholder')}
-                          style={{ ...inputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)', fontSize: 13 }}
-                        />
-                        <PixelButton variant="secondary" size="md" onClick={pickFolder}>
-                          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                            <Icon name="folder" /> {tr('addAgent.pick')}
-                          </span>
-                        </PixelButton>
-                      </div>
-                      {michaelFolder && (
-                        <span style={helperStyle}>
-                          {cwdAuto ? tr('addAgent.folderInsideMichael') : tr('addAgent.folderPrivate')}
-                        </span>
-                      )}
-                      {SHOW_WORKSPACE_DEV_OPTIONS && cwd.trim() && !repos.includes(cwd.trim()) && (
-                        <button
-                          onClick={() => registerProject(cwd)}
-                          title={tr('addAgent.saveAsProjectTitle')}
-                          style={{
-                            alignSelf: 'flex-start', marginTop: 2,
-                            padding: '2px 8px 1px', border: 'none', cursor: 'pointer',
-                            background: 'var(--cth-mint-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                            fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
-                            display: 'inline-flex', alignItems: 'center', gap: 4
-                          }}
-                        >
-                          <Icon name="plus" /> {tr('addAgent.saveAsProject')}
-                        </button>
-                      )}
-                    </Row>
+                      </Row>
+                    </div>
+                  </div>
 
-                    {/* Git isolation and resume session are developer options,
-                        hidden with SHOW_WORKSPACE_DEV_OPTIONS (owner, 2026-09-27). */}
-                    {SHOW_WORKSPACE_DEV_OPTIONS && <>
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: resuming ? 'not-allowed' : 'pointer', opacity: resuming ? 0.5 : 1 }}>
-                      <input
-                        type="checkbox"
-                        checked={resuming ? false : isolate}
-                        disabled={resuming}
-                        onChange={(e) => setIsolate(e.target.checked)}
-                        style={{ width: 16, height: 16, cursor: resuming ? 'not-allowed' : 'pointer' }}
-                      />
-                      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink-900)' }}>
-                        {tr('addAgent.gitIsolation')}
-                      </span>
-                    </label>
-
-                    <Row label={tr('addAgent.resumeSession')}>
-                      <input
-                        value={resumeSessionId}
-                        onChange={(e) => { setResumeSessionId(e.target.value); setFolderNote(undefined); }}
-                        onBlur={resolveFolderFromSession}
-                        placeholder={tr('addAgent.resumePlaceholder')}
-                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 13 }}
-                      />
-                      {folderNote && (
-                        <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-mint, var(--cth-ink-700))' }}>
-                          {folderNote}
-                        </span>
-                      )}
-                      {resuming && (
-                        <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-700)' }}>
-                          {tr('addAgent.resumeNote')}
-                        </span>
-                      )}
-                    </Row>
-                    </>}
-                  </>
-                )}
-
-                {section === 'engine' && (
-                  <>
+                  {/* Engine, model list and the raw command: developer options,
+                      hidden with SHOW_ENGINE_PICKER (owner, 2026-09-27). */}
+                  {SHOW_ENGINE_PICKER && <>
                     <Row label={tr('addAgent.provider')}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {/* This build's engines only (BUILD_ENGINES, like setup),
-                            plus one an imported hire already chose. */}
                         {AGENT_PROVIDER_PRESETS
                           .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
-                          .map((p) => {
-                          const active = provider === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => pickProvider(p.id)}
-                              title={
-                                p.id === 'antigravity'
-                                  ? tr('addAgent.providerAntigravity')
-                                  : p.id === 'codex'
-                                    ? tr('addAgent.providerCodex')
-                                    : p.id === 'custom'
-                                      ? tr('addAgent.providerCustom')
-                                      : p.label
-                              }
-                              style={{
-                                padding: '3px 8px 1px',
-                                background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                                boxShadow: active
-                                  ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                                  : 'inset 0 0 0 1px var(--cth-ink-100)',
-                                fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-                                color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none',
-                                display: 'inline-flex', alignItems: 'center', gap: 6
-                              }}
-                            >
+                          .map((p) => (
+                            <button key={p.id} type="button" onClick={() => { setProvider(p.id); setCustomModel(undefined); setCommandEdit(undefined); }} style={{ ...chip(provider === p.id), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <ProviderLogo provider={p.id} size={14} />
                               {p.label}
                             </button>
-                          );
-                        })}
+                          ))}
                       </div>
                     </Row>
-
-                    {preset.supportsModel && <Row label={tr('addAgent.model')}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {(() => {
-                          // An imported hire may name a model newer than this picker's
-                          // hardcoded list (e.g. claude-fable-5). Surface it as a real,
-                          // selected card instead of leaving the picker looking unset —
-                          // the command field already carries it either way.
-                          const known = modelsForProvider(provider);
-                          return model && !known.some((m) => m.id === model)
-                            ? [...known, { id: model, label: tr('addAgent.fromHire', { model }) }]
-                            : known;
-                        })().map((m) => {
-                          const active = (model ?? '') === (m.id ?? '');
-                          return (
-                            <button
-                              key={m.label}
-                              onClick={() => pickModel(m.id)}
-                              title={m.id ?? tr('addAgent.cliDefaultModel')}
-                              style={{
-                                padding: '3px 8px 1px',
-                                background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                                boxShadow: active
-                                  ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                                  : 'inset 0 0 0 1px var(--cth-ink-100)',
-                                fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-                                color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-                              }}
-                            >
-                              {m.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </Row>}
-
-                    {/* OSS-model quick-picks (ondev-c) — local + third-party-provider
-                        shortlists from the verified catalog. Clicking sets the
-                        engine-correct slug (OpenCode `local/<tag>`, Crush/pi
-                        `ollama/<tag>`; provider slugs are identical across engines)
-                        and rebuilds the command. */}
-                    {hasOssQuickPicks(provider) && (
-                      <Row label={tr('addAgent.ossModels')}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <div>
-                            <div style={ossGroupHead}>{tr('addAgent.ossLocal')}</div>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {OSS_LOCAL_PICKS.map((p) => {
-                                const slug = localSlugFor(provider, p.tag);
-                                const active = (model ?? '') === slug;
-                                return (
-                                  <button
-                                    key={p.tag}
-                                    onClick={() => pickModel(slug)}
-                                    title={tr('addAgent.ossLocalTitle', { slug, ram: p.minRam, tag: p.tag })}
-                                    style={ossChip(active, accent)}
-                                  >
-                                    {p.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={ossGroupHead}>{tr('addAgent.ossByok')}</div>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {OSS_PROVIDER_PICKS.map((p) => {
-                                const active = (model ?? '') === p.slug;
-                                return (
-                                  <button
-                                    key={p.slug}
-                                    onClick={() => pickModel(p.slug)}
-                                    title={tr('addAgent.ossByokTitle', { slug: p.slug, keyEnv: p.keyEnv })}
-                                    style={ossChip(active, accent)}
-                                  >
-                                    {p.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </Row>
-                    )}
-
-                    {(provider === 'opencode' || provider === 'crush' || provider === 'pi' || provider === 'qwen') && (
-                      <div style={{ fontSize: 12, color: 'var(--cth-ink-500)', lineHeight: '16px', margin: '2px 0 6px' }}>
-                        {tr('addAgent.byokNote')}
-                      </div>
-                    )}
-
-                    <Row label={config.autoMode && preset.autoFlag ? tr('addAgent.commandAuto') : tr('addAgent.command')}>
-                      <input
-                        value={command}
-                        onChange={(e) => setCommand(e.target.value)}
-                        placeholder={
-                          provider === 'antigravity'
-                            ? 'agy'
-                            : provider === 'codex'
-                              ? 'codex'
-                              : provider === 'custom'
-                                ? 'your-agent-cli'
-                                : 'claude'
-                        }
-                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)' }}
-                      />
+                    <Row label={tr('addAgent.command')}>
+                      <input value={command} onChange={(e) => setCommandEdit(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)' }} />
                     </Row>
-                  </>
-                )}
-
-                {section === 'briefing' && (
-                  <>
-                    <Row label={tr('addAgent.templates')}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {DESCRIPTION_TEMPLATES.map((t) => (
-                          <button
-                            key={t.labelKey}
-                            onClick={() => { setRole(tr(t.labelKey)); setRoleDescription(t.description); setGoal(t.goal); }}
-                            title={t.goal}
-                            style={{
-                              padding: '3px 8px 1px',
-                              background: 'var(--cth-cream-100)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                              fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-                              color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-                            }}
-                          >
-                            {tr(t.labelKey)}
-                          </button>
-                        ))}
-                      </div>
-                    </Row>
-
-                    <Row label={tr('addAgent.role')}>
-                      <input
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        placeholder={tr('addAgent.rolePlaceholder')}
-                        style={inputStyle}
-                      />
-                    </Row>
-
-                    <Row label={tr('addAgent.roleDescription')}>
-                      <textarea
-                        dir={rtl ? 'auto' : undefined}
-                        value={roleDescription}
-                        onChange={(e) => setRoleDescription(e.target.value)}
-                        placeholder={tr('addAgent.roleDescriptionPlaceholder')}
-                        rows={3}
-                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
-                      />
-                    </Row>
-                    <span style={helperStyle}>{tr('addAgent.roleHelp')}</span>
-
-                    <Row label={tr('addAgent.workStyle')}>
-                      <textarea
-                        dir={rtl ? 'auto' : undefined}
-                        value={goal}
-                        onChange={(e) => setGoal(e.target.value)}
-                        placeholder={tr('addAgent.workStylePlaceholder')}
-                        rows={4}
-                        style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
-                      />
-                    </Row>
-                    <span style={helperStyle}>{tr('addAgent.workStyleHelp')}</span>
-                  </>
-                )}
-              </div>
+                  </>}
+                </>
+              )}
             </div>
 
             {error && (
-              <div style={{
-                padding: '6px 10px',
-                background: 'var(--cth-coral-light)',
-                boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
-                fontSize: 13,
-                color: 'var(--cth-ink-900)'
-              }}>
+              <div role="alert" style={{ padding: '6px 10px', background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)', fontSize: 13, color: 'var(--cth-ink-900)' }}>
                 {error}
               </div>
             )}
 
-            {/* Import-hire explainer + AI prompt generator (item 7); hidden with
+            {/* Import-hire explainer + AI prompt generator; hidden with
                 SHOW_IMPORT_HIRE (owner, 2026-09-27). */}
             {SHOW_IMPORT_HIRE && <div style={{
-              padding: '8px 10px',
-              background: 'var(--cth-cream-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              padding: '8px 10px', background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
               display: 'flex', flexDirection: 'column', gap: 6
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px' }}>
-                  {tr('addAgent.importHireDesc')}
-                </span>
-                <button
-                  onClick={() => setShowHirePrompt((v) => !v)}
-                  style={{
-                    flexShrink: 0,
-                    padding: '2px 8px 1px', border: 'none', cursor: 'pointer',
-                    background: showHirePrompt ? 'var(--cth-lemon-light)' : 'var(--cth-cream-200)',
-                    boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                    fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)'
-                  }}
-                >
+                <span style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px' }}>{tr('addAgent.importHireDesc')}</span>
+                <button type="button" onClick={() => setShowHirePrompt((v) => !v)} style={{ ...chip(showHirePrompt), flexShrink: 0 }}>
                   {showHirePrompt ? tr('addAgent.hideAIPrompt') : tr('addAgent.generateWithAI')}
                 </button>
               </div>
               {showHirePrompt && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--cth-ink-500)', lineHeight: '16px' }}>
-                    {tr('addAgent.aiPromptHint')}
-                  </span>
-                  <textarea
-                    readOnly
-                    value={HIRE_PROMPT}
-                    onFocus={(e) => e.currentTarget.select()}
-                    rows={10}
-                    style={{
-                      ...inputStyle,
-                      width: '100%',
-                      fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px',
-                      resize: 'vertical', background: 'var(--cth-paper-100)'
-                    }}
-                  />
-                  <div>
-                    <PixelButton variant="secondary" size="sm" onClick={copyHirePrompt}>
-                      {copiedPrompt ? tr('addAgent.copied') : tr('addAgent.copyPrompt')}
-                    </PixelButton>
-                  </div>
-                </div>
+                <textarea readOnly value={HIRE_PROMPT} onFocus={(e) => e.currentTarget.select()} rows={10}
+                  style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px', resize: 'vertical' }} />
               )}
             </div>}
 
@@ -1240,9 +851,16 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 <PixelButton variant="secondary" size="md" onClick={skipHire} disabled={busy}>{tr('addAgent.skipHire')}</PixelButton>
               )}
               <PixelButton variant="ghost" size="md" onClick={onClose} disabled={busy}>{tr('common.cancel')}</PixelButton>
-              <PixelButton variant="primary" size="md" onClick={submit} disabled={busy}>
-                {busy ? tr('addAgent.spawning') : tr('addAgent.spawn')}
-              </PixelButton>
+              {stepIndex > 0 && (
+                <PixelButton variant="secondary" size="md" onClick={() => goTo(STEPS[stepIndex - 1])} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
+              )}
+              {step !== 'review' ? (
+                <PixelButton variant="primary" size="md" onClick={() => goTo(STEPS[stepIndex + 1])} disabled={step === 'who' && !!whoError}>{tr('addAgent.wizard.next')}</PixelButton>
+              ) : (
+                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || (!!verdict && !cleared)}>
+                  {busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
+                </PixelButton>
+              )}
             </div>
           </div>
         </PixelPanel>
@@ -1250,6 +868,151 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     </div>
   );
 }
+
+function JobGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)' }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function JobRow({ job, tag, selected, onPick }: { job: HireJob; tag?: string; selected: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onPick}
+      style={{
+        textAlign: 'start', border: 'none', cursor: 'pointer', padding: '6px 10px',
+        background: selected ? 'var(--cth-sky-light)' : 'var(--cth-paper-100)',
+        boxShadow: selected ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+        display: 'flex', flexDirection: 'column', gap: 2
+      }}
+    >
+      <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink-900)' }}>{job.title}</span>
+        {tag && <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{tag}</span>}
+      </span>
+      {job.summary && (
+        <span style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {job.summary}
+        </span>
+      )}
+    </button>
+  );
+}
+
+interface DistinctBoxProps {
+  checking: boolean;
+  verdict: DistinctVerdict | null;
+  overlapNames: string[];
+  binding: Binding | null;
+  name: string;
+  team: Agent[];
+  onRecheck: () => void;
+  bindMode: 'mailbox' | 'topic' | null;
+  setBindMode: (m: 'mailbox' | 'topic' | null) => void;
+  freeMailboxes: Array<{ id: string; address: string }>;
+  bindMailbox: string;
+  setBindMailbox: (id: string) => void;
+  topic: string;
+  setTopic: (t: string) => void;
+  onBindMailbox: () => void;
+  onBindTopic: () => void;
+  onClearBinding: () => void;
+}
+
+/** The distinct job check's result on Review (D6): checking, distinct, or the
+ *  overlap with the ways to make the job particular. */
+function DistinctBox(p: DistinctBoxProps) {
+  const { t } = useTranslation();
+  const listJoin = t('profile.listJoiner');
+  if (p.checking) return <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)' }}>{t('addAgent.wizard.checkingTeam')}</div>;
+  if (!p.verdict) {
+    return (
+      <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>{t('addAgent.wizard.notChecked')}</span>
+        <button type="button" onClick={p.onRecheck} style={linkStyle}>{t('addAgent.wizard.checkNow')}</button>
+      </div>
+    );
+  }
+  const fallback = p.verdict.source === 'rules' ? <div style={helperStyle}>{t('addAgent.wizard.fullCheckFailed')}</div> : null;
+  if (p.overlapNames.length === 0) {
+    return (
+      <div aria-live="polite" style={{ ...box, background: 'var(--cth-mint-light)' }}>
+        {t('addAgent.wizard.distinct')}
+        {fallback}
+      </div>
+    );
+  }
+  const others = p.binding ? bindingLines(p.binding.scope, p.name).others : '';
+  return (
+    <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-mint-light)' : 'var(--cth-lemon-light)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <strong style={{ fontSize: 13 }}>{t('addAgent.wizard.overlaps', { names: p.overlapNames.join(listJoin) })}</strong>
+      {p.verdict.why && <span>{p.verdict.why}</span>}
+      {p.binding ? (
+        <>
+          <span>{t('addAgent.wizard.boundTo', { name: p.name, scope: p.binding.scope })}</span>
+          {p.team.filter((m) => p.binding!.others.includes(m.name)).map((m) => (
+            <span key={m.id} style={helperStyle}>{t('addAgent.wizard.otherLine', { name: m.name, line: others })}</span>
+          ))}
+          <button type="button" onClick={p.onClearBinding} style={{ ...linkStyle, alignSelf: 'flex-start' }}>{t('addAgent.wizard.unbind')}</button>
+        </>
+      ) : (
+        <>
+          <span>{t('addAgent.wizard.makeParticular', { name: p.name })}</span>
+          {p.verdict.suggestion && <span style={helperStyle}>{t('addAgent.wizard.suggestion', { text: p.verdict.suggestion })}</span>}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => p.setBindMode('mailbox')} style={chip(p.bindMode === 'mailbox')} disabled={p.freeMailboxes.length === 0} title={p.freeMailboxes.length === 0 ? t('addAgent.wizard.noFreeMailbox') : undefined}>{t('addAgent.wizard.bindMailbox')}</button>
+            <button type="button" onClick={() => p.setBindMode('topic')} style={chip(p.bindMode === 'topic')}>{t('addAgent.wizard.bindTopic')}</button>
+            <button type="button" onClick={p.onRecheck} style={chip(false)}>{t('addAgent.wizard.checkAgain')}</button>
+          </div>
+          {p.bindMode === 'mailbox' && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={p.bindMailbox} onChange={(e) => p.setBindMailbox(e.target.value)} aria-label={t('addAgent.wizard.bindMailbox')} style={{ ...inputStyle, width: 'auto', fontSize: 14 }}>
+                <option value="">{t('capabilities.pickMailbox')}</option>
+                {p.freeMailboxes.map((m) => <option key={m.id} value={m.id}>{m.address}</option>)}
+              </select>
+              <PixelButton variant="secondary" size="sm" onClick={p.onBindMailbox} disabled={!p.bindMailbox}>{t('addAgent.wizard.bind')}</PixelButton>
+            </div>
+          )}
+          {p.bindMode === 'topic' && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={p.topic} maxLength={TOPIC_MAX} onChange={(e) => p.setTopic(e.target.value)} placeholder={t('addAgent.wizard.topicPlaceholder')} aria-label={t('addAgent.wizard.bindTopic')} style={{ ...inputStyle, flex: 1, fontSize: 14 }} />
+              <PixelButton variant="secondary" size="sm" onClick={p.onBindTopic} disabled={!p.topic.trim()}>{t('addAgent.wizard.bind')}</PixelButton>
+            </div>
+          )}
+          <span style={helperStyle}>{t('addAgent.wizard.editToFix')}</span>
+        </>
+      )}
+      {fallback}
+    </div>
+  );
+}
+
+const chip = (active: boolean): CSSProperties => ({
+  padding: '3px 8px 1px',
+  background: active ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
+  boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 13,
+  color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
+});
+const chipRow: CSSProperties = { display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap', marginTop: 2 };
+const codeChip = (tone: 'paprika' | 'mint' | 'sky'): CSSProperties => ({
+  fontFamily: 'var(--cth-font-mono)', fontSize: 12, padding: '0 4px',
+  background: `var(--cth-${tone}-light)`, boxShadow: `inset 0 0 0 1px var(--cth-${tone}-700, var(--cth-ink-500))`,
+  color: 'var(--cth-ink-900)'
+});
+const box: CSSProperties = { padding: '8px 10px', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)' };
+const linkStyle: CSSProperties = { background: 'none', border: 'none', padding: 0, color: 'var(--cth-sky-700, var(--cth-ink-900))', textDecoration: 'underline', cursor: 'pointer', fontSize: 13 };
+
+/** A plain note under a field: what it is for, in the owner's words. */
+const helperStyle: CSSProperties = {
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-500)'
+};
 
 const inputStyle: React.CSSProperties = {
   width: '100%',

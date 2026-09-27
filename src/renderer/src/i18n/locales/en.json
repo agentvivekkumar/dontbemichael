@@ -515,93 +515,26 @@
     "mcpSafe": "MCP servers (safe, enabled by default):",
     "mcpConsent": "⚠️ MCP (needs your consent, NOT enabled automatically):",
     "mcpEnableInSettings": "(enable in Settings → MCP after reviewing)",
-    "sections": {
-      "identity": {
-        "label": "Identity",
-        "hint": "name · character · color"
-      },
-      "workspace": {
-        "label": "Workspace",
-        "hint": "folder · projects"
-      },
-      "engine": {
-        "label": "Engine",
-        "hint": "provider · model · command"
-      },
-      "briefing": {
-        "label": "Briefing",
-        "hint": "description · goal"
-      }
-    },
     "name": "Name",
     "namePlaceholder": "Ada",
     "character": "Character",
-    "color": "Color",
-    "project": "Project",
-    "pickProject": "Pick a project, or add a new one:",
-    "noProjects": "No projects yet. Add one to get started:",
-    "addProject": "add project",
-    "addProjectTitle": "Pick a folder and register it as a project",
     "projectPlaceholder": "/path/to/your/project",
     "pick": "pick",
-    "saveAsProject": "save as project",
-    "saveAsProjectTitle": "Save this folder to your projects so it's a single click next time",
-    "gitIsolation": "Git isolation (own worktree)",
-    "resumeSession": "Resume session ID (optional)",
-    "resumePlaceholder": "paste a Claude session id to continue its conversation",
-    "folderFromSession": "folder set from session: {{path}}",
-    "resumeNote": "Will resume this session in the chosen folder (git isolation disabled).",
     "provider": "Provider",
-    "providerAntigravity": "Spawn the Antigravity CLI (agy) with a Gemini model",
-    "providerCodex": "Spawn the Codex CLI (codex) without flags meant only for Claude",
-    "providerCustom": "Run any command, with no flags meant only for Claude",
     "model": "Model",
-    "cliDefaultModel": "CLI default model",
-    "fromHire": "{{model}} (from hire)",
-    "ossModels": "OSS models",
-    "ossLocal": "Local · no key (Ollama / LM Studio)",
-    "ossByok": "Via OSS provider · BYOK",
-    "ossLocalTitle": "{{slug}} · needs about {{ram}} RAM. Pull it with: ollama pull {{tag}}",
-    "ossByokTitle": "{{slug}} · set {{keyEnv}} in Settings → AI Engines",
-    "byokNote": "BYOK keys & local endpoints for this engine live in Settings → AI Engines. New to local models? Read run on open models or set up on a Mac Mini. Live end to end testing is pending real model calls (verify on the device).",
     "command": "Command",
-    "commandAuto": "Command (auto mode on)",
-    "templates": "Templates",
-    "templatesHint": {
-      "repoJanitor": {
-        "label": "Repo janitor"
-      },
-      "docsWriter": {
-        "label": "Docs writer"
-      },
-      "bugTriager": {
-        "label": "Bug triager"
-      },
-      "researchAssistant": {
-        "label": "Research assistant"
-      },
-      "releaseManager": {
-        "label": "Release manager"
-      }
-    },
     "role": "Role",
     "rolePlaceholder": "For example: Finance",
-    "roleDescription": "Role description",
     "roleDescriptionPlaceholder": "For example: Keeps track of money in and money out, and sends a weekly summary",
     "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
     "workStyle": "Work style (optional)",
     "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
     "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
-    "folderInsideMichael": "A folder inside {{godName}}'s, named after the role. Only this team member, anyone in the same role, and {{godName}} can open it.",
     "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
     "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
-    "importHire": "Import hire",
     "importHireDesc": "Import hire loads a ready to use agent from a .json manifest. It fills in every field below for you to review. Nothing spawns until you hit spawn.",
     "generateWithAI": "generate one with AI…",
     "hideAIPrompt": "hide AI prompt",
-    "aiPromptHint": "Copy this into Claude/ChatGPT/Gemini, fill in the details at the bottom, then save its JSON reply as a .json file and import it here.",
-    "copied": "copied ✓",
-    "copyPrompt": "copy prompt",
     "importHireBtn": "import hire…",
     "importHireBtnTitle": "Import a hire manifest (.json)",
     "spawn": "hire",
@@ -639,6 +572,61 @@
       "creed": "Quality Control",
       "meredith": "Supply Chain",
       "darryl": "Warehouse"
+    },
+    "wizard": {
+      "steps": "Hiring steps",
+      "step": {
+        "who": "Who",
+        "job": "Job",
+        "review": "Review"
+      },
+      "stepHint": {
+        "who": "pick a person",
+        "job": "their job or another",
+        "review": "check and hire"
+      },
+      "nameTaken": "Someone on the team is already called {{name}}. Pick a different name.",
+      "errJob": "Give the job a title or say what to send.",
+      "errOverlap": "This job overlaps a teammate's. Bind it to a mailbox or a topic, or change what to send.",
+      "theirJob": "{{name}}'s job",
+      "likeTeammate": "as {{name}} does it today",
+      "yourOffice": "Jobs in your office",
+      "newJob": "Something new",
+      "newJobTitle": "Write a new job",
+      "newJobSummary": "Start with a blank title, what to send and work style.",
+      "allJobs": "Every job, from every kind of business",
+      "whatToSend": "What to send {{name}}",
+      "folder": "Folder",
+      "folderDefault": "use the suggested folder",
+      "folderInside": "Its own folder inside {{godName}}'s: {{path}}. Only this team member and {{godName}} can open it.",
+      "tier": {
+        "best": "Best",
+        "fast": "Fast",
+        "bestTitle": "The model set in Settings",
+        "fastTitle": "A quicker, cheaper model for simple jobs"
+      },
+      "back": "back",
+      "next": "next",
+      "checking": "checking...",
+      "checkingTeam": "Checking this job against your team...",
+      "notChecked": "This job has not been checked against your team yet.",
+      "checkNow": "check now",
+      "fullCheckFailed": "The full check could not run, so only a quick comparison of titles and wording was made.",
+      "distinct": "Distinct from everyone on the team.",
+      "overlaps": "This overlaps with {{names}}.",
+      "boundTo": "{{name}} handles only {{scope}}.",
+      "otherLine": "{{name}}'s line gains: {{line}}",
+      "unbind": "remove the binding",
+      "makeParticular": "{{name}} can join only with a job of their own. Bind it to something particular, or change what to send.",
+      "suggestion": "Idea: {{text}}",
+      "bindMailbox": "Bind to a mailbox",
+      "bindTopic": "Bind to a topic",
+      "checkAgain": "Check again",
+      "noFreeMailbox": "Every mailbox already has someone. Add one in Settings, or move one on Capabilities.",
+      "bind": "bind",
+      "topicPlaceholder": "For example: catering enquiries",
+      "editToFix": "Editing what to send and checking again works too.",
+      "mailboxScope": "the {{address}} mailbox"
     }
   },
   "onboarding": {

@@ -115,8 +115,7 @@ export const SHOW_READONLY_SERVERS = false;
  *  member is the form alone. The import code stays for when it comes back. */
 export const SHOW_IMPORT_HIRE = false;
 
-/** Developer options in Add Agent's Workspace step: Git isolation (its own
- *  worktree), "save as project" and "resume session". Hidden (owner,
- *  2026-09-27): not useful to a business owner. With them hidden a new team
- *  member never gets a worktree and always starts a fresh session. */
-export const SHOW_WORKSPACE_DEV_OPTIONS = false;
+/** The hire wizard's engine chips and raw command line: developer options. A
+ *  business owner picks only Best or Fast (hire redesign D3, owner 2026-09-27);
+ *  every hire runs on the engine set in Settings. */
+export const SHOW_ENGINE_PICKER = false;

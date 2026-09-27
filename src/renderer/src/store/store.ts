@@ -93,6 +93,11 @@ export interface Agent {
    *  Mirrors `RegistryAgent.onHold`; main owns the record, this is the copy the
    *  title bar renders from. */
   onHold?: boolean;
+  /** The office pack card this agent's job was copied from when it was hired,
+   *  `<businessType>/<cardId>` (hire redesign E2): its Profile shows that card's
+   *  does, asks first and connections. Setup's pack members need none, since
+   *  their id is their card's. */
+  sourceCard?: string;
   /** When git isolation is enabled, the dedicated worktree path the agent runs
    *  in (its own `agent/<id>` branch); undefined for shared-cwd agents. */
   worktreePath?: string;
