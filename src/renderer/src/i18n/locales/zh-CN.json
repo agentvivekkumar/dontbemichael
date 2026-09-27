@@ -1722,6 +1722,7 @@
     "schedules": "定时工作",
     "schedulesBlurb": "{{name}} 在固定时间自动开始的工作。通常一个定期检查加上几项定时工作就够了；每次运行都会消耗用量。",
     "schedulesOn": "{{count}} 项开启",
-    "schedulesNone": "无"
+    "schedulesNone": "无",
+    "pickMailbox": "选择一个邮箱"
   }
 }

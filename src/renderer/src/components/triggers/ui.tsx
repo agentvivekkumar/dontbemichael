@@ -136,11 +136,12 @@ export function MiniButton({ children, onClick, tone = 'plain', disabled, autoFo
   );
 }
 
-export function Select({ value, onChange, children, style }: {
-  value: string; onChange: (v: string) => void; children: ReactNode; style?: CSSProperties;
+export function Select({ value, onChange, children, style, label }: {
+  value: string; onChange: (v: string) => void; children: ReactNode; style?: CSSProperties; label?: string;
 }) {
   return (
     <select
+      aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       style={{ ...selectStyle, ...style }}

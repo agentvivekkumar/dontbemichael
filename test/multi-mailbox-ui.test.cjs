@@ -42,7 +42,10 @@ test('Draft only is chosen the first time email is turned on (6A); Sending is a 
   assert.match(cap, /role="radiogroup"/);
   assert.match(cap, /ArrowUp/);
   // One mailbox per agent (owner, 2026-09-26): picked from radio rows, no per-mailbox switch.
-  assert.match(cap, /<RadioRows label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current\}/);
+  // The mailbox is picked from a list, with a prompt until one is chosen (owner, 2026-09-26).
+  assert.match(cap, /<Select label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current \?\? ''\}/);
+  assert.match(cap, /\{!current && <option value="">\{t\('capabilities\.pickMailbox'\)\}<\/option>\}/);
+  assert.match(cap, /mailboxes\.length === 0 \? \(/, 'no mailbox set up: the Settings link instead');
   // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
   assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'one switch');
   assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);

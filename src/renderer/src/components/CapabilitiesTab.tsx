@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Toggle, TriggerCard } from './triggers/ui';
+import { Select, Toggle, TriggerCard } from './triggers/ui';
 import { AgentSchedules, useGodId, useMissions } from './triggers/ScheduleList';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
@@ -19,8 +19,8 @@ let handledFocusSeq: number | undefined;
  * every agent tab (owner, 2026-09-26); the header chip says what is inside:
  *
  * - Email: the section header carries the one on/off switch (owner,
- *   2026-09-26). With email on, the body is the agent's one mailbox as radio
- *   rows (address only), then Sending with Draft only first chosen (6A), then
+ *   2026-09-26). With email on, the body is the agent's one mailbox, picked
+ *   from a list (or a link to Settings when none is set up), then Sending with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had. A jump from the office
@@ -114,7 +114,11 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                   <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
                 </div>
               ) : (
-                <RadioRows label={t('capabilities.mailbox', { name })} value={current} options={mailboxOptions} onChange={pickMailbox} breakAll />
+                // A list to pick from (owner, 2026-09-26); "Pick a mailbox" until one is chosen.
+                <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%' }}>
+                  {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
+                  {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
+                </Select>
               )}
 
               <div style={h13}>{t('capabilities.sending')}</div>
@@ -150,9 +154,9 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
 /** A one-choice list (DESIGN.md 7.10a Radio row): arrow keys move and choose,
  *  only the chosen row is in the tab order (the first when none is chosen). */
-function RadioRows({ label, value, options, onChange, breakAll }: {
+function RadioRows({ label, value, options, onChange }: {
   label: string; value: string | undefined; options: Array<{ value: string; label: string; desc?: string }>;
-  onChange: (value: string) => void; breakAll?: boolean;
+  onChange: (value: string) => void;
 }) {
   const at = options.findIndex((o) => o.value === value);
   const onKey = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -182,7 +186,7 @@ function RadioRows({ label, value, options, onChange, breakAll }: {
               {checked && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cth-ink-900)' }} />}
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 14, wordBreak: breakAll ? 'break-all' : undefined }}>{o.label}</span>
+              <span style={{ display: 'block', fontSize: 14 }}>{o.label}</span>
               {o.desc && <span style={{ display: 'block', ...hint }}>{o.desc}</span>}
             </span>
           </button>

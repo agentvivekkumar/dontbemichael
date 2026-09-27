@@ -1722,6 +1722,7 @@
     "schedules": "On a schedule",
     "schedulesBlurb": "Jobs {{name}} starts by itself at set times. One regular check plus a few timed jobs is usually enough; every run costs usage.",
     "schedulesOn": "{{count}} on",
-    "schedulesNone": "None"
+    "schedulesNone": "None",
+    "pickMailbox": "Pick a mailbox"
   }
 }
