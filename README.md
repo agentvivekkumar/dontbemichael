@@ -42,10 +42,17 @@ own memory, working on your Mac.
 > Tell Michael what you need. He hands the work to whoever's job it is, keeps the team moving, and
 > brings you only the calls that need you.
 
+> [!TIP]
+> **New in 0.0.7: every team member can watch its own mailbox.**
+> Connect as many mailboxes as your business uses, then give each team member the one that fits
+> its job. Your Executive Admin watches the CEO's inbox, Customer Support answers support@, Sales
+> follows up from sales@. [See how it works](#a-mailbox-for-every-job).
+
 ## Contents
 
 - [What it is](#what-it-is)
 - [Your team](#your-team)
+- [A mailbox for every job](#a-mailbox-for-every-job)
 - [What the office does](#what-the-office-does)
 - [Getting started](#getting-started)
 - [Your data](#your-data)
@@ -82,6 +89,32 @@ Office Pack. You pick who joins, and you can hire more later.
 Each role comes with a Role description, which tells Michael what work to send there, and a Work
 style, which tells the team member how to do its job at your business. You can change both in
 Edit Agent.
+
+## A mailbox for every job
+
+Most AI assistants read one inbox: yours. Don't Be Michael connects as many mailboxes as your
+business runs on, and each team member works from the one that matches its job.
+
+| Team member | Watches | Can it send? |
+|---|---|---|
+| Pam, Executive Admin | ceo@yourbusiness.com | Draft only: replies wait in Drafts for you |
+| Kelly, Customer Support | support@yourbusiness.com | Can send |
+| Dwight, Sales Director | sales@yourbusiness.com | Can send |
+
+- **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
+  Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
+  saved, and the password stays in your Mac's keychain, never in a file an agent can read.
+- **Hand it out per team member.** On a team member's Capabilities tab, turn email on, pick its
+  mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one.
+- **Each one stays in its lane.** A team member can only read, search and draft in the mailbox you
+  gave it, and cannot forward or attach mail from another one.
+- **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
+  and the team member sorts new mail, drafts replies and tells Michael what needs you.
+- **You hear when it breaks.** If a provider stops accepting the password, the mailbox shows
+  "needs you" and Michael asks you to fix it once, on Ask me.
+
+Outlook and Microsoft 365 are not supported yet. The Gmail and Calendar connected to your Claude
+account are separate: one switch in Mailboxes allows or blocks them for the whole team.
 
 ## What the office does
 
