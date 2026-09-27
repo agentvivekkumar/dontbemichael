@@ -1,3 +1,3 @@
-- **Setup fills in your legal name** from your business name. You can still change it.
-- **Setup marks every required field,** including your kind of business, and highlights what is missing.
-- **Reset and Restart closes cleanly,** with no error on the way out.
+- **A mailbox for each agent:** connect it with an app password, then pick it on the agent's Capabilities tab.
+- **Schedules moved into Capabilities.** Michael's tab is now Office schedule.
+- **Agents pick up held work** when you open the office after closing time.

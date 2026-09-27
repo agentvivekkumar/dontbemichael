@@ -1,22 +1,23 @@
-# Don't Be Michael v0.0.6
+# Don't Be Michael v0.0.7
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.0.6
+## What's new in 0.0.7
 
-- **Setup fills in your legal name.** Step 2 starts it from the business name you gave on step 1, and follows a rename until you type your own.
-- **Setup marks every required field.** Business name and your kind of business now carry a *, and the business tiles light up when you press Next without picking one.
-- **Reset and Restart closes cleanly,** with no error on the way out.
+- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any IMAP mailbox with an app password in Settings, Connections, Mailboxes, then give an agent one mailbox on its Capabilities tab, set to Can send or Draft only.
+- **A Capabilities tab on every agent,** with Email and On a schedule. Michael's Schedules tab is now Office schedule, listing every job that is on.
+- **The office opens again after closing time,** so agents pick up held work and scheduled jobs on the next launch.
+- **Your Claude account's email is one switch** in Mailboxes: allowed for everyone, or blocked.
 
 ## Download
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.6-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.6-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.7-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.7-mac-universal.dmg) |
 
 This release is for Mac only. Windows and Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.6.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.6.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.7.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.7.tar.gz)
 
 ## Installing on your Mac
 
