@@ -115,10 +115,13 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                 </div>
               ) : (
                 // A list to pick from (owner, 2026-09-26); "Pick a mailbox" until one is chosen.
-                <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%' }}>
-                  {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
-                  {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
-                </Select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%' }}>
+                    {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
+                    {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
+                  </Select>
+                  <button type="button" onClick={openSettings} style={link}>{t('capabilities.addMailbox')}</button>
+                </div>
               )}
 
               <div style={h13}>{t('capabilities.sending')}</div>
