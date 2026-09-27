@@ -243,11 +243,26 @@ const styleBald: HairFn = (buf, color, skinBase, a) => {
   for (let y = top; y <= 10; y++) { set(buf, HX0 - 1, y, sh); set(buf, HX1 + 1, y, sh); }
 };
 
-const HAIR_FNS = { styleShort, styleFloppy, styleFrame, styleBun, styleCurly, styleMessy, styleRecede, styleSpiky, styleBald };
+// A wrapped turban (Sadiq, owner 2026-09-27): a tall rounded wrap in the recipe's
+// hair color that sits above the head and covers the forehead to the brows, with
+// diagonal folds so it reads as wrapped cloth rather than a hat.
+const TURBAN_ROWS: [number, number, number][] = [[0, 6, 11], [1, 4, 13], [2, 3, 14], [3, 3, 14], [4, 3, 14], [5, 3, 14], [6, 4, 13]];
+const styleTurban: HairFn = (buf, color) => {
+  const [hi, base, sh] = shades(color, 1.25, 0.66);
+  for (const [y, a, b] of TURBAN_ROWS) rect(buf, a, y, b, y, base);
+  // folds: two diagonal wraps rising to the right, plus the shaded right side
+  for (const [x, y] of [[5, 5], [6, 4], [7, 3], [8, 2], [9, 1], [8, 6], [9, 5], [10, 4], [11, 3], [12, 2]] as const) set(buf, x, y, sh);
+  for (let y = 2; y <= 5; y++) set(buf, 14, y, sh);
+  set(buf, 13, 6, sh);
+  // light catching the upper left of the wrap
+  for (const [x, y] of [[6, 0], [7, 0], [5, 1], [6, 1], [4, 2], [5, 2], [4, 3]] as const) set(buf, x, y, hi);
+};
+
+const HAIR_FNS = { styleShort, styleFloppy, styleFrame, styleBun, styleCurly, styleMessy, styleRecede, styleSpiky, styleBald, styleTurban };
 type HairStyle = keyof typeof HAIR_FNS;
 
 // ─── facial hair ─────────────────────────────────────────────────────────────
-type Facial = 'mustache' | 'mustacheSm' | 'stubble' | 'goatee';
+type Facial = 'mustache' | 'mustacheSm' | 'stubble' | 'goatee' | 'beard';
 function drawFacial(buf: Buf, kind: Facial, color: RGB): void {
   const [, base, sh] = shades(color);
   if (kind === 'mustache') {
@@ -258,6 +273,14 @@ function drawFacial(buf: Buf, kind: Facial, color: RGB): void {
   } else if (kind === 'stubble') {
     for (const [x, y] of [[5, 14], [6, 15], [7, 15], [8, 15], [9, 15], [10, 15], [11, 14], [12, 13], [4, 13], [5, 15], [10, 15]] as const)
       set(buf, x, y, sh, 150);
+  } else if (kind === 'beard') {
+    // short full beard: along the jaw, over the chin and a light mustache
+    // short, trimmed beard: a jawline and chin, soft on the cheeks, the mouth
+    // left clear so the face stays calm
+    for (const [x, y] of [[4, 12], [4, 13], [5, 14], [5, 15], [6, 16], [7, 16], [8, 16], [9, 16], [10, 16], [11, 16], [12, 15], [12, 14], [13, 12], [13, 13]] as const)
+      set(buf, x, y, base);
+    for (const [x, y] of [[5, 13], [6, 15], [11, 15], [12, 13], [8, 15], [9, 15]] as const) set(buf, x, y, sh, 150);
+    for (const x of [7, 10]) set(buf, x, 13, sh, 120);
   } else if (kind === 'goatee') {
     for (const x of [8, 9]) set(buf, x, 15, base);
     set(buf, 8, 14, base); set(buf, 9, 14, base);
@@ -399,6 +422,7 @@ function drawSceneTorso(buf: Buf, r: Recipe, back: boolean): void {
 function drawHeadBack(buf: Buf, r: Recipe): void {
   const s = SKIN[r.skin];
   if (r.hair === 'styleBald') { drawHeadBackBald(buf, r); return; }
+  if (r.hair === 'styleTurban') { drawHeadBackTurban(buf, r); return; }
   const [hi, base, sh] = shades(r.hairc);
   // rounded skull silhouette (narrow at crown + nape, full through the middle)
   const rows: [number, number, number][] = [
@@ -421,6 +445,24 @@ function drawHeadBack(buf: Buf, r: Recipe): void {
   rect(buf, 7, 14, 10, 14, sh);
   rect(buf, 7, 15, 10, 17, s.sh);
   rect(buf, 7, 15, 9, 15, s.base);
+}
+
+/** Back of a turbaned head: the wrap covers the whole skull above a short dark nape. */
+function drawHeadBackTurban(buf: Buf, r: Recipe): void {
+  const s = SKIN[r.skin];
+  const [hi, base, sh] = shades(r.hairc, 1.25, 0.66);
+  const rows: [number, number, number][] = [...TURBAN_ROWS, [7, 4, 13], [8, 4, 13], [9, 4, 13], [10, 5, 12]];
+  for (const [y, a, b] of rows) rect(buf, a, y, b, y, base);
+  // wraps crossing the back, and the shaded edges
+  for (const [x, y] of [[4, 8], [5, 7], [6, 6], [7, 5], [8, 4], [9, 3], [10, 2], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5], [11, 4], [12, 3]] as const) set(buf, x, y, sh);
+  for (let y = 3; y <= 9; y++) { set(buf, 3, y, sh); set(buf, 14, y, sh); }
+  for (const [x, y] of [[7, 0], [8, 0], [6, 1], [7, 1]] as const) set(buf, x, y, hi);
+  // short hair at the nape under the wrap, then the neck
+  const hairDark = r.facialc ?? [26, 20, 18];
+  rect(buf, 5, 11, 12, 12, hairDark);
+  rect(buf, 6, 13, 11, 13, s.sh);
+  rect(buf, 7, 14, 10, 17, s.sh);
+  rect(buf, 7, 14, 9, 14, s.base);
 }
 
 /** Back of a bald head: a skin skull with a sheen and a low hair fringe ring. */
@@ -468,6 +510,8 @@ interface Recipe {
   skin: string; hairc: RGB; hair: HairStyle; hairargs?: HairArgs;
   cloth: Cloth; c1: RGB; c2?: RGB; tie?: RGB; pants?: RGB;
   brow?: Brow; mouth?: Mouth; blush?: boolean; facial?: Facial; glasses?: boolean;
+  /** Facial hair color when it differs from `hairc` (e.g. a colored turban). */
+  facialc?: RGB;
   /** Bigger, lashed eyes for a more feminine, expressive face. */
   lashes?: boolean;
   /** Heavier build: chubby cheeks, a double chin, and a wider torso. */
@@ -507,7 +551,8 @@ const RECIPES: Record<OfficeCharacterName, Recipe> = {
   creed:    { skin: 'light', hairc: [170, 166, 156], hair: 'styleBald',   cloth: 'dressshirt', c1: [126, 130, 96], facial: 'stubble', brow: 'flat', mouth: 'neutral' },
   meredith: { skin: 'light', hairc: [154, 82, 46],  hair: 'styleMessy',  hairargs: { length: 15 }, cloth: 'blouse', c1: [176, 86, 74], brow: 'raised', mouth: 'smile', lashes: true },
   nick:     { skin: 'light', hairc: [46, 34, 26],   hair: 'styleCurly',  cloth: 'polo', c1: [96, 128, 106], c2: [80, 110, 90], brow: 'raised', mouth: 'neutral' },
-  sadiq:    { skin: 'brown', hairc: [22, 18, 16],   hair: 'styleShort',  hairargs: { part: 'R' }, cloth: 'dressshirt', c1: [120, 150, 186], glasses: true, brow: 'flat', mouth: 'neutral' },
+  // Red turban, short dark beard, dark cardigan over a navy shirt (owner, 2026-09-27).
+  sadiq:    { skin: 'brown', hairc: [150, 32, 44],  hair: 'styleTurban', facial: 'beard', facialc: [30, 24, 22], cloth: 'cardigan', c1: [64, 64, 72], c2: [40, 54, 100], brow: 'flat', mouth: 'neutral' },
   darryl:   { skin: 'dark',  hairc: [28, 24, 22],   hair: 'styleBald',   cloth: 'polo', c1: [74, 98, 128], c2: [60, 82, 110], facial: 'goatee', brow: 'flat', mouth: 'smile' },
 };
 
@@ -517,7 +562,7 @@ function drawHeadGroup(buf: Buf, r: Recipe): void {
   drawHead(buf, r.skin);
   if (r.heavy) drawHeavyFace(buf, r.skin);
   drawFace(buf, r.skin, r.brow ?? 'flat', r.mouth ?? 'neutral', r.blush ?? false, r.lashes ?? false);
-  if (r.facial) drawFacial(buf, r.facial, r.hairc);
+  if (r.facial) drawFacial(buf, r.facial, r.facialc ?? r.hairc);
   HAIR_FNS[r.hair](buf, r.hairc, skinBase, r.hairargs ?? {});
   if (r.glasses) drawGlasses(buf);
 }
