@@ -618,6 +618,14 @@ const api = {
     team: Array<{ name: string; title: string; routing: string; workStyle?: string; mailbox?: string }>
   ): Promise<{ distinct: boolean; overlapsWith: string[]; why: string; suggestion?: string; source: 'ai' | 'rules' }> =>
     ipcRenderer.invoke('hire:checkDistinct', { job, team }),
+  /** Rewrite a work style: the agent's instructions as the owner's plain
+   *  description, or the owner's description as instructions. */
+  workStyleConvert: (req: {
+    to: 'plain' | 'instructions';
+    text: string;
+    ctx: { name: string; title?: string; business?: { name?: string; city?: string } };
+    previous?: string;
+  }): Promise<{ text: string; source: 'ai' | 'rules' }> => ipcRenderer.invoke('workStyle:convert', req),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }

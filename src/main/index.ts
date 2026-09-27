@@ -40,6 +40,7 @@ import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
 import { checkDistinct, readJobProfile } from './hireCheck';
+import { convertWorkStyle, readConvertRequest } from './workStyleConvert';
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
@@ -4056,6 +4057,20 @@ ipcMain.handle('hire:checkDistinct', async (_evt, payload: unknown) => {
   const team = Array.isArray(p.team) ? p.team.map(readJobProfile).filter((m): m is NonNullable<typeof m> => !!m) : [];
   const cfg = readConfig();
   return checkDistinct(job, team, {
+    cwd: cfg.harnessHome ?? app.getPath('home'),
+    command: cfg.defaultCommand ?? 'claude',
+    env: memory.env(),
+    log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+  });
+});
+
+/** A work style between the owner's plain description and the agent's
+ *  instructions (owner, 2026-09-27). Falls back to a plain-text rewrite. */
+ipcMain.handle('workStyle:convert', async (_evt, payload: unknown) => {
+  const req = readConvertRequest(payload);
+  if (!req) return { text: '', source: 'rules' };
+  const cfg = readConfig();
+  return convertWorkStyle(req, {
     cwd: cfg.harnessHome ?? app.getPath('home'),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),

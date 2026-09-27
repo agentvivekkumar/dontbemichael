@@ -528,8 +528,6 @@
     "roleDescriptionPlaceholder": "例如：记录每一笔收入和支出，每周发一份汇总",
     "roleHelp": "{{godName}} 会根据角色和角色说明决定把哪些工作交给这位成员。",
     "workStyle": "工作方式",
-    "workStylePlaceholder": "例如：每个数字都核对两遍。完成后发一份简短汇总。",
-    "workStyleHelp": "{{godName}} 看不到这部分。这是这位成员完成工作的方式，包括按日程运行的任务：按什么步骤做，结束前检查什么。",
     "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
     "errFolderShared": "这是 {{godName}} 的文件夹。请为这位成员选择一个自己的文件夹。",
     "importHireDesc": "导入 hire 会从一个 .json 清单加载现成的智能体，它会填好下方所有字段供你检查。不点 生成 就不会启动任何东西。",
@@ -627,7 +625,12 @@
       "modelDefault": "{{model}}（默认）",
       "cliDefault": "Claude 自带的默认模型",
       "sameWork": "无论职位名称如何，要交给他的事读起来是同一份工作。",
-      "errWorkStyle": "工作方式为必填：请写明这位团队成员如何完成工作。"
+      "errWorkStyle": "工作方式为必填：请写明这位团队成员如何完成工作。",
+      "workStylePlaceholder": "用你自己的话写：{{name}} 做什么，你希望怎么做，以及哪些事 {{name}} 应该先问你。",
+      "workStyleHelp": "像向新员工解释工作那样写，包括按计划运行的工作。招聘时，应用会把它变成给 {{name}} 的工作指令。{{godName}} 看不到这段内容。",
+      "describing": "正在把这份工作写成通俗的说明...",
+      "writingInstructions": "正在为 {{name}} 撰写工作指令...",
+      "errInstructions": "未能写出工作指令。请再点一次招聘。"
     }
   },
   "onboarding": {

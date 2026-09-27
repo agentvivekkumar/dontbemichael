@@ -44,6 +44,7 @@ import {
   type HireJob,
   type JobProfile
 } from '@shared/hireTemplates';
+import { plainFallback } from '@shared/workStyleText';
 import { useRtl } from '@/i18n/useDirection';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { SHOW_IMPORT_HIRE, SHOW_ENGINE_PICKER } from '@shared/buildFeatures';
@@ -213,7 +214,36 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   //    changes, so edits survive going back and forth otherwise ──
   const [title, setTitle] = useState(() => splitAgentRole(pendingHire?.description).role);
   const [routing, setRouting] = useState(() => splitAgentRole(pendingHire?.description).roleDescription);
-  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ?? '');
+  // Work style in two forms (owner, 2026-09-27): the owner reads and edits a
+  // plain description (`workStyle`); the agent gets instructions written from
+  // it at Hire. `baseInstructions` are the copied job's instructions, used as
+  // they are when the owner leaves the description unchanged.
+  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal) : '');
+  const [baseInstructions, setBaseInstructions] = useState(pendingHire?.goal ?? '');
+  const [plainOfBase, setPlainOfBase] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal) : '');
+  const [describing, setDescribing] = useState(false);
+  const [writingInstructions, setWritingInstructions] = useState(false);
+  const describeSeq = useRef(0);
+  const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business });
+  /** Show a job's instructions as a plain description: the quick rewrite at
+   *  once, the model's when it arrives, unless the owner has started typing. */
+  const setInstructions = (instructions: string, forName = name.trim(), forTitle = title.trim()): void => {
+    const seq = ++describeSeq.current;
+    setBaseInstructions(instructions);
+    const quick = instructions.trim() ? plainFallback(instructions) : '';
+    setWorkStyle(quick);
+    setPlainOfBase(quick);
+    if (!instructions.trim()) { setDescribing(false); return; }
+    setDescribing(true);
+    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: forName, title: forTitle || undefined, business } })
+      .then((res) => {
+        if (seq !== describeSeq.current || res.source !== 'ai' || !res.text) return;
+        setWorkStyle((cur) => (cur === quick ? res.text : cur));
+        setPlainOfBase((cur) => (cur === quick ? res.text : cur));
+      })
+      .catch(() => { /* the quick rewrite stays */ })
+      .finally(() => { if (seq === describeSeq.current) setDescribing(false); });
+  };
   const [sourceCard, setSourceCard] = useState<string | undefined>(undefined);
   const applied = useRef<string | null>(pendingHire ? 'manifest' : null);
   const applyJob = (): void => {
@@ -223,11 +253,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (applied.current === 'manifest' && jobKey === null) return;
     applied.current = sig;
     setBinding(null);
-    if (!chosenJob) { setTitle(''); setRouting(''); setWorkStyle(''); setSourceCard(undefined); return; }
+    if (!chosenJob) { setTitle(''); setRouting(''); setInstructions(''); setSourceCard(undefined); return; }
     const copy = jobFor(chosenJob, name.trim());
     setTitle(copy.title);
     setRouting(copy.routing);
-    setWorkStyle(copy.workStyle);
+    setInstructions(copy.workStyle, name.trim(), copy.title);
     setSourceCard(chosenJob.sourceCard);
   };
 
@@ -334,7 +364,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     const split = splitAgentRole(m.description);
     setTitle(split.role);
     setRouting(split.roleDescription);
-    setWorkStyle(m.goal ?? '');
+    setInstructions(m.goal ?? '', m.name, split.role);
     setSourceCard(undefined);
     setBinding(null);
     applied.current = 'manifest';
@@ -427,6 +457,18 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (overlaps.length > 0 && !binding) { setError(tr('addAgent.wizard.errOverlap')); return; }
 
     setBusy(true);
+    // The agent's instructions: the copied job's own when the owner left the
+    // description as it was, else written from the description, to the house
+    // prompting guidelines (owner, 2026-09-27).
+    let goal = baseInstructions.trim();
+    if (!goal || workStyle.trim() !== plainOfBase.trim()) {
+      setWritingInstructions(true);
+      const res = await window.cth.workStyleConvert({ to: 'instructions', text: workStyle, ctx: styleCtx(), previous: baseInstructions || undefined })
+        .catch(() => null);
+      setWritingInstructions(false);
+      goal = res?.text?.trim() || '';
+      if (!goal) { setBusy(false); setError(tr('addAgent.wizard.errInstructions')); return; }
+    }
     // The folder is made here, the first time it's needed; an existing one is
     // left exactly as it is.
     if (michaelFolder && !customCwd) {
@@ -482,7 +524,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       project: basename(spawnedCwd),
       tmuxTarget: '',
       cwd: spawnedCwd,
-      goal: workStyle.trim() || undefined,
+      goal: goal || undefined,
       sourceCard,
       status: 'idle',
       action: 'starting up',
@@ -778,12 +820,13 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     <textarea
                       dir={rtl ? 'auto' : undefined}
                       value={workStyle}
-                      onChange={(e) => setWorkStyle(e.target.value)}
-                      placeholder={tr('addAgent.workStylePlaceholder')}
-                      rows={6}
+                      onChange={(e) => { describeSeq.current++; setDescribing(false); setWorkStyle(e.target.value); }}
+                      placeholder={tr('addAgent.wizard.workStylePlaceholder', { name: name.trim() })}
+                      rows={7}
                       style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', fontSize: 14, resize: 'vertical' }}
                     />
-                    <span style={helperStyle}>{tr('addAgent.workStyleHelp', { godName })}</span>
+                    {describing && <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.describing')}</span>}
+                    <span style={helperStyle}>{tr('addAgent.wizard.workStyleHelp', { name: name.trim(), godName })}</span>
                   </Row>
 
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -902,7 +945,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 <PixelButton variant="primary" size="md" onClick={() => goTo(STEPS[stepIndex + 1])} disabled={step === 'who' && !!whoError}>{tr('addAgent.wizard.next')}</PixelButton>
               ) : (
                 <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || (overlapNames.length > 0 && !binding)}>
-                  {busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
+                  {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
                 </PixelButton>
               )}
             </div>

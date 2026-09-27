@@ -19,7 +19,7 @@ const wizard = read('src/renderer/src/components/OnboardingWizard.tsx');
 const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
 
 test('the hire wizard asks for Role, what to send and Work style, stored as Role: description', () => {
-  for (const key of ['role', 'roleHelp', 'workStyle', 'workStyleHelp', 'wizard.whatToSend']) {
+  for (const key of ['role', 'roleHelp', 'workStyle', 'wizard.workStyleHelp', 'wizard.whatToSend']) {
     assert.match(modal, new RegExp(`tr\\('addAgent\\.${key.replace('.', '\\.')}'`), key);
   }
   assert.match(modal, /const description = hireRole\(title, routing\);/, 'stored as Role: description');

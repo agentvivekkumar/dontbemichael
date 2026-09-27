@@ -528,8 +528,6 @@
     "roleDescriptionPlaceholder": "For example: Keeps track of money in and money out, and sends a weekly summary",
     "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
     "workStyle": "Work style",
-    "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
-    "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
     "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
     "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
     "importHireDesc": "Import hire loads a ready to use agent from a .json manifest. It fills in every field below for you to review. Nothing spawns until you hit spawn.",
@@ -627,7 +625,12 @@
       "modelDefault": "{{model}} (default)",
       "cliDefault": "Claude's own default",
       "sameWork": "What to send reads like the same work, whatever the job title says.",
-      "errWorkStyle": "Work style is required: write how this team member does the job."
+      "errWorkStyle": "Work style is required: write how this team member does the job.",
+      "workStylePlaceholder": "In your own words: what {{name}} does, how you like it done, and what {{name}} should ask you about first.",
+      "workStyleHelp": "Write it the way you would explain the job to a new employee, jobs it runs on a schedule included. When you hire, the app turns it into instructions for {{name}}. {{godName}} doesn't see this.",
+      "describing": "Putting the job into plain words...",
+      "writingInstructions": "writing {{name}}'s instructions...",
+      "errInstructions": "The instructions could not be written. Try Hire again."
     }
   },
   "onboarding": {
