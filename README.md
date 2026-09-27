@@ -98,7 +98,7 @@ directly, open it and choose **Talk 1:1**; Michael sends it no work until you en
 
 </td>
 <td width="50%">
-  <a href="https://github.com/agentvivekkumar/dontbemichael/raw/main/docs/media/demo/orchestrator.mp4"><img src="./docs/media/demo/orchestrator-poster.jpg" alt="Briefing Michael from the Command Center" width="100%"></a>
+  <img src="./docs/media/command-center.jpg" alt="Michael's Command Center: his profile, what he does, what he asks you first, and the team of eight on the office floor" width="100%">
 </td>
 </tr>
 <tr>
