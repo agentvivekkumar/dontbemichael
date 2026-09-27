@@ -618,6 +618,27 @@
       "people": "HR & Support",
       "it": "IT & Security",
       "operations": "Operations"
+    },
+    "castRole": {
+      "michael": "Manager",
+      "pam": "Admin",
+      "erin": "Admin",
+      "dwight": "Sales",
+      "jim": "Sales",
+      "stanley": "Sales",
+      "phyllis": "Sales",
+      "andy": "Sales",
+      "ryan": "Marketing",
+      "oscar": "Accounting",
+      "angela": "Accounting",
+      "kevin": "Accounting",
+      "toby": "HR",
+      "kelly": "Customer Support",
+      "nick": "IT",
+      "sadiq": "IT Security",
+      "creed": "Quality Control",
+      "meredith": "Supply Chain",
+      "darryl": "Warehouse"
     }
   },
   "onboarding": {

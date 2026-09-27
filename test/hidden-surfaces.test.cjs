@@ -287,8 +287,10 @@ test('Add Agent groups the characters by their job in the show (owner, 2026-09-2
   assert.deepEqual(CAST_GROUPS[1].members.slice(0, 2), ['dwight', 'jim']);
   assert.ok(CAST_GROUPS.every((g) => g.members.length >= 2), 'no group is a lone tile');
   assert.match(src, /flexWrap: 'wrap', columnGap: 20/, 'groups sit side by side and wrap');
+  assert.match(src, /tr\(`addAgent\.castRole\.\$\{c\.name\}`\)/, 'each tile names its job');
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
     for (const g of CAST_GROUPS) assert.ok(d.addAgent.castGroup?.[g.key], `${loc}: ${g.key} has a heading`);
+    for (const n of grouped) assert.ok(d.addAgent.castRole?.[n], `${loc}: ${n} names its own job`);
   }
 });

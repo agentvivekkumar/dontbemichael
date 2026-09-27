@@ -618,6 +618,27 @@
       "people": "人力资源与支持",
       "it": "IT 与安全",
       "operations": "运营"
+    },
+    "castRole": {
+      "michael": "经理",
+      "pam": "行政",
+      "erin": "行政",
+      "dwight": "销售",
+      "jim": "销售",
+      "stanley": "销售",
+      "phyllis": "销售",
+      "andy": "销售",
+      "ryan": "市场营销",
+      "oscar": "会计",
+      "angela": "会计",
+      "kevin": "会计",
+      "toby": "人力资源",
+      "kelly": "客户支持",
+      "nick": "IT",
+      "sadiq": "IT 安全",
+      "creed": "质量控制",
+      "meredith": "供应链",
+      "darryl": "仓库"
     }
   },
   "onboarding": {
