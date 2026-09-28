@@ -6,6 +6,45 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **A new hire wizard: Who, Job, Role, Finalize.** Pick a character and they bring their job: a
+  teammate doing it today, or the job from your business pack. Or pick any job from any kind of
+  business, or write a new one. Each hire gets its own folder, like Admin_Erin, when Admin is taken.
+- **No two teammates do the same work.** A new job is checked against every teammate's by what they
+  handle, not by title. An overlap must be bound to its own mailbox or topic before Hire, and the
+  teammate's line says the bound work now goes to the new hire.
+- **Work style in plain words.** Hiring and Edit Agent show the work style as a plain description
+  you can edit; the app writes the agent's instructions from it when you hire or save.
+- **One job, several times.** A schedule can have more than one "when" line, for example every 2h
+  on weekdays between 08:00 and 18:00 plus weekends at 14:00.
+- **Erin joins the cast**, the character tiles are grouped by job with each one's job under the
+  name, and every character has break room lines of their own.
+
+### Changed
+
+- **Michael runs the office.** Only Michael assigns work: a teammate asking another teammate to do
+  something goes to Michael, and questions between teammates still go straight through. Michael
+  decides the team's schedule requests and asks you in ASK ME only when he can't settle one, or
+  when he hasn't decided it within 12 hours. Each request says why, and two about the same job
+  become one.
+- **Schedules offer 4h** in the every… list, a common half day rhythm.
+- **One agent per mailbox.** A mailbox another agent checks shows who has it, and moving it asks
+  first.
+- **The office speaks office.** Agents say "clocking in…" at launch and "nothing to do" when idle,
+  the memory graph shows each agent's character, Sadiq wears a turban and Darryl a full beard.
+- **Hiring is simpler.** Developer options are hidden: engine and command line, Git isolation,
+  projects, resume session and import. Field explanations sit behind info icons.
+
+### Fixed
+
+- **A memory tidy reads only its own answer**, so one agent's notes can no longer land in another
+  agent's memory.
+- **Closing the hire dialog by accident.** Selecting text past its edge, or pressing Escape in a
+  field, no longer closes it, and it can't be closed while Hire is running.
+
 ## [0.0.7] (2026-09-26)
 
 ### Added
