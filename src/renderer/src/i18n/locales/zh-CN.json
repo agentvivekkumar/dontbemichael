@@ -526,9 +526,8 @@
     "role": "角色",
     "rolePlaceholder": "例如：财务",
     "roleDescriptionPlaceholder": "例如：回复写信到客服邮箱的客户，并把退款请求转给 Oscar。",
-    "roleHelp": "交给 {{name}} 的工作：哪些请求、哪个邮箱、哪些客户。{{godName}} 根据这段内容决定把什么交给 {{name}}，所以要写得足够具体，确保没有同事负责同样的事。",
+    "roleHelp": "{{godName}} 根据这段内容决定把什么交给 {{name}}。写明哪些请求、邮箱或客户，确保没有同事负责同样的事。",
     "workStyle": "工作方式",
-    "folderPrivate": "只有这位成员、共用这个文件夹的成员和 {{godName}} 能打开。",
     "errFolderShared": "这是 {{godName}} 的文件夹。请为这位成员选择一个自己的文件夹。",
     "importHireDesc": "导入 hire 会从一个 .json 清单加载现成的智能体，它会填好下方所有字段供你检查。不点 生成 就不会启动任何东西。",
     "generateWithAI": "用 AI 生成一个…",
@@ -577,7 +576,7 @@
         "who": "人选",
         "job": "工作",
         "role": "职位",
-        "setup": "设置"
+        "setup": "完成"
       },
       "stepHint": {
         "who": "选一个人",
@@ -598,7 +597,6 @@
       "whatToSend": "{{name}} 负责的工作",
       "folder": "文件夹",
       "folderDefault": "使用建议的文件夹",
-      "folderInside": "{{godName}} 文件夹内属于他自己的文件夹：{{path}}。只有这位团队成员和 {{godName}} 能打开。",
       "back": "上一步",
       "next": "下一步",
       "checking": "检查中...",
@@ -629,13 +627,12 @@
       "sameWork": "无论职位叫什么，{{name}} 负责的工作读起来是同一份工作。",
       "errWorkStyle": "工作方式为必填：请写明这位团队成员如何完成工作。",
       "workStylePlaceholder": "用你自己的话写：{{name}} 做什么，你希望怎么做，以及哪些事 {{name}} 应该先问你。",
-      "workStyleHelp": "像向新员工解释工作那样写，包括按计划运行的工作。招聘时，应用会把它变成给 {{name}} 的工作指令。{{godName}} 看不到这段内容。",
       "describing": "正在把这份工作写成通俗的说明...",
       "writingInstructions": "正在为 {{name}} 撰写工作指令...",
       "errInstructions": "未能写出工作指令。请再点一次招聘。",
-      "workStyleIntro": "工作方式是 {{name}} 日常完成工作的方法：这份工作的目的、你希望怎么做，以及哪些事 {{name}} 要先交给你批准。{{name}} 每次开始工作都会读它，并在每项任务中遵循，包括按计划运行的任务。{{godName}} 不使用它：他按上一页的职位分派工作。",
-      "folderPurpose": "{{name}} 存放这份工作文件的地方：草稿、报告、下载的文件，以及你放进来让 {{name}} 处理的任何东西。",
-      "modelPurpose": "{{name}} 用来思考的 AI 模型。默认使用设置中为团队成员选定的模型。较大的模型更擅长复杂判断；较小的模型更快也更省钱。",
+      "workStyleIntro": "{{name}} 完成工作的方式：工作的目的、你希望怎么做，以及哪些事要先经你批准。{{name}} 在每项任务中都会遵循，包括按计划运行的任务。用你自己的话写；招聘时应用会把它变成工作指令。{{godName}} 不使用它。",
+      "folderPurpose": "{{name}} 存放这份工作文件的地方。只有 {{name}} 和 {{godName}} 能打开。",
+      "modelPurpose": "{{name}} 用来思考的 AI 模型。默认使用设置中为团队成员选定的模型。较大的模型更擅长复杂判断；较小的更快更省钱。",
       "resolved": "可以了：{{name}} 的工作已与 {{names}} 分开。"
     }
   },

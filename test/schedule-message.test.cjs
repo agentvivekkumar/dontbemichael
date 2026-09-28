@@ -38,7 +38,7 @@ test('the scheduler sends that message, and the Schedules card has no prompt for
   assert.match(ui, /updateAgent\(agent\.id, \{ goal: \[agent\.goal\?\.trim\(\), `\$\{m\.label\}: \$\{text\}`\]/, 'older instructions move into the Work style');
   assert.match(ui, /\{heartbeat && \(\s*<Field label=\{t\('schedulesSection\.prompt'\)\}>/, 'the heartbeat keeps its box for now');
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
-  assert.match(en.addAgent.wizard.workStyleHelp, /jobs it runs on a schedule included/);
+  assert.match(en.addAgent.wizard.workStyleIntro, /scheduled jobs included/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
     for (const k of ['labelHint', 'olderInstructions', 'olderInstructionsHint', 'moveToWorkStyle', 'removeOlder']) assert.ok(d.schedulesSection[k], `${loc} ${k}`);

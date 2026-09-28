@@ -5,6 +5,7 @@ import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
+import { InfoTip } from './InfoTip';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, CAST_BY_NAME, CAST_GROUPS, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -800,7 +801,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     </div>
                   </div>
 
-                  <Row label={tr('addAgent.wizard.whatToSend', { name: name.trim() })}>
+                  <Row label={tr('addAgent.wizard.whatToSend', { name: name.trim() })} info={tr('addAgent.roleHelp', { godName, name: name.trim() })}>
                     <textarea
                       dir={rtl ? 'auto' : undefined}
                       value={routing}
@@ -809,7 +810,6 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       rows={3}
                       style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                     />
-                    <span style={helperStyle}>{tr('addAgent.roleHelp', { godName, name: name.trim() })}</span>
                   </Row>
 
                   <DistinctBox
@@ -846,8 +846,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     </div>
                   </div>
 
-                  <Row label={tr('addAgent.workStyle')}>
-                    <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13, lineHeight: '19px' }}>{tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}</span>
+                  <Row label={tr('addAgent.workStyle')} info={tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}>
                     <textarea
                       dir={rtl ? 'auto' : undefined}
                       value={workStyle}
@@ -857,13 +856,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', fontSize: 14, resize: 'vertical' }}
                     />
                     {describing && <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.describing')}</span>}
-                    <span style={helperStyle}>{tr('addAgent.wizard.workStyleHelp', { name: name.trim(), godName })}</span>
                   </Row>
 
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <div style={{ flex: '1 1 380px', minWidth: 0 }}>
-                      <Row label={tr('addAgent.wizard.folder')}>
-                        <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13 }}>{tr('addAgent.wizard.folderPurpose', { name: name.trim() })}</span>
+                      <Row label={tr('addAgent.wizard.folder')} info={tr('addAgent.wizard.folderPurpose', { name: name.trim(), godName })}>
                         {michaelFolder && !customCwd ? (
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <input value={folderName} onChange={(e) => setFolderName(e.target.value)} style={{ ...inputStyle, flex: 1 }} aria-label={tr('addAgent.wizard.folder')} />
@@ -880,16 +877,13 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                             {michaelFolder && <button type="button" onClick={() => setCustomCwd(undefined)} style={linkStyle}>{tr('addAgent.wizard.folderDefault')}</button>}
                           </div>
                         )}
-                        <span style={helperStyle}>
-                          {michaelFolder && !customCwd
-                            ? tr('addAgent.wizard.folderInside', { godName, path: cwd || michaelFolder })
-                            : tr('addAgent.folderPrivate', { godName })}
-                        </span>
+                        {michaelFolder && !customCwd && cwd && (
+                          <span style={{ ...helperStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 11, wordBreak: 'break-all' }}>{cwd}</span>
+                        )}
                       </Row>
                     </div>
                     <div style={{ flex: '0 0 auto' }}>
-                      <Row label={tr('addAgent.model')}>
-                        <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13, maxWidth: 360 }}>{tr('addAgent.wizard.modelPurpose', { name: name.trim() })}</span>
+                      <Row label={tr('addAgent.model')} info={tr('addAgent.wizard.modelPurpose', { name: name.trim() })}>
                         <Select
                           label={tr('addAgent.model')}
                           value={model ?? ''}
@@ -1159,15 +1153,20 @@ const inputStyle: React.CSSProperties = {
   outline: 'none'
 };
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** A field with its label; `info` puts the explanation behind an info icon
+ *  beside the label instead of text on the screen (owner, 2026-09-27). */
+function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{
-        fontFamily: 'var(--cth-font-display)',
-        fontSize: 8, lineHeight: '12px',
-        color: 'var(--cth-ink-700)',
-        textTransform: 'uppercase'
-      }}>{label}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{
+          fontFamily: 'var(--cth-font-display)',
+          fontSize: 8, lineHeight: '12px',
+          color: 'var(--cth-ink-700)',
+          textTransform: 'uppercase'
+        }}>{label}</span>
+        {info && <InfoTip text={info} label={label} />}
+      </span>
       {children}
     </label>
   );

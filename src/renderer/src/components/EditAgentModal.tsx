@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
+import { InfoTip } from './InfoTip';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -322,7 +323,10 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 />
               </Row>
 
-              <Row label={`What ${name.trim() || agent.name} handles`}>
+              <Row
+                label={`What ${name.trim() || agent.name} handles`}
+                info={`Michael reads this to decide what goes to ${name.trim() || agent.name}. Name the requests, inbox or customers, so no teammate covers the same thing.`}
+              >
                 <textarea
                   value={roleDescription}
                   onChange={(e) => setRoleDescription(e.target.value)}
@@ -331,11 +335,11 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                 />
               </Row>
-              <span style={helperStyle}>
-                The work that comes to {name.trim() || agent.name}: which requests, which inbox, which customers. Michael reads this to decide what goes to {name.trim() || agent.name}, so be specific enough that no teammate covers the same thing.
-              </span>
 
-              <Row label="Work style">
+              <Row
+                label="Work style"
+                info={`How ${name.trim() || agent.name} does the job: what it is for, how you like it done, and what needs your approval first, scheduled jobs included. Write it in your own words; the app turns it into instructions when you save a change. Michael doesn't use it.`}
+              >
                 <textarea
                   value={goal}
                   onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
@@ -356,9 +360,6 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   ! The instructions could not be written. Try saving again.
                 </span>
               )}
-              <span style={helperStyle}>
-                Write it the way you would explain the job to a new employee, jobs it runs on a schedule included. When you save a change, the app turns it into instructions for {name.trim() || agent.name}. Michael doesn't see this.
-              </span>
             </Section>
               </div>
             </div>
@@ -420,15 +421,20 @@ function Section({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** A field with its label; `info` puts the explanation behind an info icon
+ *  (owner, 2026-09-27: less verbose everywhere). */
+function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{
-        fontFamily: 'var(--cth-font-display)',
-        fontSize: 8, lineHeight: '12px',
-        color: 'var(--cth-ink-700)',
-        textTransform: 'uppercase'
-      }}>{label}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{
+          fontFamily: 'var(--cth-font-display)',
+          fontSize: 8, lineHeight: '12px',
+          color: 'var(--cth-ink-700)',
+          textTransform: 'uppercase'
+        }}>{label}</span>
+        {info && <InfoTip text={info} label={label} />}
+      </span>
       {children}
     </label>
   );

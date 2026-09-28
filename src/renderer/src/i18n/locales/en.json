@@ -526,9 +526,8 @@
     "role": "Role",
     "rolePlaceholder": "For example: Finance",
     "roleDescriptionPlaceholder": "For example: Answers customers who write to the support inbox, and passes refund requests to Oscar.",
-    "roleHelp": "The work that comes to {{name}}: which requests, which inbox, which customers. {{godName}} reads this to decide what goes to {{name}}, so be specific enough that no teammate covers the same thing.",
+    "roleHelp": "{{godName}} reads this to decide what goes to {{name}}. Name the requests, inbox or customers, so no teammate covers the same thing.",
     "workStyle": "Work style",
-    "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
     "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
     "importHireDesc": "Import hire loads a ready to use agent from a .json manifest. It fills in every field below for you to review. Nothing spawns until you hit spawn.",
     "generateWithAI": "generate one with AI…",
@@ -577,7 +576,7 @@
         "who": "Who",
         "job": "Job",
         "role": "Role",
-        "setup": "Setup"
+        "setup": "Finalize"
       },
       "stepHint": {
         "who": "pick a person",
@@ -598,7 +597,6 @@
       "whatToSend": "What {{name}} handles",
       "folder": "Folder",
       "folderDefault": "use the suggested folder",
-      "folderInside": "Its own folder inside {{godName}}'s: {{path}}. Only this team member and {{godName}} can open it.",
       "back": "back",
       "next": "next",
       "checking": "checking...",
@@ -629,13 +627,12 @@
       "sameWork": "The work {{name}} handles reads like the same work, whatever the role is called.",
       "errWorkStyle": "Work style is required: write how this team member does the job.",
       "workStylePlaceholder": "In your own words: what {{name}} does, how you like it done, and what {{name}} should ask you about first.",
-      "workStyleHelp": "Write it the way you would explain the job to a new employee, jobs it runs on a schedule included. When you hire, the app turns it into instructions for {{name}}. {{godName}} doesn't see this.",
       "describing": "Putting the job into plain words...",
       "writingInstructions": "writing {{name}}'s instructions...",
       "errInstructions": "The instructions could not be written. Try Hire again.",
-      "workStyleIntro": "The work style is how {{name}} does the job, day to day: what the job is for, how you like the work done, and what {{name}} brings to you for approval first. {{name}} reads it at the start of every session and follows it on every task, the scheduled ones too. {{godName}} does not use it: he hands out work by the role on the last screen.",
-      "folderPurpose": "Where {{name}} keeps the files for this job: drafts, reports, downloads and anything you drop in for {{name}} to work on.",
-      "modelPurpose": "The AI model {{name}} thinks with. It starts on the default for agents in Settings. A larger model handles harder judgement calls; a smaller one is quicker and costs less.",
+      "workStyleIntro": "How {{name}} does the job: what it is for, how you like it done, and what needs your approval first. {{name}} follows it on every task, scheduled jobs included. Write it in your own words; the app turns it into instructions when you hire. {{godName}} doesn't use it.",
+      "folderPurpose": "Where {{name}} keeps the files for this job. Only {{name}} and {{godName}} can open it.",
+      "modelPurpose": "The AI model {{name}} thinks with. Starts on the default for agents in Settings. Larger models handle harder calls; smaller ones are quicker and cheaper.",
       "resolved": "Ready: {{name}}'s work is kept apart from {{names}}."
     }
   },

@@ -45,9 +45,15 @@ test('Setup opens only for a verified role: distinct, or bound; Hire checks agai
   assert.match(modal, /disabled=\{\(step === 'who' && !!whoError\) \|\| \(step === 'role' && \(checking \|\| \(overlapNames\.length > 0 && !binding\)\)\)\}/);
 });
 
-test('Setup explains the work style, the folder and the model', () => {
+test('Finalize explains the work style, the folder and the model behind info icons', () => {
   const setup = modal.slice(modal.indexOf("{step === 'setup' && ("));
-  for (const k of ['workStyleIntro', 'folderPurpose', 'modelPurpose']) assert.match(setup, new RegExp(`addAgent\\.wizard\\.${k}`), k);
+  for (const k of ['workStyleIntro', 'folderPurpose', 'modelPurpose']) assert.match(setup, new RegExp(`info=\\{tr\\('addAgent\\.wizard\\.${k}'`), k);
+  assert.match(modal, /\{info && <InfoTip text=\{info\} label=\{label\} \/>\}/);
+  assert.match(modal, /info=\{tr\('addAgent\.roleHelp'/, 'the role screen too');
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const w = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).addAgent.wizard;
+    assert.equal(w.step.setup, { en: 'Finalize', 'zh-CN': '完成', ar: 'إنهاء' }[loc]);
+  }
   const role = modal.slice(modal.indexOf("{step === 'role' && ("), modal.indexOf("{step === 'setup' && ("));
   assert.match(role, /<DistinctBox/);
   assert.doesNotMatch(role, /addAgent\.workStyle'/, 'work style is not on the role screen');

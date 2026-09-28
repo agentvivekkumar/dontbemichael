@@ -45,14 +45,14 @@ test('joining uses whichever field is filled, and nothing when both are empty', 
 test('Edit Agent shows Role, Role description and Work style, with plain notes', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/EditAgentModal.tsx'), 'utf8');
   const briefing = src.slice(src.indexOf('<Section label="Briefing"'), src.indexOf('</Section>', src.indexOf('<Section label="Briefing"')));
-  for (const label of ['<Row label="Role">', '<Row label={`What ${name.trim() || agent.name} handles`}>', '<Row label="Work style">']) {
+  for (const label of ['<Row label="Role">', 'label={`What ${name.trim() || agent.name} handles`}', 'label="Work style"']) {
     assert.ok(briefing.includes(label), label);
   }
   assert.doesNotMatch(briefing, /label="Description"|label="Goal/, 'the old labels are gone');
-  assert.match(briefing, /Michael reads this to decide what goes to/);
+  assert.match(briefing, /info=\{`Michael reads this to decide what goes to/);
   assert.doesNotMatch(briefing, /Role description/, 'the plain label replaced it (owner, 2026-09-27)');
-  assert.match(briefing, /Write it the way you would explain the job to a new employee, jobs it runs on a schedule included\./);
-  assert.match(briefing, /Michael doesn't see this\./);
+  assert.match(briefing, /info=\{`How \$\{name\.trim\(\) \|\| agent\.name\} does the job:[^`]*scheduled jobs included/);
+  assert.match(briefing, /Michael doesn't use it\./);
 });
 
 test('saving joins the fields, keeps the old role when both are empty, and tells the registry', () => {
