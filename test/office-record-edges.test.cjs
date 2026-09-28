@@ -61,12 +61,12 @@ test('a record file with no team keeps its business details and takes the team f
   });
   try {
     fs.writeFileSync(path.join(home, 'office.json'), JSON.stringify({
-      version: 1, businessName: 'MoblizeIt', businessCity: 'Austin, TX',
+      version: 1, businessName: 'SunriseBakery', businessCity: 'Austin, TX',
       officeFolder: '/Users/o/Documents/Guess/Office', team: [] // written before 2026-09-25
     }));
     const f = file.findOffice(home);
     assert.equal(f.source, 'registry');
-    assert.equal(f.record.businessName, 'MoblizeIt', 'the file names the business, not the folder guess');
+    assert.equal(f.record.businessName, 'SunriseBakery', 'the file names the business, not the folder guess');
     assert.equal(f.record.businessCity, 'Austin, TX');
     assert.equal(f.record.businessFolder, '/Users/o/Documents/Guess', 'the folder holding the old Office');
     assert.deepEqual(f.record.team, [{ agentId: 'oscar', folder: '/Users/o/Documents/Guess/Finance' }]);

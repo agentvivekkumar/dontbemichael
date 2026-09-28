@@ -23,7 +23,7 @@ const rec = loadTs('src/shared/officeRecord.ts');
 const file = loadTs('src/main/officeFile.ts');
 const read = (rel) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
 
-const DOCS = '/Users/owner/Documents/MoblizeIt';
+const DOCS = '/Users/owner/Documents/SunriseBakery';
 const team = [
   { agentId: 'oscar', folder: `${DOCS}/Finance` },
   { agentId: 'pam', folder: `${DOCS}/Admin` }
@@ -31,7 +31,7 @@ const team = [
 const cfg = {
   onboardingComplete: true,
   harnessHome: '/Users/owner/HarnessAgents',
-  businessName: 'MoblizeIt',
+  businessName: 'SunriseBakery',
   businessCity: 'Mountain View, CA',
   businessType: 'saas-consulting',
   businessFolder: DOCS,
@@ -45,7 +45,7 @@ test('the config describes the office once setup has finished, and not before', 
   assert.equal(rec.officeRecordFromConfig({ ...cfg, harnessHome: null }), null);
   assert.deepEqual(rec.officeRecordFromConfig(cfg), {
     version: 1,
-    businessName: 'MoblizeIt',
+    businessName: 'SunriseBakery',
     businessCity: 'Mountain View, CA',
     businessType: 'saas-consulting',
     businessFolder: DOCS,
@@ -82,12 +82,12 @@ test('an older office is described from its registry: every member with a folder
   // archived in the registry means its terminal closed (every agent, on quit),
   // not that the owner removed it, so Toby is still on the team.
   assert.deepEqual(r.team, [...team, { agentId: 'toby', folder: `${DOCS}/HR` }]);
-  assert.equal(r.businessName, 'MoblizeIt', 'best guess: the folder the team shares');
+  assert.equal(r.businessName, 'SunriseBakery', 'best guess: the folder the team shares');
   assert.equal(rec.officeRecordFromRegistry({ god: { id: 'god', cwd: '/x' } }), null, 'no team, nothing to continue');
 });
 
 test('continuing an office keeps its recorded folders, whatever name is typed this time', () => {
-  const plan = rec.teamPlanFromRecord(rec.officeRecordFromConfig({ ...cfg, businessName: 'Moblize It' }));
+  const plan = rec.teamPlanFromRecord(rec.officeRecordFromConfig({ ...cfg, businessName: 'Sunrise Bakery' }));
   assert.equal(plan.ok, true);
   assert.equal(plan.business, DOCS);
   assert.deepEqual(plan.team, team);
@@ -121,7 +121,7 @@ test('a config save writes office.json, and an unchanged one is not rewritten', 
   const home = office();
   try {
     assert.equal(file.syncOfficeRecord({ ...cfg, harnessHome: home }), true);
-    assert.equal(file.readOfficeRecord(home).businessName, 'MoblizeIt');
+    assert.equal(file.readOfficeRecord(home).businessName, 'SunriseBakery');
     assert.equal(file.syncOfficeRecord({ ...cfg, harnessHome: home }), false, 'same record, no write');
     assert.equal(file.syncOfficeRecord({ ...cfg, harnessHome: home, businessCity: 'Austin, TX' }), true);
     assert.equal(file.syncOfficeRecord({ ...cfg, harnessHome: path.join(home, 'gone') }), false, 'a missing office is never recreated');
@@ -171,7 +171,7 @@ test('only saves that describe the office count, and the backfill needs the offi
   for (const k of rec.OFFICE_FIELDS) assert.equal(rec.touchesOffice({ [k]: undefined }), true, k);
   const agents = { oscar: { id: 'oscar', cwd: `${DOCS}/Finance` }, pam: { id: 'pam', cwd: `${DOCS}/Admin/` } };
   assert.equal(rec.configMatchesRegistry(cfg, agents, false), true, 'same folders (a trailing slash is the same folder)');
-  const typedDifferently = { ...cfg, businessTeam: team.map((m) => ({ ...m, folder: m.folder.replace('MoblizeIt', 'MoblizeIT') })) };
+  const typedDifferently = { ...cfg, businessTeam: team.map((m) => ({ ...m, folder: m.folder.replace('SunriseBakery', 'SunRiseBakery') })) };
   assert.equal(rec.configMatchesRegistry(typedDifferently, agents, true), true, 'macOS folder names ignore case');
   assert.equal(rec.configMatchesRegistry(typedDifferently, agents, false), false);
   assert.equal(rec.configMatchesRegistry(cfg, { oscar: agents.oscar }, true), false, 'a member this office never had');
@@ -221,7 +221,7 @@ const { teamMemberStart } = loadTs('src/shared/teamPlan.ts');
 test('team start leaves the floor alone and brings a lost member back in its real folder', () => {
   const floor = new Set(['oscar']);
   assert.deepEqual(teamMemberStart('oscar', `${DOCS}/Finance`, floor, `${DOCS}/Finance`), { start: false }, 'already on the floor');
-  assert.deepEqual(teamMemberStart('pam', '/Users/owner/Documents/Moblize It/Admin', floor, `${DOCS}/Admin`),
+  assert.deepEqual(teamMemberStart('pam', '/Users/owner/Documents/Sunrise Bakery/Admin', floor, `${DOCS}/Admin`),
     { start: true, cwd: `${DOCS}/Admin` }, 'the registry folder wins over a name typed differently');
   assert.deepEqual(teamMemberStart('toby', `${DOCS}/HR`, floor, undefined), { start: true, cwd: `${DOCS}/HR` }, 'new member: setup folder');
   assert.deepEqual(teamMemberStart('toby', `${DOCS}/HR`, floor, '  '), { start: true, cwd: `${DOCS}/HR` });

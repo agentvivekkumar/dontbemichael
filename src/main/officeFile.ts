@@ -136,8 +136,8 @@ export function isUsableTeamFolder(folder: string, home = homedir()): boolean {
  * The folders an office's access rules are built from (src/shared/folderAccess.ts).
  *
  * `folders` is every team member's working folder as recorded (config and
- * registry), which can differ in case from the disk ("MoblizeIt" for
- * "MoblizeIT"), so each is resolved to its real path: the OS sandbox matches
+ * registry), which can differ in case from the disk ("SunriseBakery" for
+ * "SunRiseBakery"), so each is resolved to its real path: the OS sandbox matches
  * real paths. Folders that aren't a team member's own place are dropped: the
  * home folder and the app's kept folders, the app's own folder, and anything
  * that contains Michael's folder (an agent started in ~/Documents is not a

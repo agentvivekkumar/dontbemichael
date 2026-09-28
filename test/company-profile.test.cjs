@@ -17,11 +17,11 @@ const cp = loadTs('src/shared/companyProfile.ts');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 const full = {
-  ceo: 'Vivek Kumar',
+  ceo: 'Ana Rivera',
   address: { street: '1 Main St', city: 'Mountain View', region: 'CA', postalCode: '94043', country: 'United States' },
-  website: 'moblize.it',
-  legalName: 'MoblizeIT LLC', entityType: 'llc',
-  phone: '+1 650 555 0100', email: 'hello@moblize.it', social: ['linkedin.com/company/moblizeit'],
+  website: 'sunrisebakery.example',
+  legalName: 'Sunrise Bakery LLC', entityType: 'llc',
+  phone: '+1 650 555 0100', email: 'hello@sunrisebakery.example', social: ['linkedin.com/company/sunrisebakery'],
   hours: 'Mon to Fri, 9am to 5pm', timeZone: 'America/Los_Angeles', serviceArea: 'national',
   languages: 'English', currency: 'usd', fiscalYearStartMonth: 1
 };
@@ -45,16 +45,16 @@ test('setup needs the CEO and the headquarters street, city and country; the ind
 });
 
 test('agents get the filled in facts, one per line, and a pointer to company knowledge', () => {
-  const text = cp.companyProfileContext({ name: 'MoblizeIT', industry: 'SaaS & Consulting' }, cp.cleanCompanyProfile(full));
+  const text = cp.companyProfileContext({ name: 'Sunrise Bakery', industry: 'SaaS & Consulting' }, cp.cleanCompanyProfile(full));
   assert.match(text, /^COMPANY PROFILE\. Facts the owner entered about this business; use them as they are\./);
   for (const line of [
-    'Business name: MoblizeIT', 'Legal name: MoblizeIT LLC', 'Business type: LLC', 'Industry: SaaS & Consulting',
-    'CEO: Vivek Kumar', 'Headquarters: 1 Main St, Mountain View, CA 94043, United States', 'Website: moblize.it',
+    'Business name: Sunrise Bakery', 'Legal name: Sunrise Bakery LLC', 'Business type: LLC', 'Industry: SaaS & Consulting',
+    'CEO: Ana Rivera', 'Headquarters: 1 Main St, Mountain View, CA 94043, United States', 'Website: sunrisebakery.example',
     'Time zone: America/Los_Angeles', 'Serves: the whole country', 'Currency: USD', 'Financial year starts: January'
   ]) assert.ok(text.includes(line), line);
   assert.match(text, /is in the company knowledge store\.$/);
   assert.doesNotMatch(text, /[–—]/);
-  const bare = cp.companyProfileContext({ name: 'MoblizeIT' }, {});
+  const bare = cp.companyProfileContext({ name: 'Sunrise Bakery' }, {});
   assert.doesNotMatch(bare, /CEO|Website/, 'blank fields are left out');
   assert.equal(cp.companyProfileContext({}, {}), null, 'nothing to say: nothing sent');
 });
@@ -87,7 +87,7 @@ test('setup asks for it in two steps, and Settings has a page with a pointer to 
 test('the office record keeps the profile, so setting up again doesn\'t ask twice', () => {
   const rec = loadTs('src/shared/officeRecord.ts');
   const r = rec.officeRecordFromConfig({ onboardingComplete: true, harnessHome: '/h', businessName: 'X', companyProfile: full, businessTeam: [] });
-  assert.equal(r.companyProfile.ceo, 'Vivek Kumar');
+  assert.equal(r.companyProfile.ceo, 'Ana Rivera');
   assert.ok(rec.OFFICE_FIELDS.includes('companyProfile'));
   assert.equal(rec.parseOfficeRecord({ version: 1, team: [], companyProfile: { ceo: 'A' } }).companyProfile.ceo, 'A');
 });

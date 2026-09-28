@@ -821,7 +821,7 @@ function ensureClaudeProjectTrust(home: string, cwd: string): void {
       c = parsed as ClaudeConfig;
     }
     // Claude Code looks the folder up by its real name on disk. On a Mac a
-    // folder typed as "MoblizeIT" opens "MoblizeIt" too, but only the real name
+    // folder typed as "SunRiseBakery" opens "SunriseBakery" too, but only the real name
     // counts as trusted, so trust that as well; otherwise the agent stops on
     // the trust question (seen live 2026-09-25).
     let real = cwd;
