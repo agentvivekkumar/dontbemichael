@@ -1026,6 +1026,56 @@ function JobRow({ job, tag, selected, onPick }: { job: HireJob; tag?: string; se
   );
 }
 
+/**
+ * What the owner watches while the job check runs, which can take a while
+ * (owner, 2026-09-27): each teammate's portrait takes a turn hopping as
+ * "Comparing with Pam...", then the next. With reduced motion the line stays
+ * put and says it is checking the team.
+ */
+function CheckingTeam({ team }: { team: Agent[] }) {
+  const { t } = useTranslation();
+  const [turn, setTurn] = useState(0);
+  const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const shown = team.slice(0, 10);
+  useEffect(() => {
+    if (still || shown.length === 0) return;
+    const timer = setInterval(() => setTurn((n) => n + 1), 900);
+    return () => clearInterval(timer);
+  }, [still, shown.length]);
+  const current = shown.length ? shown[turn % shown.length] : undefined;
+  const dots = '.'.repeat((turn % 3) + 1);
+  return (
+    <div aria-live="polite" aria-busy="true" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {shown.length > 0 && (
+        <div aria-hidden="true" style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {shown.map((m, i) => {
+            const on = !still && i === turn % shown.length;
+            return (
+              <span
+                key={m.id}
+                style={{
+                  width: 28, height: 34, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden',
+                  background: on ? 'var(--cth-sky-light)' : 'transparent',
+                  boxShadow: on ? 'inset 0 0 0 1px var(--cth-ink-300)' : 'none',
+                  opacity: on || still ? 1 : 0.45,
+                  animation: on ? 'cth-hop 0.45s steps(1) infinite' : undefined
+                }}
+              >
+                <SpritePortrait character={m.character} scale={1} />
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <span>
+        {current && !still
+          ? `${t('addAgent.wizard.comparingWith', { name: current.name })}${dots}`
+          : t('addAgent.wizard.checkingTeam')}
+      </span>
+    </div>
+  );
+}
+
 interface DistinctBoxProps {
   checking: boolean;
   verdict: DistinctVerdict | null;
@@ -1051,7 +1101,7 @@ interface DistinctBoxProps {
 function DistinctBox(p: DistinctBoxProps) {
   const { t } = useTranslation();
   const listJoin = t('profile.listJoiner');
-  if (p.checking) return <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)' }}>{t('addAgent.wizard.checkingTeam')}</div>;
+  if (p.checking) return <CheckingTeam team={p.team} />;
   if (!p.verdict && p.overlapNames.length === 0) {
     return (
       <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', alignItems: 'center', gap: 8 }}>

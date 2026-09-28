@@ -180,6 +180,11 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
   0%, 49% { transform: scale(1); }
   50%, 100% { transform: scale(0.7); }
 }
+/* A portrait hopping while the hire check reads that teammate's job. */
+@keyframes cth-hop {
+  0%, 49% { transform: translateY(0); }
+  50%, 100% { transform: translateY(-3px); }
+}
 
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {

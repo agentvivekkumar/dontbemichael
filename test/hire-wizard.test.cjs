@@ -136,3 +136,12 @@ test('a bound job says the overlap is resolved instead of repeating it (owner, 2
   assert.match(modal, /p\.binding\s*\? t\('addAgent\.wizard\.resolved', \{ name: p\.name, names: p\.overlapNames\.join\(listJoin\) \}\)\s*: t\('addAgent\.wizard\.overlaps'/);
   assert.match(modal, /\{!p\.binding && <span>\{p\.verdict\?\.why/);
 });
+
+test('the job check shows each teammate taking a turn while it runs (owner, 2026-09-27)', () => {
+  assert.match(modal, /if \(p\.checking\) return <CheckingTeam team=\{p\.team\} \/>;/);
+  const anim = modal.slice(modal.indexOf('function CheckingTeam'), modal.indexOf('interface DistinctBoxProps'));
+  assert.match(anim, /setInterval\(\(\) => setTurn\(\(n\) => n \+ 1\), 900\)/);
+  assert.match(anim, /prefers-reduced-motion: reduce/, 'still for reduced motion');
+  assert.match(anim, /t\('addAgent\.wizard\.comparingWith', \{ name: current\.name \}\)/);
+  assert.match(read('src/renderer/src/design/global.css'), /@keyframes cth-hop/);
+});

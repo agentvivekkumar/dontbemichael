@@ -633,7 +633,8 @@
       "workStyleIntro": "How {{name}} does the job: what it is for, how you like it done, and what needs your approval first. {{name}} follows it on every task, scheduled jobs included. Write it in your own words; the app turns it into instructions when you hire. {{godName}} doesn't use it.",
       "folderPurpose": "Where {{name}} keeps the files for this job. Only {{name}} and {{godName}} can open it.",
       "modelPurpose": "The AI model {{name}} thinks with. Starts on the default for agents in Settings. Larger models handle harder calls; smaller ones are quicker and cheaper.",
-      "resolved": "Ready: {{name}}'s work is kept apart from {{names}}."
+      "resolved": "Ready: {{name}}'s work is kept apart from {{names}}.",
+      "comparingWith": "Comparing with {{name}}'s job"
     }
   },
   "onboarding": {
