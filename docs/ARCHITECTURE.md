@@ -67,6 +67,9 @@ src/
     harnessGuard.ts          PreToolUse guard that keeps agents from saving work in the harness folder
     docText.ts / docTextCli.ts / macOcr.ts   Word, Excel, PowerPoint, PDF and scan reading (OCR via macOS Vision)
     claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor
+    hireCheck.ts             the hire wizard's distinct job check (hidden Claude call, rules as fallback)
+    workStyleConvert.ts      turns a plain work style into an agent's instructions and back
+    transcriptText.ts        reads a hidden Claude call's answer from its own session transcript
   shared/                    code both processes use
     buildFeatures.ts         switches for surfaces hidden in this build (git, IDE, temp workers, org trigger)
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
@@ -77,7 +80,11 @@ src/
     folderAccess.ts          who may open and change which folder: sandbox, permission rules, hook checks
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
     missions.ts              schedules: ownership, next run, the scheduler's arm plan, one-schedule edits,
-                             and agent schedule requests the owner approves in Ask me
+                             and agent schedule requests: Michael decides them, the owner only those he passes on
+    scheduleTimes.ts         a schedule's "when" lines (every N or at a time, per day) and the next due slot
+    hireTemplates.ts         the jobs the hire wizard offers, a hire's own folder, the instant distinct job rules
+    workStyleText.ts         work style as plain words and as instructions: the prompts and plain fallbacks
+    handoffRule.ts           only Michael assigns: the router sends a teammate's request to another teammate to him
     agentProfile.ts          splits an agent's role line into the parts its Profile tab shows
     messageView.ts           the Messages tab as a day-grouped history, office notices counted on one line
     askMeRouting.ts          where an owner's Ask me answer goes: the agent that raised the question
@@ -94,7 +101,9 @@ src/
     MailboxesSettings,       Settings > Connections > Mailboxes, AddMailboxDialog, and the Claude account email switch
     triggers/ScheduleList,   per-agent schedules: the On a schedule section of Capabilities (agent mode) and
                              Michael's Office schedule tab (office mode); rules live in shared/missions.ts
-    ScheduleRequestCards,    Ask me cards for schedule changes an agent asked for (Approve / Decline)
+    triggers/WhenLines,      the several "when" lines one schedule can have
+    ScheduleRequestCards,    Ask me cards for schedule requests Michael passed to the owner (Approve / Decline)
+    AddAgentModal,           the hire wizard (Who, Job, Role, Finalize); EditAgentModal edits the plain work style
     ProfileTab,              the first tab on every agent: job, folder (Open folder), full instructions
     MemoryNotes,             an agent's Memory tab as grouped notes; "Show the file" keeps the raw text
     OwnerViaMichaelBar,      replaces a team member's message box outside 1:1 (Message Michael / Talk 1:1)
@@ -125,5 +134,5 @@ docs/message-queue.md        who may type into an agent's terminal, and when
 The aesthetic is **Animal Crossing × Earthbound × SNES menu UI** — pixel-snapped, chunky, friendly.
 [`DESIGN.md`](../DESIGN.md) is canonical; every component derives from its tokens. The Don't Be Michael
 brand layers a **Dunder-Mifflin maroon** (`#6E1423`) and **gold** (`#F4D35E`) on top for logo and
-chrome. The 15 avatars are the cast of *The Office*, differentiated by hair/skin/shirt recipes.
+chrome. The 20 avatars are the cast of *The Office*, differentiated by hair/skin/shirt recipes.
 
