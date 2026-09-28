@@ -874,7 +874,7 @@
       "compacting": "compacting context",
       "looping": "looping: breaker armed",
       "runningFloor": "running the floor",
-      "idle": "idle",
+      "idle": "nothing to do",
       "clockingIn": "clocking in…"
     }
   },

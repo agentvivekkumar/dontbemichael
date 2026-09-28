@@ -410,7 +410,11 @@ export const ACTION_CLOCKING_IN = 'clocking in…';
 /** An agent's action for display: the app's own captions in the owner's
  *  language, anything else as it is. */
 export function actionText(action: string, t: (key: string) => string): string {
-  return action === ACTION_CLOCKING_IN ? t('office.activity.clockingIn') : action;
+  if (action === ACTION_CLOCKING_IN) return t('office.activity.clockingIn');
+  // The hook marks a finished agent "idle"; the office says it more kindly
+  // (owner, 2026-09-27: "nothing to do").
+  if (action.trim().toLowerCase() === 'idle') return t('office.activity.idle');
+  return action;
 }
 
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt'>;
