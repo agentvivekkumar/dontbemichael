@@ -25,7 +25,6 @@ test('the job list offers the character\'s own job, the office\'s jobs, a new jo
   assert.match(modal, /ownJob\(character, officeJobs, cards\)/);
   assert.match(modal, /teamJobs\(team, cards\)/);
   assert.match(modal, /officeJobs\.filter\(\(j\) => j\.key !== theirJob\?\.key && \(listAll \|\| sameFamily\(j, character\)\)\)/, 'office jobs open on the character\'s family');
-  assert.match(modal, /for \(const c of cards\.filter\(\(j\) => listAll \|\| inFamily\(j\)\)\)/, 'pack jobs too');
   assert.match(modal, /useEffect\(\(\) => \{ setShowAll\(false\); \}, \[character\]\);/, 'a new character closes the list again');
   assert.match(modal, /tr\('addAgent\.wizard\.showAll', \{ count: hiddenCount \}\)/);
   assert.match(modal, /\{familyJobs\.map\(\(j\) => \(/);
@@ -100,4 +99,9 @@ test('work style is required, when hiring and when editing (owner, 2026-09-27)',
     const a = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).addAgent;
     assert.doesNotMatch(a.workStyle, /optional|可选|اختياري/, loc);
   }
+});
+
+test('the other businesses\' list leaves out this business\'s own card for the job (owner, 2026-09-27)', () => {
+  assert.match(modal, /const ownBusinessCard = \(j: HireJob\) => !!config\.businessType && j\.sourceCard\?\.startsWith\(`\$\{config\.businessType\}\/`\) && inFamily\(j\) && !!family;/);
+  assert.match(modal, /cards\.filter\(\(j\) => \(listAll \|\| inFamily\(j\)\) && !ownBusinessCard\(j\)\)/);
 });

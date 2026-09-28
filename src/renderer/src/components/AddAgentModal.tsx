@@ -573,14 +573,18 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const stepIndex = STEPS.indexOf(step);
   const jobGroups = useMemo(() => {
     const byTitle = new Map<string, HireJob[]>();
-    for (const c of cards.filter((j) => listAll || inFamily(j))) {
+    // This business's own card for the character's job is already their job
+    // (or a teammate's copy of it) above, so it isn't listed again among the
+    // other businesses' versions (owner, 2026-09-27).
+    const ownBusinessCard = (j: HireJob) => !!config.businessType && j.sourceCard?.startsWith(`${config.businessType}/`) && inFamily(j) && !!family;
+    for (const c of cards.filter((j) => (listAll || inFamily(j)) && !ownBusinessCard(j))) {
       const list = byTitle.get(c.title) ?? [];
       list.push(c);
       byTitle.set(c.title, list);
     }
     return [...byTitle.entries()];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, listAll, character]);
+  }, [cards, listAll, character, config.businessType]);
 
   return (
     <div
