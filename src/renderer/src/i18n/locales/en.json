@@ -576,12 +576,14 @@
       "step": {
         "who": "Who",
         "job": "Job",
-        "review": "Review"
+        "role": "Role",
+        "setup": "Setup"
       },
       "stepHint": {
         "who": "pick a person",
         "job": "their job or another",
-        "review": "check and hire"
+        "role": "name, role, overlap check",
+        "setup": "work style, folder, model"
       },
       "nameTaken": "Someone on the team is already called {{name}}. Pick a different name.",
       "errJob": "Give the job a title or say what to send.",
@@ -630,7 +632,10 @@
       "workStyleHelp": "Write it the way you would explain the job to a new employee, jobs it runs on a schedule included. When you hire, the app turns it into instructions for {{name}}. {{godName}} doesn't see this.",
       "describing": "Putting the job into plain words...",
       "writingInstructions": "writing {{name}}'s instructions...",
-      "errInstructions": "The instructions could not be written. Try Hire again."
+      "errInstructions": "The instructions could not be written. Try Hire again.",
+      "workStyleIntro": "The work style is how {{name}} does the job, day to day: what the job is for, how you like the work done, and what {{name}} brings to you for approval first. {{name}} reads it at the start of every session and follows it on every task, the scheduled ones too. {{godName}} does not use it: he hands out work by the role on the last screen.",
+      "folderPurpose": "Where {{name}} keeps the files for this job: drafts, reports, downloads and anything you drop in for {{name}} to work on.",
+      "modelPurpose": "The AI model {{name}} thinks with. It starts on the default for agents in Settings. A larger model handles harder judgement calls; a smaller one is quicker and costs less."
     }
   },
   "onboarding": {

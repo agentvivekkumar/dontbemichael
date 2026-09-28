@@ -86,8 +86,11 @@ Role / what I want this agent to do:
  *
  * A queued hire (deep link, import) opens on Review, prefilled from its manifest.
  */
-type Step = 'who' | 'job' | 'review';
-const STEPS: Step[] = ['who', 'job', 'review'];
+// Role and Setup are two screens (owner, 2026-09-27): first the role is named
+// and checked against the team, then, with a verified role, the work style,
+// folder and model are set.
+type Step = 'who' | 'job' | 'role' | 'setup';
+const STEPS: Step[] = ['who', 'job', 'role', 'setup'];
 
 /** Same folder, ignoring a trailing slash and (as macOS and Windows do) case. */
 function samePath(a: string, b: string): boolean {
@@ -172,7 +175,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const firstCharacter = pendingHire?.character
     ? knownCharacter(pendingHire.character)
     : (characterForName(pendingHire?.name ?? '') ?? DEFAULT_CHARACTER);
-  const [step, setStep] = useState<Step>(pendingHire ? 'review' : 'who');
+  const [step, setStep] = useState<Step>(pendingHire ? 'role' : 'who');
   const [character, setCharacter] = useState<OfficeCharacterName>(firstCharacter);
   const [name, setName] = useState(pendingHire?.name ?? CAST_BY_NAME[firstCharacter].displayName);
   const [hireMeta, setHireMeta] = useState<HireManifest | null>(pendingHire ?? null);
@@ -324,7 +327,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   };
   // Run once when Review opens with a job to check.
   useEffect(() => {
-    if (step === 'review' && profile.name && (profile.title || profile.routing) && !verdict && !checking) void runCheck();
+    if (step === 'role' && profile.name && (profile.title || profile.routing) && !verdict && !checking) void runCheck();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
   // The instant rules always count, live on every edit, so a job whose what to
@@ -368,7 +371,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     setSourceCard(undefined);
     setBinding(null);
     applied.current = 'manifest';
-    setStep('review');
+    setStep('role');
   };
   useLayoutEffect(() => {
     if (pendingHire) applyManifest(pendingHire);
@@ -417,19 +420,36 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const nameTaken = (n: string) => agents.some((a) => a.name.trim().toLowerCase() === n.trim().toLowerCase());
   const whoError = !name.trim() ? tr('addAgent.errName') : nameTaken(name) ? tr('addAgent.wizard.nameTaken', { name: name.trim() }) : undefined;
 
-  const goTo = (next: Step): void => {
+  /** The role step's gate: a name, a role, and a job that is distinct from
+   *  every teammate's or bound to its own mailbox or topic (D6). */
+  const roleReady = async (): Promise<boolean> => {
+    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob')); return false; }
+    let v = verdict;
+    if (!v) v = await runCheck();
+    if (!v) return false;
+    const overlaps = [...new Set([...v.overlapsWith, ...overlapsByRules(profile, teamProfiles)])];
+    if (overlaps.length > 0 && !binding) { setError(tr('addAgent.wizard.errOverlap')); return false; }
+    return true;
+  };
+
+  const goTo = async (next: Step): Promise<void> => {
     setError(undefined);
     if (next !== 'who' && whoError) { setError(whoError); setStep('who'); return; }
-    if (next === 'review' && step !== 'review') {
+    if (next === 'role' && (step === 'who' || step === 'job')) {
       applyJob();
       setFolderName('');
+    }
+    if (next === 'setup' && step !== 'setup') {
+      if (step === 'who' || step === 'job') { applyJob(); setStep('role'); return; }
+      if (!(await roleReady())) { setStep('role'); return; }
     }
     setStep(next);
   };
   // After the job is applied, suggest the folder for it.
-  useEffect(() => { if (step === 'review') void suggestFolder(); },
+  const onRoleOrSetup = step === 'role' || step === 'setup';
+  useEffect(() => { if (onRoleOrSetup) void suggestFolder(); },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [step === 'review' ? `${title}|${chosenKey}|${name}` : '']);
+  [onRoleOrSetup ? `${title}|${chosenKey}|${name}` : '']);
 
   const pickFolder = async () => {
     setError(undefined);
@@ -441,21 +461,13 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const submit = async () => {
     setError(undefined);
     if (whoError) { setError(whoError); setStep('who'); return; }
-    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob')); return; }
+    if (!(await roleReady())) { setStep('role'); return; }
     // Work style is required: it is how the new hire does the job (owner, 2026-09-27).
     if (!workStyle.trim()) { setError(tr('addAgent.wizard.errWorkStyle')); return; }
     if (!cwd) { setError(tr('addAgent.errFolder')); return; }
     // Michael's folder is private to him (src/shared/folderAccess.ts).
     if (michaelFolder && samePath(michaelFolder, cwd)) { setError(tr('addAgent.errFolderShared', { godName })); return; }
     if (!command.trim()) { setError(tr('addAgent.errCommand')); return; }
-    // The job must be distinct from every teammate's, or bound (D6). A job
-    // edited since the last check is checked again first.
-    let v = verdict;
-    if (!v) v = await runCheck();
-    if (!v) return;
-    const overlaps = [...new Set([...v.overlapsWith, ...overlapsByRules(profile, teamProfiles)])];
-    if (overlaps.length > 0 && !binding) { setError(tr('addAgent.wizard.errOverlap')); return; }
-
     setBusy(true);
     // The agent's instructions: the copied job's own when the owner left the
     // description as it was, else written from the description, to the house
@@ -653,7 +665,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     type="button"
                     aria-current={active ? 'step' : undefined}
                     disabled={i > stepIndex}
-                    onClick={() => goTo(s)}
+                    onClick={() => { void goTo(s); }}
                     style={{
                       flex: 1, textAlign: 'start', padding: '6px 9px 5px', border: 'none',
                       cursor: i > stepIndex ? 'default' : 'pointer',
@@ -770,7 +782,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 </div>
               )}
 
-              {step === 'review' && (
+              {step === 'role' && (
                 <>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
                     <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
@@ -819,8 +831,23 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     onBindTopic={() => applyBinding(topic)}
                     onClearBinding={clearBinding}
                   />
+                </>
+              )}
+
+              {step === 'setup' && (
+                <>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                      <SpritePortrait character={character} scale={2} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--cth-ink-900)' }}>{name.trim()}</div>
+                      <div style={{ fontSize: 13, color: 'var(--cth-ink-700)' }}>{title.trim()}</div>
+                    </div>
+                  </div>
 
                   <Row label={tr('addAgent.workStyle')}>
+                    <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13, lineHeight: '19px' }}>{tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}</span>
                     <textarea
                       dir={rtl ? 'auto' : undefined}
                       value={workStyle}
@@ -836,6 +863,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <div style={{ flex: '1 1 380px', minWidth: 0 }}>
                       <Row label={tr('addAgent.wizard.folder')}>
+                        <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13 }}>{tr('addAgent.wizard.folderPurpose', { name: name.trim() })}</span>
                         {michaelFolder && !customCwd ? (
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <input value={folderName} onChange={(e) => setFolderName(e.target.value)} style={{ ...inputStyle, flex: 1 }} aria-label={tr('addAgent.wizard.folder')} />
@@ -861,6 +889,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     </div>
                     <div style={{ flex: '0 0 auto' }}>
                       <Row label={tr('addAgent.model')}>
+                        <span style={{ ...helperStyle, color: 'var(--cth-ink-700)', fontSize: 13, maxWidth: 360 }}>{tr('addAgent.wizard.modelPurpose', { name: name.trim() })}</span>
                         <Select
                           label={tr('addAgent.model')}
                           value={model ?? ''}
@@ -943,12 +972,19 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               )}
               <PixelButton variant="ghost" size="md" onClick={onClose} disabled={busy}>{tr('common.cancel')}</PixelButton>
               {stepIndex > 0 && (
-                <PixelButton variant="secondary" size="md" onClick={() => goTo(STEPS[stepIndex - 1])} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
+                <PixelButton variant="secondary" size="md" onClick={() => { void goTo(STEPS[stepIndex - 1]); }} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
               )}
-              {step !== 'review' ? (
-                <PixelButton variant="primary" size="md" onClick={() => goTo(STEPS[stepIndex + 1])} disabled={step === 'who' && !!whoError}>{tr('addAgent.wizard.next')}</PixelButton>
+              {step !== 'setup' ? (
+                <PixelButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => { void goTo(STEPS[stepIndex + 1]); }}
+                  disabled={(step === 'who' && !!whoError) || (step === 'role' && (checking || (overlapNames.length > 0 && !binding)))}
+                >
+                  {step === 'role' && checking ? tr('addAgent.wizard.checking') : tr('addAgent.wizard.next')}
+                </PixelButton>
               ) : (
-                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || (overlapNames.length > 0 && !binding)}>
+                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || !workStyle.trim()}>
                   {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
                 </PixelButton>
               )}

@@ -15,9 +15,9 @@ const loadTs = require('./load-ts.cjs');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 const modal = read('src/renderer/src/components/AddAgentModal.tsx');
 
-test('three steps, Who then Job then Review; a queued hire opens on Review', () => {
-  assert.match(modal, /const STEPS: Step\[\] = \['who', 'job', 'review'\];/);
-  assert.match(modal, /useState<Step>\(pendingHire \? 'review' : 'who'\)/);
+test('four steps, Who, Job, Role then Setup; a queued hire opens on Role', () => {
+  assert.match(modal, /const STEPS: Step\[\] = \['who', 'job', 'role', 'setup'\];/);
+  assert.match(modal, /useState<Step>\(pendingHire \? 'role' : 'who'\)/);
   assert.doesNotMatch(modal, /DESCRIPTION_TEMPLATES/, 'the developer templates are gone');
 });
 
@@ -32,15 +32,25 @@ test('the job list offers the character\'s own job, the office\'s jobs, a new jo
   assert.match(modal, /const copy = jobFor\(chosenJob, name\.trim\(\)\);/, 'the name is swapped in');
 });
 
-test('Hire needs a distinct job or a binding, checked again after any edit', () => {
+test('Setup opens only for a verified role: distinct, or bound; Hire checks again', () => {
+  const gate = modal.slice(modal.indexOf('const roleReady = async'), modal.indexOf('const goTo = async'));
+  assert.match(gate, /if \(!v\) v = await runCheck\(\);/);
+  assert.match(gate, /if \(overlaps\.length > 0 && !binding\) \{ setError\(tr\('addAgent\.wizard\.errOverlap'\)\); return false; \}/);
+  assert.match(modal, /if \(!\(await roleReady\(\)\)\) \{ setStep\('role'\); return; \}/);
   const start = modal.indexOf('const submit = async');
   const flow = modal.slice(start, modal.indexOf('\n  return (', start));
-  assert.match(flow, /if \(!v\) v = await runCheck\(\);/);
-  assert.match(flow, /if \(overlaps\.length > 0 && !binding\) \{ setError\(tr\('addAgent\.wizard\.errOverlap'\)\); return; \}/);
-  assert.ok(flow.indexOf('runCheck') < flow.indexOf('spawnPty'), 'checked before spawning');
+  assert.ok(flow.indexOf('roleReady()') < flow.indexOf('spawnPty'), 'checked before spawning');
   assert.match(modal, /const checkSig = `\$\{profile\.name\}\\n\$\{profile\.routing\}`;/, 'a title edit does not reset the check');
   assert.match(modal, /const overlapNames = \[\.\.\.new Set\(\[\.\.\.\(verdict\?\.overlapsWith \?\? \[\]\), \.\.\.ruleOverlaps\]\)\];/, 'the rules always count, live');
-  assert.match(modal, /disabled=\{busy \|\| checking \|\| \(overlapNames\.length > 0 && !binding\)\}/);
+  assert.match(modal, /disabled=\{\(step === 'who' && !!whoError\) \|\| \(step === 'role' && \(checking \|\| \(overlapNames\.length > 0 && !binding\)\)\)\}/);
+});
+
+test('Setup explains the work style, the folder and the model', () => {
+  const setup = modal.slice(modal.indexOf("{step === 'setup' && ("));
+  for (const k of ['workStyleIntro', 'folderPurpose', 'modelPurpose']) assert.match(setup, new RegExp(`addAgent\\.wizard\\.${k}`), k);
+  const role = modal.slice(modal.indexOf("{step === 'role' && ("), modal.indexOf("{step === 'setup' && ("));
+  assert.match(role, /<DistinctBox/);
+  assert.doesNotMatch(role, /addAgent\.workStyle'/, 'work style is not on the role screen');
 });
 
 test('a binding updates the overlapping teammates\' lines and a mailbox binding is set before the spawn', () => {
@@ -80,7 +90,7 @@ test('every wizard string exists in all three languages, without dashes', () => 
       assert.equal(typeof v, 'string', `${loc}: wizard.${k}`);
       assert.doesNotMatch(v, /[–—]| - /, `${loc}: wizard.${k} has a dash`);
     }
-    for (const s of ['who', 'job', 'review']) assert.ok(w.step[s] && w.stepHint[s], `${loc}: step ${s}`);
+    for (const s of ['who', 'job', 'role', 'setup']) assert.ok(w.step[s] && w.stepHint[s], `${loc}: step ${s}`);
   }
 });
 
