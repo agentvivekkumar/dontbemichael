@@ -341,7 +341,8 @@ Below 1024 px wide, the right panel collapses to a bottom drawer.
 |---|---|
 | ≤ 1040 px | Nav switches to two rows (§8.1). Anchor offset becomes 112 px. |
 | ≤ 980 px | Type steps down (§4.3). Section padding 46 px. |
-| ≤ 480 px | Wordmark 22 px, mark 24 px, nav button 19 px. The bar fits at 320 px. |
+| ≤ 480 px | Wordmark 22 px, mark 24 px, nav button 19 px. |
+| ≤ 360 px | Wordmark 20 px, nav gap 8 px, nav button padding 8 px 10 px, so the bar with `DOWNLOAD` fits at 320 px. |
 
 - No horizontal page scroll at any width from 320 px up. This is a release check.
 
@@ -516,13 +517,14 @@ All in `public/assets/site.css` unless noted as page-local in `index.html`.
 
 ### 8.1 Nav
 
-- Left: the mark (30 px) and the wordmark. Center: section links. Right: a divider,
-  `DISCORD ↗`, and a primary `GITHUB` button.
-- Section labels are one or two words: HOW IT WORKS, TEAM, BUSINESSES, LIMITS, PLANS.
-  The label promises what the section delivers. The section with no prices is PLANS,
-  not PRICING.
-- Links that leave the site carry `↗` and sit after a 2 px `ink-900` divider, apart from
-  in-page links.
+- Left: the mark (30 px) and the wordmark. Center: four section links. Right: one
+  primary `DOWNLOAD` button that goes to `/download`. Nothing else: Discord, GitHub and
+  the FAQ live in the footer (§8.5), so the bar has one action.
+- Section labels are one or two words: HOW IT WORKS, TEAM, LIMITS, PLANS. The label
+  promises what the section delivers. The section with no prices is PLANS, not PRICING.
+  Sections without a link (Dwight, the day log, business types, FAQ) light up the link
+  of the chapter they sit in.
+- Links that leave the site carry `↗` wherever they appear.
 - Current section: `ink-900` text, a 3 px coral underline and `aria-current="true"`. It is
   set by a scroll check: the last section whose top has passed the bottom of the nav.
   Nothing is marked above the first section.
@@ -551,8 +553,8 @@ One job per section.
 
 ### 8.5 Footer
 
-`ink-900` ground, Pixelify Sans 17 px, `peach` links with `lemon` hover. Links: GitHub,
-Discord, License, Contact.
+`ink-900` ground, Pixelify Sans 17 px, `peach` links with `lemon` hover. Links: Download,
+FAQ, GitHub, Discord, License, Contact.
 
 ---
 
@@ -672,8 +674,9 @@ customer's.
 
 - Headlines are sentence case statements, and they land in one line when they can.
   "The software is free. The setup is what costs."
-- Claims stay honest. No price on a page with no prices. No download button until a
-  real release exists.
+- Claims stay honest. No price on a page with no prices. A download button only points
+  at a real release (met from v0.0.1; the button goes to `/download`, which reads the latest
+  release from GitHub).
 
 ---
 
@@ -759,6 +762,7 @@ Known gaps between this spec and the code, as of 2026-09-24. Each one is either
 
 | Date | Change |
 |---|---|
+| 2026-09-28 | Web: nav cut to four links plus a `DOWNLOAD` button (§8.1); Discord, GitHub and FAQ moved to the footer (§8.5); ≤ 360 px row added (§5.3); download rule met (§13.3). |
 | 2026-09-24 | Moved into `branding/` with the full brand kit: logos, lockups, app icon, favicons, social card, color files, fonts, a printable brand guide and the build script. |
 | 2026-09-24 | Rewritten as one spec for app and web. Documented the v0.3.4 recalibration (calm accents, Inter and JetBrains Mono, hairline panels, dark theme) that the old doc predated. Added brand, logo (Struck M), web profile, accent map and the deviation register. Retired the three-layer panel, Pixelify and VT323 in the app, and "no dark mode". |
 | 2026-09-24 | Web: nav rebuilt (§8.1), Struck M logo and favicons shipped, Discord added. |
