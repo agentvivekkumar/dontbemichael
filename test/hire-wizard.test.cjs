@@ -125,3 +125,8 @@ test('the role screen asks what the new hire handles, not what to send (owner, 2
   assert.equal(en.wizard.whatToSend, 'What {{name}} handles');
   assert.match(modal, /tr\('addAgent\.roleHelp', \{ godName, name: name\.trim\(\) \}\)/);
 });
+
+test('a bound job says the overlap is resolved instead of repeating it (owner, 2026-09-27)', () => {
+  assert.match(modal, /p\.binding\s*\? t\('addAgent\.wizard\.resolved', \{ name: p\.name, names: p\.overlapNames\.join\(listJoin\) \}\)\s*: t\('addAgent\.wizard\.overlaps'/);
+  assert.match(modal, /\{!p\.binding && <span>\{p\.verdict\?\.why/);
+});

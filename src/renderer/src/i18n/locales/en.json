@@ -635,7 +635,8 @@
       "errInstructions": "The instructions could not be written. Try Hire again.",
       "workStyleIntro": "The work style is how {{name}} does the job, day to day: what the job is for, how you like the work done, and what {{name}} brings to you for approval first. {{name}} reads it at the start of every session and follows it on every task, the scheduled ones too. {{godName}} does not use it: he hands out work by the role on the last screen.",
       "folderPurpose": "Where {{name}} keeps the files for this job: drafts, reports, downloads and anything you drop in for {{name}} to work on.",
-      "modelPurpose": "The AI model {{name}} thinks with. It starts on the default for agents in Settings. A larger model handles harder judgement calls; a smaller one is quicker and costs less."
+      "modelPurpose": "The AI model {{name}} thinks with. It starts on the default for agents in Settings. A larger model handles harder judgement calls; a smaller one is quicker and costs less.",
+      "resolved": "Ready: {{name}}'s work is kept apart from {{names}}."
     }
   },
   "onboarding": {

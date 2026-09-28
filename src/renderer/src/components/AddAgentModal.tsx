@@ -1078,8 +1078,14 @@ function DistinctBox(p: DistinctBoxProps) {
   const others = p.binding ? bindingLines(p.binding.scope, p.name).others : '';
   return (
     <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-mint-light)' : 'var(--cth-lemon-light)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <strong style={{ fontSize: 13 }}>{t('addAgent.wizard.overlaps', { names: p.overlapNames.join(listJoin) })}</strong>
-      <span>{p.verdict?.why || t('addAgent.wizard.sameWork', { name: p.name })}</span>
+      {/* A binding resolves the overlap, so the heading says so instead of
+          repeating the problem (owner, 2026-09-27). */}
+      <strong style={{ fontSize: 13 }}>
+        {p.binding
+          ? t('addAgent.wizard.resolved', { name: p.name, names: p.overlapNames.join(listJoin) })
+          : t('addAgent.wizard.overlaps', { names: p.overlapNames.join(listJoin) })}
+      </strong>
+      {!p.binding && <span>{p.verdict?.why || t('addAgent.wizard.sameWork', { name: p.name })}</span>}
       {p.binding ? (
         <>
           <span>{t('addAgent.wizard.boundTo', { name: p.name, scope: p.binding.scope })}</span>
