@@ -13,6 +13,7 @@
  * Michael's too until migrateMissions rewrites it.
  */
 import { normalizeWeekly, nextWeeklyFireMs, weeklyDelayMs } from './weeklySchedule';
+import { normalizeLine, normalizeTimes, nextTimesFireMs, simpleTimes, timesDelayMs, type ScheduleLine } from './scheduleTimes';
 import { scheduledRunBody, relayRunBody } from './scheduleMessage';
 
 export interface ScheduledMission {
@@ -22,6 +23,10 @@ export interface ScheduledMission {
   /** Day-of-week + time. When present and valid it REPLACES `intervalMs`; the
    *  interval stays on the record so switching back restores it. */
   weekly?: { days: number[]; minute: number };
+  /** Several "when" lines (src/shared/scheduleTimes.ts). When present and valid
+   *  they REPLACE both `intervalMs` and `weekly`. A single plain line is stored
+   *  as `intervalMs` or `weekly` instead, so this is set only when needed. */
+  times?: ScheduleLine[];
   /** The agent that owns and runs this schedule: an agent id, or `'god'` for
    *  Michael. (`'broadcast'` only on rows migrateMissions has not seen yet.) */
   to: string;
@@ -62,6 +67,8 @@ export function canEdit(actor: string, m: Pick<ScheduledMission, 'to'>, godId: s
  *  an interval schedule that has never fired). Matches what the scheduler arms. */
 export function nextRunAt(m: ScheduledMission, now: number): number | null {
   if (!m.enabled) return null;
+  const times = m.kind === 'heartbeat' ? null : normalizeTimes(m.times);
+  if (times) return nextTimesFireMs(times, now);
   const weekly = m.kind === 'heartbeat' ? null : normalizeWeekly(m.weekly);
   if (weekly) return nextWeeklyFireMs(weekly, now);
   if (!(m.intervalMs > 0)) return null;
@@ -107,6 +114,8 @@ export type ArmPlan =
   /** Self-rescheduling weekly slots; `firstDelayMs` is the first wait (0 = a
    *  missed slot to catch up now). Later waits are recomputed at each re-arm. */
   | { type: 'weekly'; weekly: { days: number[]; minute: number }; firstDelayMs: number }
+  /** Several "when" lines; self-rescheduling like weekly. */
+  | { type: 'times'; times: ScheduleLine[]; firstDelayMs: number }
   /** Wait `firstDelayMs`, fire, then fire every `everyMs`. */
   | { type: 'interval'; firstDelayMs: number; everyMs: number };
 
@@ -121,6 +130,11 @@ export interface ArmContext {
  *  made inline before this module existed; see test/missions.test.cjs. */
 export function armPlan(m: ScheduledMission, now: number, ctx: ArmContext): ArmPlan {
   if (!m.enabled) return { type: 'skip' };
+  const times = m.kind === 'heartbeat' ? null : normalizeTimes(m.times);
+  if (times) {
+    const firstDelayMs = timesDelayMs(times, now, m.lastFiredAt ?? 0);
+    return firstDelayMs === null ? { type: 'skip' } : { type: 'times', times, firstDelayMs };
+  }
   // A weekly mission needs no interval, so the interval guard comes after it.
   const weekly = m.kind === 'heartbeat' ? null : normalizeWeekly(m.weekly);
   if (!weekly && !(m.intervalMs > 0)) return { type: 'skip' };
@@ -160,8 +174,10 @@ export function upsertMission(list: ScheduledMission[], incoming: ScheduledMissi
   if (!prev) return [...list, { ...incoming, createdBy: incoming.createdBy ?? OWNER }];
   const lastFiredAt = Math.max(incoming.lastFiredAt ?? 0, prev.lastFiredAt ?? 0) || undefined;
   const merged: ScheduledMission = { ...incoming, lastFiredAt, createdBy: prev.createdBy ?? incoming.createdBy ?? OWNER };
-  // An explicit `weekly: undefined` is the switch back to interval mode.
+  // An explicit `weekly: undefined` is the switch back to interval mode, and
+  // an absent or undefined `times` drops the extra lines.
   if (!('weekly' in incoming) || incoming.weekly === undefined) delete merged.weekly;
+  if (!('times' in incoming) || incoming.times === undefined) delete merged.times;
   return list.map((m) => (m.id === incoming.id ? merged : m));
 }
 
@@ -199,6 +215,7 @@ export interface ScheduleDraft {
   label: string;
   intervalMs: number;
   weekly?: { days: number[]; minute: number };
+  times?: ScheduleLine[];
 }
 
 export interface ScheduleRequest {
@@ -225,44 +242,102 @@ const LABEL_MAX = 80;
 export const MAX_INTERVAL_MS = 24 * 86_400_000;
 const MAX_TIMER_MS = 2_147_483_647;
 
-/** Read an agent's `when`: `{ every: "30m" | "2h" | "1d" }` or
- *  `{ days: ["mon", "fri"] | ["weekdays"], at: "09:00" }`. Null if unusable. */
-export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days: number[]; minute: number } } | null {
-  if (!when || typeof when !== 'object') return null;
-  const w = when as { every?: unknown; days?: unknown; at?: unknown };
-  if (typeof w.every === 'string') {
-    const hit = /^\s*(\d+)\s*(m|min|mins|minutes?|h|hr|hrs|hours?|d|days?)\s*$/i.exec(w.every);
-    if (!hit) return null;
-    const n = Number(hit[1]);
-    const unit = hit[2].toLowerCase()[0];
-    const ms = n * (unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000);
-    return ms >= 60_000 && ms <= MAX_INTERVAL_MS ? { intervalMs: ms } : null;
+/** Day names ("mon", "weekdays", "weekends", "daily") as day numbers, or null. */
+function parseDays(raw: unknown): number[] | null {
+  if (!Array.isArray(raw)) return null;
+  const days = new Set<number>();
+  for (const r of raw) {
+    if (typeof r !== 'string') return null;
+    const d = r.trim().toLowerCase();
+    if (d === 'weekdays') [1, 2, 3, 4, 5].forEach((x) => days.add(x));
+    else if (d === 'weekends') [0, 6].forEach((x) => days.add(x));
+    else if (d === 'daily' || d === 'every day') [0, 1, 2, 3, 4, 5, 6].forEach((x) => days.add(x));
+    else if (d.slice(0, 3) in DAY_NAMES) days.add(DAY_NAMES[d.slice(0, 3)]);
+    else return null;
   }
-  if (Array.isArray(w.days) && typeof w.at === 'string') {
-    const t = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(w.at);
-    // "09:75" is not a time: refuse it instead of rolling it over to 10:15.
-    if (!t || Number(t[1]) > 23 || Number(t[2]) > 59) return null;
-    const minute = Number(t[1]) * 60 + Number(t[2]);
-    const days = new Set<number>();
-    for (const raw of w.days) {
-      if (typeof raw !== 'string') return null;
-      const d = raw.trim().toLowerCase();
-      if (d === 'weekdays') [1, 2, 3, 4, 5].forEach((x) => days.add(x));
-      else if (d === 'weekends') [0, 6].forEach((x) => days.add(x));
-      else if (d === 'daily' || d === 'every day') [0, 1, 2, 3, 4, 5, 6].forEach((x) => days.add(x));
-      else if (d.slice(0, 3) in DAY_NAMES) days.add(DAY_NAMES[d.slice(0, 3)]);
-      else return null;
+  return days.size ? [...days].sort((a, b) => a - b) : null;
+}
+
+/** "09:00" as minutes since midnight; "09:75" is not a time. */
+function parseClock(raw: unknown): number | null {
+  if (typeof raw !== 'string') return null;
+  const t = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(raw);
+  if (!t || Number(t[1]) > 23 || Number(t[2]) > 59) return null;
+  return Number(t[1]) * 60 + Number(t[2]);
+}
+
+function parseEvery(raw: unknown): number | null {
+  if (typeof raw !== 'string') return null;
+  const hit = /^\s*(\d+)\s*(m|min|mins|minutes?|h|hr|hrs|hours?|d|days?)\s*$/i.exec(raw);
+  if (!hit) return null;
+  const unit = hit[2].toLowerCase()[0];
+  return Number(hit[1]) * (unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000);
+}
+
+/** One `when` object as a line: `{ every, days?, between? }` or `{ days, at }`. */
+function whenLine(when: unknown): ScheduleLine | null {
+  if (!when || typeof when !== 'object') return null;
+  const w = when as { every?: unknown; days?: unknown; at?: unknown; between?: unknown };
+  if (w.every !== undefined) {
+    const everyMs = parseEvery(w.every);
+    if (everyMs === null) return null;
+    const line: Record<string, unknown> = { kind: 'every', everyMs };
+    if (w.days !== undefined) { const days = parseDays(w.days); if (!days) return null; line.days = days; }
+    if (w.between !== undefined) {
+      if (!Array.isArray(w.between) || w.between.length !== 2) return null;
+      const from = parseClock(w.between[0]);
+      const to = parseClock(w.between[1]);
+      if (from === null || to === null) return null;
+      line.from = from; line.to = to;
     }
-    const weekly = normalizeWeekly({ days: [...days], minute });
+    return normalizeLine(line);
+  }
+  const days = parseDays(w.days);
+  const minute = parseClock(w.at);
+  return days && minute !== null ? normalizeLine({ kind: 'at', days, minute }) : null;
+}
+
+/**
+ * Read an agent's `when`: one object or a list of them.
+ *   `{ "every": "2h" }` (m, h or d; 1 minute to 24 days) runs around the clock;
+ *   `{ "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }`
+ *     limits it (every is then at most 1d);
+ *   `{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }`.
+ * A list runs at whichever line comes due first. Null if anything is unusable.
+ */
+export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days: number[]; minute: number }; times?: ScheduleLine[] } | null {
+  // The plain "every" keeps its old, longer range (up to 24 days).
+  if (when && typeof when === 'object' && !Array.isArray(when)) {
+    const w = when as { every?: unknown; days?: unknown; between?: unknown };
+    if (w.every !== undefined && w.days === undefined && w.between === undefined) {
+      const ms = parseEvery(w.every);
+      return ms !== null && ms >= 60_000 && ms <= MAX_INTERVAL_MS ? { intervalMs: ms } : null;
+    }
+  }
+  const list = Array.isArray(when) ? when : [when];
+  const lines: ScheduleLine[] = [];
+  for (const w of list) {
+    const line = whenLine(w);
+    if (!line) return null;
+    lines.push(line);
+  }
+  const times = normalizeTimes(lines);
+  if (!times) return null;
+  const simple = simpleTimes(times);
+  if (simple && 'weekly' in simple) {
+    const weekly = normalizeWeekly(simple.weekly);
     return weekly ? { intervalMs: 86_400_000, weekly } : null;
   }
-  return null;
+  if (simple) return { intervalMs: simple.intervalMs };
+  const firstEvery = times.find((l) => l.kind === 'every');
+  return { intervalMs: firstEvery && firstEvery.kind === 'every' ? firstEvery.everyMs : 86_400_000, times };
 }
 
 /** What an approval must find unchanged. */
 export function missionFingerprint(m: ScheduledMission): string {
   const w = normalizeWeekly(m.weekly);
-  return JSON.stringify([m.label, m.intervalMs, w ? `${w.days.join(',')}@${w.minute}` : '', m.enabled]);
+  const t = normalizeTimes(m.times);
+  return JSON.stringify([m.label, m.intervalMs, w ? `${w.days.join(',')}@${w.minute}` : '', m.enabled, ...(t ? [JSON.stringify(t)] : [])]);
 }
 
 /**
@@ -284,7 +359,7 @@ export function buildScheduleRequest(
   if (op === 'add') {
     if (!label) return { ok: false, reason: 'An add needs a "label" naming the job.' };
     const when = parseWhen(p.when);
-    if (!when) return { ok: false, reason: 'An add needs a usable "when": {"every": "2h"} (1 minute to 24 days) or {"days": ["mon"], "at": "09:00"}.' };
+    if (!when) return { ok: false, reason: 'An add needs a usable "when": {"every": "2h"} (1 minute to 24 days), {"every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"]}, {"days": ["mon"], "at": "09:00"}, or a list of these.' };
     return { ok: true, request: { id, agentId: actor, op, draft: { label, ...when }, createdAt: now } };
   }
 
@@ -301,7 +376,8 @@ export function buildScheduleRequest(
   const draft: ScheduleDraft = {
     label: label || target.label,
     intervalMs: when ? when.intervalMs : target.intervalMs,
-    ...(when ? (when.weekly ? { weekly: when.weekly } : {}) : (target.weekly ? { weekly: target.weekly } : {}))
+    ...(when ? (when.weekly ? { weekly: when.weekly } : {}) : (target.weekly ? { weekly: target.weekly } : {})),
+    ...(when ? (when.times ? { times: when.times } : {}) : (target.times ? { times: target.times } : {}))
   };
   return { ok: true, request: { ...base, draft } };
 }
@@ -322,6 +398,7 @@ export function applyScheduleRequest(
     const m: ScheduledMission = {
       id: newId, label: req.draft.label, intervalMs: Math.min(req.draft.intervalMs, MAX_INTERVAL_MS),
       ...(req.draft.weekly ? { weekly: req.draft.weekly } : {}),
+      ...(req.draft.times ? { times: req.draft.times } : {}),
       to: req.agentId, body: '', enabled: true, createdBy: req.agentId
     };
     return { ok: true, missions: [...missions, m], missionId: newId };
@@ -337,6 +414,7 @@ export function applyScheduleRequest(
     if (!target) return { ok: false, error: 'stale' };
     const updated: ScheduledMission = { ...target, label: req.draft.label, intervalMs: req.draft.intervalMs };
     if (req.draft.weekly) updated.weekly = req.draft.weekly; else delete updated.weekly;
+    if (req.draft.times) updated.times = req.draft.times; else delete updated.times;
     return { ok: true, missions: missions.map((m) => (m.id === id ? updated : m)), missionId: id };
   }
   return { ok: false, error: 'invalid' };

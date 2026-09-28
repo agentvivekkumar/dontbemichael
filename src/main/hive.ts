@@ -70,7 +70,7 @@ A schedule runs one of your jobs on a clock. You never change a schedule yoursel
 \`\`\`
 
 - \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
-- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
+- \`when\`: \`{ "every": "2h" }\` (m, h or d) runs around the clock; \`{ "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }\` limits it to those days and hours; \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\` runs at a time. One job can have several: \`"when": [ { "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }, { "days": ["weekends"], "at": "14:00" } ]\` runs at whichever comes due first. Ask for one schedule with several times rather than several schedules for the same job.
 - \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
 - You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
 `;

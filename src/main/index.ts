@@ -19,6 +19,7 @@ import {
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
+import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
   migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor,
@@ -829,7 +830,7 @@ function syncMissions(): void {
       }
     };
     const entry: MissionTimer = {};
-    if (plan.type === 'weekly') {
+    if (plan.type === 'weekly' || plan.type === 'times') {
       // Weekly self-reschedules: there is no steady interval to settle into,
       // because the gap between two slots varies (Fri to Mon is not Mon to Wed,
       // and the week the clocks change is not 168 hours long).
@@ -843,7 +844,9 @@ function syncMissions(): void {
       const rearm = (justFired: boolean): void => {
         const now = Date.now();
         const persisted = (readConfig().missions ?? []).find((x) => x.id === m.id)?.lastFiredAt ?? 0;
-        const delay = weeklyDelayMs(plan.weekly, now, justFired ? Math.max(persisted, now) : persisted);
+        const floor = justFired ? Math.max(persisted, now) : persisted;
+        // Several "when" lines re-arm the same way (src/shared/scheduleTimes.ts).
+        const delay = plan.type === 'times' ? timesDelayMs(plan.times, now, floor) : weeklyDelayMs(plan.weekly, now, floor);
         if (delay === null) return;
         entry.timeout = setTimeout(() => { fire(); rearm(true); }, delay);
       };
@@ -4552,8 +4555,18 @@ const isMission = (m: unknown): m is ScheduledMission =>
   !!m && typeof m === 'object' && typeof (m as ScheduledMission).id === 'string' && typeof (m as ScheduledMission).label === 'string'
   && typeof (m as ScheduledMission).to === 'string' && typeof (m as ScheduledMission).enabled === 'boolean';
 ipcMain.handle('missions:list', () => readConfig().missions ?? []);
-ipcMain.handle('missions:upsert', (_evt, mission: unknown): MissionOpResult =>
-  isMission(mission) ? applyMissions((list) => upsertMission(list, mission)) : { ok: false, error: 'invalid schedule' });
+ipcMain.handle('missions:upsert', (_evt, mission: unknown): MissionOpResult => {
+  if (!isMission(mission)) return { ok: false, error: 'invalid schedule' };
+  // Several "when" lines are stored canonical, or the save is refused: a bad
+  // line would run on a clock nobody set.
+  let clean: ScheduledMission = mission;
+  if (mission.times !== undefined) {
+    const times = normalizeTimes(mission.times);
+    if (!times) return { ok: false, error: 'invalid schedule times' };
+    clean = { ...mission, times };
+  }
+  return applyMissions((list) => upsertMission(list, clean));
+});
 ipcMain.handle('missions:delete', (_evt, id: unknown): MissionOpResult =>
   typeof id === 'string' ? applyMissions((list) => deleteMission(list, id)) : { ok: false, error: 'invalid id' });
 ipcMain.handle('missions:setEnabled', (_evt, id: unknown, on: unknown): MissionOpResult =>

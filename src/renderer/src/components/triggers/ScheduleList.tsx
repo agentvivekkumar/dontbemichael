@@ -10,6 +10,8 @@ import {
   weeklyDraft, weeklyIsUsable, type WeeklyDraft
 } from './ui';
 import { formatWeekly } from '@shared/weeklySchedule';
+import { formatTimes, normalizeTimes } from '@shared/scheduleTimes';
+import { WhenLines, fieldsFromLines, linesFromMission, sameLines, type LineDraft } from './WhenLines';
 import { GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
 import { useRtl } from '@/i18n/useDirection';
 
@@ -121,8 +123,10 @@ function relTime(ms: number, lang: string): string {
 }
 
 /** What the when chip says: the calendar, the interval, or the heartbeat. */
-export function whenText(m: Pick<ScheduledMission, 'kind' | 'weekly' | 'intervalMs'>, t: TFunction): string {
+export function whenText(m: Pick<ScheduledMission, 'kind' | 'weekly' | 'intervalMs' | 'times'>, t: TFunction): string {
   if (m.kind === 'heartbeat') return t('schedulesSection.beat');
+  const times = normalizeTimes(m.times);
+  if (times) return formatTimes(times);
   const w = weeklyDraft(m.weekly);
   return w ? formatWeekly(w) : fmtInterval(m.intervalMs);
 }
@@ -170,6 +174,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
   const [label, setLabel] = useState(mission.label);
   const [intervalMs, setIntervalMs] = useState(mission.intervalMs);
   const [weekly, setWeekly] = useState<WeeklyDraft | null>(weeklyDraft(mission.weekly));
+  const [lines, setLines] = useState<LineDraft[]>(() => linesFromMission(mission));
   const [body, setBody] = useState(mission.body);
   const [saved, setSaved] = useState(false);
   const { busy, failed, setFailed, run } = useSaveOp();
@@ -184,6 +189,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
     setLabel(mission.label);
     setIntervalMs(mission.intervalMs);
     setWeekly(weeklyDraft(mission.weekly));
+    setLines(linesFromMission(mission));
     setBody(mission.body);
     setSaved(false);
     setConfirming(false);
@@ -194,9 +200,13 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
   const legacy = heartbeat ? '' : mission.body.trim();
   const storedWeekly = weeklyDraft(mission.weekly);
   const weeklyKey = (w: WeeklyDraft | null) => (w ? `${[...w.days].sort((a, b) => a - b).join(',')}@${w.minute}` : '');
-  const dirty = label !== mission.label || intervalMs !== mission.intervalMs
-    || (heartbeat && body !== mission.body) || weeklyKey(weekly) !== weeklyKey(storedWeekly);
-  const whenIsUsable = !weekly || weeklyIsUsable(weekly);
+  // A heartbeat keeps its single interval; every other schedule is edited as
+  // "when" lines (WhenLines.tsx).
+  const dirty = label !== mission.label || (heartbeat
+    ? intervalMs !== mission.intervalMs || body !== mission.body || weeklyKey(weekly) !== weeklyKey(storedWeekly)
+    : !sameLines(lines, linesFromMission(mission)));
+  const whenFields = heartbeat ? null : fieldsFromLines(lines, mission.intervalMs);
+  const whenIsUsable = heartbeat ? (!weekly || weeklyIsUsable(weekly)) : whenFields !== null;
 
   const now = Date.now();
   const nextAt = nextRunAt(mission, now);
@@ -213,10 +223,12 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
     const trimmed = label.trim();
     if (!trimmed) return;
     setLabel(trimmed);
-    // `weekly: undefined` is the switch back to interval mode.
-    void run(() => window.cth.upsertMission({
-      ...mission, label: trimmed, intervalMs, ...(heartbeat ? { body } : {}), weekly: weekly ?? undefined
-    }), () => { setSaved(true); setTimeout(() => setSaved(false), 1300); });
+    // `weekly: undefined` is the switch back to interval mode; `times:
+    // undefined` drops extra lines the schedule no longer has.
+    void run(() => window.cth.upsertMission(heartbeat
+      ? { ...mission, label: trimmed, intervalMs, body, weekly: weekly ?? undefined }
+      : { ...mission, label: trimmed, ...(whenFields ?? {}) }
+    ), () => { setSaved(true); setTimeout(() => setSaved(false), 1300); });
   };
   const toggle = () => { void run(() => window.cth.setMissionEnabled(mission.id, !mission.enabled)); };
   const remove = () => { void run(() => window.cth.deleteMission(mission.id)); };
@@ -286,7 +298,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
           <Field label={t('schedulesSection.when')}>
             {heartbeat
               ? <SchedulePicker intervalMs={intervalMs} weekly={null} onInterval={setIntervalMs} onWeekly={() => { /* interval only */ }} />
-              : <SchedulePicker intervalMs={intervalMs} weekly={weekly} onInterval={setIntervalMs} onWeekly={setWeekly} />}
+              : <WhenLines lines={lines} onChange={setLines} />}
             {heartbeat && <Hint>{t('schedulesSection.beatCeiling')}</Hint>}
           </Field>
           {heartbeat && (
@@ -351,21 +363,22 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState('');
-  const [intervalMs, setIntervalMs] = useState<number>(DEFAULT_INTERVAL_MS);
-  const [weekly, setWeekly] = useState<WeeklyDraft | null>(null);
+  const firstLines = (): LineDraft[] => linesFromMission({ intervalMs: DEFAULT_INTERVAL_MS });
+  const [lines, setLines] = useState<LineDraft[]>(firstLines);
   const { busy, failed, setFailed, run } = useSaveOp();
-  const whenIsUsable = !weekly || weeklyIsUsable(weekly);
-  const reset = () => { setAdding(false); setLabel(''); setWeekly(null); setFailed(false); };
+  const whenFields = fieldsFromLines(lines, DEFAULT_INTERVAL_MS);
+  const whenIsUsable = whenFields !== null;
+  const reset = () => { setAdding(false); setLabel(''); setLines(firstLines()); setFailed(false); };
 
   const add = async () => {
     if (!label.trim() || !whenIsUsable) return;
+    if (!whenFields) return;
     await run(() => window.cth.upsertMission({
       id: `m_${Date.now().toString(36)}`,
       label: label.trim(),
-      // The interval rides along even in weekly mode, so flipping back to
-      // "every..." later restores the cadence rather than a default.
-      intervalMs,
-      ...(weekly ? { weekly } : {}),
+      intervalMs: whenFields.intervalMs,
+      ...(whenFields.weekly ? { weekly: whenFields.weekly } : {}),
+      ...(whenFields.times ? { times: whenFields.times } : {}),
       to,
       body: '',
       enabled: true,
@@ -395,7 +408,7 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
         <Hint>{t('schedulesSection.labelHint')}</Hint>
       </Field>
       <Field label={t('schedulesSection.when')}>
-        <SchedulePicker intervalMs={intervalMs} weekly={weekly} onInterval={setIntervalMs} onWeekly={setWeekly} />
+        <WhenLines lines={lines} onChange={setLines} />
       </Field>
       {failed && <Line tone="error">{t('schedulesSection.saveFailed')}</Line>}
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>

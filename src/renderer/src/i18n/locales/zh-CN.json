@@ -1080,7 +1080,13 @@
     "at": "在",
     "weekdays": "工作日",
     "everyDay": "每天",
-    "pickDayHint": "至少选择一天，否则它将永远不会运行。"
+    "pickDayHint": "至少选择一天，否则它将永远不会运行。",
+    "addTime": "再加一个时间",
+    "removeTime": "删除",
+    "onlyBetween": "只在",
+    "and": "至",
+    "windowHint": "结束时间早于开始时间。",
+    "timeN": "时间 {{n}}"
   },
   "triggerHistory": {
     "justNow": "刚刚",
