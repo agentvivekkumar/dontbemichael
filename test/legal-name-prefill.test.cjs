@@ -26,7 +26,7 @@ test('no business name leaves the field alone', () => {
 });
 
 test('a rename on step 1 carries over while the field is still ours', () => {
-  const first = prefillLegalName({}, 'Moblize', undefined);
+  const first = prefillLegalName({}, 'Sunrise', undefined);
   const r = prefillLegalName(first.profile, 'SunRiseBakery', first.filled);
   assert.equal(r.profile.legalName, 'SunRiseBakery');
 });
@@ -34,7 +34,7 @@ test('a rename on step 1 carries over while the field is still ours', () => {
 test("the owner's own legal name is never overwritten", () => {
   const first = prefillLegalName({}, 'SunRiseBakery', undefined);
   const typed = { ...first.profile, legalName: 'SunRiseBakery LLC' };
-  const r = prefillLegalName(typed, 'Moblize Inc', first.filled);
+  const r = prefillLegalName(typed, 'Sunrise Inc', first.filled);
   assert.equal(r.profile.legalName, 'SunRiseBakery LLC');
   assert.equal(r.filled, first.filled);
 });
