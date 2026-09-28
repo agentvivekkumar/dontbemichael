@@ -23,7 +23,7 @@ const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 const HOUR = 3_600_000;
 const ctx = { standupId: 'ops-standup', standupFiredThisLaunch: true };
 const mk = (over = {}) => ({ id: 'm1', label: 'Triage the inbox', intervalMs: HOUR, to: 'pam', body: '', enabled: true, ...over });
-const build = (p, list = [mk()]) => M.buildScheduleRequest('pam', p, list, 'god', 0, 'r');
+const build = (p, list = [mk()]) => M.buildScheduleRequest('pam', p, list, 'god', 0, 'r', 'why');
 
 /* ───────────────────────────── parseWhen ───────────────────────────── */
 
@@ -102,7 +102,7 @@ test('an add never goes stale; an update missing its draft is refused as invalid
 
 test('Michael may ask about his schedules, including a legacy everyone row', () => {
   const list = [mk({ id: 'b', to: 'broadcast' })];
-  const r = M.buildScheduleRequest('god', { op: 'pause', id: 'b' }, list, 'god', 0, 'r');
+  const r = M.buildScheduleRequest('god', { op: 'pause', id: 'b' }, list, 'god', 0, 'r', 'why');
   assert.equal(r.ok, true);
   assert.equal(M.pauseMissionsOf(list, 'god', 'god').paused, 1, 'closing Michael pauses his everyone row too');
 });
@@ -222,9 +222,9 @@ test('the owner interval picker stops at the same ceiling', () => {
 });
 
 test('request replies point an agent at list, and the close warning counts with the shared ownership rule', () => {
-  const bad = M.buildScheduleRequest('pam', { op: 'delete', id: 'nope' }, [], 'god', 0, 'r1');
+  const bad = M.buildScheduleRequest('pam', { op: 'delete', id: 'nope' }, [], 'god', 0, 'r1', 'why');
   assert.match(bad.reason, /"op": "list"/);
-  assert.match(M.buildScheduleRequest('pam', { op: 'x' }, [], 'god', 0, 'r1').reason, /delete or list/);
+  assert.match(M.buildScheduleRequest('pam', { op: 'x' }, [], 'god', 0, 'r1', 'why').reason, /delete or list/);
   const list = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../src/renderer/src/components/triggers/ScheduleList.tsx'), 'utf8');
   assert.match(list, /const count = missionsFor\(st\.missions, agentId, godId\)\.filter\(\(m\) => m\.enabled\)\.length;/);
 });

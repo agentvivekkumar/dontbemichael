@@ -116,7 +116,8 @@
     "scheduleDelete": "حذف: {{label}}",
     "scheduleStale": "تغيّر هذا منذ أن طلبه {{name}}، لذا يمكن رفضه فقط.",
     "approve": "موافقة",
-    "decline": "رفض"
+    "decline": "رفض",
+    "scheduleWhy": "السبب: {{reason}}"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",

@@ -69,15 +69,15 @@ test('agents ask for several times in one request, and the old forms still work'
 
 test('an approved request with times adds or updates one schedule with them', () => {
   const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true, createdBy: 'owner' }];
-  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: [{ every: '2h', days: ['weekdays'], between: ['08:00', '18:00'] }, { days: ['weekends'], at: '14:00' }] }, missions, 'god', 1, 'r1');
+  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: [{ every: '2h', days: ['weekdays'], between: ['08:00', '18:00'] }, { days: ['weekends'], at: '14:00' }] }, missions, 'god', 1, 'r1', 'why');
   assert.equal(add.ok, true);
   const added = M.applyScheduleRequest(add.request, missions, 'm2');
   assert.deepEqual(added.missions[1].times, owners);
-  const upd = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: [{ days: ['weekdays'], at: '08:00' }, { days: ['weekdays'], at: '14:00' }] }, missions, 'god', 1, 'r2');
+  const upd = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: [{ days: ['weekdays'], at: '08:00' }, { days: ['weekdays'], at: '14:00' }] }, missions, 'god', 1, 'r2', 'why');
   const updated = M.applyScheduleRequest(upd.request, missions, 'x').missions[0];
   assert.equal(updated.times.length, 2);
   // Back to one plain line clears the extra lines.
-  const back = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: { every: '4h' } }, [updated], 'god', 1, 'r3');
+  const back = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: { every: '4h' } }, [updated], 'god', 1, 'r3', 'why');
   const plain = M.applyScheduleRequest(back.request, [updated], 'x').missions[0];
   assert.equal(plain.times, undefined);
   assert.equal(plain.intervalMs, 4 * H);
@@ -128,4 +128,46 @@ test('a day an every line runs on belongs to it alone (owner, 2026-09-27)', () =
   assert.match(ui, /disabled=\{blocked\}/);
   assert.match(ui, /t\('triggersUi\.daysClash'/);
   assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /taken\?: number\[\];/);
+});
+
+test('a request carries its reason, and one without is not sent (owner, 2026-09-27)', () => {
+  const none = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' } }, [], 'god', 1, 'r');
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /Say why in the message "body"/);
+  const ok = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' } }, [], 'god', 1, 'r', '  Quiet   mailbox. ');
+  assert.equal(ok.request.reason, 'Quiet mailbox.');
+  const card = read('src/renderer/src/components/ScheduleRequestCards.tsx');
+  assert.match(card, /t\('askMe\.scheduleWhy', \{ reason: req\.reason \}\)/);
+  assert.match(read('src/main/hive.ts'), /this\.scheduleRequestHandler\(id, schedule, typeof msg\.body === 'string' \? msg\.body : ''\)/);
+});
+
+test('two requests from one agent about one job become one card (owner, 2026-09-27)', () => {
+  const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true, createdBy: 'owner' }];
+  const why = 'Twice daily, agreed with Michael.';
+  const upd = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: { days: ['weekdays'], at: '08:00' } }, missions, 'god', 1, 'r1', why).request;
+  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { days: ['weekdays'], at: '14:00' } }, missions, 'god', 2, 'r2', why).request;
+  const filed = M.fileScheduleRequest([upd], add, missions);
+  assert.equal(filed.length, 1);
+  assert.equal(filed[0].op, 'update');
+  assert.equal(filed[0].missionId, 'm1');
+  assert.deepEqual(filed[0].draft.times, [{ kind: 'at', days: [1, 2, 3, 4, 5], minute: 480 }, { kind: 'at', days: [1, 2, 3, 4, 5], minute: 840 }]);
+  assert.equal(filed[0].reason, why, 'the same reason once');
+  assert.equal(T.formatTimes(filed[0].draft.times), 'weekdays at 08:00 and 14:00');
+  // Approving it gives one schedule at both times.
+  const applied = M.applyScheduleRequest(filed[0], missions, 'x').missions;
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].times.length, 2);
+  // Another agent, or another job, stays its own card.
+  const other = M.buildScheduleRequest('pam', { op: 'add', label: 'Check Emails', when: { every: '1h' } }, missions, 'god', 3, 'r3', 'x').request;
+  assert.equal(M.fileScheduleRequest(filed, other, missions).length, 2);
+  // Folding requests filed before merging existed.
+  assert.equal(M.foldScheduleRequests([upd, add], missions).length, 1);
+  // A pause after a change about the same job replaces it: the latest intent.
+  const pause = M.buildScheduleRequest('nick', { op: 'pause', id: 'm1' }, missions, 'god', 4, 'r4', 'Mailbox moved.').request;
+  const replaced = M.fileScheduleRequest(filed, pause, missions);
+  assert.equal(replaced.length, 1);
+  assert.equal(replaced[0].op, 'pause');
+  const main = read('src/main/index.ts');
+  assert.match(main, /const filed = fileScheduleRequest\(before, built\.request, cfg\.missions \?\? \[\]\);/);
+  assert.match(main, /const folded = foldScheduleRequests\(pending, cfg\.missions \?\? \[\]\);/);
 });

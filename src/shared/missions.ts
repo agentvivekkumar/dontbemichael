@@ -230,6 +230,9 @@ export interface ScheduleRequest {
   /** The target as it was when the agent asked; a mismatch at approval time
    *  means the owner or someone else changed it since. */
   snapshot?: string;
+  /** Why the agent asks, in its words, shown on the card (owner, 2026-09-27:
+   *  "there is no rational or explanation behind what made agent propose this"). */
+  reason?: string;
   createdAt: number;
 }
 
@@ -345,6 +348,18 @@ export function missionFingerprint(m: ScheduledMission): string {
  * `actor` is the owning outbox folder. `reason` goes back to the agent.
  */
 export function buildScheduleRequest(
+  actor: string, payload: unknown, missions: ScheduledMission[], godId: string, now: number, id: string, why?: string
+): { ok: true; request: ScheduleRequest } | { ok: false; reason: string } {
+  const built = buildRequestShape(actor, payload, missions, godId, now, id);
+  if (!built.ok) return built;
+  // The owner decides on the card, so the card says why (owner, 2026-09-27).
+  // Checked last, so a request with other problems hears about those first.
+  const reason = (why ?? '').replace(/\s+/g, ' ').trim().slice(0, 400);
+  if (!reason) return { ok: false, reason: 'Say why in the message "body", in a sentence or two the owner can read on the card: what you noticed and what the change fixes.' };
+  return { ok: true, request: { ...built.request, reason } };
+}
+
+function buildRequestShape(
   actor: string, payload: unknown, missions: ScheduledMission[], godId: string, now: number, id: string
 ): { ok: true; request: ScheduleRequest } | { ok: false; reason: string } {
   if (!payload || typeof payload !== 'object') return { ok: false, reason: 'The "schedule" field must be an object.' };
@@ -380,6 +395,69 @@ export function buildScheduleRequest(
     ...(when ? (when.times ? { times: when.times } : {}) : (target.times ? { times: target.times } : {}))
   };
   return { ok: true, request: { ...base, draft } };
+}
+
+/** A draft's timing as "when" lines, or null when it can't be one (a plain
+ *  interval longer than a day). */
+function draftLines(d: ScheduleDraft): ScheduleLine[] | null {
+  const times = normalizeTimes(d.times);
+  if (times) return times;
+  const w = normalizeWeekly(d.weekly);
+  if (w) return [{ kind: 'at', days: w.days, minute: w.minute }];
+  return d.intervalMs > 0 && d.intervalMs <= 86_400_000 ? [{ kind: 'every', everyMs: d.intervalMs }] : null;
+}
+
+/** The job a request is about: its target schedule, else its draft's name. */
+function requestJob(req: ScheduleRequest, missions: ScheduledMission[]): string {
+  const target = missions.find((m) => m.id === req.missionId);
+  return (target?.label ?? req.draft?.label ?? '').trim().toLowerCase();
+}
+
+/**
+ * File a new request among the pending ones (owner, 2026-09-27: "showing two
+ * cards on the exact same topic may confuse owner"). A request from the same
+ * agent about the same job joins the pending one into one card:
+ *   - two adds or updates: one change whose "when" lines are both sets of
+ *     times together (Nick's "weekdays at 08:00" and "weekdays at 14:00"
+ *     become one schedule at 08:00 and 14:00);
+ *   - anything else, or times that can't sit together: the newer request
+ *     replaces the older, since it is the agent's latest intent.
+ * The reasons are kept, both when they differ.
+ */
+export function fileScheduleRequest(pending: ScheduleRequest[], incoming: ScheduleRequest, missions: ScheduledMission[]): ScheduleRequest[] {
+  const job = requestJob(incoming, missions);
+  const i = pending.findIndex((p) => p.agentId === incoming.agentId && job && requestJob(p, missions) === job);
+  if (i < 0) return [...pending, incoming];
+  const prev = pending[i];
+  const reasons = [...new Set([prev.reason, incoming.reason].filter((r): r is string => !!r))];
+  const reason = reasons.join(' ').slice(0, 600) || undefined;
+  let merged: ScheduleRequest = { ...incoming, reason };
+  const shaping = (r: ScheduleRequest) => (r.op === 'add' || r.op === 'update') && !!r.draft;
+  if (shaping(prev) && shaping(incoming)) {
+    const a = draftLines(prev.draft!);
+    const b = draftLines(incoming.draft!);
+    const seen = new Set<string>();
+    const lines = a && b ? [...a, ...b].filter((l) => { const k = JSON.stringify(l); if (seen.has(k)) return false; seen.add(k); return true; }) : null;
+    const times = lines ? normalizeTimes(lines) : null;
+    if (times) {
+      // Keep the one that names an existing schedule: that is the change.
+      const base = prev.op === 'update' ? prev : incoming.op === 'update' ? incoming : prev;
+      const simple = simpleTimes(times);
+      const draft: ScheduleDraft = simple && 'intervalMs' in simple
+        ? { label: base.draft!.label, intervalMs: simple.intervalMs }
+        : simple && 'weekly' in simple
+          ? { label: base.draft!.label, intervalMs: 86_400_000, weekly: simple.weekly }
+          : { label: base.draft!.label, intervalMs: base.draft!.intervalMs, times };
+      merged = { ...base, id: incoming.id, draft, reason, createdAt: incoming.createdAt };
+    }
+  }
+  return pending.map((p, j) => (j === i ? merged : p));
+}
+
+/** Fold a list of pending requests the same way, oldest first (requests filed
+ *  before merging existed). */
+export function foldScheduleRequests(pending: ScheduleRequest[], missions: ScheduledMission[]): ScheduleRequest[] {
+  return pending.reduce<ScheduleRequest[]>((acc, r) => fileScheduleRequest(acc, r, missions), []);
 }
 
 /** Has the target changed (or gone) since the agent asked? Adds never go stale. */

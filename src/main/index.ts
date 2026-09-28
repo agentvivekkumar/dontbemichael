@@ -22,7 +22,7 @@ import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
-  migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor,
+  migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor, fileScheduleRequest, foldScheduleRequests,
   type ScheduleRequest
 } from '../shared/missions';
 import {
@@ -1021,7 +1021,7 @@ function closeAgentByOwner(id: string): { ok: boolean; paused: number } {
 /** An agent asked (from its outbox) to change one of its schedules. Nothing
  *  changes here: the request waits in ASK ME. The return text goes back to the
  *  agent as the scheduler's reply. */
-function receiveScheduleRequest(actor: string, payload: unknown): string {
+function receiveScheduleRequest(actor: string, payload: unknown, why = ''): string {
   const cfg = readConfig();
   // "list" is a question, not a change: answer it directly with the ids an
   // update, pause, resume or delete request needs.
@@ -1031,16 +1031,23 @@ function receiveScheduleRequest(actor: string, payload: unknown): string {
       ? 'You have no schedules.'
       : ['Your schedules (id: job):', ...mine.map((m) => `${m.id}: ${m.label}${m.enabled ? '' : ' (paused)'}`)].join('\n');
   }
-  const built = buildScheduleRequest(actor, payload, cfg.missions ?? [], hiveGodId(), Date.now(), `sr_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`);
+  const built = buildScheduleRequest(actor, payload, cfg.missions ?? [], hiveGodId(), Date.now(), `sr_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`, why);
   if (!built.ok) return `Schedule request not sent: ${built.reason}`;
-  writeConfig({ scheduleRequests: [...(cfg.scheduleRequests ?? []), built.request] });
+  // A request about a job this agent already has waiting joins it as one card
+  // (owner, 2026-09-27).
+  const before = cfg.scheduleRequests ?? [];
+  const filed = fileScheduleRequest(before, built.request, cfg.missions ?? []);
+  const joined = filed.length === before.length;
+  writeConfig({ scheduleRequests: filed });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
   // ASK ME has no badge, so Michael tells the owner there is something to
   // decide. Only Michael notifies (docs/designs/michael-only-notifications.md).
   let name = 'A team member';
   try { name = hive.registry().agents[actor]?.name?.trim() || name; } catch { /* keep the fallback */ }
   ownerToast(michaelName(), `${name} asked to change a schedule. It's waiting for you in ASK ME.`);
-  return 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
+  return joined
+    ? 'Joined your earlier request about the same job: the owner sees them as one card in ASK ME. Nothing changes until they approve it; you will get a message either way.'
+    : 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
 }
 
 /** The owner approved or declined a request. Approval applies exactly that one
@@ -4573,7 +4580,14 @@ ipcMain.handle('missions:setEnabled', (_evt, id: unknown, on: unknown): MissionO
   typeof id === 'string' ? applyMissions((list) => setMissionEnabled(list, id, on === true)) : { ok: false, error: 'invalid id' });
 
 // ─── IPC: schedule requests (an agent asked, the owner decides in ASK ME) ────
-ipcMain.handle('scheduleRequests:list', () => readConfig().scheduleRequests ?? []);
+ipcMain.handle('scheduleRequests:list', () => {
+  // Requests filed before merging existed are folded into one card per job.
+  const cfg = readConfig();
+  const pending = cfg.scheduleRequests ?? [];
+  const folded = foldScheduleRequests(pending, cfg.missions ?? []);
+  if (folded.length !== pending.length) writeConfig({ scheduleRequests: folded });
+  return folded;
+});
 ipcMain.handle('scheduleRequests:decide', (_evt, id: unknown, approve: unknown): MissionOpResult => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   return decideScheduleRequest(id, approve === true);

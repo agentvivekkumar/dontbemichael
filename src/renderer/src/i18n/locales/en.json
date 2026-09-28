@@ -116,7 +116,8 @@
     "scheduleDelete": "Delete: {{label}}",
     "scheduleStale": "This changed since {{name}} asked, so it can only be declined.",
     "approve": "Approve",
-    "decline": "Decline"
+    "decline": "Decline",
+    "scheduleWhy": "Why: {{reason}}"
   },
   "agentStrip": {
     "privateNote": "PRIVATE NOTE · {{name}}",

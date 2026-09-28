@@ -210,7 +210,23 @@ export function formatLine(line: ScheduleLine): string {
   return parts.join(' ');
 }
 
-/** All lines in words, joined: "every 2h weekdays 08:00 to 18:00, weekends at 14:00". */
+/** All lines in words, joined: "every 2h weekdays 08:00 to 18:00, weekends at
+ *  14:00". Times on the same days read as one: "weekdays at 08:00 and 14:00". */
 export function formatTimes(times: ScheduleLine[]): string {
-  return times.map(formatLine).join(', ');
+  const parts: string[] = [];
+  const atGroups = new Map<string, { days: number[]; minutes: number[]; index: number }>();
+  for (const line of times) {
+    if (line.kind === 'every') { parts.push(formatLine(line)); continue; }
+    const key = line.days.join(',');
+    const g = atGroups.get(key);
+    if (g) { g.minutes.push(line.minute); continue; }
+    atGroups.set(key, { days: line.days, minutes: [line.minute], index: parts.length });
+    parts.push('');
+  }
+  for (const g of atGroups.values()) {
+    const mins = [...new Set(g.minutes)].sort((a, b) => a - b).map(formatMinute);
+    const list = mins.length > 1 ? `${mins.slice(0, -1).join(', ')} and ${mins[mins.length - 1]}` : mins[0];
+    parts[g.index] = `${formatDays(g.days)} at ${list}`;
+  }
+  return parts.join(', ');
 }

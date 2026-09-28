@@ -116,7 +116,8 @@
     "scheduleDelete": "删除：{{label}}",
     "scheduleStale": "{{name}} 提出请求后这项已有变化，只能拒绝。",
     "approve": "批准",
-    "decline": "拒绝"
+    "decline": "拒绝",
+    "scheduleWhy": "原因：{{reason}}"
   },
   "agentStrip": {
     "privateNote": "私人笔记 · {{name}}",

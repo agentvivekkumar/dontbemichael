@@ -65,13 +65,15 @@ const SCHEDULES_PROTOCOL = `## Your schedules
 A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
 
 \`\`\`json
-{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
+{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "Invoices slip past 30 days because nobody checks them; a Friday check catches them first.",
   "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
 \`\`\`
 
 - \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
 - \`when\`: \`{ "every": "2h" }\` (m, h or d) runs around the clock; \`{ "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }\` limits it to those days and hours; \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\` runs at a time. One job can have several: \`"when": [ { "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }, { "days": ["weekends"], "at": "14:00" } ]\` runs at whichever comes due first. Ask for one schedule with several times rather than several schedules for the same job.
 - \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- \`body\` says why, in a sentence or two the owner reads on the card: what you noticed and what the change fixes. A request without it is not sent.
+- One job, one request: ask for every time a job needs in one \`when\` list. A second request about the same job joins the first as one card.
 - You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
 `;
 
@@ -554,8 +556,8 @@ export class HiveManager {
    *  with a `schedule` object). It records a request for the owner and returns
    *  the reply for the agent; it never changes a schedule itself (owner,
    *  2026-09-25). `actor` is the owning outbox folder, never the message. */
-  private scheduleRequestHandler: ((actor: string, payload: unknown) => string) | null = null;
-  onScheduleRequest(handler: (actor: string, payload: unknown) => string): void { this.scheduleRequestHandler = handler; }
+  private scheduleRequestHandler: ((actor: string, payload: unknown, why: string) => string) | null = null;
+  onScheduleRequest(handler: (actor: string, payload: unknown, why: string) => string): void { this.scheduleRequestHandler = handler; }
 
   /** agentId → whether it has been told company knowledge is on, as of its
    *  spawn or its last update. Lets an owner's toggle reach running agents
@@ -2098,7 +2100,8 @@ export class HiveManager {
             // A schedule request, not mail: main files it for the owner and the
             // scheduler answers the asking agent (and only that agent).
             let reply: string;
-            try { reply = this.scheduleRequestHandler(id, schedule); } catch (e) {
+            // The message body is the agent's reason, shown on the owner's card.
+            try { reply = this.scheduleRequestHandler(id, schedule, typeof msg.body === 'string' ? msg.body : ''); } catch (e) {
               reply = 'Schedule request not sent: the app hit an error. Try again later.';
               console.error('[hive] schedule request', e);
             }

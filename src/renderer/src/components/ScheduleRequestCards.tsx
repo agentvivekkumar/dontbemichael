@@ -89,6 +89,12 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
             </div>
             <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)' }}>
               <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{describe(req, target, t)}</div>
+              {/* Why the agent asks (owner, 2026-09-27). */}
+              {req.reason && (
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
+                  {t('askMe.scheduleWhy', { reason: req.reason })}
+                </div>
+              )}
               {stale && (
                 <div role="status" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
                   {t('askMe.scheduleStale', { name })}
