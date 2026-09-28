@@ -13,9 +13,9 @@ const loadTs = require('./load-ts.cjs');
 const { prefillLegalName } = loadTs('src/shared/companyProfile.ts');
 
 test('an empty legal name takes the business name', () => {
-  const r = prefillLegalName({}, '  MoblizeIT  ', undefined);
-  assert.equal(r.profile.legalName, 'MoblizeIT');
-  assert.equal(r.filled, 'MoblizeIT');
+  const r = prefillLegalName({}, '  SunRiseBakery  ', undefined);
+  assert.equal(r.profile.legalName, 'SunRiseBakery');
+  assert.equal(r.filled, 'SunRiseBakery');
 });
 
 test('no business name leaves the field alone', () => {
@@ -27,15 +27,15 @@ test('no business name leaves the field alone', () => {
 
 test('a rename on step 1 carries over while the field is still ours', () => {
   const first = prefillLegalName({}, 'Moblize', undefined);
-  const r = prefillLegalName(first.profile, 'MoblizeIT', first.filled);
-  assert.equal(r.profile.legalName, 'MoblizeIT');
+  const r = prefillLegalName(first.profile, 'SunRiseBakery', first.filled);
+  assert.equal(r.profile.legalName, 'SunRiseBakery');
 });
 
 test("the owner's own legal name is never overwritten", () => {
-  const first = prefillLegalName({}, 'MoblizeIT', undefined);
-  const typed = { ...first.profile, legalName: 'MoblizeIT LLC' };
+  const first = prefillLegalName({}, 'SunRiseBakery', undefined);
+  const typed = { ...first.profile, legalName: 'SunRiseBakery LLC' };
   const r = prefillLegalName(typed, 'Moblize Inc', first.filled);
-  assert.equal(r.profile.legalName, 'MoblizeIT LLC');
+  assert.equal(r.profile.legalName, 'SunRiseBakery LLC');
   assert.equal(r.filled, first.filled);
 });
 

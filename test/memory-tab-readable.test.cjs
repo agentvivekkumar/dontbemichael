@@ -28,7 +28,7 @@ const MICHAEL = [
   'The app keeps this file. Add notes to memory/inbox.md; they are sorted in here in the background.',
   '',
   '- [m1] fact | Work routing: email goes to Pam first | task | 2026-09-25',
-  '- [m3] reference | Office folder: ~/Documents/MoblizeIt/Office | task | 2026-09-25',
+  '- [m3] reference | Office folder: ~/Documents/SunriseBakery/Office | task | 2026-09-25',
   '- [m4] preference | Never email a customer without asking | owner | 2026-09-24',
   '- [m5] fact | Cloud Scheduler retryCount=0 | tool | 2026-09-25 | expires 2026-10-30',
   '- [m11] procedure | Shutdown protocol: steps in memory/procedures/shutdown-protocol.md | task | 2026-09-25',
