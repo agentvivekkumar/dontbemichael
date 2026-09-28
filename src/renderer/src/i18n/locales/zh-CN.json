@@ -1086,7 +1086,9 @@
     "onlyBetween": "只在",
     "and": "至",
     "windowHint": "结束时间早于开始时间。",
-    "timeN": "时间 {{n}}"
+    "timeN": "时间 {{n}}",
+    "dayTaken": "{{day}} 已在另一个时间里",
+    "daysClash": "{{days}} 不能同时在“每隔”行和另一个时间里。请在其中一行关掉它。"
   },
   "triggerHistory": {
     "justNow": "刚刚",

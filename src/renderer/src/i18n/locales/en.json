@@ -1086,7 +1086,9 @@
     "onlyBetween": "only between",
     "and": "and",
     "windowHint": "The end time is before the start time.",
-    "timeN": "Time {{n}}"
+    "timeN": "Time {{n}}",
+    "dayTaken": "{{day}} is in another time",
+    "daysClash": "{{days}} can't be in an every line and another time. Turn it off in one of them."
   },
   "triggerHistory": {
     "justNow": "just now",

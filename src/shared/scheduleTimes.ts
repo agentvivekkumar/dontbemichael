@@ -72,8 +72,45 @@ export function normalizeLine(raw: unknown): ScheduleLine | null {
   return line;
 }
 
-/** Every line made canonical, or null when there are none or any is unusable
- *  (a schedule with one bad line would run on a clock nobody set). */
+/** The days a line runs on. */
+export function lineDays(line: { kind: 'every' | 'at'; days?: number[] }): number[] {
+  return line.days && line.days.length ? line.days : line.kind === 'every' ? [0, 1, 2, 3, 4, 5, 6] : [];
+}
+
+/**
+ * Days claimed twice (owner, 2026-09-27: a weekend day ticked on "every 2h"
+ * while another line runs weekends at 2 PM "should not be allowed"). A day an
+ * "every" line runs on belongs to that line alone, because it already sets the
+ * rhythm for the day; several "on days" lines may share a day (08:00 and 14:00
+ * on weekdays). Returns the clashing days, sorted.
+ */
+export function clashingDays(lines: Array<{ kind: 'every' | 'at'; days?: number[] }>): number[] {
+  const clash = new Set<number>();
+  lines.forEach((a, i) => {
+    if (a.kind !== 'every') return;
+    const mine = lineDays(a);
+    lines.forEach((b, j) => {
+      if (i === j) return;
+      for (const d of lineDays(b)) if (mine.includes(d)) clash.add(d);
+    });
+  });
+  return [...clash].sort((x, y) => x - y);
+}
+
+/** The days line `i` can't take because another line holds them. */
+export function daysTakenFor(lines: Array<{ kind: 'every' | 'at'; days?: number[] }>, i: number): number[] {
+  const me = lines[i];
+  const taken = new Set<number>();
+  lines.forEach((other, j) => {
+    if (j === i) return;
+    if (me.kind === 'every' || other.kind === 'every') for (const d of lineDays(other)) taken.add(d);
+  });
+  return [...taken].sort((x, y) => x - y);
+}
+
+/** Every line made canonical, or null when there are none, any is unusable
+ *  (a schedule with one bad line would run on a clock nobody set), or two
+ *  lines claim a day an "every" line runs on. */
 export function normalizeTimes(raw: unknown): ScheduleLine[] | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_LINES) return null;
   const out: ScheduleLine[] = [];
@@ -82,7 +119,7 @@ export function normalizeTimes(raw: unknown): ScheduleLine[] | null {
     if (!line) return null;
     out.push(line);
   }
-  return out;
+  return clashingDays(out).length ? null : out;
 }
 
 /** True when `times` says no more than the old single-rule fields can: one

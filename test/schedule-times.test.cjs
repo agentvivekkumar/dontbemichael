@@ -111,3 +111,21 @@ test('main arms times like weekly, refuses bad lines, and agents are told how to
     for (const k of ['addTime', 'removeTime', 'onlyBetween', 'and', 'windowHint', 'timeN']) assert.ok(u[k], `${loc}: ${k}`);
   }
 });
+
+test('a day an every line runs on belongs to it alone (owner, 2026-09-27)', () => {
+  const clash = [{ kind: 'every', everyMs: 2 * H, days: [1, 2, 3, 4, 5, 6] }, { kind: 'at', days: [0, 6], minute: 840 }];
+  assert.deepEqual(T.clashingDays(clash), [6]);
+  assert.equal(T.normalizeTimes(clash), null, 'refused on save and in agent requests');
+  assert.equal(M.parseWhen([{ every: '2h', days: ['mon', 'sat'] }, { days: ['weekends'], at: '14:00' }]), null);
+  // Several "on days" lines may share a day.
+  assert.deepEqual(T.clashingDays([{ kind: 'at', days: [1, 2, 3, 4, 5], minute: 480 }, { kind: 'at', days: [1, 2, 3, 4, 5], minute: 840 }]), []);
+  // What each line's picker greys out.
+  assert.deepEqual(T.daysTakenFor(owners, 0), [0, 6]);
+  assert.deepEqual(T.daysTakenFor(owners, 1), [1, 2, 3, 4, 5]);
+  assert.deepEqual(T.daysTakenFor([{ kind: 'at', days: [1], minute: 1 }, { kind: 'at', days: [1], minute: 2 }], 0), []);
+  const ui = read('src/renderer/src/components/triggers/WhenLines.tsx');
+  assert.match(ui, /const taken = \(i: number\) => daysTakenFor\(lines, i\);/);
+  assert.match(ui, /disabled=\{blocked\}/);
+  assert.match(ui, /t\('triggersUi\.daysClash'/);
+  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /taken\?: number\[\];/);
+});

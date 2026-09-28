@@ -2,7 +2,7 @@ import { type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IntervalPicker, MiniButton, WeeklyPicker, Hint, inputStyle } from './ui';
 import { WEEKDAY_INITIALS, WEEKDAY_LABELS, formatMinute, normalizeWeekly } from '@shared/weeklySchedule';
-import { normalizeTimes, simpleTimes, MAX_LINES, type ScheduleLine } from '@shared/scheduleTimes';
+import { clashingDays, daysTakenFor, normalizeTimes, simpleTimes, MAX_LINES, type ScheduleLine } from '@shared/scheduleTimes';
 import type { ScheduledMission } from '@shared/missions';
 
 /**
@@ -72,6 +72,15 @@ export function WhenLines({ lines, onChange }: { lines: LineDraft[]; onChange: (
   const set = (i: number, next: LineDraft) => onChange(lines.map((l, j) => (j === i ? next : l)));
   const remove = (i: number) => onChange(lines.filter((_, j) => j !== i));
   const plain = isPlainEvery(lines);
+  // A day an "every" line runs on belongs to it alone (owner, 2026-09-27), so
+  // each line's picker greys out the days another line holds.
+  const taken = (i: number) => daysTakenFor(lines, i);
+  const clash = clashingDays(lines);
+  /** Days no "every" line holds, for a new line to start on. */
+  const freeDays = (days: number[]) => {
+    const everyDays = new Set(lines.filter((l) => l.kind === 'every').flatMap((l) => l.days));
+    return days.filter((d) => !everyDays.has(d));
+  };
   const tab = (active: boolean): CSSProperties => ({
     padding: '3px 10px 2px', border: 'none', cursor: 'pointer',
     background: active ? 'var(--cth-cream-100)' : 'transparent',
@@ -89,32 +98,60 @@ export function WhenLines({ lines, onChange }: { lines: LineDraft[]; onChange: (
           style={lines.length > 1 ? { padding: 6, boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', display: 'flex', flexDirection: 'column', gap: 6 } : { display: 'flex', flexDirection: 'column', gap: 6 }}
         >
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <button type="button" style={tab(line.kind === 'every')} onClick={() => line.kind !== 'every' && set(i, { kind: 'every', everyMs: 2 * HOUR, days: line.days, window: null })}>{t('triggersUi.every')}</button>
-            <button type="button" style={tab(line.kind === 'at')} onClick={() => line.kind !== 'at' && set(i, { kind: 'at', days: line.days.length === 7 ? [1, 2, 3, 4, 5] : line.days, minute: 9 * 60 })}>{t('triggersUi.onDays')}</button>
+            <button type="button" style={tab(line.kind === 'every')} onClick={() => {
+              if (line.kind === 'every') return;
+              // An "every" line can't take a day another line runs on.
+              const others = new Set(lines.filter((_, j) => j !== i).flatMap((l) => l.days));
+              set(i, { kind: 'every', everyMs: 2 * HOUR, days: line.days.filter((d) => !others.has(d)), window: null });
+            }}>{t('triggersUi.every')}</button>
+            <button type="button" style={tab(line.kind === 'at')} onClick={() => {
+              if (line.kind === 'at') return;
+              const blocked = new Set(taken(i));
+              const days = (line.days.length === 7 ? [1, 2, 3, 4, 5] : line.days).filter((d) => !blocked.has(d));
+              set(i, { kind: 'at', days, minute: 9 * 60 });
+            }}>{t('triggersUi.onDays')}</button>
             <span style={{ flex: 1 }} />
             {lines.length > 1 && <MiniButton onClick={() => remove(i)}>{t('triggersUi.removeTime')}</MiniButton>}
           </div>
           {line.kind === 'at'
-            ? <WeeklyPicker value={{ days: line.days, minute: line.minute }} onChange={(w) => set(i, { kind: 'at', days: w.days, minute: w.minute })} />
-            : <EveryLine line={line} longRange={plain} onChange={(next) => set(i, next)} />}
+            ? <WeeklyPicker value={{ days: line.days, minute: line.minute }} taken={taken(i)} onChange={(w) => set(i, { kind: 'at', days: w.days, minute: w.minute })} />
+            : <EveryLine line={line} longRange={plain} taken={taken(i)} onChange={(next) => set(i, next)} />}
         </div>
       ))}
       {lines.length < MAX_LINES && (
         <div>
-          <MiniButton onClick={() => onChange([...lines, { kind: 'at', days: [0, 6], minute: 14 * 60 }])}>{t('triggersUi.addTime')}</MiniButton>
+          {/* A new line starts on the weekend, or whichever days no "every"
+              line holds yet. */}
+          <MiniButton onClick={() => {
+            const weekend = freeDays([0, 6]);
+            if (weekend.length || freeDays(ALL_DAYS).length) {
+              onChange([...lines, { kind: 'at', days: weekend.length ? weekend : freeDays(ALL_DAYS), minute: 14 * 60 }]);
+              return;
+            }
+            // Every day is held by one "every" line (the usual start): the new
+            // line takes the weekend from it, so both can be seen and changed.
+            const holder = lines.findIndex((l) => l.kind === 'every' && l.days.length === 7);
+            if (holder < 0) { onChange([...lines, { kind: 'at', days: [], minute: 14 * 60 }]); return; }
+            const moved = lines.map((l, j) => (j === holder ? { ...l, days: [1, 2, 3, 4, 5] } : l));
+            onChange([...moved, { kind: 'at', days: [0, 6], minute: 14 * 60 }]);
+          }}>{t('triggersUi.addTime')}</MiniButton>
         </div>
+      )}
+      {clash.length > 0 && (
+        <Hint>{t('triggersUi.daysClash', { days: clash.map((d) => WEEKDAY_LABELS[d]).join(', ') })}</Hint>
       )}
     </div>
   );
 }
 
-function EveryLine({ line, longRange, onChange }: {
-  line: Extract<LineDraft, { kind: 'every' }>; longRange: boolean; onChange: (l: LineDraft) => void;
+function EveryLine({ line, longRange, taken, onChange }: {
+  line: Extract<LineDraft, { kind: 'every' }>; longRange: boolean; taken: number[]; onChange: (l: LineDraft) => void;
 }) {
   const { t } = useTranslation();
-  const toggleDay = (d: number) => onChange({
-    ...line, days: line.days.includes(d) ? line.days.filter((x) => x !== d) : [...line.days, d].sort((a, b) => a - b)
-  });
+  const toggleDay = (d: number) => {
+    if (taken.includes(d) && !line.days.includes(d)) return;
+    onChange({ ...line, days: line.days.includes(d) ? line.days.filter((x) => x !== d) : [...line.days, d].sort((a, b) => a - b) });
+  };
   const time = (value: number, apply: (m: number) => void) => (
     <input
       type="time"
@@ -137,15 +174,17 @@ function EveryLine({ line, longRange, onChange }: {
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         {WEEKDAY_INITIALS.map((initial, d) => {
           const on = line.days.includes(d);
+          const blocked = !on && taken.includes(d);
           return (
             <button
               key={d}
               type="button"
               onClick={() => toggleDay(d)}
-              title={WEEKDAY_LABELS[d]}
+              disabled={blocked}
+              title={blocked ? t('triggersUi.dayTaken', { day: WEEKDAY_LABELS[d] }) : WEEKDAY_LABELS[d]}
               aria-pressed={on}
               style={{
-                width: 26, height: 24, border: 'none', cursor: 'pointer',
+                width: 26, height: 24, border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.4 : 1,
                 background: on ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
                 boxShadow: on ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 11,
