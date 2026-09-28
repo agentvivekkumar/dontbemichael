@@ -12,7 +12,7 @@ const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 test('agents are drawn as their characters', () => {
   const panel = read('src/renderer/src/components/MemoryGraphPanel.tsx');
-  assert.match(panel, /\{n\.kind === 'agent' \? \([\s\S]{0,400}<image\s+href=\{portraitDataUrl\(n\.character\)\}/);
+  assert.match(panel, /\{n\.kind === 'agent' \? \([\s\S]{0,900}<image\s+href=\{portraitDataUrl\(n\.character\)\}/);
   assert.match(panel, /style=\{\{ imageRendering: 'pixelated' \}\}/);
   const graph = read('src/renderer/src/components/memoryGraph/buildGraph.ts');
   assert.match(graph, /character: a\.character,/);
