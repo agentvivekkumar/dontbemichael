@@ -40,7 +40,7 @@ test('a period inside a quoted request does not split the sentence', () => {
 });
 
 test('the work style drops the line that addresses the agent', () => {
-  assert.equal(workStyleBody('The owner set this work style for your role at Moblize, Mountain View.\n\n### The job\nSort mail.'), '### The job\nSort mail.');
+  assert.equal(workStyleBody('The owner set this work style for your role at Sunrise Bakery, Austin.\n\n### The job\nSort mail.'), '### The job\nSort mail.');
   assert.equal(workStyleBody(undefined), '');
 });
 

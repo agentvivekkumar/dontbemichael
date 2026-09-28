@@ -173,20 +173,20 @@ test('parseWhen reads intervals and day lists', () => {
 
 test('an add request proposes, and writes nothing', () => {
   const list = [mk()];
-  const r = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { days: ['fri'], at: '09:00' } }, list, 'god', 5, 'r1');
+  const r = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { days: ['fri'], at: '09:00' } }, list, 'god', 5, 'r1', 'why');
   assert.equal(r.ok, true);
-  assert.deepEqual(r.request, { id: 'r1', agentId: 'pam', op: 'add', draft: { label: 'Check invoices', intervalMs: 86_400_000, weekly: { days: [5], minute: 540 } }, createdAt: 5 });
+  assert.deepEqual(r.request, { id: 'r1', agentId: 'pam', op: 'add', draft: { label: 'Check invoices', intervalMs: 86_400_000, weekly: { days: [5], minute: 540 } }, createdAt: 5, reason: 'why' });
   assert.equal(list.length, 1, 'building a request never touches the list');
 });
 
 test('requests about another agent\'s schedule are refused', () => {
-  const r = M.buildScheduleRequest('oscar', { op: 'pause', id: 'm1' }, [mk()], 'god', 0, 'r');
+  const r = M.buildScheduleRequest('oscar', { op: 'pause', id: 'm1' }, [mk()], 'god', 0, 'r', 'why');
   assert.equal(r.ok, false);
   assert.match(r.reason, /another team member/);
 });
 
 test('malformed and unknown requests are refused with a reason', () => {
-  const bad = (p) => M.buildScheduleRequest('pam', p, [mk()], 'god', 0, 'r');
+  const bad = (p) => M.buildScheduleRequest('pam', p, [mk()], 'god', 0, 'r', 'why');
   assert.equal(bad(null).ok, false);
   assert.equal(bad({ op: 'explode' }).ok, false);
   assert.equal(bad({ op: 'add', when: { every: '1h' } }).ok, false, 'no label');
@@ -197,7 +197,7 @@ test('malformed and unknown requests are refused with a reason', () => {
 });
 
 test('approve applies an add exactly once, as the agent\'s', () => {
-  const req = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { every: '1d' } }, [], 'god', 0, 'r').request;
+  const req = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { every: '1d' } }, [], 'god', 0, 'r', 'why').request;
   const r = M.applyScheduleRequest(req, [], 'new1');
   assert.equal(r.ok, true);
   assert.deepEqual(r.missions, [{ id: 'new1', label: 'Check invoices', intervalMs: 86_400_000, to: 'pam', body: '', enabled: true, createdBy: 'pam' }]);
@@ -205,20 +205,20 @@ test('approve applies an add exactly once, as the agent\'s', () => {
 
 test('approve applies update, pause, resume and delete', () => {
   const list = [mk()];
-  const req = (p) => M.buildScheduleRequest('pam', p, list, 'god', 0, 'r').request;
+  const req = (p) => M.buildScheduleRequest('pam', p, list, 'god', 0, 'r', 'why').request;
   assert.equal(M.applyScheduleRequest(req({ op: 'pause', id: 'm1' }), list, 'x').missions[0].enabled, false);
   assert.deepEqual(M.applyScheduleRequest(req({ op: 'delete', id: 'm1' }), list, 'x').missions, []);
   const up = M.applyScheduleRequest(req({ op: 'update', id: 'm1', when: { days: ['mon'], at: '08:00' } }), list, 'x').missions[0];
   assert.deepEqual(up.weekly, { days: [1], minute: 480 });
   assert.equal(up.label, 'Triage the inbox', 'a when-only update keeps the label');
   const paused = [mk({ enabled: false })];
-  const resume = M.buildScheduleRequest('pam', { op: 'resume', id: 'm1' }, paused, 'god', 0, 'r').request;
+  const resume = M.buildScheduleRequest('pam', { op: 'resume', id: 'm1' }, paused, 'god', 0, 'r', 'why').request;
   assert.equal(M.applyScheduleRequest(resume, paused, 'x').missions[0].enabled, true);
 });
 
 test('a request whose schedule changed since is stale and never applies', () => {
   const list = [mk()];
-  const req = M.buildScheduleRequest('pam', { op: 'pause', id: 'm1' }, list, 'god', 0, 'r').request;
+  const req = M.buildScheduleRequest('pam', { op: 'pause', id: 'm1' }, list, 'god', 0, 'r', 'why').request;
   const edited = [mk({ label: 'Owner renamed it' })];
   assert.equal(M.requestIsStale(req, edited), true);
   assert.deepEqual(M.applyScheduleRequest(req, edited, 'x'), { ok: false, error: 'stale' });

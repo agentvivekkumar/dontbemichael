@@ -8,6 +8,7 @@ import { RealtimeMichaelToggle } from './RealtimeMichaelToggle';
 import { SHOW_VOICE } from '@shared/buildFeatures';
 import { CostHud } from '@/realtime/CostHud';
 import { AccentColorName } from '@/design/tokens';
+import { actionText } from '@/store/store';
 import { OfficeCharacterName } from '@/scene/office/cast';
 
 export interface AgentCardProps {
@@ -130,7 +131,7 @@ export function AgentCard({
   const nextLine = nextRunAt
     ? t('agentCard.nextRun', { time: new Date(nextRunAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) })
     : null;
-  const infoLine = (status !== 'idle' && action) ? action : (nextLine ?? project);
+  const infoLine = (status !== 'idle' && action) ? actionText(action, t) : (nextLine ?? project);
   const noteFirstLine = (note ?? '').split('\n').find((l) => l.trim()) ?? '';
 
   return (

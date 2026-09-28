@@ -19,7 +19,7 @@ import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart, rewrittenInstructions } from '../../../shared/teamPlan';
 import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
-import { ACTION_AT_PROMPT } from '@/store/store';
+import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
 
 const GOD_ID = 'god';
 /** Accent palette for MAIN-spawned (voice-hired) agents — picked deterministically
@@ -326,7 +326,7 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
       cwd: folder,
       goal: teamMemberGoal(def, { name: config.businessName, city: config.businessCity }),
       status: 'idle',
-      action: 'starting up',
+      action: ACTION_CLOCKING_IN,
       progress: 0,
       currentStation: 'desk',
       ptyId,
@@ -1143,7 +1143,7 @@ export function useHive(config: HarnessConfig | null): void {
         tmuxTarget: '',
         cwd: rec.cwd,
         status: 'idle',
-        action: 'starting up',
+        action: ACTION_CLOCKING_IN,
         progress: 0,
         currentStation: 'desk',
         ptyId: rec.id,

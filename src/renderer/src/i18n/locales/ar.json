@@ -116,7 +116,9 @@
     "scheduleDelete": "حذف: {{label}}",
     "scheduleStale": "تغيّر هذا منذ أن طلبه {{name}}، لذا يمكن رفضه فقط.",
     "approve": "موافقة",
-    "decline": "رفض"
+    "decline": "رفض",
+    "scheduleWhy": "السبب: {{reason}}",
+    "scheduleMichael": "يقول {{name}}: {{note}}"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",
@@ -515,102 +517,127 @@
     "mcpSafe": "خوادم MCP (آمنة، مفعّلة مسبقًا):",
     "mcpConsent": "⚠️ MCP (تحتاج موافقتك، غير مفعّلة تلقائيًا):",
     "mcpEnableInSettings": "(فعّلها في الإعدادات ← MCP بعد المراجعة)",
-    "sections": {
-      "identity": {
-        "label": "الهوية",
-        "hint": "الاسم · الشخصية · اللون"
-      },
-      "workspace": {
-        "label": "مساحة العمل",
-        "hint": "المجلد · العزل · الاستئناف"
-      },
-      "engine": {
-        "label": "المحرّك",
-        "hint": "المزوّد · النموذج · الأمر"
-      },
-      "briefing": {
-        "label": "الإحاطة",
-        "hint": "الوصف · الهدف"
-      }
-    },
     "name": "الاسم",
     "namePlaceholder": "Ada",
     "character": "الشخصية",
-    "color": "اللون",
-    "project": "المشروع",
-    "pickProject": "اختر مشروعًا، أو أضف واحدًا جديدًا:",
-    "noProjects": "لا مشاريع بعد، أضف واحدًا للبدء:",
-    "addProject": "أضف مشروعًا",
-    "addProjectTitle": "اختر مجلدًا وسجّله كمشروع",
     "projectPlaceholder": "/path/to/your/project",
     "pick": "اختر",
-    "saveAsProject": "احفظ كمشروع",
-    "saveAsProjectTitle": "احفظ هذا المجلد في مشاريعك ليصبح اختيارًا بنقرة واحدة في المرة القادمة",
-    "gitIsolation": "عزل git (شجرة عمل خاصة)",
-    "resumeSession": "معرّف جلسة للاستئناف (اختياري)",
-    "resumePlaceholder": "الصق معرّف جلسة Claude لمتابعة محادثتها",
-    "folderFromSession": "المجلد مضبوط من الجلسة: {{path}}",
-    "resumeNote": "سيستأنف هذه الجلسة في المجلد المختار (عزل git معطّل).",
     "provider": "المزوّد",
-    "providerAntigravity": "أنشئ أداة Antigravity (agy) بنموذج Gemini",
-    "providerCodex": "أنشئ أداة Codex (codex) بلا رايات خاصة بـClaude",
-    "providerCustom": "شغّل أي أمر، بلا رايات خاصة بـClaude",
     "model": "النموذج",
-    "cliDefaultModel": "النموذج الافتراضي للـCLI",
-    "fromHire": "{{model}} (من التعيين)",
-    "ossModels": "نماذج مفتوحة المصدر",
-    "ossLocal": "محلي · بلا مفتاح (Ollama / LM Studio)",
-    "ossByok": "عبر مزوّد مفتوح · بمفتاحك",
-    "ossLocalTitle": "{{slug}} · يحتاج ~{{ram}} من الذاكرة، اجلبه بـ: ollama pull {{tag}}",
-    "ossByokTitle": "{{slug}} · اضبط {{keyEnv}} في الإعدادات ← محرّكات الذكاء الاصطناعي",
-    "byokNote": "مفاتيحك ونقاط النهاية المحلية لهذا المحرّك موجودة في الإعدادات ← محرّكات الذكاء الاصطناعي. جديد على النماذج المحلية؟ اقرأ \"شغّل على نماذج مفتوحة\" أو \"أعِدّه على جهاز Mac Mini\". التحقّق الحيّ الكامل ينتظر استدعاءات نماذج حقيقية (تحقّق على جهازك).",
     "command": "الأمر",
-    "commandAuto": "الأمر (الوضع التلقائي مفعّل)",
-    "templates": "القوالب",
-    "templatesHint": {
-      "repoJanitor": {
-        "label": "مُنظِّف المستودع"
-      },
-      "docsWriter": {
-        "label": "كاتب التوثيق"
-      },
-      "bugTriager": {
-        "label": "فارز العلل"
-      },
-      "researchAssistant": {
-        "label": "مساعد البحث"
-      },
-      "releaseManager": {
-        "label": "مدير الإصدارات"
-      }
-    },
     "role": "الدور",
     "rolePlaceholder": "مثلًا: المالية",
-    "roleDescription": "وصف الدور",
-    "roleDescriptionPlaceholder": "مثلًا: يتابع الأموال الداخلة والخارجة، ويرسل ملخصًا أسبوعيًا",
-    "roleHelp": "يقرأ {{godName}} الدور ووصفه ليقرر أي عمل يعطيه لهذا العضو.",
-    "workStyle": "أسلوب العمل (اختياري)",
-    "workStylePlaceholder": "مثلًا: راجع كل رقم مرتين. أرسل ملخصًا قصيرًا حين تنتهي.",
-    "workStyleHelp": "لا يرى {{godName}} هذا. إنه طريقة هذا العضو في إنجاز عمله، ومنه المهام التي يشغّلها وفق جدول: الخطوات التي يتبعها وما يتحقق منه قبل أن ينتهي.",
-    "folderInsideMichael": "مجلد داخل مجلد {{godName}}، باسم الدور. لا يفتحه إلا هذا العضو ومن يشاركه الدور و{{godName}}.",
-    "folderPrivate": "لا يفتحه إلا هذا العضو ومن يشاركه المجلد و{{godName}}.",
+    "roleDescriptionPlaceholder": "مثال: يرد على العملاء الذين يكتبون إلى بريد الدعم، ويحوّل طلبات الاسترداد إلى Oscar.",
+    "roleHelp": "يقرأ {{godName}} هذا ليقرر ما يذهب إلى {{name}}. اذكر الطلبات أو صندوق البريد أو العملاء، حتى لا يتولى زميل الشيء نفسه.",
+    "workStyle": "أسلوب العمل",
     "errFolderShared": "هذا المجلد خاص بـ{{godName}}. اختر مجلدًا خاصًا بهذا العضو.",
-    "importHire": "استورد تعيينًا",
     "importHireDesc": "يحمّل استيراد التعيين وكيلًا جاهزًا من ملف .json، ويملأ كل حقل أدناه لتراجعه. لا يُنشأ شيء حتى تضغط \"إنشاء\".",
     "generateWithAI": "ولّد واحدًا بالذكاء الاصطناعي…",
     "hideAIPrompt": "أخفِ موجّه الذكاء الاصطناعي",
-    "aiPromptHint": "انسخ هذا إلى Claude/ChatGPT/Gemini، واملأ التفاصيل في الأسفل، ثم احفظ ردّه بصيغة JSON في ملف ‎.json واستورده هنا.",
-    "copied": "نُسخ ✓",
-    "copyPrompt": "انسخ الموجّه",
     "importHireBtn": "استورد تعيينًا…",
     "importHireBtnTitle": "استورد بيان تعيين (‎.json)",
-    "spawn": "إنشاء",
-    "spawning": "جارٍ الإنشاء...",
+    "spawn": "تعيين",
+    "spawning": "جارٍ التعيين...",
     "errName": "الاسم مطلوب",
     "errFolder": "اختر مجلدًا أولًا",
     "errCommand": "الأمر مطلوب",
     "hireProgress": "التعيين {{current}} من {{total}}",
-    "skipHire": "تخطَّ التعيين"
+    "skipHire": "تخطَّ التعيين",
+    "castGroup": {
+      "office": "الإدارة والشؤون الإدارية",
+      "sales": "المبيعات والتسويق",
+      "accounting": "المحاسبة",
+      "people": "الموارد البشرية والدعم",
+      "it": "تقنية المعلومات والأمن",
+      "operations": "العمليات"
+    },
+    "castRole": {
+      "michael": "المدير",
+      "pam": "الإدارة",
+      "erin": "الإدارة",
+      "dwight": "المبيعات",
+      "jim": "المبيعات",
+      "stanley": "المبيعات",
+      "phyllis": "المبيعات",
+      "andy": "المبيعات",
+      "ryan": "التسويق",
+      "oscar": "المحاسبة",
+      "angela": "المحاسبة",
+      "kevin": "المحاسبة",
+      "toby": "الموارد البشرية",
+      "kelly": "دعم العملاء",
+      "nick": "تقنية المعلومات",
+      "sadiq": "أمن المعلومات",
+      "creed": "مراقبة الجودة",
+      "meredith": "سلسلة الإمداد",
+      "darryl": "المستودع"
+    },
+    "wizard": {
+      "steps": "خطوات التعيين",
+      "step": {
+        "who": "من",
+        "job": "الوظيفة",
+        "role": "الدور",
+        "setup": "إنهاء"
+      },
+      "stepHint": {
+        "who": "اختر شخصًا",
+        "job": "وظيفته أو غيرها",
+        "role": "الاسم والدور وفحص التداخل",
+        "setup": "أسلوب العمل والمجلد والنموذج"
+      },
+      "nameTaken": "يوجد في الفريق من اسمه {{name}}. اختر اسمًا آخر.",
+      "errJob": "أعط الدور مسمى أو اكتب ما يتولاه {{name}}.",
+      "errOverlap": "هذا يتداخل مع عمل زميل. اربطه بصندوق بريد أو بموضوع، أو غيّر ما يتولاه الموظف الجديد.",
+      "theirJob": "وظيفة {{name}}",
+      "likeTeammate": "كما يؤديها {{name}} اليوم",
+      "yourOffice": "وظائف في مكتبك",
+      "newJob": "شيء جديد",
+      "newJobTitle": "اكتب وظيفة جديدة",
+      "newJobSummary": "ابدأ بدور فارغ وما يتولاه وأسلوب العمل.",
+      "allJobs": "كل الوظائف من كل أنواع الأعمال",
+      "whatToSend": "ما يتولاه {{name}}",
+      "folder": "المجلد",
+      "folderDefault": "استخدم المجلد المقترح",
+      "back": "رجوع",
+      "next": "التالي",
+      "checking": "جارٍ التحقق...",
+      "checkingTeam": "جارٍ مقارنة هذه الوظيفة بفريقك...",
+      "notChecked": "لم تتم مقارنة هذه الوظيفة بفريقك بعد.",
+      "checkNow": "تحقق الآن",
+      "fullCheckFailed": "تعذر إجراء الفحص الكامل، لذا قورنت المسميات والصياغة فقط.",
+      "distinct": "مختلفة عن كل أعضاء الفريق.",
+      "overlaps": "هذه تتداخل مع {{names}}.",
+      "boundTo": "يتولى {{name}} {{scope}} فقط.",
+      "otherLine": "يُضاف إلى سطر {{name}}: {{line}}",
+      "unbind": "إزالة الربط",
+      "makeParticular": "لا ينضم {{name}} إلا بعمل خاص به. اربطه بشيء محدد، أو غيّر ما يتولاه {{name}}.",
+      "suggestion": "فكرة: {{text}}",
+      "bindMailbox": "اربط بصندوق بريد",
+      "bindTopic": "اربط بموضوع",
+      "checkAgain": "تحقق مرة أخرى",
+      "noFreeMailbox": "لكل صندوق بريد من يستخدمه. أضف واحدًا في الإعدادات، أو انقل واحدًا من صفحة القدرات.",
+      "bind": "اربط",
+      "topicPlaceholder": "مثال: طلبات تقديم الطعام",
+      "editToFix": "يمكنك أيضًا تغيير ما يتولاه {{name}} ثم التحقق مرة أخرى.",
+      "mailboxScope": "صندوق البريد {{address}}",
+      "familyJobs": "وظائف {{role}} من كل أنواع الأعمال",
+      "showAll": "عرض كل الوظائف ({{count}} أخرى)",
+      "showFamily": "عرض وظائف {{role}} فقط",
+      "modelDefault": "{{model}} (افتراضي)",
+      "cliDefault": "النموذج الافتراضي في Claude",
+      "sameWork": "العمل الذي يتولاه {{name}} يبدو العمل نفسه، مهما كان اسم الدور.",
+      "errWorkStyle": "أسلوب العمل مطلوب: اكتب كيف يؤدي عضو الفريق هذا عمله.",
+      "workStylePlaceholder": "الوظيفة: ما يفعله {{name}} ولماذا.\nطريقة العمل: كيف يحب المالك أن يُنجز.\nيسأل المالك أولًا: ما يحتاج موافقة.",
+      "describing": "جارٍ كتابة الوظيفة بكلمات بسيطة...",
+      "writingInstructions": "جارٍ كتابة تعليمات {{name}}...",
+      "errInstructions": "تعذرت كتابة التعليمات. اضغط تعيين مرة أخرى.",
+      "workStyleIntro": "طريقة {{name}} في أداء الوظيفة: الغرض منها، وكيف تحب أن تُنجز، وما يحتاج موافقتك أولًا. يتبعه {{name}} في كل مهمة، والمهام المجدولة أيضًا. اكتبه بكلماتك؛ يحوّله التطبيق إلى تعليمات عند التعيين. لا يستخدمه {{godName}}.",
+      "folderPurpose": "المكان الذي يحفظ فيه {{name}} ملفات هذه الوظيفة. لا يفتحه إلا {{name}} و{{godName}}.",
+      "modelPurpose": "نموذج الذكاء الاصطناعي الذي يفكر به {{name}}. يبدأ بالنموذج الافتراضي لأعضاء الفريق في الإعدادات. النماذج الأكبر أفضل في القرارات الصعبة؛ والأصغر أسرع وأرخص.",
+      "resolved": "جاهز: عمل {{name}} منفصل عن عمل {{names}}.",
+      "comparingWith": "جارٍ المقارنة بوظيفة {{name}}"
+    }
   },
   "onboarding": {
     "titles": {
@@ -847,7 +874,8 @@
       "compacting": "يضغط السياق",
       "looping": "يدور في حلقة: القاطع مسلَّح",
       "runningFloor": "يُدير الأرضية",
-      "idle": "خامل"
+      "idle": "لا شيء لأفعله",
+      "clockingIn": "يسجّل الحضور…"
     }
   },
   "setupPanel": {
@@ -1012,7 +1040,8 @@
     "runAria": "تشغيل {{job}}",
     "closedGroup": "{{name}} (مغلق)",
     "closedNote": "{{name}} مغلق، لذا هذه المواعيد متوقفة مؤقتًا.",
-    "relayHint": "يوزع {{godName}} هذا العمل على الفريق."
+    "relayHint": "يوزع {{godName}} هذا العمل على الفريق.",
+    "approvedBy": "وافق عليه {{name}}"
   },
   "webhooksSection": {
     "summaryNone": "لا شيء",
@@ -1055,7 +1084,15 @@
     "at": "عند",
     "weekdays": "أيام العمل",
     "everyDay": "كل يوم",
-    "pickDayHint": "اختر يومًا واحدًا على الأقل، وإلا فلن يعمل هذا أبدًا."
+    "pickDayHint": "اختر يومًا واحدًا على الأقل، وإلا فلن يعمل هذا أبدًا.",
+    "addTime": "أضف وقتًا آخر",
+    "removeTime": "إزالة",
+    "onlyBetween": "فقط بين",
+    "and": "و",
+    "windowHint": "وقت الانتهاء قبل وقت البدء.",
+    "timeN": "الوقت {{n}}",
+    "dayTaken": "{{day}} موجود في وقت آخر",
+    "daysClash": "لا يمكن أن يكون {{days}} في سطر التكرار وفي وقت آخر معًا. أوقفه في أحدهما."
   },
   "triggerHistory": {
     "justNow": "الآن",
@@ -1510,7 +1547,7 @@
     "country": "الدولة",
     "contactHead": "بيانات التواصل",
     "legalName": "الاسم القانوني",
-    "legalNamePlaceholder": "مثلًا: MoblizeIT LLC",
+    "legalNamePlaceholder": "مثلًا: Sunrise Bakery LLC",
     "entityType": "نوع الكيان",
     "entity": {
       "sole-proprietor": "مؤسسة فردية",
@@ -1720,6 +1757,11 @@
     "schedulesOn": "{{count}} مفعّل",
     "schedulesNone": "لا شيء",
     "pickMailbox": "اختر صندوق بريد",
-    "addMailbox": "أضف صندوق بريد جديدًا"
+    "addMailbox": "أضف صندوق بريد جديدًا",
+    "heldBy": "يستخدمه {{name}}",
+    "moveMailbox": "يتابع {{from}} البريد {{address}}. هل تنقله إلى {{to}}؟ سيتوقف {{from}} عن متابعة البريد.",
+    "moveMailboxFree": "استخدام {{address}}؟",
+    "moveIt": "انقله",
+    "keepIt": "أبقه"
   }
 }

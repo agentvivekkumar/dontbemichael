@@ -1,7 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
+import { InfoTip } from './InfoTip';
+import { useBackdropClose } from '@/hooks/useBackdropClose';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -17,6 +20,7 @@ import {
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
+import { plainFallback } from '@shared/workStyleText';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -32,6 +36,7 @@ export interface EditAgentModalProps {
  */
 export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const updateAgent = useStore((s) => s.updateAgent);
+  const godName = useResolvedGodName();
   const renameAgent = useStore((s) => s.renameAgent);
   const [nameError, setNameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
@@ -48,7 +53,35 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   // two fields and joined back on save (agentRole.ts).
   const [role, setRole] = useState(() => splitAgentRole(agent.description).role);
   const [roleDescription, setRoleDescription] = useState(() => splitAgentRole(agent.description).roleDescription);
-  const [goal, setGoal] = useState(agent.goal ?? '');
+  // Work style in two forms (owner, 2026-09-27): the owner edits a plain
+  // description (`goal` here); the agent keeps its instructions (agent.goal),
+  // rewritten from the description on save only when it changed.
+  const [goal, setGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
+  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
+  const [describing, setDescribing] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const [goalError, setGoalError] = useState(false);
+  const [writeError, setWriteError] = useState(false);
+  const describeSeq = useRef(0);
+  /** Show the agent's instructions as a plain description: the quick rewrite
+   *  at once, the model's when it arrives, unless the owner started typing. */
+  const describe = (instructions: string): void => {
+    const seq = ++describeSeq.current;
+    const quick = instructions.trim() ? plainFallback(instructions, agent.name) : '';
+    setGoal(quick);
+    setPlainOfGoal(quick);
+    if (!instructions.trim()) { setDescribing(false); return; }
+    setDescribing(true);
+    const title = splitAgentRole(agent.description).role;
+    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: agent.name, title: title || undefined, manager: godName } })
+      .then((res) => {
+        if (seq !== describeSeq.current || res.source !== 'ai' || !res.text) return;
+        setGoal((cur) => (cur === quick ? res.text : cur));
+        setPlainOfGoal((cur) => (cur === quick ? res.text : cur));
+      })
+      .catch(() => { /* the quick rewrite stays */ })
+      .finally(() => { if (seq === describeSeq.current) setDescribing(false); });
+  };
 
   useEffect(() => {
     void window.cth.getConfig().then(setConfig).catch(() => setConfig(null));
@@ -63,7 +96,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     setModel(agent.model);
     setRole(splitAgentRole(agent.description).role);
     setRoleDescription(splitAgentRole(agent.description).roleDescription);
-    setGoal(agent.goal ?? '');
+    describe(agent.goal ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id]);
 
   const pickProvider = (id: AgentProvider) => {
@@ -77,10 +111,38 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   };
 
   const preset = providerPreset(provider);
+  const backdrop = useBackdropClose(onClose);
 
   const save = async () => {
-    if (saving) return;
+    if (saving || writing) return;
     const trimmedName = name.trim() || agent.name;
+    // Work style is required for a team member (owner, 2026-09-27); Michael and
+    // his assistant have none.
+    if (!agent.isGod && !agent.isAssistant && !goal.trim()) { setGoalError(true); return; }
+    setGoalError(false);
+    // The instructions: unchanged when the description is, else written from
+    // it to the house prompting guidelines, keeping the old wording that fits.
+    let trimmedGoal = (agent.goal ?? '').trim();
+    // Michael and his assistant may clear theirs; that saves no work style.
+    if (!goal.trim()) trimmedGoal = '';
+    else if (goal.trim() !== plainOfGoal.trim()) {
+      setWriting(true);
+      setWriteError(false);
+      const res = await window.cth.workStyleConvert({
+        to: 'instructions',
+        text: goal,
+        ctx: {
+          name: trimmedName,
+          title: role.trim() || undefined,
+          business: { name: config?.businessName, city: config?.businessCity },
+          manager: godName
+        },
+        previous: agent.goal || undefined
+      }).catch(() => null);
+      setWriting(false);
+      if (!res?.text?.trim()) { setWriteError(true); return; }
+      trimmedGoal = res.text.trim();
+    }
     // A new name goes through the office registry first, the rename Michael
     // and the team read names from. If it's refused (say, the name is taken),
     // the dialog stays open and nothing is saved (owner, 2026-09-25).
@@ -93,7 +155,6 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     setNameError(undefined);
     // Both fields cleared keeps the role it had, rather than saving a blank.
     const trimmedDescription = joinAgentRole(role, roleDescription) || agent.description;
-    const trimmedGoal = goal.trim();
     const command = config
       ? buildSpawnCommand(config, model, provider)
       : agent.command;
@@ -117,7 +178,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
 
   return (
     <div
-      onClick={onClose}
+      {...backdrop}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(26, 19, 32, 0.6)',
@@ -267,31 +328,43 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 />
               </Row>
 
-              <Row label="Role description">
+              <Row
+                label={`What ${name.trim() || agent.name} handles`}
+                info={`Michael reads this to decide what goes to ${name.trim() || agent.name}. Name the requests, inbox or customers, so no teammate covers the same thing.`}
+              >
                 <textarea
                   value={roleDescription}
                   onChange={(e) => setRoleDescription(e.target.value)}
-                  placeholder="For example: Keeps track of money in and money out, and sends a weekly summary"
+                  placeholder="For example: Answers customers who write to the support inbox, and passes refund requests to Oscar."
                   rows={3}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                 />
               </Row>
-              <span style={helperStyle}>
-                Michael reads the role and role description to decide which work to give this team member.
-              </span>
 
-              <Row label="Work style (optional)">
+              <Row
+                label="Work style"
+                info={`How ${name.trim() || agent.name} does the job: what it is for, how you like it done, and what needs your approval first, scheduled jobs included. Write it in your own words; the app turns it into instructions when you save a change. Michael doesn't use it.`}
+              >
                 <textarea
                   value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  placeholder="For example: Check every number twice. Send a short summary when you finish."
+                  onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
+                  aria-invalid={goalError || undefined}
+                  placeholder={`The job: what ${name.trim() || agent.name} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.`}
                   rows={4}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
                 />
               </Row>
-              <span style={helperStyle}>
-                Michael doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.
-              </span>
+              {goalError && (
+                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-900)' }}>
+                  ! Work style is required: write how {agent.name} does the job.
+                </span>
+              )}
+              {describing && <span aria-live="polite" style={helperStyle}>Putting the job into plain words...</span>}
+              {writeError && (
+                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-900)' }}>
+                  ! The instructions could not be written. Try saving again.
+                </span>
+              )}
             </Section>
               </div>
             </div>
@@ -299,7 +372,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
               <PixelButton variant="ghost" size="md" onClick={onClose}>cancel</PixelButton>
               <div style={{ flex: 1 }} />
-              <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving}>save changes</PixelButton>
+              <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? 'writing instructions...' : 'save changes'}</PixelButton>
             </div>
           </div>
         </PixelPanel>
@@ -353,15 +426,20 @@ function Section({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** A field with its label; `info` puts the explanation behind an info icon
+ *  (owner, 2026-09-27: less verbose everywhere). */
+function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{
-        fontFamily: 'var(--cth-font-display)',
-        fontSize: 8, lineHeight: '12px',
-        color: 'var(--cth-ink-700)',
-        textTransform: 'uppercase'
-      }}>{label}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{
+          fontFamily: 'var(--cth-font-display)',
+          fontSize: 8, lineHeight: '12px',
+          color: 'var(--cth-ink-700)',
+          textTransform: 'uppercase'
+        }}>{label}</span>
+        {info && <InfoTip text={info} label={label} />}
+      </span>
       {children}
     </label>
   );

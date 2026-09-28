@@ -116,7 +116,9 @@
     "scheduleDelete": "Delete: {{label}}",
     "scheduleStale": "This changed since {{name}} asked, so it can only be declined.",
     "approve": "Approve",
-    "decline": "Decline"
+    "decline": "Decline",
+    "scheduleWhy": "Why: {{reason}}",
+    "scheduleMichael": "{{name}}: {{note}}"
   },
   "agentStrip": {
     "privateNote": "PRIVATE NOTE · {{name}}",
@@ -515,102 +517,127 @@
     "mcpSafe": "MCP servers (safe, enabled by default):",
     "mcpConsent": "⚠️ MCP (needs your consent, NOT enabled automatically):",
     "mcpEnableInSettings": "(enable in Settings → MCP after reviewing)",
-    "sections": {
-      "identity": {
-        "label": "Identity",
-        "hint": "name · character · color"
-      },
-      "workspace": {
-        "label": "Workspace",
-        "hint": "folder · isolation · resume"
-      },
-      "engine": {
-        "label": "Engine",
-        "hint": "provider · model · command"
-      },
-      "briefing": {
-        "label": "Briefing",
-        "hint": "description · goal"
-      }
-    },
     "name": "Name",
     "namePlaceholder": "Ada",
     "character": "Character",
-    "color": "Color",
-    "project": "Project",
-    "pickProject": "Pick a project, or add a new one:",
-    "noProjects": "No projects yet. Add one to get started:",
-    "addProject": "add project",
-    "addProjectTitle": "Pick a folder and register it as a project",
     "projectPlaceholder": "/path/to/your/project",
     "pick": "pick",
-    "saveAsProject": "save as project",
-    "saveAsProjectTitle": "Save this folder to your projects so it's a single click next time",
-    "gitIsolation": "Git isolation (own worktree)",
-    "resumeSession": "Resume session ID (optional)",
-    "resumePlaceholder": "paste a Claude session id to continue its conversation",
-    "folderFromSession": "folder set from session: {{path}}",
-    "resumeNote": "Will resume this session in the chosen folder (git isolation disabled).",
     "provider": "Provider",
-    "providerAntigravity": "Spawn the Antigravity CLI (agy) with a Gemini model",
-    "providerCodex": "Spawn the Codex CLI (codex) without flags meant only for Claude",
-    "providerCustom": "Run any command, with no flags meant only for Claude",
     "model": "Model",
-    "cliDefaultModel": "CLI default model",
-    "fromHire": "{{model}} (from hire)",
-    "ossModels": "OSS models",
-    "ossLocal": "Local · no key (Ollama / LM Studio)",
-    "ossByok": "Via OSS provider · BYOK",
-    "ossLocalTitle": "{{slug}} · needs about {{ram}} RAM. Pull it with: ollama pull {{tag}}",
-    "ossByokTitle": "{{slug}} · set {{keyEnv}} in Settings → AI Engines",
-    "byokNote": "BYOK keys & local endpoints for this engine live in Settings → AI Engines. New to local models? Read run on open models or set up on a Mac Mini. Live end to end testing is pending real model calls (verify on the device).",
     "command": "Command",
-    "commandAuto": "Command (auto mode on)",
-    "templates": "Templates",
-    "templatesHint": {
-      "repoJanitor": {
-        "label": "Repo janitor"
-      },
-      "docsWriter": {
-        "label": "Docs writer"
-      },
-      "bugTriager": {
-        "label": "Bug triager"
-      },
-      "researchAssistant": {
-        "label": "Research assistant"
-      },
-      "releaseManager": {
-        "label": "Release manager"
-      }
-    },
     "role": "Role",
     "rolePlaceholder": "For example: Finance",
-    "roleDescription": "Role description",
-    "roleDescriptionPlaceholder": "For example: Keeps track of money in and money out, and sends a weekly summary",
-    "roleHelp": "{{godName}} reads the role and role description to decide which work to give this team member.",
-    "workStyle": "Work style (optional)",
-    "workStylePlaceholder": "For example: Check every number twice. Send a short summary when you finish.",
-    "workStyleHelp": "{{godName}} doesn't see this. It's how this team member gets their work done, jobs it runs on a schedule included: the steps they follow and what they check before they finish.",
-    "folderInsideMichael": "A folder inside {{godName}}'s, named after the role. Only this team member, anyone in the same role, and {{godName}} can open it.",
-    "folderPrivate": "Only this team member, anyone sharing the folder, and {{godName}} can open it.",
+    "roleDescriptionPlaceholder": "For example: Answers customers who write to the support inbox, and passes refund requests to Oscar.",
+    "roleHelp": "{{godName}} reads this to decide what goes to {{name}}. Name the requests, inbox or customers, so no teammate covers the same thing.",
+    "workStyle": "Work style",
     "errFolderShared": "That folder is {{godName}}'s. Pick a folder of this team member's own.",
-    "importHire": "Import hire",
     "importHireDesc": "Import hire loads a ready to use agent from a .json manifest. It fills in every field below for you to review. Nothing spawns until you hit spawn.",
     "generateWithAI": "generate one with AI…",
     "hideAIPrompt": "hide AI prompt",
-    "aiPromptHint": "Copy this into Claude/ChatGPT/Gemini, fill in the details at the bottom, then save its JSON reply as a .json file and import it here.",
-    "copied": "copied ✓",
-    "copyPrompt": "copy prompt",
     "importHireBtn": "import hire…",
     "importHireBtnTitle": "Import a hire manifest (.json)",
-    "spawn": "spawn",
-    "spawning": "spawning...",
+    "spawn": "hire",
+    "spawning": "hiring...",
     "errName": "Name is required",
     "errFolder": "Pick a folder first",
     "errCommand": "Command is required",
     "hireProgress": "hire {{current}} of {{total}}",
-    "skipHire": "skip hire"
+    "skipHire": "skip hire",
+    "castGroup": {
+      "office": "Management & Admin",
+      "sales": "Sales & Marketing",
+      "accounting": "Accounting",
+      "people": "HR & Support",
+      "it": "IT & Security",
+      "operations": "Operations"
+    },
+    "castRole": {
+      "michael": "Manager",
+      "pam": "Admin",
+      "erin": "Admin",
+      "dwight": "Sales",
+      "jim": "Sales",
+      "stanley": "Sales",
+      "phyllis": "Sales",
+      "andy": "Sales",
+      "ryan": "Marketing",
+      "oscar": "Accounting",
+      "angela": "Accounting",
+      "kevin": "Accounting",
+      "toby": "HR",
+      "kelly": "Customer Support",
+      "nick": "IT",
+      "sadiq": "IT Security",
+      "creed": "Quality Control",
+      "meredith": "Supply Chain",
+      "darryl": "Warehouse"
+    },
+    "wizard": {
+      "steps": "Hiring steps",
+      "step": {
+        "who": "Who",
+        "job": "Job",
+        "role": "Role",
+        "setup": "Finalize"
+      },
+      "stepHint": {
+        "who": "pick a person",
+        "job": "their job or another",
+        "role": "name, role, overlap check",
+        "setup": "work style, folder, model"
+      },
+      "nameTaken": "Someone on the team is already called {{name}}. Pick a different name.",
+      "errJob": "Give the role a title or say what {{name}} handles.",
+      "errOverlap": "This overlaps a teammate's work. Bind it to a mailbox or a topic, or change what the new hire handles.",
+      "theirJob": "{{name}}'s job",
+      "likeTeammate": "as {{name}} does it today",
+      "yourOffice": "Jobs in your office",
+      "newJob": "Something new",
+      "newJobTitle": "Write a new job",
+      "newJobSummary": "Start with a blank role, what they handle and work style.",
+      "allJobs": "Every job, from every kind of business",
+      "whatToSend": "What {{name}} handles",
+      "folder": "Folder",
+      "folderDefault": "use the suggested folder",
+      "back": "back",
+      "next": "next",
+      "checking": "checking...",
+      "checkingTeam": "Checking this job against your team...",
+      "notChecked": "This job has not been checked against your team yet.",
+      "checkNow": "check now",
+      "fullCheckFailed": "The full check could not run, so only a quick comparison of titles and wording was made.",
+      "distinct": "Distinct from everyone on the team.",
+      "overlaps": "This overlaps with {{names}}.",
+      "boundTo": "{{name}} handles only {{scope}}.",
+      "otherLine": "{{name}}'s line gains: {{line}}",
+      "unbind": "remove the binding",
+      "makeParticular": "{{name}} can join only with work of their own. Bind it to something particular, or change what {{name}} handles.",
+      "suggestion": "Idea: {{text}}",
+      "bindMailbox": "Bind to a mailbox",
+      "bindTopic": "Bind to a topic",
+      "checkAgain": "Check again",
+      "noFreeMailbox": "Every mailbox already has someone. Add one in Settings, or move one on Capabilities.",
+      "bind": "bind",
+      "topicPlaceholder": "For example: catering enquiries",
+      "editToFix": "Changing what {{name}} handles and checking again works too.",
+      "mailboxScope": "the {{address}} mailbox",
+      "familyJobs": "{{role}} jobs from every kind of business",
+      "showAll": "show all jobs ({{count}} more)",
+      "showFamily": "show only {{role}} jobs",
+      "modelDefault": "{{model}} (default)",
+      "cliDefault": "Claude's own default",
+      "sameWork": "The work {{name}} handles reads like the same work, whatever the role is called.",
+      "errWorkStyle": "Work style is required: write how this team member does the job.",
+      "workStylePlaceholder": "The job: what {{name}} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.",
+      "describing": "Putting the job into plain words...",
+      "writingInstructions": "writing {{name}}'s instructions...",
+      "errInstructions": "The instructions could not be written. Try Hire again.",
+      "workStyleIntro": "How {{name}} does the job: what it is for, how you like it done, and what needs your approval first. {{name}} follows it on every task, scheduled jobs included. Write it in your own words; the app turns it into instructions when you hire. {{godName}} doesn't use it.",
+      "folderPurpose": "Where {{name}} keeps the files for this job. Only {{name}} and {{godName}} can open it.",
+      "modelPurpose": "The AI model {{name}} thinks with. Starts on the default for agents in Settings. Larger models handle harder calls; smaller ones are quicker and cheaper.",
+      "resolved": "Ready: {{name}}'s work is kept apart from {{names}}.",
+      "comparingWith": "Comparing with {{name}}'s job"
+    }
   },
   "onboarding": {
     "titles": {
@@ -847,7 +874,8 @@
       "compacting": "compacting context",
       "looping": "looping: breaker armed",
       "runningFloor": "running the floor",
-      "idle": "idle"
+      "idle": "nothing to do",
+      "clockingIn": "clocking in…"
     }
   },
   "setupPanel": {
@@ -1012,7 +1040,8 @@
     "runAria": "Run {{job}}",
     "closedGroup": "{{name}} (closed)",
     "closedNote": "{{name}} is closed, so these are paused.",
-    "relayHint": "{{godName}} hands this job to the team."
+    "relayHint": "{{godName}} hands this job to the team.",
+    "approvedBy": "approved by {{name}}"
   },
   "webhooksSection": {
     "summaryNone": "none",
@@ -1055,7 +1084,15 @@
     "at": "at",
     "weekdays": "weekdays",
     "everyDay": "every day",
-    "pickDayHint": "Pick at least one day, or this will never run."
+    "pickDayHint": "Pick at least one day, or this will never run.",
+    "addTime": "add another time",
+    "removeTime": "remove",
+    "onlyBetween": "only between",
+    "and": "and",
+    "windowHint": "The end time is before the start time.",
+    "timeN": "Time {{n}}",
+    "dayTaken": "{{day}} is in another time",
+    "daysClash": "{{days}} can't be in an every line and another time. Turn it off in one of them."
   },
   "triggerHistory": {
     "justNow": "just now",
@@ -1510,7 +1547,7 @@
     "country": "Country",
     "contactHead": "CONTACT DETAILS",
     "legalName": "Legal name",
-    "legalNamePlaceholder": "For example: MoblizeIT LLC",
+    "legalNamePlaceholder": "For example: Sunrise Bakery LLC",
     "entityType": "Business type",
     "entity": {
       "sole-proprietor": "Sole proprietor",
@@ -1720,6 +1757,11 @@
     "schedulesOn": "{{count}} on",
     "schedulesNone": "None",
     "pickMailbox": "Pick a mailbox",
-    "addMailbox": "Add new mailbox"
+    "addMailbox": "Add new mailbox",
+    "heldBy": "{{name}} has this",
+    "moveMailbox": "{{from}} checks {{address}}. Move it to {{to}}? {{from}} stops checking email.",
+    "moveMailboxFree": "Use {{address}}?",
+    "moveIt": "Move it",
+    "keepIt": "Keep it"
   }
 }

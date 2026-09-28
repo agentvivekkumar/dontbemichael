@@ -18,22 +18,20 @@ const modal = read('src/renderer/src/components/AddAgentModal.tsx');
 const wizard = read('src/renderer/src/components/OnboardingWizard.tsx');
 const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
 
-test('the hire dialog asks for Role, Role description and Work style', () => {
-  for (const key of ['role', 'roleDescription', 'roleHelp', 'workStyle', 'workStyleHelp']) {
-    assert.match(modal, new RegExp(`tr\\('addAgent\\.${key}'\\)`), key);
-    assert.ok(en.addAgent[key], `en has addAgent.${key}`);
+test('the hire wizard asks for Role, what to send and Work style, stored as Role: description', () => {
+  for (const key of ['role', 'roleHelp', 'workStyle', 'wizard.workStyleIntro', 'wizard.whatToSend']) {
+    assert.match(modal, new RegExp(`tr\\('addAgent\\.${key.replace('.', '\\.')}'`), key);
   }
-  assert.match(modal, /const description = joinAgentRole\(role, roleDescription\);/, 'stored as Role: description');
+  assert.match(modal, /const description = hireRole\(title, routing\);/, 'stored as Role: description');
   assert.match(modal, /const split = splitAgentRole\(m\.description\);/, 'an imported hire fills both fields');
   assert.equal(en.addAgent.description, undefined, 'the old Description field is gone');
 });
 
-test('a new team member\'s folder defaults to Michael\'s folder, named after the role', () => {
+test('a new team member gets its own folder inside Michael\'s, suffixed with its name on a clash', () => {
   assert.match(modal, /const michaelFolder = config\.businessFolder;/);
-  assert.match(modal, /const folderLabel = role\.trim\(\) \|\| name\.trim\(\);/, 'the role, or the name while no role is typed');
-  assert.match(modal, /window\.cth\.foldersSuggest\(config\.businessName \?\? '', \[folderLabel\], michaelFolder\)/);
-  assert.match(modal, /const setCwd = \(path: string\) => \{ setCwdAuto\(false\); setCwdRaw\(path\); \};/, 'any pick by the owner wins');
-  assert.match(modal, /if \(michaelFolder && cwdAuto\) \{\s*const \[made\] = await window\.cth\.foldersEnsure\(\[cwd\]\)/, 'made on hire, never overwritten');
+  assert.match(modal, /window\.cth\.foldersExist\(michaelFolder, candidates\)/);
+  assert.match(modal, /setFolderName\(hireFolderName\(base, n, \(f\) => !!onDisk\[f\] \|\| used\.has\(f\.toLowerCase\(\)\)\)\)/, 'on disk or used by a teammate');
+  assert.match(modal, /if \(michaelFolder && !customCwd\) \{\s*const \[made\] = await window\.cth\.foldersEnsure\(\[cwd\]\)/, 'made on hire, never overwritten');
 });
 
 test('Michael\'s folder is never a team member\'s own folder', () => {

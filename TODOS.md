@@ -125,6 +125,67 @@
 
 ## Agents and 1:1
 
+### Clean up a "Not for" clause when its teammate leaves
+
+**What:** When a hire is bound to a mailbox or topic, overlapping teammates' routing lines gain "Not for <scope>; that goes to <Name>." If that teammate is later renamed or removed, rewrite or drop the clause.
+
+**Why:** A stale clause sends Michael to a name that no longer exists, and the work bounces.
+
+**Context:** Found by the spec review of the hire wizard redesign (2026-09-27). The clause format is `bindingLines` in `src/shared/hireTemplates.ts`; hook the rename path in `hive.ts` and agent removal in the renderer.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** the hire wizard redesign.
+
+### Show the rewritten instructions before saving a work style
+
+**What:** When the owner edits a plain work style (hire or Edit Agent), show the instructions the app wrote from it and let them accept or undo, instead of saving straight away.
+
+**Why:** The owner edits a summary; details the summary left out could still be lost in a rewrite. The prompt now keeps them, but the owner can't see the result.
+
+**Context:** From the /ship pre-landing review of feat/hire-wizard (2026-09-27). `src/main/workStyleConvert.ts`, `toInstructionsPrompt` in `src/shared/workStyleText.ts`, AddAgentModal and EditAgentModal save paths.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** nothing.
+
+### End a hidden Claude call early when it can't answer
+
+**What:** A hidden call whose session is stuck on a trust or sign-in screen now waits for its full timeout (60 to 180 seconds). Detect a known blocking screen, or no transcript at all, and give up early so the rules fallback answers quickly.
+
+**Why:** The owner waits on "checking..." for a minute when Claude is signed out.
+
+**Context:** From the /ship pre-landing review (2026-09-27): `captureAndFinish` in `src/main/hiddenClaude.ts` re-arms until its own answer appears.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** nothing.
+
+### Test Michael deciding schedule requests end to end
+
+**What:** Runtime tests for `receiveScheduleRequest`, `michaelDecides`, `decideScheduleRequest` and `sweepScheduleRequests` in `src/main/index.ts` (unknown id, stale, escalated, pending list, the 12 hour escalation), which today are checked by source patterns only.
+
+**Why:** These decide whether a request reaches Michael or the owner at all.
+
+**Context:** From the /ship coverage audit (2026-09-27). Needs the functions moved into a module that tests can load with fake config and hive.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** nothing.
+
+### Hire through Michael
+
+**What:** The owner tells Michael "hire another admin for catering" and Michael asks the app to open the hire wizard on Review, prefilled with a job he adjusted. The owner still presses Hire; Michael can never hire on his own.
+
+**Why:** The owner runs the office by talking to Michael, so hiring from chat fits how the app is used.
+
+**Context:** Deferred in /plan-ceo-review of the hire wizard redesign (2026-09-27, D5.5) because it needs the wizard first (`docs/designs/hire-redesign.md`). To build: a Michael to app message (an MCP tool, since sandboxed Bash cannot reach the app), a prefill path into the Review step that runs the same distinct job check, and a guard that no agent message can press Hire.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** the hire wizard redesign.
+
+
 ### One rule for "stuck at a prompt" in main and the panel
 
 **What:** Put the terminal prompt check (`isTerminalPrompt` in `src/main/hooks.ts`) in shared code

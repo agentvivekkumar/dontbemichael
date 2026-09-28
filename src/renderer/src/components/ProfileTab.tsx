@@ -23,6 +23,8 @@ import { useStore, type Agent } from '@/store/store';
  *  Michael the business and what he's told about it. Loaded once and shared. */
 interface OfficeInfo {
   cards: Map<string, AgentDefinitionV2>;
+  /** Every pack's cards by `<businessType>/<cardId>`, for a hire's sourceCard. */
+  allCards: Map<string, AgentDefinitionV2>;
   business: { name?: string; city?: string };
   /** The pack's briefing with the business filled in; Michael gets it at start. */
   briefing: string;
@@ -35,13 +37,18 @@ function loadOfficeInfo(): Promise<OfficeInfo> {
         const c = config as { businessType?: string; businessName?: string; companyProfile?: { address?: { city?: string } } };
         const pack = res.packs.find((p) => p.pack.businessType === c.businessType)?.pack ?? res.core;
         const business = { name: c.businessName?.trim() || undefined, city: c.companyProfile?.address?.city?.trim() || undefined };
+        const allCards = new Map<string, AgentDefinitionV2>();
+        for (const p of [...res.packs.map((x) => x.pack), res.core]) {
+          for (const a of p?.agents ?? []) allCards.set(`${p!.businessType}/${a.id}`, a);
+        }
         return {
           cards: new Map((pack?.agents ?? []).map((a) => [a.id, a])),
+          allCards,
           business,
           briefing: pack?.briefing ? fillBusiness(pack.briefing, business) : ''
         };
       })
-      .catch(() => { officeInfo = null; return { cards: new Map(), business: {}, briefing: '' }; });
+      .catch(() => { officeInfo = null; return { cards: new Map(), allCards: new Map(), business: {}, briefing: '' }; });
   }
   return officeInfo;
 }
@@ -68,9 +75,10 @@ export function ProfileTab({ agent }: { agent: Agent }) {
     let alive = true;
     setShowInstructions(false);
     setFolderError(false);
-    loadOfficeInfo().then((o) => { if (alive) { setOffice(o); setCard(o.cards.get(agent.id)); } });
+    // A hire copied from a card shows that card (hire redesign E2).
+    loadOfficeInfo().then((o) => { if (alive) { setOffice(o); setCard(o.cards.get(agent.id) ?? (agent.sourceCard ? o.allCards.get(agent.sourceCard) : undefined)); } });
     return () => { alive = false; };
-  }, [agent.id]);
+  }, [agent.id, agent.sourceCard]);
 
   const role = useMemo(() => parseRoleLine(agent.description), [agent.description]);
   const instructions = workStyleBody(agent.goal);

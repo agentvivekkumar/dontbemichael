@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { useStore, type Agent } from '@/store/store';
+import { useStore, type Agent, ACTION_CLOCKING_IN } from '@/store/store';
 import { buildSpawnCommand, inferAgentProvider, tokenizeCommand, type HarnessConfig } from '@/store/config';
 import { roleForHiveSpawn } from '@shared/agentRole';
 
@@ -157,7 +157,7 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
                 archived: false,
                 status: 'idle',
                 // Surface the worktree fallback on the floor card; otherwise normal.
-                action: worktreeGone ? 'worktree gone, using base repo' : 'starting up',
+                action: worktreeGone ? 'worktree gone, using base repo' : ACTION_CLOCKING_IN,
                 // The worktree is no longer on disk — drop it so this agent is treated
                 // as a plain base-cwd agent going forward (a future restore won't keep
                 // re-probing a dead path).

@@ -43,10 +43,11 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.0.7: every team member can watch its own mailbox.**
-> Connect as many mailboxes as your business uses, then give each team member the one that fits
-> its job. Your Executive Admin watches the CEO's inbox, Customer Support answers support@, Sales
-> follows up from sales@. [See how it works](#a-mailbox-for-every-job).
+> **New in 0.0.8: Michael runs the office, and hiring makes sense.**
+> A four step hire wizard where each character brings a real job, a check that no two teammates do
+> the same work, and work styles in plain words. Only Michael assigns work and decides the team's
+> schedule requests, asking you only when he can't settle one. One job can now run at several
+> times. [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
 
@@ -105,7 +106,8 @@ business runs on, and each team member works from the one that matches its job.
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
   saved, and the password stays in your Mac's keychain, never in a file an agent can read.
 - **Hand it out per team member.** On a team member's Capabilities tab, turn email on, pick its
-  mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one.
+  mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
+  and each mailbox is watched by one team member: moving it to another asks you first.
 - **Each one stays in its lane.** A team member can only read, search and draft in the mailbox you
   gave it, and cannot forward or attach mail from another one.
 - **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
@@ -125,8 +127,10 @@ account are separate: one switch in Mailboxes allows or blocks them for the whol
 ### Talk to Michael, not the whole team
 
 Michael is the one you brief. He sends each job to the team member whose role fits, keeps an eye
-on the task board, and brings you only what needs you. Once an hour he runs a standup with the
-team. He is the only one who sends you desktop notifications. To speak with one team member
+on the task board, and brings you only what needs you. He is the only one who hands out work: when
+one team member needs another to do something, the request goes to Michael and he decides who
+does it. Team members can still ask each other questions directly. Once an hour he runs a standup
+with the team. He is the only one who sends you desktop notifications. To speak with one team member
 directly, open it and choose **Talk 1:1**; Michael sends it no work until you end the 1:1.
 
 </td>
@@ -139,8 +143,12 @@ directly, open it and choose **Talk 1:1**; Michael sends it no work until you en
 
 ### Hire a team member
 
-Give a new hire a name, a role, a Role description and a Work style. It gets its own folder inside
-your business folder and starts working.
+The hire wizard has four steps: Who, Job, Role and Finalize. Pick a character and it brings a
+job: one a teammate does today, one from your Office Pack, one from any other kind of business, or
+a new one you write. Before you hire, the app checks the new job against every teammate's so no
+two do the same work; an overlap has to be tied to its own mailbox or topic first. The work style
+is plain words you can edit. Each hire gets its own folder inside your business folder and starts
+working.
 
 </td>
 <td width="50%">
@@ -216,8 +224,8 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 **Running the office**
 - **Ask me.** When the team needs a decision, it goes on Michael's Ask me board. Your answer goes back to whoever asked, and they remember it.
-- **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Capabilities tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. A team member can ask for a schedule change, but nothing changes until you approve it in Ask me. Michael's Office schedule tab lists every job that is on.
-- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Capabilities tab, pick its one mailbox, and choose Can send or Draft only. Outlook is not supported yet.
+- **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Capabilities tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you in Ask me only when he can't settle it. Michael's Office schedule tab lists every job that is on.
+- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Capabilities tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Capabilities (email and schedules), Messages as a day by day history, and Memory as readable notes.
 - **Tasks and the floor.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
 - **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
@@ -296,6 +304,7 @@ If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
 
 ### Where to read next
 
+- [`docs/FEATURES.md`](./docs/FEATURES.md): every feature, and every change release by release.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md): diagrams and the module map.
 - [`HIVE.md`](./HIVE.md): how agents coordinate.
 - [`SPEC.md`](./SPEC.md): the terminal and event planes.

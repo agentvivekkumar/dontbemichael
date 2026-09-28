@@ -1,9 +1,10 @@
 import * as pty from 'node-pty';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { resolveCommand, userShellPath } from './shellEnv';
 import { expandTilde } from './fs';
 import { projectDir } from './transcript';
+import { lastAssistantText, transcriptFile } from './transcriptText';
 import { ensureKilled } from './procKill';
 
 /**
@@ -58,48 +59,6 @@ export interface HiddenClaudeResult {
   error?: string;
 }
 
-/**
- * Extract the last assistant text block from the transcript JSONL written
- * at or after `spawnedAt`. Reuses projectDir() from transcript.ts.
- */
-function extractLastAssistantText(cwd: string, spawnedAt: number): string | null {
-  try {
-    const dir = projectDir(cwd);
-    if (!existsSync(dir)) return null;
-
-    const candidates: { f: string; mtime: number }[] = [];
-    for (const f of readdirSync(dir)) {
-      if (!f.endsWith('.jsonl')) continue;
-      try {
-        const mtime = statSync(path.join(dir, f)).mtimeMs;
-        // 5 s slack: include files that already existed at spawn but were
-        // updated by this session. Sort by mtime and take the newest.
-        if (mtime >= spawnedAt - 5000) candidates.push({ f, mtime });
-      } catch { /* file removed between readdir and stat — skip */ }
-    }
-    if (!candidates.length) return null;
-    candidates.sort((a, b) => b.mtime - a.mtime);
-
-    const lines = readFileSync(path.join(dir, candidates[0].f), 'utf8').split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const trimmed = lines[i].trim();
-      if (!trimmed) continue;
-      let rec: { type?: unknown; message?: { content?: unknown[] } };
-      try { rec = JSON.parse(trimmed); } catch { continue; }
-      if (rec.type !== 'assistant') continue;
-      const content = rec.message?.content;
-      if (!Array.isArray(content)) continue;
-      for (let j = content.length - 1; j >= 0; j--) {
-        const block = content[j] as { type?: unknown; text?: unknown };
-        if (block.type === 'text' && typeof block.text === 'string' && block.text.trim()) {
-          return block.text.trim();
-        }
-      }
-    }
-    return null;
-  } catch { return null; }
-}
-
 export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Promise<HiddenClaudeResult> {
   return new Promise((resolve) => {
     if (!prompt.trim()) { resolve({ ok: false, error: 'empty prompt' }); return; }
@@ -116,7 +75,11 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     const disallowed = opts.disallowedTools ?? ['Edit', 'Write', 'NotebookEdit'];
     const addDirs = (opts.addDirs ?? []).filter((d) => d && existsSync(d));
 
+    // This call's own session: its answer is read from this transcript and no
+    // other, so two hidden calls in a row can never swap answers.
+    const sessionId = randomUUID();
     const args: string[] = [
+      '--session-id', sessionId,
       '--model', opts.model,
       '--permission-mode', 'bypassPermissions',
       ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--disallowedTools', ...disallowed]),
@@ -127,7 +90,6 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     const idleMs = opts.idleMs ?? 3500;
     const timeoutMs = opts.timeoutMs ?? 180_000;
 
-    const spawnedAt = Date.now();
     // Windows: node-pty's CreateProcess can't exec the npm `.cmd`/extensionless
     // `claude` shim directly (ERROR_BAD_EXE_FORMAT, error 193) — route non-.exe
     // targets through cmd.exe. A real claude.exe (WinGet) launches directly. (#22)
@@ -179,11 +141,16 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       resolve(r);
     };
 
+    const ownAnswer = (): string | null => lastAssistantText(transcriptFile(projectDir(opts.cwd), sessionId));
+    // The screen going quiet is not the answer arriving: a model can think for
+    // a while with nothing on screen. Until this session's own transcript has
+    // an answer, keep waiting (the global timeout still bounds it).
     const captureAndFinish = () => {
-      const text = extractLastAssistantText(opts.cwd, spawnedAt);
-      finish(text
-        ? { ok: true, text }
-        : { ok: false, error: 'no assistant response found in transcript' });
+      if (settled) return;
+      const text = ownAnswer();
+      if (text) { finish({ ok: true, text }); return; }
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(captureAndFinish, idleMs);
     };
 
     const sendPrompt = () => {
@@ -214,6 +181,10 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     });
 
     // Session exited cleanly before idle — try to capture the transcript anyway.
-    ptyProc.onExit(() => { if (!settled) captureAndFinish(); });
+    ptyProc.onExit(() => {
+      if (settled) return;
+      const text = ownAnswer();
+      finish(text ? { ok: true, text } : { ok: false, error: 'no assistant response found in transcript' });
+    });
   });
 }

@@ -44,7 +44,7 @@ test('a team member opens its own folder and nothing else of the office', () => 
   assert.ok(!allow('Read', `${B}/plan.md`), 'Michael\'s own files are his');
   assert.ok(!allow('Read', `${B}/Office/Company profile.md`), 'the retired Office folder is just part of Michael\'s');
   assert.ok(allow('Read', '/Users/me/Downloads/rates.csv'), 'places outside the office are not this rule\'s business');
-  // Case differs from the disk on macOS: the registry once held "MoblizeIt" for "MoblizeIT".
+  // Case differs from the disk on macOS: the registry once held "SunriseBakery" for "SunRiseBakery".
   assert.ok(!allow('Read', `${B.toLowerCase()}/admin/x`));
 });
 

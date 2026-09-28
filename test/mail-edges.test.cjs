@@ -352,6 +352,26 @@ test('setAgentCapabilities: unknown mailboxes are dropped; restart only on first
   assert.equal(a.state.cfg.agentCapabilities.dwight.email, undefined);
 });
 
+test('setAgentCapabilities: one agent per mailbox; a move needs confirming and turns the holder off', () => {
+  const a = admin({
+    mailboxes: [box('sales', 's@x.com'), box('ceo', 'c@x.com')],
+    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['sales'], send: true } } }
+  });
+  const refused = setAgentCapabilities(a, 'erin', { email: { enabled: true, mailboxes: ['sales'], send: false } });
+  assert.deepEqual(refused, { ok: false, restartNeeded: false, heldBy: 'pam' });
+  assert.equal(a.state.cfg.agentCapabilities.erin, undefined, 'nothing saved');
+  // A free mailbox, or email on with none picked, is fine.
+  assert.equal(setAgentCapabilities(a, 'erin', { email: { enabled: true, mailboxes: [], send: false } }).ok, true);
+  assert.equal(setAgentCapabilities(a, 'erin', { email: { enabled: true, mailboxes: ['ceo'], send: false } }).ok, true);
+  // Pam keeping her own mailbox is not a clash with herself.
+  assert.equal(setAgentCapabilities(a, 'pam', { email: { enabled: true, mailboxes: ['sales'], send: false } }).ok, true);
+  const moved = setAgentCapabilities(a, 'erin', { email: { enabled: true, mailboxes: ['sales'], send: false }, move: true });
+  assert.equal(moved.ok, true);
+  assert.equal(moved.movedFrom, 'pam');
+  assert.deepEqual(a.state.cfg.agentCapabilities.pam.email, { enabled: false, mailboxes: [], send: false });
+  assert.deepEqual(a.state.cfg.agentCapabilities.erin.email.mailboxes, ['sales']);
+});
+
 test('closeAll logs out every open connection', async () => {
   const { svc, call, state } = setup();
   await call('dwight', 'search', { mailbox: 'sales' });

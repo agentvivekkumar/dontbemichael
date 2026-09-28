@@ -1,3 +1,3 @@
-- **A mailbox for each agent:** connect it with an app password, then pick it on the agent's Capabilities tab.
-- **Schedules moved into Capabilities.** Michael's tab is now Office schedule.
-- **Agents pick up held work** when you open the office after closing time.
+- **New hire wizard:** each character brings a real job; no two teammates overlap.
+- **Michael runs the office:** only he assigns work and decides schedule requests.
+- **One job, several times,** like every 2h on weekdays plus 2 pm at weekends.

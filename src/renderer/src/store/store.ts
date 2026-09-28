@@ -93,6 +93,11 @@ export interface Agent {
    *  Mirrors `RegistryAgent.onHold`; main owns the record, this is the copy the
    *  title bar renders from. */
   onHold?: boolean;
+  /** The office pack card this agent's job was copied from when it was hired,
+   *  `<businessType>/<cardId>` (hire redesign E2): its Profile shows that card's
+   *  does, asks first and connections. Setup's pack members need none, since
+   *  their id is their card's. */
+  sourceCard?: string;
   /** When git isolation is enabled, the dedicated worktree path the agent runs
    *  in (its own `agent/<id>` branch); undefined for shared-cwd agents. */
   worktreePath?: string;
@@ -398,6 +403,19 @@ const initialFloorView: FloorView = (() => {
  *  "blocked", so this marker is what tells the panel to offer Talk 1:1
  *  (docs/designs/owner-talks-via-michael.md). */
 export const ACTION_AT_PROMPT = 'waiting at a prompt';
+/** What an agent's card and bubble say while it comes back after a launch, or
+ *  starts for the first time: office words, not "reconnecting" or "starting
+ *  up" (owner, 2026-09-27). Shown translated (actionText). */
+export const ACTION_CLOCKING_IN = 'clocking in…';
+/** An agent's action for display: the app's own captions in the owner's
+ *  language, anything else as it is. */
+export function actionText(action: string, t: (key: string) => string): string {
+  if (action === ACTION_CLOCKING_IN) return t('office.activity.clockingIn');
+  // The hook marks a finished agent "idle"; the office says it more kindly
+  // (owner, 2026-09-27: "nothing to do").
+  if (action.trim().toLowerCase() === 'idle') return t('office.activity.idle');
+  return action;
+}
 
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt'>;
 
@@ -548,7 +566,7 @@ function loadPersistedAgents(): Agent[] {
       ...a,
       progress: 0,
       status: 'idle',
-      action: 'reconnecting…',
+      action: ACTION_CLOCKING_IN,
       currentStation: 'desk',
       carrying: undefined,
       recentTextTs: Date.now(),

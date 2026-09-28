@@ -10,7 +10,7 @@
 /** Michael's role in the hive registry: fixed, whatever his card says. */
 export const MICHAEL_ROLE = 'office manager';
 
-const TRANSIENT_ROLE_RE = /^(on\s+)?standby$|^(idle|awaiting|paused|resumed|working|thinking|archived|starting up|reconnecting…?|running the floor|a fresh harness)$/i;
+const TRANSIENT_ROLE_RE = /^(on\s+)?standby$|^(idle|awaiting|paused|resumed|working|thinking|archived|starting up|reconnecting…?|clocking in…?|running the floor|a fresh harness)$/i;
 
 export function isDurableRole(text: string | undefined | null): boolean {
   const value = (text ?? '').trim();

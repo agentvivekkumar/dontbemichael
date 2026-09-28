@@ -51,6 +51,7 @@ import { resolveGodName } from '../shared/godIdentity';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { OFFICE_ROLES } from '../shared/officeRoles';
 import { APP_NAME } from '../shared/appName';
+import { isPeerAssignment, rerouteToMichael, hopDropNotice } from '../shared/handoffRule';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
  *  Kept as a local shape so hive.ts never imports the foundation-owned config
@@ -61,16 +62,18 @@ type McpDefaultsMap = { [id: string]: { enabled: boolean } } | undefined;
 
 /** The schedules section of the protocol, the same in both protocol files. */
 const SCHEDULES_PROTOCOL = `## Your schedules
-A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
+A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and Michael, who manages the office, approves or declines it (he brings it to the owner only when he can't settle it). His own schedules change when he sends the request. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
 
 \`\`\`json
-{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "",
+{ "to": "scheduler", "act": "request", "subject": "schedule", "body": "Invoices slip past 30 days because nobody checks them; a Friday check catches them first.",
   "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
 \`\`\`
 
 - \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
-- \`when\`: \`{ "every": "2h" }\` (m, h or d) or \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\`.
+- \`when\`: \`{ "every": "2h" }\` (m, h or d) runs around the clock; \`{ "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }\` limits it to those days and hours; \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\` runs at a time. One job can have several: \`"when": [ { "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }, { "days": ["weekends"], "at": "14:00" } ]\` runs at whichever comes due first. Ask for one schedule with several times rather than several schedules for the same job.
 - \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- \`body\` says why, in a sentence or two the owner reads on the card: what you noticed and what the change fixes. A request without it is not sent.
+- One job, one request: ask for every time a job needs in one \`when\` list. A second request about the same job joins the first as one card.
 - You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
 `;
 
@@ -258,7 +261,7 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     ...(briefing ? ['', '## The business', briefing] : []),
     '',
     '## Routing work',
-    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. It is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
+    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. You are the only one who assigns work: a team member never hands a job to another, and when one asks another to do something, the app delivers it to you marked as a handoff, so decide who does it. Team members may ask each other for facts directly. The roster is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
     '',
     '## Doing it yourself',
     'Answer small things yourself: a fact you know, a short reply, a quick lookup. Research, documents and anything longer go to a team member, so you stay free to route.',
@@ -276,8 +279,11 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     '## Keeping the task board accurate',
     'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
     '',
+    '## Schedule requests',
+    'You manage the office, so you decide the team\'s schedule requests. Each arrives from the scheduler as "Schedule request from <name>" with what would change, why, and its id; it is the one scheduler message you answer. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
+    '',
     '## Scheduled runs',
-    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. The scheduler does not read replies, so do not answer it.',
+    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. A scheduled run needs no reply, so do not answer it.',
     '',
     '## Staying cheap',
     'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
@@ -300,6 +306,8 @@ export function teamMemberInstructions(name: string, role: string, michael: stri
     'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else.',
     '',
     `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
+    '',
+    `Only ${michael} assigns work. If you need a fact from a teammate to do your job, ask them directly: write to their id (listed in registry.json in ${p.hiveRoot}) with "act": "query", and answer a teammate's query the same way with "act": "inform". If they cannot help, or you need someone else to do something, tell ${michael} and he hands it off. Never give a teammate work yourself.`,
     '',
     `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone. Its replies about your schedule requests (subject "Schedule request", "Schedule change approved" or "Schedule change declined") are notices, not jobs: read them and do nothing else. Never ask the owner in your terminal (nobody answers it): send your question to ${michael} with "act": "query".${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
   ].join('\n');
@@ -551,8 +559,8 @@ export class HiveManager {
    *  with a `schedule` object). It records a request for the owner and returns
    *  the reply for the agent; it never changes a schedule itself (owner,
    *  2026-09-25). `actor` is the owning outbox folder, never the message. */
-  private scheduleRequestHandler: ((actor: string, payload: unknown) => string) | null = null;
-  onScheduleRequest(handler: (actor: string, payload: unknown) => string): void { this.scheduleRequestHandler = handler; }
+  private scheduleRequestHandler: ((actor: string, payload: unknown, why: string) => string) | null = null;
+  onScheduleRequest(handler: (actor: string, payload: unknown, why: string) => string): void { this.scheduleRequestHandler = handler; }
 
   /** agentId → whether it has been told company knowledge is on, as of its
    *  spawn or its last update. Lets an owner's toggle reach running agents
@@ -1873,8 +1881,16 @@ export class HiveManager {
   private routeMessage(msg: HiveMessage): void {
     if (msg.hops > HOP_CAP) {
       // loop guard — drop a runaway message rather than let agents ping-pong.
-      // There's no human queue to fall back on; the god agent owns conflicts.
+      // There's no human queue to fall back on; the god agent owns conflicts,
+      // so he is told rather than the drop being silent (owner, 2026-09-27).
       this.appendLog({ kind: 'drop', reason: 'hop-cap', from: msg.from, to: msg.to, id: msg.id });
+      try {
+        const r = this.registry();
+        const god = r.godId ?? 'god';
+        if (msg.from !== 'system') {
+          this.deliver(this.normalize({ to: god, act: 'inform', ...hopDropNotice(msg, r.agents) }, 'system'), god);
+        }
+      } catch { /* best-effort notice */ }
       return;
     }
     const reg = this.registry();
@@ -1890,6 +1906,18 @@ export class HiveManager {
       const t = to.toLowerCase();
       return t === 'human' || t === 'god' || t === 'michael' || t === godName ? godId : to;
     };
+    // Only Michael assigns work (owner, 2026-09-27, src/shared/handoffRule.ts):
+    // a teammate handing another teammate a job goes to Michael instead.
+    if (isPeerAssignment(msg, reg.agents, godId, resolveTo(msg.to))) {
+      this.appendLog({ kind: 'reroute', reason: 'only-michael-assigns', from: msg.from, to: msg.to, id: msg.id });
+      // The asker hears where it went, so it isn't left waiting on the teammate.
+      const asked = msg.to === 'broadcast' ? 'the team' : (reg.agents[resolveTo(msg.to)]?.name ?? msg.to);
+      this.deliver(this.normalize({
+        to: msg.from, act: 'inform', subject: `Sent to ${resolveGodName(reg.agents[godId]?.name)}: ${msg.subject}`.slice(0, 200),
+        body: `Your request to ${asked} went to ${resolveGodName(reg.agents[godId]?.name)}, who assigns work. To ask a teammate for a fact, use "act": "query".`
+      }, 'system'), msg.from);
+      msg = rerouteToMichael(msg, reg.agents, godId);
+    }
     // The scheduler and heartbeat send; they don't read. A reply to one is
     // dropped quietly instead of bouncing back to Michael as undeliverable.
     if (msg.to === 'scheduler' || msg.to === 'heartbeat') {
@@ -2081,7 +2109,8 @@ export class HiveManager {
             // A schedule request, not mail: main files it for the owner and the
             // scheduler answers the asking agent (and only that agent).
             let reply: string;
-            try { reply = this.scheduleRequestHandler(id, schedule); } catch (e) {
+            // The message body is the agent's reason, shown on the owner's card.
+            try { reply = this.scheduleRequestHandler(id, schedule, typeof msg.body === 'string' ? msg.body : ''); } catch (e) {
               reply = 'Schedule request not sent: the app hit an error. Try again later.';
               console.error('[hive] schedule request', e);
             }
@@ -3611,7 +3640,7 @@ One JSON file in \`outbox/\`, any name ending in \`.json\`:
 }
 \`\`\`
 
-The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Messages from the scheduler name a job and need no reply.
+The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Only Michael assigns work: a \`request\` from one team member to another is delivered to Michael, who decides who does it. Ask a teammate for a fact with \`query\`; they answer with \`inform\`. Messages from the scheduler name a job and need no reply, except Michael's schedule requests, which he answers with approve, decline or ask-owner.
 
 ${SCHEDULES_PROTOCOL}
 ## The task board

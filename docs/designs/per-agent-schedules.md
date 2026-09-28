@@ -740,3 +740,13 @@ next to the agent's tools, not on its own tab. Owner chose option A:
   Michael's included. The wall calendar still opens it.
 - An office schedule row opens that agent's Capabilities tab with On a schedule
   unfolded and the row focused. A saved Schedules tab reopens as Capabilities.
+
+## Update (owner, 2026-09-27): Michael decides schedule requests
+
+"all office management decisions should be handled by michael only. owner should be engaged only when it cannot truly be resolved based on avaialble facts, or something conflicting based on different sources, or of a sensitive nature". This replaces R6's owner-approves-every-request flow:
+
+- A team member's request goes to Michael as a "Schedule request from <name>" message (what would change, why, the id). He answers the scheduler with `approve`, `decline` (with a note), or `ask-owner` (with a note on what he can't settle). `pending` lists what waits.
+- Only `ask-owner` requests show in ASK ME, with Michael's note; that is also the only time Michael toasts the owner. The owner's decision is sent to the agent and to Michael.
+- Michael's own requests apply at once. A row set by a request he approved reads "added by Nick, approved by Michael".
+- Every request must say why (the message body), shown to Michael and on the owner's card. Two requests from one agent about one job merge into one.
+- One job can have several "when" lines (src/shared/scheduleTimes.ts); a day an "every" line runs on belongs to it alone.

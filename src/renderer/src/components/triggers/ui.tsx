@@ -309,6 +309,7 @@ export const INTERVAL_OPTS: { ms: number; label: string }[] = [
   { ms: 30 * MINUTE, label: '30m' },
   { ms: HOUR, label: '1h' },
   { ms: 2 * HOUR, label: '2h' },
+  { ms: 4 * HOUR, label: '4h' },
   { ms: 6 * HOUR, label: '6h' },
   { ms: 12 * HOUR, label: '12h' },
   { ms: DAY, label: '24h' },
@@ -462,15 +463,20 @@ export function weeklyIsUsable(w: WeeklyDraft): boolean {
  * is Sunday-first to match `Date.getDay()`, so no index maths sits between what
  * is clicked and what is stored.
  */
-export function WeeklyPicker({ value, onChange }: {
+export function WeeklyPicker({ value, onChange, taken = [] }: {
   value: WeeklyDraft; onChange: (w: WeeklyDraft) => void;
+  /** Days another "when" line holds; they can't be picked here (WhenLines). */
+  taken?: number[];
 }) {
   const { t } = useTranslation();
-  const toggle = (d: number) => onChange({
-    ...value,
-    days: value.days.includes(d) ? value.days.filter((x) => x !== d) : [...value.days, d].sort((a, b) => a - b)
-  });
-  const setDays = (days: number[]) => onChange({ ...value, days });
+  const toggle = (d: number) => {
+    if (taken.includes(d) && !value.days.includes(d)) return;
+    onChange({
+      ...value,
+      days: value.days.includes(d) ? value.days.filter((x) => x !== d) : [...value.days, d].sort((a, b) => a - b)
+    });
+  };
+  const setDays = (days: number[]) => onChange({ ...value, days: days.filter((d) => !taken.includes(d)) });
   const same = (days: number[]) =>
     value.days.length === days.length && days.every((d) => value.days.includes(d));
 
@@ -479,15 +485,17 @@ export function WeeklyPicker({ value, onChange }: {
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         {WEEKDAY_INITIALS.map((initial, d) => {
           const on = value.days.includes(d);
+          const blocked = !on && taken.includes(d);
           return (
             <button
               key={d}
               type="button"
               onClick={() => toggle(d)}
-              title={WEEKDAY_LABELS[d]}
+              disabled={blocked}
+              title={blocked ? t('triggersUi.dayTaken', { day: WEEKDAY_LABELS[d] }) : WEEKDAY_LABELS[d]}
               aria-pressed={on}
               style={{
-                width: 26, height: 24, border: 'none', cursor: 'pointer',
+                width: 26, height: 24, border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.4 : 1,
                 background: on ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
                 boxShadow: on
                   ? 'inset 0 0 0 1.5px var(--cth-ink-500)'

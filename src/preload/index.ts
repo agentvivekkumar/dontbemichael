@@ -609,6 +609,23 @@ const api = {
   foldersSuggest: (businessName: string, folders: string[], root?: string): Promise<{
     home: string; root: string; byFolder: Record<string, string>; rootRefused?: boolean;
   }> => ipcRenderer.invoke('folders:suggest', { businessName, folders, root }),
+  /** Which of `names` already exist as folders under `root`. Reads only. */
+  foldersExist: (root: string, names: string[]): Promise<Record<string, boolean>> =>
+    ipcRenderer.invoke('folders:exists', { root, names }),
+  /** The hire wizard's distinct job check against every teammate (design D6). */
+  hireCheckDistinct: (
+    job: { name: string; title: string; routing: string; workStyle?: string; mailbox?: string },
+    team: Array<{ name: string; title: string; routing: string; workStyle?: string; mailbox?: string }>
+  ): Promise<{ distinct: boolean; overlapsWith: string[]; why: string; suggestion?: string; source: 'ai' | 'rules' }> =>
+    ipcRenderer.invoke('hire:checkDistinct', { job, team }),
+  /** Rewrite a work style: the agent's instructions as the owner's plain
+   *  description, or the owner's description as instructions. */
+  workStyleConvert: (req: {
+    to: 'plain' | 'instructions';
+    text: string;
+    ctx: { name: string; title?: string; business?: { name?: string; city?: string }; manager?: string };
+    previous?: string;
+  }): Promise<{ text: string; source: 'ai' | 'rules' }> => ipcRenderer.invoke('workStyle:convert', req),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }
@@ -833,7 +850,9 @@ const api = {
   mailSave: (input: { id?: string; provider: MailProvider; address: string; password: string; imap?: MailServer; smtp?: MailServer }): Promise<{ ok: true; record: MailboxRecord } | { ok: false; kind: string; reason: string }> =>
     ipcRenderer.invoke('mail:save', input),
   mailRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> => ipcRenderer.invoke('mail:remove', id),
-  mailSetCapabilities: (agentId: string, caps: AgentCapabilities): Promise<{ ok: boolean; restartNeeded: boolean }> =>
+  /** `move: true` confirms taking a mailbox another agent holds (one agent per
+   *  mailbox); without it main answers `heldBy` and changes nothing. */
+  mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),

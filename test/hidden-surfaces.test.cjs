@@ -262,3 +262,45 @@ test('this build hides the safe and read only server list; the switches that nee
   const src = read('src/renderer/src/components/McpDefaultsSettings.tsx');
   assert.match(src, /const TIER_ORDER: McpTier\[\] = \(\['safe-readonly', 'write', 'secret'\] as McpTier\[\]\)\s*\.filter\(\(tier\) => tier !== 'safe-readonly' \|\| SHOW_READONLY_SERVERS\);/);
 });
+
+test('Add Agent hides import hire and its AI prompt; the button says hire (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(fs.readFileSync(path.resolve(__dirname, '..', 'src/shared/buildFeatures.ts'), 'utf8'), /export const SHOW_IMPORT_HIRE = false;/);
+  assert.match(src, /\{SHOW_IMPORT_HIRE && <div style=\{\{/, 'the explainer and generate with AI are gated');
+  assert.match(src, /\{SHOW_IMPORT_HIRE && \(\s*<PixelButton[\s\S]*?onClick=\{importHire\}/, 'the import hire button is gated');
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
+    assert.doesNotMatch(d.addAgent.spawn, /spawn|生成|إنشاء/i, `${loc}: the button hires`);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.spawn, 'hire');
+});
+
+test('Add Agent groups the characters by their job in the show (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(src, /CAST_GROUPS\.map\(\(g\) =>/);
+  assert.match(src, /tr\(`addAgent\.castGroup\.\$\{g\.key\}`\)/);
+  const { OFFICE_CAST, CAST_GROUPS } = loadTs('src/renderer/src/scene/office/cast.ts');
+  const grouped = CAST_GROUPS.flatMap((g) => g.members);
+  assert.deepEqual([...grouped].sort(), OFFICE_CAST.map((c) => c.name).sort(), 'every character is in exactly one group');
+  assert.equal(new Set(grouped).size, grouped.length);
+  assert.deepEqual(CAST_GROUPS[0], { key: 'office', members: ['michael', 'pam', 'erin'] });
+  assert.deepEqual(CAST_GROUPS[1].members.slice(0, 2), ['dwight', 'jim']);
+  assert.ok(CAST_GROUPS.every((g) => g.members.length >= 2), 'no group is a lone tile');
+  assert.match(src, /flexWrap: 'wrap', columnGap: 20/, 'groups sit side by side and wrap');
+  assert.match(src, /tr\(`addAgent\.castRole\.\$\{c\.name\}`\)/, 'each tile names its job');
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
+    for (const g of CAST_GROUPS) assert.ok(d.addAgent.castGroup?.[g.key], `${loc}: ${g.key} has a heading`);
+    for (const n of grouped) assert.ok(d.addAgent.castRole?.[n], `${loc}: ${n} names its own job`);
+  }
+});
+
+test('the hire wizard has no worktree, resume, projects or engine choices (owner, 2026-09-27)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  const flags = fs.readFileSync(path.resolve(__dirname, '..', 'src/shared/buildFeatures.ts'), 'utf8');
+  assert.match(src, /isolate: false,/, 'never a worktree');
+  assert.doesNotMatch(src, /resumeSessionId|registerProject|gitIsolation/, 'no resume or project list');
+  assert.match(flags, /export const SHOW_ENGINE_PICKER = false;/);
+  assert.match(src, /\{SHOW_ENGINE_PICKER && <>[\s\S]*?addAgent\.provider[\s\S]*?addAgent\.command[\s\S]*?<\/>\}/, 'engine and command are gated');
+  assert.match(src, /const model = customModel \?\? defaultModel;/, 'the model starts on the Settings default');
+});

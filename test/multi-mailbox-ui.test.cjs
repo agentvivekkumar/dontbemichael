@@ -155,3 +155,8 @@ test('fixing or removing a mailbox that needed the owner closes its Ask me card 
   assert.match(dialog, /button:not\(\[disabled\]\):not\(\[tabindex="-1"\]\)/, 'the Tab trap ends on the chosen service, not a skipped tile');
   assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /refocus\(ok \? 'add' : `remove-\$\{id\}`\);/);
 });
+
+test('the schedule picker offers 4h between 2h and 6h (owner, 2026-09-27)', () => {
+  const ui = read('src/renderer/src/components/triggers/ui.tsx');
+  assert.match(ui, /label: '2h' \},\s*\{ ms: 4 \* HOUR, label: '4h' \},\s*\{ ms: 6 \* HOUR, label: '6h' \}/);
+});

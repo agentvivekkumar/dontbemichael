@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { paintCastPortrait, type OfficeCharacterName } from '@/scene/office/cast';
+import { paintPortrait } from '@/scene/office/portraitArt';
 import { PORTRAIT_W, PORTRAIT_H } from '@/scene/office/portraitArt';
 
 const FRAME_W = PORTRAIT_W;
@@ -57,4 +58,28 @@ export function SpritePortrait({
       }}
     />
   );
+}
+
+const portraitUrls = new Map<string, string>();
+
+/** A cast member's portrait as an image URL, for places that draw in SVG (the
+ *  memory graph). Painted once per character and scale, then cached. */
+export function portraitDataUrl(character: OfficeCharacterName, scale = 4): string {
+  const key = `${character}@${scale}`;
+  const hit = portraitUrls.get(key);
+  if (hit) return hit;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(FRAME_W * scale);
+    canvas.height = Math.round(FRAME_H * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.imageSmoothingEnabled = false;
+    paintPortrait(ctx, character, scale);
+    const url = canvas.toDataURL('image/png');
+    portraitUrls.set(key, url);
+    return url;
+  } catch {
+    return '';
+  }
 }

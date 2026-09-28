@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useStore } from '@/store/store';
+import { portraitDataUrl } from './SpritePortrait';
+import { PORTRAIT_W, PORTRAIT_H } from '@/scene/office/portraitArt';
 import { PixelBadge } from './PixelBadge';
 import { Icon } from './Icon';
 import type { MessageAct } from '@/scene/office/MessageEnvelope';
@@ -293,24 +295,35 @@ export function MemoryGraphPanel({
                   onClick={() => { if (navigable && !moved.current) onJumpToMemory(n.id); }}
                   style={{ cursor: navigable ? 'pointer' : 'grab' }}
                 >
-                  {/* hard offset shadow */}
-                  <rect x={-half + 2} y={-half + 2} width={s} height={s} fill="var(--cth-ink-900)" />
-                  {/* body */}
-                  <rect
-                    x={-half} y={-half} width={s} height={s}
-                    fill={nodeFill(n)}
-                    stroke="var(--cth-ink-900)"
-                    strokeWidth={n.kind === 'agent' && n.isGod ? 2 : 1.5}
-                  />
-                  {/* double border for god + human */}
-                  {((n.kind === 'agent' && n.isGod) || (n.kind === 'pseudo' && n.id === 'human')) && (
-                    <rect x={-half + 3} y={-half + 3} width={s - 6} height={s - 6}
-                      fill="none" stroke="var(--cth-ink-900)" strokeWidth={1} />
-                  )}
-                  {/* status ring for agents */}
-                  {n.kind === 'agent' && (
-                    <rect x={-half - 2} y={-half - 2} width={s + 4} height={s + 4}
-                      fill="none" stroke={`var(--cth-status-${n.status})`} strokeWidth={1.5} />
+                  {n.kind === 'agent' ? (
+                    // The agent's own character, not a box (owner, 2026-09-27),
+                    // standing on a small tile in its colour with the status
+                    // shown as the tile's rim.
+                    <>
+                      <rect x={-half} y={half * 0.55} width={s} height={half * 0.45} fill={nodeFill(n)}
+                        stroke={`var(--cth-status-${n.status})`} strokeWidth={1.5} />
+                      <image
+                        href={portraitDataUrl(n.character)}
+                        x={-half * (PORTRAIT_W / PORTRAIT_H)}
+                        y={half - s * 1.2}
+                        width={s * (PORTRAIT_W / PORTRAIT_H)}
+                        height={s * 1.2}
+                        preserveAspectRatio="xMidYMax meet"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {/* hard offset shadow */}
+                      <rect x={-half + 2} y={-half + 2} width={s} height={s} fill="var(--cth-ink-900)" />
+                      {/* body */}
+                      <rect x={-half} y={-half} width={s} height={s} fill={nodeFill(n)} stroke="var(--cth-ink-900)" strokeWidth={1.5} />
+                      {/* double border for the human */}
+                      {n.kind === 'pseudo' && n.id === 'human' && (
+                        <rect x={-half + 3} y={-half + 3} width={s - 6} height={s - 6}
+                          fill="none" stroke="var(--cth-ink-900)" strokeWidth={1} />
+                      )}
+                    </>
                   )}
                 </g>
               );
