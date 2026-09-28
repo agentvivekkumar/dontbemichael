@@ -117,7 +117,8 @@
     "scheduleStale": "{{name}} 提出请求后这项已有变化，只能拒绝。",
     "approve": "批准",
     "decline": "拒绝",
-    "scheduleWhy": "原因：{{reason}}"
+    "scheduleWhy": "原因：{{reason}}",
+    "scheduleMichael": "{{name}}：{{note}}"
   },
   "agentStrip": {
     "privateNote": "私人笔记 · {{name}}",
@@ -1038,7 +1039,8 @@
     "runAria": "运行 {{job}}",
     "closedGroup": "{{name}}（已关闭）",
     "closedNote": "{{name}} 已关闭，所以这些已暂停。",
-    "relayHint": "{{godName}} 会把这项工作分给团队。"
+    "relayHint": "{{godName}} 会把这项工作分给团队。",
+    "approvedBy": "由 {{name}} 批准"
   },
   "webhooksSection": {
     "summaryNone": "无",

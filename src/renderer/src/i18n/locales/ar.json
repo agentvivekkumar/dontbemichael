@@ -117,7 +117,8 @@
     "scheduleStale": "تغيّر هذا منذ أن طلبه {{name}}، لذا يمكن رفضه فقط.",
     "approve": "موافقة",
     "decline": "رفض",
-    "scheduleWhy": "السبب: {{reason}}"
+    "scheduleWhy": "السبب: {{reason}}",
+    "scheduleMichael": "يقول {{name}}: {{note}}"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",
@@ -1038,7 +1039,8 @@
     "runAria": "تشغيل {{job}}",
     "closedGroup": "{{name}} (مغلق)",
     "closedNote": "{{name}} مغلق، لذا هذه المواعيد متوقفة مؤقتًا.",
-    "relayHint": "يوزع {{godName}} هذا العمل على الفريق."
+    "relayHint": "يوزع {{godName}} هذا العمل على الفريق.",
+    "approvedBy": "وافق عليه {{name}}"
   },
   "webhooksSection": {
     "summaryNone": "لا شيء",

@@ -117,7 +117,8 @@
     "scheduleStale": "This changed since {{name}} asked, so it can only be declined.",
     "approve": "Approve",
     "decline": "Decline",
-    "scheduleWhy": "Why: {{reason}}"
+    "scheduleWhy": "Why: {{reason}}",
+    "scheduleMichael": "{{name}}: {{note}}"
   },
   "agentStrip": {
     "privateNote": "PRIVATE NOTE · {{name}}",
@@ -1038,7 +1039,8 @@
     "runAria": "Run {{job}}",
     "closedGroup": "{{name}} (closed)",
     "closedNote": "{{name}} is closed, so these are paused.",
-    "relayHint": "{{godName}} hands this job to the team."
+    "relayHint": "{{godName}} hands this job to the team.",
+    "approvedBy": "approved by {{name}}"
   },
   "webhooksSection": {
     "summaryNone": "none",

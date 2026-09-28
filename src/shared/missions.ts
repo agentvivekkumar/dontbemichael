@@ -13,7 +13,8 @@
  * Michael's too until migrateMissions rewrites it.
  */
 import { normalizeWeekly, nextWeeklyFireMs, weeklyDelayMs } from './weeklySchedule';
-import { normalizeLine, normalizeTimes, nextTimesFireMs, simpleTimes, timesDelayMs, type ScheduleLine } from './scheduleTimes';
+import { formatEvery, formatTimes, normalizeLine, normalizeTimes, nextTimesFireMs, simpleTimes, timesDelayMs, type ScheduleLine } from './scheduleTimes';
+import { formatWeekly } from './weeklySchedule';
 import { scheduledRunBody, relayRunBody } from './scheduleMessage';
 
 export interface ScheduledMission {
@@ -43,6 +44,8 @@ export interface ScheduledMission {
   createdBy?: string;
   /** A former "everyone" schedule: Michael gets it and hands the job out. */
   relay?: boolean;
+  /** Who approved the request that set it: 'michael' or 'owner'. */
+  approvedBy?: 'michael' | 'owner';
 }
 
 export const OWNER = 'owner';
@@ -233,6 +236,12 @@ export interface ScheduleRequest {
   /** Why the agent asks, in its words, shown on the card (owner, 2026-09-27:
    *  "there is no rational or explanation behind what made agent propose this"). */
   reason?: string;
+  /** Michael passed it to the owner (it shows in ASK ME), with his note on
+   *  what he can't settle. Otherwise Michael decides it (owner, 2026-09-27). */
+  escalated?: boolean;
+  escalation?: string;
+  /** Michael has been told about it. */
+  sentToMichael?: boolean;
   createdAt: number;
 }
 
@@ -458,6 +467,26 @@ export function fileScheduleRequest(pending: ScheduleRequest[], incoming: Schedu
  *  before merging existed). */
 export function foldScheduleRequests(pending: ScheduleRequest[], missions: ScheduledMission[]): ScheduleRequest[] {
   return pending.reduce<ScheduleRequest[]>((acc, r) => fileScheduleRequest(acc, r, missions), []);
+}
+
+/** A schedule's timing in words, for messages: "every 2h", "weekdays at 08:00". */
+export function whenWords(m: { intervalMs: number; weekly?: unknown; times?: unknown }): string {
+  const times = normalizeTimes(m.times);
+  if (times) return formatTimes(times);
+  if (normalizeWeekly(m.weekly)) return formatWeekly(m.weekly);
+  return `every ${formatEvery(m.intervalMs)}`;
+}
+
+/** What a request would do, in a sentence for Michael or the agent. */
+export function requestSummary(req: ScheduleRequest, missions: ScheduledMission[]): string {
+  const target = missions.find((m) => m.id === req.missionId);
+  const label = target?.label ?? req.draft?.label ?? 'a schedule';
+  if (req.op === 'add' && req.draft) return `add "${req.draft.label}", ${whenWords(req.draft)}`;
+  if (req.op === 'update' && req.draft) {
+    const rename = target && req.draft.label !== target.label ? ` and rename it "${req.draft.label}"` : '';
+    return `change "${label}" from ${target ? whenWords(target) : 'its current times'} to ${whenWords(req.draft)}${rename}`;
+  }
+  return `${req.op} "${label}"`;
 }
 
 /** Has the target changed (or gone) since the agent asked? Adds never go stale. */

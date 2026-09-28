@@ -171,3 +171,22 @@ test('two requests from one agent about one job become one card (owner, 2026-09-
   assert.match(main, /const filed = fileScheduleRequest\(before, built\.request, cfg\.missions \?\? \[\]\);/);
   assert.match(main, /const folded = foldScheduleRequests\(pending, cfg\.missions \?\? \[\]\);/);
 });
+
+test('Michael decides team members\' schedule requests; the owner sees only what he passes on (owner, 2026-09-27)', () => {
+  const main = read('src/main/index.ts');
+  const intake = main.slice(main.indexOf('function receiveScheduleRequest('), main.indexOf('function tellMichaelAboutRequest('));
+  assert.match(intake, /if \(actor === godId && \(op === 'approve' \|\| op === 'decline' \|\| op === 'ask-owner' \|\| op === 'pending'\)\)/);
+  assert.match(intake, /tellMichaelAboutRequest\(request, cfg\.missions \?\? \[\]\);/);
+  assert.doesNotMatch(intake, /ownerToast/, 'a new request no longer pings the owner');
+  assert.match(intake, /if \(actor === godId\) \{[\s\S]{0,200}applyScheduleRequest\(built\.request/, "Michael's own changes apply at once");
+  const decide = main.slice(main.indexOf('function michaelDecides('), main.indexOf('function decideScheduleRequest('));
+  assert.match(decide, /if \(!note\) return 'Add a "note" saying what you can\\'t settle/);
+  assert.match(decide, /escalated: true, escalation: note/);
+  assert.match(main, /try \{ offerPendingToMichael\(\); \}/, 'waiting requests go to Michael once');
+  const cards = read('src/renderer/src/components/ScheduleRequestCards.tsx');
+  assert.match(cards, /setRequests\(all\.filter\(\(r\) => r\.escalated\)\)/);
+  assert.match(cards, /t\('askMe\.scheduleMichael', \{ name: godName, note: req\.escalation \}\)/);
+  const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true }];
+  const req = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: [{ days: ['weekdays'], at: '08:00' }, { days: ['weekdays'], at: '14:00' }] }, missions, 'god', 1, 'r', 'why').request;
+  assert.equal(M.requestSummary(req, missions), 'change "Check Emails" from every 2h to weekdays at 08:00 and 14:00');
+});

@@ -62,7 +62,7 @@ type McpDefaultsMap = { [id: string]: { enabled: boolean } } | undefined;
 
 /** The schedules section of the protocol, the same in both protocol files. */
 const SCHEDULES_PROTOCOL = `## Your schedules
-A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
+A schedule runs one of your jobs on a clock. You never change a schedule yourself: you ask, and Michael, who manages the office, approves or declines it (he brings it to the owner only when he can't settle it). His own schedules change when he sends the request. Send one JSON file to your outbox with \`"to": "scheduler"\` and a \`schedule\` object:
 
 \`\`\`json
 { "to": "scheduler", "act": "request", "subject": "schedule", "body": "Invoices slip past 30 days because nobody checks them; a Friday check catches them first.",
@@ -280,6 +280,9 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
     '',
     '## Scheduled runs',
+    '## Schedule requests',
+    'You manage the office, so you decide the team\'s schedule requests. Each arrives as "Schedule request from <name>" with what would change, why, and its id. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
+    '',
     'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. The scheduler does not read replies, so do not answer it.',
     '',
     '## Staying cheap',

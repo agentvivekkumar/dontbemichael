@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
 import { useMissions, whenText } from './triggers/ScheduleList';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { requestIsStale, type ScheduleRequest, type ScheduledMission } from '@shared/missions';
 
 /**
@@ -19,7 +20,9 @@ import { requestIsStale, type ScheduleRequest, type ScheduledMission } from '@sh
 export function useScheduleRequests(): { requests: ScheduleRequest[]; refresh: () => void } {
   const [requests, setRequests] = useState<ScheduleRequest[]>([]);
   const refresh = useCallback(() => {
-    window.cth.listScheduleRequests().then(setRequests).catch(() => { /* keep last good */ });
+    // Michael decides schedule requests; only the ones he passes on reach the
+    // owner (owner, 2026-09-27).
+    window.cth.listScheduleRequests().then((all) => setRequests(all.filter((r) => r.escalated))).catch(() => { /* keep last good */ });
   }, []);
   useEffect(() => {
     refresh();
@@ -48,6 +51,7 @@ function describe(req: ScheduleRequest, target: ScheduledMission | undefined, t:
 export function ScheduleRequestCards({ requests, refresh }: { requests: ScheduleRequest[]; refresh: () => void }) {
   const { t } = useTranslation();
   const { missions } = useMissions();
+  const godName = useResolvedGodName();
   const agents = useStore((s) => s.agents);
   const restorable = useStore((s) => s.restorableAgents);
   const [busy, setBusy] = useState<string | null>(null);
@@ -89,7 +93,12 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
             </div>
             <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)' }}>
               <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{describe(req, target, t)}</div>
-              {/* Why the agent asks (owner, 2026-09-27). */}
+              {/* What Michael can't settle, then why the agent asks (owner, 2026-09-27). */}
+              {req.escalation && (
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                  {t('askMe.scheduleMichael', { name: godName, note: req.escalation })}
+                </div>
+              )}
               {req.reason && (
                 <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
                   {t('askMe.scheduleWhy', { reason: req.reason })}

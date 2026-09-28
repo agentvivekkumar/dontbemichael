@@ -23,6 +23,7 @@ import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
   migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor, fileScheduleRequest, foldScheduleRequests,
+  requestSummary, whenWords,
   type ScheduleRequest
 } from '../shared/missions';
 import {
@@ -1018,53 +1019,134 @@ function closeAgentByOwner(id: string): { ok: boolean; paused: number } {
   return { ok: res.ok, paused };
 }
 
-/** An agent asked (from its outbox) to change one of its schedules. Nothing
- *  changes here: the request waits in ASK ME. The return text goes back to the
- *  agent as the scheduler's reply. */
+/**
+ * An agent asked (from its outbox) about one of its schedules. Office
+ * management is Michael's (owner, 2026-09-27): a team member's request goes to
+ * him to approve or decline, and he passes it to the owner in ASK ME only when
+ * the facts can't settle it, sources conflict, or it is sensitive. Michael's
+ * own changes apply at once. The return text is the scheduler's reply to the
+ * asking agent.
+ */
 function receiveScheduleRequest(actor: string, payload: unknown, why = ''): string {
   const cfg = readConfig();
+  const godId = hiveGodId();
+  const op = payload && typeof payload === 'object' ? (payload as { op?: unknown }).op : undefined;
+  // Michael deciding a team member's request.
+  if (actor === godId && (op === 'approve' || op === 'decline' || op === 'ask-owner' || op === 'pending')) {
+    return michaelDecides(payload as { op: string; request?: unknown; note?: unknown });
+  }
   // "list" is a question, not a change: answer it directly with the ids an
   // update, pause, resume or delete request needs.
-  if (payload && typeof payload === 'object' && (payload as { op?: unknown }).op === 'list') {
-    const mine = missionsFor(cfg.missions ?? [], actor, hiveGodId());
+  if (op === 'list') {
+    const mine = missionsFor(cfg.missions ?? [], actor, godId);
     return mine.length === 0
       ? 'You have no schedules.'
-      : ['Your schedules (id: job):', ...mine.map((m) => `${m.id}: ${m.label}${m.enabled ? '' : ' (paused)'}`)].join('\n');
+      : ['Your schedules (id: job):', ...mine.map((m) => `${m.id}: ${m.label}, ${whenWords(m)}${m.enabled ? '' : ' (paused)'}`)].join('\n');
   }
-  const built = buildScheduleRequest(actor, payload, cfg.missions ?? [], hiveGodId(), Date.now(), `sr_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`, why);
+  const built = buildScheduleRequest(actor, payload, cfg.missions ?? [], godId, Date.now(), `sr_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`, why);
   if (!built.ok) return `Schedule request not sent: ${built.reason}`;
-  // A request about a job this agent already has waiting joins it as one card
+  // Michael's own schedules: he manages the office, so the change applies now.
+  if (actor === godId) {
+    let refused = '';
+    const res = applyMissions((list) => {
+      const applied = applyScheduleRequest(built.request, list, `m_${Date.now().toString(36)}`);
+      if (!applied.ok) { refused = applied.error; return null; }
+      return applied.missions.map((m) => (m.id === applied.missionId ? { ...m, approvedBy: 'michael' as const } : m));
+    });
+    if (refused || !res.ok) return `Schedule not changed: ${refused || (!res.ok ? res.error : '')}.`;
+    return `Done: ${requestSummary(built.request, cfg.missions ?? [])}.`;
+  }
+  // A request about a job this agent already has waiting joins it as one
   // (owner, 2026-09-27).
   const before = cfg.scheduleRequests ?? [];
   const filed = fileScheduleRequest(before, built.request, cfg.missions ?? []);
   const joined = filed.length === before.length;
-  writeConfig({ scheduleRequests: filed });
+  const request = filed.find((r) => r.id === built.request.id) ?? built.request;
+  writeConfig({ scheduleRequests: filed.map((r) => (r.id === request.id ? { ...r, sentToMichael: true } : r)) });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
-  // ASK ME has no badge, so Michael tells the owner there is something to
-  // decide. Only Michael notifies (docs/designs/michael-only-notifications.md).
-  let name = 'A team member';
-  try { name = hive.registry().agents[actor]?.name?.trim() || name; } catch { /* keep the fallback */ }
-  ownerToast(michaelName(), `${name} asked to change a schedule. It's waiting for you in ASK ME.`);
+  tellMichaelAboutRequest(request, cfg.missions ?? []);
   return joined
-    ? 'Joined your earlier request about the same job: the owner sees them as one card in ASK ME. Nothing changes until they approve it; you will get a message either way.'
-    : 'Sent to the owner for approval in ASK ME. Nothing changes until they approve it; you will get a message either way.';
+    ? 'Joined your earlier request about the same job; Michael decides them as one. Nothing changes until he does; you will get a message either way.'
+    : 'Sent to Michael to decide. Nothing changes until he does; you will get a message either way.';
 }
 
-/** The owner approved or declined a request. Approval applies exactly that one
- *  change; a request whose schedule changed since it was asked is refused. */
-function decideScheduleRequest(id: string, approve: boolean): { ok: true } | { ok: false; error: string } {
+/** Michael hears about a team member's request, with how to decide it. */
+function tellMichaelAboutRequest(req: ScheduleRequest, missions: ScheduledMission[]): void {
+  if (!hive.enabled()) return;
+  let name = req.agentId;
+  try { name = hive.registry().agents[req.agentId]?.name?.trim() || name; } catch { /* keep the id */ }
+  hive.send({
+    to: hiveGodId(), act: 'request',
+    subject: `Schedule request from ${name}`,
+    body: [
+      `${name} asks to ${requestSummary(req, missions)}.${req.reason ? ` Why: ${req.reason}` : ''}`,
+      `Request id: ${req.id}. You decide it: send the scheduler {"op": "approve", "request": "${req.id}"} or {"op": "decline", "request": "${req.id}", "note": "why"}.`,
+      `Pass it to the owner only when the facts can't settle it, sources conflict, or it is sensitive: {"op": "ask-owner", "request": "${req.id}", "note": "what you can't settle"}.`
+    ].join('\n')
+  }, 'scheduler');
+}
+
+/** Requests waiting from before Michael decided them are offered to him once. */
+function offerPendingToMichael(): void {
+  const cfg = readConfig();
+  const pending = foldScheduleRequests(cfg.scheduleRequests ?? [], cfg.missions ?? []);
+  const fresh = pending.filter((r) => !r.escalated && !r.sentToMichael);
+  if (!fresh.length) { if (pending.length !== (cfg.scheduleRequests ?? []).length) writeConfig({ scheduleRequests: pending }); return; }
+  for (const r of fresh) tellMichaelAboutRequest(r, cfg.missions ?? []);
+  writeConfig({ scheduleRequests: pending.map((r) => (fresh.includes(r) ? { ...r, sentToMichael: true } : r)) });
+  try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
+}
+
+/** Michael's answer to a request: approve, decline, pass it to the owner, or
+ *  list what is waiting. */
+function michaelDecides(p: { op: string; request?: unknown; note?: unknown }): string {
+  const cfg = readConfig();
+  const pending = cfg.scheduleRequests ?? [];
+  if (p.op === 'pending') {
+    const open = pending.filter((r) => !r.escalated);
+    return open.length
+      ? ['Schedule requests waiting for you (id: request):', ...open.map((r) => `${r.id}: ${requestSummary(r, cfg.missions ?? [])}`)].join('\n')
+      : 'No schedule requests are waiting for you.';
+  }
+  const id = typeof p.request === 'string' ? p.request : '';
+  const note = typeof p.note === 'string' ? p.note.replace(/\s+/g, ' ').trim().slice(0, 400) : '';
+  const req = pending.find((r) => r.id === id);
+  if (!req) return 'No waiting request has that id: it may have been decided, or joined with a newer one. Send {"op": "pending"} to see what is waiting.';
+  if (p.op === 'ask-owner') {
+    if (!note) return 'Add a "note" saying what you can\'t settle, for the owner\'s card.';
+    writeConfig({ scheduleRequests: pending.map((r) => (r.id === id ? { ...r, escalated: true, escalation: note } : r)) });
+    try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
+    let name = 'A team member';
+    try { name = hive.registry().agents[req.agentId]?.name?.trim() || name; } catch { /* keep the fallback */ }
+    // Only Michael notifies the owner (docs/designs/michael-only-notifications.md).
+    ownerToast(michaelName(), `${name}'s schedule change needs you in ASK ME.`);
+    return 'Passed to the owner in ASK ME. You will hear when they decide.';
+  }
+  const res = decideScheduleRequest(id, p.op === 'approve', 'michael', note);
+  if (!res.ok) {
+    return res.error === 'stale'
+      ? 'That schedule changed since the request was made, so it can\'t be applied. Decline it and ask the team member to send a new one.'
+      : `Not applied: ${res.error}.`;
+  }
+  return p.op === 'approve' ? 'Approved and in place.' : 'Declined. Nothing changed.';
+}
+
+/** A request was approved or declined, by Michael or by the owner in ASK ME.
+ *  Approval applies exactly that one change; a request whose schedule changed
+ *  since it was asked is refused. The asking agent is told either way. */
+function decideScheduleRequest(id: string, approve: boolean, by: 'owner' | 'michael' = 'owner', note = ''): { ok: true } | { ok: false; error: string } {
   const cfg = readConfig();
   const req = (cfg.scheduleRequests ?? []).find((r) => r.id === id);
   if (!req) return { ok: false, error: 'not found' };
   // Name the schedule before the change: after an approved delete it's gone.
-  const described = describeScheduleRequest(req, cfg.missions ?? []);
+  const described = requestSummary(req, cfg.missions ?? []);
   if (approve) {
     let refused = '';
     // Apply against the list as it is when written (applyMissions reads it fresh).
     const res = applyMissions((list) => {
       const applied = applyScheduleRequest(req, list, `m_${Date.now().toString(36)}`);
       if (!applied.ok) { refused = applied.error; return null; }
-      return applied.missions;
+      return applied.missions.map((m) => (m.id === applied.missionId ? { ...m, approvedBy: by } : m));
     });
     if (refused) return { ok: false, error: refused };
     if (!res.ok) return res;
@@ -1072,20 +1154,20 @@ function decideScheduleRequest(id: string, approve: boolean): { ok: true } | { o
   writeConfig({ scheduleRequests: (readConfig().scheduleRequests ?? []).filter((r) => r.id !== id) });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
   if (hive.enabled()) {
+    const who = by === 'michael' ? michaelName() : 'The owner';
     hive.send({
       to: req.agentId, act: 'inform',
       subject: approve ? 'Schedule change approved' : 'Schedule change declined',
-      body: `${approve ? 'Approved' : 'Declined'}: ${described}. ${approve ? 'It is in place now.' : 'Nothing changed.'}`
+      body: `${who} ${approve ? 'approved' : 'declined'}: ${described}. ${approve ? 'It is in place now.' : 'Nothing changed.'}${note ? ` Note: ${note}` : ''}`
     }, 'scheduler');
+    // The owner decided one Michael passed on: he hears the outcome too.
+    if (by === 'owner' && req.escalated) {
+      hive.send({ to: hiveGodId(), act: 'inform', subject: `Owner ${approve ? 'approved' : 'declined'} a schedule change`, body: `${described}.` }, 'scheduler');
+    }
   }
   return { ok: true };
 }
 
-function describeScheduleRequest(req: ScheduleRequest, missions: ScheduledMission[]): string {
-  const target = missions.find((m) => m.id === req.missionId);
-  const name = req.draft?.label ?? target?.label ?? 'a schedule';
-  return `${req.op} "${name}"`;
-}
 
 
 /** One-time migration: ensure the built-in hourly ops standup exists for installs
@@ -5670,6 +5752,8 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
+  // Requests filed before Michael decided them are offered to him once.
+  try { offerPendingToMichael(); } catch (e) { console.error('[schedules] offer to Michael failed', e); }
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
   hive.setRuntimeInfo({ version: app.getVersion(), packaged: app.isPackaged, appPath: app.getAppPath() });

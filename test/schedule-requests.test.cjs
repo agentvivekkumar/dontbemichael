@@ -138,7 +138,8 @@ test('agents are told how to ask, in both protocols', () => {
   // One copy, used by both protocol files (simplification review, 2026-09-25).
   assert.equal((hive.match(/## Your schedules/g) ?? []).length, 1);
   assert.equal((hive.match(/\$\{SCHEDULES_PROTOCOL\}/g) ?? []).length, 2);
-  assert.match(hive, /You never change a schedule yourself: you ask, and the owner approves or declines in ASK ME\./);
+  assert.match(hive, /You never change a schedule yourself: you ask, and Michael, who manages the office, approves or declines it/);
+  assert.match(hive, /'## Schedule requests',/, "Michael is told how to decide them");
 });
 
 test('only Michael notifies: every desktop toast in main is his, or one of the app\'s own warnings', () => {
@@ -150,7 +151,7 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()'].sort());
   assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
   assert.match(main, /ownerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
-  assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\} asked to change a schedule\. It's waiting for you in ASK ME\.`\);/);
+  assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\}'s schedule change needs you in ASK ME\.`\);/, 'only when Michael passes it on');
   assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return;/);
 });
 

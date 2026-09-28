@@ -210,9 +210,12 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
   const now = Date.now();
   const nextAt = nextRunAt(mission, now);
-  const creator = !mission.createdBy || mission.createdBy === OWNER
+  const creator = (!mission.createdBy || mission.createdBy === OWNER
     ? t('schedulesSection.addedByYou')
-    : t('schedulesSection.addedBy', { name: nameOf(mission.createdBy) });
+    : t('schedulesSection.addedBy', { name: nameOf(mission.createdBy) }))
+    // Michael approves team members' requests (owner, 2026-09-27); say so.
+    + (mission.approvedBy === 'michael' && mission.createdBy && mission.createdBy !== OWNER && nameOf(mission.createdBy) !== godName
+      ? `, ${t('schedulesSection.approvedBy', { name: godName })}` : '');
   const sub = [
     mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) }) : t('schedulesSection.notFired'),
     nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, i18n.language) }) : null,
