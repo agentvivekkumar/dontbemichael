@@ -1,23 +1,26 @@
-# Don't Be Michael v0.0.7
+# Don't Be Michael v0.0.8
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.0.7
+## What's new in 0.0.8
 
-- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any IMAP mailbox with an app password in Settings, Connections, Mailboxes, then give an agent one mailbox on its Capabilities tab, set to Can send or Draft only.
-- **A Capabilities tab on every agent,** with Email and On a schedule. Michael's Schedules tab is now Office schedule, listing every job that is on.
-- **The office opens again after closing time,** so agents pick up held work and scheduled jobs on the next launch.
-- **Your Claude account's email is one switch** in Mailboxes: allowed for everyone, or blocked.
+- **A new hire wizard: Who, Job, Role, Finalize.** Each character brings a real job, or you write one. The app checks it against every teammate so no two do the same work, and the work style is in plain words you can edit.
+- **Michael runs the office.** Only Michael assigns work, and he decides the team's schedule requests himself. He asks you only when he can't settle one.
+- **One job, several times.** Every 2 hours on weekdays plus 2 pm at weekends, in one schedule.
+- **One team member per mailbox,** with a confirm before moving one.
+- **Erin joins the cast,** every character has break room lines, and the memory graph shows each agent's character.
+
+Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
 ## Download
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.7-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.7-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.8-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.8-mac-universal.dmg) |
 
 This release is for Mac only. Windows and Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.7.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.7.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.8.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.8.tar.gz)
 
 ## Installing on your Mac
 

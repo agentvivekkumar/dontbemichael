@@ -43,10 +43,11 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.0.7: every team member can watch its own mailbox.**
-> Connect as many mailboxes as your business uses, then give each team member the one that fits
-> its job. Your Executive Admin watches the CEO's inbox, Customer Support answers support@, Sales
-> follows up from sales@. [See how it works](#a-mailbox-for-every-job).
+> **New in 0.0.8: Michael runs the office, and hiring makes sense.**
+> A four step hire wizard where each character brings a real job, a check that no two teammates do
+> the same work, and work styles in plain words. Only Michael assigns work and decides the team's
+> schedule requests, asking you only when he can't settle one. One job can now run at several
+> times. [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
 
@@ -303,6 +304,7 @@ If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
 
 ### Where to read next
 
+- [`docs/FEATURES.md`](./docs/FEATURES.md): every feature, and every change release by release.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md): diagrams and the module map.
 - [`HIVE.md`](./HIVE.md): how agents coordinate.
 - [`SPEC.md`](./SPEC.md): the terminal and event planes.
