@@ -246,16 +246,24 @@ const styleBald: HairFn = (buf, color, skinBase, a) => {
 // A wrapped turban (Sadiq, owner 2026-09-27): a tall rounded wrap in the recipe's
 // hair color that sits above the head and covers the forehead to the brows, with
 // diagonal folds so it reads as wrapped cloth rather than a hat.
-const TURBAN_ROWS: [number, number, number][] = [[0, 6, 11], [1, 4, 13], [2, 3, 14], [3, 3, 14], [4, 3, 14], [5, 3, 14], [6, 4, 13]];
+// A Sikh turban (Sadiq, owner 2026-09-27: "more like a turban"): taller and
+// wider than the head, a broad top, the sides wrapped down over the temples,
+// and the front edge rising to a point over the middle of the forehead where
+// the wraps cross, with the folds drawn as chevrons meeting at that point.
+const TURBAN_ROWS: [number, number, number][] = [[0, 6, 11], [1, 4, 13], [2, 3, 14], [3, 3, 14], [4, 3, 14], [5, 3, 14]];
 const styleTurban: HairFn = (buf, color) => {
-  const [hi, base, sh] = shades(color, 1.25, 0.66);
+  const [hi, base, sh] = shades(color, 1.3, 0.62);
   for (const [y, a, b] of TURBAN_ROWS) rect(buf, a, y, b, y, base);
-  // folds: two diagonal wraps rising to the right, plus the shaded right side
-  for (const [x, y] of [[5, 5], [6, 4], [7, 3], [8, 2], [9, 1], [8, 6], [9, 5], [10, 4], [11, 3], [12, 2]] as const) set(buf, x, y, sh);
-  for (let y = 2; y <= 5; y++) set(buf, 14, y, sh);
-  set(buf, 13, 6, sh);
-  // light catching the upper left of the wrap
-  for (const [x, y] of [[6, 0], [7, 0], [5, 1], [6, 1], [4, 2], [5, 2], [4, 3]] as const) set(buf, x, y, hi);
+  // the sides come down over the temples; the forehead shows as a peak
+  rect(buf, 3, 6, 7, 6, base); rect(buf, 10, 6, 14, 6, base);
+  rect(buf, 3, 7, 6, 7, base); rect(buf, 11, 7, 14, 7, base);
+  rect(buf, 3, 8, 4, 8, base); rect(buf, 13, 8, 14, 8, base);
+  // folds: chevrons rising to the centre, one per wrap
+  for (const [x, y] of [[3, 6], [4, 6], [5, 5], [6, 5], [7, 4], [8, 4], [9, 4], [10, 4], [11, 5], [12, 5], [13, 6], [14, 6]] as const) set(buf, x, y, sh);
+  for (const [x, y] of [[4, 3], [5, 3], [6, 2], [7, 2], [10, 2], [11, 2], [12, 3], [13, 3]] as const) set(buf, x, y, sh);
+  // shade down the right, light across the upper left of each wrap
+  for (let y = 2; y <= 8; y++) set(buf, 14, y, sh);
+  for (const [x, y] of [[7, 0], [8, 0], [5, 1], [6, 1], [7, 1], [4, 2], [5, 2], [4, 4], [5, 4], [6, 4], [3, 5], [4, 5]] as const) set(buf, x, y, hi);
 };
 
 // Close-cropped hair (Darryl, owner 2026-09-27): a short, even, rounded cap with
@@ -469,7 +477,8 @@ function drawHeadBack(buf: Buf, r: Recipe): void {
 function drawHeadBackTurban(buf: Buf, r: Recipe): void {
   const s = SKIN[r.skin];
   const [hi, base, sh] = shades(r.hairc, 1.25, 0.66);
-  const rows: [number, number, number][] = [...TURBAN_ROWS, [7, 4, 13], [8, 4, 13], [9, 4, 13], [10, 5, 12]];
+  // The back is whole: no forehead peak, so it keeps row 6 the front leaves open.
+  const rows: [number, number, number][] = [...TURBAN_ROWS, [6, 3, 14], [7, 4, 13], [8, 4, 13], [9, 4, 13], [10, 5, 12]];
   for (const [y, a, b] of rows) rect(buf, a, y, b, y, base);
   // wraps crossing the back, and the shaded edges
   for (const [x, y] of [[4, 8], [5, 7], [6, 6], [7, 5], [8, 4], [9, 3], [10, 2], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5], [11, 4], [12, 3]] as const) set(buf, x, y, sh);
