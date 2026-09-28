@@ -56,6 +56,8 @@ interface SkinPal { hi: RGB; base: RGB; sh: RGB; line: RGB; }
 const SKIN: Record<string, SkinPal> = {
   light: { hi: [255, 221, 189], base: [247, 201, 170], sh: [212, 158, 126], line: [168, 112, 82] },
   tan:   { hi: [232, 182, 136], base: [214, 162, 116], sh: [176, 126, 86],  line: [138, 92, 60] },
+  // A warm South Asian medium brown, between tan and brown (Sadiq, owner 2026-09-27).
+  wheat: { hi: [214, 162, 118], base: [194, 140, 98],  sh: [158, 110, 74],   line: [114, 76, 50] },
   brown: { hi: [180, 130, 94],  base: [158, 112, 78],  sh: [124, 86, 58],   line: [90, 60, 40] },
   dark:  { hi: [142, 98, 70],   base: [120, 80, 56],   sh: [94, 62, 42],    line: [64, 42, 28] },
 };
@@ -485,7 +487,9 @@ function drawHeadBackTurban(buf: Buf, r: Recipe): void {
   for (let y = 3; y <= 9; y++) { set(buf, 3, y, sh); set(buf, 14, y, sh); }
   for (const [x, y] of [[7, 0], [8, 0], [6, 1], [7, 1]] as const) set(buf, x, y, hi);
   // short hair at the nape under the wrap, then the neck
-  const hairDark = r.facialc ?? [26, 20, 18];
+  // His own hair is black whatever his facial hair colour is (the stubble is a
+  // light shadow, owner 2026-09-27).
+  const hairDark: RGB = [26, 20, 18];
   rect(buf, 5, 11, 12, 12, hairDark);
   rect(buf, 6, 13, 11, 13, s.sh);
   rect(buf, 7, 14, 10, 17, s.sh);
@@ -581,7 +585,9 @@ const RECIPES: Record<OfficeCharacterName, Recipe> = {
   meredith: { skin: 'light', hairc: [154, 82, 46],  hair: 'styleMessy',  hairargs: { length: 15 }, cloth: 'blouse', c1: [176, 86, 74], brow: 'raised', mouth: 'smile', lashes: true },
   nick:     { skin: 'light', hairc: [46, 34, 26],   hair: 'styleCurly',  cloth: 'polo', c1: [96, 128, 106], c2: [80, 110, 90], brow: 'raised', mouth: 'neutral' },
   // Red turban, short dark beard, dark cardigan over a navy shirt (owner, 2026-09-27).
-  sadiq:    { skin: 'brown', hairc: [150, 32, 44],  hair: 'styleTurban', facial: 'beard', facialc: [30, 24, 22], cloth: 'cardigan', c1: [64, 64, 72], c2: [40, 54, 100], brow: 'flat', mouth: 'neutral' },
+  // Maroon turban, mostly clean shaven with a light shadow along the jaw, grey
+  // cardigan over a navy polo (owner, 2026-09-27, from a photo).
+  sadiq:    { skin: 'wheat', hairc: [128, 26, 40],  hair: 'styleTurban', facial: 'stubble', facialc: [150, 106, 76], cloth: 'cardigan', c1: [64, 64, 72], c2: [34, 46, 92], brow: 'flat', mouth: 'neutral' },
   // Short black hair, full short beard, grey collared work shirt (owner, 2026-09-27).
   darryl:   { skin: 'dark',  hairc: [24, 20, 20],   hair: 'styleCrop',   cloth: 'dressshirt', c1: [146, 150, 158], facial: 'beardFull', brow: 'flat', mouth: 'neutral' },
 };
