@@ -623,7 +623,7 @@ const api = {
   workStyleConvert: (req: {
     to: 'plain' | 'instructions';
     text: string;
-    ctx: { name: string; title?: string; business?: { name?: string; city?: string } };
+    ctx: { name: string; title?: string; business?: { name?: string; city?: string }; manager?: string };
     previous?: string;
   }): Promise<{ text: string; source: 'ai' | 'rules' }> => ipcRenderer.invoke('workStyle:convert', req),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */

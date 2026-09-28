@@ -223,24 +223,24 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   // plain description (`workStyle`); the agent gets instructions written from
   // it at Hire. `baseInstructions` are the copied job's instructions, used as
   // they are when the owner leaves the description unchanged.
-  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal) : '');
+  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, pendingHire.name) : '');
   const [baseInstructions, setBaseInstructions] = useState(pendingHire?.goal ?? '');
-  const [plainOfBase, setPlainOfBase] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal) : '');
+  const [plainOfBase, setPlainOfBase] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, pendingHire.name) : '');
   const [describing, setDescribing] = useState(false);
   const [writingInstructions, setWritingInstructions] = useState(false);
   const describeSeq = useRef(0);
-  const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business });
+  const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business, manager: godName });
   /** Show a job's instructions as a plain description: the quick rewrite at
    *  once, the model's when it arrives, unless the owner has started typing. */
   const setInstructions = (instructions: string, forName = name.trim(), forTitle = title.trim()): void => {
     const seq = ++describeSeq.current;
     setBaseInstructions(instructions);
-    const quick = instructions.trim() ? plainFallback(instructions) : '';
+    const quick = instructions.trim() ? plainFallback(instructions, forName) : '';
     setWorkStyle(quick);
     setPlainOfBase(quick);
     if (!instructions.trim()) { setDescribing(false); return; }
     setDescribing(true);
-    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: forName, title: forTitle || undefined, business } })
+    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: forName, title: forTitle || undefined, business, manager: godName } })
       .then((res) => {
         if (seq !== describeSeq.current || res.source !== 'ai' || !res.text) return;
         setWorkStyle((cur) => (cur === quick ? res.text : cur));

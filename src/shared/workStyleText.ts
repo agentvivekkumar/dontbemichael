@@ -23,6 +23,8 @@ export interface WorkStyleContext {
   title?: string;
   /** Business name and city, for the instructions' first line. */
   business?: { name?: string; city?: string };
+  /** The office manager's name (Michael unless the owner renamed him). */
+  manager?: string;
 }
 
 const where = (b?: { name?: string; city?: string }) => {
@@ -38,10 +40,12 @@ export function instructionsOpening(b?: { name?: string; city?: string }): strin
 /** The hidden call that turns an agent's instructions into the owner's plain
  *  description. */
 export function toPlainPrompt(instructions: string, ctx: WorkStyleContext): string {
+  const michael = ctx.manager?.trim() || 'Michael';
   return [
     `Rewrite the instructions below, which were written for an AI team member named ${ctx.name}${ctx.title ? ` (${ctx.title})` : ''}, as a short plain English description for the small business owner who employs them.`,
     `Write about ${ctx.name} in the third person ("${ctx.name} sorts the inbox"), in everyday words a busy owner reads in a minute. Keep every duty, habit and approval rule the instructions contain, and add nothing new.`,
-    'Use three short parts, each a label on its own line followed by a few sentences: "The job:", "How the work is done:", "Asks you first:". Leave out a part the instructions have nothing for.',
+    `Never write "you" or "your": the reader cannot tell who that means. Name every party. The business owner is "the owner". ${michael} is the office manager: team members report to ${michael} and ${michael} brings to the owner whatever needs them, so anything ${ctx.name} sends, reports or asks for approval goes to ${michael}, even where the instructions say "the owner" or "you". Teammates keep their names or job titles as the instructions give them.`,
+    'Use three short parts, each a label on its own line followed by a few sentences: "The job:", "How the work is done:", "Asks the owner first:". Leave out a part the instructions have nothing for.',
     'No markdown symbols, no bullet characters, no dashes; use commas, colons and periods. Answer with the description only.',
     '',
     '--- INSTRUCTIONS ---',
@@ -58,6 +62,7 @@ export function toPlainPrompt(instructions: string, ctx: WorkStyleContext): stri
 export function toInstructionsPrompt(plain: string, ctx: WorkStyleContext, previous?: string): string {
   return [
     `Turn the owner's description below into the standing work style for ${ctx.name}, an AI team member${ctx.title ? ` whose job is ${ctx.title}` : ''} at ${where(ctx.business)}. ${ctx.name} reads it at the start of every session.`,
+    `In the description, "the owner" is the business owner and ${ctx.manager?.trim() || 'Michael'} is the office manager, who hands out work and brings the owner what needs them. Team members send reports and approvals to ${ctx.manager?.trim() || 'Michael'}, never to the owner directly.`,
     '',
     'Follow these rules, because the team member reads every line literally:',
     `Start with exactly this line: "${instructionsOpening(ctx.business)}"`,
@@ -77,13 +82,13 @@ export function toInstructionsPrompt(plain: string, ctx: WorkStyleContext, previ
 const HEADING_LABEL: Record<string, string> = {
   'the job': 'The job:',
   'how to work': 'How the work is done:',
-  "needs the owner's approval": 'Asks you first:',
-  'needs the owners approval': 'Asks you first:'
+  "needs the owner's approval": 'Asks the owner first:',
+  'needs the owners approval': 'Asks the owner first:'
 };
 
 /** A plain description without the model: the opening line addressed to the
  *  agent dropped, headings turned into labels, markdown removed. */
-export function plainFallback(instructions: string): string {
+export function plainFallback(instructions: string, name?: string): string {
   const lines = instructions.replace(/\r/g, '').split('\n');
   const out: string[] = [];
   for (const raw of lines) {
@@ -98,13 +103,26 @@ export function plainFallback(instructions: string): string {
     }
     out.push(line.replace(/^[-*•]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1'));
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const text = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return name?.trim() ? thirdPerson(text, name.trim()) : text;
+}
+
+/** The quick rewrite's "you" (the team member, in instructions) as their name,
+ *  so the owner never reads a "you" that isn't them (owner, 2026-09-27). */
+export function thirdPerson(text: string, name: string): string {
+  return text
+    .replace(/\b[Yy]ou are\b/g, `${name} is`)
+    .replace(/\b[Yy]ou're\b/g, `${name} is`)
+    .replace(/\b[Yy]ou have\b/g, `${name} has`)
+    .replace(/\b[Yy]ourself\b/g, name)
+    .replace(/\b[Yy]our\b/g, `${name}'s`)
+    .replace(/\b[Yy]ou\b/g, name);
 }
 
 const LABEL_HEADING: Array<[RegExp, string]> = [
   [/^the job:\s*/i, '### The job'],
   [/^how the work is done:\s*/i, '### How to work'],
-  [/^asks you first:\s*/i, "### Needs the owner's approval"]
+  [/^asks (?:you|the owner) first:\s*/i, "### Needs the owner's approval"]
 ];
 
 /** Instructions without the model: the opening line, the owner's labels turned

@@ -51,13 +51,13 @@ export function readConvertRequest(v: unknown): ConvertRequest | null {
   return {
     to: o.to,
     text,
-    ctx: { name, title: str(c.title, 120) || undefined, business: { name: str(b.name, 120) || undefined, city: str(b.city, 120) || undefined } },
+    ctx: { name, title: str(c.title, 120) || undefined, business: { name: str(b.name, 120) || undefined, city: str(b.city, 120) || undefined }, manager: str(c.manager, 60).trim() || undefined },
     previous: str(o.previous, MAX_TEXT) || undefined
   };
 }
 
 export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): Promise<{ text: string; source: 'ai' | 'rules' }> {
-  const fallback = () => (req.to === 'plain' ? plainFallback(req.text) : instructionsFallback(req.text, req.ctx));
+  const fallback = () => (req.to === 'plain' ? plainFallback(req.text, req.ctx.name) : instructionsFallback(req.text, req.ctx));
   try {
     const prompt = req.to === 'plain' ? toPlainPrompt(req.text, req.ctx) : toInstructionsPrompt(req.text, req.ctx, req.previous);
     const result = await runHiddenClaude(prompt, {

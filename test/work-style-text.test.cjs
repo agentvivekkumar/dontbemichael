@@ -22,7 +22,7 @@ test('the quick plain rewrite drops the agent-facing opening and markdown', () =
   assert.doesNotMatch(plain, /The owner set this work style|###|\{Business\}/);
   assert.match(plain, /^The job:/m);
   assert.match(plain, /^How the work is done:/m);
-  assert.match(plain, /^Asks you first:/m);
+  assert.match(plain, /^Asks the owner first:/m);
 });
 
 test('the quick instructions rewrite restores the house opening and headings', () => {
@@ -66,4 +66,18 @@ test('Edit Agent shows the plain description and rewrites instructions only when
   const save = edit.slice(edit.indexOf('const save = async'));
   assert.ok(save.indexOf("to: 'instructions'") < save.indexOf('renameAgent('), 'written before anything is saved');
   assert.doesNotMatch(edit, /Check every number twice/, 'no prompt-style placeholder');
+});
+
+test('the plain description names the owner and Michael, never "you" (owner, 2026-09-27)', () => {
+  const p = W.toPlainPrompt(pam, { ...ctx, manager: 'Michael' });
+  assert.match(p, /Never write "you" or "your"/);
+  assert.match(p, /The business owner is "the owner"\. Michael is the office manager/);
+  assert.match(p, /anything Erin sends, reports or asks for approval goes to Michael/);
+  assert.match(p, /"Asks the owner first:"/);
+  assert.match(W.toInstructionsPrompt('x', { ...ctx, manager: 'Michael' }), /Team members send reports and approvals to Michael, never to the owner directly\./);
+  const quick = W.plainFallback('### How to work\nYou are the admin. Send your summary to Michael so you can move on.', 'Erin');
+  assert.doesNotMatch(quick, /\byou\b|\byour\b/i);
+  assert.match(quick, /Erin is the admin\. Send Erin's summary to Michael so Erin can move on\./);
+  // The owner's old label still reads back as the approval heading.
+  assert.match(W.instructionsFallback('Asks you first: refunds.', ctx), /### Needs the owner's approval\nrefunds\./);
 });

@@ -4,6 +4,7 @@ import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { InfoTip } from './InfoTip';
 import { useBackdropClose } from '@/hooks/useBackdropClose';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -35,6 +36,7 @@ export interface EditAgentModalProps {
  */
 export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const updateAgent = useStore((s) => s.updateAgent);
+  const godName = useResolvedGodName();
   const renameAgent = useStore((s) => s.renameAgent);
   const [nameError, setNameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
@@ -54,8 +56,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   // Work style in two forms (owner, 2026-09-27): the owner edits a plain
   // description (`goal` here); the agent keeps its instructions (agent.goal),
   // rewritten from the description on save only when it changed.
-  const [goal, setGoal] = useState(() => plainFallback(agent.goal ?? ''));
-  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(agent.goal ?? ''));
+  const [goal, setGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
+  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
   const [describing, setDescribing] = useState(false);
   const [writing, setWriting] = useState(false);
   const [goalError, setGoalError] = useState(false);
@@ -65,13 +67,13 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
    *  at once, the model's when it arrives, unless the owner started typing. */
   const describe = (instructions: string): void => {
     const seq = ++describeSeq.current;
-    const quick = instructions.trim() ? plainFallback(instructions) : '';
+    const quick = instructions.trim() ? plainFallback(instructions, agent.name) : '';
     setGoal(quick);
     setPlainOfGoal(quick);
     if (!instructions.trim()) { setDescribing(false); return; }
     setDescribing(true);
     const title = splitAgentRole(agent.description).role;
-    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: agent.name, title: title || undefined } })
+    window.cth.workStyleConvert({ to: 'plain', text: instructions, ctx: { name: agent.name, title: title || undefined, manager: godName } })
       .then((res) => {
         if (seq !== describeSeq.current || res.source !== 'ai' || !res.text) return;
         setGoal((cur) => (cur === quick ? res.text : cur));
@@ -132,7 +134,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
         ctx: {
           name: trimmedName,
           title: role.trim() || undefined,
-          business: { name: config?.businessName, city: config?.businessCity }
+          business: { name: config?.businessName, city: config?.businessCity },
+          manager: godName
         },
         previous: agent.goal || undefined
       }).catch(() => null);
@@ -346,7 +349,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   value={goal}
                   onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
                   aria-invalid={goalError || undefined}
-                  placeholder={`In your own words: what ${name.trim() || agent.name} does, how you like it done, and what to ask you about first.`}
+                  placeholder={`The job: what ${name.trim() || agent.name} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.`}
                   rows={4}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
                 />

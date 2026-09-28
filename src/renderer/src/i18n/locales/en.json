@@ -626,7 +626,7 @@
       "cliDefault": "Claude's own default",
       "sameWork": "The work {{name}} handles reads like the same work, whatever the role is called.",
       "errWorkStyle": "Work style is required: write how this team member does the job.",
-      "workStylePlaceholder": "In your own words: what {{name}} does, how you like it done, and what {{name}} should ask you about first.",
+      "workStylePlaceholder": "The job: what {{name}} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.",
       "describing": "Putting the job into plain words...",
       "writingInstructions": "writing {{name}}'s instructions...",
       "errInstructions": "The instructions could not be written. Try Hire again.",

@@ -626,7 +626,7 @@
       "cliDefault": "Claude 自带的默认模型",
       "sameWork": "无论职位叫什么，{{name}} 负责的工作读起来是同一份工作。",
       "errWorkStyle": "工作方式为必填：请写明这位团队成员如何完成工作。",
-      "workStylePlaceholder": "用你自己的话写：{{name}} 做什么，你希望怎么做，以及哪些事 {{name}} 应该先问你。",
+      "workStylePlaceholder": "工作内容：{{name}} 做什么，为什么。\n做法：老板希望怎么做。\n先问老板：哪些事需要批准。",
       "describing": "正在把这份工作写成通俗的说明...",
       "writingInstructions": "正在为 {{name}} 撰写工作指令...",
       "errInstructions": "未能写出工作指令。请再点一次招聘。",
