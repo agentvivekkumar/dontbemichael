@@ -595,7 +595,10 @@ export function setAgentCapabilities(
   // holder's email off in the same write.
   const caps = { ...(cfg.agentCapabilities ?? {}) };
   let movedFrom: string | undefined;
-  if (email?.enabled && email.mailboxes[0]) {
+  // Checked only when the mailbox changes, so an agent that already shared one
+  // before this rule can still change its other settings.
+  const changed = email?.mailboxes[0] !== (before?.email?.enabled ? before.email.mailboxes[0] : undefined);
+  if (email?.enabled && email.mailboxes[0] && changed) {
     const holder = mailboxHolder(caps, email.mailboxes[0], agentId);
     if (holder && next.move !== true) return { ok: false, restartNeeded: false, heldBy: holder };
     if (holder) {

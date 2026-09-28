@@ -217,6 +217,8 @@ export type ScheduleOp = 'add' | 'update' | 'pause' | 'resume' | 'delete';
 export interface ScheduleDraft {
   label: string;
   intervalMs: number;
+  /** An update that set new times (false: a rename only). */
+  whenGiven?: boolean;
   weekly?: { days: number[]; minute: number };
   times?: ScheduleLine[];
 }
@@ -240,8 +242,9 @@ export interface ScheduleRequest {
    *  what he can't settle. Otherwise Michael decides it (owner, 2026-09-27). */
   escalated?: boolean;
   escalation?: string;
-  /** Michael has been told about it. */
+  /** Michael has been told about it, and when. */
   sentToMichael?: boolean;
+  sentToMichaelAt?: number;
   createdAt: number;
 }
 
@@ -399,6 +402,7 @@ function buildRequestShape(
   if (!label && !when) return { ok: false, reason: 'An update needs a new "label", a new "when", or both.' };
   const draft: ScheduleDraft = {
     label: label || target.label,
+    whenGiven: !!when,
     intervalMs: when ? when.intervalMs : target.intervalMs,
     ...(when ? (when.weekly ? { weekly: when.weekly } : {}) : (target.weekly ? { weekly: target.weekly } : {})),
     ...(when ? (when.times ? { times: when.times } : {}) : (target.times ? { times: target.times } : {}))
@@ -440,25 +444,35 @@ export function fileScheduleRequest(pending: ScheduleRequest[], incoming: Schedu
   const prev = pending[i];
   const reasons = [...new Set([prev.reason, incoming.reason].filter((r): r is string => !!r))];
   const reason = reasons.join(' ').slice(0, 600) || undefined;
-  let merged: ScheduleRequest = { ...incoming, reason };
+  // A joined request goes back to Michael to decide as one, even if the older
+  // one had gone to the owner (pre-landing review, 2026-09-27).
+  const reset = { escalated: undefined, escalation: undefined, sentToMichael: undefined, sentToMichaelAt: undefined };
+  let merged: ScheduleRequest = { ...incoming, ...reset, reason };
   const shaping = (r: ScheduleRequest) => (r.op === 'add' || r.op === 'update') && !!r.draft;
   if (shaping(prev) && shaping(incoming)) {
-    const a = draftLines(prev.draft!);
-    const b = draftLines(incoming.draft!);
-    const seen = new Set<string>();
-    const lines = a && b ? [...a, ...b].filter((l) => { const k = JSON.stringify(l); if (seen.has(k)) return false; seen.add(k); return true; }) : null;
-    const times = lines ? normalizeTimes(lines) : null;
-    if (times) {
-      // Keep the one that names an existing schedule: that is the change.
-      const base = prev.op === 'update' ? prev : incoming.op === 'update' ? incoming : prev;
-      const simple = simpleTimes(times);
-      const draft: ScheduleDraft = simple && 'intervalMs' in simple
-        ? { label: base.draft!.label, intervalMs: simple.intervalMs }
-        : simple && 'weekly' in simple
-          ? { label: base.draft!.label, intervalMs: 86_400_000, weekly: simple.weekly }
-          : { label: base.draft!.label, intervalMs: base.draft!.intervalMs, times };
-      merged = { ...base, id: incoming.id, draft, reason, createdAt: incoming.createdAt };
+    const base = prev.op === 'update' ? prev : incoming.op === 'update' ? incoming : prev;
+    const label = incoming.draft!.label;
+    if (incoming.op === 'update' && incoming.draft!.whenGiven === false) {
+      // A rename after a timing change: the timing stays, the name is the new one.
+      merged = { ...base, ...reset, id: incoming.id, draft: { ...prev.draft!, label }, reason, createdAt: incoming.createdAt };
+    } else if (prev.op === 'add' || incoming.op === 'add') {
+      // Asking for another time for the job: both sets of times together.
+      const a = draftLines(prev.draft!);
+      const b = draftLines(incoming.draft!);
+      const seen = new Set<string>();
+      const lines = a && b ? [...a, ...b].filter((l) => { const k = JSON.stringify(l); if (seen.has(k)) return false; seen.add(k); return true; }) : null;
+      const times = lines ? normalizeTimes(lines) : null;
+      if (times) {
+        const simple = simpleTimes(times);
+        const draft: ScheduleDraft = simple && 'intervalMs' in simple
+          ? { label: base.draft!.label, intervalMs: simple.intervalMs }
+          : simple && 'weekly' in simple
+            ? { label: base.draft!.label, intervalMs: 86_400_000, weekly: simple.weekly }
+            : { label: base.draft!.label, intervalMs: base.draft!.intervalMs, times };
+        merged = { ...base, ...reset, id: incoming.id, draft, reason, createdAt: incoming.createdAt };
+      }
     }
+    // Two timing updates: the newer is a correction and replaces the older.
   }
   return pending.map((p, j) => (j === i ? merged : p));
 }

@@ -69,7 +69,7 @@ test('a non text id is refused like an unknown one', () => {
 test('an update with only a new label keeps the weekly slot', () => {
   const list = [mk({ weekly: { days: [1], minute: 540 } })];
   const r = build({ op: 'update', id: 'm1', label: 'Renamed' }, list);
-  assert.deepEqual(r.request.draft, { label: 'Renamed', intervalMs: HOUR, weekly: { days: [1], minute: 540 } });
+  assert.deepEqual(r.request.draft, { label: 'Renamed', whenGiven: false, intervalMs: HOUR, weekly: { days: [1], minute: 540 } });
   const applied = M.applyScheduleRequest(r.request, list, 'x').missions[0];
   assert.equal(applied.label, 'Renamed');
   assert.deepEqual(applied.weekly, { days: [1], minute: 540 });
@@ -78,7 +78,7 @@ test('an update with only a new label keeps the weekly slot', () => {
 test('an update to an interval switches a weekly schedule back to the interval', () => {
   const list = [mk({ weekly: { days: [1], minute: 540 } })];
   const r = build({ op: 'update', id: 'm1', when: { every: '2h' } }, list);
-  assert.deepEqual(r.request.draft, { label: 'Triage the inbox', intervalMs: 2 * HOUR });
+  assert.deepEqual(r.request.draft, { label: 'Triage the inbox', whenGiven: true, intervalMs: 2 * HOUR });
   const applied = M.applyScheduleRequest(r.request, list, 'x').missions[0];
   assert.equal('weekly' in applied, false);
   assert.equal(applied.intervalMs, 2 * HOUR);

@@ -78,12 +78,18 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   };
   // One agent per mailbox (owner, 2026-09-27): a mailbox another agent holds
   // is moved only after the owner confirms, and the holder's email goes off.
-  const holderOf = (id: string): string | undefined => mailboxHolder(config.agentCapabilities, id, agent.id);
+  // An id no longer on the team (a fired or failed hire) doesn't hold anything.
+  const onTeam = (id: string): boolean => agents.some((a) => a.id === id) || useStore.getState().archivedAgents.some((a) => a.id === id);
+  const holderOf = (id: string): string | undefined => {
+    const h = mailboxHolder(config.agentCapabilities, id, agent.id);
+    return h && onTeam(h) ? h : undefined;
+  };
   const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? id;
   const pickMailbox = (id: string): void => {
     if (id === current) return;
     if (holderOf(id)) { setMoving(id); return; }
-    void save({ ...email, mailboxes: [id] });
+    // A left-over holder that isn't on the team is moved without asking.
+    void save({ ...email, mailboxes: [id] }, !!mailboxHolder(config.agentCapabilities, id, agent.id));
   };
   const movingHolder = moving ? holderOf(moving) : undefined;
   const movingAddress = moving ? mailboxes.find((m) => m.id === moving)?.address ?? moving : '';

@@ -182,11 +182,32 @@ test('Michael decides team members\' schedule requests; the owner sees only what
   const decide = main.slice(main.indexOf('function michaelDecides('), main.indexOf('function decideScheduleRequest('));
   assert.match(decide, /if \(!note\) return 'Add a "note" saying what you can\\'t settle/);
   assert.match(decide, /escalated: true, escalation: note/);
-  assert.match(main, /try \{ offerPendingToMichael\(\); \}/, 'waiting requests go to Michael once');
+  assert.match(main, /try \{ sweepScheduleRequests\(\); \}/, 'waiting requests reach Michael, then the owner');
   const cards = read('src/renderer/src/components/ScheduleRequestCards.tsx');
   assert.match(cards, /setRequests\(all\.filter\(\(r\) => r\.escalated\)\)/);
   assert.match(cards, /t\('askMe\.scheduleMichael', \{ name: godName, note: req\.escalation \}\)/);
   const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true }];
   const req = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: [{ days: ['weekdays'], at: '08:00' }, { days: ['weekdays'], at: '14:00' }] }, missions, 'god', 1, 'r', 'why').request;
   assert.equal(M.requestSummary(req, missions), 'change "Check Emails" from every 2h to weekdays at 08:00 and 14:00');
+});
+
+test('merges keep a rename and a correction as asked; a joined request goes back to Michael (pre-landing review)', () => {
+  const missions = [{ id: 'm1', label: 'Standup', intervalMs: 86_400_000, weekly: { days: [1, 2, 3, 4, 5], minute: 540 }, to: 'pam', body: '', enabled: true }];
+  const b = (p, id) => M.buildScheduleRequest('pam', p, missions, 'god', 1, id, 'why').request;
+  const time = b({ op: 'update', id: 'm1', when: { days: ['weekdays'], at: '08:00' } }, 'a');
+  const rename = b({ op: 'update', id: 'm1', label: 'Morning standup' }, 'b');
+  const renamed = M.fileScheduleRequest([time], rename, missions)[0];
+  assert.equal(renamed.draft.label, 'Morning standup');
+  assert.deepEqual(renamed.draft.weekly, { days: [1, 2, 3, 4, 5], minute: 480 }, 'the new time stays, the old one is not added');
+  const fix = b({ op: 'update', id: 'm1', when: { days: ['weekdays'], at: '10:00' } }, 'c');
+  const corrected = M.fileScheduleRequest([time], fix, missions)[0];
+  assert.deepEqual(corrected.draft.weekly, { days: [1, 2, 3, 4, 5], minute: 600 }, 'a correction replaces, it does not add');
+  const escalated = { ...time, escalated: true, escalation: 'x', sentToMichael: true };
+  const joined = M.fileScheduleRequest([escalated], fix, missions)[0];
+  assert.equal(joined.escalated, undefined);
+  assert.equal(joined.sentToMichael, undefined);
+  const main = read('src/main/index.ts');
+  assert.match(main, /if \(req\.escalated\) return 'That request is with the owner in ASK ME now/);
+  assert.match(main, /const overdue = pending\.filter\(\(r\) => !r\.escalated && r\.sentToMichael && now - \(r\.sentToMichaelAt \?\? r\.createdAt\) > MICHAEL_DECIDES_WITHIN_MS\);/);
+  assert.match(main, /scheduleSweepTimer = setInterval\(/);
 });

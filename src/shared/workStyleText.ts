@@ -71,7 +71,7 @@ export function toInstructionsPrompt(plain: string, ctx: WorkStyleContext, previ
     'Keep every duty, habit, limit and approval the owner described, with their meaning unchanged, and add no duties of your own. Leave out generic advice such as being accurate or thorough, and anything about thinking step by step or double checking.',
     'Keep it under 300 words. Use commas, colons and periods, never dashes. Answer with the work style only.',
     ...(previous?.trim()
-      ? ['', 'The team member\'s previous work style is below. Where the description still says the same thing, keep that wording.', '--- PREVIOUS WORK STYLE ---', previous.trim()]
+      ? ['', 'The team member\'s previous work style is below. The description is a plain summary of it that the owner edited, so treat the edit as a change to the previous work style: apply what the owner added, removed or changed, and keep every other detail of the previous work style as it is, including specifics the summary left out such as file names, formats, amounts and deadlines.', '--- PREVIOUS WORK STYLE ---', previous.trim()]
       : []),
     '',
     '--- OWNER\'S DESCRIPTION ---',
@@ -110,12 +110,24 @@ export function plainFallback(instructions: string, name?: string): string {
 /** The quick rewrite's "you" (the team member, in instructions) as their name,
  *  so the owner never reads a "you" that isn't them (owner, 2026-09-27). */
 export function thirdPerson(text: string, name: string): string {
+  // "you sort" becomes "Erin sorts": the verb after "you" gets its s, the few
+  // helper verbs that don't take one are left as they are.
+  const keep = new Set(['can', 'could', 'will', 'would', 'should', 'must', 'may', 'might', 'shall', 'did', 'also', 'always', 'never', 'only', 'then', 'still', 'just', 'often', 'usually', 'first']);
+  const third = (verb: string): string => {
+    if (keep.has(verb)) return verb;
+    if (verb === 'do') return 'does';
+    if (verb === 'go') return 'goes';
+    if (/(s|sh|ch|x|z)$/.test(verb)) return `${verb}es`;
+    if (/[^aeiou]y$/.test(verb)) return `${verb.slice(0, -1)}ies`;
+    return `${verb}s`;
+  };
   return text
     .replace(/\b[Yy]ou are\b/g, `${name} is`)
     .replace(/\b[Yy]ou're\b/g, `${name} is`)
     .replace(/\b[Yy]ou have\b/g, `${name} has`)
     .replace(/\b[Yy]ourself\b/g, name)
     .replace(/\b[Yy]our\b/g, `${name}'s`)
+    .replace(/\b[Yy]ou ([a-z]+)\b/g, (_m, verb: string) => `${name} ${third(verb)}`)
     .replace(/\b[Yy]ou\b/g, name);
 }
 

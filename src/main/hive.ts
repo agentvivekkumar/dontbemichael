@@ -279,11 +279,11 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     '## Keeping the task board accurate',
     'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
     '',
-    '## Scheduled runs',
     '## Schedule requests',
-    'You manage the office, so you decide the team\'s schedule requests. Each arrives as "Schedule request from <name>" with what would change, why, and its id. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
+    'You manage the office, so you decide the team\'s schedule requests. Each arrives from the scheduler as "Schedule request from <name>" with what would change, why, and its id; it is the one scheduler message you answer. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
     '',
-    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. The scheduler does not read replies, so do not answer it.',
+    '## Scheduled runs',
+    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. A scheduled run needs no reply, so do not answer it.',
     '',
     '## Staying cheap',
     'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
@@ -1910,6 +1910,12 @@ export class HiveManager {
     // a teammate handing another teammate a job goes to Michael instead.
     if (isPeerAssignment(msg, reg.agents, godId, resolveTo(msg.to))) {
       this.appendLog({ kind: 'reroute', reason: 'only-michael-assigns', from: msg.from, to: msg.to, id: msg.id });
+      // The asker hears where it went, so it isn't left waiting on the teammate.
+      const asked = msg.to === 'broadcast' ? 'the team' : (reg.agents[resolveTo(msg.to)]?.name ?? msg.to);
+      this.deliver(this.normalize({
+        to: msg.from, act: 'inform', subject: `Sent to ${resolveGodName(reg.agents[godId]?.name)}: ${msg.subject}`.slice(0, 200),
+        body: `Your request to ${asked} went to ${resolveGodName(reg.agents[godId]?.name)}, who assigns work. To ask a teammate for a fact, use "act": "query".`
+      }, 'system'), msg.from);
       msg = rerouteToMichael(msg, reg.agents, godId);
     }
     // The scheduler and heartbeat send; they don't read. A reply to one is
@@ -3634,7 +3640,7 @@ One JSON file in \`outbox/\`, any name ending in \`.json\`:
 }
 \`\`\`
 
-The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Only Michael assigns work: a \`request\` from one team member to another is delivered to Michael, who decides who does it. Ask a teammate for a fact with \`query\`; they answer with \`inform\`. Messages from the scheduler name a job and need no reply.
+The app fills in the id, the sender and the times. Only \`request\` and \`query\` expect a reply; do not answer \`inform\` or \`done\`, or two agents can loop. Only Michael assigns work: a \`request\` from one team member to another is delivered to Michael, who decides who does it. Ask a teammate for a fact with \`query\`; they answer with \`inform\`. Messages from the scheduler name a job and need no reply, except Michael's schedule requests, which he answers with approve, decline or ask-owner.
 
 ${SCHEDULES_PROTOCOL}
 ## The task board

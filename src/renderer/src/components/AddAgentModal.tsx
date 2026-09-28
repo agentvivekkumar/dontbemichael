@@ -101,6 +101,12 @@ function samePath(a: string, b: string): boolean {
 }
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 const joinPath = (root: string, name: string) => `${root.replace(/[\\/]+$/, '')}/${name}`;
+/** One folder name, safe on every system: no path separators or characters
+ *  Windows forbids, no leading dots, at most 60 characters. "AR/AP Clerk"
+ *  becomes "AR-AP Clerk", never a folder inside a folder. */
+function safeFolder(raw: string): string {
+  return raw.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/^[.\s-]+/, '').replace(/[.\s]+$/, '').trim().slice(0, 60);
+}
 
 function uniqueId(name: string): string {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
@@ -271,10 +277,10 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [customCwd, setCustomCwd] = useState<string | undefined>(
     michaelFolder ? undefined : (config.registeredRepos[0] ?? '')
   );
-  const cwd = customCwd ?? (michaelFolder && folderName.trim() ? joinPath(michaelFolder, folderName.trim()) : '');
+  const cwd = customCwd ?? (michaelFolder && safeFolder(folderName) ? joinPath(michaelFolder, safeFolder(folderName)) : '');
   const suggestFolder = async (): Promise<void> => {
     if (!michaelFolder) return;
-    const base = (chosenJob?.folder ?? title).trim() || name.trim();
+    const base = safeFolder(chosenJob?.folder ?? title) || safeFolder(name);
     const n = name.trim();
     const candidates = [base, `${base}_${n}`, ...Array.from({ length: 8 }, (_, i) => `${base}_${n}_${i + 2}`)];
     const onDisk = await window.cth.foldersExist(michaelFolder, candidates).catch(() => ({} as Record<string, boolean>));
@@ -389,14 +395,18 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [busy, setBusy] = useState(false);
   const [showHirePrompt, setShowHirePrompt] = useState(false);
 
-  const backdrop = useBackdropClose(onClose);
+  // While Hire runs (checks, instructions, spawn) the dialog can't be closed:
+  // closing then would still hire the person (pre-landing review, 2026-09-27).
+  const submitting = useRef(false);
+  const close = (): void => { if (!submitting.current) onClose(); };
+  const backdrop = useBackdropClose(close);
   // Close only the modal on Esc.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || escapeBelongsToField(e.target)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      onClose();
+      if (!submitting.current) onClose();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -462,6 +472,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   };
 
   const submit = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    try { await submitHire(); } finally { submitting.current = false; }
+  };
+  const submitHire = async () => {
     setError(undefined);
     if (whoError) { setError(whoError); setStep('who'); return; }
     if (!(await roleReady())) { setStep('role'); return; }
@@ -503,6 +518,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       if (!res?.ok) { setBusy(false); setError(tr('capabilities.saveFailed')); return; }
     }
     const [exe, ...args] = tokenizeCommand(command.trim());
+    const giveBackMailbox = (): void => {
+      if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
+    };
     const spawnRes = await window.cth.spawnPty({
       id: ptyId,
       cwd,
@@ -521,10 +539,10 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
         // A hire manifest may carry validated capability tags (routing hints).
         capabilities: hireMeta?.capabilities
       }
-    });
+    }).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e), cwd: undefined, seedPrompt: undefined }));
     if (!spawnRes.ok) {
       // Give back a mailbox the failed hire was holding.
-      if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
+      giveBackMailbox();
       setBusy(false);
       setError(spawnRes.error ?? 'spawn failed');
       return;
@@ -966,7 +984,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               {pendingHire && (
                 <PixelButton variant="secondary" size="md" onClick={skipHire} disabled={busy}>{tr('addAgent.skipHire')}</PixelButton>
               )}
-              <PixelButton variant="ghost" size="md" onClick={onClose} disabled={busy}>{tr('common.cancel')}</PixelButton>
+              <PixelButton variant="ghost" size="md" onClick={close} disabled={busy || checking || writingInstructions}>{tr('common.cancel')}</PixelButton>
               {stepIndex > 0 && (
                 <PixelButton variant="secondary" size="md" onClick={() => { void goTo(STEPS[stepIndex - 1]); }} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
               )}

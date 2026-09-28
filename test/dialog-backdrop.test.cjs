@@ -20,7 +20,7 @@ test('the backdrop closes only when the press and the click are both on it', () 
   assert.match(hook, /const close = pressedOnBackdrop\.current && e\.target === e\.currentTarget;/);
   for (const f of ['AddAgentModal', 'EditAgentModal']) {
     const src = read(`src/renderer/src/components/${f}.tsx`);
-    assert.match(src, /const backdrop = useBackdropClose\(onClose\);/, f);
+    assert.match(src, /const backdrop = useBackdropClose\((?:onClose|close)\);/, f);
     assert.match(src, /\{\.\.\.backdrop\}\n      style=\{\{\n        position: 'fixed', inset: 0,/, f);
   }
 });
@@ -36,4 +36,11 @@ test('Escape in a field, list or info bubble does not close the hire dialog', ()
   assert.equal(escapeBelongsToField(el(null)), false);
   assert.equal(escapeBelongsToField(null), false);
   assert.match(read('src/renderer/src/components/InfoTip.tsx'), /data-infotip=""/);
+});
+
+test('the hire dialog can\'t be closed while Hire runs (pre-landing review)', () => {
+  const src = read('src/renderer/src/components/AddAgentModal.tsx');
+  assert.match(src, /const close = \(\): void => \{ if \(!submitting\.current\) onClose\(\); \};/);
+  assert.match(src, /if \(!submitting\.current\) onClose\(\);\n    \};/, 'Escape too');
+  assert.match(src, /try \{ await submitHire\(\); \} finally \{ submitting\.current = false; \}/);
 });

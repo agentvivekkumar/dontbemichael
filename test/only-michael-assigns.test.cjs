@@ -54,9 +54,17 @@ test('a dropped runaway message is reported to Michael, with no dashes', () => {
 
 test('the router applies the rule and tells Michael about hop drops; instructions say so', () => {
   const hive = fs.readFileSync(path.resolve(__dirname, '..', 'src/main/hive.ts'), 'utf8');
-  assert.match(hive, /if \(isPeerAssignment\(msg, reg\.agents, godId, resolveTo\(msg\.to\)\)\) \{[\s\S]{0,200}msg = rerouteToMichael\(msg, reg\.agents, godId\);/);
+  assert.match(hive, /if \(isPeerAssignment\(msg, reg\.agents, godId, resolveTo\(msg\.to\)\)\) \{[\s\S]{0,900}msg = rerouteToMichael\(msg, reg\.agents, godId\);/);
   assert.match(hive, /hopDropNotice\(msg, r\.agents\)/);
   assert.match(hive, /`Only \$\{michael\} assigns work\./);
   assert.match(hive, /You are the only one who assigns work/);
   assert.match(hive, /Only Michael assigns work: a \\`request\\` from one team member to another is delivered to Michael/);
+});
+
+test('the asker hears that its request went to Michael (pre-landing review, 2026-09-27)', () => {
+  const hive = fs.readFileSync(path.resolve(__dirname, '..', 'src/main/hive.ts'), 'utf8');
+  assert.match(hive, /went to \$\{resolveGodName\(reg\.agents\[godId\]\?\.name\)\}, who assigns work\. To ask a teammate for a fact, use "act": "query"\./);
+  const michael = hive.slice(hive.indexOf("'## Schedule requests',"), hive.indexOf("'## Staying cheap',"));
+  assert.ok(michael.indexOf("'## Schedule requests',") < michael.indexOf("'## Scheduled runs',"), 'its own section, before scheduled runs');
+  assert.match(michael, /it is the one scheduler message you answer/);
 });

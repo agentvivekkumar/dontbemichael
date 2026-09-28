@@ -1062,11 +1062,11 @@ function receiveScheduleRequest(actor: string, payload: unknown, why = ''): stri
   const filed = fileScheduleRequest(before, built.request, cfg.missions ?? []);
   const joined = filed.length === before.length;
   const request = filed.find((r) => r.id === built.request.id) ?? built.request;
-  writeConfig({ scheduleRequests: filed.map((r) => (r.id === request.id ? { ...r, sentToMichael: true } : r)) });
+  writeConfig({ scheduleRequests: filed.map((r) => (r.id === request.id ? { ...r, sentToMichael: true, sentToMichaelAt: Date.now() } : r)) });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
   tellMichaelAboutRequest(request, cfg.missions ?? []);
   return joined
-    ? 'Joined your earlier request about the same job; Michael decides them as one. Nothing changes until he does; you will get a message either way.'
+    ? 'This joins or replaces your earlier request about the same job, and Michael decides it as one. Nothing changes until he does; you will get a message either way.'
     : 'Sent to Michael to decide. Nothing changes until he does; you will get a message either way.';
 }
 
@@ -1086,16 +1086,39 @@ function tellMichaelAboutRequest(req: ScheduleRequest, missions: ScheduledMissio
   }, 'scheduler');
 }
 
-/** Requests waiting from before Michael decided them are offered to him once. */
-function offerPendingToMichael(): void {
+/** How long Michael has to decide a request before it goes to the owner. */
+const MICHAEL_DECIDES_WITHIN_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Keep every waiting schedule request moving: one Michael hasn't heard about
+ * (filed before he decided them) is offered to him once, and one he hasn't
+ * decided within MICHAEL_DECIDES_WITHIN_MS goes to the owner in ASK ME, so no
+ * request is stranded (pre-landing review, 2026-09-27). Runs at launch and
+ * every half hour.
+ */
+function sweepScheduleRequests(now = Date.now()): void {
   const cfg = readConfig();
-  const pending = foldScheduleRequests(cfg.scheduleRequests ?? [], cfg.missions ?? []);
+  const before = cfg.scheduleRequests ?? [];
+  const pending = foldScheduleRequests(before, cfg.missions ?? []);
   const fresh = pending.filter((r) => !r.escalated && !r.sentToMichael);
-  if (!fresh.length) { if (pending.length !== (cfg.scheduleRequests ?? []).length) writeConfig({ scheduleRequests: pending }); return; }
+  const overdue = pending.filter((r) => !r.escalated && r.sentToMichael && now - (r.sentToMichaelAt ?? r.createdAt) > MICHAEL_DECIDES_WITHIN_MS);
+  if (!fresh.length && !overdue.length) {
+    if (pending.length !== before.length) writeConfig({ scheduleRequests: pending });
+    return;
+  }
   for (const r of fresh) tellMichaelAboutRequest(r, cfg.missions ?? []);
-  writeConfig({ scheduleRequests: pending.map((r) => (fresh.includes(r) ? { ...r, sentToMichael: true } : r)) });
+  const note = `${michaelName()} did not decide this within 12 hours.`;
+  writeConfig({
+    scheduleRequests: pending.map((r) => {
+      if (fresh.includes(r)) return { ...r, sentToMichael: true, sentToMichaelAt: now };
+      if (overdue.includes(r)) return { ...r, escalated: true, escalation: note };
+      return r;
+    })
+  });
   try { liveWebContents()?.send('scheduleRequests:updated'); } catch { /* window gone */ }
+  if (overdue.length) ownerToast(michaelName(), `${overdue.length === 1 ? 'A schedule change needs' : `${overdue.length} schedule changes need`} you in ASK ME.`);
 }
+let scheduleSweepTimer: NodeJS.Timeout | null = null;
 
 /** Michael's answer to a request: approve, decline, pass it to the owner, or
  *  list what is waiting. */
@@ -1112,6 +1135,8 @@ function michaelDecides(p: { op: string; request?: unknown; note?: unknown }): s
   const note = typeof p.note === 'string' ? p.note.replace(/\s+/g, ' ').trim().slice(0, 400) : '';
   const req = pending.find((r) => r.id === id);
   if (!req) return 'No waiting request has that id: it may have been decided, or joined with a newer one. Send {"op": "pending"} to see what is waiting.';
+  // Once it is with the owner it is theirs to decide.
+  if (req.escalated) return 'That request is with the owner in ASK ME now; you will hear when they decide.';
   if (p.op === 'ask-owner') {
     if (!note) return 'Add a "note" saying what you can\'t settle, for the owner\'s card.';
     writeConfig({ scheduleRequests: pending.map((r) => (r.id === id ? { ...r, escalated: true, escalation: note } : r)) });
@@ -5752,8 +5777,13 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
-  // Requests filed before Michael decided them are offered to him once.
-  try { offerPendingToMichael(); } catch (e) { console.error('[schedules] offer to Michael failed', e); }
+  // Waiting schedule requests reach Michael, and ones he leaves undecided
+  // reach the owner (sweepScheduleRequests).
+  try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+  if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
+  scheduleSweepTimer = setInterval(() => {
+    try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+  }, 30 * 60 * 1000);
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.
   hive.setRuntimeInfo({ version: app.getVersion(), packaged: app.isPackaged, appPath: app.getAppPath() });

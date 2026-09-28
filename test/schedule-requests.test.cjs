@@ -148,7 +148,7 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   const titles = [...main.matchAll(/new Notification\(\{ title: ([^,]+),/g)].map((m) => m[1].trim());
   for (const t of titles) assert.ok(['michaelName()', 'title'].includes(t), `unexpected toast title ${t}`);
   const toasts = [...main.matchAll(/ownerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
-  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()'].sort());
+  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()', 'michaelName()'].sort());
   assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
   assert.match(main, /ownerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
   assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\}'s schedule change needs you in ASK ME\.`\);/, 'only when Michael passes it on');

@@ -8,6 +8,7 @@ import { runHiddenClaude } from './hiddenClaude';
 import {
   cleanAnswer,
   instructionsFallback,
+  instructionsOpening,
   plainFallback,
   toInstructionsPrompt,
   toPlainPrompt,
@@ -68,7 +69,14 @@ export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): 
       env: deps.env,
       timeoutMs: TIMEOUT_MS
     });
-    const text = result.ok && result.text ? cleanAnswer(result.text) : '';
+    let text = result.ok && result.text ? cleanAnswer(result.text) : '';
+    // Instructions must start with the house opening line: a refusal or a
+    // chatty preamble is never saved as an agent's work style.
+    if (text && req.to === 'instructions') {
+      const opening = instructionsOpening(req.ctx.business);
+      const at = text.indexOf(opening);
+      text = at >= 0 ? text.slice(at).trim() : '';
+    }
     if (text) return { text, source: 'ai' };
     deps.log?.({ kind: 'work-style-fallback', to: req.to, reason: result.ok ? 'empty' : (result.error ?? 'failed') });
   } catch (e) {
