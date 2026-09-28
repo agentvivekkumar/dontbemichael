@@ -47,7 +47,7 @@ export function rerouteToMichael<M extends { from: string; to: string; subject: 
   return {
     ...msg,
     to: godId,
-    subject: `[handoff: ${asker} asked ${target}] ${msg.subject}`,
+    subject: `[handoff: ${asker} asked ${target}] ${msg.subject}`.slice(0, 200),
     body: `${asker} asked ${target} to do this. Only you assign work: hand it to the right teammate, or answer ${asker} yourself.\n\n${msg.body}`
   };
 }
