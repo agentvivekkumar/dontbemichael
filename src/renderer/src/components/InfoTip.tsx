@@ -17,6 +17,7 @@ export function InfoTip({ text, label }: { text: string; label?: string }) {
     >
       <button
         type="button"
+        data-infotip=""
         aria-label={label ?? text}
         aria-describedby={open ? id : undefined}
         onFocus={() => setOpen(true)}

@@ -3,6 +3,7 @@ import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { InfoTip } from './InfoTip';
+import { useBackdropClose } from '@/hooks/useBackdropClose';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -108,6 +109,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   };
 
   const preset = providerPreset(provider);
+  const backdrop = useBackdropClose(onClose);
 
   const save = async () => {
     if (saving || writing) return;
@@ -173,7 +175,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
 
   return (
     <div
-      onClick={onClose}
+      {...backdrop}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(26, 19, 32, 0.6)',

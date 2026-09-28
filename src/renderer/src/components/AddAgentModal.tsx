@@ -6,6 +6,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { InfoTip } from './InfoTip';
+import { useBackdropClose, escapeBelongsToField } from '@/hooks/useBackdropClose';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, CAST_BY_NAME, CAST_GROUPS, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -388,10 +389,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [busy, setBusy] = useState(false);
   const [showHirePrompt, setShowHirePrompt] = useState(false);
 
+  const backdrop = useBackdropClose(onClose);
   // Close only the modal on Esc.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || escapeBelongsToField(e.target)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       onClose();
@@ -601,7 +603,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
 
   return (
     <div
-      onClick={onClose}
+      {...backdrop}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(26, 19, 32, 0.6)',
