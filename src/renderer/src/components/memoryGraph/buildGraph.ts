@@ -9,6 +9,7 @@ import type { AccentColorName } from '@/design/tokens';
 import type { StatusKind } from '@/components/PixelBadge';
 import type { MessageAct } from '@/scene/office/MessageEnvelope';
 import { extractTopics } from './extractTopics';
+import type { OfficeCharacterName } from '@/scene/office/cast';
 
 export interface AgentNode {
   kind: 'agent';
@@ -17,6 +18,9 @@ export interface AgentNode {
   accent: AccentColorName;
   status: StatusKind;
   isGod: boolean;
+  /** Office cast member drawn for this agent (owner, 2026-09-27: characters,
+   *  not boxes). */
+  character: OfficeCharacterName;
   /** number of message edges touching this agent (drives node size) */
   degree: number;
 }
@@ -63,6 +67,7 @@ export interface MinimalAgent {
   accent: AccentColorName;
   status: StatusKind;
   isGod?: boolean;
+  character: OfficeCharacterName;
 }
 export interface MessageLogEntry {
   ts?: number;
@@ -149,6 +154,7 @@ export function buildGraph(
       accent: a.accent,
       status: a.status,
       isGod: !!a.isGod,
+      character: a.character,
       degree: degree.get(a.id) ?? 0
     });
   }
