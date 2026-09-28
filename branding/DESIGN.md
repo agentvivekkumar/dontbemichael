@@ -520,8 +520,9 @@ All in `public/assets/site.css` unless noted as page-local in `index.html`.
 - Left: the mark (30 px) and the wordmark. Center: four section links. Right: one
   primary `DOWNLOAD` button that goes to `/download`. Nothing else: Discord, GitHub and
   the FAQ live in the footer (§8.5), so the bar has one action.
-- Section labels are one or two words: HOW IT WORKS, TEAM, LIMITS, PLANS. The label
-  promises what the section delivers. The section with no prices is PLANS, not PRICING.
+- Section labels are one or two words: HOW IT WORKS, TEAM, LIMITS, OPEN SOURCE. The
+  label promises what the section delivers. There is no paid tier, so nothing is labelled
+  PLANS or PRICING.
   Sections without a link (Dwight, the day log, business types, FAQ) light up the link
   of the chapter they sit in.
 - Links that leave the site carry `↗` wherever they appear.
@@ -762,6 +763,7 @@ Known gaps between this spec and the code, as of 2026-09-24. Each one is either
 
 | Date | Change |
 |---|---|
+| 2026-09-28 | Web: Pro offering removed; the site is open source only. PLANS becomes OPEN SOURCE (§8.1). |
 | 2026-09-28 | Web: nav cut to four links plus a `DOWNLOAD` button (§8.1); Discord, GitHub and FAQ moved to the footer (§8.5); ≤ 360 px row added (§5.3); download rule met (§13.3). |
 | 2026-09-24 | Moved into `branding/` with the full brand kit: logos, lockups, app icon, favicons, social card, color files, fonts, a printable brand guide and the build script. |
 | 2026-09-24 | Rewritten as one spec for app and web. Documented the v0.3.4 recalibration (calm accents, Inter and JetBrains Mono, hairline panels, dark theme) that the old doc predated. Added brand, logo (Struck M), web profile, accent map and the deviation register. Retired the three-layer panel, Pixelify and VT323 in the app, and "no dark mode". |
