@@ -115,3 +115,13 @@ test('the other businesses\' list leaves out this business\'s own card for the j
   assert.match(modal, /const ownBusinessCard = \(j: HireJob\) => !!config\.businessType && j\.sourceCard\?\.startsWith\(`\$\{config\.businessType\}\/`\) && inFamily\(j\) && !!family;/);
   assert.match(modal, /cards\.filter\(\(j\) => \(listAll \|\| inFamily\(j\)\) && !ownBusinessCard\(j\)\)/);
 });
+
+test('the role screen asks what the new hire handles, not what to send (owner, 2026-09-27)', () => {
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const a = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).addAgent;
+    assert.doesNotMatch(JSON.stringify(a), /what to send|What to send/, `${loc}: no "what to send" left`);
+  }
+  const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).addAgent;
+  assert.equal(en.wizard.whatToSend, 'What {{name}} handles');
+  assert.match(modal, /tr\('addAgent\.roleHelp', \{ godName, name: name\.trim\(\) \}\)/);
+});

@@ -322,17 +322,17 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 />
               </Row>
 
-              <Row label="Role description">
+              <Row label={`What ${name.trim() || agent.name} handles`}>
                 <textarea
                   value={roleDescription}
                   onChange={(e) => setRoleDescription(e.target.value)}
-                  placeholder="For example: Keeps track of money in and money out, and sends a weekly summary"
+                  placeholder="For example: Answers customers who write to the support inbox, and passes refund requests to Oscar."
                   rows={3}
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                 />
               </Row>
               <span style={helperStyle}>
-                Michael reads the role and role description to decide which work to give this team member.
+                The work that comes to {name.trim() || agent.name}: which requests, which inbox, which customers. Michael reads this to decide what goes to {name.trim() || agent.name}, so be specific enough that no teammate covers the same thing.
               </span>
 
               <Row label="Work style">

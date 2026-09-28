@@ -423,7 +423,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   /** The role step's gate: a name, a role, and a job that is distinct from
    *  every teammate's or bound to its own mailbox or topic (D6). */
   const roleReady = async (): Promise<boolean> => {
-    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob')); return false; }
+    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob', { name: name.trim() })); return false; }
     let v = verdict;
     if (!v) v = await runCheck();
     if (!v) return false;
@@ -809,7 +809,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       rows={3}
                       style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                     />
-                    <span style={helperStyle}>{tr('addAgent.roleHelp', { godName })}</span>
+                    <span style={helperStyle}>{tr('addAgent.roleHelp', { godName, name: name.trim() })}</span>
                   </Row>
 
                   <DistinctBox
@@ -1079,7 +1079,7 @@ function DistinctBox(p: DistinctBoxProps) {
   return (
     <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-mint-light)' : 'var(--cth-lemon-light)', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <strong style={{ fontSize: 13 }}>{t('addAgent.wizard.overlaps', { names: p.overlapNames.join(listJoin) })}</strong>
-      <span>{p.verdict?.why || t('addAgent.wizard.sameWork')}</span>
+      <span>{p.verdict?.why || t('addAgent.wizard.sameWork', { name: p.name })}</span>
       {p.binding ? (
         <>
           <span>{t('addAgent.wizard.boundTo', { name: p.name, scope: p.binding.scope })}</span>
@@ -1112,7 +1112,7 @@ function DistinctBox(p: DistinctBoxProps) {
               <PixelButton variant="secondary" size="sm" onClick={p.onBindTopic} disabled={!p.topic.trim()}>{t('addAgent.wizard.bind')}</PixelButton>
             </div>
           )}
-          <span style={helperStyle}>{t('addAgent.wizard.editToFix')}</span>
+          <span style={helperStyle}>{t('addAgent.wizard.editToFix', { name: p.name })}</span>
         </>
       )}
       {fallback}
