@@ -874,7 +874,8 @@
       "compacting": "يضغط السياق",
       "looping": "يدور في حلقة: القاطع مسلَّح",
       "runningFloor": "يُدير الأرضية",
-      "idle": "خامل"
+      "idle": "خامل",
+      "clockingIn": "يسجّل الحضور…"
     }
   },
   "setupPanel": {

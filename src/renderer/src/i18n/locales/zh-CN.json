@@ -874,7 +874,8 @@
       "compacting": "正在压缩上下文",
       "looping": "循环中：断路器已启动",
       "runningFloor": "正在管理楼层",
-      "idle": "空闲"
+      "idle": "空闲",
+      "clockingIn": "正在打卡上班…"
     }
   },
   "setupPanel": {

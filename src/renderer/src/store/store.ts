@@ -403,6 +403,15 @@ const initialFloorView: FloorView = (() => {
  *  "blocked", so this marker is what tells the panel to offer Talk 1:1
  *  (docs/designs/owner-talks-via-michael.md). */
 export const ACTION_AT_PROMPT = 'waiting at a prompt';
+/** What an agent's card and bubble say while it comes back after a launch, or
+ *  starts for the first time: office words, not "reconnecting" or "starting
+ *  up" (owner, 2026-09-27). Shown translated (actionText). */
+export const ACTION_CLOCKING_IN = 'clocking in…';
+/** An agent's action for display: the app's own captions in the owner's
+ *  language, anything else as it is. */
+export function actionText(action: string, t: (key: string) => string): string {
+  return action === ACTION_CLOCKING_IN ? t('office.activity.clockingIn') : action;
+}
 
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt'>;
 
@@ -553,7 +562,7 @@ function loadPersistedAgents(): Agent[] {
       ...a,
       progress: 0,
       status: 'idle',
-      action: 'reconnecting…',
+      action: ACTION_CLOCKING_IN,
       currentStation: 'desk',
       carrying: undefined,
       recentTextTs: Date.now(),

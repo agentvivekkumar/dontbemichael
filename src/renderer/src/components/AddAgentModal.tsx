@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { InfoTip } from './InfoTip';
 import { useBackdropClose, escapeBelongsToField } from '@/hooks/useBackdropClose';
-import { useStore, type Agent } from '@/store/store';
+import { useStore, type Agent, ACTION_CLOCKING_IN } from '@/store/store';
 import { OFFICE_CAST, CAST_BY_NAME, CAST_GROUPS, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
 import type { HireManifest } from '@shared/hire';
@@ -542,7 +542,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       goal: goal || undefined,
       sourceCard,
       status: 'idle',
-      action: 'starting up',
+      action: ACTION_CLOCKING_IN,
       progress: 0,
       currentStation: 'desk',
       ptyId,
