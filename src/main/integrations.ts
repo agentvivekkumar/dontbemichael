@@ -17,8 +17,9 @@
  * Contract: hive/docs/integrations-spec.md.
  */
 import { app, safeStorage } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { writeFileAtomic } from './atomicFile';
 import {
   type IntegrationRecord,
   validateIntegrationRecord,
@@ -96,10 +97,12 @@ function readSecretBlob(): Record<string, string> {
   }
 }
 
+/** Every secret lives in this one file, so a torn write would lose all of them:
+ *  write it atomically (atomicFile.ts). */
 function writeSecretBlob(blob: Record<string, string>): void {
   const p = secretsPath();
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(blob, null, 2), { encoding: 'utf8', mode: 0o600 });
+  writeFileAtomic(p, JSON.stringify(blob, null, 2), 0o600);
 }
 
 /** Store a secret ENCRYPTED. Fail closed if OS encryption is unavailable (never
