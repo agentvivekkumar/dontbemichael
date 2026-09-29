@@ -8,6 +8,7 @@ export type { HireManifest } from '../shared/hire';
 import type { IntegrationRecord, IntegrationTemplate } from '../shared/integrations';
 export type { IntegrationRecord, IntegrationTemplate } from '../shared/integrations';
 import type { UpdateStatus } from '../shared/updateState';
+import type { CliUpdateStatus } from '../shared/cliUpdate';
 export type { UpdateStatus } from '../shared/updateState';
 import type { ToolStatus } from '../shared/toolCatalog';
 export type { ToolStatus } from '../shared/toolCatalog';
@@ -500,6 +501,8 @@ export interface ClosingTimeEvent {
   /** Workers that have ACKed so far / total workers being waited on. */
   acked: number;
   total: number;
+  /** The app reopens itself after closing. */
+  relaunch: boolean;
 }
 
 /** Per-agent operator-control state (#7C.1–7C.3). */
@@ -1078,8 +1081,8 @@ const api = {
   /** Start the closing-time protocol: the god broadcasts shutdown, every worker
    *  saves its memory and ACKs, the god concludes — then the app quits itself.
    *  Resolves with ok:false (+ error) when no god agent is running. */
-  startClosingTime: (): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('app:startClosingTime'),
+  startClosingTime: (opts?: { relaunch?: boolean }): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:startClosingTime', opts),
   /** Abort an in-progress closing time and tell the floor to resume work. */
   cancelClosingTime: (): Promise<void> => ipcRenderer.invoke('app:cancelClosingTime'),
   /** Progress events for the quit dialog: started → progress (ACK counts) →
@@ -1499,6 +1502,17 @@ const api = {
   /** The last known status — a reloaded window subscribes AFTER main may have
    *  already emitted, so it pulls the current state instead of waiting 6h. */
   updateCurrent: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:current'),
+
+  // ─── Claude Code updated underneath the team (src/shared/cliUpdate.ts) ──────
+  /** Pushed when live agents fall behind the installed Claude Code, or catch up
+   *  (null). */
+  onCliUpdateStatus: (cb: (status: CliUpdateStatus | null) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, payload: CliUpdateStatus | null) => cb(payload);
+    ipcRenderer.on('cliUpdate:status', listener);
+    return () => ipcRenderer.removeListener('cliUpdate:status', listener);
+  },
+  /** The last known status, for a window that subscribed after the push. */
+  cliUpdateCurrent: (): Promise<CliUpdateStatus | null> => ipcRenderer.invoke('cliUpdate:current'),
   /** Quit and install the downloaded update — only ever called from an explicit
    *  "restart to update" click. */
   updateRestartAndInstall: (): Promise<{ ok: boolean; error?: string }> =>

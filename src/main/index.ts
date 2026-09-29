@@ -111,6 +111,7 @@ import { cleanCompanyProfile, companyProfileContext } from '../shared/companyPro
 import { scheduledRunBody } from '../shared/scheduleMessage';
 import { OFFICE_OPEN_SUBJECT, officeClosedInLog, officeOpenBody } from '../shared/officeOpen';
 import { CLAUDE_MODEL_CLI_FLOOR, modelForCli } from '../shared/modelCliFloor';
+import { cliUpdateStatus, type CliUpdateStatus } from '../shared/cliUpdate';
 import {
   CODEX_REMOTE_SOCKET_RELATIVE,
   codexRemoteAliasPath,
@@ -260,6 +261,27 @@ async function enableCodexRemoteForSpawn(
 /** Live PTY id → its hive agent id, recorded at spawn. The pty:kill handler only
  *  gets the PTY id, so this lets a closed tab archive the right registry agent. */
 const ptyToAgent = new Map<string, string>();
+/** Live Claude PTY id → the binary it ran and the Claude Code version it started
+ *  on. Claude Code updates itself on disk, but a running agent keeps its version
+ *  until restarted; comparing the two drives the "close the office and reopen"
+ *  notice (src/shared/cliUpdate.ts). */
+const ptyCli = new Map<string, { bin: string; started: string }>();
+let lastCliUpdate: CliUpdateStatus | null = null;
+/** Re-read the installed version and tell the renderer when the answer changes.
+ *  The probe is cached per binary + mtime, so this is cheap to call often. */
+async function refreshCliUpdate(): Promise<void> {
+  const agents = await Promise.all([...ptyCli.values()].map(async (p) => ({
+    started: p.started,
+    installed: await claudeCliVersion(p.bin)
+  })));
+  const next = cliUpdateStatus(agents);
+  if (JSON.stringify(next) === JSON.stringify(lastCliUpdate)) return;
+  lastCliUpdate = next;
+  try { liveWebContents()?.send('cliUpdate:status', next); } catch { /* window tore down */ }
+}
+// Claude Code's own updater runs in the background, so poll for it.
+setInterval(() => { void refreshCliUpdate(); }, 10 * 60_000).unref();
+ipcMain.handle('cliUpdate:current', () => lastCliUpdate);
 /** PTY id → the spawn it should auto restart-and-continue into once a first-time
  *  CLI install finishes. The missing-CLI short-circuit runs the engine's installer
  *  in this PTY; when it exits cleanly the exit handler re-runs the SAME spawn (with
@@ -555,6 +577,7 @@ function teardownPty(id: string): void {
   //    non-worker PTY; ensures a dead worker's token can never reach an integration.
   try { integrationBroker.revoke(id); } catch { /* best-effort */ }
   // 1) Archive the agent — retained + flagged; only live-PTY agents are active.
+  if (ptyCli.delete(id)) void refreshCliUpdate();
   const agentId = ptyToAgent.get(id);
   if (agentId) {
     ptyToAgent.delete(id);
@@ -3370,6 +3393,14 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // live terminal means active — ensureAgent above already cleared `archived`.
   if (opts.hive?.id) {
     ptyToAgent.set(opts.id, opts.hive.id);
+    if (claudeProvider) {
+      const binPath = ptyManager.commandPath(opts.command.trim().split(/\s+/)[0] || opts.command);
+      void claudeCliVersion(binPath).then((started) => {
+        if (!binPath || !started || !ptyToAgent.has(opts.id)) return;
+        ptyCli.set(opts.id, { bin: binPath, started });
+        void refreshCliUpdate();
+      });
+    }
     // Worker inbox-wake watchdog (#151): boot grace starts at spawn so the
     // initial orientation prompt is never mistaken for an idle agent.
     workerWake.noteSpawn(opts.id);
@@ -4467,13 +4498,18 @@ const closingTime = new ClosingTimeController(
   // sessions that ended with a hard quit — never archived, never able to ACK.
   () => [...new Set(ptyToAgent.values())],
   () => liveWebContents(),
-  () => teardownAndQuit(),
+  (relaunch) => {
+    // Same dev-mode caveat as restart.ts: a relaunched dev build opens blank.
+    if (relaunch && !process.env.ELECTRON_RENDERER_URL) app.relaunch();
+    teardownAndQuit();
+  },
   // #7C.2 steering — the graceful interrupt that reaches deeply busy agents
   // at their next hook boundary instead of waiting for a Stop.
   control
 );
 hive.setRoutedObserver((msg, targets) => closingTime.onRouted(msg, targets));
-ipcMain.handle('app:startClosingTime', () => closingTime.start());
+ipcMain.handle('app:startClosingTime', (_evt, opts?: { relaunch?: boolean }) =>
+  closingTime.start({ relaunch: opts?.relaunch === true }));
 ipcMain.handle('app:cancelClosingTime', () => closingTime.cancel());
 
 // ─── IPC: full reset (wipe data + config, relaunch into onboarding) ──────────

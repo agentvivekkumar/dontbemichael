@@ -37,6 +37,8 @@ export interface ClosingTimeEvent {
   /** Workers that have ACKed so far / total workers being waited on. */
   acked: number;
   total: number;
+  /** The app reopens itself after closing (a Claude Code update, cliUpdate.ts). */
+  relaunch: boolean;
 }
 
 /** Subject markers. Deliberately forgiving (case, -/_/space) — agents write
@@ -55,6 +57,7 @@ const TEARDOWN_GRACE_MS = 2_500;
 export class ClosingTimeController {
   private active = false;
   private godId = 'god';
+  private relaunch = false;
   private workers = new Set<string>();
   private acked = new Set<string>();
   private timeoutTimer: NodeJS.Timeout | null = null;
@@ -68,8 +71,9 @@ export class ClosingTimeController {
      *  registry-based roster waits on ghosts that can never ACK. */
     private getLiveAgentIds: () => string[],
     private getWebContents: () => WebContents | null,
-    /** Called once the god concluded — runs the real teardown + app.quit(). */
-    private onConcluded: () => void,
+    /** Called once the god concluded — runs the real teardown + app.quit(),
+     *  relaunching first when the closing was started with `relaunch`. */
+    private onConcluded: (relaunch: boolean) => void,
     /** Mid-run steering (#7C.2): lets closing time reach DEEPLY BUSY agents at
      *  their next hook boundary instead of waiting for the Stop-hook inbox
      *  drain — the graceful interrupt. Optional so tests can omit it. */
@@ -82,9 +86,11 @@ export class ClosingTimeController {
 
   /** Kick off the protocol. Returns an error string when the floor cannot run
    *  it (no live god agent) so the UI can fall back to the hard quit. */
-  start(): { ok: boolean; error?: string } {
+  start(opts: { relaunch?: boolean } = {}): { ok: boolean; error?: string } {
     if (this.active) {
       // Re-pressed while running (e.g. from the timeout view): keep waiting.
+      // A reopen asked for on the way out still counts.
+      if (opts.relaunch) this.relaunch = true;
       this.armTimeout();
       this.emitState('progress');
       return { ok: true };
@@ -106,6 +112,7 @@ export class ClosingTimeController {
     );
     this.acked = new Set();
     this.active = true;
+    this.relaunch = opts.relaunch === true;
 
     const names = [...this.workers]
       .map((id) => `${reg.agents[id]?.name ?? id} (${id})`)
@@ -216,7 +223,7 @@ export class ClosingTimeController {
       this.emitState('complete');
       this.teardownTimer = setTimeout(() => {
         this.active = false;
-        this.onConcluded();
+        this.onConcluded(this.relaunch);
       }, TEARDOWN_GRACE_MS);
     }
   }
@@ -235,7 +242,7 @@ export class ClosingTimeController {
   }
 
   private emitState(phase: ClosingTimePhase): void {
-    const ev: ClosingTimeEvent = { phase, acked: this.acked.size, total: this.workers.size };
+    const ev: ClosingTimeEvent = { phase, acked: this.acked.size, total: this.workers.size, relaunch: this.relaunch };
     try { this.getWebContents()?.send('app:closingTime', ev); } catch { /* window tore down */ }
   }
 }

@@ -23,6 +23,7 @@ import { QuitWarningModal, type ClosingTimeState } from '@/components/QuitWarnin
 import { CompletionToast } from '@/realtime/CompletionToast';
 import { UpdateToast } from '@/components/UpdateToast';
 import { UpdateBadge } from '@/components/UpdateBadge';
+import { CliUpdateToast, CliUpdateBadge } from '@/components/CliUpdateNotice';
 import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import { SettingsModal, type Section as SettingsSection } from '@/components/SettingsModal';
 import { PixelPanel } from '@/components/PixelPanel';
@@ -177,13 +178,19 @@ export function App() {
   // tears down and quits by itself moments later.
   useEffect(() => window.cth.onClosingTime?.((ev) => {
     if (ev.phase === 'cancelled') { setClosing(null); return; }
-    setClosing({ phase: ev.phase, acked: ev.acked, total: ev.total });
+    setClosing({ phase: ev.phase, acked: ev.acked, total: ev.total, relaunch: ev.relaunch });
     if (ev.phase === 'started' || ev.phase === 'progress') setQuitWarn((w) => w ?? { ptyCount: 0 });
   }), []);
 
-  const startClosingTime = async () => {
-    const res = await window.cth.startClosingTime();
+  const startClosingTime = async (opts?: { relaunch?: boolean }) => {
+    const res = await window.cth.startClosingTime(opts);
     if (!res.ok) setClosing({ phase: 'error', acked: 0, total: 0, error: res.error });
+  };
+  // A Claude Code update is waiting (CliUpdateNotice): the owner's click closes
+  // the office the safe way, then the app reopens on the new version.
+  const closeOfficeAndReopen = (liveAgents: number) => {
+    setQuitWarn((w) => w ?? { ptyCount: liveAgents });
+    void startClosingTime({ relaunch: true });
   };
   const cancelClosingTime = () => {
     void window.cth.cancelClosingTime();
@@ -297,6 +304,7 @@ export function App() {
       {/* v0.3.4: background-update toast ("restart to update"); renders null until
           main's updater pushes a status. */}
       <UpdateToast />
+      <CliUpdateToast onCloseAndReopen={closeOfficeAndReopen} />
       {/* Title bar */}
       <div
         className="cth-titlebar-drag"
@@ -327,6 +335,7 @@ export function App() {
         {/* v0.3.7: the version is no longer inert text — it doubles as the
             update control (check / download / restart to update). */}
         <UpdateBadge />
+        <CliUpdateBadge />
         {SHOW_AUTO_MODE_LABEL && (
           <span style={{
             fontFamily: 'var(--cth-font-ui)',
@@ -553,7 +562,7 @@ export function App() {
             setQuitWarn(null);
           }}
           onConfirm={async () => { await window.cth.confirmClose(); }}
-          onClosingTime={startClosingTime}
+          onClosingTime={() => { void startClosingTime(); }}
         />
       )}
 
