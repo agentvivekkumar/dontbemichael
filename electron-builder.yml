@@ -71,6 +71,10 @@ extraResources:
   # Claude Code starts it with the bundled node, outside the asar.
   - from: resources/md-mail-mcp.cjs
     to: md-mail-mcp.cjs
+  # The stdio loop md-mail (and md-books) share: md-mail-mcp.cjs does
+  # require('./md-mcp-core.cjs'), so it must sit beside it (eng review EXT-1).
+  - from: resources/md-mcp-core.cjs
+    to: md-mcp-core.cjs
   # Knowledge Graph agent CLI + its pure-JS core. Agents invoke `node
   # <resources>/kg.cjs` out-of-process; kg-core.cjs ships beside it so the CLI's
   # `require('./kg-core.cjs')` resolves outside the asar.
