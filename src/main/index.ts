@@ -376,7 +376,7 @@ function meaningSearch(): { bin: string; palace: string } | undefined {
   const palace = memory.palacePath();
   return memory.active() && knowledge.active() && bin && palace ? { bin, palace } : undefined;
 }
-// Enterprise Knowledge Graph — file-backed store + agent CLI (default OFF).
+// Company knowledge: file-backed store + agent CLI (default ON).
 const knowledge = new KnowledgeManager();
 // Keeps each agent's memory index useful (owner, 2026-09-25): agents add notes
 // to memory/inbox.md and this turns them into itemised changes on Haiku, in

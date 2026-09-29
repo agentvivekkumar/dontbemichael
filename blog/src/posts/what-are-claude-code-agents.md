@@ -93,8 +93,8 @@ When you wrap your agents in that layer, you've got a [multi-agent harness](/blo
 
 - Ready to run several? Start with [how to run multiple Claude Code
   agents](/blog/how-to-run-multiple-claude-code-agents/).
-- Want the field of tools? See [the best tools to run multiple Claude Code
-  agents](/blog/best-claude-code-multi-agent-tools/).
+- Want the field of tools? See the best tools to run multiple Claude Code
+  agents.
 - Curious about the concept? [What is a multi-agent harness?](/blog/what-is-a-multi-agent-harness/)
 
 ---

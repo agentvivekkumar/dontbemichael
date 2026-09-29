@@ -73,6 +73,10 @@ moving, and brings you only the decisions that need you.
 
 ## Part 2: Every change, release by release
 
+### 0.0.9 (2026-09-28)
+- No app changes. The old project's website files, promo media and 42 of its blog posts left the
+  repo; the release drops, message queue and company knowledge docs match the app again.
+
 ### 0.0.8 (2026-09-27)
 - New hire wizard: Who, Job, Role, Finalize. Jobs come from a teammate, your business pack, any
   other business, or a new one; lists open on the character's own kind of job.

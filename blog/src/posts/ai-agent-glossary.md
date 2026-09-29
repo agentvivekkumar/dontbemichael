@@ -105,8 +105,8 @@ In one sentence using all of it: *a **harness** runs a **hive** of **agents** (e
 **tools**), gives them shared **semantic memory** and **mailboxes**, and lets an **orchestrator** route
 work — **local-first**, with a **human in the loop** for the critical calls.*
 
-If any term sparked a "wait, which tool does that?", the [roundup of multi-agent Claude Code
-tools](/blog/best-claude-code-multi-agent-tools/) maps the vocabulary onto real software.
+If any term sparked a "wait, which tool does that?", the roundup of multi-agent Claude Code
+tools maps the vocabulary onto real software.
 
 ---
 

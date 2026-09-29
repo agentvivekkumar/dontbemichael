@@ -1,20 +1,13 @@
-# Demo videos — hero tab switcher (docs/index.html)
+# Demo videos
 
-The landing page's multi-section demo (below the hero text) is a sliding tab switcher
-with five narrated videos, click-to-play with sound. Files live in THIS folder:
+`agents.mp4` and `agents-poster.jpg` are embedded in the repo `README.md` (the "agents at
+work" section). They are the old project's recording and are due to be replaced; see
+"Record demo videos of Don't Be Michael" in `TODOS.md`.
 
-| Tab | Video | Poster | Source recording |
-|-----|-------|--------|------------------|
-| Introduction | `intro.mp4` | `intro-poster.jpg` | `../MunderDifflin001.mp4` |
-| Setup & installation | `setup.mp4` | `setup-poster.jpg` | `../MunderDifflin002.mp4` |
-| Adding new agents | `agents.mp4` | `agents-poster.jpg` | `../MunderDifflin003.mp4` |
-| Talking to the orchestrator | `orchestrator.mp4` | `orchestrator-poster.jpg` | `../MunderDifflin004.mp4` |
-| Other features & configs | `features.mp4` | `features-poster.jpg` | `../MunderDifflin005.mp4` |
+## Encoding a new video
 
-## Updating a video
-
-Re-encode the new recording with faststart (required — without it the browser
-downloads the ENTIRE file before playback starts) and moderate CRF:
+Re-encode the recording with faststart (without it the browser downloads the whole file
+before playback starts) and a moderate CRF:
 
 ```sh
 ffmpeg -i NewRecording.mov \
@@ -22,17 +15,11 @@ ffmpeg -i NewRecording.mov \
   -c:a aac -b:a 128k -movflags +faststart \
   docs/media/demo/<name>.mp4
 
-# refresh the poster (frame at 1.5s)
+# poster (frame at 1.5s)
 ffmpeg -y -ss 1.5 -i docs/media/demo/<name>.mp4 -frames:v 1 -q:v 4 docs/media/demo/<name>-poster.jpg
 ```
 
-Then update the duration badge (`<span class="dur">`) for that panel in
-`docs/index.html` if the length changed.
-
 Notes:
-- Target 16:10-ish, ≤1440px wide. CRF 26 keeps screen-recording text crisp at ~1/6
-  the size of a raw recording (the five originals were 88 MB; these are ~17 MB total).
-- Do NOT commit the raw `MunderDifflin00*.mp4` originals — they're gitignored so the
-  repo and the deployed GitHub Pages site stay small.
-- Loading strategy (in index.html): every `<video>` is `preload="none"` with a poster;
-  the active tab lazily attaches `src` and fetches metadata only. Bytes stream on play.
+- Target about 16:10, at most 1440px wide. CRF 26 keeps screen-recording text crisp at
+  roughly a sixth of the raw size.
+- Do not commit raw recordings; `.gitignore` already keeps `docs/media/*.mov` out.

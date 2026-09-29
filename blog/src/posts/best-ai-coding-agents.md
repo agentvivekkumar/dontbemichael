@@ -33,7 +33,7 @@ where it fits, and where coordinating a <em>team</em> of agents is a different g
 saying city commute or cross-country haul. By 2026 the field has sorted into categories that answer
 different needs. This guide maps them honestly, credits what each tool leads at, and shows where a
 local multi-agent hive fits. (If you specifically want to run *multiple Claude Code agents*, that
-narrower niche has its own roundup: [the best tools to run multiple Claude Code agents](/blog/best-claude-code-multi-agent-tools/).)
+narrower niche has its own roundup: the best tools to run multiple Claude Code agents.)
 
 ## The five categories (read this first)
 
@@ -73,7 +73,7 @@ dedicated app, it's the benchmark. Our [Claude Code vs Cursor](/blog/claude-code
 your API keys or free local models via Ollama), and per 2026 roundups
 [its CLI 2.0 added parallel terminal agents](https://www.morphllm.com/best-ai-coding-agents-2026). Best
 if you want a Cursor-like agent inside VS Code without a subscription. (We compare it directly in
-[Cline vs Munder Difflin](/blog/cline-vs-munder-difflin/).)
+Cline vs Munder Difflin.)
 
 **Aider** — the open-source, git-native **CLI** agent: free, you pay only model API costs, auto-commits
 as it works. Best for terminal-centric, version-control-disciplined workflows.
@@ -99,7 +99,7 @@ All five tools above are essentially *one agent* helping you (or one autonomous 
 
 It's not competing to be "a better Cursor" — it's the orchestration layer you add when one agent isn't
 enough. If that's your need specifically with Claude Code, the
-[multi-agent tools roundup](/blog/best-claude-code-multi-agent-tools/) goes deeper, and
+multi-agent tools roundup goes deeper, and
 [local-first vs cloud agent SDKs](/blog/local-first-vs-cloud-agent-sdks/) covers the build-vs-buy angle.
 
 {% img "note-2" %}
@@ -113,8 +113,8 @@ enough. If that's your need specifically with Claude Code, the
 - **You want a coordinated *team* of agents, local and private** → a multi-agent hive.
 
 For a structured rubric across all of these, see [how to choose a multi-agent tool](/blog/how-to-choose-a-multi-agent-tool/);
-for two head-to-heads, [Cline vs](/blog/cline-vs-munder-difflin/) and
-[Claude Squad vs Munder Difflin](/blog/claude-squad-vs-munder-difflin/). Choosing between two terminal agents? [Codex CLI vs Claude Code](/blog/codex-cli-vs-claude-code/) compares them head to head.
+for two head-to-heads, Cline vs and
+Claude Squad vs Munder Difflin. Choosing between two terminal agents? [Codex CLI vs Claude Code](/blog/codex-cli-vs-claude-code/) compares them head to head.
 
 ## The bottom line
 

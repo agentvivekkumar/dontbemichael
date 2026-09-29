@@ -71,7 +71,7 @@ heading answer a question a real person asks? Do the links work? A draft that fa
 
 ### 4. Pictures, drawn in code
 
-Every hero image and inline sketch on this blog is [drawn as code by an agent](/blog/an-agent-redesigned-this-blog/):
+Every hero image and inline sketch on this blog is drawn as code by an agent:
 a library of SVG parts, a set of scene layouts and one spec file, rendered in a headless browser. No image API
 bills. One manifest lists every image, and a post shows a designed placeholder until its drawings land, so a page
 never renders broken.
@@ -106,7 +106,7 @@ only a human can complete.
 
 **5. Put it on a schedule.** Once a few posts come out right, open the Triggers tab and create a schedule: a label,
 who it goes to, and the prompt that starts the loop. It is the same move that stood up
-[an hourly PR reviewer](/blog/one-prompt-automated-pr-review/) for us.
+an hourly PR reviewer for us.
 
 {% img "note-2", "One gate stays human on purpose: publishing. Everything before it runs on its own." %}
 

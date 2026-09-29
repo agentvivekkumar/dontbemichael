@@ -83,11 +83,11 @@ Findings we would have missed by skimming, all of which changed real decisions:
   cross-channel synthesis caught that they were the same request.
 - **Every blocked-user story on two channels traced to the same bug class** (the non-Claude-Code
   path on Windows), which moved it to the top of
-  [0.4.4](/blog/launching-munder-difflin-v0-4-4/).
+  0.4.4.
 
 The Reddit and Product Hunt halves of this analysis became
-[their](/blog/what-reddit-told-us-about-munder-difflin/)
-[own](/blog/number-five-on-product-hunt/) posts — both written *from the agents' reports*, which
+their
+own posts — both written *from the agents' reports*, which
 is why they have real numbers in them instead of vibes.
 
 ## Run it on your launch

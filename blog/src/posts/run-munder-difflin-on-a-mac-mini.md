@@ -154,7 +154,7 @@ For LM Studio, use `http://localhost:1234/v1` and the model id LM Studio shows y
 ## Step 3: Run the office
 
 With a model served and the engines pointed at it, hire workers from the
-[Agent Gallery or Add agent](/blog/how-to-hire-from-the-agent-gallery/), give Michael a goal, and let it run. Messages move between
+Agent Gallery or Add agent, give Michael a goal, and let it run. Messages move between
 agents through [file mailboxes](/blog/atomic-file-mailboxes-for-agents/), schedules fire on local timers, and git keeps the history.
 
 A few notes for an always on Mac mini:

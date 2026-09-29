@@ -80,7 +80,7 @@ export class KnowledgeManager {
   }
 
   /** Env merged into each agent's spawn so its `kg` CLI hits this store. Empty
-   *  when off — so a default install injects nothing (zero behaviour change). */
+   *  when company knowledge is off, so nothing is injected then. */
   env(): Record<string, string> {
     if (!this.active()) return {};
     return { KG_ROOT: this.root(), KG_CLI: this.cliPath(), KG_CORE: this.corePath() };

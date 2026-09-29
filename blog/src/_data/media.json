@@ -100,31 +100,6 @@
     },
     "youtube": []
   },
-  "an-agent-redesigned-this-blog": {
-    "title": "An Agent Redesigned the Blog You're Reading",
-    "category": "use-cases",
-    "hero": {
-      "file": "assets/media/an-agent-redesigned-this-blog/hero.png",
-      "alt": "Illustration: An Agent Redesigned the Blog You're Reading",
-      "prompt": "Hero image for a blog post titled \"An Agent Redesigned the Blog You're Reading\". The post is about: Reddit said our blog was unreadable and AI-sloppy. So one agent redesigned it end to end: a new editorial theme, and 119 hand-drawn hero illustrations rendered as code for exactly $0 in image APIs. This is the making-of.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/an-agent-redesigned-this-blog/note-1.png",
-        "alt": "Hand-drawn sketch from “An Agent Redesigned the Blog You're Reading”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/an-agent-redesigned-this-blog/note-2.png",
-        "alt": "Hand-drawn sketch from “An Agent Redesigned the Blog You're Reading”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "append-only-event-log-agents": {
     "title": "An Append-Only Event Log for a Hive of Agents",
     "category": "internals",
@@ -219,31 +194,6 @@
       "note-2": {
         "file": "assets/media/best-ai-coding-agents/note-2.png",
         "alt": "Hand-drawn sketch from “The Best AI Coding Agents in 2026: A Field Guide”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "best-claude-code-multi-agent-tools": {
-    "title": "The Best Tools to Run Multiple Claude Code Agents (2026)",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/best-claude-code-multi-agent-tools/hero.png",
-      "alt": "Illustration: The Best Tools to Run Multiple Claude Code Agents (2026)",
-      "prompt": "Hero image for a blog post titled \"The Best Tools to Run Multiple Claude Code Agents (2026)\". The post is about: An honest 2026 roundup of tools to run multiple Claude Code agents — Claude Squad, Conductor, Crystal, vibe-kanban, and Munder Difflin — compared.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/best-claude-code-multi-agent-tools/note-1.png",
-        "alt": "Hand-drawn sketch from “The Best Tools to Run Multiple Claude Code Agents (2026)”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/best-claude-code-multi-agent-tools/note-2.png",
-        "alt": "Hand-drawn sketch from “The Best Tools to Run Multiple Claude Code Agents (2026)”",
         "prompt": "",
         "status": "ready"
       }
@@ -450,31 +400,6 @@
     },
     "youtube": []
   },
-  "claude-code-multi-agent-setup-tutorial": {
-    "title": "Set Up a Claude Code Multi-Agent Workflow in 10 Minutes",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/claude-code-multi-agent-setup-tutorial/hero.png",
-      "alt": "Illustration: Set Up a Claude Code Multi-Agent Workflow in 10 Minutes",
-      "prompt": "Hero image for a blog post titled \"Set Up a Claude Code Multi-Agent Workflow in 10 Minutes\". The post is about: A from-zero Claude Code multi-agent setup: install Munder Difflin, onboard, spawn a few agents, and watch the GOD orchestrator route your first task.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/claude-code-multi-agent-setup-tutorial/note-1.png",
-        "alt": "Hand-drawn sketch from “Set Up a Claude Code Multi-Agent Workflow in 10 Minutes”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/claude-code-multi-agent-setup-tutorial/note-2.png",
-        "alt": "Hand-drawn sketch from “Set Up a Claude Code Multi-Agent Workflow in 10 Minutes”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "claude-code-orchestration-guide": {
     "title": "Orchestrating Claude Code Agents: A Practical Guide",
     "category": "orchestration",
@@ -494,31 +419,6 @@
       "note-2": {
         "file": "assets/media/claude-code-orchestration-guide/note-2.png",
         "alt": "Hand-drawn sketch from “Orchestrating Claude Code Agents: A Practical Guide”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "claude-code-orchestration-tools-compared": {
-    "title": "Claude Code Orchestration Tools, Compared",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/claude-code-orchestration-tools-compared/hero.png",
-      "alt": "Illustration: Claude Code Orchestration Tools, Compared",
-      "prompt": "Hero image for a blog post titled \"Claude Code Orchestration Tools, Compared\". The post is about: Claude Code orchestration tools compared on memory, messaging, visibility, control, and local-first — across Claude Squad, Conductor, Crystal, and more.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/claude-code-orchestration-tools-compared/note-1.png",
-        "alt": "Hand-drawn sketch from “Claude Code Orchestration Tools, Compared”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/claude-code-orchestration-tools-compared/note-2.png",
-        "alt": "Hand-drawn sketch from “Claude Code Orchestration Tools, Compared”",
         "prompt": "",
         "status": "ready"
       }
@@ -594,81 +494,6 @@
       "note-2": {
         "file": "assets/media/claude-code-vs-cursor/note-2.png",
         "alt": "Hand drawn sketch: a character presenting a board on an easel",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "claude-squad-alternative": {
-    "title": "Looking for a Claude Squad Alternative?",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/claude-squad-alternative/hero.png",
-      "alt": "Illustration: Looking for a Claude Squad Alternative?",
-      "prompt": "Hero image for a blog post titled \"Looking for a Claude Squad Alternative?\". The post is about: What Claude Squad does well, where it stops, and why a memory-backed, orchestrated hive may be the Claude Squad alternative you're after.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/claude-squad-alternative/note-1.png",
-        "alt": "Hand-drawn sketch from “Looking for a Claude Squad Alternative?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/claude-squad-alternative/note-2.png",
-        "alt": "Hand-drawn sketch from “Looking for a Claude Squad Alternative?”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "claude-squad-vs-munder-difflin": {
-    "title": "Claude Squad vs Munder Difflin: Which Should You Use?",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/claude-squad-vs-munder-difflin/hero.png",
-      "alt": "Illustration: Claude Squad vs Munder Difflin: Which Should You Use?",
-      "prompt": "Hero image for a blog post titled \"Claude Squad vs Munder Difflin: Which Should You Use?\". The post is about: Claude Squad vs Munder Difflin: a lean terminal session manager against a memory-backed, orchestrated, visual hive. Feature table and an honest verdict.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/claude-squad-vs-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “Claude Squad vs Munder Difflin: Which Should You Use?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/claude-squad-vs-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “Claude Squad vs Munder Difflin: Which Should You Use?”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "cline-vs-munder-difflin": {
-    "title": "Cline vs Munder Difflin: In-Editor Agent or Local Hive?",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/cline-vs-munder-difflin/hero.png",
-      "alt": "Illustration: Cline vs Munder Difflin: In-Editor Agent or Local Hive?",
-      "prompt": "Hero image for a blog post titled \"Cline vs Munder Difflin: In-Editor Agent or Local Hive?\". The post is about: A fair comparison of Cline and Munder Difflin — an in-editor BYOK coding agent vs a local multi-agent orchestration hive — and when to pick which.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/cline-vs-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “Cline vs Munder Difflin: In-Editor Agent or Local Hive?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/cline-vs-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “Cline vs Munder Difflin: In-Editor Agent or Local Hive?”",
         "prompt": "",
         "status": "ready"
       }
@@ -775,31 +600,6 @@
     },
     "youtube": []
   },
-  "conductor-claude-code-alternative": {
-    "title": "A Conductor Alternative for Orchestrating Claude Code",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/conductor-claude-code-alternative/hero.png",
-      "alt": "Illustration: A Conductor Alternative for Orchestrating Claude Code",
-      "prompt": "Hero image for a blog post titled \"A Conductor Alternative for Orchestrating Claude Code\". The post is about: Conductor is a polished macOS app for parallel Claude Code worktrees. When to pick a cross-platform, orchestrated hive as your Conductor alternative.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/conductor-claude-code-alternative/note-1.png",
-        "alt": "Hand-drawn sketch from “A Conductor Alternative for Orchestrating Claude Code”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/conductor-claude-code-alternative/note-2.png",
-        "alt": "Hand-drawn sketch from “A Conductor Alternative for Orchestrating Claude Code”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "context-engineering-for-ai-agents": {
     "title": "Context Engineering for AI Agents: Budgeting the Window",
     "category": "guides",
@@ -875,31 +675,6 @@
     },
     "youtube": []
   },
-  "crystal-claude-code-alternative": {
-    "title": "A Crystal Alternative: Multi-Agent Claude Code with Memory",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/crystal-claude-code-alternative/hero.png",
-      "alt": "Illustration: A Crystal Alternative: Multi-Agent Claude Code with Memory",
-      "prompt": "Hero image for a blog post titled \"A Crystal Alternative: Multi-Agent Claude Code with Memory\". The post is about: Crystal runs parallel Claude Code worktrees well. Where a memory-backed, orchestrated hive changes the workflow — and when to stick with Crystal.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/crystal-claude-code-alternative/note-1.png",
-        "alt": "Hand-drawn sketch from “A Crystal Alternative: Multi-Agent Claude Code with Memory”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/crystal-claude-code-alternative/note-2.png",
-        "alt": "Hand-drawn sketch from “A Crystal Alternative: Multi-Agent Claude Code with Memory”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "debugging-multi-agent-systems": {
     "title": "How to Debug a Multi-Agent System",
     "category": "guides",
@@ -950,31 +725,6 @@
     },
     "youtube": []
   },
-  "deploy-automated-pr-reviewer-agent": {
-    "title": "Deploy a PR Reviewer That Never Sleeps — In About One Prompt",
-    "category": "orchestration",
-    "hero": {
-      "file": "assets/media/deploy-automated-pr-reviewer-agent/hero.png",
-      "alt": "Illustration: Deploy a PR Reviewer That Never Sleeps — In About One Prompt",
-      "prompt": "Hero image for a blog post titled \"Deploy a PR Reviewer That Never Sleeps — In About One Prompt\". The post is about: A how-to for standing up a fully automated PR-reviewing agent in Munder Difflin — one that reads your real source (not just the PR description), de-dupes noise, and only escalates what matters. With a real triage run that turned 22 duplicate firings into a clean v0.2.5 patch queue.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/deploy-automated-pr-reviewer-agent/note-1.png",
-        "alt": "Hand-drawn sketch from “Deploy a PR Reviewer That Never Sleeps — In About One Prompt”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/deploy-automated-pr-reviewer-agent/note-2.png",
-        "alt": "Hand-drawn sketch from “Deploy a PR Reviewer That Never Sleeps — In About One Prompt”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "do-more-with-less-model-routing": {
     "title": "Do More With Less: Smart Model Routing Across Agents",
     "category": "concepts",
@@ -994,31 +744,6 @@
       "note-2": {
         "file": "assets/media/do-more-with-less-model-routing/note-2.png",
         "alt": "Hand-drawn sketch from “Do More With Less: Smart Model Routing Across Agents”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "does-the-june-2026-agent-sdk-change-affect-munder-difflin": {
-    "title": "Does the June 2026 Agent SDK Change Affect Munder Difflin?",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/does-the-june-2026-agent-sdk-change-affect-munder-difflin/hero.png",
-      "alt": "Illustration: Does the June 2026 Agent SDK Change Affect Munder Difflin?",
-      "prompt": "Hero image for a blog post titled \"Does the June 2026 Agent SDK Change Affect Munder Difflin?\". The post is about: From June 15, 2026 the Claude Agent SDK gets a separate credit. Munder Difflin drives the native Claude Code CLI, so your hive runs on your plan as before.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/does-the-june-2026-agent-sdk-change-affect-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “Does the June 2026 Agent SDK Change Affect Munder Difflin?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/does-the-june-2026-agent-sdk-change-affect-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “Does the June 2026 Agent SDK Change Affect Munder Difflin?”",
         "prompt": "",
         "status": "ready"
       }
@@ -1175,56 +900,6 @@
     },
     "youtube": []
   },
-  "grok-bot-alternatives": {
-    "title": "Grok Bot Alternatives: Six Picks, Grouped by What You Want",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/grok-bot-alternatives/hero.png",
-      "alt": "A yellow cartoon character with a clipboard at a signpost, choosing between a cloud kiosk, a phone, a laptop desk and a small home server",
-      "prompt": "Generated with Antigravity (gemini-3.1-flash-image) by jim-mu106131, 14 Sep 2026, house style: ink line art, yellow bean, no red, no text.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/grok-bot-alternatives/note-1.png",
-        "alt": "Papers locked in a drawer inside a faraway cloud, next to the same papers on a desk beside a laptop",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/grok-bot-alternatives/note-2.png",
-        "alt": "A yellow cartoon character hands a ring of keys to a small robot helper while keeping one key back, with an open notebook between them",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "herdr-alternatives": {
-    "title": "Herdr Alternatives: What to Pick and Who Each One Fits",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/herdr-alternatives/hero.png",
-      "alt": "A yellow cartoon character as a shepherd with a crook, herding small terminal windows with legs across a hill",
-      "prompt": "Generated with Antigravity (gemini-3.1-flash-image) by jim-mu106131, 14 Sep 2026, house style: ink line art, yellow bean, no red, no text.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/herdr-alternatives/note-1.png",
-        "alt": "A monitor split into terminal panes next to a small office floor with a bean at each desk",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/herdr-alternatives/note-2.png",
-        "alt": "Four terminal windows showing an hourglass, a spinning gear, a check mark and a sleeping cloud",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "hire-manifest-untrusted-input": {
     "title": "Treating a Hire Manifest as Untrusted Input",
     "category": "internals",
@@ -1375,31 +1050,6 @@
     },
     "youtube": []
   },
-  "how-to-add-a-github-copilot-cli-agent": {
-    "title": "How to Add a GitHub Copilot CLI Agent to Your Floor",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/how-to-add-a-github-copilot-cli-agent/hero.png",
-      "alt": "Illustration: How to Add a GitHub Copilot CLI Agent to Your Floor",
-      "prompt": "Hero image for a blog post titled \"How to Add a GitHub Copilot CLI Agent to Your Floor\". The post is about: A step-by-step v0.3.3 walkthrough: install GitHub Copilot CLI (or let the harness install it for you), hire a Copilot worker, pick a model, and know exactly what print mode can and can't do.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/how-to-add-a-github-copilot-cli-agent/note-1.png",
-        "alt": "Hand-drawn sketch from “How to Add a GitHub Copilot CLI Agent to Your Floor”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/how-to-add-a-github-copilot-cli-agent/note-2.png",
-        "alt": "Hand-drawn sketch from “How to Add a GitHub Copilot CLI Agent to Your Floor”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "how-to-add-an-mcp-server-to-claude-code": {
     "title": "How to Add an MCP Server to Claude Code",
     "category": "guides",
@@ -1469,31 +1119,6 @@
       "note-2": {
         "file": "assets/media/how-to-connect-ollama-to-claude-code/note-2.png",
         "alt": "Hand-drawn sketch from “How to Connect Ollama to Claude Code”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "how-to-hire-from-the-agent-gallery": {
-    "title": "How to Hire From the Agent Gallery",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/how-to-hire-from-the-agent-gallery/hero.png",
-      "alt": "Illustration: How to Hire From the Agent Gallery",
-      "prompt": "Hero image for a blog post titled \"How to Hire From the Agent Gallery\". The post is about: A practical guide to Munder Difflin's Agent Gallery: browse six off-the-shelf hires, import one from a link or file, review the pre-filled manifest, customize identity, workspace, engine, and briefing — then spawn it yourself.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/how-to-hire-from-the-agent-gallery/note-1.png",
-        "alt": "Hand-drawn sketch from “How to Hire From the Agent Gallery”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/how-to-hire-from-the-agent-gallery/note-2.png",
-        "alt": "Hand-drawn sketch from “How to Hire From the Agent Gallery”",
         "prompt": "",
         "status": "ready"
       }
@@ -1859,268 +1484,6 @@
     },
     "youtube": []
   },
-  "launching-munder-difflin-v0-2-0": {
-    "title": "Launching Munder Difflin v0.2.0",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-2-0/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.2.0",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.2.0\". The post is about: Munder Difflin v0.2.0 is here: a Command Center overhaul, per-agent token budgets, live OpenTelemetry observability, a circuit breaker, durable SQLite persistence, and a big round of community fixes.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-2-0/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.0”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-2-0/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.0”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-2-4": {
-    "title": "Launching Munder Difflin v0.2.4",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-2-4/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.2.4",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.2.4\". The post is about: Munder Difflin v0.2.4 is here: Claude Code, OpenAI Codex, and Antigravity (Gemini) agents now run as one hive with full parity — no API keys, no setup. Brief a GOD orchestrator, automate basically anything in one prompt, and close the lid while it keeps working.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-2-4/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.4”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-2-4/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.4”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-2-8": {
-    "title": "Launching Munder Difflin v0.2.8: Shareable Hires",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-2-8/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.2.8: Shareable Hires",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.2.8: Shareable Hires\". The post is about: Munder Difflin v0.2.8 ships Shareable Hires: a one-click, portable agent role manifest + The Hiring Fair gallery. Click a hire link, review every field, then spawn it yourself.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-2-8/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.8: Shareable Hires”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-2-8/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.2.8: Shareable Hires”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-3-0": {
-    "title": "Launching Munder Difflin v0.3.0: Selectable Engines, Integrations & Slack-Spawned Workers",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-3-0/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.3.0: Selectable Engines, Integrations & Slack-Spawned Workers",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.3.0: Selectable Engines, Integrations & Slack-Spawned Workers\". The post is about: Munder Difflin v0.3.0 makes every hire — and Michael himself — a pluggable engine, adds an integrations registry with a write-only secret broker, and lets the god orchestrator spawn an ephemeral worker straight from Slack.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-3-0/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.0: Selectable Engines, Integrations & Slack-Spawned Workers”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-3-0/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.0: Selectable Engines, Integrations & Slack-Spawned Workers”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-3-2": {
-    "title": "Launching Munder Difflin v0.3.2: Talk to Michael, a Realtime Voice Orchestrator",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-3-2/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.3.2: Talk to Michael, a Realtime Voice Orchestrator",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.3.2: Talk to Michael, a Realtime Voice Orchestrator\". The post is about: Munder Difflin v0.3.2 adds Realtime Michael — a low-latency voice channel to the GOD orchestrator. Talk to Michael and he listens, answers, and acts: reading the hive and, behind spoken echo-back confirmation, dispatching, spawning, and steering the floor in real time.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-3-2/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.2: Talk to Michael, a Realtime Voice Orchestrator”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-3-2/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.2: Talk to Michael, a Realtime Voice Orchestrator”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-3-3": {
-    "title": "Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-3-3/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support\". The post is about: Munder Difflin v0.3.3 adds a full Monaco IDE — file tree, editor tabs, save, and side-by-side git diffs of your agents' changes — plus GitHub Copilot CLI as a first-class agent engine, our first community-contributed provider.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-3-3/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-3-3/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-3-5": {
-    "title": "Launching Munder Difflin v0.3.5: A Michael Who Knows the Floor, a Git Time-Machine, and an App That Updates Itself",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-3-5/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.3.5: A Michael Who Knows the Floor, a Git Time-Machine, and an App That Updates Itself",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.3.5: A Michael Who Knows the Floor, a Git Time-Machine, and an App That Updates Itself\". The post is about: The v0.3.4 + v0.3.5 wave: voice orchestration with live floor context and full app control, markdown previews everywhere, commit history and branch compare in the built-in IDE, a six-tab Settings redesign, xAI Grok and Kimi Code engines, auto-update, and a queue that always has an escape hatch.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-3-5/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.5: A Michael Who Knows the Floor, a Git Time-Machine, and an App That Updates Itself”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-3-5/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.3.5: A Michael Who Knows the Floor, a Git Time-Machine, and an App That Updates Itself”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-4-4": {
-    "title": "Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-4-4/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk\". The post is about: v0.4.4 fixes the bug that silently broke agent-to-agent messaging on Windows, starts hive services on the very first run, rebuilds dark mode so you can read it, and adds a 227-skill catalog, a Prerequisites page, and designed release notes.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-4-4/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-4-4/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-3": {
-        "file": "assets/media/launching-munder-difflin-v0-4-4/note-3.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.4: Windows Agents Can Finally Talk”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-4-6": {
-    "title": "Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-4-6/hero.png",
-      "alt": "Illustration: Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now",
-      "prompt": "Hero image for a blog post titled \"Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now\". The post is about: v0.4.6 adds Chinese and Arabic interfaces with right-to-left support, ships its fonts inside the app so nothing is fetched from Google, and makes the updater actually update itself instead of pointing at a download page.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-4-6/note-1.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-4-6/note-2.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-3": {
-        "file": "assets/media/launching-munder-difflin-v0-4-6/note-3.png",
-        "alt": "Hand-drawn sketch from “Launching Munder Difflin v0.4.6: It Speaks Chinese and Arabic Now”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "launching-munder-difflin-v0-5-2": {
-    "title": "Munder Difflin 0.5.2: Pro, the Stapler and Everything Since 0.4.6",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/launching-munder-difflin-v0-5-2/hero.png",
-      "alt": "Illustration: Munder Difflin 0.5.2: Pro, the Stapler and Everything Since 0.4.6",
-      "prompt": "Hero image for a blog post titled \"Munder Difflin 0.5.2: Pro, the Stapler and Everything Since 0.4.6\". The post is about: Munder Difflin 0.5.2 is out: how to install it, how to start Pro, what Pro adds, what changed since 0.4.6, and the end of signed Community builds.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/launching-munder-difflin-v0-5-2/note-1.png",
-        "alt": "Hand-drawn sketch from “Munder Difflin 0.5.2: Pro, the Stapler and Everything Since 0.4.6”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/launching-munder-difflin-v0-5-2/note-2.png",
-        "alt": "Hand-drawn sketch from “Munder Difflin 0.5.2: Pro, the Stapler and Everything Since 0.4.6”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "local-first-ai-agent-orchestration": {
     "title": "Local-First AI Agent Orchestration: How a Hive Runs Without a Cloud",
     "category": "orchestration",
@@ -2365,31 +1728,6 @@
     },
     "youtube": []
   },
-  "munder-difflin-v0-2-4-feature-walkthrough": {
-    "title": "Munder Difflin v0.2.4 Feature Walkthrough",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/munder-difflin-v0-2-4-feature-walkthrough/hero.png",
-      "alt": "Illustration: Munder Difflin v0.2.4 Feature Walkthrough",
-      "prompt": "Hero image for a blog post titled \"Munder Difflin v0.2.4 Feature Walkthrough\". The post is about: A comprehensive guide to every change in Munder Difflin v0.2.4 — how the Codex lifecycle-hook bridge achieves full hive parity, what the Schedules tab adds, why tunnelmole replaced localtunnel, and what else shipped.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/munder-difflin-v0-2-4-feature-walkthrough/note-1.png",
-        "alt": "Hand-drawn sketch from “Munder Difflin v0.2.4 Feature Walkthrough”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/munder-difflin-v0-2-4-feature-walkthrough/note-2.png",
-        "alt": "Hand-drawn sketch from “Munder Difflin v0.2.4 Feature Walkthrough”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "node-pty-electron-real-terminals": {
     "title": "Real Terminals in Electron with node-pty",
     "category": "internals",
@@ -2409,31 +1747,6 @@
       "note-2": {
         "file": "assets/media/node-pty-electron-real-terminals/note-2.png",
         "alt": "Hand-drawn sketch from “Real Terminals in Electron with node-pty”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "number-five-on-product-hunt": {
-    "title": "Nº 5 Product of the Day: How Our First Product Hunt Launch Went",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/number-five-on-product-hunt/hero.png",
-      "alt": "Illustration: Nº 5 Product of the Day: How Our First Product Hunt Launch Went",
-      "prompt": "Hero image for a blog post titled \"Nº 5 Product of the Day: Our Product Hunt Launch, by the Numbers\". The post is about: Munder Difflin finished #5 Product of the Day on Product Hunt — ahead of DeepSeek's harness launch that day. Here's what actually happened: the numbers, the people who showed up, and the two pieces of feedback we're already shipping fixes for.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/number-five-on-product-hunt/note-1.png",
-        "alt": "Hand-drawn sketch from “Nº 5 Product of the Day: How Our First Product Hunt Launch Went”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/number-five-on-product-hunt/note-2.png",
-        "alt": "Hand-drawn sketch from “Nº 5 Product of the Day: How Our First Product Hunt Launch Went”",
         "prompt": "",
         "status": "ready"
       }
@@ -2465,56 +1778,6 @@
     },
     "youtube": []
   },
-  "omniagent-alternatives": {
-    "title": "OmniAgent Alternatives: What to Use Instead of Databricks Omnigent",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/omniagent-alternatives/hero.png",
-      "alt": "Hand drawn sketch: two agents at their desks and a yellow character handing work to a todo, doing, done board, labelled one harness, many agents",
-      "prompt": "Code drawn (media-src spec.js, fleet archetype), founder choice 14 Sep 2026.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/omniagent-alternatives/note-1.png",
-        "alt": "Hand drawn sketch: two agents working at their own desks",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/omniagent-alternatives/note-2.png",
-        "alt": "Hand drawn sketch: a todo, doing, done board with task cards",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "one-prompt-automated-pr-review": {
-    "title": "One Prompt, Five PR Reviews, and an Hourly Automation — A Dogfooding Story",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/one-prompt-automated-pr-review/hero.png",
-      "alt": "Illustration: One Prompt, Five PR Reviews, and an Hourly Automation — A Dogfooding Story",
-      "prompt": "Hero image for a blog post titled \"One Prompt, Five PR Reviews, and an Hourly Automation — A Dogfooding Story\". The post is about: How a single prompt to the Munder Difflin god agent reviewed all open PRs and set up a recurring hourly PR reviewer — while the repo was blowing up with 400+ stars.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/one-prompt-automated-pr-review/note-1.png",
-        "alt": "Hand-drawn sketch from “One Prompt, Five PR Reviews, and an Hourly Automation — A Dogfooding Story”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/one-prompt-automated-pr-review/note-2.png",
-        "alt": "Hand-drawn sketch from “One Prompt, Five PR Reviews, and an Hourly Automation — A Dogfooding Story”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "open-source-ai-tools-on-purpose": {
     "title": "Building AI Dev Tools in the Open, On Purpose",
     "category": "concepts",
@@ -2534,31 +1797,6 @@
       "note-2": {
         "file": "assets/media/open-source-ai-tools-on-purpose/note-2.png",
         "alt": "Hand-drawn sketch from “Building AI Dev Tools in the Open, On Purpose”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "orca-vs-munder-difflin": {
-    "title": "Orca vs Munder Difflin: Agent IDE or Agent Office?",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/orca-vs-munder-difflin/hero.png",
-      "alt": "Illustration: Orca vs Munder Difflin: Agent IDE or Agent Office?",
-      "prompt": "Hero image for a blog post titled \"Orca vs Munder Difflin: Agent IDE or Agent Office?\". The post is about: Orca is a YC-backed Agent IDE for driving coding agents side by side in isolated worktrees. Munder Difflin is an agent office that runs itself. An honest comparison of the two — and when each one is the right pick.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/orca-vs-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “Orca vs Munder Difflin: Agent IDE or Agent Office?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/orca-vs-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “Orca vs Munder Difflin: Agent IDE or Agent Office?”",
         "prompt": "",
         "status": "ready"
       }
@@ -2609,31 +1847,6 @@
       "note-2": {
         "file": "assets/media/prompt-caching-for-ai-agents/note-2.png",
         "alt": "Hand-drawn sketch from “Prompt Caching for AI Agents: Stop Paying for the Same Tokens Twice”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "qm-vs-munder-difflin": {
-    "title": "qm vs Munder Difflin: YC's Multiplayer Harness or a Local-First Agent Office?",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/qm-vs-munder-difflin/hero.png",
-      "alt": "Illustration: qm vs Munder Difflin: YC's Multiplayer Harness or a Local-First Agent Office?",
-      "prompt": "Hero image for a blog post titled \"qm vs Munder Difflin: YC's Multiplayer Harness or a Local-First Agent Office?\". The post is about: An honest comparison of YC's qm and Munder Difflin: both orchestrate fleets of CLI coding agents with security postures, scheduled background work, and Slack — one as a headless multiplayer harness for teams, one as a local-first desktop office with real terminals, voice, and a built-in IDE.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/qm-vs-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “qm vs Munder Difflin: YC's Multiplayer Harness or a Local-First Agent Office?”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/qm-vs-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “qm vs Munder Difflin: YC's Multiplayer Harness or a Local-First Agent Office?”",
         "prompt": "",
         "status": "ready"
       }
@@ -2759,31 +1972,6 @@
       "note-2": {
         "file": "assets/media/run-a-release-train-with-agents/note-2.png",
         "alt": "Hand-drawn sketch from “Run a Release Train with Agents”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "run-ai-agent-hive-from-slack-setup": {
-    "title": "Run Your AI Agent Hive from Slack: The Complete Setup",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/run-ai-agent-hive-from-slack-setup/hero.png",
-      "alt": "Illustration: Run Your AI Agent Hive from Slack: The Complete Setup",
-      "prompt": "Hero image for a blog post titled \"Run Your AI Agent Hive from Slack: The Complete Setup\". The post is about: Step-by-step setup for driving Munder Difflin's AI agent hive from Slack: create the app, set scopes, paste the tunnel Request URL, and @mention your bot to start work — done-summaries post back in-thread.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/run-ai-agent-hive-from-slack-setup/note-1.png",
-        "alt": "Hand-drawn sketch from “Run Your AI Agent Hive from Slack: The Complete Setup”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/run-ai-agent-hive-from-slack-setup/note-2.png",
-        "alt": "Hand-drawn sketch from “Run Your AI Agent Hive from Slack: The Complete Setup”",
         "prompt": "",
         "status": "ready"
       }
@@ -2934,37 +2122,6 @@
       "note-2": {
         "file": "assets/media/semantic-memory-for-ai-agents/note-2.png",
         "alt": "Hand-drawn sketch from “Semantic Memory for AI Agents: Recall in Milliseconds”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "seven-releases-in-eight-days": {
-    "title": "Seven Releases in Eight Days: 0.3.8 → 0.4.4",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/seven-releases-in-eight-days/hero.png",
-      "alt": "Illustration: Seven Releases in Eight Days: 0.3.8 → 0.4.4",
-      "prompt": "Hero image for a blog post titled \"Seven Releases in Eight Days: 0.3.8 → 0.4.4\". The post is about: Between August 11 and August 18 we shipped seven releases: memory condensation that finally works, an update checker, a whole new brand, a public telemetry contract, ten engines named honestly, and the Windows fix. The full tour.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/seven-releases-in-eight-days/note-1.png",
-        "alt": "Hand-drawn sketch from “Seven Releases in Eight Days: 0.3.8 → 0.4.4”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/seven-releases-in-eight-days/note-2.png",
-        "alt": "Hand-drawn sketch from “Seven Releases in Eight Days: 0.3.8 → 0.4.4”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-3": {
-        "file": "assets/media/seven-releases-in-eight-days/note-3.png",
-        "alt": "Hand-drawn sketch from “Seven Releases in Eight Days: 0.3.8 → 0.4.4”",
         "prompt": "",
         "status": "ready"
       }
@@ -3221,81 +2378,6 @@
     },
     "youtube": []
   },
-  "tmux-and-scripts-vs-an-agent-harness": {
-    "title": "Running Agents in tmux vs an Agent Harness",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/tmux-and-scripts-vs-an-agent-harness/hero.png",
-      "alt": "Illustration: Running Agents in tmux vs an Agent Harness",
-      "prompt": "Hero image for a blog post titled \"Running Agents in tmux vs an Agent Harness\". The post is about: tmux panes, git worktrees, shell scripts, and cron will absolutely run several Claude Code sessions at once. Here's what that DIY setup does well, where it breaks at scale, and what a purpose-built agent harness automates.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/tmux-and-scripts-vs-an-agent-harness/note-1.png",
-        "alt": "Hand-drawn sketch from “Running Agents in tmux vs an Agent Harness”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/tmux-and-scripts-vs-an-agent-harness/note-2.png",
-        "alt": "Hand-drawn sketch from “Running Agents in tmux vs an Agent Harness”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "trigger-ai-agents-from-github-webhook": {
-    "title": "How to Trigger Your AI Agent Hive from a GitHub Webhook",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/trigger-ai-agents-from-github-webhook/hero.png",
-      "alt": "Illustration: How to Trigger Your AI Agent Hive from a GitHub Webhook",
-      "prompt": "Hero image for a blog post titled \"How to Trigger Your AI Agent Hive from a GitHub Webhook\". The post is about: Wire a GitHub webhook to Munder Difflin: a secret-gated local endpoint turns each repo event into a task for your GOD orchestrator — POST a message, get a token, poll the result. No server to host.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/trigger-ai-agents-from-github-webhook/note-1.png",
-        "alt": "Hand-drawn sketch from “How to Trigger Your AI Agent Hive from a GitHub Webhook”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/trigger-ai-agents-from-github-webhook/note-2.png",
-        "alt": "Hand-drawn sketch from “How to Trigger Your AI Agent Hive from a GitHub Webhook”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "trigger-ai-agents-from-slack": {
-    "title": "Trigger Your AI Agent Hive from Slack",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/trigger-ai-agents-from-slack/hero.png",
-      "alt": "Illustration: Trigger Your AI Agent Hive from Slack",
-      "prompt": "Hero image for a blog post titled \"Trigger Your AI Agent Hive from Slack\". The post is about: Trigger an AI agent hive from Slack: a local webhook verifies each message and drops it into your orchestrator's queue as a task — no server to host.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/trigger-ai-agents-from-slack/note-1.png",
-        "alt": "Hand-drawn sketch from “Trigger Your AI Agent Hive from Slack”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/trigger-ai-agents-from-slack/note-2.png",
-        "alt": "Hand-drawn sketch from “Trigger Your AI Agent Hive from Slack”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "turn-feedback-into-a-backlog-with-agents": {
     "title": "Turn a Firehose of Feedback into a Backlog with Agents",
     "category": "use-cases",
@@ -3315,31 +2397,6 @@
       "note-2": {
         "file": "assets/media/turn-feedback-into-a-backlog-with-agents/note-2.png",
         "alt": "Hand-drawn sketch from “Turn a Firehose of Feedback into a Backlog with Agents”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "vibe-kanban-alternative": {
-    "title": "A vibe-kanban Alternative for Coordinating AI Agents",
-    "category": "comparisons",
-    "hero": {
-      "file": "assets/media/vibe-kanban-alternative/hero.png",
-      "alt": "Illustration: A vibe-kanban Alternative for Coordinating AI Agents",
-      "prompt": "Hero image for a blog post titled \"A vibe-kanban Alternative for Coordinating AI Agents\". The post is about: vibe-kanban gives you a board to assign tasks to coding agents. When a self-routing hive is the better vibe-kanban alternative — and when a board wins.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/vibe-kanban-alternative/note-1.png",
-        "alt": "Hand-drawn sketch from “A vibe-kanban Alternative for Coordinating AI Agents”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/vibe-kanban-alternative/note-2.png",
-        "alt": "Hand-drawn sketch from “A vibe-kanban Alternative for Coordinating AI Agents”",
         "prompt": "",
         "status": "ready"
       }
@@ -3390,31 +2447,6 @@
       "note-2": {
         "file": "assets/media/voice-as-a-control-plane-for-agent-fleets/note-2.png",
         "alt": "Hand-drawn sketch from “Voice Is a Control Plane, Not a Gimmick”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "we-opened-a-discord": {
-    "title": "We Opened a Discord (Merge a PR, Become Employee of the Month)",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/we-opened-a-discord/hero.png",
-      "alt": "Illustration: We Opened a Discord (Merge a PR, Become Employee of the Month)",
-      "prompt": "Hero image for a blog post titled \"We Opened a Discord (Merge a PR, Become Employee of the Month)\". The post is about: Munder Difflin has a Discord now. Come watch releases land, get help with your floor, and earn the most thematically necessary contributor role in open source.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/we-opened-a-discord/note-1.png",
-        "alt": "Hand-drawn sketch from “We Opened a Discord (Merge a PR, Become Employee of the Month)”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/we-opened-a-discord/note-2.png",
-        "alt": "Hand-drawn sketch from “We Opened a Discord (Merge a PR, Become Employee of the Month)”",
         "prompt": "",
         "status": "ready"
       }
@@ -3596,31 +2628,6 @@
     },
     "youtube": []
   },
-  "what-reddit-told-us-about-munder-difflin": {
-    "title": "What Reddit Told Us About Munder Difflin",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/what-reddit-told-us-about-munder-difflin/hero.png",
-      "alt": "Illustration: What Reddit Told Us About Munder Difflin",
-      "prompt": "Hero image for a blog post titled \"What 516 Reddit Comments Told Us About Munder Difflin\". The post is about: We launched across ten subreddits, collected 2,233 combined upvotes and 516 comments, and then read every single one. What landed, what got roasted, and what we shipped because of it.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/what-reddit-told-us-about-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “What Reddit Told Us About Munder Difflin”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/what-reddit-told-us-about-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “What Reddit Told Us About Munder Difflin”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
   "whats-new-in-agentic-ai-june-2026": {
     "title": "What's New in Agentic AI: A June 2026 Field Guide",
     "category": "guides",
@@ -3640,31 +2647,6 @@
       "note-2": {
         "file": "assets/media/whats-new-in-agentic-ai-june-2026/note-2.png",
         "alt": "Hand-drawn sketch from “What's New in Agentic AI: A June 2026 Field Guide”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "whats-up-with-munder-difflin": {
-    "title": "What's Up With Munder Difflin: Six Weeks, Four Releases, and the Part of the Stack You Actually Own",
-    "category": "story",
-    "hero": {
-      "file": "assets/media/whats-up-with-munder-difflin/hero.png",
-      "alt": "Illustration: What's Up With Munder Difflin: Six Weeks, Four Releases, and the Part of the Stack You Actually Own",
-      "prompt": "Hero image for a blog post titled \"What's Up With Munder Difflin: Six Weeks, Four Releases, and the Part of the Stack You Actually Own\". The post is about: Everything that shipped between v0.3.3 and v0.3.7 — a Michael who knows the floor and runs the app by voice, a git time-machine in the IDE, nine agent engines, a queue that respects your draft, Node that installs itself, and the auto-update bug that had been silently broken since the day we shipped it.",
-      "status": "ready"
-    },
-    "inline": {
-      "note-1": {
-        "file": "assets/media/whats-up-with-munder-difflin/note-1.png",
-        "alt": "Hand-drawn sketch from “What's Up With Munder Difflin: Six Weeks, Four Releases, and the Part of the Stack You Actually Own”",
-        "prompt": "",
-        "status": "ready"
-      },
-      "note-2": {
-        "file": "assets/media/whats-up-with-munder-difflin/note-2.png",
-        "alt": "Hand-drawn sketch from “What's Up With Munder Difflin: Six Weeks, Four Releases, and the Part of the Stack You Actually Own”",
         "prompt": "",
         "status": "ready"
       }
@@ -3815,218 +2797,6 @@
       "note-2": {
         "file": "assets/media/why-we-built-munder-difflin/note-2.png",
         "alt": "Hand-drawn sketch from “Why We Built Munder Difflin”",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": []
-  },
-  "your-first-hour-with-munder-difflin": {
-    "title": "Your First Hour With Munder Difflin: Onboarding to a Pro Office",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/your-first-hour-with-munder-difflin/hero.png",
-      "alt": "Michael, the orchestrator, in the Pro app after dispatching four tasks to his agents",
-      "prompt": "",
-      "status": "ready"
-    },
-    "inline": {
-      "a1-landing": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/a1-landing.png",
-        "alt": "The top of munderdiffl.in with the Download free button",
-        "prompt": "",
-        "status": "ready"
-      },
-      "a3-download": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/a3-download.png",
-        "alt": "The Munder Difflin 0.5.2 download card with macOS, Windows and Linux builds",
-        "prompt": "",
-        "status": "ready"
-      },
-      "b1-terminal": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/b1-terminal.png",
-        "alt": "A terminal installing Claude Code, Codex and OpenCode with npm, then printing each version",
-        "prompt": "",
-        "status": "ready"
-      },
-      "b2-prerequisites": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/b2-prerequisites.png",
-        "alt": "Settings, Prerequisites in Munder Difflin listing agent engines, with Claude Code, Codex and OpenCode marked Found",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c1-entry": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c1-entry.png",
-        "alt": "The first onboarding step, How are you using Munder Difflin, with On my own selected",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c2-signin": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c2-signin.png",
-        "alt": "The Sign in to continue step with a box to paste the code from the browser",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c4-orchestrator": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c4-orchestrator.png",
-        "alt": "The Meet your orchestrator step: Michael on Claude Code, marked Installed, with Opus 4.8 1M",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c5-engines": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c5-engines.png",
-        "alt": "The orchestrator engine list open, from Claude Code and Codex down to OpenCode, Pi, Copilot and Cursor",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c7-paywall": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c7-paywall.png",
-        "alt": "The Go PRO on this machine screen listing what Pro adds, with Continue with the free version, I have a licence key and Get PRO",
-        "prompt": "",
-        "status": "ready"
-      },
-      "c8-license": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/c8-license.png",
-        "alt": "The Enter your license key screen with an empty key field and an Activate button",
-        "prompt": "",
-        "status": "ready"
-      },
-      "d2-agents": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/d2-agents.png",
-        "alt": "The Pro Agents screen with Michael's budget and breaker cards above Jim, Dwight, Angela on Codex and Oscar on OpenCode",
-        "prompt": "",
-        "status": "ready"
-      },
-      "d3-add-agent": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/d3-add-agent.png",
-        "alt": "Add an agent: the Provider list, Model set to Sonnet 5, the exact command, and Token cap chips with 800k chosen",
-        "prompt": "",
-        "status": "ready"
-      },
-      "d4-agent": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/d4-agent.png",
-        "alt": "Jim's agent room: a live Claude Code terminal reviewing a change, with an 800k token cap in force on the right",
-        "prompt": "",
-        "status": "ready"
-      },
-      "e1-pr-sweep": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/e1-pr-sweep.png",
-        "alt": "A scheduled automation named PR review sweep, every 30 minutes, sent to Jim",
-        "prompt": "",
-        "status": "ready"
-      },
-      "h3-slack": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/h3-slack.png",
-        "alt": "The Slack card in Settings, Connections with the bot token field, required scopes and the three ways Slack reaches the office",
-        "prompt": "",
-        "status": "ready"
-      },
-      "e2-morning-brief": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/e2-morning-brief.png",
-        "alt": "A weekly automation named Morning brief, Monday to Friday at 08:30, asking a Claude Code agent to use the Gmail and Google Calendar connectors",
-        "prompt": "",
-        "status": "ready"
-      },
-      "e7-connectors": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/e7-connectors.png",
-        "alt": "The /mcp list in a Claude Code agent's terminal showing claude.ai Gmail and Google Calendar connected",
-        "prompt": "",
-        "status": "ready"
-      },
-      "e4-automations": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/e4-automations.png",
-        "alt": "The Automations list with PR review sweep, Morning brief, Blog writer and the default automations",
-        "prompt": "",
-        "status": "ready"
-      },
-      "e5-webhook": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/e5-webhook.png",
-        "alt": "A webhook endpoint sheet: name, endpoint, secret, strict gate, standing prompt, security warning switch and payload schema",
-        "prompt": "",
-        "status": "ready"
-      },
-      "f1-tasks": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/f1-tasks.png",
-        "alt": "The Pro Tasks board with cards in To do, Doing, Blocked and Done",
-        "prompt": "",
-        "status": "ready"
-      },
-      "f2-inbox": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/f2-inbox.png",
-        "alt": "The Pro Inbox with For you, Your team, Everyone and Outside, showing Dwight's done message",
-        "prompt": "",
-        "status": "ready"
-      },
-      "f4-memory": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/f4-memory.png",
-        "alt": "Memory search results for test, grouped as Tickets, Agents and Memories, across everyone's memory",
-        "prompt": "",
-        "status": "ready"
-      },
-      "f5-capabilities": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/f5-capabilities.png",
-        "alt": "The Capabilities marketplace, a curated catalog with Skills, MCP, Engines and Plugins filters",
-        "prompt": "",
-        "status": "ready"
-      },
-      "f8-voice": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/f8-voice.png",
-        "alt": "Settings, Voice: Free Flow dictation with a Groq API key field, and Realtime Michael with an OpenAI API key field",
-        "prompt": "",
-        "status": "ready"
-      },
-      "g1-stapler": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/g1-stapler.png",
-        "alt": "The Stapler screen with the stapler on screen and its face, shape, expression, size and colour settings",
-        "prompt": "",
-        "status": "ready"
-      },
-      "g3-ring": {
-        "file": "assets/media/your-first-hour-with-munder-difflin/g3-ring.png",
-        "alt": "The floating Stapler with its action ring open",
-        "prompt": "",
-        "status": "ready"
-      }
-    },
-    "youtube": [
-      {
-        "id": "",
-        "title": "Your first hour with Munder Difflin — full walkthrough",
-        "status": "placeholder"
-      }
-    ]
-  },
-  "connect-slack-to-munder-difflin": {
-    "title": "How to Connect Slack to Munder Difflin 0.5.2",
-    "category": "guides",
-    "hero": {
-      "file": "assets/media/connect-slack-to-munder-difflin/hero.png",
-      "alt": "The Slack card in Munder Difflin 0.5.2 settings, with the bot token field, required scopes and Test connection",
-      "prompt": "",
-      "status": "ready"
-    },
-    "inline": {
-      "modes": {
-        "file": "assets/media/connect-slack-to-munder-difflin/modes.png",
-        "alt": "How Slack reaches the office: Check for messages, Stay connected and Let Slack call the office, with Check every and Channel ID",
-        "prompt": "",
-        "status": "ready"
-      },
-      "steps": {
-        "file": "assets/media/connect-slack-to-munder-difflin/steps.png",
-        "alt": "The in app connect steps for Check for messages",
-        "prompt": "",
-        "status": "ready"
-      },
-      "who": {
-        "file": "assets/media/connect-slack-to-munder-difflin/who.png",
-        "alt": "The Who answers inbound messages list with Michael recommended",
-        "prompt": "",
-        "status": "ready"
-      },
-      "stay": {
-        "file": "assets/media/connect-slack-to-munder-difflin/stay.png",
-        "alt": "The Slack card set to Stay connected, with Bot token and App token fields and Catch up every",
         "prompt": "",
         "status": "ready"
       }

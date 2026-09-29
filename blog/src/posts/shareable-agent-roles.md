@@ -119,7 +119,7 @@ It also fits the broader bet behind Munder Difflin: **local-first, open-source, 
 
 The fastest way to feel the idea is to use it. Open [The Hiring Fair](https://munderdiffl.in/hires/), pick a role that matches something on your plate, flip it to your provider, and hire it — then read every field in the modal before you spawn, because that review step is the whole point.
 
-- [Launching Munder Difflin v0.2.8: Shareable Hires](/blog/launching-munder-difflin-v0-2-8/) — the release.
+- Launching Munder Difflin v0.2.8: Shareable Hires — the release.
 - [The hire manifest as untrusted input](/blog/hire-manifest-untrusted-input/) — the security deep-dive on the trust model.
 - [Inside the GOD orchestrator](/blog/how-the-god-orchestrator-works/) — who coordinates the roles you hire.
 - [The clone army trap](/blog/the-clone-army-trap-mixed-swarm-vs-identical-agents/) — why a *mix* of well-chosen roles beats ten identical agents.

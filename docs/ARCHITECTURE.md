@@ -118,10 +118,10 @@ src/
     assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)
 resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarded to the broker
-docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime), `logo.png`, `banner.png`
+docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime)
 docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
                              (the old project's website files still here are tracked for removal in TODOS.md)
-docs/media/                  `og.png` (social previews) + rendered Remotion clips
+docs/media/                  media the README embeds (see docs/media/README.md)
 landing-remotion/            Remotion project that renders the landing page's "how it works" clips
 HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 docs/message-queue.md        who may type into an agent's terminal, and when

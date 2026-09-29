@@ -115,7 +115,7 @@ subscriptions you already pay for and within their normal usage limits.
   track of them.
 - [How to give Claude Code long term memory](/blog/give-claude-code-long-term-memory/) so the team stops
   forgetting.
-- [The best tools to run multiple Claude Code agents](/blog/best-claude-code-multi-agent-tools/), compared.
+- The best tools to run multiple Claude Code agents, compared.
 
 ---
 

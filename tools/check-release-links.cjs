@@ -19,8 +19,7 @@
  * page even claimed the opposite ("stays correct across versions").
  *
  * Two modes:
- *   (default) offline — every advertised version string matches package.json,
- *             except the website fallback, which may be newer (see rule 3).
+ *   (default) offline — every advertised version string matches package.json.
  *             Run this BEFORE tagging, when the assets do not exist yet.
  *   --live    also HEADs each URL and requires 200. Run this AFTER publishing
  *             the release, which is the only moment the answer is meaningful.
@@ -34,13 +33,6 @@ const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf
 const releaseMd = fs.readFileSync(path.join(root, 'RELEASE.md'), 'utf8');
 
 const problems = [];
-
-// -1, 0 or 1 for plain x.y.z strings, which is all these files ever carry.
-function compareVersions(a, b) {
-  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
-  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
-  return 0;
-}
 
 // — 1. every pinned artifact name must carry the current version —
 const assetRe = /Dont-Be-Michael-(\d+\.\d+\.\d+)-([^\s`)]+)/g;
@@ -60,40 +52,6 @@ for (const m of releaseMd.matchAll(/archive\/refs\/tags\/v(\d+\.\d+\.\d+)/g)) {
   }
 }
 
-// — 3. the website's direct download version —
-//   The site links straight to files on its own release host (BASE in
-//   docs/index.html), and that host can ship ahead of main: 0.5.2 went out as
-//   binaries while package.json on main stayed at 0.4.6, and this rule turned
-//   every PR red for a site that was correct. So a NEWER fallback is allowed and
-//   an OLDER one is still stale. --live proves the newer files really exist.
-const indexHtml = path.join(root, 'docs/index.html');
-const siteAssets = [];
-if (fs.existsSync(indexHtml)) {
-  const html = fs.readFileSync(indexHtml, 'utf8');
-  const m = /var REL = '(\d+\.\d+\.\d+)'/.exec(html);
-  if (m && compareVersions(m[1], version) < 0) {
-    problems.push(`docs/index.html download fallback is ${m[1]}, older than package.json ${version}`);
-  }
-  const base = /var BASE = '([^']+)'/.exec(html);
-  if (m && base) {
-    for (const f of html.matchAll(/'Dont-Be-Michael-' \+ REL \+ '([^']+)'/g)) {
-      siteAssets.push(`${base[1]}Dont-Be-Michael-${m[1]}${f[1]}`);
-    }
-  }
-}
-
-// — 4. llms.txt, which advertises the current version to crawlers and LLMs —
-//   Added in 0.4.3: this file sat at 0.4.1 for two releases while the checker
-//   stayed green, because nothing was watching it.
-const llms = path.join(root, 'docs/llms.txt');
-if (fs.existsSync(llms)) {
-  const m = /Current version:\s*(\d+\.\d+\.\d+)/.exec(fs.readFileSync(llms, 'utf8'));
-  if (!m) problems.push('docs/llms.txt no longer states "Current version: x.y.z" — did the line move?');
-  else if (m[1] !== version) {
-    problems.push(`docs/llms.txt says current version ${m[1]}, package.json says ${version}`);
-  }
-}
-
 async function head(url, label) {
   let status = 0;
   try {
@@ -110,7 +68,6 @@ async function head(url, label) {
 async function checkLive() {
   const base = 'https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/';
   for (const name of [...assets, 'SHA256SUMS.txt']) await head(base + name, name);
-  for (const url of siteAssets) await head(url, url);
 }
 
 (async () => {
@@ -121,7 +78,7 @@ async function checkLive() {
   if (problems.length) {
     console.error(`\n✗ release links are wrong (${problems.length}):`);
     for (const p of problems) console.error(`  - ${p}`);
-    console.error('\nFix RELEASE.md / docs/index.html / docs/llms.txt to match package.json before releasing.');
+    console.error('\nFix RELEASE.md to match package.json before releasing.');
     process.exit(1);
   }
   console.log(`✓ release links consistent at v${version}`);

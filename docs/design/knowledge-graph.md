@@ -1,206 +1,194 @@
-# Knowledge Graph — Enterprise Multimodal Context for Agents (Design, v1)
+# Company knowledge (the `kg` store)
 
-**Feature:** Knowledge Graph (enterprise context store + agent access)
-**Branch:** `feat/knowledge-graph` · **Author:** Stanley · **Status:** design + v1 vertical slice in this pass
-**Flag:** `knowledgeGraph.enabled` (default **OFF** — zero behaviour change when off)
+**Config:** `knowledgeGraph` (`{ enabled, rootPath? }`), **on by default** since 2026-09-25.
+Existing installs are switched on once at launch (`knowledgeOnSeeded`, in `migrateBusinessFolder`).
+**Code:** `src/main/kg-core.cjs` (store, shared by everything), `resources/kg.cjs` (agent CLI),
+`src/main/knowledge.ts` (`KnowledgeManager`), `src/main/docText.ts` (file to text),
+`src/main/memory.ts` (search by meaning), `companyKnowledgeLine` in `src/main/hive.ts` (what agents are told).
+**Tests:** `test/kg-core.test.cjs`, `test/doc-text.test.cjs`.
 
-> **Naming note.** This is *not* `MEMORY_GRAPH_SPEC.md` (Jim's hive **message-graph visualization** — a renderer panel that draws who-talks-to-whom). This feature is the **enterprise knowledge store**: the user/enterprise adds multimodal artifacts (docs, PDFs, images, sheets, code, markdown…) that represent their context and business logic, and agents on the floor get a **CLI tool** to query that knowledge on demand. The two share no code. Config key here is `knowledgeGraph`; the manager class is `KnowledgeManager` and the agent CLI is `kg`.
-
----
-
-## 1. Goal & shape
-
-Give every agent on the floor on-demand access to the enterprise's own context — so a task like *"draft the onboarding email in our house style"* or *"what's our refund policy?"* can be answered from the company's real documents instead of guessed.
-
-Two halves:
-
-1. **Ingest → store (in-app):** the user adds files. The main process parses/extracts text per modality, chunks it, and writes it to a local file-backed store. The renderer manages the corpus (toggle on, add files, see counts).
-2. **Retrieve (agent-facing):** a spawned agent runs `kg search "<query>"` via Bash and gets back ranked, source-attributed snippets it can act on — exactly the way the hive already exposes **MemPalace** (`mempalace search "<query>"`).
-
-It is **read-mostly** for agents (they query; they do not write the corpus) and **opt-in** for the user (flag default off). It must never change harness behaviour when the flag is off.
+> **Naming.** This is not `MEMORY_GRAPH_SPEC.md`, which is the message graph view. This is
+> the company knowledge store: documents the owner adds (policies, rules, prices, locations,
+> how the business works) that every agent, Michael included, searches before relying on
+> memory or the internet. Config key `knowledgeGraph`, manager `KnowledgeManager`, CLI `kg`.
 
 ---
 
-## 2. Why these choices (the three load-bearing decisions)
+## 1. Shape
 
-### 2.1 Access mechanism — **CLI via Bash**, not MCP, not a built-in tool, not a skill file
+1. **Ingest (in app).** The owner adds files in Settings. Main converts each one to text
+   (`docText.ts`), chunks it and writes it to a local, file backed store (`kg-core.cjs`).
+2. **Retrieve (agents).** Agents search it two ways from their shell:
+   - **exact words:** `node kg.cjs search "<words>"`, keyword scoring over the store;
+   - **by meaning:** MemPalace, `search "<question>" --wing company`, when MemPalace is installed.
+     It finds passages that say the same thing in other words, and each hit carries the document id.
 
-| Option | Verdict |
-|---|---|
-| **CLI invoked via Bash** ✅ | This is the **established hive pattern**: MemPalace is surfaced to agents as `mempalace search …` documented in the injected system prompt (`hive.ts injectedPrompt`), with paths passed as spawn env. It is **provider-agnostic** — Claude, Codex, and Antigravity agents all have a shell, so all of them can query KG with zero per-provider work. No per-agent `settings.json`, no server handshake, no SDK. Mirrors the existing `md-slack-reply.cjs` helper (a bundled pure-JS `.cjs` that agents call as `node "<path>" …`). |
-| MCP server | Rejected for v1. Heaviest option: requires writing/merging an MCP server config into **every** agent's Claude settings, a running stdio/SSE transport, and is Claude-specific (Codex/Antigravity agents wouldn't get it). Real value only once we need typed tool schemas or streaming — a clean **v2** upgrade that can sit *behind the same `kg` CLI contract*. |
-| Built-in Claude tool | Not available to us — we don't control the model's tool set except via MCP. |
-| Skill file (`.claude/skills/…`) | Viable, but it's just documentation pointing at a CLI anyway, and it's Claude-only. We instead document the CLI in the injected system prompt (one flag-gated line) — same effect, provider-agnostic, and consistent with how MemPalace is taught. A skill can be added later as sugar. |
-
-**Decision:** ship a small **`kg` CLI** (pure-JS `.cjs`, no native deps) in `resources/`, injected into agents via env (`KG_CLI`, `KG_ROOT`) and taught via one flag-gated line in the injected system prompt. MCP is the documented v2.
-
-### 2.2 Retrieval — **keyword (BM25-ish term scoring)**, not embeddings, for v1
-
-The dispatch says *pick the simplest that works*. Embeddings would need a model + vector index + a new heavy dependency (and an embedding service the offline app can't assume). Keyword search over chunked text is:
-
-- **Zero new deps** — pure string tokenization + term-frequency scoring with a title boost and exact-phrase bonus. Deterministic and trivially unit-testable.
-- **Good enough** for a v1 enterprise corpus (policies, templates, specs, code) where users search with the literal vocabulary of their own documents.
-- **Forward-compatible** — the agent contract is `kg search "<q>"`; swapping the index implementation (FTS5, then embeddings) is invisible to agents. See §8.
-
-**Decision:** keyword scoring in v1. **SQLite FTS5** (BM25, ships free with the existing `better-sqlite3` dep) is the documented next step; **embeddings** (via MemPalace's existing local embedder, or a small model) is the v2 after that.
-
-### 2.3 Store — **file-backed** (`index.jsonl` + per-doc folders), not SQLite, for v1
-
-We deliberately do **not** put the v1 store in `better-sqlite3` even though it's an existing dep. Reason: **the agent CLI runs out-of-process under plain `node`**, while `better-sqlite3` is a **native module rebuilt for Electron's ABI** (`electron-rebuild -f`). A standalone `node tools/kg.cjs` opening that `.node` binary would hit an ABI/loader mismatch on user machines. A file-backed store the CLI reads with only `node:fs` sidesteps this entirely — and it's consistent with how the hive already works (agents read `memory.md`, `tasks.json`, `inbox/*` as plain files). The in-app management UI reads the same files over IPC.
-
-> This is the same robustness reason `md-slack-reply.cjs` talks to a loopback endpoint instead of touching the DB directly. FTS5 (§8) becomes viable for agents the day we front it with an in-app loopback query endpoint — listed as v2.
+Agents only read the store. Only the owner adds or removes documents.
 
 ---
 
-## 3. Data model
+## 2. Why these choices
 
-### 3.1 On-disk layout
+### 2.1 Access: a CLI run from the shell, not MCP, not a skill
 
-`KG_ROOT` defaults to `<userData>/knowledge` (override via `knowledgeGraph.rootPath`). It is injected into agents as the `KG_ROOT` env var.
+- **Works for every engine.** Claude, Codex, Gemini, Crush and the rest all have a shell, so
+  one prompt line covers all of them with no per engine setup. This is the same pattern as
+  MemPalace and `md-slack-reply.cjs`.
+- **MCP was rejected** because it means writing a server entry into every agent's settings,
+  running a transport, and it only reaches engines that speak MCP. It could sit behind the same
+  store later without changing what agents are told.
+- **A skill file** would just be documentation pointing at the CLI, and only Claude reads skills.
+
+### 2.2 Store: plain files, not SQLite
+
+The CLI runs out of process under plain `node`. `better-sqlite3` is a native module rebuilt for
+Electron's ABI, so a plain `node` loading it fails on user machines. A store the CLI reads with
+only `node:fs` avoids that entirely, and matches how agents already read `memory.md`,
+`tasks.json` and inboxes as plain files. The app reads the same files over IPC.
+
+### 2.3 Search: keyword in the store, meaning through MemPalace
+
+Keyword scoring needs no dependencies, is deterministic and easy to test, and works well when
+people search with their own documents' words. Search by meaning reuses MemPalace, the local
+vector store the app already runs for agents' memory, instead of adding a second embedder.
+The agent contract (`search`, `list`, `get`) stays the same whichever index answers it.
+
+---
+
+## 3. On disk
+
+The store root is `<userData>/knowledge` unless `knowledgeGraph.rootPath` overrides it.
 
 ```
-<KG_ROOT>/
-  index.jsonl            # the search index — ONE JSON line per CHUNK
+<root>/
+  index.jsonl            # the keyword index: one JSON line per chunk
   docs/
     <docId>/
-      meta.json          # artifact metadata (see §3.3)
-      original.<ext>     # the raw artifact, copied in verbatim (images, PDFs, binaries…)
-      text.md            # the full extracted/normalized searchable text (for `kg get`)
+      meta.json          # document metadata
+      original.<ext>     # the file as added, kept byte for byte
+      text.md            # the full extracted text (what `kg get` prints)
+  meaning/
+    <docId>.md           # mirror for MemPalace: "Title:" and "Document id:" on top, then the text
 ```
 
-- **`index.jsonl`** is the hot path: append-only, one line per chunk, streamed and scored by `kg search`. Rebuildable from `docs/*/text.md` + `meta.json` at any time (a `kg reindex` is a trivial follow-up).
-- **`docs/<docId>/`** is the durable record of each artifact: the original bytes (so images/PDFs survive for future OCR/vision), the extracted text, and metadata. Removing a doc deletes its folder and filters its lines out of `index.jsonl`.
+- `index.jsonl` is rebuildable from `docs/*/text.md` and `meta.json`. Removing a document
+  deletes its folder and filters its lines out of the index.
+- `meaning/` is kept in step by `KnowledgeManager.meaningMirror()`: missing files written,
+  removed documents' files deleted. `MemoryManager` indexes it into the palace's `company`
+  wing, again only when the set of documents changes (a signature of the ids).
 
-### 3.2 Chunk record (one line of `index.jsonl`)
+**Chunk record** (one line of `index.jsonl`):
 
 ```jsonc
-{
-  "docId":   "k7f3…",      // stable id of the parent artifact
-  "title":   "Refund Policy 2026",
-  "source":  "refund-policy.md",   // original filename
-  "modality":"text",       // text | image | pdf | sheet | code | …
-  "chunkIdx": 0,           // 0-based position within the doc
-  "text":    "Customers may request a full refund within 30 days…"
-}
+{ "docId": "k7f3…", "title": "Refund Policy", "source": "refund-policy.docx",
+  "modality": "doc", "chunkIdx": 0, "text": "Customers may request a full refund within 30 days…" }
 ```
 
-### 3.3 Doc metadata (`meta.json`)
+**Document metadata** (`meta.json`): `id`, `title`, `source`, `modality`, `mime`, `origExt`,
+`bytes`, `tags`, `caption`, `chunkCount`, `addedAt`, `extractor` (which reader produced
+`text.md`, for provenance) and `truncated`.
 
-```jsonc
-{
-  "id":        "k7f3…",
-  "title":     "Refund Policy 2026",   // user-supplied or derived from filename/first heading
-  "source":    "refund-policy.md",
-  "modality":  "text",
-  "mime":      "text/markdown",
-  "origExt":   "md",
-  "bytes":     5120,
-  "tags":      ["policy", "support"],   // optional, user-supplied
-  "caption":   null,                    // images: user description folded into searchable text
-  "chunkCount":3,
-  "addedAt":   "2026-06-11T…Z",
-  "extractor": "text-utf8@1"            // which extractor produced text.md (provenance)
-}
-```
-
-This *is* the "graph" seed: `tags`, `modality`, and `source` are the edges a future graph view (or an embedding-cluster view) would draw on. v1 keeps it flat; the schema is forward-compatible with typed relations (§8).
+Document ids are generated by the app, never taken from a file name, so a hostile file name
+cannot write outside the store.
 
 ---
 
-## 4. Ingestion pipeline (per modality)
+## 4. Ingest: file to text
 
-`ingest(KG_ROOT, { srcPath, title?, tags?, caption?, modality? })`:
+`KnowledgeManager.ingestFile` runs `extractDocumentText` first. A file it cannot read is
+**refused with a plain reason**, never stored as junk (that is how a `.docx` once got indexed
+as zip bytes and reported success).
 
-1. **Detect modality** from extension/MIME (`detectModality`).
-2. **Copy** the raw artifact to `docs/<docId>/original.<ext>` (so nothing is lost).
-3. **Extract text** (`extractText`) per modality → `text.md`.
-4. **Chunk** the text (`chunkText`) into ~1.2 KB windows on paragraph/line boundaries with small overlap.
-5. **Append** one `index.jsonl` line per chunk; write `meta.json`.
-
-| Modality | v1 extraction | Status |
+| Kind | How it becomes text | `extractor` |
 |---|---|---|
-| **Markdown / text / code / CSV / JSON / YAML / logs** | Read UTF-8 verbatim (already text). Title from first `# heading` or filename. | ✅ **v1** |
-| **Images** (png/jpg/gif/webp/svg) | No OCR yet. Searchable text = `title + caption + tags + filename`. Original bytes stored for future vision/OCR. Demonstrates the multimodal data model end-to-end. | ✅ **v1** (metadata-level) |
-| **PDF** | Best-effort: shell out to `pdftotext` (poppler) **if present on PATH**; else store original + mark `extractor:"pending"` so a later pass can fill it in. No new bundled dep. | ⏳ follow-up (hook present) |
-| **Spreadsheets** (xlsx) | Flatten cells to CSV-like text. Needs a parser dep. | ⏳ follow-up |
-| **Office docs** (docx/pptx) | unzip + XML text extraction. | ⏳ follow-up |
-| **Image OCR / vision captions** | Run an OCR/vision pass over stored originals to enrich `text.md`. Originals are already retained for exactly this. | ⏳ follow-up |
+| Word, PowerPoint, Excel (`.docx`, `.pptx`, `.xlsx` and relatives) | read the XML inside the zip | `docx-xml@1`, `pptx-xml@1`, `xlsx-xml@1` |
+| PDF with a text layer | bundled PDF.js, no `pdftotext` needed | `pdfjs@1` |
+| Scanned PDF | macOS Vision OCR, first 50 pages (`MAX_OCR_PAGES`), with a note when cut short | `vision-ocr@1` |
+| Images | macOS Vision OCR; with no text found (or off macOS), kept and searchable by title, caption, tags and file name | `vision-ocr@1`, else `image-meta@1` |
+| `.doc`, `.rtf`, `.odt`, `.webarchive` | macOS `textutil` (Mac only; elsewhere the owner is asked to save as .docx or PDF) | |
+| Plain text, markdown, code, CSV, JSON and the like | read as UTF-8 by `kg-core` | |
+| Old `.xls` and similar | refused with advice on what to save it as | |
 
-**v1 ships 2 modalities end-to-end** (text-family + images), exactly as the dispatch suggested, with PDF wired as a best-effort hook and everything else listed as honest follow-up rather than half-built.
+Then `kg-core` copies the original, writes `text.md`, splits the text into about 1,200
+character chunks on paragraph and line boundaries (150 characters of overlap), and appends
+one index line per chunk.
+
+**Size limits:** files over 100 MB are refused. Text past 5 MB per document is left out of the
+index and the document is marked `truncated`.
 
 ---
 
-## 5. Retrieval (the `kg` CLI — agent-facing)
+## 5. Agents
 
-A pure-JS `.cjs` (`resources/kg.cjs`) using only `node:fs`/`node:path`. Resolved at spawn the same way as `md-slack-reply.cjs` and injected as `KG_CLI`; the store as `KG_ROOT`.
+### 5.1 The CLI
 
 ```
-kg search "<query>" [--limit N] [--json]   # ranked snippets (default human-readable)
-kg list                                     # all artifacts (title, modality, tags, id)
-kg get <docId>                              # full extracted text of one artifact
+kg search "<words>" [--limit N] [--json] [--root <dir>]   ranked passages (default 8)
+kg list   [--json] [--root <dir>]                         every document: title, kind, id, tags
+kg get <docId> [--json] [--root <dir>]                    one document's full text
+kg stats  [--json] [--root <dir>]                         document and chunk counts
 ```
 
-**Scoring (`scoreChunk`):** tokenize the query (lowercase, alphanumeric, drop stopwords); a chunk's score = Σ term-frequency over query terms, **+ title-match boost**, **+ exact-phrase bonus** when the full query substring appears. Rank desc, return top-K with `{ docId, title, source, modality, score, snippet }` where `snippet` is a window around the best match. Deterministic; no deps; same code path the in-app search uses, so results match.
+The store comes from `--root`, else `KG_ROOT`. `kg-core.cjs` is found through `KG_CORE`, then
+beside the CLI (packaged), then the repo layout (dev). With no store configured it prints one
+line and exits 0.
 
-**Empty/zero states:** flag off → CLI prints a one-line "Knowledge Graph is disabled" and exits 0; no results → "no matches".
+**Scoring (`scoreChunk`):** the query is lowercased and tokenized, stop words dropped. For each
+query term found in a chunk, add `1 + ln(1 + count)`; add 2 when the term is in the title; add
+0.5 per distinct term matched; add 5 when the whole query appears as written. Results come back
+highest first with a snippet around the first hit. The app's own search calls the same code, so
+results match what agents see.
 
-### 5.1 How the agent learns about it
+### 5.2 What agents are told
 
-One flag-gated line appended to the injected system prompt (`hive.ts injectedPrompt`), beside the MemPalace line, **volatile-free** (references the `$KG_CLI`/`$KG_ROOT` env vars, not interpolated absolute paths or counts — preserves the prompt-cache invariant):
+`companyKnowledgeLine` adds one `COMPANY KNOWLEDGE:` paragraph to the injected system prompt
+when the feature is on. It tells the agent to search the store before relying on memory or the
+internet, and to follow what it says. It gives:
 
-> *Enterprise knowledge: this org has a private knowledge base of its own documents, policies, and business context. When a task needs that context, run `node "$KG_CLI" search "<query>"` to retrieve relevant passages (use `kg list` to see what's available, `kg get <id>` for a full document). Prefer it over guessing about company-specific facts.*
+- the exact words search, `list` and `get` commands, with **absolute paths** to Node, the CLI and
+  `--root`. Environment variables are not used in the prompt, because `$KG_CLI` expands to
+  nothing under Windows `cmd.exe`, and bare `node` may not be on the agent's PATH;
+- the search by meaning command, with absolute paths to MemPalace and the palace, when MemPalace
+  is installed.
 
-The line only appears when `knowledgeGraph.enabled` is true (the manager's `active()`), so agents in a default install never see it.
+The same absolute paths also go into the spawn environment (`KG_ROOT`, `KG_CLI`, `KG_CORE`) for
+anything that wants them.
 
----
+### 5.3 Turning it on or off while agents run
 
-## 6. Where it plugs into the harness (all additive)
-
-Mirrors the MemPalace / Slack wiring 1:1 so it composes with existing code and other in-flight branches:
-
-| Layer | File | Change |
-|---|---|---|
-| **Core logic** | `src/main/kg-core.cjs` (NEW) | Pure-JS: `ingest`, `search`, `list`, `getDoc`, `removeDoc`, `detectModality`, `extractText`, `chunkText`, `tokenize`, `scoreChunk`. Shared by main, the CLI, and the test (same pattern as `slack-trigger.cjs`). |
-| **Agent CLI** | `resources/kg.cjs` (NEW) | Thin `node:fs` wrapper over `kg-core.cjs` exposing `search`/`list`/`get`. Added to `electron-builder.yml` `extraResources` + `tools/copy-main-assets.cjs` + `electron.vite.config.ts` sidecar copy. |
-| **Manager** | `src/main/knowledge.ts` (NEW) | `KnowledgeManager`: `active()`, `env()` (→`KG_CLI`,`KG_ROOT`), `ingestFile()`, `search()`, `list()`, `get()`, `remove()`, `status()`. `require()`s `kg-core.cjs` like `slack.ts` does its sidecar. |
-| **Config** | `src/main/config.ts` | Add `KnowledgeGraphConfig { enabled?; rootPath? }` + `knowledgeGraph?` on `HarnessConfig`; default `{ enabled: false }`. |
-| **Config mirror** | `src/renderer/src/store/config.ts`, `src/preload/index.d.ts` | Mirror the type (hand-mirrored, per repo convention). |
-| **Spawn** | `src/main/index.ts` (~1251), `src/main/hive.ts` (`ensureAgent`, `injectedPrompt`) | Pass `knowledgeGraph: knowledge.active()` into `ensureAgent`; merge `knowledge.env()` into spawn env; add the flag-gated `knowledgeLine`. |
-| **IPC** | `src/main/index.ts` | `kg:status`, `kg:list`, `kg:search`, `kg:ingestFiles`, `kg:get`, `kg:remove`. |
-| **Preload** | `src/preload/index.ts` (+`.d.ts`) | `window.cth.kgStatus/kgList/kgSearch/kgIngestFiles/kgGet/kgRemove`. |
-| **Settings UI** | `src/renderer/src/components/SettingsModal.tsx` | A "Knowledge Graph" section: enable toggle + doc count + "Add files…" (OS dialog) — minimal, mirrors the Slack/webhook blocks. |
-| **Tests** | `test/kg-core.test.cjs` (NEW) | `node test/kg-core.test.cjs` — tokenize/chunk/score + ingest→search round-trip over text + image fixtures (matches `test/slack.test.cjs` convention). |
-
-**Boundary discipline:** every edit to a shared file (`index.ts`, `preload`, `hive.ts`, `config.ts`, `SettingsModal.tsx`) is a self-contained additive block — no reordering, no reformatting of unrelated code — so it merges cleanly alongside other agents' branches.
-
----
-
-## 7. Security & safety
-
-- **Flag default OFF.** When off: `active()` is false → no env injected, no prompt line, no IPC effect, no store created. Provably zero behaviour change.
-- **Local only.** The store lives under `userData`; nothing is uploaded. The `kg` CLI is read-only over local files.
-- **No secret handling.** Unlike Slack/webhook, KG has no tokens; the CLI needs no auth because it only reads local files the user already owns.
-- **Path safety.** `docId`s are app-generated (never user-controlled path segments); ingestion copies into `docs/<docId>/` so a malicious filename can't escape `KG_ROOT`.
-- **Size guards.** Per-file and total-corpus byte caps (configurable) prevent a huge artifact from bloating `index.jsonl`; oversize files are stored but truncated in the index, surfaced in `meta.json` (never silently dropped).
+The owner's toggle reaches running agents without a restart. `HiveManager.knowledgeUpdate` remembers
+what each agent was last told. On the agent's next `SessionStart` or `UserPromptSubmit` hook,
+the new `COMPANY KNOWLEDGE` paragraph (or `COMPANY_KNOWLEDGE_OFF`) is added as hook context (`src/main/hooks.ts`).
+That is why the CLI takes `--root`: an agent started while the feature was off has no
+`KG_ROOT`. Adding or removing a document, or flipping the toggle, also re-indexes the
+`company` wing right away (`memory.companyKnowledgeChanged`).
 
 ---
 
-## 8. Forward path (explicitly deferred — listed, not half-built)
+## 6. In the app
 
-1. **More modalities:** PDF (poppler hook → bundled parser), xlsx/docx/pptx, image **OCR/vision** enrichment over the already-stored originals.
-2. **FTS5 index:** swap the keyword scorer for SQLite FTS5/BM25 (free with `better-sqlite3`), fronted by a loopback query endpoint so the out-of-process CLI keeps its native-free contract. Agent interface unchanged.
-3. **Embeddings / semantic search:** reuse MemPalace's local embedder to add a vector index; `kg search` blends keyword + semantic. Agent interface unchanged.
-4. **True graph layer:** promote `tags`/`source`/`modality` + extracted entities into typed relations; optionally a renderer view (distinct from Jim's message graph).
-5. **MCP surface:** wrap the same store in an MCP server for typed tool-call access when an agent benefits from schema'd queries — behind the same data + the same flag.
-6. **Renderer management panel:** drag-drop ingestion, per-doc preview, re-index, delete — beyond the minimal Settings toggle shipped in v1.
-7. **Packaging verification:** confirm `KG_CLI` resolves under `process.resourcesPath` in a packaged build (v1 is validated in dev/worktree via tests + direct CLI runs, matching the dispatch bar of typecheck + tests green).
+- **Settings:** the on/off toggle, the document count and an "Add files" button (OS file
+  picker). Each file reports whether it was added or why not.
+- **IPC** (`src/main/index.ts`): `kg:status`, `kg:list`, `kg:search`, `kg:get`, `kg:remove`,
+  `kg:ingestFiles`, `kg:addFiles`, exposed on `window.cth` as `kgStatus`, `kgList` and so on.
 
 ---
 
-## 9. Definition of done (this pass)
+## 7. Safety
 
-- ✅ This design doc, committed to `feat/knowledge-graph`.
-- ✅ v1 vertical slice behind `knowledgeGraph.enabled` (default off): **ingest → store → agent-retrieval** for **text/markdown + images**, with the `kg` CLI taught to agents via the injected prompt.
-- ✅ `npm run typecheck` clean; `node test/kg-core.test.cjs` green.
-- ✅ Remaining modalities/work listed above as follow-up, not half-implemented.
-- ✅ Done report to god (god QAs + merges to local main; this branch is not pushed/merged by me).
+- **Local only.** The store lives under `userData`; nothing is uploaded. OCR is the macOS
+  Vision framework on the machine.
+- **Read only for agents.** The CLI has no write commands.
+- **No secrets.** The store needs no tokens and the CLI needs no auth.
+- **Paths.** Ids are app generated; originals are copied into `docs/<docId>/`.
+- **When off:** no prompt paragraph, no environment variables, no palace indexing, and running
+  agents are told the commands stop working.
+
+---
+
+## 8. Not built yet
+
+- A way to browse, preview and remove documents beyond the Settings block.
+- OCR off macOS (images and scans are metadata only there).
+- Typed relations between documents (the "graph" part of the name): `tags`, `source` and
+  `modality` are the edges it would start from.

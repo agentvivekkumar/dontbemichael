@@ -23,7 +23,7 @@ faq:
 
 Choose Cursor for an editor where you steer an agent across models from several labs. Choose Claude Code if you would rather hand work to Anthropic's agent in a terminal, IDE, desktop app or browser, built around Claude models. Outside India, paid plans for both start at $20 a month (14 Sep 2026), plus Cursor's free Hobby plan.
 
-Two things moved in the last month. Cursor became part of SpaceX on 14 Aug 2026 ([Cursor's announcement](https://cursor.com/blog/joining-spacex)), and Claude Code's weekly limits changed today. If you are choosing a whole setup rather than one tool, our roundup of [multi-agent tools built on Claude Code](/blog/best-claude-code-multi-agent-tools/) covers the wider field.
+Two things moved in the last month. Cursor became part of SpaceX on 14 Aug 2026 ([Cursor's announcement](https://cursor.com/blog/joining-spacex)), and Claude Code's weekly limits changed today. If you are choosing a whole setup rather than one tool, our roundup of multi-agent tools built on Claude Code covers the wider field.
 
 ## Is Claude Code better than Cursor?
 

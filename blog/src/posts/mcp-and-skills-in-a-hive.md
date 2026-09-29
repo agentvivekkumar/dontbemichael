@@ -134,7 +134,7 @@ Putting it together, a tooled-up hive might look like this:
 You end up with a team where each agent has exactly the capabilities its job needs — built entirely
 from configuration you already had, plus roles. That's the fast path from your existing Claude Code
 setup to a coordinated team, which is the same ten-minute on-ramp as the
-[multi-agent setup tutorial](/blog/claude-code-multi-agent-setup-tutorial/).
+multi-agent setup tutorial.
 
 ## FAQ
 

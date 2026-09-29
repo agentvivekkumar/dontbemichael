@@ -86,7 +86,7 @@ array, which goes through `CreateProcess` with the multi-line argument intact.
 Then reality added a second chapter, as it does. OpenCode's npm package ships a *compiled
 binary*, so npm writes an interpreter-less shim the decoder didn't model — it returned null for
 every Windows OpenCode install and fell back to the truncating path. That's the
-[0.4.4](/blog/launching-munder-difflin-v0-4-4/) follow-up: direct-executable shims are handled,
+0.4.4 follow-up: direct-executable shims are handled,
 and — the real lesson — **the fallback is no longer silent.** If the decoder meets a shim it
 can't parse, it logs exactly what it couldn't decode. The next variant of this bug will
 announce itself.
