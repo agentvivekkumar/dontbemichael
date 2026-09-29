@@ -39,16 +39,18 @@ markup for every user, so it is treated as no drop at all.
 ## What you can use
 
 Images, video, audio, web fonts, gradients, transforms, grid, flexbox, keyframe
-animations, `prefers-color-scheme`, `prefers-reduced-motion`. Remote assets must
-be **https** (or `data:`/`blob:`).
+animations, `prefers-color-scheme`, `prefers-reduced-motion`, and links with
+`target="_blank"`, which open in the OS browser. Remote assets must be **https**
+(or `data:`/`blob:`).
 
-A small token palette is pre-defined — `--ink`, `--ink-soft`, `--paper`,
-`--cream`, `--lemon`, `--mint`, `--coral` — so a drop can match the app without
-restating its colours. Ignore them entirely for a bespoke look.
+The app's palette is pre-defined as tokens (`--paper`, `--cream`, `--ink`,
+`--ink-soft`, `--yellow`, `--sky`, `--maroon`, `--mint` and more; the full list
+is `FRAME_BASE_CSS` in `src/shared/releaseDrop.ts`), so a drop can match the app
+without restating its colours. Ignore them entirely for a bespoke look.
 
 ## What you cannot use, and why
 
-**No JavaScript. No forms. No working links.**
+**No JavaScript. No forms. No same-frame links.**
 
 The drop is remote, author-controlled markup. The renderer it would otherwise
 land in has `window.cth` bridged onto it — `spawnPty`, `writeFileText`,
@@ -56,14 +58,15 @@ land in has `window.cth` bridged onto it — `spawnPty`, `writeFileText`,
 execution on the user's machine with the app's full authority, available to
 anyone who can publish a release or intercept the fetch.
 
-So the drop renders inside an iframe with `sandbox=""` (no scripts, no
-same-origin, no forms, no popups, no top-level navigation) and its own
+So the drop renders inside an iframe with `sandbox="allow-popups"` (no
+scripts, no same-origin, no forms, no top-level navigation) and its own
 `default-src 'none'` CSP. Two independent controls, either sufficient alone.
 
-Because nothing in the frame can navigate, **the modal's own buttons carry every
-action** — "open releases", "restart to update", the star link, "later". Design
-around them; don't put a call-to-action link in the drop expecting a click to
-work.
+`allow-popups` is the only grant. The modal has no buttons of its own beyond
+close, so any action a release wants to offer is a `<a target="_blank">` link in
+the drop. Main's `setWindowOpenHandler` denies the window and hands the URL to
+the OS browser, and only for http(s). A link without `target="_blank"` does
+nothing, so the drop can never replace itself.
 
 If a drop ever genuinely needs scripting, the change is `allow-scripts` on the
 iframe — and it must **never** be paired with `allow-same-origin`, because that
@@ -74,16 +77,11 @@ combination lets the frame remove its own sandbox.
 The update path only runs in packaged builds, so dev has a simulate hook:
 
 ```js
-await window.cth.updateSimulate({ version: '0.5.0', notes: '<paste the body>' })
+await window.cth.updateSimulate({ drop: true })                                  // the built-in sample drop
+await window.cth.updateSimulate({ version: '0.5.0', notes: '<paste the body>' }) // your own drop
 ```
 
 Run it in DevTools (⌥⌘I → Console). Dev-only — hard-gated on `!app.isPackaged`.
-
-To see the star ask again after it has been spent:
-
-```js
-localStorage.removeItem('cth.updateStarAsked')
-```
 
 ## One thing to know about pre-release tags
 

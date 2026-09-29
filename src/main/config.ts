@@ -140,13 +140,13 @@ export interface CircuitBreakerConfig {
   tokenVelocityPerMin?: number;
 }
 
-/** Enterprise Knowledge Graph (multimodal context store + agent access tool).
- *  The user ingests their own documents/images/PDFs; agents query them on demand
- *  via the `kg` CLI. Opt-in like the heartbeat/Slack features — `enabled` gates
- *  everything (no env injected, no prompt line, no store touched when off). See
- *  docs/design/knowledge-graph.md. */
+/** Company knowledge (the Knowledge Graph store + agent access tool).
+ *  The owner adds their own documents, sheets, PDFs and images; agents search
+ *  them on demand via the `kg` CLI and MemPalace. On by default (owner,
+ *  2026-09-25); `enabled` still gates everything (no env injected, no prompt
+ *  line, no palace indexing when off). See docs/design/knowledge-graph.md. */
 export interface KnowledgeGraphConfig {
-  /** Master switch. Default false = zero behaviour change (the feature is dark). */
+  /** Master switch. Default true (DEFAULT_CONFIG); the owner can turn it off in Settings. */
   enabled?: boolean;
   /** Override the store location. Unset = <userData>/knowledge. */
   rootPath?: string;
@@ -301,7 +301,7 @@ export interface HarnessConfig {
   defaultWorkerTokenCap?: number;
   /** Circuit-breaker thresholds (Lane A #6.6b). Unset = conservative defaults. */
   circuitBreaker?: CircuitBreakerConfig;
-  /** Enterprise Knowledge Graph (multimodal context for agents). Default OFF. */
+  /** Company knowledge (the Knowledge Graph store). Default ON. */
   knowledgeGraph?: KnowledgeGraphConfig;
   /** Fire native desktop notifications on agent lifecycle events (idle finish / waiting for input). */
   notifications?: boolean;

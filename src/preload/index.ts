@@ -237,12 +237,13 @@ export interface PtyExit { exitCode: number; signal?: number | undefined }
 /** A recurring schedule; the type lives in shared/missions.ts. */
 export type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 
-/** Circuit-breaker thresholds (Lane A #6.6b). Mirrors src/main/config.ts. */
+/** Company knowledge config. Mirrors src/main/config.ts. */
 export interface KnowledgeGraphConfig {
   enabled?: boolean;
   rootPath?: string;
 }
 
+/** Circuit-breaker thresholds (Lane A #6.6b). Mirrors src/main/config.ts. */
 export interface CircuitBreakerConfig {
   enabled?: boolean;
   hardStop?: boolean;
@@ -333,7 +334,7 @@ export interface HarnessConfig {
   autoDeliveryPausedAgents?: string[];
   maxTurns?: number;
   circuitBreaker?: CircuitBreakerConfig;
-  /** Enterprise Knowledge Graph (multimodal context for agents). Default OFF. */
+  /** Company knowledge (the Knowledge Graph store). Default ON. */
   knowledgeGraph?: KnowledgeGraphConfig;
   /** Terminal theme, mirrored into each agent's per-session Claude settings. */
   terminalTheme?: 'light' | 'dark';

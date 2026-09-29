@@ -1735,7 +1735,7 @@ export class HiveManager {
       // (or an empty expansion) for a Windows agent that tried to use it literally.
       ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your memory index is mined into the palace automatically.'
       : '';
-    // Enterprise Knowledge Graph (opt-in). Volatile-free: the bundled-node launcher
+    // Company knowledge (on by default). Volatile-free: the bundled-node launcher
     // and the KG CLI are both fixed absolute paths for an install, so baking them
     // keeps the prefix prompt-cache-stable while making the command runnable in
     // cmd.exe/PowerShell as well as a POSIX shell.
