@@ -1,3 +1,3 @@
-- **New hire wizard:** each character brings a real job; no two teammates overlap.
-- **Michael runs the office:** only he assigns work and decides schedule requests.
-- **One job, several times,** like every 2h on weekdays plus 2 pm at weekends.
+- **A cleaner repo:** the old project's website, blog posts and promo media are gone.
+- **Docs match the app:** release drops, the message queue and company knowledge.
+- **No changes to the app itself** since 0.0.8.

@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.9] (2026-09-28)
+
+No changes to the app itself.
+
+### Removed
+
+- The old project's website files from `docs/`: its pages, CNAME, robots.txt, the Google
+  verification file, research notes, the hires gallery, PR evidence, a talk deck, saved Reddit
+  threads, badges, the banner and the old logo set with `tools/make-logo.cjs`.
+- Its promo media (Pro, Product Hunt, landing demos and explainer clips) and 42 blog posts about
+  the old product: launch posts, competitor comparisons, launch stories and guides for features
+  this app does not have.
+
+### Changed
+
+- `npm run check:links` checks only `RELEASE.md`.
+- `docs/release-drops.md`, `docs/message-queue.md` and `docs/design/knowledge-graph.md` match the
+  code again, and code comments say company knowledge is on by default.
+
 ## [0.0.8] (2026-09-27)
 
 ### Added
