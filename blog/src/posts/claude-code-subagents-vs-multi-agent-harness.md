@@ -130,7 +130,7 @@ Reach for a **harness** when:
 That threshold — one agent's task vs. a coordinated team — is the whole decision. If you're hitting it,
 the next read is [how to run multiple Claude Code agents](/blog/how-to-run-multiple-claude-code-agents/),
 and for a concrete head-to-head of two ways to get a team, see
-[Claude Squad vs Munder Difflin](/blog/claude-squad-vs-munder-difflin/).
+Claude Squad vs Munder Difflin.
 
 ## FAQ
 

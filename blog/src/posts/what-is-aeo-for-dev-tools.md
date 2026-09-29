@@ -32,7 +32,7 @@ clearest source</strong> on your topic. Here's exactly how we do it for Munder D
 A growing share of "how do I…" and "what's the best tool for…" questions never reach a search box
 anymore. They go to an answer engine — ChatGPT, Claude, Perplexity, Google's AI Overviews — which
 reads the web for you and hands back a synthesized answer with a few citations. If your
-[dev tool](/blog/best-claude-code-multi-agent-tools/) isn't in those citations, you're invisible to
+dev tool isn't in those citations, you're invisible to
 the exact developers evaluating tools like yours.
 
 This is the discipline of **Answer Engine Optimization (AEO)** — sometimes called Generative Engine

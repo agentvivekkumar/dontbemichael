@@ -68,11 +68,11 @@ received](/blog/human-in-the-loop-ai-agents/).
 The final pass turns merged items into kanban cards, ranked by things you can defend: how many
 distinct people, how blocked they were, whether they're the kind of user you're building for.
 The card's description carries the quotes and links, so whoever picks it up — human or
-[agent](/blog/deploy-automated-pr-reviewer-agent/) — starts from the actual reports rather
+agent — starts from the actual reports rather
 than a paraphrase.
 
 Then the backlog met reality: the top cards became
-[v0.4.4's headline fixes](/blog/launching-munder-difflin-v0-4-4/). And because every card
+v0.4.4's headline fixes. And because every card
 carried its reporters, "tell the people who reported it" was a checklist item, not archaeology.
 One blocked user from launch week had said, verbatim, that he'd re-test when the fix shipped.
 The card knew his name. That follow-up is worth more than a week of marketing.
@@ -89,7 +89,7 @@ becomes a pipeline, and the backlog stays ranked by evidence instead of by whoev
 most recently.
 
 The uncomfortable, useful truth we took from ours:
-[the community's](/blog/what-reddit-told-us-about-munder-difflin/) most upvoted praise and its
+the community's most upvoted praise and its
 sharpest criticism pointed at the same place — people love *watching* agents work and want
 more *control* over what they see. A backlog built on receipts forces you to hear both halves.
 That tension is now the roadmap's spine, and we can cite our sources.

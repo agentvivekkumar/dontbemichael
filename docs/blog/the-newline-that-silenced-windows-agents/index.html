@@ -220,7 +220,7 @@ array, which goes through <code>CreateProcess</code> with the multi-line argumen
 <p>Then reality added a second chapter, as it does. OpenCode’s npm package ships a <em>compiled
 binary</em>, so npm writes an interpreter-less shim the decoder didn’t model — it returned null for
 every Windows OpenCode install and fell back to the truncating path. That’s the
-<a href="/blog/launching-munder-difflin-v0-4-4/">0.4.4</a> follow-up: direct-executable shims are handled,
+0.4.4 follow-up: direct-executable shims are handled,
 and — the real lesson — <strong>the fallback is no longer silent.</strong> If the decoder meets a shim it
 can’t parse, it logs exactly what it couldn’t decode. The next variant of this bug will
 announce itself.</p>
@@ -284,7 +284,7 @@ the target is a <code>.cmd</code>. We’ll wait. It’s probably ten minutes and
 
   <footer class="post-foot wrap"><div class="prevnext">
       <a class="pn prev" href="/blog/turn-feedback-into-a-backlog-with-agents/"><span class="k">← Older</span><span class="t">Turn a Firehose of Feedback into a Backlog with Agents</span></a>
-      <a class="pn next" href="/blog/seven-releases-in-eight-days/"><span class="k">Newer →</span><span class="t">Seven Releases in Eight Days: 0.3.8 → 0.4.4</span></a>
+      <a class="pn next" href="/blog/run-a-release-train-with-agents/"><span class="k">Newer →</span><span class="t">Run a Release Train with Agents</span></a>
     </div>
     <section class="related">
       <h2>Related in Internals</h2>

@@ -50,7 +50,7 @@ The other half of the fit: orchestration is naturally *ambient*. You're across t
 
 ## Case study: Talk mode
 
-Munder Difflin shipped this thesis as a feature in v0.3.2 (the [launch post](/blog/launching-munder-difflin-v0-3-2/) has the full tour). Press **Talk** and you get a low-latency voice channel — OpenAI Realtime API over WebRTC, bring-your-own key — to Michael, the GOD orchestrator, running *alongside* the async terminal floor, not replacing it.
+Munder Difflin shipped this thesis as a feature in v0.3.2 (the launch post has the full tour). Press **Talk** and you get a low-latency voice channel — OpenAI Realtime API over WebRTC, bring-your-own key — to Michael, the GOD orchestrator, running *alongside* the async terminal floor, not replacing it.
 
 Michael listens, answers, and acts. The read side covers the hive: tasks, board, memory, agents, activity, cost. The action side is the full orchestration verb set: create and assign tasks, dispatch agents, pause / steer / halt, spawn and hire workers, kill them, edit schedules. Notice what's *not* in that list: writing code. The voice channel never touches an editor. It only moves work around — exactly the payload the channel can carry.
 

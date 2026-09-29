@@ -21,8 +21,8 @@ faq:
 ---
 
 <div class="callout tldr"><span class="ic">TL;DR</span><p>A release is one decision and forty
-chores. During our <a href="/blog/seven-releases-in-eight-days/">seven-releases-in-eight-days
-week</a>, the chores — version bumps, changelog prose, release notes, site updates, link
+chores. During our seven-releases-in-eight-days
+week, the chores — version bumps, changelog prose, release notes, site updates, link
 checks — ran as a repeatable agent workflow. The decision stayed human. That's the whole
 trick, and here's the train schedule.</p></div>
 
@@ -41,8 +41,8 @@ is that the chores are a train the [hive](/blog/what-is-a-multi-agent-harness/) 
 PRs since the last tag — not a memory of them — and drafts the changelog entry with a hard
 rule we stole from our own postmortems: *every entry says what was broken from the user's point
 of view, not which function changed.* "Agents booted, looked healthy, and had no idea they
-could message anyone" survives to [the published
-changelog](/blog/launching-munder-difflin-v0-4-4/) because the draft started from the diff and
+could message anyone" survives to the published
+changelog because the draft started from the diff and
 the issue thread, where that sentence was earned.
 
 {% img "note-1", "The changelog agent works from merged diffs and issue threads — not from anyone's memory of the week." %}

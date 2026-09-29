@@ -90,7 +90,7 @@ The comparison table writes itself once you frame it as lifecycle:
 
 Because Munder Difflin makes the engine a per-hire choice, this isn't an either/or. The pattern that works: **Claude Code as the orchestrator and your long-lived workers** — the agents that need to receive messages, hold context across turns, and run under hook-driven approval gates — and **Copilot CLI workers for burst tasks** the orchestrator dispatches: a scoped refactor, a test-writing pass, a one-shot investigation. Different engines for different roles is the general lesson of mixed fleets, and it also spreads cost across two subscriptions you likely already pay for.
 
-For everything else in the release — including the built-in Monaco IDE — see the [v0.3.3 launch post](/blog/launching-munder-difflin-v0-3-3/).
+For everything else in the release — including the built-in Monaco IDE — see the v0.3.3 launch post.
 
 ## Try both on one floor
 

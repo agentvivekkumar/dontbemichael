@@ -111,7 +111,7 @@ A harness automates all four habits at once:
   one process commits, with retry and stale-lock recovery, so `index.lock` races simply can't corrupt
   the repo.
 
-That's the leap from a [multi-agent setup](/blog/claude-code-multi-agent-setup-tutorial/) you babysit
+That's the leap from a multi-agent setup you babysit
 to one that runs itself. If you're not sure you need it yet, you probably don't — the honest rule is
 to add tooling only when the tabs start costing you more than they return. The next read up is
 [how to run multiple Claude Code agents](/blog/how-to-run-multiple-claude-code-agents/), which walks

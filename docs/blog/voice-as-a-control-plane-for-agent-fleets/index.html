@@ -189,7 +189,7 @@
 <p>The other half of the fit: orchestration is naturally <em>ambient</em>. You’re across the room while an overnight mission grinds. A status question shouldn’t cost you a walk to the desk, and a completion shouldn’t wait until you happen to glance at a terminal.</p>
 <figure class="fig fig-inline"><img src="/blog/assets/media/voice-as-a-control-plane-for-agent-fleets/note-1.png" alt="Hand-drawn sketch from “Voice Is a Control Plane, Not a Gimmick”" loading="lazy" decoding="async" /></figure>
 <h2 id="case-study-talk-mode" tabindex="-1">Case study: Talk mode <a class="anchor" href="#case-study-talk-mode" aria-hidden="true">#</a></h2>
-<p>Munder Difflin shipped this thesis as a feature in v0.3.2 (the <a href="/blog/launching-munder-difflin-v0-3-2/">launch post</a> has the full tour). Press <strong>Talk</strong> and you get a low-latency voice channel — OpenAI Realtime API over WebRTC, bring-your-own key — to Michael, the GOD orchestrator, running <em>alongside</em> the async terminal floor, not replacing it.</p>
+<p>Munder Difflin shipped this thesis as a feature in v0.3.2 (the launch post has the full tour). Press <strong>Talk</strong> and you get a low-latency voice channel — OpenAI Realtime API over WebRTC, bring-your-own key — to Michael, the GOD orchestrator, running <em>alongside</em> the async terminal floor, not replacing it.</p>
 <p>Michael listens, answers, and acts. The read side covers the hive: tasks, board, memory, agents, activity, cost. The action side is the full orchestration verb set: create and assign tasks, dispatch agents, pause / steer / halt, spawn and hire workers, kill them, edit schedules. Notice what’s <em>not</em> in that list: writing code. The voice channel never touches an editor. It only moves work around — exactly the payload the channel can carry.</p>
 <p>And the loop closes in both directions. Voice-dispatched work reports back on its own: a completion watcher detects when a task lands and pushes the event into the live session so <strong>Michael speaks it unprompted</strong> — “respond when done” as a first-class behavior, with an on-screen toast, and a queue-to-notification path if the session is already closed. That’s the ambient half delivered: you delegated by sentence, and the result comes back as a sentence.</p>
 <figure class="fig fig-inline"><img src="/blog/assets/media/voice-as-a-control-plane-for-agent-fleets/note-2.png" alt="Hand-drawn sketch from “Voice Is a Control Plane, Not a Gimmick”" loading="lazy" decoding="async" /></figure>
@@ -263,7 +263,7 @@
 
   <footer class="post-foot wrap"><div class="prevnext">
       <a class="pn prev" href="/blog/what-is-an-agent-development-environment/"><span class="k">← Older</span><span class="t">What Is an Agent Development Environment (ADE)?</span></a>
-      <a class="pn next" href="/blog/tmux-and-scripts-vs-an-agent-harness/"><span class="k">Newer →</span><span class="t">Running Agents in tmux vs an Agent Harness</span></a>
+      <a class="pn next" href="/blog/run-a-mixed-engine-office/"><span class="k">Newer →</span><span class="t">Run a Mixed-Engine Office: the Right CLI for Every Desk</span></a>
     </div>
     <section class="related">
       <h2>Related in Concepts</h2>

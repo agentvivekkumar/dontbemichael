@@ -69,7 +69,7 @@ model releases: vendors are optimizing for **autonomy and parallelism**, not jus
 frontier lab is now orchestrating subagents inside its own coding tool, the case for a
 [multi-agent harness](/#what) you control — where you can watch and steer that fan-out — gets stronger,
 not weaker. (For the broader tool landscape, see our
-[roundup of multi-agent Claude Code tools](/blog/best-claude-code-multi-agent-tools/).)
+roundup of multi-agent Claude Code tools.)
 
 {% img "note-1" %}
 

@@ -138,7 +138,7 @@ If you've ever wondered whether built-in mechanisms are enough versus an externa
 the same question shows up for [subagents vs a harness](/blog/claude-code-subagents-vs-multi-agent-harness/) —
 and the answer rhymes: native primitives handle the small scale; a coordination layer handles the team
 scale. For a concrete tool-vs-tool take on that coordination layer, see
-[Claude Squad vs Munder Difflin](/blog/claude-squad-vs-munder-difflin/).
+Claude Squad vs Munder Difflin.
 
 ## FAQ
 

@@ -116,6 +116,6 @@ The same content that an AI will confidently quote is the content a human will t
 Munder Difflin is built [in the open](/#what) with this in mind — quotable docs, structured data, and a
 blog designed to be cited. [Download Munder Difflin](/#install) to see it; free and open source. (For a
 broader map of the tooling AI engines cite, see our
-[roundup of multi-agent Claude Code tools](/blog/best-claude-code-multi-agent-tools/).)
+roundup of multi-agent Claude Code tools.)
 
 <p style="font-size:0.85em;opacity:0.7;margin-top:2rem">Sources: <a href="https://aithinkerlab.com/generative-engine-optimization-2026/">Princeton/Georgia Tech GEO study summary</a>; <a href="https://www.prnewswire.com/news-releases/5w-releases-ai-platform-citation-source-index-2026-the-50-websites-that-now-decide-what-brands-are-visible-inside-chatgpt-claude-perplexity-gemini-and-google-ai-overviews-302759804.html">5W AI Platform Citation Source Index 2026</a>; <a href="https://discoveredlabs.com/blog/ai-citation-patterns-how-chatgpt-claude-and-perplexity-choose-sources">Discovered Labs — AI citation patterns</a>; <a href="https://www.similarweb.com/blog/marketing/geo/answer-engine-optimization/">Similarweb — AEO guide 2026</a>. Per-engine percentages are from single-source indices; treat as illustrative.</p>

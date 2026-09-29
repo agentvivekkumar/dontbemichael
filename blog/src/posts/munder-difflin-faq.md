@@ -64,7 +64,7 @@ live office floor on your own machine.
 
 If you're comparing options, these go deeper than an FAQ can:
 
-- [The best tools to run multiple Claude Code agents](/blog/best-claude-code-multi-agent-tools/) — the
+- The best tools to run multiple Claude Code agents — the
   honest field roundup.
 - [Why we built Munder Difflin](/blog/why-we-built-munder-difflin/) — the origin story and the problem
   it solves.

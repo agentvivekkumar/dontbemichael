@@ -20,7 +20,7 @@ tool</strong> by scoring it on six things that actually change your workflow: <s
 matters to <em>you</em>, score each tool 0–3, and the highest total wins — for your situation, not in
 the abstract.</p></div>
 
-There's no single best [agentic coding tool](/blog/best-claude-code-multi-agent-tools/) — there's the
+There's no single best agentic coding tool — there's the
 best one for your workload. The way to find it isn't reading ten reviews; it's running the same
 checklist across the contenders. Here's a framework you can use in fifteen minutes.
 
@@ -95,8 +95,8 @@ Multiply, sum, compare. A worked example for a team whose bottleneck is coordina
 
 Flip the weights for a team whose bottleneck is "just run three parallel tasks," and the session
 manager wins handily — that's the point. The rubric encodes *your* priorities, so it gives *your*
-answer. For a ready-made criteria breakdown across the real tools, see [Claude Code orchestration
-tools, compared](/blog/claude-code-orchestration-tools-compared/).
+answer. For a ready-made criteria breakdown across the real tools, see Claude Code orchestration
+tools, compared.
 
 {% img "note-2" %}
 
@@ -111,7 +111,7 @@ tools, compared](/blog/claude-code-orchestration-tools-compared/).
 
 ## Run the checklist
 
-Pick your two or three finalists from [the roundup](/blog/best-claude-code-multi-agent-tools/), score
+Pick your two or three finalists from the roundup, score
 each on the six criteria with your weights, and trust the total. The exercise is fast and it kills
 analysis paralysis.
 

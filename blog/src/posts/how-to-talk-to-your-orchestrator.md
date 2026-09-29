@@ -90,7 +90,7 @@ A brief is not a launch-and-pray. Three controls matter while the floor runs:
 
 Everything above works typed into Michael's terminal. Since v0.3.2 it also works spoken. Press **Talk** and Realtime Michael (OpenAI Realtime API over WebRTC, bring-your-own key) listens and *acts*: he reads the hive, creates and assigns tasks, dispatches agents, spawns and kills workers — with every destructive verb gated behind a spoken echo-back confirmation, never a bare "yes." He speaks task completions the moment they land, and the session runs under a live cost meter with a hard spend cap and idle auto-disconnect.
 
-The same brief discipline applies out loud. "Michael, goal: the changelog is updated for the release. Constraint: docs only. Deliverable: a commit on the release branch" is a complete voice brief. (Full details in the [v0.3.2 launch post](/blog/launching-munder-difflin-v0-3-2/).)
+The same brief discipline applies out loud. "Michael, goal: the changelog is updated for the release. Constraint: docs only. Deliverable: a commit on the release branch" is a complete voice brief. (Full details in the v0.3.2 launch post.)
 
 ## The habit
 

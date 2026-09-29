@@ -175,7 +175,7 @@
   <div class="post-wrap wrap">
     <div class="prose">
       <div class="callout tldr"><span class="ic">TL;DR</span><p>Munder Difflin v0.3.3 ships a <strong>built-in Monaco IDE</strong> — the VS&nbsp;Code editor engine, fully self-hosted, no CDN. A title-bar <strong>IDE</strong> button toggles a full-window overlay above the office floor: a <strong>git CHANGES rail</strong> where clicking a file opens a <strong>side-by-side diff vs HEAD</strong>, a workspace <strong>file tree</strong>, <strong>editor tabs with dirty-state dots</strong>, and <strong>Cmd/Ctrl+S</strong> save. The workspace root snapshots from the <strong>selected → god → first agent's cwd</strong>, and <strong>all fs/git access goes through main-process IPC</strong> — the renderer never touches disk. The point: <em>agent finishes → open IDE → read the diff → tweak → approve</em>, without leaving the app.</p></div>
-<p>You hired a floor of agents, one of them just announced it’s done, and now comes the part that actually matters: <strong>reading what it changed before you bless it.</strong> Until v0.3.3, that meant alt-tabbing to your editor, finding the right directory, and running <code>git diff</code> by hand. Now the review surface is built in. This is a practical walkthrough of the Monaco IDE that shipped in <a href="/blog/launching-munder-difflin-v0-3-3/">v0.3.3</a> — what each piece does and the workflow it’s designed around.</p>
+<p>You hired a floor of agents, one of them just announced it’s done, and now comes the part that actually matters: <strong>reading what it changed before you bless it.</strong> Until v0.3.3, that meant alt-tabbing to your editor, finding the right directory, and running <code>git diff</code> by hand. Now the review surface is built in. This is a practical walkthrough of the Monaco IDE that shipped in v0.3.3 — what each piece does and the workflow it’s designed around.</p>
 <h2 id="opening-it-the-title-bar-ide-button" tabindex="-1">Opening it: the title-bar IDE button <a class="anchor" href="#opening-it-the-title-bar-ide-button" aria-hidden="true">#</a></h2>
 <p>There’s an <strong>IDE</strong> button in the title bar. Click it and a full-window Monaco editor overlays the office floor — same fullscreen-overlay pattern as the rest of the app, so the floor, the terminals, and the voice UX keep running underneath, untouched. Click it again and you’re back watching avatars.</p>
 <p>Monaco is the editor engine inside VS Code, and here it’s <strong>fully self-hosted</strong>: bundled workers, no CDN, themed to the harness’s light palette. That’s not a vanity detail — it means the IDE works offline and nothing about your code round-trips through a third-party host just to render syntax highlighting. Local-first, like everything else in the app.</p>
@@ -269,7 +269,7 @@
   </div>
 
   <footer class="post-foot wrap"><div class="prevnext">
-      <a class="pn prev" href="/blog/launching-munder-difflin-v0-3-3/"><span class="k">← Older</span><span class="t">Launching Munder Difflin v0.3.3: A Built-in Monaco IDE and GitHub Copilot CLI Support</span></a>
+      <a class="pn prev" href="/blog/loop-engineering-for-ai-agents/"><span class="k">← Older</span><span class="t">Loop Engineering: Designing Agent Loops That Converge</span></a>
       <a class="pn next" href="/blog/how-to-talk-to-your-orchestrator/"><span class="k">Newer →</span><span class="t">How to Brief Your Orchestrator (So the Floor Actually Ships)</span></a>
     </div>
     <section class="related">
@@ -308,18 +308,18 @@
   </div>
 </article>
 <article class="card t-guides">
-  <a class="thumb t-guides" href="/blog/connect-slack-to-munder-difflin/" aria-hidden="true" tabindex="-1"><img src="/blog/assets/media/connect-slack-to-munder-difflin/hero.png" alt="" loading="lazy" decoding="async" /></a>
+  <a class="thumb t-guides" href="/blog/how-to-connect-ollama-to-claude-code/" aria-hidden="true" tabindex="-1"><img src="/blog/assets/media/how-to-connect-ollama-to-claude-code/hero.png" alt="" loading="lazy" decoding="async" /></a>
   <div class="body">
     <div class="meta">
       <time datetime="2026-09-14">Sep 14, 2026</time>
       <span class="dot" aria-hidden="true"></span>
       <span>5 min</span>
     </div>
-    <h3><a href="/blog/connect-slack-to-munder-difflin/">How to Connect Slack to Munder Difflin 0.5.2</a></h3>
-    <p class="dek">Connect Slack to Munder Difflin 0.5.2: create the Slack app, add the bot scopes, pick one of three connection modes, and get answers in the thread.</p>
+    <h3><a href="/blog/how-to-connect-ollama-to-claude-code/">How to Connect Ollama to Claude Code</a></h3>
+    <p class="dek">Point Claude Code at Ollama with ollama launch claude or three environment variables, give the model 64K of context, and know what stops working.</p>
     <div class="foot">
       <span class="tag kind">Guides</span>
-      <a class="more" href="/blog/connect-slack-to-munder-difflin/" aria-label="Read: How to Connect Slack to Munder Difflin 0.5.2">Read →</a>
+      <a class="more" href="/blog/how-to-connect-ollama-to-claude-code/" aria-label="Read: How to Connect Ollama to Claude Code">Read →</a>
     </div>
   </div>
 </article>
