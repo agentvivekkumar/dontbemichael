@@ -16,7 +16,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
-import type { CliUpdateStatus } from '@shared/cliUpdate';
+import { cliUpdateToastVisible, type CliUpdateStatus } from '@shared/cliUpdate';
 
 /** The installed version the owner said "later" to. `cth.`-prefixed renderer
  *  memory, like UpdateToast's star ask. */
@@ -45,7 +45,7 @@ function useCliUpdate(): CliUpdateStatus | null {
   return status;
 }
 
-export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAgents: number) => void }) {
+export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAgents: number) => Promise<boolean> }) {
   const status = useCliUpdate();
   const [laterFor, setLaterFor] = useState<string | null>(readLater);
 
@@ -55,10 +55,12 @@ export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAg
     return () => window.removeEventListener(SHOW_EVENT, onShow);
   }, []);
 
-  if (!status || laterFor === status.installed) return null;
+  if (!status || !cliUpdateToastVisible(status, laterFor)) return null;
 
   const later = () => { writeLater(status.installed); setLaterFor(status.installed); };
-  const go = () => { later(); onCloseAndReopen(status.live); };
+  // Hidden only once closing time really started: a refused start (Michael's
+  // terminal ended) keeps the toast, so the offer is still there after.
+  const go = () => { void onCloseAndReopen(status.live).then((ok) => { if (ok) later(); }); };
 
   const buttonStyle: React.CSSProperties = {
     padding: '3px 10px 1px',
@@ -69,7 +71,7 @@ export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAg
   };
 
   return (
-    <div role="status" style={{
+    <div style={{
       // Top-right, under the title bar: the bottom-right corner belongs to the
       // app-update and completion toasts, and these can all be up at once.
       position: 'fixed', right: 16, top: 48, zIndex: 400,
@@ -86,7 +88,7 @@ export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAg
           Your team has an upgrade waiting
         </span>
       </div>
-      <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
+      <span role="status" style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
         Claude Code {status.installed} is installed, but {status.behind === 1 ? '1 agent is' : `${status.behind} agents are`} still
         on the older version. Close the office and reopen to switch everyone over. Each agent
         saves its work first, so nothing is lost. Nothing restarts until you say so.

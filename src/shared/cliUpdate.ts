@@ -44,3 +44,9 @@ export function cliUpdateStatus(agents: readonly RunningAgentCli[]): CliUpdateSt
   }
   return installed ? { installed, behind, live: agents.length } : null;
 }
+
+/** Whether the toast shows: an upgrade is waiting and the owner has not said
+ *  "later" to this installed version. A newer version shows it again. */
+export function cliUpdateToastVisible(status: CliUpdateStatus | null, laterFor: string | null): boolean {
+  return !!status && laterFor !== status.installed;
+}

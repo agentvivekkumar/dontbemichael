@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { cliUpdateStatus } = loadTs('src/shared/cliUpdate.ts');
+const { cliUpdateStatus, cliUpdateToastVisible } = loadTs('src/shared/cliUpdate.ts');
 const { ClosingTimeController } = loadTs('src/main/closingTime.ts');
 
 test('nothing to offer: no agents, or every agent already on the installed version', () => {
@@ -107,4 +107,23 @@ test('asking to reopen while closing time is already running still reopens', (t)
   o.finish();
   t.mock.timers.tick(3000);
   assert.deepEqual(o.concluded, [true]);
+});
+
+test('"later" hides the toast for that version only; a newer one shows it again', () => {
+  // Value: protects=the owner is asked again when a newer Claude Code lands, never nagged for the same one; fails_when=later is kept per app start or ignores the version; why_new=ship review: the rule was inline in the component; seam=none
+  const st = { installed: '2.1.300', behind: 1, live: 2 };
+  assert.equal(cliUpdateToastVisible(null, null), false, 'nothing waiting');
+  assert.equal(cliUpdateToastVisible(st, null), true);
+  assert.equal(cliUpdateToastVisible(st, '2.1.300'), false, 'later for this version');
+  assert.equal(cliUpdateToastVisible({ ...st, installed: '2.1.301' }, '2.1.300'), true, 'a newer version asks again');
+});
+
+test('an agent counts toward the upgrade only once its terminal really started', () => {
+  // Value: protects=a failed spawn never shows a phantom agent to upgrade, and a duplicate id never overwrites a live agent's version; fails_when=the version probe runs before ptyManager.spawn succeeds; why_new=ship review; seam=source (index.ts needs Electron)
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8');
+  const spawn = src.indexOf('const res = ptyManager.spawn(opts, owner);');
+  const record = src.indexOf('ptyCli.set(opts.id');
+  assert.ok(spawn > 0 && record > spawn, 'recorded after the spawn');
+  assert.match(src.slice(spawn, record), /if \(res\.ok && opts\.hive\?\.id && claudeProvider\)/);
+  assert.match(src, /if \(run !== cliUpdateRun\) return;/, 'only the latest refresh reports');
 });

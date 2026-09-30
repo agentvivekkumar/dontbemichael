@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore, selectedAgent, ROSTER_BOOT_HOME } from '@/store/store';
 import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
@@ -184,15 +184,20 @@ export function App() {
     if (phase === 'started' || phase === 'progress') setQuitWarn((w) => w ?? { ptyCount: 0 });
   }), []);
 
-  const startClosingTime = async (opts?: { relaunch?: boolean }) => {
+  const startClosingTime = async (opts?: { relaunch?: boolean }): Promise<boolean> => {
     const res = await window.cth.startClosingTime(opts);
     if (!res.ok) setClosing({ phase: 'error', acked: 0, total: 0, error: res.error });
+    return res.ok;
   };
+  // The owner asked to reopen (CliUpdateNotice). Kept until they cancel, so a
+  // retry from the quit dialog (after a refused start) still reopens.
+  const reopenAsked = useRef(false);
   // A Claude Code update is waiting (CliUpdateNotice): the owner's click closes
   // the office the safe way, then the app reopens on the new version.
-  const closeOfficeAndReopen = (liveAgents: number) => {
+  const closeOfficeAndReopen = (liveAgents: number): Promise<boolean> => {
+    reopenAsked.current = true;
     setQuitWarn((w) => w ?? { ptyCount: liveAgents });
-    void startClosingTime({ relaunch: true });
+    return startClosingTime({ relaunch: true });
   };
   const cancelClosingTime = () => {
     void window.cth.cancelClosingTime();
@@ -559,12 +564,13 @@ export function App() {
           ptyCount={quitWarn.ptyCount}
           closing={closing}
           onCancel={() => {
+            reopenAsked.current = false;
             if (closing) cancelClosingTime();
             window.cth.cancelClose();
             setQuitWarn(null);
           }}
           onConfirm={async () => { await window.cth.confirmClose(); }}
-          onClosingTime={() => { void startClosingTime(); }}
+          onClosingTime={() => { void startClosingTime(reopenAsked.current ? { relaunch: true } : undefined); }}
         />
       )}
 

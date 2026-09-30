@@ -271,11 +271,16 @@ const ptyCli = new Map<string, { bin: string; started: string }>();
 let lastCliUpdate: CliUpdateStatus | null = null;
 /** Re-read the installed version and tell the renderer when the answer changes.
  *  The probe is cached per binary + mtime, so this is cheap to call often. */
+let cliUpdateRun = 0;
 async function refreshCliUpdate(): Promise<void> {
+  // A slow probe (a cache miss) must not land after a newer refresh and put
+  // back an agent that has since exited: only the latest run reports.
+  const run = ++cliUpdateRun;
   const agents = await Promise.all([...ptyCli.values()].map(async (p) => ({
     started: p.started,
     installed: await claudeCliVersion(p.bin)
   })));
+  if (run !== cliUpdateRun) return;
   const next = cliUpdateStatus(agents);
   if (JSON.stringify(next) === JSON.stringify(lastCliUpdate)) return;
   lastCliUpdate = next;
@@ -3415,14 +3420,6 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // live terminal means active — ensureAgent above already cleared `archived`.
   if (opts.hive?.id) {
     ptyToAgent.set(opts.id, opts.hive.id);
-    if (claudeProvider) {
-      const binPath = ptyManager.commandPath(opts.command.trim().split(/\s+/)[0] || opts.command);
-      void claudeCliVersion(binPath).then((started) => {
-        if (!binPath || !started || !ptyToAgent.has(opts.id)) return;
-        ptyCli.set(opts.id, { bin: binPath, started });
-        void refreshCliUpdate();
-      });
-    }
     // Worker inbox-wake watchdog (#151): boot grace starts at spawn so the
     // initial orientation prompt is never mistaken for an idle agent.
     workerWake.noteSpawn(opts.id);
@@ -3518,6 +3515,16 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     }
   }
   const res = ptyManager.spawn(opts, owner);
+  // Record the Claude Code version this agent starts on, only once its terminal
+  // is really running: a failed spawn must not count as an agent to upgrade.
+  if (res.ok && opts.hive?.id && claudeProvider) {
+    const binPath = ptyManager.commandPath(opts.command.trim().split(/\s+/)[0] || opts.command);
+    void claudeCliVersion(binPath).then((started) => {
+      if (!binPath || !started || !ptyToAgent.has(opts.id)) return;
+      ptyCli.set(opts.id, { bin: binPath, started });
+      void refreshCliUpdate();
+    });
+  }
   if (res.ok) analytics.track('agent_spawned', { provider });
   else analytics.track('agent_spawn_failed', { provider, reason: spawnFailReason(res.error) });
   syncKeepAwake(); // arm the power-save blocker while ≥1 agent PTY is alive (#18)

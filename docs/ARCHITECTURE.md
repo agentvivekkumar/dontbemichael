@@ -64,14 +64,16 @@ src/
     atomicFile.ts            crash-safe file write (temp file, fsync, rename); the secret store's writer
     closingTime.ts           Closing Time shutdown protocol (the office reopens on next launch, shared/officeOpen.ts)
                              The quit dialog lists who is still working (hook `detail` from hooks.ts toolDetail),
-                             with Remind and Close without them (never pty:kill: that archives the agent)
+                             with Remind and Close without them (never pty:kill: that archives the agent).
+                             start({relaunch}) reopens the app once closed (a Claude Code update, shared/cliUpdate.ts)
     fs.ts / git.ts           sandboxed filesystem + git bridges
     packs.ts                 loads and validates the bundled Office Packs (resources/packs/)
     agentFolders.ts          each agent's folder under ~/Documents/<Business> (Michael's), plus the Office folder
     homeFolder.ts            office (harness home) folder checks behind the "can't find your office" screen
     harnessGuard.ts          PreToolUse guard that keeps agents from saving work in the harness folder
     docText.ts / docTextCli.ts / macOcr.ts   Word, Excel, PowerPoint, PDF and scan reading (OCR via macOS Vision)
-    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor
+    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor and the
+                             Claude Code update notice (index.ts records each agent's started version)
     hireCheck.ts             the hire wizard's distinct job check (hidden Claude call, rules as fallback)
     workStyleConvert.ts      turns a plain work style into an agent's instructions and back
     transcriptText.ts        reads a hidden Claude call's answer from its own session transcript
@@ -85,6 +87,8 @@ src/
                              and quickbooksAccess (the hook's rule: the Settings switch, off by default, then per agent;
                              books roles like Oscar default to Read only)
     officeOpen.ts            the Office open message each agent gets after closing time
+    cliUpdate.ts             whether live Claude agents run an older Claude Code than the one installed
+                             (cliUpdate:status push, cliUpdate:current pull)
     folderAccess.ts          who may open and change which folder: sandbox, permission rules, hook checks
     appName.ts               app name, data folder name, dontbemichael:// URL scheme
     missions.ts              schedules: ownership, next run, the scheduler's arm plan, one-schedule edits,
@@ -121,6 +125,8 @@ src/
     OwnerViaMichaelBar,      replaces a team member's message box outside 1:1 (Message Michael / Talk 1:1)
     FloorViewToggle,         the floor's OFFICE / TASKS / GRAPH switch
     OfficeFolderMissing,     launch screen shown only when the office folder is missing
+    CliUpdateNotice,         "team upgrade ready" title-bar chip and corner note; its click runs closing time
+                             with relaunch, "later" waits for a newer version (localStorage cth.cliUpdateLaterFor)
     ToolWaterfall,           per-agent tool-span waterfall for the observability view
     TasksKanban,             dependency-aware kanban board (the floor's TASKS view)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
