@@ -1,0 +1,141 @@
+'use strict';
+
+/**
+ * The closing-time dialog's rows (owner, 2026-09-29). Structural checks: the
+ * renderer has no DOM test harness here, so these pin the wiring that the
+ * unit tests in closing-time-progress.test.cjs cannot see.
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+
+test('the dialog keeps its safety invariants: Michael by id, never excused, no terminal stopped', () => {
+  // Value: protects=the owner can never close without Michael or stop a terminal from the dialog; fails_when=the dialog hard-codes Michael, excuses him, or calls a PTY kill; why_new=row wording moved to closing-time-rows.test.cjs; seam=none
+  const src = read('src/renderer/src/components/QuitWarningModal.tsx');
+  assert.match(src, /const godId = closing\.godId;/, "Michael's row comes from the event, never a hard-coded id");
+  assert.match(src, /remindButton\(godId\)/, 'Michael can be reminded');
+  assert.doesNotMatch(src, /closeWithout[^\n]*godId|closingTimeExcuse\(godId\)/, 'never close without Michael');
+  assert.doesNotMatch(src, /ptyKill|pty:kill|killPty/, 'the dialog stops no terminal');
+  // A double click cannot send twice; focus returns after a confirm closes;
+  // an ended Michael gets no Remind (review pass 3, owner 2026-09-29).
+  assert.match(src, /if \(busy\[id\]\) return;/);
+  assert.match(src, /<MiniButton disabled=\{!!busy\[id\]\} onClick=\{\(\) => \{ void act\(id, 'remind'\); \}\}>/);
+  assert.match(src, /const keepWaiting = \(id: string\): void => \{ setConfirming\(null\); setRefocus\(id\); \};/);
+  assert.match(src, /\{!done && !godGone && <span/);
+  assert.match(src, /const godGone = closing\.godLive === false;/);
+  assert.match(src, /closing!\.phase === 'timeout' && closing!\.godLive !== false && \(/, 'no "keep waiting" advice once Michael is gone');
+  // Focus comes back after Remind and after a refused Close without them (R23).
+  assert.match(src, /setRefocus\(kind === 'excuse' \? 'keep' : id\)/);
+  assert.match(src, /buttonRef=\{keepButton\}/);
+  assert.match(src, /godGone \? t\('closingTime\.michaelEnded'\)/);
+  assert.match(src, /\{godDone && !done && !godGone && \(/, "no stale tool line under an ended Michael");
+  // While confirming, only the confirm's own Close without them shows (review R13).
+  assert.match(src, /\{confirming !== id && <MiniButton [^\n]*?onClick=\{\(\) => setConfirming\(id\)\}>/);
+  // A refusal is shown, never taken as success (review R1, owner 2026-09-29).
+  assert.match(src, /const message = actionMessage\(res, t\('closingTime\.sendFailed'\)\);\n(?:\s*\/\/[^\n]*\n)*\s+if \(message\) \{ setFailed/);
+  assert.match(src, /\{headerLine\(closing!\)\}/, 'the counter strip comes from the tested headerLine()');
+});
+
+test('App passes the new event fields through to the dialog', () => {
+  assert.match(read('src/renderer/src/App.tsx'), /const \{ phase, \.\.\.rows \} = ev;[\s\S]{0,200}setClosing\(\{ phase, \.\.\.rows \}\)/);
+});
+
+test('the tool detail and its clock are live-only: never saved, never a reason to save', () => {
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /'lastPrompt', 'actionDetail', 'actionAt'/, 'volatile: a tool call does not rewrite localStorage');
+  assert.equal((store.match(/actionDetail, actionAt, \.\.\.rest/g) || []).length, 2, 'stripped from both saved rosters');
+  assert.match(store, /'seedPrompt' \| 'actionDetail' \| 'actionAt'>/);
+});
+
+test('the clock restarts on hook events only, never from the terminal parser', () => {
+  const hive = read('src/renderer/src/hooks/useHive.ts');
+  assert.match(hive, /action: `using \$\{e\.tool\}`, actionDetail: e\.detail, actionAt: Date\.now\(\)/);
+  assert.doesNotMatch(read('src/renderer/src/hooks/usePtyParser.ts'), /actionAt|actionDetail/);
+  // Value: protects=a row never shows a finished agent's old tool detail or clock; fails_when=an idle/stop/compact hook branch stops clearing them; why_new=only the PreToolUse set was checked; seam=none
+  // Hook-event idle patches only (updateAgent(e.agentId, ...)); the silence
+  // watchdog's guess (updateAgent(a.id, ...)) leaves the detail and clock alone.
+  const idleSets = hive.match(/updateAgent\(e\.agentId, \{ status: 'idle', action: 'idle', carrying: undefined[^}]*\}/g) || [];
+  assert.equal(idleSets.length, 3, 'PostInvocation, Stop and the idle Notification');
+  for (const p of idleSets) assert.match(p, /actionDetail: undefined, actionAt: Date\.now\(\)/, p);
+  // Value: protects=a compacting or prompt-parked agent never shows the last tool's detail or its old clock; fails_when=the compact or at-prompt hook patch stops clearing them; why_new=only the idle patches were checked; seam=none
+  for (const re of [
+    /status: 'compacting', action: 'compacting context', carrying: undefined, actionDetail: undefined, actionAt: Date\.now\(\) \}/,
+    /status: 'working', action: 'resumed', carrying: undefined, actionDetail: undefined, actionAt: Date\.now\(\) \}/,
+    /\{ status: 'waiting', action: ACTION_AT_PROMPT, actionDetail: undefined, actionAt: Date\.now\(\) \}/
+  ]) assert.match(hive, re);
+});
+
+test('a terminal ending mid-close refreshes the rows, guarded for startup order', () => {
+  const main = read('src/main/index.ts');
+  assert.match(main, /try \{ if \(agentId\) closingTime\.refresh\(agentId\); \} catch \(e\) \{ console\.error\('\[closing-time\] refresh:', e\); \}/, 'a refresh failure is logged, never hidden, and never breaks teardown');
+});
+
+test('Remind and Close without them reach main on the channels main handles', () => {
+  // Value: protects=the preload and main agree on the Remind/Close-without IPC channels; fails_when=one side renames a channel so the buttons only say "Didn't send"; why_new=nothing pinned the channels; seam=none
+  const preload = read('src/preload/index.ts');
+  const main = read('src/main/index.ts');
+  for (const [channel, method] of [['app:closingTimeRemind', 'remind'], ['app:closingTimeExcuse', 'excuse']]) {
+    assert.match(preload, new RegExp(`ipcRenderer\\.invoke\\('${channel}', id\\)`), channel);
+    assert.match(main, new RegExp(`ipcMain\\.handle\\('${channel}', \\(_evt, id: unknown\\) => closingTime\\.${method}\\(id\\)\\)`), channel);
+  }
+});
+
+test('every closing-time string the dialog shows exists in English', () => {
+  // Value: protects=no row shows a raw "closingTime.x" key; fails_when=a t('closingTime.*') key is renamed or mistyped on one side; why_new=locale parity tests only compare locales, not what the code renders; seam=none
+  const src = read('src/renderer/src/components/QuitWarningModal.tsx') + read('src/renderer/src/components/closingTimeRows.ts');
+  const used = [...new Set([...src.matchAll(/\bt\('closingTime\.([A-Za-z0-9_]+)'/g)].map((m) => m[1]))];
+  assert.ok(used.includes('closeWithout') && used.includes('stillWorking'), 'sanity: both files are scanned');
+  const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).closingTime;
+  const missing = used.filter((k) => typeof en[k] !== 'string' || !en[k].trim());
+  assert.deepEqual(missing, []);
+});
+
+test('a finished tool call leaves the row: its detail clears and the clock restarts', () => {
+  // Value: protects=the owner never judges an agent by a tool call that already ended; fails_when=PostToolUse keeps the previous actionDetail; why_new=review run 2 pass B (red team); seam=none
+  const hive = read('src/renderer/src/hooks/useHive.ts');
+  assert.match(hive, /e\.event === 'PostToolUse' \|\| e\.event === 'UserPromptSubmit'[\s\S]{0,400}updateAgent\(e\.agentId, \{ status: 'working', actionDetail: undefined, actionAt: Date\.now\(\) \}\)/);
+  assert.match(hive, /action: 'thinking', actionDetail: undefined, actionAt: Date\.now\(\)/);
+});
+
+test('the non-English "terminal ended" hint names the buttons as they appear on screen', () => {
+  // Value: protects=a Chinese or Arabic owner is pointed at labels that exist; fails_when=the hint translates the English-only button names; why_new=review run 2 pass B; seam=none
+  for (const lang of ['zh-CN', 'ar']) {
+    const d = JSON.parse(read(`src/renderer/src/i18n/locales/${lang}.json`));
+    assert.match(d.closingTime.michaelEnded, /cancel and go back to work/, lang);
+    assert.match(d.closingTime.michaelEnded, /force quit now/, lang);
+  }
+});
+
+test('a tool call\'s detail and clock stay in memory: no save, and never in the saved roster (run for real)', () => {
+  // Generated by /ship coverage audit (pass 1).
+  // Value: protects=a tool call writes nothing to disk and a file name in the
+  //   detail never lands in the saved roster; fails_when=actionDetail/actionAt
+  //   leave VOLATILE_AGENT_FIELDS or slimAgents; why_new=the store was only
+  //   regex-checked; seam=none
+  const { execFileSync } = require('node:child_process');
+  const script = `
+    const mem = { 'cth.agents': JSON.stringify([{ id: 'pam', name: 'Pam' }]) };
+    let writes = 0;
+    const storage = { getItem: (k) => mem[k] ?? null, setItem: (k, v) => { if (k === 'cth.agents') writes++; mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
+    globalThis.window = { localStorage: storage, addEventListener() {}, removeEventListener() {}, dispatchEvent() {} };
+    globalThis.localStorage = storage;
+    const store = require(${JSON.stringify(path.join(__dirname, 'load-ts.cjs'))})('src/renderer/src/store/store.ts').useStore;
+    store.getState().updateAgent('pam', { status: 'working', action: 'using Read', actionDetail: 'salaries-2026.xlsx', actionAt: 123 });
+    const live = store.getState().agents.find((a) => a.id === 'pam');
+    const afterTool = writes;
+    store.getState().updateAgent('pam', { description: 'Sales' });
+    const saved = JSON.parse(mem['cth.agents']).find((a) => a.id === 'pam');
+    store.getState().addAgent({ id: 'dwight', name: 'Dwight', status: 'working', action: 'using Bash', actionDetail: 'Run the tests', actionAt: 456 }, { select: false });
+    const added = JSON.parse(mem['cth.agents']).find((a) => a.id === 'dwight');
+    process.stdout.write(JSON.stringify({ afterTool, live: [live.actionDetail, live.actionAt], writes, saved, added }));`;
+  const r = JSON.parse(execFileSync(process.execPath, ['-e', script], { cwd: path.resolve(__dirname, '..'), encoding: 'utf8' }));
+  assert.equal(r.afterTool, 0, 'a tool call alone is not a reason to save');
+  assert.deepEqual(r.live, ['salaries-2026.xlsx', 123], 'the rows still see it in memory');
+  assert.equal(r.saved.description, 'Sales', 'a durable change is saved');
+  assert.ok(!('actionDetail' in r.saved) && !('actionAt' in r.saved), JSON.stringify(r.saved));
+  assert.ok(r.added && !('actionDetail' in r.added) && !('actionAt' in r.added), JSON.stringify(r.added));
+});

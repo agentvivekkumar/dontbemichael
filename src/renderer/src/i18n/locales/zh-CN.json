@@ -1763,5 +1763,23 @@
     "moveMailboxFree": "使用 {{address}}？",
     "moveIt": "改给他",
     "keepIt": "保持不变"
+  },
+  "closingTime": {
+    "listLabel": "谁还在工作",
+    "stillWorking": "仍在工作",
+    "atPrompt": "在提示处等待",
+    "nothingToDo": "无事可做",
+    "confirmed": "已确认",
+    "excused": "不等他们了",
+    "remind": "提醒",
+    "reminded": "已提醒",
+    "closeWithout": "不等他们",
+    "keepWaiting": "继续等待",
+    "confirmClose": "不等 {{name}} 就关门？{{name}} 手头进行中的内容会丢失；{{name}} 明天会回来。",
+    "michaelWaiting": "正在等团队",
+    "michaelBoard": "正在更新看板",
+    "minutes": "{{count}} 分钟",
+    "sendFailed": "没有发送成功。请重试。",
+    "michaelEnded": "终端已结束：请点“cancel and go back to work”，或点“force quit now”"
   }
 }

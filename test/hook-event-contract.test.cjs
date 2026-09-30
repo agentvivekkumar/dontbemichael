@@ -16,6 +16,7 @@ test('accepts valid hook event payloads', () => {
     notificationType: 'permission',
     source: 'claude',
     message: 'Running a command',
+    detail: 'Run the full test suite',
     blocked: false
   }), true);
 });
@@ -36,6 +37,7 @@ test('rejects malformed optional fields', () => {
   assert.equal(validateHookEvent({ agentId: '', event: 'Stop' }), false);
   assert.equal(validateHookEvent({ agentId: 'jim-1', event: 'PreToolUse', tool: 42 }), false);
   assert.equal(validateHookEvent({ agentId: 'jim-1', event: 'Stop', blocked: 'false' }), false);
+  assert.equal(validateHookEvent({ agentId: 'jim-1', event: 'PreToolUse', detail: 7 }), false);
   assert.equal(validateHookEvent(null), false);
 });
 

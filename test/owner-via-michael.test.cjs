@@ -132,7 +132,7 @@ test('the stuck bar keys on the team member prompt marker, and the Michael prefi
   assert.match(bar, /const stuck = agent\.status === 'waiting' && agent\.action === ACTION_AT_PROMPT;/);
   assert.match(bar, /if \(!current\.trimEnd\(\)\.endsWith\(prefix\.trimEnd\(\)\)\)/);
   assert.match(read('src/renderer/src/hooks/usePtyParser.ts'), /action: ACTION_AT_PROMPT,/);
-  assert.match(read('src/renderer/src/hooks/useHive.ts'), /\{ status: 'waiting', action: ACTION_AT_PROMPT \}/);
+  assert.match(read('src/renderer/src/hooks/useHive.ts'), /\{ status: 'waiting', action: ACTION_AT_PROMPT[ ,]/);
 });
 
 test('agent panel tabs: messages, schedules, then the technical ones', () => {

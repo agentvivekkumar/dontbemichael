@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.8). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.10). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -72,6 +72,12 @@ moving, and brings you only the decisions that need you.
 - English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.10 (2026-09-29)
+- Closing time shows who is still working: every team member and Michael, confirmed, still
+  working, waiting at a prompt or nothing to do, with what each is doing and for how long.
+- Remind sends one agent the closing steps again; Close without them stops waiting for one team
+  member. Nothing is stopped, and a row goes when that agent's terminal ends.
 
 ### 0.0.9 (2026-09-28)
 - No app changes. The old project's website files, promo media and 42 of its blog posts left the

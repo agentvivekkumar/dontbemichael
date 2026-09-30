@@ -1,14 +1,11 @@
-# Don't Be Michael v0.0.9
+# Don't Be Michael v0.0.10
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.0.9
+## What's new in 0.0.10
 
-This release changes nothing in the app itself. It cleans up the repository:
-
-- **The old project's website is gone** from the repo: its pages, 42 blog posts about the old product, promo videos, badges and the old logo set.
-- **Docs match the app again:** release drops, the message queue, and company knowledge (on by default, searchable by meaning).
-- **A task to record new demo videos** of Don't Be Michael for the README.
+- **Closing time shows who is still working.** Every team member and Michael, with what each one is doing and for how long, so a long job no longer looks like a stuck one.
+- **Remind** sends one agent the closing steps again, and **Close without them** stops waiting for one team member without stopping their work.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
@@ -16,11 +13,11 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.9-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.9-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.10-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.10-mac-universal.dmg) |
 
 This release is for Mac only. Windows and Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.9.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.9.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.10.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.10.tar.gz)
 
 ## Installing on your Mac
 

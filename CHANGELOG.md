@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.10] (2026-09-29)
+
+### Added
+
+- **Closing time shows who is still working.** The quit dialog lists every team member and
+  Michael: confirmed, still working, waiting at a prompt, or nothing to do. It also shows what
+  each one is doing and for how long, for example "Run the test suite · 7 min". The line is the
+  agent's own description of the step, a file name or a site's host, never the command itself. It
+  is redacted, cut to one 80-character line, and never saved to disk.
+- **Remind.** Sends one agent, or Michael, the closing steps again: a note in their inbox and a
+  nudge at their next step. At most once every 30 seconds per agent.
+- **Close without them.** Stops waiting for one team member and tells Michael so the office can
+  close. Nothing is stopped: the agent keeps its work and its terminal ends with the others when
+  the app quits.
+- A row goes when that agent's terminal ends, and Michael is told so he stops waiting for it.
+
+### Changed
+
+- Closing time can be started again while it is running, and refuses once the app is already
+  closing or when Michael's terminal has ended.
+
 ## [0.0.9] (2026-09-28)
 
 No changes to the app itself.

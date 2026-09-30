@@ -1763,5 +1763,23 @@
     "moveMailboxFree": "Use {{address}}?",
     "moveIt": "Move it",
     "keepIt": "Keep it"
+  },
+  "closingTime": {
+    "listLabel": "Who is still working",
+    "stillWorking": "still working",
+    "atPrompt": "waiting at a prompt",
+    "nothingToDo": "nothing to do",
+    "confirmed": "confirmed",
+    "excused": "not waiting for them",
+    "remind": "Remind",
+    "reminded": "reminded",
+    "closeWithout": "Close without them",
+    "keepWaiting": "Keep waiting",
+    "confirmClose": "Close without {{name}}? Whatever {{name}} is in the middle of is lost; {{name}} is back tomorrow.",
+    "michaelWaiting": "waiting for the team",
+    "michaelBoard": "updating the board",
+    "minutes": "{{count}} min",
+    "sendFailed": "Didn't send. Try again.",
+    "michaelEnded": "terminal ended: cancel and go back to work, or force quit now"
   }
 }
