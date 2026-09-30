@@ -1,3 +1,3 @@
-- **Saved passwords and keys survive a crash mid-save:** the file is swapped in whole.
-- **An unreadable secrets file is never saved over,** so other secrets can't be erased.
-- **The secrets file is always owner-only.**
+- **Closing time shows who is still working,** with Remind and Close without them.
+- **QuickBooks through your Claude account:** one switch in Settings, Read only by default.
+- **Saved passwords and keys survive a crash mid-save.**
