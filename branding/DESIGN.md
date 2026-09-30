@@ -817,8 +817,8 @@ As §3.5. In addition:
 - Tokens are small isometric cards or glyph circles in the act color (§3.3), white ring,
   traveling along paths. Speed about 240 px/s with ease in out. At most 16 in flight;
   beyond that, counts on paths (a mono number pill) replace extra tokens.
-- Flow rules, which mirror the product: mailbox posts and schedules feed Michael or the
-  mailbox's owner; Michael feeds everyone; teammates exchange `query` tokens directly;
+- Flow rules, which mirror the product: each mailbox post feeds the person who watches it
+  (a team member reads its own mailbox; mail does not pass through Michael); Michael feeds everyone; teammates exchange `query` tokens directly;
   a teammate who is stuck sends a `query` to Michael; only Michael sends `act-you` tokens,
   which leave the stage toward the right column.
 - A finished job sends a green check token from the pod to Michael's task board.
@@ -841,10 +841,13 @@ that is working or needs you.
 - Departments, not seats. Each department has one pod holding up to 4 desks (1: single
   desk; 2: side by side; 3 and 4: a 2 × 2 cluster). A fifth person in a department opens a
   second pod for it.
-- Up to 8 department pods sit on a ring around Michael's pod. 9 to 12 use an outer ring on
-  a larger platform scaled to fit.
-- Above about 30 people the Office view switches to a compact grid of label cards grouped
-  by department, with the same states and badges.
+- Up to 7 department pods sit on a ring around Michael's pod, each department in the same
+  slot every day (front desk, marketing, support, sales, finance, IT, people; operations
+  and team take any free slot).
+- More pods than slots, or more than 28 people, switches the Office view to a compact grid
+  of label cards grouped by department, with the same states and badges.
+- A department is read from the job card a person was hired with, then their character's
+  usual job, then the start of their role line; anything else sits in the team pod.
 - One person (Michael only): the platform with the glass pod alone.
 
 ### 8.10 Themes and direction

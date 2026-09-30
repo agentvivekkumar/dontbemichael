@@ -48,16 +48,16 @@
     "tok": "tok"
   },
   "badge": {
-    "idle": "idle",
-    "thinking": "working",
-    "working": "working",
-    "waiting": "waiting",
-    "blocked": "needs you",
-    "success": "done",
-    "ghost": "gone",
-    "compacting": "compacting",
-    "looping": "looping",
-    "typing": "your draft"
+    "idle": "Idle",
+    "thinking": "Thinking",
+    "working": "Working",
+    "waiting": "Waiting",
+    "blocked": "Needs you",
+    "success": "Done",
+    "ghost": "Gone",
+    "compacting": "Tidying up",
+    "looping": "Stuck",
+    "typing": "Your draft"
   },
   "agentControl": {
     "deliveryPaused": "queued messages held (whole floor)",
@@ -1841,5 +1841,35 @@
     "noAgentTitle": "Your office is empty",
     "noAgentBody": "Hire your first team member to get started.",
     "queued": "Waiting for {{godName}}: {{count}}"
+  },
+  "studio": {
+    "summary": "{{count}} people in the office",
+    "officeManager": "Office Manager",
+    "runningTheOffice": "Running the office",
+    "delegated": "delegated",
+    "toYou": "to you",
+    "kept": "kept",
+    "todo": "To do",
+    "doingCol": "Doing",
+    "blocked": "Blocked",
+    "done": "Done",
+    "context": "Context",
+    "doing": "Doing {{count}}",
+    "forYou": "{{count}} for you",
+    "nothingNow": "Nothing right now",
+    "noOwner": "Nobody yet",
+    "mailboxBroken": "Password stopped working",
+    "fix": "Fix",
+    "dept": {
+      "front-desk": "Front desk",
+      "support": "Support",
+      "sales": "Sales",
+      "finance": "Finance",
+      "marketing": "Marketing",
+      "people": "People",
+      "it": "IT",
+      "operations": "Operations",
+      "team": "Team"
+    }
   }
 }

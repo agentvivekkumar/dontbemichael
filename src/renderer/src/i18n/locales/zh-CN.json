@@ -49,7 +49,7 @@
   },
   "badge": {
     "idle": "空闲",
-    "thinking": "工作中",
+    "thinking": "思考中",
     "working": "工作中",
     "waiting": "等待中",
     "blocked": "需要你",
@@ -1841,5 +1841,35 @@
     "noAgentTitle": "你的办公室还是空的",
     "noAgentBody": "招聘第一位团队成员即可开始。",
     "queued": "等待 {{godName}} 处理：{{count}}"
+  },
+  "studio": {
+    "summary": "办公室里有 {{count}} 人",
+    "officeManager": "办公室经理",
+    "runningTheOffice": "管理办公室",
+    "delegated": "已分派",
+    "toYou": "待你处理",
+    "kept": "自留",
+    "todo": "待办",
+    "doingCol": "进行中",
+    "blocked": "已阻塞",
+    "done": "已完成",
+    "context": "上下文",
+    "doing": "进行中 {{count}}",
+    "forYou": "{{count}} 项待你处理",
+    "nothingNow": "暂无事项",
+    "noOwner": "暂无负责人",
+    "mailboxBroken": "密码已失效",
+    "fix": "修复",
+    "dept": {
+      "front-desk": "前台",
+      "support": "客服",
+      "sales": "销售",
+      "finance": "财务",
+      "marketing": "市场",
+      "people": "人事",
+      "it": "IT",
+      "operations": "运营",
+      "team": "团队"
+    }
   }
 }

@@ -1,0 +1,353 @@
+/**
+ * The studio illustration (branding/DESIGN.md 8): platform, department pods,
+ * Michael's glass pod, mailbox posts and the paths between them. Pure SVG, drawn
+ * on the fixed 1060 x 816 stage; StudioStage scales it and lays the HTML cards
+ * over it. Ported from the approved reference generator.
+ */
+import { Fragment, type ReactNode } from 'react';
+import { P, curvePts, dpath, pts, type Pt } from './iso';
+import { Box, EllipseAt, Poly } from './shapes';
+import type { Family, SceneTokens } from './theme';
+
+/** What a desk's screen and floor show (DESIGN.md 3.5, 8.5). */
+export type DeskState = 'working' | 'thinking' | 'waiting' | 'needs' | 'compacting' | 'looping' | 'success' | 'idle';
+
+/* ── Shared defs ──────────────────────────────────────────────────────────── */
+
+export function StudioDefs({ T, families }: { T: SceneTokens; families: Record<string, Family> }) {
+  return (
+    <defs>
+      {Object.entries(families).map(([k, c]) => (
+        <Fragment key={k}>
+          <radialGradient id={`st-glow-${k}`}>
+            <stop offset="0" stopColor={c.acc} stopOpacity={T.glowOp[0]} />
+            <stop offset=".55" stopColor={c.acc} stopOpacity={T.glowOp[1]} />
+            <stop offset="1" stopColor={c.acc} stopOpacity={0} />
+          </radialGradient>
+          <linearGradient id={`st-scr-${k}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor={T.scr0} />
+            <stop offset=".55" stopColor={c.lit} />
+            <stop offset="1" stopColor={c.litM} />
+          </linearGradient>
+        </Fragment>
+      ))}
+      <radialGradient id="st-glow-coral"><stop offset="0" stopColor={T.coral} stopOpacity=".40" /><stop offset=".55" stopColor={T.coral} stopOpacity=".12" /><stop offset="1" stopColor={T.coral} stopOpacity="0" /></radialGradient>
+      <radialGradient id="st-glow-violet"><stop offset="0" stopColor={T.violet} stopOpacity=".36" /><stop offset=".55" stopColor={T.violet} stopOpacity=".12" /><stop offset="1" stopColor={T.violet} stopOpacity="0" /></radialGradient>
+      <radialGradient id="st-glow-hub"><stop offset="0" stopColor="#7C6CF2" stopOpacity=".30" /><stop offset=".6" stopColor="#7C6CF2" stopOpacity=".08" /><stop offset="1" stopColor="#7C6CF2" stopOpacity="0" /></radialGradient>
+      <linearGradient id="st-floor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={T.floor0} /><stop offset="1" stopColor={T.floor1} /></linearGradient>
+      <linearGradient id="st-glassB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={T.glassB[0]} stopOpacity={T.glassB[1]} /><stop offset="1" stopColor={T.glassB[2]} stopOpacity={T.glassB[3]} /></linearGradient>
+      <linearGradient id="st-glassF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={T.glassF[0]} stopOpacity={T.glassF[1]} /><stop offset="1" stopColor={T.glassF[2]} stopOpacity={T.glassF[3]} /></linearGradient>
+      <linearGradient id="st-scr-hub" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset=".5" stopColor="#E6E2FF" /><stop offset="1" stopColor="#B9B0F7" /></linearGradient>
+      <linearGradient id="st-scr-think" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset=".5" stopColor="#EDE5FF" /><stop offset="1" stopColor="#C8B4FA" /></linearGradient>
+      <linearGradient id="st-scr-needs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset=".5" stopColor="#FFE6E7" /><stop offset="1" stopColor="#FFB9BB" /></linearGradient>
+      <linearGradient id="st-beam" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#7C6CF2" stopOpacity="0" /><stop offset=".4" stopColor="#7C6CF2" stopOpacity=".18" /><stop offset="1" stopColor="#7C6CF2" stopOpacity="0" /></linearGradient>
+      <filter id="st-soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="14" /></filter>
+      <filter id="st-halo" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" /></filter>
+      <marker id="st-arr-coral" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M1,1 L8,5 L1,9" fill="none" stroke={T.coral} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </marker>
+    </defs>
+  );
+}
+
+/* ── Platform ─────────────────────────────────────────────────────────────── */
+
+export function Platform({ T }: { T: SceneTokens }) {
+  const A = 5;
+  const TH = 22;
+  const shadow = [P(-A, -A, -TH - 10), P(A, -A, -TH - 10), P(A, A, -TH - 10), P(-A, A, -TH - 10)].map(([x, y]) => [x, y + 26] as Pt);
+  const lines: ReactNode[] = [];
+  for (let i = -4; i <= 4; i++) {
+    const [a, b, c, d] = [P(i, -A), P(i, A), P(-A, i), P(A, i)];
+    lines.push(<line key={`a${i}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={T.grid} strokeOpacity={T.gridOp} strokeWidth={1} />);
+    lines.push(<line key={`b${i}`} x1={c[0]} y1={c[1]} x2={d[0]} y2={d[1]} stroke={T.grid} strokeOpacity={T.gridOp} strokeWidth={1} />);
+  }
+  return (
+    <g>
+      <polygon points={pts(shadow)} fill={T.platSh} opacity={T.platShOp} filter="url(#st-soft)" />
+      <Poly ps={[P(-A, A, 0), P(A, A, 0), P(A, A, -TH), P(-A, A, -TH)]} fill={T.platL} />
+      <Poly ps={[P(A, -A, 0), P(A, A, 0), P(A, A, -TH), P(A, -A, -TH)]} fill={T.platR} />
+      <polyline points={pts([P(-A, A, -TH + 6), P(A, A, -TH + 6), P(A, -A, -TH + 6)])} fill="none" stroke="#FFFFFF" strokeOpacity={T.bandOp} strokeWidth={1} />
+      <polygon points={pts([P(-A, -A), P(A, -A), P(A, A), P(-A, A)])} fill="url(#st-floor)" />
+      {lines}
+      <polyline points={pts([P(-A, A), P(A, A), P(A, -A)])} fill="none" stroke={T.edgeF} strokeWidth={1.6} />
+      <polyline points={pts([P(-A, A), P(-A, -A), P(A, -A)])} fill="none" stroke={T.edgeB} strokeWidth={1} />
+    </g>
+  );
+}
+
+/* ── A desk (station) ─────────────────────────────────────────────────────── */
+
+export function Station({ gx, gy, st, sc = 1, plant = false, c, famKey, T, dark }: {
+  gx: number; gy: number; st: DeskState; sc?: number; plant?: boolean; c: Family; famKey: string; T: SceneTokens; dark: boolean;
+}) {
+  const mz0 = 33;
+  const mh = sc >= 1 ? 24 : 21;
+  const mw = 0.36 * sc;
+  const iw = mw - 0.04;
+  const scr = [P(gx - iw, gy - 0.37, mz0 + 2.5), P(gx + iw, gy - 0.37, mz0 + 2.5), P(gx + iw, gy - 0.37, mz0 + mh - 2.5), P(gx - iw, gy - 0.37, mz0 + mh - 2.5)];
+  const on = st !== 'idle';
+  const screenFill = st === 'idle' ? T.scrOff
+    : st === 'thinking' || st === 'compacting' ? 'url(#st-scr-think)'
+    : st === 'needs' ? 'url(#st-scr-needs)'
+    : `url(#st-scr-${famKey})`;
+  const lineColor = st === 'thinking' || st === 'compacting' ? T.violet : st === 'needs' ? T.coral : c.acc;
+  const cw = 0.19 * Math.min(sc, 1);
+  const lines = st === 'working' || st === 'needs' || st === 'thinking' || st === 'looping' || st === 'success';
+  return (
+    <g className={st === 'working' ? 'cth-st-breathe' : undefined}>
+      <Box gx={gx - 0.5 * sc} gy={gy - 0.48} w={1.0 * sc} d={0.56} h={22} z0={6} top={T.desk} left={c.m} right={c.d} T={T} />
+      <Box gx={gx - 0.04} gy={gy - 0.38} w={0.08} d={0.05} h={5} z0={28} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
+      <Box gx={gx - 0.14 * sc} gy={gy - 0.42} w={0.28 * sc} d={0.12} h={1.5} z0={28} top={T.kbase} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
+      <Box gx={gx - mw} gy={gy - 0.42} w={2 * mw} d={0.05} h={mh} z0={mz0} top={T.mon[0]} left={T.mon[1]} right={T.mon[2]} rim={false} T={T} />
+      {dark && on && <polygon points={pts(scr)} fill={lineColor} opacity={0.75} filter="url(#st-halo)" />}
+      <polygon points={pts(scr)} fill={screenFill} />
+      {lines && [[-0.72, 0.33], [-0.72, 0.55], [-0.72, 0.05]].map(([x0, x1], i) => {
+        const zz = mz0 + mh - 7 - i * 5;
+        const [a, b] = [P(gx + x0 * iw, gy - 0.37, zz), P(gx + x1 * iw, gy - 0.37, zz)];
+        return <line key={i} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={lineColor} strokeWidth={1.6} strokeLinecap="round" opacity={0.9 - i * 0.2} />;
+      })}
+      {on && st !== 'waiting' && (
+        <polygon points={pts([P(gx - 0.34 * sc, gy - 0.3, 28.2), P(gx + 0.34 * sc, gy - 0.3, 28.2), P(gx + 0.3 * sc, gy + 0.02, 28.2), P(gx - 0.3 * sc, gy + 0.02, 28.2)])} fill={lineColor} opacity={T.spillOp} />
+      )}
+      <polygon points={pts([P(gx - 0.2 * sc, gy - 0.12, 28.3), P(gx + 0.18 * sc, gy - 0.12, 28.3), P(gx + 0.18 * sc, gy, 28.3), P(gx - 0.2 * sc, gy, 28.3)])} fill={T.kb} stroke={T.kbBd} strokeWidth={0.8} />
+      <Box gx={gx + 0.38 * sc - 0.08} gy={gy - 0.08} w={0.1} d={0.1} h={7} z0={28} top={T.mug} left={c.acc} right={c.d} rim={false} T={T} />
+      {/* chair */}
+      <Box gx={gx - 0.03} gy={gy + 0.3} w={0.06} d={0.06} h={12} z0={6} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
+      <Box gx={gx - cw} gy={gy + 0.2} w={2 * cw} d={0.32} h={4} z0={16} top={T.seat[0]} left={T.seat[1]} right={T.seat[2]} T={T} />
+      <Box gx={gx - cw} gy={gy + 0.46} w={2 * cw} d={0.07} h={20} z0={20} top={T.back[0]} left={T.back[1]} right={T.back[2]} T={T} />
+      {plant && <Plant gx={gx - 0.47 * sc} gy={gy - 0.45} T={T} />}
+      {(st === 'thinking') && <ThinkBubble at={P(gx + 0.1, gy - 0.4, 70)} T={T} />}
+      {st === 'compacting' && <CompactGlyph at={P(gx + 0.25 * sc, gy - 0.2, 36)} T={T} />}
+      {st === 'looping' && <LoopRing at={P(gx, gy + 0.36, 16)} T={T} />}
+      {st === 'success' && <CheckBurst at={P(gx, gy - 0.4, 74)} T={T} />}
+    </g>
+  );
+}
+
+function Plant({ gx, gy, T }: { gx: number; gy: number; T: SceneTokens }) {
+  const [x, y] = P(gx + 0.06, gy + 0.06, 42);
+  return (
+    <g>
+      <Box gx={gx} gy={gy} w={0.12} d={0.12} h={7} z0={28} top={T.pot[0]} left={T.pot[1]} right={T.pot[2]} rim={false} T={T} />
+      <circle cx={x - 3} cy={y + 2} r={5.2} fill="#6BCB94" />
+      <circle cx={x + 3} cy={y} r={5.5} fill="#4DB97E" />
+      <circle cx={x} cy={y - 4} r={4.8} fill="#86D9A8" />
+    </g>
+  );
+}
+
+function ThinkBubble({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
+  return (
+    <g className="cth-st-think">
+      <rect x={x - 17} y={y - 9} width={34} height={18} rx={9} fill={T.bub} stroke={T.bubBd} />
+      {[0, 1, 2].map((i) => <circle key={i} cx={x - 8 + i * 8} cy={y} r={2.4} fill={T.violet} opacity={1 - i * 0.25} />)}
+    </g>
+  );
+}
+
+function CompactGlyph({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
+  return (
+    <g>
+      <rect x={x - 7} y={y - 6} width={14} height={11} rx={2} fill={T.bub} stroke={T.violet} strokeWidth={1.4} />
+      <path d={`M${x - 7},${y - 2} h14 M${x - 2},${y - 2} v3 h4 v-3`} fill="none" stroke={T.violet} strokeWidth={1.2} />
+    </g>
+  );
+}
+
+function LoopRing({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
+  return (
+    <ellipse className="cth-st-spin" cx={x} cy={y} rx={22} ry={11} fill="none" stroke={T.amber} strokeWidth={2} strokeDasharray="14 8" />
+  );
+}
+
+function CheckBurst({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
+  return (
+    <g className="cth-st-burst">
+      <circle cx={x} cy={y} r={11} fill={T.green} />
+      <path d={`M${x - 4.5},${y} l3,3 l6,-6`} fill="none" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/* ── A department pod ─────────────────────────────────────────────────────── */
+
+export interface PodDesk { st: DeskState }
+
+/** Desk offsets for a pod of 1 to 4 people (DESIGN.md 8.9). */
+function deskSpots(n: number): { dx: number; dy: number; sc: number }[] {
+  if (n <= 1) return [{ dx: 0, dy: 0, sc: 1 }];
+  if (n === 2) return [{ dx: -0.48, dy: 0, sc: 0.9 }, { dx: 0.48, dy: 0, sc: 0.9 }];
+  const back = [{ dx: -0.48, dy: -0.5, sc: 0.9 }, { dx: 0.48, dy: -0.5, sc: 0.9 }];
+  const front = n === 3 ? [{ dx: 0, dy: 0.62, sc: 0.9 }] : [{ dx: -0.48, dy: 0.62, sc: 0.9 }, { dx: 0.48, dy: 0.62, sc: 0.9 }];
+  return [...back, ...front];
+}
+
+export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark }: {
+  grid: Pt; desks: PodDesk[]; c: Family; famKey: string; selected: boolean; T: SceneTokens; dark: boolean;
+}) {
+  const n = desks.length;
+  const hw = n === 1 ? 0.65 : 1.0;
+  const hd = n <= 2 ? 0.65 : 1.2;
+  const spots = deskSpots(n);
+  const allIdle = desks.every((d) => d.st === 'idle');
+  const needs = desks.some((d) => d.st === 'needs');
+  return (
+    <g className={allIdle ? 'cth-st-idle' : undefined}>
+      <Box gx={gx - hw} gy={gy - hd} w={2 * hw} d={2 * hd} h={6} z0={0} top={c.l} left={c.m} right={c.d} T={T} />
+      <polygon points={pts([P(gx - hw + 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy + hd - 0.1, 6), P(gx - hw + 0.1, gy + hd - 0.1, 6)])}
+        fill="none" stroke={T.inset} strokeOpacity={T.insetOp} strokeWidth={1} />
+      {spots.map((sp, i) => {
+        const d = desks[i];
+        const inner = <Station gx={gx + sp.dx} gy={gy + sp.dy} st={d.st} sc={sp.sc} plant={i === 0 && n <= 2} c={c} famKey={famKey} T={T} dark={dark} />;
+        return <g key={i} className={d.st === 'idle' && !allIdle ? 'cth-st-idle' : undefined}>{inner}</g>;
+      })}
+      {needs && <Beacon at={[gx + 0.42, gy - hd + 0.2]} T={T} />}
+      {selected && (
+        <EllipseAt gx={gx} gy={gy} z={2} r={Math.max(hw, hd) + 0.3} fill="none" stroke={dark ? '#ECEAF4' : '#1E1B2E'} strokeWidth={1.6} strokeDasharray="6 4" />
+      )}
+    </g>
+  );
+}
+
+/** Floor glow under a pod, drawn beneath everything (DESIGN.md 8.3). */
+export function PodGlow({ grid: [gx, gy], desks, famKey }: { grid: Pt; desks: PodDesk[]; famKey: string }) {
+  const sts = desks.map((d) => d.st);
+  if (sts.includes('needs')) return <EllipseAt gx={gx} gy={gy} z={0} r={1.3} fill="url(#st-glow-coral)" className="cth-st-breathe" />;
+  if (sts.includes('working') || sts.includes('looping') || sts.includes('success')) return <EllipseAt gx={gx} gy={gy} z={0} r={1.25} fill={`url(#st-glow-${famKey})`} />;
+  if (sts.includes('thinking') || sts.includes('compacting')) return <EllipseAt gx={gx} gy={gy} z={0} r={1.2} fill="url(#st-glow-violet)" />;
+  return null;
+}
+
+function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
+  const [a, b] = [P(bx, by, 28), P(bx, by, 76)];
+  return (
+    <g>
+      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={T.pole} strokeWidth={2} strokeLinecap="round" />
+      <ellipse className="cth-st-ring" cx={b[0]} cy={b[1]} rx={16} ry={16} fill="none" stroke={T.coral} strokeWidth={1.6} />
+      <circle cx={b[0]} cy={b[1]} r={13} fill={T.coral} opacity={0.18} />
+      <circle cx={b[0]} cy={b[1]} r={7.5} fill={T.coral} />
+      <circle cx={b[0] - 2.2} cy={b[1] - 2.4} r={2.4} fill="#FFFFFF" opacity={0.75} />
+    </g>
+  );
+}
+
+/* ── Michael's glass pod ──────────────────────────────────────────────────── */
+
+export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number } }) {
+  const a = 1.05;
+  const ph = 14;
+  const wh = 58;
+  const z0 = ph;
+  const z1 = ph + wh;
+  const bz0 = z0 + 26;
+  const bz1 = z0 + 50;
+  const cols: [number, string, number][] = [
+    [-0.9, '#B7B2DD', board.todo], [-0.52, T.blue, board.doing], [-0.14, T.coral, board.blocked], [0.24, T.green, board.done]
+  ];
+  const [mx, my] = P(0, -0.2, 96);
+  const beam = [P(-0.15, -0.2, ph + 50), P(0.15, -0.2, ph + 50)];
+  return (
+    <g>
+      <EllipseAt gx={0} gy={0} z={0} r={2.2} fill="url(#st-glow-hub)" />
+      <Box gx={-a - 0.12} gy={-a - 0.12} w={2 * a + 0.24} d={2 * a + 0.24} h={5} z0={0} top={T.hbBase[0]} left={T.hbBase[1]} right={T.hbBase[2]} T={T} />
+      <Box gx={-a} gy={-a} w={2 * a} d={2 * a} h={ph - 5} z0={5} top={T.hbFloor[0]} left={T.hbFloor[1]} right={T.hbFloor[2]} T={T} />
+      <EllipseAt gx={0} gy={0} z={ph} r={0.92} fill="none" stroke={T.ring} strokeOpacity={0.35} strokeWidth={1.5} />
+      <EllipseAt gx={0} gy={0} z={ph} r={0.72} fill="none" stroke={T.ring} strokeOpacity={0.18} strokeWidth={1} strokeDasharray="2 4" />
+      <polygon points={pts([P(-a, -a, z0), P(-a, a, z0), P(-a, a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
+      <polygon points={pts([P(-a, -a, z0), P(a, -a, z0), P(a, -a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
+      {/* the task board on the back glass: one sticky per task, up to 4 per column */}
+      <polygon points={pts([P(-a + 0.01, -0.95, bz0), P(-a + 0.01, 0.55, bz0), P(-a + 0.01, 0.55, bz1), P(-a + 0.01, -0.95, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
+      {cols.map(([g0, col, n]) => Array.from({ length: Math.min(n, 4) }, (_, j) => {
+        const zz = bz1 - 5 - j * 5;
+        return <polygon key={`${g0}-${j}`} points={pts([P(-a + 0.02, g0 + 0.04, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz), P(-a + 0.02, g0 + 0.04, zz)])} fill={col} opacity={0.9} />;
+      }))}
+      {[[P(-a, a, z0), P(-a, a, z1)], [P(-a, -a, z0), P(-a, -a, z1)], [P(a, -a, z0), P(a, -a, z1)]].map(([p0, p1], i) => (
+        <line key={i} x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} stroke={T.wall} strokeWidth={1.4} />
+      ))}
+      <polyline points={pts([P(-a, a, z1), P(-a, -a, z1), P(a, -a, z1)])} fill="none" stroke={T.wall} strokeWidth={1.6} />
+      <Box gx={-0.62} gy={-0.5} w={1.24} d={0.6} h={22} z0={ph} top={T.hdesk[0]} left={T.hdesk[1]} right={T.hdesk[2]} T={T} />
+      {[-0.36, 0.12].map((ox) => {
+        const scr = [P(ox - 0.04, -0.4, ph + 29.5), P(ox + 0.36, -0.4, ph + 29.5), P(ox + 0.36, -0.4, ph + 46.5), P(ox - 0.04, -0.4, ph + 46.5)];
+        return (
+          <g key={ox} className="cth-st-breathe">
+            <Box gx={ox + 0.1} gy={-0.42} w={0.06} d={0.05} h={5} z0={ph + 22} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
+            <Box gx={ox - 0.07} gy={-0.45} w={0.46} d={0.05} h={22} z0={ph + 27} top={T.mon[0]} left={T.mon[1]} right={T.mon[2]} rim={false} T={T} />
+            {dark && <polygon points={pts(scr)} fill="#8C80F0" opacity={0.8} filter="url(#st-halo)" />}
+            <polygon points={pts(scr)} fill="url(#st-scr-hub)" />
+            {[0, 1].map((i) => {
+              const zz = ph + 42 - i * 5;
+              const [p1, p2] = [P(ox + 0.01, -0.4, zz), P(ox + 0.24 - i * 0.08, -0.4, zz)];
+              return <line key={i} x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#6C5CE7" strokeWidth={1.5} strokeLinecap="round" opacity={0.8} />;
+            })}
+          </g>
+        );
+      })}
+      <polygon points={pts([P(-0.2, -0.16, ph + 22.3), P(0.2, -0.16, ph + 22.3), P(0.2, -0.04, ph + 22.3), P(-0.2, -0.04, ph + 22.3)])} fill={T.kb} stroke={T.kbBd} strokeWidth={0.8} />
+      <Box gx={0.36} gy={-0.2} w={0.2} d={0.16} h={3} z0={ph + 22} top={T.tray[0]} left={T.tray[1]} right={T.tray[2]} rim={false} T={T} />
+      <Box gx={0.38} gy={-0.18} w={0.16} d={0.12} h={2} z0={ph + 25} top={T.tray2[0]} left={T.tray2[1]} right={T.tray2[2]} rim={false} T={T} />
+      <Box gx={-0.03} gy={0.28} w={0.06} d={0.06} h={12} z0={ph} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
+      <Box gx={-0.2} gy={0.18} w={0.4} d={0.34} h={4} z0={ph + 10} top={T.hseat[0]} left={T.hseat[1]} right={T.hseat[2]} T={T} />
+      <Box gx={-0.2} gy={0.46} w={0.4} d={0.07} h={20} z0={ph + 14} top={T.hback[0]} left={T.hback[1]} right={T.hback[2]} T={T} />
+      <path d={`M${beam[0][0]},${beam[0][1]} L${mx - 13},${my} L${mx + 13},${my} L${beam[1][0]},${beam[1][1]} Z`} fill="url(#st-beam)" />
+      <circle cx={mx} cy={my} r={17} fill="#7C6CF2" opacity={0.14} />
+      <circle cx={mx} cy={my} r={12.5} fill={T.mbg} />
+      <text x={mx} y={my + 4.3} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={12} fill="#fff">M</text>
+      <polygon points={pts([P(-a, a, z0), P(a, a, z0), P(a, a, z1), P(-a, a, z1)])} fill="url(#st-glassF)" />
+      <polygon points={pts([P(a, -a, z0), P(a, a, z0), P(a, a, z1), P(a, -a, z1)])} fill="url(#st-glassF)" />
+      {[[-0.7, -0.45], [-0.3, -0.2]].map(([g0, g1]) => (
+        <polygon key={g0} points={pts([P(g0, a, z0 + 6), P(g1, a, z0 + 6), P(g1 + 0.25, a, z1 - 6), P(g0 + 0.25, a, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[0]} />
+      ))}
+      <polygon points={pts([P(a, 0.2, z0 + 6), P(a, 0.38, z0 + 6), P(a, 0.13, z1 - 6), P(a, -0.05, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[1]} />
+      <polyline points={pts([P(-a, a, z1), P(a, a, z1), P(a, -a, z1)])} fill="none" stroke={T.wall} strokeWidth={1.8} />
+      <line x1={P(a, a, z0)[0]} y1={P(a, a, z0)[1]} x2={P(a, a, z1)[0]} y2={P(a, a, z1)[1]} stroke={T.wall} strokeWidth={1.6} />
+      <line x1={P(-0.25, a, z0)[0]} y1={P(-0.25, a, z0)[1]} x2={P(0.25, a, z0)[0]} y2={P(0.25, a, z0)[1]} stroke="#7C6CF2" strokeOpacity={0.5} strokeWidth={2} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/* ── Mailbox post ─────────────────────────────────────────────────────────── */
+
+export function MailPost({ gx, gy, broken, c, T }: { gx: number; gy: number; broken: boolean; c: Family | null; T: SceneTokens }) {
+  const [top, left, right] = broken || !c ? T.bill : [c.m, T.boxFront, c.d];
+  const acc = broken || !c ? T.coral : c.acc;
+  const [sa, sb] = [P(gx - 0.16, gy + 0.2, 43), P(gx + 0.16, gy + 0.2, 43)];
+  const [wx, wy] = P(gx, gy, 78);
+  return (
+    <g>
+      <EllipseAt gx={gx} gy={gy} z={0} r={0.36} fill={T.papSh} opacity={0.1} />
+      <Box gx={gx - 0.24} gy={gy - 0.24} w={0.48} d={0.48} h={4} z0={0} top={T.postB[0]} left={T.postB[1]} right={T.postB[2]} T={T} />
+      <Box gx={gx - 0.06} gy={gy - 0.06} w={0.12} d={0.12} h={26} z0={4} top={T.postP[0]} left={T.postP[1]} right={T.postP[2]} rim={false} T={T} />
+      <Box gx={gx - 0.27} gy={gy - 0.2} w={0.54} d={0.4} h={20} z0={30} top={top} left={left} right={right} T={T} />
+      <Poly ps={[P(gx - 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 34), P(gx - 0.27, gy + 0.2, 34)]} fill={acc} opacity={0.85} />
+      <line x1={sa[0]} y1={sa[1]} x2={sb[0]} y2={sb[1]} stroke={T.slot} strokeWidth={2.4} strokeLinecap="round" />
+      {!broken && (
+        <polygon points={pts([P(gx - 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 50), P(gx - 0.1, gy + 0.2, 50)])} fill={T.env} stroke={acc} strokeWidth={1} />
+      )}
+      <polygon points={pts([P(gx + 0.27, gy - 0.05, 40), P(gx + 0.27, gy + 0.08, 40), P(gx + 0.27, gy + 0.08, 58), P(gx + 0.27, gy - 0.05, 58)])} fill={acc} />
+      {broken && (
+        <g className="cth-st-blink">
+          <line x1={wx} y1={wy + 10} x2={wx} y2={wy + 18} stroke={T.coral} strokeWidth={1.5} />
+          <path d={`M${wx},${wy - 9} L${wx + 9.5},${wy + 7} L${wx - 9.5},${wy + 7} Z`} fill={T.coral} stroke={T.coral} strokeWidth={2} strokeLinejoin="round" />
+          <text x={wx} y={wy + 5.5} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={10} fill="#fff">!</text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+/* ── Paths on the floor ───────────────────────────────────────────────────── */
+
+export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T }: {
+  a: Pt; b: Pt; bend: number; color: string; width: number; opacity?: number; dash?: string; T: SceneTokens;
+}) {
+  const sh = dpath(curvePts(a, b, bend, 0));
+  const ln = dpath(curvePts(a, b, bend, 5));
+  return (
+    <g>
+      <path d={sh} fill="none" stroke={T.flowSh} strokeOpacity={T.flowShOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
+      <path d={ln} fill="none" stroke={T.under} strokeOpacity={T.underOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
+      <path d={ln} fill="none" stroke={color} strokeOpacity={opacity} strokeWidth={width} strokeLinecap="round" strokeDasharray={dash} />
+    </g>
+  );
+}

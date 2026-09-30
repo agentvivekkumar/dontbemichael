@@ -4,7 +4,7 @@ import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
-import { OfficeFloor } from '@/scene/office/OfficeFloor';
+import { StudioStage } from '@/scene/studio/StudioStage';
 import { FloorViewIntro } from '@/components/FloorViewToggle';
 import { TasksKanban } from '@/components/TasksKanban';
 import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
@@ -314,7 +314,7 @@ export function App() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', background: 'var(--cth-bg)' }}>
-          <OfficeFloor />
+          <StudioStage config={config} />
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
           {agentCount === 0 && godStatus !== 'booting' && (
             <div style={{

@@ -182,6 +182,28 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
   50% { transform: translateY(-3px); }
 }
 
+/* ── The studio (branding/DESIGN.md 8, 11) ──────────────────────────────── */
+.cth-st-breathe { animation: cth-breathe 2.4s ease-in-out infinite; }
+.cth-st-blink { animation: cth-blink 1.6s ease-in-out infinite; }
+.cth-st-ring { transform-box: fill-box; transform-origin: center; animation: cth-ring 1.8s ease-out infinite; }
+.cth-st-think { animation: cth-breathe 1.8s ease-in-out infinite; }
+.cth-st-spin { transform-box: fill-box; transform-origin: center; animation: cth-spin 2.4s linear infinite; }
+.cth-st-burst { transform-box: fill-box; transform-origin: center; animation: cth-burst 900ms var(--cth-ease) both; }
+.cth-st-idle { filter: saturate(.25); opacity: .82; }
+:root[data-cth-theme='dark'] .cth-st-idle { filter: saturate(.45) brightness(1.15); opacity: .95; }
+.cth-studio-paused * { animation-play-state: paused !important; }
+.cth-st-quote {
+  position: absolute; white-space: nowrap; pointer-events: none;
+  padding: 5px 10px; border-radius: 12px 12px 12px 3px;
+  background: var(--cth-neutral-soft); box-shadow: inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm);
+  font-size: 10.5px; font-style: italic; color: var(--cth-ink-3);
+  animation: cth-fade 6s var(--cth-ease) both;
+}
+@keyframes cth-spin { to { transform: rotate(360deg); } }
+@keyframes cth-burst { 0% { transform: scale(.4); opacity: 0; } 40% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes cth-fade { 0% { opacity: 0; } 7% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: 0; } }
+.cth-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0s !important; transition-duration: 0s !important; }
