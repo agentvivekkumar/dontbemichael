@@ -35,7 +35,7 @@ const wrap: React.CSSProperties = {
 };
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--cth-font-display)',
-  fontSize: 8,
+  fontSize: 10, fontWeight: 600,
   lineHeight: '12px',
   color: 'var(--cth-ink-500)',
   textTransform: 'uppercase'

@@ -21,7 +21,7 @@ export function InfoTip({ text, label }: { text: string; label?: string }) {
         aria-describedby={open ? id : undefined}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+        onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); } }}
         // Inside a <label>, a click would otherwise focus the field.
         onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
         style={iconButton}

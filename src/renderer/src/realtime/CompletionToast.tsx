@@ -118,7 +118,7 @@ export function CompletionToast(): JSX.Element | null {
               alignItems: 'center',
               gap: 8,
               fontFamily: 'var(--cth-font-display)',
-              fontSize: 8,
+              fontSize: 10, fontWeight: 600,
               lineHeight: '12px',
               color: 'var(--cth-ink-900)',
               textTransform: 'uppercase'

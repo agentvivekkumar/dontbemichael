@@ -24,7 +24,7 @@ const TIER_NOTE_KEY: Record<McpTier, string> = {
 
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--cth-font-display)',
-  fontSize: 8,
+  fontSize: 10, fontWeight: 600,
   lineHeight: '12px',
   color: 'var(--cth-ink-500)',
   textTransform: 'uppercase'
@@ -72,7 +72,7 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
           <div key={tier} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{
-                fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+                fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
                 color: isConsent ? '#6E1423' : 'var(--cth-ink-500)',
                 textTransform: 'uppercase'
               }}>
@@ -123,7 +123,7 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
                         boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
                         border: 'none',
                         fontFamily: 'var(--cth-font-display)',
-                        fontSize: 8,
+                        fontSize: 10, fontWeight: 600,
                         lineHeight: '14px',
                         color: 'var(--cth-ink-900)',
                         cursor: 'pointer',

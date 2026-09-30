@@ -206,7 +206,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{
-        fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+        fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
         textTransform: 'uppercase',
         color: 'var(--cth-ink-700)',
         padding: '8px 10px 4px',

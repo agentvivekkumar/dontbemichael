@@ -2,7 +2,12 @@ import { CompanyProfileFields, localCurrency, localTimeZone } from './CompanyPro
 import { cityLine, cleanCompanyProfile, missingProfileFields, prefillLegalName, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PixelPanel } from './PixelPanel';
+import { OnboardingStudio } from '@/scene/studio/OnboardingStudio';
+import { departmentOf } from '@/scene/studio/layout';
+import { family } from '@/scene/studio/theme';
+import { useAppTheme } from '@/design/theme';
+import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
+import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 import { PixelButton } from './PixelButton';
 import { Icon, type IconName } from './Icon';
 import { SpritePortrait } from './SpritePortrait';
@@ -502,42 +507,46 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   };
 
+  // Design v2 onboarding (branding/DESIGN.md 7.25): a full window with the
+  // lockup and the step indicator on top, the step's card on the left, and the
+  // studio on the right filling with the team as it is picked.
+  const stepIndex = ORDERED_STEPS.indexOf(step as typeof ORDERED_STEPS[number]);
+  const stepTitle = t(`onboarding.stepTitle.${step}`);
+  const studioPicked = step === 'team' ? teamAgents.filter((a) => teamPicked[a.id]) : teamAgents.filter((a) => teamPicked[a.id] ?? true);
+  const studioUnpicked = step === 'team' ? teamAgents.filter((a) => !teamPicked[a.id]) : [];
+  const toSeat = (a: AgentDefinitionV2) => ({ id: a.id, character: a.character, description: a.role });
   return (
     <div style={{
-      position: 'fixed', inset: 0,
-      background: 'var(--cth-cream-200)',
-      backgroundImage:
-        `repeating-linear-gradient(45deg, rgba(232, 217, 160, 0.4) 0 1px, transparent 1px 8px)`,
-      // Scroll the overlay rather than clip the wizard. The manager step lists every
-      // installed CLI engine (8 rows + a model select), which is taller than a
-      // 1080p-class window once the OS chrome is subtracted — the panel was
-      // being cut off at BOTH edges with no way to reach the buttons.
-      display: 'flex',
-      overflowY: 'auto',
-      zIndex: 200,
-      padding: 32
+      position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto',
+      background: 'radial-gradient(900px 600px at 72% 55%, color-mix(in srgb, var(--cth-card) 90%, transparent) 0%, transparent 70%), var(--cth-bg)',
+      display: 'flex', flexDirection: 'column'
     }}>
-      {/* `margin: auto` centers, NOT `align-items: center`. A centered flex item
-          that overflows its container is clipped at the TOP and unreachable by
-          scrolling (the overflow spills past the scroll origin); auto margins
-          center while it fits and collapse to a normal scroll once it doesn't. */}
-      <div style={{ width: 640, maxWidth: '94vw', margin: 'auto' }}>
-        <PixelPanel
-          variant="dialog"
-          title={
-            step === 'resume' ? t('onboarding.titles.resume')
-            : step === 'business' ? t('onboarding.titles.business')
-            : step === 'details' ? t('onboarding.titles.details')
-            : step === 'welcome' ? t('onboarding.titles.welcome')
-            : step === 'home' ? t('onboarding.titles.home')
-            : step === 'orchestrator' ? t('onboarding.titles.orchestrator')
-            : step === 'team' ? t('onboarding.titles.team')
-            : step === 'permissions' ? t('onboarding.titles.permissions')
-            : t('onboarding.titles.done')
-          }
-          noPadding
-        >
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '86vh', overflowY: 'auto' }}>
+      <div className="cth-titlebar-drag" style={{
+        flexShrink: 0, height: 72, display: 'flex', alignItems: 'center', gap: 20,
+        paddingInlineStart: 88, paddingInlineEnd: 28
+      }}>
+        <img className="cth-lockup-light" src={lockupLight} alt="Don't Be Michael" style={{ height: 24, width: 'auto' }} />
+        <img className="cth-lockup-dark" src={lockupDark} alt="Don't Be Michael" style={{ height: 24, width: 'auto' }} />
+        {stepIndex >= 0 && <StepIndicator current={stepIndex} />}
+        {stepIndex >= 0 && (
+          <span style={{ marginInlineStart: 'auto', fontSize: 12, color: 'var(--cth-ink-3)' }}>
+            {t('onboarding.stepOf', { n: stepIndex + 1, total: ORDERED_STEPS.length })}
+          </span>
+        )}
+      </div>
+      {/* `margin: auto` centers while the card fits and falls back to a normal
+          scroll once it doesn't (a centered flex item that overflows is clipped
+          at the top and cannot be scrolled to). */}
+      <div style={{ flex: 1, display: 'flex', gap: 32, padding: '8px 28px 28px', alignItems: 'stretch', width: '100%', maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box' }}>
+        <div style={{ width: 560, maxWidth: '100%', flexShrink: 0, margin: step === 'team' ? '0' : 'auto 0' }}>
+          <div role="region" aria-label={stepTitle} style={{
+            background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
+            boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)', overflow: 'hidden'
+          }}>
+          <div style={{ padding: '22px 22px 4px' }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--cth-ink)' }}>{stepTitle}</h1>
+          </div>
+          <div style={{ padding: '14px 22px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {step === 'resume' && found && (
               <>
@@ -1259,9 +1268,52 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </div>
             </div>
           </div>
-        </PixelPanel>
+          </div>
+        </div>
+        {(step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions') && teamAgents.length > 0 && (
+          <div className="cth-onboarding-studio" style={{ flex: 1, minWidth: 0, minHeight: 480, height: 'calc(100vh - 110px)', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
+            <OnboardingStudio picked={studioPicked.map(toSeat)} unpicked={studioUnpicked.map(toSeat)} businessName={businessName} />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+const ORDERED_STEPS = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions'] as const;
+
+/** Seven labelled steps: done ones checked, the current one in ink. */
+function StepIndicator({ current }: { current: number }) {
+  const { t } = useTranslation();
+  return (
+    <ol aria-label={t('onboarding.stepsLabel')} style={{
+      margin: '0 auto', padding: '6px 10px', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8,
+      background: 'var(--cth-card)', borderRadius: 999, boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+    }}>
+      {ORDERED_STEPS.map((key, i) => {
+        const done = i < current;
+        const now = i === current;
+        return (
+          <li key={key} aria-current={now ? 'step' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {i > 0 && <span aria-hidden="true" style={{ width: 14, height: 1, background: 'var(--cth-line-2)' }} />}
+            <span style={{
+              width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0,
+              fontFamily: 'var(--cth-font-mono)', fontSize: 11, fontWeight: 600,
+              background: done ? 'var(--cth-green)' : now ? 'var(--cth-ink)' : 'transparent',
+              color: done || now ? '#FFFFFF' : 'var(--cth-ink-3)',
+              boxShadow: done || now ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)'
+            }}>
+              {done ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+              ) : i + 1}
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: now ? 600 : 500, color: now ? 'var(--cth-ink)' : done ? 'var(--cth-ink-2)' : 'var(--cth-ink-3)', whiteSpace: 'nowrap' }}>
+              {t(`onboarding.steps.${key}`)}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -1320,12 +1372,21 @@ function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
 
 type TeamChip = { tone: 'muted' | 'core' | 'need' | 'optional' | 'ok'; label: string };
 
+// Design v2 chips (branding/DESIGN.md 7.25): fill, text, and a dashed edge
+// for optional connections.
 const CHIP_BG: Record<TeamChip['tone'], string> = {
-  muted: 'var(--cth-paper-100)',
-  core: 'var(--cth-lemon-light)',
-  need: 'var(--cth-peach-light)',
-  optional: 'var(--cth-cream-200)',
-  ok: 'var(--cth-mint-light)'
+  muted: 'var(--cth-indigo-soft)',
+  core: 'var(--cth-green-soft)',
+  need: 'var(--cth-card-2)',
+  optional: 'transparent',
+  ok: 'transparent'
+};
+const CHIP_FG: Record<TeamChip['tone'], string> = {
+  muted: 'var(--cth-indigo-text)',
+  core: 'var(--cth-green-text)',
+  need: 'var(--cth-ink)',
+  optional: 'var(--cth-ink-2)',
+  ok: 'var(--cth-ink-3)'
 };
 
 /** A portrait we know how to draw; anything else from a pack falls back rather than breaking. */
@@ -1358,44 +1419,50 @@ function TeamCard({
 }) {
   const pickable = picked !== undefined;
   const active = !pickable || picked;
-  // The folder row lines up under the text: checkbox + gap + portrait + gap.
-  const textIndent = (pickable ? 16 + 10 : 0) + 44 + 10;
+  const dark = useAppTheme() === 'dark';
+  const isMichael = character === 'michael';
+  const fam = isMichael ? null : family(departmentOf({ id: character ?? '', character }), dark);
+  // The folder row lines up under the text: checkbox + gap + avatar + gap.
+  const textIndent = (pickable ? 18 + 12 : 18 + 12) + 36 + 12;
+  const [first, ...rest] = name.split(' · ');
   return (
-    <div style={{
-      padding: 10,
-      background: pickable ? (picked ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)') : 'var(--cth-cream-100)',
-      boxShadow: `inset 0 0 0 ${pickable && picked ? 2 : 1}px ${pickable && picked ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
-    }}>
-      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: pickable ? 'pointer' : 'default' }}>
-        {pickable && (
+    <div style={{ padding: '12px 4px', borderTop: '1px solid var(--cth-line)', opacity: active ? 1 : 0.55 }}>
+      <label style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: pickable ? 'pointer' : 'default' }}>
+        {pickable ? (
           <input
             type="checkbox"
             checked={picked}
             onChange={onTogglePicked}
-            style={{ width: 16, height: 16, flexShrink: 0, marginTop: 14 }}
+            style={{ width: 18, height: 18, flexShrink: 0, marginTop: 9, accentColor: 'var(--cth-ink)' }}
           />
-        )}
-        <span style={{
-          width: 44, height: 44, flexShrink: 0, overflow: 'hidden',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
-        }}>
-          <SpritePortrait character={castName(character)} scale={1.5} />
-        </span>
-        <span style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 3 }}>
-            <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)' }}>
-              {name}
-            </span>
+        ) : (
+          <span aria-hidden="true" style={{ width: 18, height: 18, flexShrink: 0, marginTop: 9, display: 'grid', placeItems: 'center', color: 'var(--cth-ink-3)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
           </span>
-          <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>{summary}</span>
-          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+        )}
+        <span aria-hidden="true" style={{
+          width: 36, height: 36, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+          background: fam ? fam.l : 'var(--cth-ink)', color: fam ? fam.acc : 'var(--cth-bg)',
+          boxShadow: fam ? `inset 0 0 0 1px ${fam.m}` : 'none', fontSize: 14, fontWeight: 700
+        }}>{first.slice(0, 1).toUpperCase()}</span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', marginBottom: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink)' }}>{first}</span>
+            {rest.length > 0 && <span style={{ fontSize: 12.5, color: 'var(--cth-ink-3)' }}>{rest.join(' · ')}</span>}
+          </span>
+          <span style={{ display: 'block', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-2)' }}>{summary}</span>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
             {chips.map((c) => (
               <span key={c.label} style={{
-                fontSize: 11, lineHeight: '16px', padding: '0 6px',
-                background: CHIP_BG[c.tone], color: 'var(--cth-ink-700)',
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
-              }}>{c.label}</span>
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 11, fontWeight: 600, lineHeight: '16px', padding: '2px 9px', borderRadius: 999,
+                background: CHIP_BG[c.tone], color: CHIP_FG[c.tone],
+                boxShadow: c.tone === 'optional' ? 'none' : c.tone === 'need' ? 'inset 0 0 0 1px var(--cth-line-2)' : 'none',
+                border: c.tone === 'optional' ? '1px dashed var(--cth-line-2)' : 'none'
+              }}>
+                {c.tone === 'need' && <i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cth-indigo)', display: 'block' }} />}
+                {c.label}
+              </span>
             ))}
           </span>
         </span>
@@ -1404,24 +1471,27 @@ function TeamCard({
       {active && folder && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-          marginTop: 8, marginLeft: textIndent, fontSize: 11, color: 'var(--cth-ink-700)', minWidth: 0
+          marginTop: 8, marginInlineStart: textIndent, fontSize: 11.5, color: 'var(--cth-ink-3)', minWidth: 0
         }}>
           <Icon name="folder" />
-          <span style={{ color: 'var(--cth-ink-500)' }}>{labels.worksIn}</span>
+          <span>{labels.worksIn}</span>
           <span title={folder} style={{
-            fontFamily: 'var(--cth-font-mono)', minWidth: 0, maxWidth: '100%',
+            fontFamily: 'var(--cth-font-mono)', color: 'var(--cth-ink-2)', minWidth: 0, maxWidth: '100%',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>{displayPath(folder)}</span>
-          {folderNote && <span style={{ color: 'var(--cth-ink-500)' }}>· {folderNote}</span>}
-          <PixelButton variant="ghost" size="sm" onClick={onChangeFolder}>{labels.change}</PixelButton>
-          {overridden && (
-            <PixelButton variant="ghost" size="sm" onClick={onUseSuggested}>{labels.useSuggested}</PixelButton>
-          )}
+          {folderNote && <span>{folderNote}</span>}
+          <button type="button" onClick={onChangeFolder} style={linkBtn}>{labels.change}</button>
+          {overridden && <button type="button" onClick={onUseSuggested} style={linkBtn}>{labels.useSuggested}</button>}
         </div>
       )}
     </div>
   );
 }
+
+const linkBtn: React.CSSProperties = {
+  padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textDecoration: 'underline',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-indigo-text)'
+};
 
 function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
   icon: IconName;
@@ -1434,21 +1504,21 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
 }) {
   return (
     <label style={{
-      display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
-      background: on ? tint : 'var(--cth-paper-100)',
-      boxShadow: `inset 0 0 0 ${on ? 2 : 1}px ${on ? edge : 'var(--cth-ink-300)'}`,
+      display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 'var(--cth-r-lg)',
+      background: on ? 'var(--cth-card-2)' : 'var(--cth-card)',
+      boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-line-2)' : 'var(--cth-line)'}`,
       cursor: 'pointer'
-    }}>
+    }} data-tint={tint} data-edge={edge}>
       <input
         type="checkbox"
         checked={on}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 18, height: 18, flexShrink: 0, marginTop: 5 }}
+        style={{ width: 18, height: 18, flexShrink: 0, marginTop: 5, accentColor: 'var(--cth-ink)' }}
       />
       <span style={{
-        width: 28, height: 28, flexShrink: 0, display: 'flex',
+        width: 28, height: 28, flexShrink: 0, display: 'flex', borderRadius: 'var(--cth-r-md)',
         alignItems: 'center', justifyContent: 'center',
-        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+        background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)'
       }}>
         <Icon name={icon} />
       </span>

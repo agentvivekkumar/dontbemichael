@@ -497,5 +497,5 @@ const selectStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 8, color: 'var(--cth-ink-500)'
+  fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, color: 'var(--cth-ink-500)'
 };

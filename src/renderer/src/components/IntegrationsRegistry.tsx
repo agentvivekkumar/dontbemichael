@@ -60,7 +60,7 @@ function glyphFor(kind: string, label: string): { mono: string; bg: string } {
   return GLYPH[kind] ?? { mono: (label.replace(/[^A-Za-z0-9]/g, '').slice(0, 2) || '··'), bg: '#6B5878' };
 }
 
-const dispLabel: CSSProperties = { fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' };
+const dispLabel: CSSProperties = { fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' };
 const fieldLabel: CSSProperties = { ...dispLabel, color: 'var(--cth-ink-700)' };
 const subText: CSSProperties = { fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' };
 const hint: CSSProperties = { fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-500)' };

@@ -68,7 +68,7 @@ export function MailboxesSettings() {
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' }}>
             {t('mailboxes.title')}
             {needs > 0 && <span style={{ ...badge, ...needsBadge, marginInlineStart: 8, textTransform: 'none', fontFamily: 'var(--cth-font-ui)' }}><Dot color="var(--cth-coral)" />{t('mailboxes.needsCount', { count: needs })}</span>}
           </div>

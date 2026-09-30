@@ -796,6 +796,33 @@
     "errSaveSetup": "تعذّر حفظ إعدادك. حاول مجددًا.",
     "details": {
       "intro": "كلها اختيارية. يستخدمها {{godName}} والفريق في التواقيع والمواعيد والأسعار. يمكنك تعبئتها لاحقًا في الإعدادات، ملف الشركة."
+    },
+    "stepTitle": {
+      "resume": "مرحبًا بعودتك",
+      "business": "نشاطك التجاري",
+      "details": "بيانات الشركة",
+      "welcome": "تعرّف على مكتبك",
+      "team": "فريقك",
+      "home": "مكان التطبيق",
+      "orchestrator": "مديرك",
+      "permissions": "الصلاحيات والاعتمادية",
+      "done": "تم كل شيء"
+    },
+    "steps": {
+      "business": "النشاط",
+      "details": "البيانات",
+      "welcome": "تعرّف",
+      "team": "الفريق",
+      "home": "المكان",
+      "orchestrator": "المدير",
+      "permissions": "الصلاحيات"
+    },
+    "stepOf": "الخطوة {{n}} من {{total}}",
+    "stepsLabel": "خطوات الإعداد",
+    "studio": {
+      "yourBusiness": "نشاطك التجاري",
+      "yourOffice": "مكتبك",
+      "notPicked": "{{names}}، لم يُختَر"
     }
   },
   "office": {

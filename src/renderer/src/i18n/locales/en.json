@@ -796,6 +796,33 @@
     "errSaveSetup": "Couldn't save your setup. Try again.",
     "details": {
       "intro": "All optional. {{godName}} and the team use these for signatures, scheduling and prices. You can fill them in later in Settings, Company profile."
+    },
+    "stepTitle": {
+      "resume": "Welcome back",
+      "business": "Your business",
+      "details": "Company details",
+      "welcome": "Meet your office",
+      "team": "Your team",
+      "home": "A home for the app",
+      "orchestrator": "Your manager",
+      "permissions": "Permissions and reliability",
+      "done": "All set"
+    },
+    "steps": {
+      "business": "Business",
+      "details": "Details",
+      "welcome": "Meet",
+      "team": "Team",
+      "home": "Home",
+      "orchestrator": "Manager",
+      "permissions": "Permissions"
+    },
+    "stepOf": "Step {{n}} of {{total}}",
+    "stepsLabel": "Setup steps",
+    "studio": {
+      "yourBusiness": "Your business",
+      "yourOffice": "Your office",
+      "notPicked": "{{names}}, not picked"
     }
   },
   "office": {

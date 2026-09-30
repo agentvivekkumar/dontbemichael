@@ -415,7 +415,7 @@ function Section({
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{
           fontFamily: 'var(--cth-font-display)',
-          fontSize: 9, lineHeight: '12px',
+          fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-900)',
           textTransform: 'uppercase'
         }}>{label}</span>
@@ -434,7 +434,7 @@ function Row({ label, info, children }: { label: string; info?: string; children
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <span style={{
           fontFamily: 'var(--cth-font-display)',
-          fontSize: 8, lineHeight: '12px',
+          fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)',
           textTransform: 'uppercase'
         }}>{label}</span>

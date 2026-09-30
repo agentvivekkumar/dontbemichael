@@ -50,7 +50,7 @@ export function QuickBooksSettings() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' }}>
             {t('quickbooksSettings.title')}
           </div>
           <div style={hint}>{t(on ? 'quickbooksSettings.introOn' : 'quickbooksSettings.introOff')}</div>

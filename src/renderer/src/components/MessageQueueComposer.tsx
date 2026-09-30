@@ -208,7 +208,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       }}>
       {dragOver && (
         <span style={{
-          fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px',
+          fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)', textAlign: 'center'
         }}>{t('queueComposer.dropToAttach')}</span>
       )}
@@ -216,7 +216,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{
           fontFamily: 'var(--cth-font-display)',
-          fontSize: 9, lineHeight: '12px',
+          fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)'
         }}>{t('queueComposer.queue')}</span>
         {queue.length > 0 && (
@@ -680,13 +680,13 @@ function FreeFlowButton({ agentId, hasGroqKey }: { agentId: string; hasGroqKey: 
                 width: HINT_W, padding: '10px 12px', boxSizing: 'border-box',
                 display: 'flex', flexDirection: 'column', gap: 7,
                 background: 'var(--cth-paper-100)',
-                boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 4px 4px 0 rgba(26,19,32,0.25)',
+                boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 0 6px 18px rgba(62,52,140,.08)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 11, lineHeight: '15px',
                 color: 'var(--cth-ink-900)', textAlign: 'left', whiteSpace: 'normal'
               }}
             >
               <span style={{
-                fontFamily: 'var(--cth-font-display)', fontSize: 9, letterSpacing: 0.5,
+                fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
                 textTransform: 'uppercase', color: 'var(--cth-ink-500)'
               }}>{t('queueComposer.ffSetupTitle')}</span>
 

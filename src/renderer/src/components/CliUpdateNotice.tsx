@@ -77,7 +77,7 @@ export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAg
       position: 'fixed', right: 16, top: 48, zIndex: 400,
       maxWidth: 340,
       background: 'var(--cth-cream-50)',
-      boxShadow: '0 0 0 2px var(--cth-ink-900), 4px 5px 0 0 rgba(26,19,32,0.25)',
+      boxShadow: '0 0 0 2px var(--cth-ink-900), 0 6px 18px rgba(62,52,140,.08)',
       padding: '10px 12px',
       display: 'flex', flexDirection: 'column', gap: 8,
       fontFamily: 'var(--cth-font-ui)'

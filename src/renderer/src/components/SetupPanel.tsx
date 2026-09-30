@@ -33,7 +33,7 @@ function StatusChip({ tool }: { tool: ToolStatus }) {
   const ready = tool.found;
   return (
     <span style={{
-      fontFamily: 'var(--cth-font-display)', fontSize: 9, letterSpacing: 0.5,
+      fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
       padding: '2px 6px', flexShrink: 0, whiteSpace: 'nowrap',
       background: ready ? 'var(--cth-mint-light)' : 'var(--cth-cream-200)',
       boxShadow: `inset 0 0 0 1px ${ready ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`,

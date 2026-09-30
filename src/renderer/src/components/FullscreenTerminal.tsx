@@ -868,7 +868,7 @@ function SidebarRow({
             zIndex: 450,
             padding: 8,
             background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 4px 4px 0 rgba(26,19,32,0.25)',
+            boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 0 6px 18px rgba(62,52,140,.08)',
             boxSizing: 'border-box'
           }}
         >

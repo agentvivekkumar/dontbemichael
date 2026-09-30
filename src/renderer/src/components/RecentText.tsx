@@ -27,7 +27,7 @@ export function RecentText({ accent, text, seed }: RecentTextProps) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         fontFamily: 'var(--cth-font-display)',
-        fontSize: 8, lineHeight: '12px',
+        fontSize: 10, fontWeight: 600, lineHeight: '12px',
         color: 'var(--cth-ink-700)',
         textTransform: 'uppercase'
       }}>

@@ -695,7 +695,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                       opacity: i > stepIndex ? 0.6 : 1
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '13px', textTransform: 'uppercase', color: 'var(--cth-ink-900)' }}>
+                    <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '13px', textTransform: 'uppercase', color: 'var(--cth-ink-900)' }}>
                       {i + 1} {tr(`addAgent.wizard.step.${s}`)}
                     </span>
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--cth-ink-500)' }}>{tr(`addAgent.wizard.stepHint.${s}`)}</span>
@@ -1231,7 +1231,7 @@ function Row({ label, info, children }: { label: string; info?: string; children
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <span style={{
           fontFamily: 'var(--cth-font-display)',
-          fontSize: 8, lineHeight: '12px',
+          fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)',
           textTransform: 'uppercase'
         }}>{label}</span>

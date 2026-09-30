@@ -1,6 +1,7 @@
 import { MailboxesSettings } from './MailboxesSettings';
 import { QuickBooksSettings } from './QuickBooksSettings';
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useDialog } from '@/shell/useDialog';
 import { useTranslation } from 'react-i18next';
 import { agentModels, type HarnessConfig } from '@/store/config';
 import { useStore } from '@/store/store';
@@ -89,7 +90,7 @@ const slackInputStyle: CSSProperties = {
 
 const slackLabelStyle: CSSProperties = {
   fontFamily: 'var(--cth-font-display)',
-  fontSize: 8,
+  fontSize: 10, fontWeight: 600,
   lineHeight: '12px',
   color: 'var(--cth-ink-700)',
   textTransform: 'uppercase'
@@ -170,7 +171,7 @@ import { showByokSettings } from '@shared/agentProvider';
    seventeen times, in three slightly different forms, which is how a tab ends
    up looking subtly unlike its neighbours. */
 const sectionHead = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+  fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
   color: 'var(--cth-ink-500)', textTransform: 'uppercase', marginBottom: 10
 } as const;
 /** Same heading, tight under a section that supplies its own spacing. */
@@ -200,6 +201,11 @@ const NAV_SECTION_KEYS: Record<Section, string> = {
 
 export function SettingsModal({ config, onClose, initialSection }: SettingsModalProps) {
   const { t, i18n } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // Esc and the focus trap (DESIGN.md 7.23). The close it runs is set below,
+  // once requestClose exists, so unsaved changes still ask first.
+  const closeFnRef = useRef<() => void>(() => onClose());
+  useDialog(dialogRef, () => closeFnRef.current());
   const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'the orchestrator';
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -414,6 +420,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     if (dirty && !window.confirm(t('settings.unsavedWarning'))) return;
     onClose();
   };
+  closeFnRef.current = busy ? () => {} : requestClose;
 
   const fmtBudgetTokens = (raw: string): string => {
     const n = Number(raw);
@@ -885,25 +892,37 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
       onClick={busy ? undefined : onClose}
       style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(26, 19, 32, 0.7)',
+        background: 'color-mix(in srgb, var(--cth-bg) 60%, transparent)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 300
       }}
     >
+      {/* Design v2 dialog (branding/DESIGN.md 7.23): a card with its title and
+          close, Esc and a focus trap (useDialog). */}
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={modalTitle}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 840, maxWidth: '92vw', maxHeight: '88vh',
-          display: 'flex', flexDirection: 'column',
-          filter: 'drop-shadow(4px 4px 0 rgba(26, 19, 32, 0.25))'
+          width: 880, maxWidth: '92vw', maxHeight: '88vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', outline: 'none',
+          background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
+          boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
         }}
       >
-        <PixelPanel
-          variant="dialog"
-          title={modalTitle}
-          noPadding
-          style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: '88vh' }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 14px 22px', borderBottom: '1px solid var(--cth-line)', flexShrink: 0 }}>
+          <h2 style={{ margin: 0, flex: 1, fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{modalTitle}</h2>
+          <button type="button" onClick={busy ? undefined : requestClose} aria-label={t('common.close')} style={{
+            width: 30, height: 30, display: 'grid', placeItems: 'center', border: 'none', cursor: 'pointer', borderRadius: 'var(--cth-r-md)',
+            background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-2)'
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, flex: 1 }}>
           {/* === Change home sub-modal === */}
           {changeHome ? (
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
@@ -935,8 +954,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       disabled={changeBusy}
                       style={{
                         textAlign: 'left', cursor: changeBusy ? 'default' : 'pointer',
-                        padding: '10px 12px', background: 'var(--cth-paper-100)', border: 'none',
-                        boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-ink-900)' : 'var(--cth-ink-300)'}`,
+                        padding: '10px 12px', background: 'var(--cth-card)', border: 'none', borderRadius: 'var(--cth-r-lg)',
+                        boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-ink)' : 'var(--cth-line-2)'}`,
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
@@ -953,7 +972,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
               </div>
 
               {changeErr && (
-                <div style={{ fontSize: 12, lineHeight: '18px', color: '#6E1423' }}>{changeErr}</div>
+                <div style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{changeErr}</div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -1001,11 +1020,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                 {/* Left nav */}
                 <div style={{
-                  width: 160, flexShrink: 0,
-                  display: 'flex', flexDirection: 'column',
-                  borderRight: '2px solid var(--cth-ink-300)',
-                  paddingTop: 8, paddingBottom: 8,
-                  background: 'var(--cth-cream-200)'
+                  width: 190, flexShrink: 0,
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                  borderInlineEnd: '1px solid var(--cth-line)',
+                  padding: 10,
+                  background: 'var(--cth-card-2)'
                 }}>
                   {VISIBLE_SECTIONS.map((section) => {
                     const active = activeSection === section;
@@ -1014,18 +1033,16 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         key={section}
                         type="button"
                         onClick={() => setActiveSection(section)}
+                        aria-current={active ? 'page' : undefined}
                         style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          padding: '10px 16px 8px',
-                          border: 'none',
-                          borderLeft: active ? '3px solid var(--cth-lemon)' : '3px solid transparent',
-                          background: active ? 'var(--cth-ink-900)' : 'transparent',
-                          color: active ? 'var(--cth-cream-50)' : 'var(--cth-ink-700)',
-                          fontFamily: 'var(--cth-font-display)',
-                          fontSize: 8,
-                          lineHeight: '12px',
-                          cursor: 'pointer',
-                          letterSpacing: 0
+                          display: 'block', width: '100%', textAlign: 'start',
+                          height: 34, padding: '0 12px',
+                          border: 'none', borderRadius: 'var(--cth-r-md)',
+                          background: active ? 'var(--cth-ink)' : 'transparent',
+                          color: active ? 'var(--cth-bg)' : 'var(--cth-ink-2)',
+                          fontFamily: 'var(--cth-font-ui)',
+                          fontSize: 13, fontWeight: active ? 600 : 500,
+                          cursor: 'pointer'
                         }}
                       >
                         {t(NAV_SECTION_KEYS[section])}
@@ -1052,7 +1069,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           and a sponsor live here; both render nothing until set. */}
                       <SettingsHeroCard />
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Updates — first among the settings proper, because "am I
                           on the latest?" is the question people open Settings to
@@ -1060,7 +1077,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           the answer is yes. */}
                       <UpdatesSection />
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Home folder */}
                       <div>
@@ -1098,7 +1115,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         )}
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Environment — settings that used to be trapped in onboarding */}
                       <div>
@@ -1161,7 +1178,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Language — app UI language (i18n) */}
                       <div>
@@ -1188,7 +1205,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Desktop notifications toggle */}
                       <div>
@@ -1214,7 +1231,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Scheduled auto-compact (compact-maintenance mission) */}
                       <div>
@@ -1340,14 +1357,14 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* API keys and local endpoints feed only OpenCode, Crush, pi and
                           Qwen; this build offers none of them (BUILD_ENGINES). */}
                       {showByokSettings() && (
                         <>
                           <AiEnginesSettings config={config} />
-                          <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                          <div style={{ height: 1, background: 'var(--cth-line)' }} />
                         </>
                       )}
 
@@ -1418,7 +1435,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       </div>
                       </>)}
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Circuit breaker — the FULL unit (v0.3.4: all fields have UI) */}
                       <div>
@@ -1582,7 +1599,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         )}
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Knowledge Graph — enterprise multimodal context for agents */}
                       <div>
@@ -1627,7 +1644,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   {activeSection === 'Connections' && (
                     <>
                       <McpDefaultsSettings config={config} />
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
                     </>
                   )}
 
@@ -2336,7 +2353,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
               </div>
             </>
           )}
-        </PixelPanel>
+        </div>
       </div>
     </div>
   );

@@ -796,6 +796,33 @@
     "errSaveSetup": "无法保存你的设置，请重试。",
     "details": {
       "intro": "全部可选。{{godName}} 和团队会在签名、日程安排和报价时用到这些信息。您也可以稍后在“设置 > 公司资料”里填写。"
+    },
+    "stepTitle": {
+      "resume": "欢迎回来",
+      "business": "你的企业",
+      "details": "公司信息",
+      "welcome": "认识你的办公室",
+      "team": "你的团队",
+      "home": "应用的位置",
+      "orchestrator": "你的经理",
+      "permissions": "权限与稳定运行",
+      "done": "全部完成"
+    },
+    "steps": {
+      "business": "企业",
+      "details": "信息",
+      "welcome": "认识",
+      "team": "团队",
+      "home": "位置",
+      "orchestrator": "经理",
+      "permissions": "权限"
+    },
+    "stepOf": "第 {{n}} 步，共 {{total}} 步",
+    "stepsLabel": "设置步骤",
+    "studio": {
+      "yourBusiness": "你的企业",
+      "yourOffice": "你的办公室",
+      "notPicked": "{{names}}，未选择"
     }
   },
   "office": {
