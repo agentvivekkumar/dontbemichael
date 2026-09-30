@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.11] (2026-09-30)
+
+### Added
+
+- **QuickBooks through your Claude account, with you in control.** The app does not connect to
+  Intuit itself: team members use the QuickBooks connected to your Claude account.
+- **One switch in Settings > Connections > QuickBooks, off by default.** Off, no team member can use
+  QuickBooks and it doesn't show on anyone's Capabilities. On, the app checks whether your Claude
+  account has QuickBooks connected and, if not, shows the steps to connect it in Claude.
+- **Who may use it, on each Capabilities tab:** Can use QuickBooks, then Read only or Can make
+  changes. Before you choose, Oscar is on and Read only; everyone else is off. A change applies on
+  the team member's next step, with no restart.
+- **Read only means a fixed list of reads.** Reports, invoices, customers and payroll details to look
+  at. Anything else, including any tool Intuit adds later, shopping for loans and peer loan offers,
+  is refused until it is known to be safe.
+
+### Known limitation
+
+- The switch and Capabilities are checked on every QuickBooks call a team member makes. A team member
+  that starts its own separate Claude from its terminal is outside that check and can reach your
+  Claude account's QuickBooks. The same is true today for email through your Claude account. A fix
+  is planned (TODOS.md, P1).
+
 ## [0.0.10] (2026-09-29)
 
 ### Added

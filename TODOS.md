@@ -109,6 +109,89 @@
 **Effort:** XS
 **Priority:** P3
 
+## QuickBooks through the Claude account (deferred from ship of feat/qbo-claude-channel, 2026-09-30)
+
+### Stop a nested Claude from reaching the account's connectors
+
+**What:** Keep agents from starting their own `claude` (for example `claude -p`) outside the app's hooks, or turn off the Claude account's connectors for such runs.
+
+**Why:** The QuickBooks switch and Capabilities are enforced by the app's PreToolUse hook, which reaches an agent only through `--settings` (`src/main/hive.ts`). A nested Claude started from Bash has no hook but inherits the account's QuickBooks (and email), so the switch off is not a hard guarantee. Stated in CHANGELOG 0.0.11.
+
+**Effort:** M
+**Priority:** P1
+
+### Recognise the connector behind an opaque server name
+
+**What:** When the connector's server has a UUID-like name, 16 of its tools (including `money_onboarding_application_submit`) are not recognised as QuickBooks and are not gated.
+
+**Why:** Claude Code names claude.ai connectors `claude_ai_Intuit_QuickBooks`, which matches; a differently named server would not. Match on the connector URL from `claude mcp list` or on the full tool catalog.
+
+**Effort:** S
+**Priority:** P2
+
+### Subagents keep their parent's QuickBooks access
+
+**What:** Tag hook payloads with the harness agent id so a subagent's own `agent_id` does not replace it.
+
+**Why:** If Claude Code sends a subagent id, the hook finds no capability and refuses Oscar's delegated QuickBooks reads (fails closed).
+
+**Effort:** S
+**Priority:** P3
+
+### Base the QuickBooks default on the role, not the agent id
+
+**What:** Give hired agents with a books role the on + Read only default.
+
+**Why:** Only an agent whose id is literally `oscar` gets it (`booksReadRoleIds` in `src/main/index.ts`); a bookkeeper hired later starts off.
+
+**Effort:** S
+**Priority:** P3
+
+### Say "couldn't reach QuickBooks" when the connector failed
+
+**What:** Show a separate message for `✘ Failed to connect` instead of "needs you to sign in again".
+
+**Why:** A network or server failure tells the owner to sign in.
+
+**Effort:** S
+**Priority:** P3
+
+### Status check on Windows with the npm Claude shim
+
+**What:** Run `claude.cmd` through the Windows shim handling the pty module uses.
+
+**Why:** `execFile` refuses `.cmd` files, so the status is always "Couldn't check" on Windows npm installs. Windows builds are not shipped yet.
+
+**Effort:** S
+**Priority:** P3
+
+### Status check side effects
+
+**What:** Stop child MCP servers `claude mcp list` starts when the 30 s timeout kills it; avoid overlapping runs.
+
+**Why:** The check starts every configured MCP server; a timeout can leave them running.
+
+**Effort:** S
+**Priority:** P3
+
+### Show a locally added QuickBooks server in the status
+
+**What:** Read non-`claude.ai` QuickBooks servers from `claude mcp list` too.
+
+**Why:** A QuickBooks server added with `claude mcp add` is gated but Settings says it is not connected.
+
+**Effort:** S
+**Priority:** P3
+
+### Validate the agent id when saving QuickBooks access
+
+**What:** Refuse ids that are not on the roster in `quickbooks:setAccess`.
+
+**Why:** Any string is written into `agentCapabilities` and would apply to a future agent with that id.
+
+**Effort:** S
+**Priority:** P4
+
 ## Closing time (deferred from ship of feat/closing-time-progress, 2026-09-29)
 
 ### Feed each row's latest line from the agent's transcript

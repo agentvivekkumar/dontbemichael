@@ -1,3 +1,3 @@
-- **Closing time shows who is still working,** what each one is doing and for how long.
-- **Remind** one agent, or **close without them** without stopping their work.
-- **Nothing is saved:** the step names stay on screen only.
+- **QuickBooks through your Claude account:** one switch in Settings, off by default.
+- **Choose who uses it** on each Capabilities tab: Read only or Can make changes.
+- **Read only is a fixed list of reads;** anything new is refused until known safe.
