@@ -14,7 +14,7 @@ import { createServer, type Server } from 'node:net';
 import { existsSync, realpathSync, rmSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { Notification, type WebContents } from 'electron';
-import type { HiveManager } from './hive';
+import { redactSecrets, type HiveManager } from './hive';
 import type { HarnessConfig } from './config';
 import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
@@ -710,6 +710,7 @@ export class HookServer {
       notificationType: p.notification_type,
       source: p.source,
       message: p.message,
+      detail: event === 'PreToolUse' ? toolLine(p.tool_name, p.tool_input) : undefined,
       blocked
     };
     if (!validateHookEvent(payload)) {
@@ -718,6 +719,62 @@ export class HookServer {
     }
     this.getWebContents()?.send('hive:hookEvent', payload);
   }
+}
+
+/**
+ * A one-line summary of a tool call for the owner to read (closing time,
+ * owner 2026-09-29): Claude's own description of a command, never the command
+ * itself, which can carry a token; a file's name; a site's host. Undefined
+ * when there is nothing safe to say. Pure; the caller redacts and caps.
+ */
+export function toolDetail(tool: unknown, input: unknown): string | undefined {
+  if (typeof tool !== 'string') return undefined;
+  const i = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
+  const baseName = (v: unknown): string | undefined => str(v)?.split(/[\\/]/).filter(Boolean).pop();
+  switch (tool) {
+    case 'Bash':
+    case 'Task':
+    case 'Agent':
+      return str(i.description);
+    case 'Read':
+    case 'Edit':
+    case 'Write':
+    case 'MultiEdit':
+      return baseName(i.file_path);
+    case 'NotebookEdit':
+      return baseName(i.notebook_path);
+    case 'WebFetch':
+      try { return new URL(String(i.url)).host || undefined; } catch { return undefined; }
+  }
+  // mcp__<server>__<tool>: the same split as the connector matchers.
+  const mcp = /^mcp__.+?__(.+)$/.exec(tool);
+  return mcp ? mcp[1].replace(/_+/g, ' ').trim() || undefined : undefined;
+}
+
+/** Longest agent text redacted for the closing-time line. The text is the
+ *  agent's own and unbounded, and redaction is slow on very long runs (2.6 s
+ *  at 64 KB, ~9 ms at 4 KB), so it is cut first. A private key cut off by
+ *  this window no longer matches its BEGIN...END pattern, so toolLine drops
+ *  any line that still shows a key header. */
+const TOOL_LINE_SCAN_MAX = 4096;
+/** The closing-time line's length, in code points. */
+const TOOL_LINE_MAX = 80;
+
+/** toolDetail, redacted, on one line and at most 80 characters. Control and
+ *  invisible format characters (bidi overrides, zero-width) are dropped so an
+ *  agent cannot disguise the line the owner decides by. */
+export function toolLine(tool: unknown, input: unknown): string | undefined {
+  const d = toolDetail(tool, input);
+  if (!d) return undefined;
+  // Invisible format characters are removed, not spaced, so one hidden
+  // inside a token cannot split it past redaction.
+  const plain = d.replace(/\p{Cf}+/gu, '').replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, TOOL_LINE_SCAN_MAX);
+  // Cut by code point so an emoji is never split in half.
+  const redacted = redactSecrets(plain);
+  if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(redacted)) return undefined;
+  const line = Array.from(redacted).slice(0, TOOL_LINE_MAX).join('').trim();
+  return line || undefined;
 }
 
 /** The real path of `p`, following links and taking the letter case on disk.

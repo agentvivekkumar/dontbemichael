@@ -60,6 +60,8 @@ src/
     mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
     integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
     closingTime.ts           Closing Time shutdown protocol (the office reopens on next launch, shared/officeOpen.ts)
+                             The quit dialog lists who is still working (hook `detail` from hooks.ts toolDetail),
+                             with Remind and Close without them (never pty:kill: that archives the agent)
     fs.ts / git.ts           sandboxed filesystem + git bridges
     packs.ts                 loads and validates the bundled Office Packs (resources/packs/)
     agentFolders.ts          each agent's folder under ~/Documents/<Business> (Michael's), plus the Office folder

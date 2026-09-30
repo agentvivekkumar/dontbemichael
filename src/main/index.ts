@@ -600,6 +600,9 @@ function teardownPty(id: string): void {
   if (wasWorker) {
     try { liveWebContents()?.send('hive:agentArchived', { id }); } catch { /* window torn down */ }
   }
+  // A terminal that ends during closing time leaves the dialog's list at once.
+  // Best-effort: a failure here must never break the teardown.
+  try { if (agentId) closingTime.refresh(agentId); } catch (e) { console.error('[closing-time] refresh:', e); }
   syncKeepAwake();
 }
 
@@ -4475,6 +4478,9 @@ const closingTime = new ClosingTimeController(
 hive.setRoutedObserver((msg, targets) => closingTime.onRouted(msg, targets));
 ipcMain.handle('app:startClosingTime', () => closingTime.start());
 ipcMain.handle('app:cancelClosingTime', () => closingTime.cancel());
+/** The closing-time dialog's Remind and Close without them (owner, 2026-09-29). */
+ipcMain.handle('app:closingTimeRemind', (_evt, id: unknown) => closingTime.remind(id));
+ipcMain.handle('app:closingTimeExcuse', (_evt, id: unknown) => closingTime.excuse(id));
 
 // ─── IPC: full reset (wipe data + config, relaunch into onboarding) ──────────
 ipcMain.handle('app:resetAll', () => {

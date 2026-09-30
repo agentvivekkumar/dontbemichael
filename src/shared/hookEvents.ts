@@ -6,10 +6,14 @@ export interface HookEvent {
   notificationType?: string;
   source?: string;
   message?: string;
+  /** PreToolUse only: a safe one-line summary of the call (toolLine in
+   *  src/main/hooks.ts: redacted, one line, at most 80 characters), e.g.
+   *  Claude's description of a command. */
+  detail?: string;
   blocked?: boolean;
 }
 
-const OPTIONAL_STRING_FIELDS = ['tool', 'notificationType', 'source', 'message'] as const;
+const OPTIONAL_STRING_FIELDS = ['tool', 'notificationType', 'source', 'message', 'detail'] as const;
 
 /** Validate an untrusted payload before it crosses the Electron IPC boundary. */
 export function validateHookEvent(value: unknown): value is HookEvent {

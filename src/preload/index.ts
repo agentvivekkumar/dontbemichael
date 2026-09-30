@@ -497,9 +497,21 @@ export interface PowerResumeEvent {
 /** Closing-time progress event (mirrors src/main/closingTime.ts). */
 export interface ClosingTimeEvent {
   phase: 'started' | 'progress' | 'complete' | 'timeout' | 'cancelled';
-  /** Workers that have ACKed so far / total workers being waited on. */
+  /** Workers that have ACKed so far / every worker closing time started
+   *  with, including any later closed without or whose terminal ended (see
+   *  `waiting` for who is still waited on). */
   acked: number;
   total: number;
+  /** Team members who confirmed. */
+  confirmed: string[];
+  /** Team members still being waited on. */
+  waiting: string[];
+  /** Team members the owner chose to close without. */
+  excused: string[];
+  /** Michael's id, for his own row. */
+  godId: string;
+  /** False once Michael's terminal has ended. */
+  godLive: boolean;
 }
 
 /** Per-agent operator-control state (#7C.1–7C.3). */
@@ -1082,8 +1094,15 @@ const api = {
     ipcRenderer.invoke('app:startClosingTime'),
   /** Abort an in-progress closing time and tell the floor to resume work. */
   cancelClosingTime: (): Promise<void> => ipcRenderer.invoke('app:cancelClosingTime'),
-  /** Progress events for the quit dialog: started → progress (ACK counts) →
-   *  complete (the app tears down moments later) | timeout | cancelled. */
+  /** Re-send the closing-time note to one agent (Michael included). */
+  closingTimeRemind: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeRemind', id),
+  /** Close without one team member: stop waiting on it; it is back tomorrow. */
+  closingTimeExcuse: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeExcuse', id),
+  /** Progress events for the quit dialog: started → progress → complete (the
+   *  app tears down moments later) | timeout | cancelled. Each carries the ACK
+   *  counts and the rows: who confirmed, who is still waited on, who the owner
+   *  closed without, and Michael's id. Progress also fires on Close without
+   *  them and when a waited-on terminal ends. */
   onClosingTime: (cb: (ev: ClosingTimeEvent) => void): (() => void) => {
     const listener = (_e: IpcRendererEvent, ev: ClosingTimeEvent) => cb(ev);
     ipcRenderer.on('app:closingTime', listener);
