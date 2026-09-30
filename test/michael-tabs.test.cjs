@@ -16,16 +16,26 @@ const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/compone
 
 // PROFILE is first on every agent (owner, 2026-09-25); ASK ME right after it,
 // and the panel still opens on ASK ME (next test).
-test('PROFILE then ASK ME lead Michael\'s panel', () => {
+// Design v2 (branding/DESIGN.md 7.6, 7.11): Ask me left Michael's panel and
+// became the Needs you board, the right column's default state.
+test('PROFILE leads Michael\'s panel, and Ask me is no longer one of its tabs', () => {
   const block = src.match(/const TABS:[^=]*= \[([\s\S]*?)\n\];/);
   assert.ok(block, 'could not find the TABS list');
   const keys = [...block[1].matchAll(/key: '([a-z-]+)'/g)].map((m) => m[1]);
-  assert.deepEqual(keys.slice(0, 2), ['profile', 'human']);
+  assert.equal(keys[0], 'profile');
+  assert.ok(!keys.includes('human'), 'Ask me is the Needs you board now');
   assert.ok(keys.includes('terminal'), 'the terminal is still there, just not first');
 });
 
-test('the docked panel opens on ASK ME; only focus mode opens on the terminal', () => {
-  assert.match(src, /const defaultTab: CCTab = fullscreen \? 'terminal' : 'human';/);
+test('Ask me lives on the Needs you board, which the right column shows by default', () => {
+  const read = (p) => require('node:fs').readFileSync(require('node:path').resolve(__dirname, '..', p), 'utf8');
+  assert.match(read('src/renderer/src/shell/NeedsYouBoard.tsx'), /<AskMeTab \/>/);
+  assert.match(read('src/renderer/src/App.tsx'), /\{needsYouOpen \|\| !agent \? \(\s*<NeedsYouBoard config=\{config\} \/>/);
+  assert.match(read('src/renderer/src/store/store.ts'), /needsYouOpen: true,/);
+});
+
+test('the docked panel opens on Profile; only focus mode opens on the terminal', () => {
+  assert.match(src, /const defaultTab: CCTab = fullscreen \? 'terminal' : 'profile';/);
   assert.match(src, /useState<CCTab>\(defaultTab\)/);
   assert.doesNotMatch(src, /setTab\('terminal'\)/, 'nothing falls back to the terminal behind the default\'s back');
 });

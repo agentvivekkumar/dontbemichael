@@ -238,6 +238,11 @@ interface State {
   bumpToolCount: (id: string) => void;
   setGodStatus: (status: GodStatus) => void;
   select: (id: string) => void;
+  /** Design v2 (branding/DESIGN.md 7.6): the right column shows the Needs you
+   *  board instead of the selected person's panel. Selecting someone closes it;
+   *  the Needs you button and strip open it. Opens by default on launch. */
+  needsYouOpen: boolean;
+  setNeedsYouOpen: (open: boolean) => void;
   updateAgent: (id: string, patch: Partial<Agent>) => void;
   /** Copy durable hive roles onto roster descriptions (and the reverse is a
    *  no-op when the roster already has a real job string). */
@@ -770,11 +775,15 @@ export const useStore = create<State>((set, get) => ({
     return {
       selectedId,
       ccTabRequest: { tab: 'memory', seq },
-      memoryFocusRequest: { agentId, seq }
+      memoryFocusRequest: { agentId, seq },
+      needsYouOpen: false
     };
   }),
+  // 'human' was Michael's Ask me tab; in v2 Ask me is the Needs you board.
   requestCommandCenterTab: (tab) =>
-    set((s) => ({ ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 } })),
+    set((s) => tab === 'human'
+      ? { needsYouOpen: true }
+      : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, needsYouOpen: false }),
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
@@ -792,7 +801,9 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
-  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null }; }),
+  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, needsYouOpen: false }; }),
+  needsYouOpen: true,
+  setNeedsYouOpen: (open) => set({ needsYouOpen: open }),
   updateAgent: (id, patch) =>
     set((s) => {
       const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);

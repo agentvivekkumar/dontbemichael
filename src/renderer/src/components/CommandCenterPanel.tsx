@@ -7,7 +7,6 @@ import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
-import { AskMeTab } from './AskMeTab';
 import { ProfileTab } from './ProfileTab';
 import { MemoryNotes, memorySummary } from './MemoryNotes';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
@@ -55,7 +54,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'profile' | 'capabilities' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'capabilities' | 'terminal' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -79,7 +78,6 @@ interface GHIssue {
  *  owner, and a business owner opening Michael should land there. */
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
-  { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
   // Michael follows Capabilities like everyone (docs/designs/multi-mailbox.md, E3);
   // after ASK ME, which stays second on his panel (owner, 2026-09-25).
   { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
@@ -100,10 +98,11 @@ const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['na
  *  cols/rows and corrupt the display. */
 export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent; fullscreen?: boolean }) {
   const { t } = useTranslation();
-  // The docked panel opens on ASK ME: a terminal is the least friendly thing a
-  // business owner can meet first. Focus mode is the one place that opens on
-  // the terminal, because reaching it means asking for the terminal full screen.
-  const defaultTab: CCTab = fullscreen ? 'terminal' : 'human';
+  // Design v2: Ask me is no longer a tab here; it is the Needs you board in the
+  // right column (branding/DESIGN.md 7.6). The docked panel opens on Profile: a
+  // terminal is the least friendly thing a business owner can meet first. Focus
+  // mode opens on the terminal, because reaching it means asking for it.
+  const defaultTab: CCTab = fullscreen ? 'terminal' : 'profile';
   const [tab, setTab] = useState<CCTab>(defaultTab);
   // The trigger-history ledger has nothing to say until an outside party can
   // reach us, so its tab appears only once an org key or a webhook exists. This
@@ -361,7 +360,6 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
         )}
         {tab === 'profile' && <ProfileTab agent={agent} />}
         {tab === 'capabilities' && <CapabilitiesTab agent={agent} />}
-        {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}
         {tab === 'memory' && (

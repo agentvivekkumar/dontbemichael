@@ -139,9 +139,10 @@ test('nothing is sent while usage stats are hidden, whatever the saved setting',
  */
 test('the header hides the auto mode text', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
-  const app = read('src/renderer/src/App.tsx');
-  const label = app.indexOf("'auto mode on' : 'auto mode off'");
-  assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
+  // Design v2's top bar (shell/TopBar.tsx) has no auto mode text at all.
+  for (const f of ['src/renderer/src/App.tsx', 'src/renderer/src/shell/TopBar.tsx']) {
+    assert.doesNotMatch(read(f), /auto mode on/, f);
+  }
 });
 
 /**

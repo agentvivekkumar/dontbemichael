@@ -5,7 +5,7 @@ import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
 import { OfficeFloor } from '@/scene/office/OfficeFloor';
-import { FloorViewToggle, FloorViewIntro } from '@/components/FloorViewToggle';
+import { FloorViewIntro } from '@/components/FloorViewToggle';
 import { TasksKanban } from '@/components/TasksKanban';
 import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
 import { useHive } from '@/hooks/useHive';
@@ -14,7 +14,6 @@ import { useGodNameSync } from '@/i18n/useGodNameSync';
 import { useDirectionSync } from '@/i18n/useDirection';
 import { useArabicTerminalSync } from '@/terminal/useArabicTerminalSync';
 import { AgentDetailPanel } from '@/components/AgentDetailPanel';
-import { AgentStrip } from '@/components/AgentStrip';
 import { AddAgentModal } from '@/components/AddAgentModal';
 import { MichaelBooting } from '@/components/MichaelBooting';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
@@ -22,24 +21,21 @@ import { OfficeFolderMissing } from '@/components/OfficeFolderMissing';
 import { QuitWarningModal, type ClosingTimeState } from '@/components/QuitWarningModal';
 import { CompletionToast } from '@/realtime/CompletionToast';
 import { UpdateToast } from '@/components/UpdateToast';
-import { UpdateBadge } from '@/components/UpdateBadge';
-import { CliUpdateToast, CliUpdateBadge } from '@/components/CliUpdateNotice';
-import { useAppTheme, toggleAppTheme } from '@/design/theme';
+import { CliUpdateToast } from '@/components/CliUpdateNotice';
 import { SettingsModal, type Section as SettingsSection } from '@/components/SettingsModal';
 import { PixelPanel } from '@/components/PixelPanel';
 import { PixelButton } from '@/components/PixelButton';
-import { Icon } from '@/components/Icon';
 import { SidebarSplitter } from '@/components/SidebarSplitter';
-import { acquireTerminal, notifyThemeChangeAll } from '@/components/terminalPool';
+import { acquireTerminal } from '@/components/terminalPool';
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
-import { SHOW_IDE, SHOW_AUTO_MODE_LABEL, SHOW_OFFICE_THEME } from '@shared/buildFeatures';
+import { SHOW_IDE, SHOW_OFFICE_THEME } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
-// The header shows the brand kit's horizontal lockup (branding/logo/lockup):
-// ink on the light theme, cream on the dark one. CSS in tokens.css shows one.
-import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
-import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
+import { useTranslation } from 'react-i18next';
+import { TopBar, NeedsYouStrip } from '@/shell/TopBar';
+import { NeedsYouBoard } from '@/shell/NeedsYouBoard';
+import { BottomBar } from '@/shell/BottomBar';
 
 // Injected at build time from package.json (see electron.vite.config.ts).
 declare const __APP_VERSION__: string;
@@ -54,13 +50,13 @@ export function App() {
   const agent = useStore(selectedAgent);
   const agents = useStore(s => s.agents);
   const agentCount = agents.length;
-  const bootingGodName = useResolvedGodName();
   const addAgentOpen = useStore(s => s.addAgentOpen);
   const setAddAgentOpen = useStore(s => s.setAddAgentOpen);
   const clearPendingHires = useStore(s => s.clearPendingHires);
   const godStatus = useStore(s => s.godStatus);
   const fullscreenAgentId = useStore(s => s.fullscreenAgentId);
-  const appThemeNow = useAppTheme();
+  const { t } = useTranslation();
+  const needsYouOpen = useStore(s => s.needsYouOpen);
   const sidebarWidth = useStore(s => s.sidebarWidth);
   const setSidebarWidth = useStore(s => s.setSidebarWidth);
   const ideOpen = useStore(s => s.ideOpen);
@@ -303,144 +299,21 @@ export function App() {
     <div style={{
       display: 'flex', flexDirection: 'column',
       width: '100vw', height: '100vh',
-      overflow: 'hidden'
+      overflow: 'hidden', background: 'var(--cth-bg)'
     }}>
-      {/* rt-12: global fixed-overlay toast for voice-Michael completions ("Oscar
-          finished X"). Self-positions bottom-right; renders null until one arrives. */}
+      {/* Toasts: voice completions, app updates, Claude Code updates. Each one
+          positions itself and renders null until it has something to say. */}
       <CompletionToast />
-      {/* v0.3.4: background-update toast ("restart to update"); renders null until
-          main's updater pushes a status. */}
       <UpdateToast />
       <CliUpdateToast onCloseAndReopen={closeOfficeAndReopen} />
-      {/* Title bar */}
-      <div
-        className="cth-titlebar-drag"
-        style={{
-          height: 36, minHeight: 36,
-          background: 'linear-gradient(180deg, var(--cth-cream-100) 0%, var(--cth-cream-200) 100%)',
-          borderBottom: '1px solid var(--cth-ink-300)',
-          display: 'flex',
-          alignItems: 'center',
-          paddingLeft: 96,
-          paddingRight: 12,
-          gap: 12,
-          userSelect: 'none'
-        }}
-      >
-        <img
-          className="cth-lockup-light"
-          src={lockupLight}
-          alt="Don't Be Michael"
-          style={{ height: 20, width: 'auto' }}
-        />
-        <img
-          className="cth-lockup-dark"
-          src={lockupDark}
-          alt="Don't Be Michael"
-          style={{ height: 20, width: 'auto' }}
-        />
-        {/* v0.3.7: the version is no longer inert text — it doubles as the
-            update control (check / download / restart to update). */}
-        <UpdateBadge />
-        <CliUpdateBadge />
-        {SHOW_AUTO_MODE_LABEL && (
-          <span style={{
-            fontFamily: 'var(--cth-font-ui)',
-            fontSize: 13,
-            color: 'var(--cth-ink-500)'
-          }}>
-            {config.autoMode ? 'auto mode on' : 'auto mode off'}
-          </span>
-        )}
-        {/* v0.3.4: theme + fullscreen live HERE (top right), not buried in the
-            terminal header — and the theme darkens the whole app, terminals
-            included (design/theme.ts + tokens.css dark block). */}
-        <button
-          className="cth-titlebar-nodrag cth-tip"
-          onClick={() => {
-            const next = toggleAppTheme();
-            // Tell every RUNNING program the theme flipped. xterm repaints its own
-            // cells, but a TUI that painted its panels with explicit colours keeps
-            // them until it redraws, which left OpenCode's boxes in the old palette
-            // until the agent restarted. Only programs that enabled DEC mode 2031
-            // are told, and it is every pooled terminal rather than the visible one,
-            // so a background agent is not stale when you switch to it.
-            notifyThemeChangeAll(next === 'dark' ? 'dark' : 'light');
-            // Mirror into the harness config: every agent (re)spawned from now
-            // on gets the matching `theme` in its per-session Claude settings,
-            // so the TUI's truecolor palette fits the terminal. Scoped to
-            // harness agents — the user's global Claude theme is never touched.
-            void window.cth.updateConfig({ terminalTheme: next });
-          }}
-          data-tip={appThemeNow === 'dark' ? 'Light theme' : 'Dark theme'}
-          aria-label="Toggle dark mode"
-          style={{
-            marginLeft: 'auto',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 28, height: 28, padding: 0,
-            background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-            border: 'none', borderRadius: 2, cursor: 'pointer',
-            color: 'var(--cth-ink-900)', fontSize: 13, lineHeight: 1
-          }}
-        >
-          {appThemeNow === 'dark' ? '☀' : '☾'}
-        </button>
-        {/* v0.3.4: the IDE button moved to agent level — every agent's header
-            (sidebar detail, god Command Center, fullscreen) carries it. */}
-        <button
-          className="cth-titlebar-nodrag cth-settings-btn cth-tip"
-          onClick={() => { setSettingsSection(undefined); setSettingsOpen(true); }}
-          data-tip="Settings"
-          aria-label="Settings"
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 28, height: 28, padding: 0,
-            background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-            border: 'none', borderRadius: 2, cursor: 'pointer',
-            color: 'var(--cth-ink-900)'
-          }}
-        >
-          <GearGlyph />
-        </button>
-        {/* Fullscreen. The title bar is chrome, not canvas, so these two use
-            clean stroke icons rather than the 16x16 pixel set the rest of the UI
-            is drawn in — at 16-18px a pixel-grid glyph reads as a rendering
-            artifact next to the OS window controls, not as a style choice. */}
-        <button
-          className="cth-titlebar-nodrag cth-tip"
-          onClick={() => {
-            if (fullscreenAgentId) { useStore.getState().setFullscreen(null); return; }
-            const all = useStore.getState().agents;
-            const target = all.find((x) => x.id === useStore.getState().selectedId && x.ptyId)
-              ?? all.find((x) => x.isGod && x.ptyId)
-              ?? all.find((x) => x.ptyId);
-            if (target) useStore.getState().setFullscreen(target.id);
-          }}
-          data-tip={fullscreenAgentId ? 'Exit focus mode (Esc)' : 'Focus mode'}
-          aria-label="Toggle focus mode"
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 28, height: 28, padding: 0,
-            background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-            border: 'none', borderRadius: 2, cursor: 'pointer',
-            color: 'var(--cth-ink-900)'
-          }}
-        >
-          {fullscreenAgentId ? <CollapseGlyph /> : <ExpandGlyph />}
-        </button>
 
-      </div>
+      {/* Design v2 shell (branding/DESIGN.md 5.2): top bar, the stage with the
+          bottom bar floating over it, and the right column. No agent strip and
+          no permanent Command Center: people live on the stage. */}
+      <TopBar onOpenSettings={() => { setSettingsSection(undefined); setSettingsOpen(true); }} />
 
-      <div style={{
-        flex: 1, minHeight: 0,
-        display: 'flex',
-        padding: 16,
-        gap: 0
-      }}>
-        <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', background: 'var(--cth-bg)' }}>
           <OfficeFloor />
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
           {agentCount === 0 && godStatus !== 'booting' && (
@@ -449,17 +322,12 @@ export function App() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               pointerEvents: 'none'
             }}>
-              <div style={{ pointerEvents: 'auto', width: 360 }}>
-                <PixelPanel variant="dialog" title="EMPTY FLOOR" noPadding>
-                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px' }}>
-                      No agents on the floor yet. Spawn one to see real claude output stream in here.
-                    </p>
-                    <PixelButton variant="primary" size="md" onClick={() => setAddAgentOpen(true)}>
-                      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                        <Icon name="plus" /> add agent
-                      </span>
-                    </PixelButton>
+              <div style={{ pointerEvents: 'auto', width: 340 }}>
+                <PixelPanel variant="dialog" noPadding>
+                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>{t('shell.noAgentTitle')}</div>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>{t('shell.noAgentBody')}</p>
+                    <PixelButton variant="primary" size="md" onClick={() => setAddAgentOpen(true)}>{t('shell.hire')}</PixelButton>
                   </div>
                 </PixelPanel>
               </div>
@@ -469,10 +337,9 @@ export function App() {
             <div style={{
               position: 'absolute', inset: 0, zIndex: 50,
               display: 'flex', flexDirection: 'column',
-              // Room for the OFFICE | TASKS toggle in the bottom left corner, so
-              // it never sits on top of the last cards in a column.
-              paddingBottom: 52,
-              background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 2px var(--cth-ink-900)'
+              // Room for the floating bottom bar, so it never covers the last cards.
+              paddingBottom: 96,
+              background: 'var(--cth-bg)'
             }}>
               <FloorViewIntro view={floorView} />
               {floorView === 'tasks' && <TasksKanban />}
@@ -481,13 +348,7 @@ export function App() {
               )}
             </div>
           )}
-          {/* OFFICE | TASKS, in the floor's bottom left corner (where the old
-              memory pill sat): no header strip taking height from the scene,
-              and above the board (zIndex 60 > 50) so it works from either view.
-              The office stays mounted (paused) under the board. */}
-          <div style={{ position: 'absolute', left: 12, bottom: 12, zIndex: 60 }}>
-            <FloorViewToggle />
-          </div>
+          <BottomBar config={config} />
         </div>
 
         <SidebarSplitter
@@ -497,51 +358,23 @@ export function App() {
         />
 
         <div style={{
-          width: sidebarWidth, flexShrink: 0,
-          minHeight: 0, display: 'flex', flexDirection: 'column'
+          width: sidebarWidth, flexShrink: 0, minHeight: 0,
+          display: 'flex', flexDirection: 'column',
+          background: 'linear-gradient(var(--cth-rail), var(--cth-rail))',
+          borderInlineStart: '1px solid var(--cth-line)'
         }}>
-          {agent ? (
-            <AgentDetailPanel agent={agent} />
-          ) : godStatus === 'booting' ? (
-            <PixelPanel variant="default" noPadding style={{
-              padding: 16, height: '100%',
-              display: 'flex', flexDirection: 'column',
-              justifyContent: 'center', alignItems: 'center', gap: 12
-            }}>
-              <div style={{
-                fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px',
-                color: 'var(--cth-ink-500)'
-              }}>WAKING THE FLOOR</div>
-              <p style={{ margin: 0, fontSize: 13, textAlign: 'center', color: 'var(--cth-ink-700)' }}>
-                {bootingGodName} is clocking in.<br />
-                The terminal will land here once he's seated.
-              </p>
-            </PixelPanel>
+          {needsYouOpen || !agent ? (
+            <NeedsYouBoard config={config} />
           ) : (
-            <PixelPanel variant="default" noPadding style={{
-              padding: 16, height: '100%',
-              display: 'flex', flexDirection: 'column',
-              justifyContent: 'center', alignItems: 'center', gap: 12
-            }}>
-              <div style={{
-                fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px',
-                color: 'var(--cth-ink-500)'
-              }}>NO AGENT SELECTED</div>
-              <p style={{ margin: 0, fontSize: 13, textAlign: 'center', color: 'var(--cth-ink-700)' }}>
-                Spawn an agent from the strip below.<br />
-                The terminal and command bar will land here.
-              </p>
-              <PixelButton variant="secondary" size="md" onClick={() => setAddAgentOpen(true)}>
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <Icon name="plus" /> add agent
-                </span>
-              </PixelButton>
-            </PixelPanel>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 12px 0' }}>
+              <NeedsYouStrip />
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <AgentDetailPanel agent={agent} />
+              </div>
+            </div>
           )}
         </div>
       </div>
-
-      <AgentStrip config={config} />
 
       {addAgentOpen && (
         <AddAgentModal
@@ -578,59 +411,5 @@ export function App() {
       {SHOW_IDE && ideOpen && <IdePanel />}
       <TaskDetailOverlay />
     </div>
-  );
-}
-
-/* ── Title-bar glyphs ────────────────────────────────────────────────────────
-   Stroke icons on a 16 unit box, inheriting `currentColor` so they follow the
-   theme exactly as the pixel set does. Deliberately NOT added to
-   components/Icon.tsx: that library is the app's pixel-art identity and is used
-   at tab and card scale, where the pixel grid is the point. These three sit
-   beside the OS traffic lights, which is the one place that identity reads as a
-   blurry asset rather than a decision. */
-function Glyph({ children }: { children: React.ReactNode }) {
-  return (
-    <svg
-      width="16" height="16" viewBox="0 0 16 16" fill="none"
-      stroke="currentColor" strokeWidth={1.4}
-      strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true" focusable="false"
-    >{children}</svg>
-  );
-}
-
-/** Four outward corner brackets — enter fullscreen. */
-function ExpandGlyph() {
-  return (
-    <Glyph>
-      <path d="M6.2 3H3v3.2M9.8 3H13v3.2M6.2 13H3V9.8M9.8 13H13V9.8" />
-    </Glyph>
-  );
-}
-
-/** The same brackets turned inward — leave fullscreen. */
-function CollapseGlyph() {
-  return (
-    <Glyph>
-      <path d="M3 6.2h3.2V3M13 6.2H9.8V3M3 9.8h3.2V13M13 9.8H9.8V13" />
-    </Glyph>
-  );
-}
-
-/** A wrench. The previous glyph was a hub with eight radiating spokes, which at
- *  18px is indistinguishable from a sun — sitting immediately beside a theme
- *  toggle whose light-mode icon IS a sun. A tool shape carries "settings"
- *  without competing with its neighbour. Drawn on a 24 box for curve headroom
- *  and rendered at 16. */
-function GearGlyph() {
-  return (
-    <svg
-      width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={2}
-      strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true" focusable="false"
-    >
-      <path d="M15.5 3.5a5 5 0 0 0-6.1 6.1l-5.6 5.6a2.3 2.3 0 1 0 3.2 3.2l5.6-5.6a5 5 0 0 0 6.1-6.1l-3 3-2.2-.6-.6-2.2z" />
-    </svg>
   );
 }

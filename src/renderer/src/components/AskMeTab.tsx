@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
-import { PixelBadge } from './PixelBadge';
 import { useStore } from '@/store/store';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { type HiveTask, type HumanQA, openQuestion, waitsOnHuman } from './TasksKanban';
@@ -10,6 +9,7 @@ import { answerMessages, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 import { ScheduleRequestCards, useScheduleRequests } from './ScheduleRequestCards';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 /**
  * ASK ME — first-class human feedback through the task system.
@@ -49,6 +49,7 @@ function dependentsTree(id: string, all: HiveTask[], seen = new Set<string>()): 
 export function AskMeTab() {
   const { t: translate } = useTranslation();
   const rtl = useRtl();
+  const godName = useResolvedGodName();
   const agents = useStore((s) => s.agents);
   const restorable = useStore((s) => s.restorableAgents);
   const [tasks, setTasks] = useState<HiveTask[]>([]);
@@ -165,147 +166,162 @@ export function AskMeTab() {
   };
 
   return (
-    // Body text is set in the mono face (VT323) — the same readable font the
-    // memory viewer uses. Pixelify Sans (font-ui) is too chunky for prose like
-    // questions and answers. Display/badge bits keep their explicit faces.
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--cth-paper-200)', padding: 10, display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--cth-font-mono)' }}>
+    // Design v2 (branding/DESIGN.md 7.8): white cards with a coral rule. Michael's
+    // question, an answer box, and what is stuck behind it. Scrolls on its own
+    // so the board heading stays put.
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 8 }}>
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
       {waiting.length === 0 && scheduleRequests.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--cth-ink-500)', fontSize: 12 }}>
-          {translate('askMe.emptyTitle')}<br />
-          <span style={{ fontSize: 11, color: 'var(--cth-ink-300)' }}>
-            {translate('askMe.emptySub')}
-          </span>
+        <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--cth-ink-3)', fontSize: 12.5, lineHeight: '19px' }}>
+          <div style={{ fontWeight: 600, color: 'var(--cth-ink-2)', marginBottom: 4 }}>{translate('shell.boardEmptyTitle')}</div>
+          {translate('shell.boardEmptySub', { godName })}
         </div>
       )}
       {waiting.map((t) => {
         const open = openQuestion(t)!;
         const stuck = dependentsTree(t.id, tasks);
+        const who = nameFor(t.assignee);
+        const answered = t.humanQA?.filter((e) => e.a).length ?? 0;
         return (
-          <div key={t.id} style={{
-            background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-            display: 'flex', flexDirection: 'column'
-          }}>
-            {/* header: title + assignee */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px',
-              background: 'var(--cth-lilac-light, #ece2f5)', boxShadow: 'inset 0 -1px 0 var(--cth-ink-700)'
-            }}>
+          <section key={t.id} aria-label={t.title} style={card}>
+            <span aria-hidden="true" style={coralRule} />
+            {/* Title (opens the task) and dismiss. */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <button
                 onClick={() => openTaskDetail(t.id)}
                 title={translate('askMe.openDetail')}
                 style={{
-                  border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, textAlign: 'left',
-                  fontFamily: 'var(--cth-font-mono)', fontSize: 15, color: 'var(--cth-ink-900)',
-                  flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  flex: 1, minWidth: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start',
+                  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 600, lineHeight: '17px',
+                  color: 'var(--cth-indigo-text)', textDecoration: 'underline',
+                  textDecorationColor: 'color-mix(in srgb, var(--cth-indigo-text) 28%, transparent)', textUnderlineOffset: 3
                 }}
               >
                 {t.title}
               </button>
-              {nameFor(t.assignee) && <PixelBadge status="blocked" label={nameFor(t.assignee)!} />}
-              {/* Dismiss — clears this ask off the board without answering it.
-                  The card's Q&A history is preserved (the question stays on the
-                  card, just marked dismissed). */}
+              {/* Dismiss: clears this ask off the board without answering it. The
+                  card's Q&A history is kept (the question stays on the task,
+                  marked dismissed). */}
               <button
                 onClick={() => void dismiss(t)}
                 disabled={sending === t.id}
                 title={translate('askMe.dismissTitle')}
                 aria-label={translate('askMe.dismissAria')}
                 style={{
-                  flexShrink: 0, width: 18, height: 18, padding: 0, marginLeft: 2,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
-                  border: 'none', cursor: sending === t.id ? 'default' : 'pointer',
-                  background: 'transparent', color: 'var(--cth-ink-500)',
-                  fontFamily: 'var(--cth-font-ui)', fontSize: 13
+                  flexShrink: 0, width: 20, height: 20, padding: 0, marginTop: -1, marginInlineEnd: -4,
+                  display: 'grid', placeItems: 'center', border: 'none', borderRadius: 6, background: 'transparent',
+                  cursor: sending === t.id ? 'default' : 'pointer', color: 'var(--cth-ink-3)', fontSize: 12, lineHeight: 1
                 }}
-                onMouseEnter={(e) => { if (sending !== t.id) e.currentTarget.style.color = 'var(--cth-coral)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--cth-ink-500)'; }}
               >✕</button>
             </div>
-
-            <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* The question, rendered as markdown. The god writes these with
-                  emphasis, lists, `code` and links; as plain text the asterisks
-                  and backticks were on screen literally. The card variant keeps
-                  this card's mono face and turns a single newline into a break, so
-                  a question with no markdown in it looks exactly as it did. */}
-              <div dir={rtl ? 'auto' : undefined} style={{ fontSize: 15, lineHeight: '19px', color: 'var(--cth-ink-900)' }}>
-                <MarkdownPreview source={open.q} variant="card" />
-              </div>
-
-              {/* answer box */}
-              <textarea
-                dir={rtl ? 'auto' : undefined}
-                value={drafts[t.id] ?? ''}
-                onChange={(e) => setAnswerDraft(t.id, e.target.value)}
-                onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(t); }}
-                rows={3}
-                placeholder={translate('askMe.answerPlaceholder')}
-                style={{
-                  width: '100%', boxSizing: 'border-box', padding: '6px 8px', resize: 'vertical',
-                  background: 'var(--cth-paper-100)', border: 'none',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                  fontFamily: 'var(--cth-font-mono)', fontSize: 15, lineHeight: '18px',
-                  color: 'var(--cth-ink-900)', outline: 'none'
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <PixelButton
-                  variant="primary" size="sm"
-                  disabled={!(drafts[t.id] ?? '').trim() || sending === t.id}
-                  onClick={() => void sendAnswer(t)}
+            {/* Who it belongs to, and who is asking. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              {who && (
+                <span style={personChip}>
+                  <span style={avatarDot}>{who.slice(0, 1).toUpperCase()}</span>{who}
+                </span>
+              )}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--cth-ink-3)' }}>
+                <span style={{ ...avatarDot, background: 'var(--cth-ink)', color: 'var(--cth-bg)' }}>{godName.slice(0, 1).toUpperCase()}</span>
+                {translate('askMe.from')} <b style={{ fontWeight: 600, color: 'var(--cth-ink-2)' }}>{godName}</b>
+              </span>
+            </div>
+            {/* The question, as markdown: Michael writes lists, emphasis and code. */}
+            <div dir={rtl ? 'auto' : undefined} style={{ margin: '6px 0 8px', fontSize: 12, lineHeight: '16.5px', color: 'var(--cth-ink)' }}>
+              <MarkdownPreview source={open.q} variant="card" />
+            </div>
+            <textarea
+              className="cth-input"
+              dir={rtl ? 'auto' : undefined}
+              value={drafts[t.id] ?? ''}
+              onChange={(e) => setAnswerDraft(t.id, e.target.value)}
+              onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(t); }}
+              rows={2}
+              placeholder={translate('askMe.answerPlaceholder')}
+              style={{
+                display: 'block', width: '100%', boxSizing: 'border-box', padding: '6px 9px', resize: 'vertical',
+                background: 'var(--cth-card-2)', border: 'none',
+                fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, lineHeight: '16px',
+                color: 'var(--cth-ink)', outline: 'none'
+              }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <PixelButton
+                variant="primary" size="sm"
+                disabled={!(drafts[t.id] ?? '').trim() || sending === t.id}
+                onClick={() => void sendAnswer(t)}
+              >
+                {sending === t.id ? translate('askMe.sending') : translate('askMe.respond')}
+              </PixelButton>
+              {who && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--cth-ink-3)' }}>
+                  <BookmarkGlyph /> {translate('askMe.savedTo', { name: who })}
+                </span>
+              )}
+              {answered > 0 && (
+                <button
+                  onClick={() => openTaskDetail(t.id)}
+                  title={translate('askMe.viewAnswersHistory')}
+                  style={{
+                    marginInlineStart: 'auto', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                    fontFamily: 'var(--cth-font-ui)', fontSize: 11, color: 'var(--cth-ink-3)', textDecoration: 'underline'
+                  }}
                 >
-                  {sending === t.id ? translate('askMe.sending') : translate('askMe.respond')}
-                </PixelButton>
-                {(t.humanQA?.filter((e) => e.a).length ?? 0) > 0 && (
-                  <button
-                    onClick={() => openTaskDetail(t.id)}
-                    title={translate('askMe.viewAnswersHistory')}
-                    style={{
-                      border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
-                      fontSize: 10, color: 'var(--cth-ink-700)', fontFamily: 'var(--cth-font-display)',
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    {(() => {
-                      const n = t.humanQA!.filter((e) => e.a).length;
-                      return n === 1
-                        ? translate('askMe.viewAnswers', { count: n })
-                        : translate('askMe.viewAnswersPlural', { count: n });
-                    })()}
-                  </button>
-                )}
-              </div>
-
-              {/* the cascade: what's stuck behind this answer */}
-              {stuck.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, color: 'var(--cth-coral)' }}>
-                    {stuck.length === 1
-                      ? translate('askMe.blockingDownstream', { count: stuck.length })
-                      : translate('askMe.blockingDownstreamPlural', { count: stuck.length })}
-                  </div>
-                  {stuck.slice(0, 6).map((d, i) => (
-                    <div key={d.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      paddingLeft: 8 + Math.min(i, 3) * 8,
-                      fontSize: 12, color: 'var(--cth-ink-700)'
-                    }}>
-                      <span style={{ color: 'var(--cth-ink-300)' }}>└</span>
-                      <span style={{ width: 7, height: 7, flexShrink: 0, background: d.status === 'blocked' ? 'var(--cth-coral)' : 'var(--cth-sky)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</span>
-                      {nameFor(d.assignee) && <span style={{ fontSize: 10, color: 'var(--cth-ink-500)' }}>({nameFor(d.assignee)})</span>}
-                    </div>
-                  ))}
-                  {stuck.length > 6 && (
-                    <div style={{ paddingLeft: 14, fontSize: 11, color: 'var(--cth-ink-300)' }}>{translate('askMe.more', { count: stuck.length - 6 })}</div>
-                  )}
-                </div>
+                  {answered === 1
+                    ? translate('askMe.viewAnswers', { count: answered })
+                    : translate('askMe.viewAnswersPlural', { count: answered })}
+                </button>
               )}
             </div>
-          </div>
+            {/* The cascade: what is stuck behind this answer. */}
+            {stuck.length > 0 && (
+              <div style={{ marginTop: 8, paddingTop: 7, borderTop: '1px solid var(--cth-line)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--cth-coral-text)' }}>
+                  {stuck.length === 1
+                    ? translate('askMe.blockingDownstream', { count: stuck.length })
+                    : translate('askMe.blockingDownstreamPlural', { count: stuck.length })}
+                </div>
+                {stuck.slice(0, 6).map((d) => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--cth-ink-2)' }}>
+                    <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 2, background: d.status === 'blocked' ? 'var(--cth-coral-base)' : 'var(--cth-blue)' }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</span>
+                    {nameFor(d.assignee) && <span style={{ fontSize: 10.5, color: 'var(--cth-ink-3)' }}>{nameFor(d.assignee)}</span>}
+                  </div>
+                ))}
+                {stuck.length > 6 && (
+                  <div style={{ fontSize: 10.5, color: 'var(--cth-ink-3)' }}>{translate('askMe.more', { count: stuck.length - 6 })}</div>
+                )}
+              </div>
+            )}
+          </section>
         );
       })}
     </div>
+  );
+}
+
+const card: CSSProperties = {
+  position: 'relative', flexShrink: 0,
+  padding: '10px 12px 10px 13px', borderRadius: 'var(--cth-r-xl)',
+  background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+};
+const coralRule: CSSProperties = {
+  position: 'absolute', insetInlineStart: 0, top: 12, bottom: 12, width: 3,
+  borderStartEndRadius: 3, borderEndEndRadius: 3, background: 'var(--cth-coral-base)'
+};
+const personChip: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px 2px 2px', borderRadius: 'var(--cth-r-pill)',
+  background: 'var(--cth-neutral-soft)', fontSize: 10.5, fontWeight: 600, color: 'var(--cth-ink-2)'
+};
+const avatarDot: CSSProperties = {
+  width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center',
+  background: 'var(--cth-indigo-soft)', color: 'var(--cth-indigo-text)', fontSize: 9, fontWeight: 700
+};
+
+function BookmarkGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
   );
 }

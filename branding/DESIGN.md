@@ -463,10 +463,11 @@ choice persists (`cth.floorView`).
 ### 7.3 Clock pill
 
 Pill, `card` fill, `line` border, padding 6 × 12. Green live dot (7 px with a 3 px
-`green` soft halo), mono time in `ink` 600, "closes 6:00 PM" in `ink-2`, a chevron. Click
+`green` soft halo), mono time in `ink` 600, "Office open" in `ink-2`, a chevron. Click
 opens a menu: **Office schedule** (opens Michael's Office schedule tab), **Closing time**
-(starts the closing time flow). When the office is closed the dot is `ink-4` and the text
-reads "Closed, opens 8:00 AM".
+(starts the closing time flow). Office hours are not a setting in the app (packs carry
+`officeHours`, but nothing reads it), so the pill never shows a closing time; the reference
+screens' "closes 6:00 PM" is sample copy (§17).
 
 ### 7.4 Version chip (UpdateBadge, CliUpdateBadge)
 
@@ -1061,6 +1062,8 @@ v2 is adopted in the spec and the kit. The code has not moved yet. Each row is *
 | 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
 | 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
 | 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Fix: tokens |
+| 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` (unused) | Fix: phases 3 and 4 |
+| 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Accepted: §7.3 is the rule |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
 
 ---

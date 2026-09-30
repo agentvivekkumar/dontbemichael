@@ -83,45 +83,54 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
           <section
             key={req.id}
             aria-label={t('askMe.scheduleTitle', { name })}
-            style={{ background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', display: 'flex', flexDirection: 'column' }}
+            style={{
+              position: 'relative', flexShrink: 0, padding: '10px 12px 10px 13px', borderRadius: 'var(--cth-r-xl)',
+              background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)',
+              display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)'
+            }}
           >
-            <div style={{
-              padding: '6px 9px', background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 -1px 0 var(--cth-ink-700)',
-              fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--cth-ink-900)'
-            }}>
+            {/* Design v2 (branding/DESIGN.md 7.9): the only card with Approve and
+                Decline. Same frame as an Ask me card. */}
+            <span aria-hidden="true" style={{
+              position: 'absolute', insetInlineStart: 0, top: 12, bottom: 12, width: 3,
+              borderStartEndRadius: 3, borderEndEndRadius: 3, background: 'var(--cth-coral-base)'
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, lineHeight: '17px', color: 'var(--cth-ink)' }}>
+              <span style={{
+                width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', flexShrink: 0,
+                background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)', fontSize: 9, fontWeight: 700
+              }}>{name.slice(0, 1).toUpperCase()}</span>
               {t('askMe.scheduleTitle', { name })}
             </div>
-            <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)' }}>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{describe(req, target, t)}</div>
-              {/* What Michael can't settle, then why the agent asks (owner, 2026-09-27). */}
-              {req.escalation && (
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                  {t('askMe.scheduleMichael', { name: godName, note: req.escalation })}
-                </div>
-              )}
-              {req.reason && (
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
-                  {t('askMe.scheduleWhy', { reason: req.reason })}
-                </div>
-              )}
-              {stale && (
-                <div role="status" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
-                  {t('askMe.scheduleStale', { name })}
-                </div>
-              )}
-              {failed === req.id && (
-                <div role="alert" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-coral)' }}>
-                  ! {t('schedulesSection.saveFailed')}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <PixelButton variant="primary" size="sm" disabled={stale || busy === req.id} onClick={() => void decide(req, true)}>
-                  {t('askMe.approve')}
-                </PixelButton>
-                <PixelButton variant="secondary" size="sm" disabled={busy === req.id} onClick={() => void decide(req, false)}>
-                  {t('askMe.decline')}
-                </PixelButton>
+            <div style={{ fontSize: 12, lineHeight: '16.5px', color: 'var(--cth-ink)' }}>{describe(req, target, t)}</div>
+            {/* Why the team member asks, then what Michael could not settle (owner, 2026-09-27). */}
+            {req.reason && (
+              <div style={{ fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-2)' }}>
+                {t('askMe.scheduleWhy', { reason: req.reason })}
               </div>
+            )}
+            {req.escalation && (
+              <div style={{ fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-2)' }}>
+                {t('askMe.scheduleMichael', { name: godName, note: req.escalation })}
+              </div>
+            )}
+            {stale && (
+              <div role="status" style={{ fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-3)' }}>
+                {t('askMe.scheduleStale', { name })}
+              </div>
+            )}
+            {failed === req.id && (
+              <div role="alert" style={{ fontSize: 11, lineHeight: '15px', color: 'var(--cth-coral-text)' }}>
+                {t('schedulesSection.saveFailed')}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+              <PixelButton variant="secondary" size="sm" disabled={busy === req.id} onClick={() => void decide(req, false)}>
+                {t('askMe.decline')}
+              </PixelButton>
+              <PixelButton variant="primary" size="sm" disabled={stale || busy === req.id} onClick={() => void decide(req, true)}>
+                {t('askMe.approve')}
+              </PixelButton>
             </div>
           </section>
         );

@@ -11,7 +11,8 @@ const path = require('node:path');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 test('the header uses the brand kit lockup, one per theme', () => {
-  const app = read('src/renderer/src/App.tsx');
+  // Design v2: the top bar is its own component (branding/DESIGN.md 7.1).
+  const app = read('src/renderer/src/shell/TopBar.tsx');
   assert.match(app, /import lockupLight from '@brandkit\/logo\/lockup\/dbm-lockup-horizontal-light\.svg\?url';/);
   assert.match(app, /import lockupDark from '@brandkit\/logo\/lockup\/dbm-lockup-horizontal-dark\.svg\?url';/);
   assert.doesNotMatch(app, /@brand\/logo\.png/);

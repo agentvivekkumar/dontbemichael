@@ -1,0 +1,332 @@
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useStore, type FloorView } from '@/store/store';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { useAppTheme, toggleAppTheme } from '@/design/theme';
+import { notifyThemeChangeAll } from '@/components/terminalPool';
+import { UpdateBadge } from '@/components/UpdateBadge';
+import { CliUpdateBadge } from '@/components/CliUpdateNotice';
+import { useNeedsYouCount, useTaskCounts } from './useNeedsYou';
+import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
+import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
+
+/**
+ * The v2 top bar (branding/DESIGN.md 7.1): lockup, view tabs, then the clock,
+ * version, theme, focus mode, Settings and the Needs you button. It is also the
+ * window's drag region; every control opts out with cth-titlebar-nodrag.
+ */
+export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const { t } = useTranslation();
+  const theme = useAppTheme();
+  const fullscreenAgentId = useStore((s) => s.fullscreenAgentId);
+
+  const toggleTheme = () => {
+    const next = toggleAppTheme();
+    // Running programs are told the theme flipped (DEC mode 2031), and agents
+    // started from now on get the matching Claude theme. Scoped to this app's
+    // agents; the owner's global Claude theme is never touched.
+    notifyThemeChangeAll(next === 'dark' ? 'dark' : 'light');
+    void window.cth.updateConfig({ terminalTheme: next });
+  };
+
+  const toggleFocus = () => {
+    if (fullscreenAgentId) { useStore.getState().setFullscreen(null); return; }
+    const all = useStore.getState().agents;
+    const target = all.find((x) => x.id === useStore.getState().selectedId && x.ptyId)
+      ?? all.find((x) => x.isGod && x.ptyId)
+      ?? all.find((x) => x.ptyId);
+    if (target) useStore.getState().setFullscreen(target.id);
+  };
+
+  return (
+    <div
+      className="cth-titlebar-drag"
+      style={{
+        height: 56, minHeight: 56,
+        display: 'flex', alignItems: 'center', gap: 10,
+        // The macOS traffic lights sit in the top left of a hiddenInset window.
+        paddingInlineStart: 88, paddingInlineEnd: 16,
+        background: 'color-mix(in srgb, var(--cth-card) 70%, var(--cth-chrome))',
+        borderBottom: '1px solid var(--cth-line)',
+        userSelect: 'none'
+      }}
+    >
+      <img className="cth-lockup-light" src={lockupLight} alt="Don't Be Michael" style={{ height: 22, width: 'auto' }} />
+      <img className="cth-lockup-dark" src={lockupDark} alt="Don't Be Michael" style={{ height: 22, width: 'auto' }} />
+      <ViewTabs />
+      <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <ClockPill />
+        <span className="cth-titlebar-nodrag" style={{ display: 'inline-flex', gap: 6 }}>
+          <UpdateBadge />
+          <CliUpdateBadge />
+        </span>
+        <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} aria="Toggle dark mode" onClick={toggleTheme}>
+          {theme === 'dark' ? <SunGlyph /> : <MoonGlyph />}
+        </IconButton>
+        <IconButton label={fullscreenAgentId ? t('shell.exitFocus') : t('shell.focus')} aria="Toggle focus mode" onClick={toggleFocus}>
+          {fullscreenAgentId ? <CollapseGlyph /> : <ExpandGlyph />}
+        </IconButton>
+        <IconButton label={t('shell.settings')} aria="Settings" onClick={onOpenSettings}>
+          <GearGlyph />
+        </IconButton>
+        <NeedsYouButton />
+      </div>
+    </div>
+  );
+}
+
+/* ── View tabs (DESIGN.md 7.2) ─────────────────────────────────────────────── */
+
+export function ViewTabs() {
+  const { t } = useTranslation();
+  const view = useStore((s) => s.floorView);
+  const setView = useStore((s) => s.setFloorView);
+  const { blocked } = useTaskCounts();
+
+  const tab = (key: FloorView, label: string, badge?: number) => {
+    const on = view === key;
+    return (
+      <button
+        key={key}
+        className="cth-titlebar-nodrag"
+        onClick={() => setView(key)}
+        aria-pressed={on}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          height: 32, padding: '0 13px', border: 'none', borderRadius: 'var(--cth-r-md)',
+          cursor: 'pointer', fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 500,
+          background: on ? 'var(--cth-ink)' : 'transparent',
+          color: on ? 'var(--cth-bg)' : 'var(--cth-ink-2)',
+          transition: 'background var(--cth-dur-fast) var(--cth-ease)'
+        }}
+      >
+        {label}
+        {!!badge && (
+          <span title={t('floorView.blockedTitle', { count: badge })} style={countBubble}>{badge}</span>
+        )}
+      </button>
+    );
+  };
+
+  return (
+    <div role="group" aria-label={t('floorView.label')} style={{ display: 'flex', gap: 4, marginInlineStart: 26 }}>
+      {tab('office', t('floorView.office'))}
+      {tab('tasks', t('floorView.tasks'), blocked)}
+      {tab('graph', t('floorView.graph'))}
+    </div>
+  );
+}
+
+const countBubble: CSSProperties = {
+  minWidth: 18, height: 18, padding: '0 5px', borderRadius: 'var(--cth-r-pill)',
+  display: 'inline-grid', placeItems: 'center',
+  background: 'var(--cth-coral-strong)', color: 'var(--cth-on-coral)',
+  fontFamily: 'var(--cth-font-mono)', fontSize: 10.5, fontWeight: 600, lineHeight: 1
+};
+
+/* ── Clock pill (DESIGN.md 7.3) ────────────────────────────────────────────── */
+
+/**
+ * The time, and whether the office is open. Office hours are not a setting in
+ * this app, so the pill never claims a closing time; its menu opens Michael's
+ * Office schedule or starts Closing time (the same flow as quitting).
+ */
+export function ClockPill() {
+  const { t } = useTranslation();
+  const [now, setNow] = useState(() => new Date());
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const openSchedule = () => {
+    setOpen(false);
+    const god = useStore.getState().agents.find((a) => a.isGod);
+    if (god) useStore.getState().select(god.id);
+    useStore.getState().requestCommandCenterTab('triggers');
+  };
+  const closingTime = () => {
+    setOpen(false);
+    // Same path as the window close button: main intercepts it and the app
+    // offers Closing time.
+    window.close();
+  };
+
+  return (
+    <div ref={ref} className="cth-titlebar-nodrag" style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 10px 0 12px',
+          border: 'none', borderRadius: 'var(--cth-r-pill)', cursor: 'pointer',
+          background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line)',
+          fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, color: 'var(--cth-ink-2)'
+        }}
+      >
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--cth-green)', boxShadow: '0 0 0 3px var(--cth-green-soft)' }} />
+        <span style={{ fontFamily: 'var(--cth-font-mono)', fontWeight: 600, color: 'var(--cth-ink)' }}>
+          {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        </span>
+        <span>{t('shell.officeOpen')}</span>
+        <ChevronGlyph />
+      </button>
+      {open && (
+        <div role="menu" style={menu}>
+          <MenuItem onClick={openSchedule}>{t('shell.officeSchedule')}</MenuItem>
+          <MenuItem onClick={closingTime}>{t('shell.closingTime')}</MenuItem>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const menu: CSSProperties = {
+  position: 'absolute', top: 'calc(100% + 6px)', insetInlineEnd: 0, zIndex: 200, minWidth: 190,
+  padding: 6, display: 'flex', flexDirection: 'column',
+  background: 'var(--cth-card)', borderRadius: 'var(--cth-r-lg)',
+  boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
+};
+
+function MenuItem({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      role="menuitem"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        height: 32, padding: '0 10px', border: 'none', borderRadius: 'var(--cth-r-md)', cursor: 'pointer',
+        textAlign: 'start', fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink)',
+        background: hover ? 'var(--cth-neutral-soft)' : 'transparent'
+      }}
+    >{children}</button>
+  );
+}
+
+/* ── Needs you button (DESIGN.md 7.5) ──────────────────────────────────────── */
+
+export function NeedsYouButton() {
+  const { t } = useTranslation();
+  const count = useNeedsYouCount();
+  const open = () => useStore.getState().setNeedsYouOpen(true);
+
+  if (count === 0) {
+    return (
+      <button className="cth-titlebar-nodrag" onClick={open} style={{
+        height: 32, padding: '0 14px', border: 'none', borderRadius: 'var(--cth-r-pill)', cursor: 'pointer',
+        background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line)',
+        fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 500, color: 'var(--cth-ink-3)'
+      }}>{t('shell.nothingNeedsYou')}</button>
+    );
+  }
+  return (
+    <button
+      className="cth-titlebar-nodrag"
+      onClick={open}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 6px 0 14px',
+        border: 'none', borderRadius: 'var(--cth-r-pill)', cursor: 'pointer',
+        background: 'var(--cth-coral-strong)', color: 'var(--cth-on-coral)', boxShadow: 'var(--cth-shadow-coral)',
+        fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600
+      }}
+    >
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', animation: 'cth-pulse 1.6s ease-in-out infinite' }} />
+      {t('shell.needsYou')}
+      <span style={{
+        minWidth: 21, height: 21, padding: '0 6px', borderRadius: 'var(--cth-r-pill)', display: 'inline-grid', placeItems: 'center',
+        background: 'var(--cth-on-coral)', color: 'var(--cth-coral-strong)',
+        fontFamily: 'var(--cth-font-mono)', fontSize: 12, fontWeight: 600
+      }}>{count}</span>
+    </button>
+  );
+}
+
+/** The coral strip at the top of a person's panel (DESIGN.md 7.6). */
+export function NeedsYouStrip() {
+  const { t } = useTranslation();
+  const count = useNeedsYouCount();
+  if (count === 0) return null;
+  return (
+    <button
+      onClick={() => useStore.getState().setNeedsYouOpen(true)}
+      aria-label={t('shell.backToBoard')}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 36, padding: '0 12px',
+        border: 'none', borderRadius: 'var(--cth-r-lg)', cursor: 'pointer', flexShrink: 0,
+        background: 'var(--cth-coral-soft)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-coral-base) 30%, transparent)',
+        color: 'var(--cth-coral-text)', fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600
+      }}
+    >
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--cth-coral-base)' }} />
+      {t('shell.needsYou')}
+      <span style={{ ...countBubble, marginInlineStart: 2 }}>{count}</span>
+      <span style={{ marginInlineStart: 'auto', display: 'inline-flex' }}><ChevronGlyph rotate={-90} /></span>
+    </button>
+  );
+}
+
+/** Michael's name for {{godName}} copy in the shell. */
+export function useGodName(): string {
+  return useResolvedGodName();
+}
+
+/* ── Icon buttons and glyphs (DESIGN.md 10: outline, 1.75 stroke) ──────────── */
+
+function IconButton({ label, aria, onClick, children }: { label: string; aria: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      className="cth-titlebar-nodrag cth-settings-btn cth-tip"
+      onClick={onClick}
+      data-tip={label}
+      aria-label={aria}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 32, height: 32, padding: 0, border: 'none', borderRadius: 'var(--cth-r-md)',
+        background: 'transparent', color: 'var(--cth-ink-2)', cursor: 'pointer'
+      }}
+    >{children}</button>
+  );
+}
+
+function Glyph({ children, size = 18 }: { children: ReactNode; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{children}</svg>
+  );
+}
+function MoonGlyph() { return <Glyph><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></Glyph>; }
+function SunGlyph() {
+  return <Glyph><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></Glyph>;
+}
+function ExpandGlyph() { return <Glyph><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></Glyph>; }
+function CollapseGlyph() { return <Glyph><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5" /></Glyph>; }
+function GearGlyph() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </Glyph>
+  );
+}
+export function ChevronGlyph({ rotate = 0 }: { rotate?: number }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: `rotate(${rotate}deg)` }}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}

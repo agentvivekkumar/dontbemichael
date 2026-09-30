@@ -1774,10 +1774,10 @@ export function OfficeFloor() {
       ref={hostRef}
       style={{
         width: '100%', height: '100%',
-        boxShadow: 'var(--cth-panel-border)',
+        boxShadow: 'none',
         overflow: 'hidden',
         imageRendering: 'pixelated',
-        background: hex(colors.ink[900]),
+        background: 'var(--cth-bg)',
       }}
     />
   );
