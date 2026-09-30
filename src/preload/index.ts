@@ -292,6 +292,9 @@ export interface HarnessConfig {
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
+  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
+   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  quickbooksClaude?: boolean;
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
@@ -867,6 +870,13 @@ const api = {
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
+  /** Whether the owner's Claude account has QuickBooks: 'connected' | 'needs-sign-in' | 'not-added' | 'unknown'. Takes a few seconds. */
+  quickbooksClaudeStatus: (): Promise<'connected' | 'needs-sign-in' | 'not-added' | 'unknown'> => ipcRenderer.invoke('quickbooks:claudeStatus'),
+  /** Agents that may use QuickBooks, Read only, before the owner chooses (Oscar). */
+  quickbooksRoleDefaults: (): Promise<string[]> => ipcRenderer.invoke('quickbooks:roleDefaults'),
+  /** Save one agent's QuickBooks capability (through the owner's Claude account). */
+  quickbooksSetAccess: (agentId: string, cap: { enabled: boolean; changes: boolean }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('quickbooks:setAccess', agentId, cap),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),
   /** Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED in

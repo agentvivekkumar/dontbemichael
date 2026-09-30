@@ -220,6 +220,8 @@ test('no Arabic string is left as its English source', () => {
     'onboarding.team.conn.shopify',
     'onboarding.team.conn.mailchimp',
     'onboarding.team.conn.github',
+    'capabilities.quickbooks',               // product name: the QuickBooks section title
+    'quickbooksSettings.title',              // same, in Settings > Connections
     'mcpDefaults.toggleNote',                // "{{id}}: {{state}}" — pure interpolation
     'webhooksSection.summary'                // "{{count}} · {{state}}" — same
   ]);

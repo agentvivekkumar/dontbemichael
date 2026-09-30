@@ -74,6 +74,8 @@ import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, type AddMailboxInput } from './mail';
 import { PROVIDER_PRESETS, secretRefForMailbox } from '../shared/mailboxes';
+import { levelFor } from '../shared/agentDefinition';
+import { claudeBinFor, claudeQuickBooksStatus } from './claudeQuickBooks';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { buildWorkerLaunch } from './workerLaunch';
@@ -338,7 +340,8 @@ const hookServer = new HookServer(
   standingGoalFromRoster,
   (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event, message); },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
-  companyProfileForAgents
+  companyProfileForAgents,
+  (agentId) => booksReadRoleIds().has(agentId)
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
@@ -1752,6 +1755,22 @@ function skillsResourceDir(): string {
  *  `resources/packs` entry in electron-builder.yml. */
 function packsDir(): string {
   return packsResourceDir(app, process.resourcesPath);
+}
+
+/** Pack roles that read the books (Oscar in every pack). They may use
+ *  QuickBooks, Read only, until the owner chooses (owner, 2026-09-29). Read
+ *  once: the bundled packs don't change while the app runs. */
+let booksReaders: Set<string> | undefined;
+function booksReadRoleIds(): Set<string> {
+  if (booksReaders) return booksReaders;
+  const ids = new Set<string>();
+  try {
+    for (const { pack } of loadBundledPacks({ packsDir }).packs) {
+      for (const role of pack.agents) if (levelFor(role, 'books.read') !== 'off') ids.add(role.id);
+    }
+  } catch (e) { console.error('[quickbooks] pack roles:', e); }
+  booksReaders = ids;
+  return ids;
 }
 
 /** The agent-facing `doc-text` CLI, built beside index.js (inside the asar when
@@ -4010,6 +4029,23 @@ ipcMain.handle('mail:remove', (_evt, id: unknown) => {
 ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
   return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean });
+});
+/** Whether the owner's Claude account has QuickBooks (Settings > Connections). */
+ipcMain.handle('quickbooks:claudeStatus', () => {
+  return claudeQuickBooksStatus(ptyManager.commandPath(claudeBinFor(readConfig().defaultCommand)));
+});
+/** Roles that may use QuickBooks, Read only, before the owner chooses. */
+ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);
+/** Save one agent's QuickBooks capability. The hook reads it on the agent's
+ *  next call, so nothing restarts. */
+ipcMain.handle('quickbooks:setAccess', (_evt, agentId: unknown, cap: unknown) => {
+  if (typeof agentId !== 'string' || !cap || typeof cap !== 'object') return { ok: false };
+  const c = cap as { enabled?: unknown; changes?: unknown };
+  const quickbooks = { enabled: c.enabled === true, changes: c.enabled === true && c.changes === true };
+  const cfg = readConfig();
+  const caps = cfg.agentCapabilities ?? {};
+  writeConfig({ agentCapabilities: { ...caps, [agentId]: { ...(caps[agentId] ?? {}), quickbooks } } });
+  return { ok: true };
 });
 /** An agent's handoff history, received and sent, for its Messages tab. */
 ipcMain.handle('hive:history', (_evt, id: unknown) => (typeof id === 'string' ? hive.messageHistory(id) : []));

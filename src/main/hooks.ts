@@ -49,6 +49,7 @@ import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget
 import { folderLayoutFor } from './officeFile';
 import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
+import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
 
 /** Why a mail or calendar tool was refused. Read by the agent (and shown on the
@@ -132,7 +133,10 @@ export class HookServer {
      *  agents on their next prompt instead of at their next start. */
     private getKnowledge?: () => { active: boolean; cliPath?: string; root?: string; meaning?: { bin: string; palace: string } },
     /** The company profile as agents read it (companyProfileContext), or null. */
-    private getCompanyProfile?: () => string | null
+    private getCompanyProfile?: () => string | null,
+    /** Whether an agent's role reads the books (Oscar), which turns QuickBooks
+     *  on, Read only, until the owner chooses. Optional so tests can omit it. */
+    private roleReadsBooks?: (agentId: string) => boolean
   ) {}
 
   start(): void {
@@ -335,6 +339,28 @@ export class HookServer {
             hookEventName: 'PreToolUse',
             permissionDecision: 'deny',
             permissionDecisionReason: d.reason ?? 'Denied by operator.'
+          }
+        };
+      }
+    }
+
+    // Settings → QuickBooks, then Capabilities → QuickBooks (owner, 2026-09-29):
+    // the Claude account's QuickBooks connector. The Settings switch off
+    // refuses everyone; then, per agent, off refuses every call; Read only
+    // refuses any call that could change the books. The name check comes first
+    // so other tools never read config.
+    if (event === 'PreToolUse' && agentId && (isQuickBooksConnectorTool(p.tool_name ?? '') || isQuickBooksResourceCall(p.tool_name ?? '', p.tool_input))) {
+      const cfg = this.getConfig();
+      const cap = quickbooksCapability(cfg.agentCapabilities?.[agentId]?.quickbooks, this.roleReadsBooks?.(agentId) ?? false);
+      const d = quickbooksAccess(cfg.quickbooksClaude === true, cap, p.tool_name ?? '');
+      if (!d.ok) {
+        this.emitControl(agentId, p.tool_name, d.reason);
+        this.emit(agentId, event, p);
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: d.reason
           }
         };
       }

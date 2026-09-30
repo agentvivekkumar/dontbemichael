@@ -11,6 +11,8 @@
  * broker and the PreToolUse hook for md-mail tools.
  */
 
+import type { QuickBooksCapability } from './quickbooks';
+
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
 
 export interface MailServer {
@@ -47,6 +49,9 @@ export interface EmailCapability {
 
 export interface AgentCapabilities {
   email?: EmailCapability;
+  /** QuickBooks through the owner's Claude account (shared/quickbooks.ts).
+   *  Absent until the owner chooses: the role default applies. */
+  quickbooks?: QuickBooksCapability;
 }
 
 export type MailOp = 'list' | 'read' | 'draft' | 'send';

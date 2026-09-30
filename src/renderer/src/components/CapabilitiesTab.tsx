@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, Toggle, TriggerCard, MiniButton } from './triggers/ui';
 import { AgentSchedules, useGodId, useMissions } from './triggers/ScheduleList';
@@ -6,9 +6,10 @@ import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore, type Agent } from '@/store/store';
 import { type EmailCapability, mailboxHolder } from '@shared/mailboxes';
 import { missionsFor } from '@shared/missions';
+import { quickbooksCapability, type QuickBooksCapability } from '@shared/quickbooks';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
-type SectionKey = 'email' | 'schedules';
+type SectionKey = 'email' | 'books' | 'schedules';
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
@@ -21,6 +22,10 @@ type SectionKey = 'email' | 'schedules';
  *   2026-09-26). With email on, the body is the agent's one mailbox, picked
  *   from a list (or a link to Settings when none is set up), then Sending with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
+ * - QuickBooks: the Claude account's QuickBooks connector (owner,
+ *   2026-09-29), shown only once it is on in Settings. The header switch, then Read only or Can make changes. The
+ *   hook reads it on the agent's next call, so nothing restarts. Before the
+ *   owner chooses, roles that read the books (Oscar) are on, Read only.
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had.
  *
@@ -42,7 +47,17 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { missions } = useMissions();
   const mine = missionsFor(missions, agent.id, godId);
   const schedulesOn = mine.filter((m) => m.enabled).length;
-  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, schedules: true });
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, books: true, schedules: true });
+  // Unknown until main answers for this agent (the card stays hidden), so
+  // Oscar's switch never shows off while the hook treats him as on, and
+  // another agent's answer never shows.
+  const [booksAnswer, setBooksAnswer] = useState<{ id: string; on: boolean } | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void window.cth.quickbooksRoleDefaults().then((ids) => { if (alive) setBooksAnswer({ id: agent.id, on: ids.includes(agent.id) }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [agent.id]);
+  const booksDefault = booksAnswer?.id === agent.id ? booksAnswer.on : undefined;
   const setFold = (key: SectionKey, open: boolean): void => setCollapsed({ ...collapsed, [key]: !open });
 
   if (!config) return null;
@@ -106,6 +121,22 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     };
   });
 
+  const books = quickbooksCapability(config.agentCapabilities?.[agent.id]?.quickbooks, booksDefault === true);
+  const saveBooks = async (next: QuickBooksCapability): Promise<void> => {
+    setFailed(false);
+    try {
+      const res = await window.cth.quickbooksSetAccess(agent.id, next);
+      if (!res.ok) setFailed(true);
+    } catch { setFailed(true); }
+  };
+  // Turning QuickBooks on opens the section, so Read only shows; it always
+  // starts Read only.
+  const toggleBooks = (): void => {
+    if (books.enabled) { void saveBooks({ enabled: false, changes: false }); return; }
+    setCollapsed({ ...collapsed, books: false });
+    void saveBooks({ enabled: true, changes: false });
+  };
+
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
 
   return (
@@ -160,6 +191,29 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
             </>
           )}
         </TriggerCard>
+
+        {config.quickbooksClaude === true && booksDefault !== undefined && <TriggerCard
+          title={t('capabilities.quickbooks')}
+          blurb={t('capabilities.quickbooksBlurb', { name })}
+          action={<Toggle on={books.enabled} label={t('capabilities.canUseBooks', { name })} onClick={toggleBooks} />}
+          open={!collapsed.books}
+          onToggle={(open) => setFold('books', open)}
+        >
+          {!books.enabled ? (
+            <div style={hint}>{t('capabilities.quickbooksOff', { name })}</div>
+          ) : (
+            <>
+              <div style={{ ...h13, marginTop: 0 }}>{t('capabilities.booksChanges')}</div>
+              <RadioRows
+                label={t('capabilities.booksChanges')}
+                value={String(books.changes)}
+                options={[{ value: 'false', label: t('capabilities.booksReadOnly'), desc: t('capabilities.booksReadOnlyDesc') }, { value: 'true', label: t('capabilities.booksCanChange'), desc: t('capabilities.booksCanChangeDesc') }]}
+                onChange={(v) => { if ((v === 'true') !== books.changes) void saveBooks({ enabled: true, changes: v === 'true' }); }}
+              />
+            </>
+          )}
+          <div style={{ ...hint, marginTop: 10 }}>{t('capabilities.booksHow')}</div>
+        </TriggerCard>}
 
         <TriggerCard
           title={t('capabilities.schedules')}
