@@ -17,8 +17,9 @@
  * Contract: hive/docs/integrations-spec.md.
  */
 import { app, safeStorage } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { writeFileAtomic } from './atomicFile';
 import {
   type IntegrationRecord,
   validateIntegrationRecord,
@@ -96,10 +97,30 @@ function readSecretBlob(): Record<string, string> {
   }
 }
 
+/** The blob to change and write back. Unlike readSecretBlob, a file that is
+ *  there but can't be read or parsed throws: writing back `{}` plus one new
+ *  secret would erase every other saved password and key. */
+function readSecretBlobForWrite(): Record<string, string> {
+  const p = secretsPath();
+  if (!existsSync(p)) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(p, 'utf8'));
+  } catch {
+    parsed = undefined;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('The saved secrets file could not be read, so nothing was saved over it. Try again; if it keeps failing, the file needs repair.');
+  }
+  return parsed as Record<string, string>;
+}
+
+/** Every secret lives in this one file, so a torn write would lose all of them:
+ *  write it atomically (atomicFile.ts). */
 function writeSecretBlob(blob: Record<string, string>): void {
   const p = secretsPath();
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(blob, null, 2), { encoding: 'utf8', mode: 0o600 });
+  writeFileAtomic(p, JSON.stringify(blob, null, 2), 0o600);
 }
 
 /** Store a secret ENCRYPTED. Fail closed if OS encryption is unavailable (never
@@ -112,7 +133,7 @@ export function setSecret(secretRef: string, plaintext: string): { ok: boolean; 
       return { ok: false, error: 'OS secret encryption is unavailable; refusing to store a secret in plaintext' };
     }
     const cipher = safeStorage.encryptString(plaintext).toString('base64');
-    const blob = readSecretBlob();
+    const blob = readSecretBlobForWrite();
     blob[secretRef] = cipher;
     writeSecretBlob(blob);
     return { ok: true };
