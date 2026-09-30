@@ -3,30 +3,22 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* The app is a fixed cream/light design. Without declaring it, Chromium on a
-   dark-mode OS styles form controls with the DARK UA scheme — most visibly a
-   white (invisible) text caret on our cream textareas. */
+/* Declare the scheme per theme, so native form controls, carets and scrollbars
+   match the tokens instead of the OS setting (DESIGN.md 15). */
 :root { color-scheme: light; }
+:root[data-cth-theme='dark'] { color-scheme: dark; }
 
 html, body, #root {
   margin: 0;
   height: 100%;
-  background: var(--cth-cream-100);
-  color: var(--cth-ink-900);
+  background: var(--cth-bg);
+  color: var(--cth-ink);
   font-family: var(--cth-font-ui);
   font-size: var(--cth-text-body-md);
   line-height: var(--cth-lh-body-md);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
   overflow: hidden;
-}
-
-body {
-  /* tiny diagonal cream noise — pure CSS, no images */
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgba(232, 217, 160, 0.20) 0 1px,
-      transparent 1px 6px
-    );
 }
 
 button, input, textarea, select {
@@ -60,12 +52,13 @@ input, textarea, [contenteditable='true'] {
 .cth-scroll-hidden { scrollbar-width: none; -ms-overflow-style: none; }
 .cth-scroll-hidden::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
-/* Pixel-snapping for any rasterised content */
-canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
+/* Pixel-snapping only where the art is pixels: the Pixi floor canvas and the
+   sprite portraits. Vector art (the studio, the lockup, icons) renders smooth. */
+canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 
-/* Focus ring — 2px outer offset, ink */
+/* Focus ring: 2px indigo, 2px offset, on everything (DESIGN.md 12). */
 :focus-visible {
-  outline: 1px solid var(--cth-ink-300);
+  outline: 2px solid var(--cth-indigo);
   outline-offset: 2px;
 }
 
@@ -80,21 +73,20 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
    click into the box. Both :focus and :focus-visible: a textarea you clicked
    into is exactly as focused as one you tabbed into, and here we WANT the mouse
    case — it is the one the founder is looking at while typing. */
-.cth-input { box-shadow: inset 0 0 0 1px var(--cth-ink-100); }
+.cth-input { box-shadow: inset 0 0 0 1px var(--cth-line-input); border-radius: var(--cth-r-md); }
 .cth-input:focus,
-.cth-input:focus-visible { box-shadow: inset 0 0 0 2px var(--cth-ink-700); }
+.cth-input:focus-visible { box-shadow: inset 0 0 0 2px var(--cth-indigo); }
 
-/* Custom scrollbar — chunky, pixel-feel */
-::-webkit-scrollbar { width: 12px; height: 12px; }
-::-webkit-scrollbar-track {
-  background: var(--cth-cream-200);
-  box-shadow: inset 0 0 0 1px var(--cth-ink-100);
-}
+/* Scrollbars: thin and quiet. The thumb is the only visible part. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--cth-ink-700);
-  box-shadow: inset 0 0 0 1px var(--cth-ink-300);
+  background: var(--cth-line-2);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--cth-r-pill);
 }
-::-webkit-scrollbar-thumb:hover { background: var(--cth-ink-900); }
+::-webkit-scrollbar-thumb:hover { background: var(--cth-ink-4); background-clip: padding-box; }
 
 /* commit-graph (open-source git visualiser) — harmonise with the pixel theme */
 /* Commit history. The `* { font-family: … !important }` blanket that used to live
@@ -127,13 +119,14 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
   top: calc(100% + 6px);
   right: 0;
   white-space: nowrap;
-  padding: 3px 7px 2px;
+  padding: 4px 8px;
   font-family: var(--cth-font-ui);
   font-size: 11px;
   line-height: 16px;
-  color: var(--cth-cream-100);
-  background: var(--cth-ink-900);
-  box-shadow: inset 0 0 0 1px var(--cth-ink-700);
+  color: var(--cth-bg);
+  background: var(--cth-ink);
+  border-radius: var(--cth-r-md);
+  box-shadow: var(--cth-shadow-md);
   opacity: 0;
   pointer-events: none;
   /* Delay matches the native tooltip feel, so it does not flash while the
@@ -158,32 +151,35 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
   line-height: 15px;
 }
 
-/* Settings (gear) button in the title bar — a clear bordered chip with a
-   neo-brutalist hover (lemon fill + offset shadow) so it reads as a button. */
-.cth-settings-btn { transition: background 80ms steps(2), box-shadow 80ms steps(2), transform 80ms steps(2); }
+/* Title bar icon buttons (DESIGN.md 7.1): quiet until hovered. */
+.cth-settings-btn { transition: background var(--cth-dur-fast) var(--cth-ease), box-shadow var(--cth-dur-fast) var(--cth-ease); }
 .cth-settings-btn:hover {
-  background: var(--cth-lemon) !important;
-  box-shadow: inset 0 0 0 1px var(--cth-ink-300), 2px 2px 0 0 var(--cth-ink-900) !important;
-  transform: translate(-1px, -1px);
+  background: var(--cth-card) !important;
+  box-shadow: inset 0 0 0 1px var(--cth-line) !important;
 }
-.cth-settings-btn:active {
-  transform: translate(0, 0);
-  box-shadow: inset 0 0 0 1px var(--cth-ink-300) !important;
-}
+.cth-settings-btn:active { background: var(--cth-neutral-soft) !important; }
 
-/* Keyframes — pixel-style: step-based, no easing */
+/* Keyframes (DESIGN.md 11.1): smooth, eased. */
 @keyframes cth-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
 }
 @keyframes cth-pulse {
-  0%, 49% { transform: scale(1); }
-  50%, 100% { transform: scale(0.7); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+@keyframes cth-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+@keyframes cth-ring {
+  0% { transform: scale(.6); opacity: .9; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
 /* A portrait hopping while the hire check reads that teammate's job. */
 @keyframes cth-hop {
-  0%, 49% { transform: translateY(0); }
-  50%, 100% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 /* Reduce motion */
@@ -293,15 +289,15 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-md-preview h3 { font-size: 16px; }
 .cth-md-preview h4 { font-size: 14px; }
 .cth-md-preview p { margin: 0.6em 0; }
-.cth-md-preview a { color: var(--cth-sky); }
+.cth-md-preview a { color: var(--cth-indigo-text); }
 .cth-md-preview code {
   font-family: var(--cth-font-mono); font-size: 12.5px;
-  background: var(--cth-cream-200); padding: 1px 5px; border-radius: 2px;
+  background: var(--cth-cream-200); padding: 1px 5px; border-radius: var(--cth-r-xs);
 }
 .cth-md-preview pre {
   background: var(--cth-cream-200);
   box-shadow: inset 0 0 0 1px var(--cth-ink-100);
-  padding: 10px 12px; overflow-x: auto; border-radius: 2px;
+  padding: 10px 12px; overflow-x: auto; border-radius: var(--cth-r-md);
 }
 .cth-md-preview pre code { background: transparent; padding: 0; }
 /* Code is LTR no matter what language the prose around it is in: an inline
@@ -318,7 +314,7 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-md-preview ul, .cth-md-preview ol { padding-inline-start: 22px; margin: 0.5em 0; }
 .cth-md-preview li { margin: 3px 0; }
 .cth-md-preview li::marker { color: var(--cth-ink-500); }
-.cth-md-preview input[type="checkbox"] { accent-color: var(--cth-mint); margin-inline-end: 6px; }
+.cth-md-preview input[type="checkbox"] { accent-color: var(--cth-indigo); margin-inline-end: 6px; }
 .cth-md-preview table {
   border-collapse: collapse; margin: 0.8em 0; display: block; overflow-x: auto;
 }
@@ -335,12 +331,12 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-md-preview .cth-md-image {
   display: block; max-width: 100%; height: auto; margin: 0.6em 0;
   box-shadow: inset 0 0 0 1px var(--cth-ink-100);
-  border-radius: 2px;
+  border-radius: var(--cth-r-md);
 }
 .cth-md-preview .cth-md-img {
   display: inline-block; padding: 2px 8px; font-size: 12px;
   background: var(--cth-cream-200); box-shadow: inset 0 0 0 1px var(--cth-ink-100);
-  color: var(--cth-ink-500); border-radius: 2px;
+  color: var(--cth-ink-500); border-radius: var(--cth-r-sm);
 }
 
 /* ─── Markdown inside a card (v0.4.6) ────────────────────────────────────────

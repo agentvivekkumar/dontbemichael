@@ -1,44 +1,93 @@
-/* Design tokens — mirrors tokens.ts. Update both together. */
+/* Design tokens, design system v2 "Studio" (branding/DESIGN.md sections 3 to 6).
+   Mirrors tokens.ts. Update both together.
+
+   Two layers live here while the app migrates:
+
+   1. The v2 tokens (--cth-bg, --cth-card, --cth-ink, --cth-coral-base ...). Names
+      match the kit's --dbm-* tokens after the prefix (branding/colors/colors.css).
+      New and rewritten components use only these.
+   2. The v1 names (--cth-cream-*, --cth-ink-900, --cth-mint ...), kept so the
+      hundreds of existing inline styles keep working, but REMAPPED onto v2 values.
+      They leave as each component moves to layer 1 (DESIGN.md section 17). */
 :root {
-  /* Base */
-  --cth-cream-50:  #FFFDF5;
-  --cth-cream-100: #FFF8E7;
-  --cth-cream-200: #F4E9C7;
-  --cth-cream-300: #E8D9A0;
-  --cth-paper-100: #FCFAF0;
-  --cth-paper-200: #F0EAD2;
+  /* ── v2 neutrals (DESIGN.md 3.1) ─────────────────────────────────────────── */
+  --cth-bg:           #F7F7FB;
+  --cth-floor:        #E9E7F7;
+  --cth-card:         #FFFFFF;
+  --cth-card-2:       #FAFAFD;
+  --cth-rail:         #F8F7FC;
+  --cth-chrome:       #F1F0F8;
+  --cth-ink:          #1E1B2E;
+  --cth-ink-2:        #4A4660;
+  --cth-ink-3:        #6C6884;
+  --cth-ink-4:        #B4B1C6;
+  --cth-line:         #E8E6F2;
+  --cth-line-2:       #DAD7EA;
+  --cth-line-input:   #8F8AA6;
+  --cth-neutral-soft: #F0EFF5;
 
-  /* Ink */
-  --cth-ink-900: #1A1320;
-  --cth-ink-700: #3D2E4A;
-  --cth-ink-500: #6B5878;
-  --cth-ink-300: #A899B5;
-  --cth-ink-100: #D9CFE0;
+  /* ── v2 accents: base, soft, text (DESIGN.md 3.2) ───────────────────────── */
+  --cth-coral-base: #FF5A5F;  --cth-coral-soft: #FFECEC;  --cth-coral-text: #C8303A;
+  --cth-green:      #1FB872;  --cth-green-soft: #E3F7EC;  --cth-green-text: #157D4D;
+  --cth-blue:       #4C6FFF;  --cth-blue-soft:  #E8EDFF;  --cth-blue-text:  #3553E8;
+  --cth-violet:     #8B5CF6;  --cth-violet-soft:#F0EAFE;  --cth-violet-text:#7043E6;
+  --cth-amber:      #F2A93B;  --cth-amber-soft: #FFF4DF;  --cth-amber-text: #8F5C07;
+  --cth-indigo:     #6C5CE7;  --cth-indigo-soft:#EEEBFD;  --cth-indigo-text:#4338CA;
+  --cth-coral-strong: #D4363D;   /* coral fills that carry text (3.2) */
+  --cth-on-coral:     #FFFFFF;
+  --cth-act-request:  #5B55C9;   /* message act colors (3.3) */
 
-  /* Accents — v0.3.4 recalibration: same hues, professional saturation.
-     The originals (#FFD93D, #FF6B6B, …) were full-saturation arcade tones that
-     read as noise at UI density; these sit in the calmer band that products
-     like Linear/Radix use — recognizable color, no glare. */
-  --cth-coral: #D96A62;       --cth-coral-light: #F3D3CD;
-  --cth-mint:  #5CA97A;       --cth-mint-light:  #D2E7DA;
-  --cth-sky:   #4F9FAF;       --cth-sky-light:   #CFE5E9;
-  --cth-lemon: #DCAB3C;       --cth-lemon-light: #F3E4BC;
-  --cth-lilac: #9482D3;       --cth-lilac-light: #E0DAF2;
-  --cth-peach: #D99168;       --cth-peach-light: #F3DACA;
+  /* ── v2 shadows and radii (3.7, 6.2) ────────────────────────────────────── */
+  --cth-shadow-sm:    0 1px 2px rgba(30, 27, 46, .05);
+  --cth-shadow-md:    0 1px 2px rgba(30, 27, 46, .05), 0 6px 18px rgba(62, 52, 140, .08);
+  --cth-shadow-lg:    0 1px 2px rgba(30, 27, 46, .05), 0 10px 30px rgba(62, 52, 140, .10);
+  --cth-shadow-hub:   0 1px 2px rgba(30, 27, 46, .05), 0 10px 26px rgba(92, 76, 220, .14);
+  --cth-shadow-coral: 0 4px 14px rgba(212, 54, 61, .30);
+  --cth-ring-select:  0 0 0 3px rgba(30, 27, 46, .08);
+  --cth-r-xs: 3px;  --cth-r-sm: 6px;  --cth-r-md: 9px;  --cth-r-lg: 12px;
+  --cth-r-xl: 14px; --cth-r-2xl: 16px; --cth-r-pill: 999px;
 
-  /* Status — same recalibration; hue meanings unchanged */
-  --cth-status-idle:     #A199AB;
-  --cth-status-thinking: #4F9FAF;
-  --cth-status-working:  #DCAB3C;
-  --cth-status-waiting:  #6D87D6;
-  --cth-status-blocked:  #D96A62;
-  --cth-status-success:  #5CA97A;
-  --cth-status-ghost:    #D9D3DE;
-  --cth-status-compacting: #8F7CC7; /* #5C — mid-/compact, "boxing up context" */
-  --cth-status-looping:    #D6903F; /* #5C — circuit-breaker armed (runaway) */
-  --cth-status-typing:     #C89838; /* unsent text on the prompt — queue is held */
+  /* ── v2 motion (11.1) ────────────────────────────────────────────────────── */
+  --cth-dur-fast: 120ms;  --cth-dur-base: 200ms;  --cth-dur-slow: 320ms;
+  --cth-ease: cubic-bezier(.2, .7, .2, 1);
 
-  /* Spacing */
+  /* ── v1 names, remapped onto v2 ──────────────────────────────────────────── */
+  /* Surfaces: the ground is bg, every panel and card is white. */
+  --cth-cream-50:  #F7F7FB;   /* ground        -> bg */
+  --cth-cream-100: #FFFFFF;   /* panel fill    -> card */
+  --cth-cream-200: #F0EFF5;   /* inset, alt    -> neutral-soft */
+  --cth-cream-300: #E8E6F2;   /* disabled fill -> line */
+  --cth-paper-100: #FFFFFF;   /* cards, inputs -> card */
+  --cth-paper-200: #FAFAFD;   /* subtle panel  -> card-2 */
+
+  /* Ink ramp */
+  --cth-ink-900: #1E1B2E;     /* -> ink */
+  --cth-ink-700: #4A4660;     /* -> ink-2 */
+  --cth-ink-500: #6C6884;     /* -> ink-3 */
+  --cth-ink-300: #B4B1C6;     /* borders -> ink-4 (as heavy as v1's #A899B5) */
+  --cth-ink-100: #E8E6F2;     /* dividers -> line */
+
+  /* Accents keep their v1 meaning, in v2 color. They are fills with dark text. */
+  --cth-coral: #FF5A5F;       --cth-coral-light: #FFECEC;   /* needs you */
+  --cth-mint:  #1FB872;       --cth-mint-light:  #E3F7EC;   /* done */
+  --cth-sky:   #4C6FFF;       --cth-sky-light:   #E8EDFF;   /* info -> blue */
+  --cth-lemon: #F2A93B;       --cth-lemon-light: #FFF4DF;   /* highlight -> amber */
+  --cth-lilac: #8B5CF6;       --cth-lilac-light: #F0EAFE;   /* -> violet */
+  --cth-peach: #6C5CE7;       --cth-peach-light: #EEEBFD;   /* tabs, selection -> indigo */
+
+  /* Status (DESIGN.md 3.5) */
+  --cth-status-idle:       #B4B1C6;
+  --cth-status-thinking:   #8B5CF6;
+  --cth-status-working:    #4C6FFF;
+  --cth-status-waiting:    #6C6884;
+  --cth-status-blocked:    #FF5A5F;
+  --cth-status-success:    #1FB872;
+  --cth-status-ghost:      #D9D6E6;
+  --cth-status-compacting: #7043E6;
+  --cth-status-looping:    #F2A93B;
+  --cth-status-typing:     #6C5CE7;
+
+  /* Spacing, 4px grid (DESIGN.md 5.1) */
   --cth-space-0: 0px;
   --cth-space-1: 4px;
   --cth-space-2: 8px;
@@ -49,127 +98,122 @@
   --cth-space-7: 48px;
   --cth-space-8: 64px;
 
-  /* Type — v0.3.4: Press Start 2P stays as the BRAND face for small caps
-     labels; everything the user actually reads is Inter (UI) and JetBrains
-     Mono (code/terminal). Pixelify/VT323 were the main readability drag. */
-  /* Press Start 2P is latin-only by design. CJK and Arabic text in a display
-     slot falls through to a system face rather than to generic monospace. */
-  --cth-font-display: "Press Start 2P", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
-  --cth-font-ui:      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", sans-serif;
-  --cth-font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
+  /* Type (DESIGN.md 4.1). Sora for words, IBM Plex Mono for numbers, JetBrains
+     Mono for the terminal. The display slot was Press Start 2P; in v2 it is Sora,
+     so every v1 "display" label reads as a Sora micro label. Sora is latin only:
+     CJK and Arabic fall through to the system faces named after it. */
+  --cth-font-display: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", sans-serif;
+  --cth-font-ui:      "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", sans-serif;
+  --cth-font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
+  --cth-font-terminal: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
+  /* The Pixi office floor still draws its bubbles in the pixel face until it is
+     replaced (DESIGN.md section 17, row 1). Nothing else may use this. */
+  --cth-font-pixel:   "Press Start 2P", monospace;
 
-  /* Type scale — v0.3.4: one step tighter (Inter reads larger than Pixelify
-     at equal px, and the controls were oversized) */
+  /* Type scale (DESIGN.md 4.2). v1 "display" sizes were pixel sizes; they are
+     lifted so a Sora label is never under the 10px floor. */
   --cth-text-display-lg: 16px;
   --cth-text-display-md: 12px;
-  --cth-text-display-sm: 8px;
-  --cth-text-body-lg:    16px;
-  --cth-text-body-md:    14px;
-  --cth-text-body-sm:    13px;
-  --cth-text-mono-md:    14px;
-  --cth-text-mono-sm:    13px;
+  --cth-text-display-sm: 10px;
+  --cth-text-body-lg:    15px;
+  --cth-text-body-md:    13px;
+  --cth-text-body-sm:    12px;
+  --cth-text-mono-md:    13px;
+  --cth-text-mono-sm:    12px;
 
-  /* Line heights — integer multiples */
-  --cth-lh-display-lg: 24px;
-  --cth-lh-display-md: 20px;
-  --cth-lh-display-sm: 12px;
-  --cth-lh-body-lg:    24px;
-  --cth-lh-body-md:    20px;
-  --cth-lh-body-sm:    18px;
-  --cth-lh-mono:       20px;
+  --cth-lh-display-lg: 22px;
+  --cth-lh-display-md: 16px;
+  --cth-lh-display-sm: 13px;
+  --cth-lh-body-lg:    20px;
+  --cth-lh-body-md:    18px;
+  --cth-lh-body-sm:    16px;
+  --cth-lh-mono:       18px;
 
-  /* Hard drop shadow — no blur, softer than before */
-  --cth-shadow-hard: 3px 3px 0 rgba(26, 19, 32, 0.14);
+  /* v1 "hard shadow": now the soft card shadow. */
+  --cth-shadow-hard: var(--cth-shadow-md);
 
-  /* Panel borders — v0.3.4: single hairlines. The old three-layer package
-     boxed every surface in thick chrome; structure now comes from surface
-     contrast, not outlines. Dialogs keep one slightly stronger line. */
-  --cth-panel-border:          inset 0 0 0 1px var(--cth-ink-300);
-  /* Text that sits ON an accent fill (a selected tab, a filled chip). The
-     accents are LIGHT surfaces in BOTH themes, so this is dark in both — using
-     ink-900 here inverts with the theme and paints near-white on a pale accent,
-     which is the one place the theme switch actively hurts legibility. */
-  --cth-on-accent: #1A1320;
-
-  --cth-panel-border-inset:    inset 0 0 0 1px var(--cth-ink-100);
-  --cth-panel-border-terminal: inset 0 0 0 1px var(--cth-ink-300);
-  --cth-panel-border-dialog:   inset 0 0 0 1px var(--cth-ink-500);
+  /* Panel borders: hairlines in v2 line colors. */
+  --cth-panel-border:          inset 0 0 0 1px var(--cth-line);
+  /* Text on an accent fill (a selected tab, a filled chip). */
+  --cth-on-accent: #1E1B2E;
+  --cth-panel-border-inset:    inset 0 0 0 1px var(--cth-line);
+  --cth-panel-border-terminal: inset 0 0 0 1px var(--cth-line-2);
+  --cth-panel-border-dialog:   inset 0 0 0 1px var(--cth-line-2);
 }
 
 /* ── Dark theme ──────────────────────────────────────────────────────────────
-   One token swap darkens the WHOLE app. Shades of black with a near-white text
-   ramp, tuned for READABILITY first and measured rather than eyeballed. Stamped
-   by design/theme.ts as data-cth-theme on <html>; the terminal palette and
-   per-agent Claude session themes follow the same switch.
-
-   THE BUG THIS FIXES. Text was never the problem — ink-900 measured 11-14:1 and
-   ink-700 8-9.6:1 against every surface. `ink-300` was, at 1.73-2.09:1. That
-   token is not decoration: it is this app's entire structural language, used
-   187 times and 93 of those as `inset 0 0 0 1px` — the border on every button,
-   input, panel, card and chip. Below ~3:1 a 1px line is not perceivable, so in
-   dark mode the edges defining every control simply were not there, and the UI
-   read as flat washes of grey. ink-300 is now 3.12-3.59:1 and ink-100 stays
-   deliberately quieter (1.47-1.69:1) for dividers that should recede.
-
-   NOT BLACK, AND NOT WHITE. A first pass took the ground to #0E0E11 and text to
-   #EDECEA, which measured beautifully and read as harsh: near-black behind
-   near-white is maximum contrast, and maximum contrast is not the same as
-   comfortable. The ground now sits at luminance 0.009-0.020 (visibly lifted off
-   black, still unambiguously a dark theme) and text at 0.71 rather than 0.84 —
-   a warm off-white. Everything still clears its floor with room to spare.
-
-   Every value below is verified against WCAG contrast for the five surfaces it
-   can appear on: body text >= 4.5, structural borders >= 3.0. Accents are held
-   to a narrow luminance band (0.36-0.44) so no single hue fluoresces against
-   the black and colour never becomes the thing carrying the layout. */
+   One token swap darkens the whole app (theme.ts stamps data-cth-theme on
+   <html>). Lifted, not black: the ground is #14131C and text #ECEAF4. Every text
+   value is measured at 4.5:1 or better on the surfaces it sits on; control
+   boundaries (line-input) at 3:1 (DESIGN.md 3 and 12). */
 :root[data-cth-theme='dark'] {
-  /* Base surfaces — a graded elevation ramp, darkest where light mode was
-     lightest. Neutral with a whisper of the brand's violet warmth. */
-  --cth-cream-50:  #17171B;   /* app ground — dark, deliberately NOT black */
-  --cth-cream-100: #1D1D22;
-  --cth-cream-200: #26262C;
-  --cth-cream-300: #313139;
-  --cth-paper-100: #1A1A1F;   /* cards, inputs, terminals */
-  --cth-paper-200: #222229;
+  --cth-bg:           #14131C;
+  --cth-floor:        #26223B;
+  --cth-card:         #1F1E2B;
+  --cth-card-2:       #24233A;
+  --cth-rail:         #181722;
+  --cth-chrome:       #1B1A26;
+  --cth-ink:          #ECEAF4;
+  --cth-ink-2:        #CFCCDD;
+  --cth-ink-3:        #A5A2B8;
+  --cth-ink-4:        #8C89A0;
+  --cth-line:         rgba(255, 255, 255, .09);
+  --cth-line-2:       rgba(255, 255, 255, .14);
+  --cth-line-input:   #76728C;
+  --cth-neutral-soft: #2A2938;
 
-  /* Ink → off-white text ramp (never #FFF — glare) */
-  --cth-ink-900: #DEDBD6;   /* 10.9-13.0:1 — primary text, warm off-white */
-  --cth-ink-700: #B3B0AC;   /*  7.0-8.3:1  — secondary text */
-  --cth-ink-500: #96919F;   /*  4.9-5.8:1  — tertiary / hints */
-  --cth-ink-300: #787684;   /*  3.4-4.0:1  — BORDERS. must stay >= 3.0 */
-  --cth-ink-100: #3E3D46;   /*  1.4-1.7:1  — dividers, meant to recede */
+  --cth-coral-base: #FF5A5F;  --cth-coral-soft: rgba(255, 90, 95, .16);   --cth-coral-text: #FF8C90;
+  --cth-green:      #34CD8A;  --cth-green-soft: rgba(52, 205, 138, .14);  --cth-green-text: #34CD8A;
+  --cth-blue:       #8FA3FF;  --cth-blue-soft:  rgba(124, 147, 255, .16); --cth-blue-text:  #8FA3FF;
+  --cth-violet:     #B69CFF;  --cth-violet-soft:rgba(167, 139, 250, .17); --cth-violet-text:#B69CFF;
+  --cth-amber:      #F2B45A;  --cth-amber-soft: rgba(242, 180, 90, .15);  --cth-amber-text: #F2B45A;
+  --cth-indigo:     #9D90FF;  --cth-indigo-soft:rgba(157, 144, 255, .16); --cth-indigo-text:#A99FFF;
+  --cth-coral-strong: #FF5A5F;
+  --cth-on-coral:     #14131C;
+  --cth-act-request:  #8F89F2;
 
-  /* Accents — one step lighter/softer than the light set so they read on dark
-     without fluorescing */
-  --cth-coral: #E08C82;       --cth-mint:  #74C096;
-  --cth-sky:   #6FB3C4;       --cth-lemon: #CFAA57;
-  --cth-lilac: #A896E3;       --cth-peach: #DFA57F;
+  --cth-shadow-sm:    0 1px 2px rgba(0, 0, 0, .35);
+  --cth-shadow-md:    0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px rgba(0, 0, 0, .32);
+  --cth-shadow-lg:    0 1px 2px rgba(0, 0, 0, .35), 0 12px 32px rgba(0, 0, 0, .40);
+  --cth-shadow-hub:   0 1px 2px rgba(0, 0, 0, .35), 0 10px 26px rgba(0, 0, 0, .45);
+  --cth-shadow-coral: 0 4px 14px rgba(255, 90, 95, .25);
+  --cth-ring-select:  0 0 0 3px rgba(236, 234, 244, .12);
 
-  /* Accent "-light" fills double as chip/selection backgrounds — deep muted
-     versions so light text (ink-900) stays readable on top. */
-  --cth-coral-light: #3B2724;
-  --cth-mint-light:  #1E3227;
-  --cth-sky-light:   #1F3238;
-  --cth-lemon-light: #332C1D;
-  --cth-lilac-light: #2B2740;
-  --cth-peach-light: #352822;
+  /* v1 names */
+  --cth-cream-50:  #14131C;
+  --cth-cream-100: #1F1E2B;
+  --cth-cream-200: #2A2938;
+  --cth-cream-300: #312F42;
+  --cth-paper-100: #1F1E2B;
+  --cth-paper-200: #24233A;
 
-  /* Status — dark-tuned counterparts (same hue language) */
-  --cth-status-idle:     #6F6C77;
-  --cth-status-thinking: #64ACBB;
-  --cth-status-working:  #D8B052;
-  --cth-status-waiting:  #8095DC;
-  --cth-status-blocked:  #DF8078;
-  --cth-status-success:  #6FB88B;
-  /* The quietest status, but still a MARK the user must be able to find — at
-     the old #3D3C44 it measured 1.54:1 on the new ground and simply vanished. */
-  --cth-status-ghost:    #6C6A76;
-  --cth-status-compacting: #9D8BD2;
-  --cth-status-looping:    #D69A55;
-  --cth-status-typing:     #CBA24A;
+  --cth-ink-900: #ECEAF4;
+  --cth-ink-700: #CFCCDD;
+  --cth-ink-500: #A5A2B8;
+  --cth-ink-300: #76728C;     /* borders, 3.5:1 on card */
+  --cth-ink-100: #34324A;
 
-  /* Hard shadow reads as depth, not void */
-  --cth-shadow-hard: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  /* Accent fills stay light enough for dark on-accent text; their "-light"
+     twins are the dark soft fills that carry light text. */
+  --cth-coral: #FF5A5F;       --cth-coral-light: #432833;
+  --cth-mint:  #34CD8A;       --cth-mint-light:  #223638;
+  --cth-sky:   #8FA3FF;       --cth-sky-light:   #2E314D;
+  --cth-lemon: #F2B45A;       --cth-lemon-light: #3F3432;
+  --cth-lilac: #B69CFF;       --cth-lilac-light: #36314E;
+  --cth-peach: #9D90FF;       --cth-peach-light: #33304D;
+
+  --cth-status-idle:       #8C89A0;
+  --cth-status-thinking:   #B69CFF;
+  --cth-status-working:    #8FA3FF;
+  --cth-status-waiting:    #A5A2B8;
+  --cth-status-blocked:    #FF5A5F;
+  --cth-status-success:    #34CD8A;
+  --cth-status-ghost:      #6C6A7E;
+  --cth-status-compacting: #B69CFF;
+  --cth-status-looping:    #F2B45A;
+  --cth-status-typing:     #9D90FF;
+
+  --cth-on-accent: #14131C;
 }
 
 /* The header lockup: one image per theme (App.tsx). */
