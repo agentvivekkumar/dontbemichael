@@ -109,6 +109,116 @@
 **Effort:** XS
 **Priority:** P3
 
+## Closing time (deferred from ship of feat/closing-time-progress, 2026-09-29)
+
+### Feed each row's latest line from the agent's transcript
+
+**What:** Show the last thing each agent said under its row, read from its Claude transcript.
+
+**Why:** The row's "latest line" was removed before release because `recentAssistantText` is only set by `src/renderer/src/mocks/mockEvents.ts`; real agents never fill it. The owner asked for it to tell a long process from a stuck one.
+
+**Effort:** M
+**Priority:** P2
+
+### Rows in a second window
+
+**What:** Give the closing-time rows names and detail in every window, not only the one that saw the hook events.
+
+**Why:** Detail lives in the renderer store of the window that received `hive:hookEvent`; another window shows names but no detail.
+
+**Effort:** S
+**Priority:** P3
+
+### An agent respawned mid-close
+
+**What:** Decide what happens to a row when an agent's terminal restarts while closing time runs.
+
+**Why:** A respawned worker becomes live again and is waited on, but its row and Michael's "terminal ended" note may already be gone.
+
+**Effort:** S
+**Priority:** P3
+
+### Row still names a finished tool
+
+**What:** After PostToolUse the row falls back to the action caption ("using Bash") and keeps counting minutes.
+
+**Why:** The owner can read a finished step as still running.
+
+**Effort:** S
+**Priority:** P3
+
+### A refused tool call still shows its detail
+
+**What:** PreToolUse that the hook denies (paused or gated) still sends `detail`.
+
+**Why:** The row names a step that never ran.
+
+**Effort:** S
+**Priority:** P3
+
+### Parallel tool calls clear each other's detail
+
+**What:** Track detail per tool call so one call's PostToolUse does not clear another's.
+
+**Why:** With parallel calls, the row goes blank while a call is still running.
+
+**Effort:** S
+**Priority:** P3
+
+### Visible focus when the list takes focus
+
+**What:** The row list's focus fallback (`tabIndex={-1}`, no outline) is invisible, including after Michael's Remind.
+
+**Why:** Keyboard users lose their place after an action.
+
+**Effort:** S
+**Priority:** P3
+
+### Tests for the focus fallback and a post-tool row
+
+**What:** Add tests for the listRef focus fallback and a describeRow case after PostToolUse; fix the stale `actionAt` docstring.
+
+**Why:** Both paths are untested.
+
+**Effort:** S
+**Priority:** P3
+
+### Replace the source-regex dialog tests with pure helpers
+
+**What:** Move the checks in `test/closing-time-dialog.test.cjs` that grep component source into tested helpers.
+
+**Why:** They break on harmless edits (comments, added props) and passed review cycles several times only after loosening.
+
+**Effort:** M
+**Priority:** P3
+
+### Archiving a live agent during closing time
+
+**What:** Archiving through voice or `hive:setArchived` drops the agent from the wait list but does not call `closingTime.refresh` or tell Michael.
+
+**Why:** Michael can keep waiting for an ACK that never comes until the 6-minute timeout.
+
+**Effort:** S
+**Priority:** P3
+
+### Mark the detail line as the agent's own words
+
+**What:** The detail is agent-written text shown where the owner decides to close without someone.
+
+**Why:** An agent can write "safe to close without me"; the owner's choice is steered by untrusted text.
+
+**Effort:** S
+**Priority:** P3
+
+### Limit combining marks in the detail line
+
+**What:** Collapse long runs of combining marks, or clip the line's overflow.
+
+**Why:** A line of stacked marks can draw over the neighbouring rows' buttons (visual only).
+
+**Effort:** S
+**Priority:** P3
+
 ## Schedules
 
 ### Starter jobs in an agent's empty Schedules tab

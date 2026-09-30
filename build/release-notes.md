@@ -1,3 +1,3 @@
-- **A cleaner repo:** the old project's website, blog posts and promo media are gone.
-- **Docs match the app:** release drops, the message queue and company knowledge.
-- **No changes to the app itself** since 0.0.8.
+- **Closing time shows who is still working,** what each one is doing and for how long.
+- **Remind** one agent, or **close without them** without stopping their work.
+- **Nothing is saved:** the step names stay on screen only.
