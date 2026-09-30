@@ -109,6 +109,35 @@
 **Effort:** XS
 **Priority:** P3
 
+## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
+
+### Retry the secrets rename on Windows
+
+**What:** Retry `renameSync` a few times with a short backoff on EPERM/EBUSY/EACCES in `src/main/atomicFile.ts`.
+
+**Why:** On Windows, antivirus or backup tools holding the file open make the rename fail; the save then fails (safely) and the owner sees an error.
+
+**Effort:** S
+**Priority:** P3
+
+### Sweep leftover secrets temp files
+
+**What:** On first secret-store access, remove `integration-secrets.json.*.tmp` older than a minute.
+
+**Why:** A crash inside the write window leaves a 0600 ciphertext temp file that nothing reads.
+
+**Effort:** S
+**Priority:** P4
+
+### Say when deleting a secret did nothing
+
+**What:** `deleteSecret` stays lenient on an unreadable file (right for callers without error handling), but callers report success while the old ciphertext stays.
+
+**Why:** A removed mailbox or key can look deleted while its encrypted secret remains in the file.
+
+**Effort:** S
+**Priority:** P3
+
 ## QuickBooks through the Claude account (deferred from ship of feat/qbo-claude-channel, 2026-09-30)
 
 ### Stop a nested Claude from reaching the account's connectors

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.11). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.12). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -72,6 +72,13 @@ moving, and brings you only the decisions that need you.
 - English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.12 (2026-09-30)
+- Saved passwords and keys (mailboxes, engines, integrations) can't be lost to a crash mid-save:
+  the secrets file is swapped in whole, so a crash, power cut or full disk leaves the old file or
+  the new one, never a torn one.
+- A secrets file that is there but can't be read is never saved over; saving a new secret fails
+  with a message instead of erasing the others. The file is always owner-only.
 
 ### 0.0.11 (2026-09-30)
 - QuickBooks through your Claude account; the app does not connect to Intuit itself. One switch

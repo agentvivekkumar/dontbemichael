@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.12] (2026-09-30)
+
+### Fixed
+
+- **Saved passwords and keys can't be lost to a crash mid-save.** Every mailbox password, engine
+  key and integration secret lives in one file. It is now written to a temporary file, flushed to
+  disk and swapped in whole, so a crash, power cut or full disk leaves the old file or the new one,
+  never a torn one. A write that stops short is never swapped in.
+- **A file that can't be read is never saved over.** If the saved secrets file is there but can't
+  be read at that moment, saving a new secret now fails with a message instead of writing a file
+  that holds only the new secret and loses all the others.
+- The secrets file is always owner-only (0600), even if an older copy was readable by others.
+
 ## [0.0.11] (2026-09-30)
 
 ### Added

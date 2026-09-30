@@ -1,3 +1,3 @@
-- **QuickBooks through your Claude account:** one switch in Settings, off by default.
-- **Choose who uses it** on each Capabilities tab: Read only or Can make changes.
-- **Read only is a fixed list of reads;** anything new is refused until known safe.
+- **Saved passwords and keys survive a crash mid-save:** the file is swapped in whole.
+- **An unreadable secrets file is never saved over,** so other secrets can't be erased.
+- **The secrets file is always owner-only.**
