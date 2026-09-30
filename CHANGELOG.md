@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.13] (2026-09-30)
+
+### Added
+
+- **The app tells you when Claude Code updated under your team.** Claude Code updates itself, but
+  agents already running keep the old version until they restart. The app notices within ten
+  minutes and shows a "team upgrade ready" chip and a corner note. Your click runs closing time
+  (every agent saves and confirms) and then reopens the app on the new version. Nothing restarts
+  on its own; "later" hides the note until a newer version arrives.
+
+### Changed
+
+- Closing time can reopen the app when it finishes: the dialog says "reopening" instead of "see
+  you tomorrow".
+
 ## [0.0.12] (2026-09-30)
 
 ### Fixed

@@ -109,6 +109,26 @@
 **Effort:** XS
 **Priority:** P3
 
+## Update notices (deferred from ship of feat/claude-code-update-notice, 2026-09-30)
+
+### Translate the update surfaces
+
+**What:** Move the Claude Code update toast and chip (`CliUpdateNotice.tsx`), the app-update toast and badge, and the quit dialog's closing-time wording into en/zh-CN/ar.
+
+**Why:** All of them are English only today, while most screens are translated; owner chose to translate them together rather than one notice at a time.
+
+**Effort:** M
+**Priority:** P3
+
+### Say "closing" in dev builds when reopen is skipped
+
+**What:** In dev (`ELECTRON_RENDERER_URL` set) the app quits instead of relaunching, but the dialog still says "reopening".
+
+**Why:** Cosmetic, dev only; the event could carry whether a relaunch will really happen.
+
+**Effort:** S
+**Priority:** P4
+
 ## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
 
 ### Retry the secrets rename on Windows

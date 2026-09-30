@@ -24,6 +24,8 @@ export interface ClosingTimeState {
   excused?: string[];
   godId?: string;
   godLive?: boolean;
+  /** The app reopens itself once closed (a Claude Code update). */
+  relaunch?: boolean;
 }
 
 export interface QuitWarningModalProps {
@@ -91,19 +93,25 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
                       marginBottom: 4
                     }}>
                       {closing!.phase === 'complete'
-                        ? 'FLOOR SAVED. SEE YOU TOMORROW'
+                        ? (closing!.relaunch ? 'FLOOR SAVED. REOPENING' : 'FLOOR SAVED. SEE YOU TOMORROW')
                         : closing!.phase === 'timeout'
                           ? 'STILL WRAPPING UP…'
                           : 'WRAPPING UP THE FLOOR'}
                     </div>
                     <div style={{ fontSize: 15, lineHeight: '22px', color: 'var(--cth-ink-700)' }}>
                       {closing!.phase === 'complete' ? (
-                        <>Every agent saved its memory and the orchestrator confirmed the
-                        shutdown. The harness closes itself in a moment.</>
+                        closing!.relaunch ? (
+                          <>Every agent saved its memory and the orchestrator confirmed the
+                          shutdown. The app reopens itself in a moment on the new Claude Code.</>
+                        ) : (
+                          <>Every agent saved its memory and the orchestrator confirmed the
+                          shutdown. The harness closes itself in a moment.</>
+                        )
                       ) : (
                         <>The orchestrator broadcast closing time. Every worker parks its
                         work, saves its memory, and reports back. The app closes only
-                        after the orchestrator confirms nothing will be lost.</>
+                        after the orchestrator confirms nothing will be lost
+                        {closing!.relaunch ? ', then reopens on the new Claude Code.' : '.'}</>
                       )}
                     </div>
                   </div>

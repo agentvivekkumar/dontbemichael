@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.12). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.13). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -72,6 +72,14 @@ moving, and brings you only the decisions that need you.
 - English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.13 (2026-09-30)
+- Claude Code updates itself, but team members already running keep the old version until they
+  restart. The app notices within ten minutes and shows a "team upgrade ready" chip in the title
+  bar and a note in the corner.
+- One click closes the office the safe way (every agent saves and confirms), then the app reopens
+  on the new version; the closing time dialog says "reopening". Nothing restarts on its own, and
+  "later" hides the note until a newer version arrives.
 
 ### 0.0.12 (2026-09-30)
 - Saved passwords and keys (mailboxes, engines, integrations) can't be lost to a crash mid-save:

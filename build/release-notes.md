@@ -1,3 +1,3 @@
-- **Closing time shows who is still working,** with Remind and Close without them.
-- **QuickBooks through your Claude account:** one switch in Settings, Read only by default.
-- **Saved passwords and keys survive a crash mid-save.**
+- **Know when Claude Code updated under your team:** a chip and note appear.
+- **One click closes the office safely and reopens** on the new version.
+- **Nothing restarts on its own;** "later" waits for a newer version.

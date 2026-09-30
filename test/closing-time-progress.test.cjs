@@ -140,7 +140,7 @@ test('COMPLETE closes the app after the grace, not before', (t) => {
 test('every update names who confirmed, who is still working, and Michael', (t) => {
   const f = floor({ t, workers: ['pam', 'dwight', 'jim'] });
   f.ct.start();
-  assert.deepEqual(last(f.events), { phase: 'started', acked: 0, total: 3, confirmed: [], waiting: ['pam', 'dwight', 'jim'], excused: [], godId: 'god', godLive: true });
+  assert.deepEqual(last(f.events), { phase: 'started', acked: 0, total: 3, confirmed: [], waiting: ['pam', 'dwight', 'jim'], excused: [], godId: 'god', godLive: true, relaunch: false });
   f.route('dwight', 'CLOSING-TIME-ACK');
   assert.deepEqual(last(f.events).confirmed, ['dwight']);
   assert.deepEqual(last(f.events).waiting, ['pam', 'jim']);
@@ -524,4 +524,21 @@ test("Close without them keeps the owner's other notes; repeated Reminds leave o
   assert.deepEqual(f.ct.excuse('dwight'), { ok: true });
   assert.equal(control.takeSteer('dwight'), "Don't push to main.");
   assert.equal(control.takeSteer('dwight'), undefined);
+});
+
+test('a reopen asked for mid-close counts, but a refused re-press never turns it on', (t) => {
+  // Value: protects=the app reopens only when a start that was accepted asked for it; fails_when=relaunch is set before the concluded / no-Michael checks; why_new=merge of #21 (relaunch) with the closing-time rows (re-press refusals); seam=none
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = floor({ t, workers: ['pam'] });
+  f.ct.start();
+  assert.equal(last(f.events).relaunch, false);
+  assert.deepEqual(f.ct.start({ relaunch: true }), { ok: true });
+  assert.equal(last(f.events).relaunch, true, 'asked for on the way out');
+  const g = floor({ t, workers: ['pam'] });
+  g.ct.start();
+  g.setLive(['pam']);
+  assert.equal(g.ct.start({ relaunch: true }).ok, false, 'Michael is gone');
+  g.setLive(['god', 'pam']);
+  g.ct.refresh();
+  assert.equal(last(g.events).relaunch, false, 'the refused press changed nothing');
 });

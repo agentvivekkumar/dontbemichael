@@ -57,6 +57,8 @@ export interface ClosingTimeEvent {
   godId: string;
   /** False once Michael's terminal has ended: closing time cannot finish. */
   godLive: boolean;
+  /** The app reopens itself after closing (a Claude Code update, cliUpdate.ts). */
+  relaunch: boolean;
 }
 
 export type ClosingTimeActionResult = { ok: true } | { ok: false; error: string };
@@ -84,6 +86,7 @@ const GOD_STEER = 'The owner pressed closing time: pause your current work at th
 export class ClosingTimeController {
   private active = false;
   private godId = 'god';
+  private relaunch = false;
   private workers = new Set<string>();
   private acked = new Set<string>();
   private excused = new Set<string>();
@@ -107,8 +110,9 @@ export class ClosingTimeController {
      *  registry-based roster waits on ghosts that can never ACK. */
     private getLiveAgentIds: () => string[],
     private getWebContents: () => WebContents | null,
-    /** Called once the god concluded — runs the real teardown + app.quit(). */
-    private onConcluded: () => void,
+    /** Called once the god concluded — runs the real teardown + app.quit(),
+     *  relaunching first when the closing was started with `relaunch`. */
+    private onConcluded: (relaunch: boolean) => void,
     /** Mid-run steering (#7C.2): lets closing time reach DEEPLY BUSY agents at
      *  their next hook boundary instead of waiting for the Stop-hook inbox
      *  drain — the graceful interrupt. Optional so tests can omit it. */
@@ -121,7 +125,7 @@ export class ClosingTimeController {
 
   /** Kick off the protocol. Returns an error string when the floor cannot run
    *  it (no live god agent) so the UI can fall back to the hard quit. */
-  start(): { ok: boolean; error?: string } {
+  start(opts: { relaunch?: boolean } = {}): { ok: boolean; error?: string } {
     if (this.active) {
       // Already closing down after COMPLETE: nothing to restart.
       if (this.concluded) return { ok: false, error: 'Closing time has finished; the app is closing.' };
@@ -130,6 +134,8 @@ export class ClosingTimeController {
       if (!this.getLiveAgentIds().includes(this.godId)) {
         return { ok: false, error: NO_GOD_ERROR };
       }
+      // A reopen asked for on the way out still counts.
+      if (opts.relaunch) this.relaunch = true;
       this.timedOut = false;
       this.armTimeout();
       this.emitProgress();
@@ -157,6 +163,7 @@ export class ClosingTimeController {
     this.timedOut = false;
     this.toldEnded = new Set();
     this.active = true;
+    this.relaunch = opts.relaunch === true;
 
     const names = [...this.workers]
       .map((id) => `${reg.agents[id]?.name ?? id} (${id})`)
@@ -399,7 +406,7 @@ export class ClosingTimeController {
       this.emitState('complete');
       this.teardownTimer = setTimeout(() => {
         this.active = false;
-        this.onConcluded();
+        this.onConcluded(this.relaunch);
       }, TEARDOWN_GRACE_MS);
     }
   }
@@ -427,7 +434,8 @@ export class ClosingTimeController {
       waiting,
       excused: [...this.excused],
       godId: this.godId,
-      godLive: this.getLiveAgentIds().includes(this.godId)
+      godLive: this.getLiveAgentIds().includes(this.godId),
+      relaunch: this.relaunch
     };
     try { this.getWebContents()?.send('app:closingTime', ev); } catch { /* window tore down */ }
   }

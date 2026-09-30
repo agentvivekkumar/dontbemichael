@@ -242,6 +242,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 **Also**
 - **Updates.** The app tells you when a new version is out and links to the download.
+- **Claude Code updates.** When Claude Code updates itself, team members already running stay on the old version until they restart. A "team upgrade ready" chip and note offer to close the office the safe way (everyone saves first) and reopen on the new version. Nothing restarts until you click.
 - **Your language.** English, Simplified Chinese and Arabic, with right to left layout for Arabic.
 
 <div align="right">(<a href="#what-it-is">↑ back to top</a>)</div>
