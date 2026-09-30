@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.10). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.11). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -72,6 +72,16 @@ moving, and brings you only the decisions that need you.
 - English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.11 (2026-09-30)
+- QuickBooks through your Claude account; the app does not connect to Intuit itself. One switch
+  in Settings > Connections > QuickBooks, off by default. On, it shows whether your Claude account
+  has QuickBooks connected, or the steps to connect it.
+- Each Capabilities tab: Can use QuickBooks, then Read only or Can make changes. Oscar starts on
+  and Read only; everyone else starts off. A change applies on the next step, with no restart.
+- Read only is a fixed list of reads; anything else, loan shopping and peer loan offers included,
+  is refused. Known limit: a separate Claude started from a team member's terminal is outside
+  the check; a fix is planned.
 
 ### 0.0.10 (2026-09-29)
 - Closing time shows who is still working: every team member and Michael, confirmed, still
