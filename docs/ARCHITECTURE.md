@@ -59,6 +59,9 @@ src/
     shellEnv.ts              resolve PATH and shell env for child processes
     mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
     integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
+    integrations.ts          the secret store: every saved password and key in one safeStorage-encrypted file
+                             (integration-secrets.json in userData, 0600); refuses to save over a file it can't read
+    atomicFile.ts            crash-safe file write (temp file, fsync, rename); the secret store's writer
     closingTime.ts           Closing Time shutdown protocol (the office reopens on next launch, shared/officeOpen.ts)
                              The quit dialog lists who is still working (hook `detail` from hooks.ts toolDetail),
                              with Remind and Close without them (never pty:kill: that archives the agent)
