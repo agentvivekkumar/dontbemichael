@@ -140,7 +140,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, background: 'var(--cth-paper-200)' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
       <div style={{ maxWidth: '72ch' }}>
         <div style={hint}>{t('capabilities.intro', { name })}</div>
 
@@ -157,14 +157,14 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           ) : (
             <>
               {mailboxes.length === 0 ? (
-                <div style={{ ...notice, marginTop: 0, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+                <div style={{ ...notice, marginTop: 0, background: 'var(--cth-neutral-soft)' }}>
                   {t('capabilities.noMailboxes')}{' '}
                   <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
                 </div>
               ) : (
                 // A list to pick from (owner, 2026-09-26); "Pick a mailbox" until one is chosen.
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%', fontSize: 14, lineHeight: '20px' }}>
+                  <Select label={t('capabilities.mailbox', { name })} value={current ?? ''} onChange={(v) => { if (v) pickMailbox(v); }} style={{ maxWidth: '100%', fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}>
                     {!current && <option value="">{t('capabilities.pickMailbox')}</option>}
                     {mailboxOptions.map((o) => <option key={o.value} value={o.value}>{o.desc ? `${o.label} (${o.desc})` : o.label}</option>)}
                   </Select>
@@ -227,8 +227,8 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
         {/* Outside the sections, so a closed Email section still shows them. */}
         <div aria-live="polite">
-          {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-lemon-light)' }}>{t('capabilities.pending', { name })}</div>}
-          {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-light)' }}>! {t('capabilities.saveFailed')}</div>}
+          {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-amber-soft)' }}>{t('capabilities.pending', { name })}</div>}
+          {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-soft)', color: 'var(--cth-coral-text)' }}>! {t('capabilities.saveFailed')}</div>}
         </div>
       </div>
     </div>
@@ -263,13 +263,13 @@ function RadioRows({ label, value, options, onChange }: {
             aria-checked={checked}
             tabIndex={checked || (at < 0 && i === 0) ? 0 : -1}
             onClick={() => onChange(o.value)}
-            style={{ ...row, width: '100%', border: 'none', borderTop: i === 0 ? 'none' : row.borderTop, background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)' }}
+            style={{ ...row, width: '100%', border: 'none', borderTop: i === 0 ? 'none' : row.borderTop, background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink)' }}
           >
-            <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, boxShadow: 'inset 0 0 0 1px var(--cth-ink-500)', background: 'var(--cth-paper-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              {checked && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cth-ink-900)' }} />}
+            <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, boxShadow: checked ? 'none' : 'inset 0 0 0 1px var(--cth-line-input)', background: checked ? 'var(--cth-ink)' : 'var(--cth-card)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              {checked && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cth-bg)' }} />}
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 14 }}>{o.label}</span>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: checked ? 600 : 500 }}>{o.label}</span>
               {o.desc && <span style={{ display: 'block', ...hint }}>{o.desc}</span>}
             </span>
           </button>
@@ -279,8 +279,8 @@ function RadioRows({ label, value, options, onChange }: {
   );
 }
 
-const hint: CSSProperties = { fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' };
-const h13: CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', margin: '16px 0 6px' };
-const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid var(--cth-ink-100)' };
-const notice: CSSProperties = { padding: '8px 10px', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)', marginTop: 8 };
-const link: CSSProperties = { border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink-900)' };
+const hint: CSSProperties = { fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-3)' };
+const h13: CSSProperties = { fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cth-ink-3)', margin: '14px 0 6px' };
+const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: '1px solid var(--cth-line)' };
+const notice: CSSProperties = { padding: '8px 10px', borderRadius: 'var(--cth-r-md)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)', marginTop: 8 };
+const link: CSSProperties = { border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, color: 'var(--cth-indigo-text)' };

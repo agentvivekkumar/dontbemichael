@@ -140,7 +140,7 @@
     "restoreAll": "全部恢复（{{count}}）"
   },
   "sidebar": {
-    "terminal": "终端",
+    "terminal": "工作",
     "git": "Git",
     "messages": "消息",
     "traces": "追踪",
@@ -419,7 +419,7 @@
     "ideTitle": "打开 IDE：浏览并编辑所选智能体工作区中的文件。",
     "ide": "IDE",
     "tabs": {
-      "terminal": "终端",
+      "terminal": "工作",
       "human": "问我",
       "history": "历史",
       "memory": "记忆",
@@ -1871,5 +1871,19 @@
       "operations": "运营",
       "team": "团队"
     }
+  },
+  "panel": {
+    "edit": "编辑",
+    "editAria": "编辑 {{name}}",
+    "close": "返回“需要你处理”",
+    "note": "备注：",
+    "addNote": "添加私人备注",
+    "notePlaceholder": "只有你能看到这条备注。",
+    "save": "保存",
+    "cancel": "取消"
+  },
+  "workTab": {
+    "live": "实时",
+    "focus": "专注"
   }
 }

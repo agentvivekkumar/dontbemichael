@@ -1,7 +1,7 @@
 {
   "common": {
-    "on": "on",
-    "off": "off",
+    "on": "On",
+    "off": "Off",
     "cancel": "cancel",
     "save": "save",
     "close": "close",
@@ -140,13 +140,13 @@
     "restoreAll": "restore all ({{count}})"
   },
   "sidebar": {
-    "terminal": "terminal",
-    "git": "git",
-    "messages": "messages",
-    "traces": "traces",
-    "memory": "memory",
-    "profile": "profile",
-    "capabilities": "Capabilities"
+    "terminal": "Work",
+    "git": "Git",
+    "messages": "Messages",
+    "traces": "Traces",
+    "memory": "Memory",
+    "profile": "Profile",
+    "capabilities": "Access"
   },
   "toolWaterfall": {
     "fresh": "fresh {{tokens}}t",
@@ -419,13 +419,13 @@
     "ideTitle": "Open the IDE: browse and edit files in the selected agent's workspace.",
     "ide": "IDE",
     "tabs": {
-      "terminal": "terminal",
+      "terminal": "Work",
       "human": "ask me",
-      "history": "history",
-      "memory": "memory",
-      "workers": "workers",
-      "advanced": "advanced",
-      "officeSchedule": "office schedule"
+      "history": "History",
+      "memory": "Memory",
+      "workers": "Workers",
+      "advanced": "Advanced",
+      "officeSchedule": "Office schedule"
     },
     "terminalFullscreen": "Terminal is open in fullscreen. Press Esc to bring it back.",
     "noTerminal": "{{name}} has no live terminal.",
@@ -1605,7 +1605,7 @@
     "hide": "Hide"
   },
   "ownerVia": {
-    "watching": "watching",
+    "watching": "Watching",
     "aboutPrefix": "About {{name}}: ",
     "regionAria": "Reaching {{name}}",
     "explain": "{{name}} takes work from {{godName}}. To ask {{name}} something, tell {{godName}}, or talk to {{name}} 1:1.",
@@ -1871,5 +1871,19 @@
       "operations": "Operations",
       "team": "Team"
     }
+  },
+  "panel": {
+    "edit": "Edit",
+    "editAria": "Edit {{name}}",
+    "close": "Back to Needs you",
+    "note": "Note:",
+    "addNote": "Add a private note",
+    "notePlaceholder": "Only you see this note.",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "workTab": {
+    "live": "Live",
+    "focus": "Focus"
   }
 }

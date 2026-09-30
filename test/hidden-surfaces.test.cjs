@@ -153,7 +153,7 @@ test('the header hides the auto mode text', () => {
 test('the close agent button is hidden everywhere', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_CLOSE_AGENT, false);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'),
-    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="md" onClick=\{onKill\}>/);
   assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'),
     /\{!agent\.isGod && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
 });

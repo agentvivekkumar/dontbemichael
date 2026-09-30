@@ -17,12 +17,11 @@ import { useHasTerminalDraft } from '@/components/terminalPool';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
-import { OFFICE_ROLES } from '@shared/officeRoles';
 import { pickSoloLine } from '@/scene/office/cafeteriaLines';
 import { useNeedsYouCount } from '@/shell/useNeedsYou';
 import { P, STAGE_H, STAGE_W, curvePts, dpath, hopPts, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
-import { EXIT, HUB, HUB_CARD, HUB_TOP, POST_GY, cardRect, departmentOf, planStudio, postGx, type PodPlan } from './layout';
+import { EXIT, HUB, HUB_CARD, HUB_TOP, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
@@ -108,17 +107,6 @@ function deskState(a: Agent): DeskState {
     case 'success': return 'success';
     default: return 'idle';
   }
-}
-
-const ROLES = OFFICE_ROLES as Record<string, { role: string }>;
-
-/** A short job title for a label card. */
-function roleOf(a: Agent): string {
-  const card = a.sourceCard?.split('/').pop();
-  const fromCard = card ? ROLES[card]?.role : undefined;
-  const usual = !a.sourceCard ? (ROLES[a.id]?.role ?? (a.character ? ROLES[a.character]?.role : undefined)) : undefined;
-  const line = (a.description ?? '').split(/[.\n]/)[0].trim();
-  return fromCard ?? usual ?? (line.length <= 28 ? line : `${line.slice(0, 26)}...`);
 }
 
 /* ── Stage ────────────────────────────────────────────────────────────────── */

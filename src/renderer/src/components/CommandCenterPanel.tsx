@@ -2,6 +2,7 @@ import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelPanel } from './PixelPanel';
+import { PanelCard, PanelHeader, PanelTabs } from '@/shell/PanelChrome';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
@@ -184,149 +185,39 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
   };
 
   return (
-    <PixelPanel
-      variant="default"
-      noPadding
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0, overflow: 'hidden' }}
-    >
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '6px 8px', background: 'var(--cth-cream-100)',
-        borderBottom: '1px solid var(--cth-ink-700)', flexShrink: 0
-      }}>
-        <div style={{
-          width: 32, height: 32, background: `var(--cth-${agent.accent}-light)`,
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
-        }}>
-          <SpritePortrait character={agent.character} scale={1} />
-        </div>
-        {/* Title + subtitle truncate; the control cluster never shrinks. At
-            sidebar width the old header wrapped its 24-char display-font title
-            onto three lines and "runs the floor" word-per-line under the two
-            wide buttons — everything here is single-line by construction. */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', color: 'var(--cth-ink-900)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-          }}>{t('commandCenter.title')}</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 1, minWidth: 0 }}>
-            <PixelBadge status={agent.status} />
-            <span style={{
-              fontSize: 12, color: 'var(--cth-ink-500)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-            }}>{t('commandCenter.runsTheFloor', { name: agent.name })}</span>
-          </div>
-        </div>
-        {/* v0.3.4: floor-wide auto-delivery lives HERE (one switch for every
-            agent's queue), and the IDE opens from agent level, not the toolbar.
-            Short labels — the tooltips carry the full explanation. */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+    <PanelCard>
+      {/* Design v2 header (branding/DESIGN.md 7.10). Floor-wide delivery and
+          the IDE stay behind their build flags, beside close. */}
+      <PanelHeader
+        agent={agent}
+        role={t('studio.officeManager')}
+        withNote={false}
+        extra={<>
           {SHOW_DELIVERY_SWITCH && (
-            <PixelButton
-              variant={floorDeliveryPaused ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => { void toggleFloorDelivery(); }}
-            >
-              <span
-                className="cth-tip cth-tip-wrap"
-                data-tip={floorDeliveryPaused
-                  ? t('commandCenter.deliveryPausedTitle')
-                  : t('commandCenter.deliveryOnTitle')}
-                aria-label={floorDeliveryPaused
-                  ? t('commandCenter.deliveryResumeAria')
-                  : t('commandCenter.deliveryHoldAria')}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
+            <PixelButton variant={floorDeliveryPaused ? 'primary' : 'secondary'} size="md" onClick={() => { void toggleFloorDelivery(); }}>
+              <span className="cth-tip cth-tip-wrap"
+                data-tip={floorDeliveryPaused ? t('commandCenter.deliveryPausedTitle') : t('commandCenter.deliveryOnTitle')}
+                aria-label={floorDeliveryPaused ? t('commandCenter.deliveryResumeAria') : t('commandCenter.deliveryHoldAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
                 {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
               </span>
             </PixelButton>
           )}
-          {/* Floor-level surface with no agent of its own: the honest target is
-              whoever is selected, stated explicitly rather than left to the
-              IDE's fallback so the intent is visible at the call site. */}
           {SHOW_IDE && (
-          <PixelButton variant="secondary" size="sm" onClick={() => {
-            const s = useStore.getState();
-            s.setIdeOpen(true, s.selectedId);
-          }}>
-            <span
-              className="cth-tip cth-tip-wrap"
-              data-tip={t('commandCenter.ideTitle')}
-              aria-label={t('commandCenter.openIdeAria')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-            >
-              <Icon name="code" /> {t('commandCenter.ide')}
-            </span>
-          </PixelButton>
+            <PixelButton variant="secondary" size="md" onClick={() => { const st = useStore.getState(); st.setIdeOpen(true, st.selectedId); }}>
+              <span className="cth-tip cth-tip-wrap" data-tip={t('commandCenter.ideTitle')} aria-label={t('commandCenter.openIdeAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="code" /> {t('commandCenter.ide')}
+              </span>
+            </PixelButton>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
-      {/* Tab bar — ONE row, tabs at their natural width, scrolling only if the
-          panel is genuinely too narrow for all of them.
-
-          This was an auto-fit grid of equal-width cells, which had a failure mode
-          the equal widths caused: every column is sized to the WIDEST tab, so the
-          track count is set by the longest label rather than by the total width
-          the labels actually need. Adding a 12th tab tipped it over at fullscreen
-          width and dropped `setup` onto a second row with most of the first row's
-          space still unused — the tabs need ~1320px of content and had ~1610px.
-
-          Content-sized tabs fit all twelve on one line with room to spare, and the
-          `.cth-tabbar` rules in global.css (scrollbar-width: none, ::-webkit-
-          scrollbar { height: 0 }) already exist for exactly this: a single row that
-          scrolls with the scrollbar hidden. The grid never scrolled, so those rules
-          have been dead code since it landed.
-
-          Trade-off, deliberate: in the NARROW docked panel the far-right tabs now
-          scroll out of view instead of wrapping to a visible second row. One row
-          that sometimes needs a scroll beats two rows where one is nearly empty —
-          and the grid's own reason for existing (keeping wrapped rows aligned)
-          stops applying the moment there is only ever one row. */}
-      <div className="cth-tabbar" style={{
-        display: 'flex', gap: 4,
-        // Docked in the sidebar the panel is narrow, so tabs WRAP: a second row
-        // costs a few pixels of a tall column, while a horizontal scroll there
-        // would hide half the tabs behind a gesture with no affordance.
-        // In focus mode the panel is wide and vertical space is the scarce
-        // resource, so it stays ONE row and scrolls instead. `.cth-tabbar` in
-        // global.css already hides that scrollbar.
-        flexWrap: fullscreen ? 'nowrap' : 'wrap',
-        overflowX: fullscreen ? 'auto' : 'visible',
-        padding: '6px 8px', background: 'var(--cth-cream-100)',
-        borderBottom: '1px solid var(--cth-ink-700)', flexShrink: 0
-      }}>
-        {visibleTabs.map((tabDef) => (
-          <button
-            key={tabDef.key}
-            onClick={() => setTab(tabDef.key)}
-            style={{
-              whiteSpace: 'nowrap',
-              // grow to share any spare width (so the strip still spans the panel
-              // exactly as the old grid did), never shrink below the label (a
-              // squashed tab is unreadable — overflow into the scroll instead).
-              flex: '1 0 auto',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              padding: '4px 8px 3px', border: 'none', cursor: 'pointer',
-              background: tab === tabDef.key ? `var(--cth-${agent.accent})` : 'var(--cth-cream-200)',
-              // The selected tab is filled with the agent's accent, which is a
-              // LIGHT colour in both themes. ink-900 flips to near-white in dark
-              // mode, so the active tab's label was pale-on-pale — the one tab
-              // you most need to read. On-accent text is dark in both themes.
-              color: tab === tabDef.key ? 'var(--cth-on-accent)' : 'var(--cth-ink-900)',
-              boxShadow: tab === tabDef.key
-                ? 'inset 0 0 0 1px var(--cth-ink-300)'
-                : 'inset 0 0 0 1px var(--cth-ink-100)',
-              fontFamily: 'var(--cth-font-ui)', fontSize: 13
-            }}
-          >
-            <Icon name={tabDef.icon} /> {t(tabDef.labelKey)}
-          </button>
-        ))}
-      </div>
+      {/* Tabs (DESIGN.md 7.11): Profile, Access, Work, Office schedule, History
+          (only once a webhook exists), Memory, Advanced. */}
+      <PanelTabs tabs={visibleTabs.map((tabDef) => ({ key: tabDef.key, label: t(tabDef.labelKey) }))} current={tab} onChange={setTab} />
 
       {/* Body */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -368,7 +259,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
         {tab === 'advanced' && <AdvancedTab key={advancedFocus.seq} focus={advancedFocus.card} seed={dispatchSeed} />}
         {ALLOW_TEMP_WORKERS && tab === 'workers' && <WorkersTab />}
       </div>
-    </PixelPanel>
+    </PanelCard>
   );
 }
 
