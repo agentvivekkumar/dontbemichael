@@ -1,109 +1,336 @@
 {
+  "version": "2 (Studio)",
   "neutrals": {
-    "cream-50": {
-      "light": "#FFFDF5",
-      "app_dark": "#17171B"
+    "bg": {
+      "light": "#F7F7FB",
+      "dark": "#14131C"
     },
-    "cream-100": {
-      "light": "#FFF8E7",
-      "app_dark": "#1D1D22"
+    "floor": {
+      "light": "#E9E7F7",
+      "dark": "#26223B"
     },
-    "cream-200": {
-      "light": "#F4E9C7",
-      "app_dark": "#26262C"
+    "card": {
+      "light": "#FFFFFF",
+      "dark": "#1F1E2B"
     },
-    "cream-300": {
-      "light": "#E8D9A0",
-      "app_dark": "#313139"
+    "card-2": {
+      "light": "#FAFAFD",
+      "dark": "#24233A"
     },
-    "paper-100": {
-      "light": "#FCFAF0",
-      "app_dark": "#1A1A1F"
+    "rail": {
+      "light": "#F8F7FC",
+      "dark": "#181722"
     },
-    "paper-200": {
-      "light": "#F0EAD2",
-      "app_dark": "#222229"
+    "chrome": {
+      "light": "#F1F0F8",
+      "dark": "#1B1A26"
     },
-    "ink-900": {
-      "light": "#1A1320",
-      "app_dark": "#DEDBD6"
+    "ink": {
+      "light": "#1E1B2E",
+      "dark": "#ECEAF4"
     },
-    "ink-700": {
-      "light": "#3D2E4A",
-      "app_dark": "#B3B0AC"
+    "ink-2": {
+      "light": "#4A4660",
+      "dark": "#CFCCDD"
     },
-    "ink-500": {
-      "light": "#6B5878",
-      "app_dark": "#96919F"
+    "ink-3": {
+      "light": "#6C6884",
+      "dark": "#A5A2B8"
     },
-    "ink-300": {
-      "light": "#A899B5",
-      "app_dark": "#787684"
+    "ink-4": {
+      "light": "#B4B1C6",
+      "dark": "#8C89A0"
     },
-    "ink-100": {
-      "light": "#D9CFE0",
-      "app_dark": "#3E3D46"
+    "line": {
+      "light": "#E8E6F2",
+      "dark": "rgba(255,255,255,.09)"
+    },
+    "line-2": {
+      "light": "#DAD7EA",
+      "dark": "rgba(255,255,255,.14)"
+    },
+    "line-input": {
+      "light": "#8F8AA6",
+      "dark": "#76728C"
+    },
+    "neutral-soft": {
+      "light": "#F0EFF5",
+      "dark": "#2A2938"
     }
   },
   "accents": {
     "coral": {
-      "meaning": "Stop, needs you, Michael",
-      "app_light": "#D96A62",
-      "app_light_tint": "#F3D3CD",
-      "app_dark": "#E08C82",
-      "app_dark_tint": "#3B2724",
-      "web": "#FF6B6B",
-      "web_tint": "#FFB4B4"
+      "meaning": "Needs you. Only the owner's to-dos",
+      "light": {
+        "base": "#FF5A5F",
+        "soft": "#FFECEC",
+        "text": "#C8303A"
+      },
+      "dark": {
+        "base": "#FF5A5F",
+        "soft": "rgba(255,90,95,.16)",
+        "text": "#FF8C90"
+      }
     },
-    "mint": {
-      "meaning": "Done, good, go",
-      "app_light": "#5CA97A",
-      "app_light_tint": "#D2E7DA",
-      "app_dark": "#74C096",
-      "app_dark_tint": "#1E3227",
-      "web": "#6BCF7F",
-      "web_tint": "#B4E5BD"
+    "green": {
+      "meaning": "Done, on, live, good",
+      "light": {
+        "base": "#1FB872",
+        "soft": "#E3F7EC",
+        "text": "#157D4D"
+      },
+      "dark": {
+        "base": "#34CD8A",
+        "soft": "rgba(52,205,138,.14)",
+        "text": "#34CD8A"
+      }
     },
-    "sky": {
-      "meaning": "Thinking, info",
-      "app_light": "#4F9FAF",
-      "app_light_tint": "#CFE5E9",
-      "app_dark": "#6FB3C4",
-      "app_dark_tint": "#1F3238",
-      "web": "#4ECDC4",
-      "web_tint": "#A8E6E0"
+    "blue": {
+      "meaning": "Working",
+      "light": {
+        "base": "#4C6FFF",
+        "soft": "#E8EDFF",
+        "text": "#3553E8"
+      },
+      "dark": {
+        "base": "#8FA3FF",
+        "soft": "rgba(124,147,255,.16)",
+        "text": "#8FA3FF"
+      }
     },
-    "lemon": {
-      "meaning": "Working, highlight",
-      "app_light": "#DCAB3C",
-      "app_light_tint": "#F3E4BC",
-      "app_dark": "#CFAA57",
-      "app_dark_tint": "#332C1D",
-      "web": "#FFD93D",
-      "web_tint": "#FFEC99"
+    "violet": {
+      "meaning": "Thinking, a question",
+      "light": {
+        "base": "#8B5CF6",
+        "soft": "#F0EAFE",
+        "text": "#7043E6"
+      },
+      "dark": {
+        "base": "#B69CFF",
+        "soft": "rgba(167,139,250,.17)",
+        "text": "#B69CFF"
+      }
     },
-    "lilac": {
-      "meaning": "Web, MCP, compacting",
-      "app_light": "#9482D3",
-      "app_light_tint": "#E0DAF2",
-      "app_dark": "#A896E3",
-      "app_dark_tint": "#2B2740",
-      "web": "#B197FC",
-      "web_tint": "#D6C5FF"
+    "amber": {
+      "meaning": "Sticky notes, proposals, loops",
+      "light": {
+        "base": "#F2A93B",
+        "soft": "#FFF4DF",
+        "text": "#8F5C07"
+      },
+      "dark": {
+        "base": "#F2B45A",
+        "soft": "rgba(242,180,90,.15)",
+        "text": "#F2B45A"
+      }
     },
-    "peach": {
-      "meaning": "Warm highlight, tabs",
-      "app_light": "#D99168",
-      "app_light_tint": "#F3DACA",
-      "app_dark": "#DFA57F",
-      "app_dark_tint": "#352822",
-      "web": "#FFA07A",
-      "web_tint": "#FFD0B5"
+    "indigo": {
+      "meaning": "Michael, links, focus, requests",
+      "light": {
+        "base": "#6C5CE7",
+        "soft": "#EEEBFD",
+        "text": "#4338CA"
+      },
+      "dark": {
+        "base": "#9D90FF",
+        "soft": "rgba(157,144,255,.16)",
+        "text": "#A99FFF"
+      }
     }
   },
+  "extra": {
+    "coral-strong": {
+      "light": "#D4363D",
+      "dark": "#FF5A5F"
+    },
+    "on-coral": {
+      "light": "#FFFFFF",
+      "dark": "#14131C"
+    },
+    "act-request": {
+      "light": "#5B55C9",
+      "dark": "#8F89F2"
+    }
+  },
+  "departments": {
+    "front-desk": {
+      "roles": "Executive Admin",
+      "light": {
+        "l": "#FFE4EC",
+        "m": "#F7C3D2",
+        "d": "#EBA6BA",
+        "acc": "#E25A83"
+      },
+      "dark": {
+        "l": "#7B3D4F",
+        "m": "#5D323E",
+        "d": "#482831",
+        "acc": "#F0759A"
+      }
+    },
+    "support": {
+      "roles": "Customer Support",
+      "light": {
+        "l": "#DDEEFF",
+        "m": "#B4D5F8",
+        "d": "#93BEEE",
+        "acc": "#3D8BE6"
+      },
+      "dark": {
+        "l": "#3D5B7B",
+        "m": "#32475D",
+        "d": "#283848",
+        "acc": "#75AEF0"
+      }
+    },
+    "sales": {
+      "roles": "Sales Director",
+      "light": {
+        "l": "#FFF3CC",
+        "m": "#F8DF95",
+        "d": "#EDCB6E",
+        "acc": "#D29B0B"
+      },
+      "dark": {
+        "l": "#7B6B3D",
+        "m": "#5D5232",
+        "d": "#484028",
+        "acc": "#F0CE75"
+      }
+    },
+    "finance": {
+      "roles": "Finance",
+      "light": {
+        "l": "#D8F5E8",
+        "m": "#AEE6CD",
+        "d": "#8DD5B5",
+        "acc": "#1FA872"
+      },
+      "dark": {
+        "l": "#3D7B5F",
+        "m": "#325D4A",
+        "d": "#28483A",
+        "acc": "#75F0BF"
+      }
+    },
+    "marketing": {
+      "roles": "Marketing",
+      "light": {
+        "l": "#FFE6D8",
+        "m": "#F9C8AE",
+        "d": "#EEB090",
+        "acc": "#E57B45"
+      },
+      "dark": {
+        "l": "#7B523D",
+        "m": "#5D4132",
+        "d": "#483328",
+        "acc": "#F09F75"
+      }
+    },
+    "people": {
+      "roles": "HR Manager",
+      "light": {
+        "l": "#EFE6FC",
+        "m": "#D6C5F4",
+        "d": "#C1AAEA",
+        "acc": "#8A63E0"
+      },
+      "dark": {
+        "l": "#533D7B",
+        "m": "#41325D",
+        "d": "#342848",
+        "acc": "#9B75F0"
+      }
+    },
+    "it": {
+      "roles": "IT Engineer, IT Security",
+      "light": {
+        "l": "#E0E6F7",
+        "m": "#BAC5E8",
+        "d": "#9DABDA",
+        "acc": "#5468C4"
+      },
+      "dark": {
+        "l": "#3D4C7B",
+        "m": "#323C5D",
+        "d": "#283048",
+        "acc": "#758BF0"
+      }
+    },
+    "operations": {
+      "roles": "Supply Chain, Inventory & Shipping, Quality Control",
+      "light": {
+        "l": "#D5F3F4",
+        "m": "#A9E3E5",
+        "d": "#86D2D5",
+        "acc": "#169BA3"
+      },
+      "dark": {
+        "l": "#3D797B",
+        "m": "#325B5D",
+        "d": "#284748",
+        "acc": "#75E9F0"
+      }
+    },
+    "team": {
+      "roles": "A new job from the hire wizard",
+      "light": {
+        "l": "#EDEBF6",
+        "m": "#D8D5EA",
+        "d": "#C4C0DE",
+        "acc": "#6C6884"
+      },
+      "dark": {
+        "l": "#463D7B",
+        "m": "#38325D",
+        "d": "#2D2848",
+        "acc": "#8775F0"
+      }
+    }
+  },
+  "shadows": {
+    "shadow-sm": {
+      "light": "0 1px 2px rgba(30,27,46,.05)",
+      "dark": "0 1px 2px rgba(0,0,0,.35)"
+    },
+    "shadow-md": {
+      "light": "0 1px 2px rgba(30,27,46,.05), 0 6px 18px rgba(62,52,140,.08)",
+      "dark": "0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.32)"
+    },
+    "shadow-lg": {
+      "light": "0 1px 2px rgba(30,27,46,.05), 0 10px 30px rgba(62,52,140,.10)",
+      "dark": "0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.40)"
+    },
+    "shadow-hub": {
+      "light": "0 1px 2px rgba(30,27,46,.05), 0 10px 26px rgba(92,76,220,.14)",
+      "dark": "0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.45)"
+    },
+    "shadow-coral": {
+      "light": "0 4px 14px rgba(212,54,61,.30)",
+      "dark": "0 4px 14px rgba(255,90,95,.25)"
+    }
+  },
+  "radii_px": {
+    "r-xs": 3,
+    "r-sm": 6,
+    "r-md": 9,
+    "r-lg": 12,
+    "r-xl": 14,
+    "r-2xl": 16,
+    "r-pill": 999
+  },
+  "fonts": {
+    "ui": "Sora",
+    "mono": "IBM Plex Mono",
+    "terminal": "JetBrains Mono"
+  },
   "logo": {
-    "ink": "#1A1320",
-    "cream": "#FFFDF5",
-    "slash": "#FF6B6B"
+    "m_on_light": "#1A1320",
+    "m_on_dark": "#ECEAF4",
+    "slash": "#FF6B6B",
+    "icon_tile": "#FFFDF5",
+    "ground_light": "#F7F7FB",
+    "ground_dark": "#14131C"
   }
 }

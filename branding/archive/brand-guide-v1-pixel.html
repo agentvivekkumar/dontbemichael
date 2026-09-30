@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Don't Be Michael brand guide</title>
+<link rel="icon" href="web/favicon.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'VT323';src:url('fonts/vt323/VT323-Regular.ttf')}
+@font-face{font-family:'Pixelify Sans';src:url('fonts/pixelifysans/PixelifySans-Variable.ttf');font-weight:400 700}
+@font-face{font-family:'Press Start 2P';src:url('fonts/pressstart2p/PressStart2P-Regular.ttf')}
+@font-face{font-family:'Inter';src:url('fonts/inter/Inter-Variable.ttf');font-weight:100 900}
+@font-face{font-family:'JetBrains Mono';src:url('fonts/jetbrainsmono/JetBrainsMono-Variable.ttf');font-weight:100 800}
+
+:root{
+  --ink:#1A1320;--ink7:#3D2E4A;--ink5:#6B5878;--ink3:#A899B5;--ink1:#D9CFE0;
+  --cream:#FFFDF5;--cream1:#FFF8E7;--cream2:#F4E9C7;--paper:#F0EAD2;--coral:#FF6B6B;
+  --hard:4px 4px 0 rgba(26,19,32,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--paper)}
+body{font-family:Inter,sans-serif;font-size:15px;line-height:1.55;color:var(--ink);max-width:1100px;margin:0 auto;padding:32px 16px 80px}
+.page{background:var(--cream);border:2px solid var(--ink);box-shadow:var(--hard);padding:48px 52px;margin-bottom:32px}
+.eyebrow{font-family:VT323;font-size:20px;letter-spacing:.12em;color:var(--ink5)}
+h1{font-family:VT323;font-weight:400;font-size:64px;line-height:1.02;margin:8px 0 14px}
+h2{font-family:'Pixelify Sans';font-weight:400;font-size:34px;line-height:1.1;margin:6px 0 12px}
+h3{font-family:VT323;font-weight:400;font-size:22px;letter-spacing:.06em;margin:26px 0 10px}
+p{max-width:64ch;color:var(--ink7);margin-bottom:10px}
+code,.mono{font-family:'JetBrains Mono',monospace;font-size:12.5px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.tile{border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;padding:28px;min-height:170px;position:relative}
+.tile .cap{position:absolute;left:10px;bottom:6px;font-size:11px;font-family:'JetBrains Mono';opacity:.75}
+.tile img{max-width:100%;display:block;image-rendering:pixelated}
+.dark{background:var(--ink);color:var(--cream)}
+.cream{background:var(--cream)}
+.don{border-color:var(--coral);position:relative}
+.don::after{content:"DON'T";position:absolute;top:8px;right:10px;font-family:VT323;font-size:18px;letter-spacing:.06em;color:var(--coral)}
+.sw{border:2px solid var(--ink);padding:10px;height:112px;display:flex;flex-direction:column;font-size:12px}
+.sw b{font-weight:500}.sw span{font-family:'JetBrains Mono';font-size:11px}.sw i{font-style:normal;margin-top:auto;font-size:11px;opacity:.85}
+.row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.row.n{grid-template-columns:repeat(11,1fr)}
+.row.n .sw{height:96px;padding:6px;font-size:10px}.row.n .sw span{font-size:9.5px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:8px}
+th,td{border-bottom:1px solid var(--ink1);padding:8px 10px 8px 0;text-align:left;vertical-align:top}
+th{font-family:VT323;font-weight:400;font-size:18px;letter-spacing:.06em;color:var(--ink5)}
+.spec{font-size:44px;line-height:1.1}
+.cover{display:flex;flex-direction:column;justify-content:center;min-height:560px}
+.cover img{width:640px;max-width:100%}
+.stamp{display:inline-block;font-family:VT323;font-size:22px;letter-spacing:.08em;color:var(--coral);border:3px solid var(--coral);padding:4px 12px;transform:rotate(-3deg);margin-top:28px;align-self:flex-start}
+ul{padding-left:20px;max-width:64ch;color:var(--ink7)}li{margin-bottom:6px}
+.files td:first-child{font-family:'JetBrains Mono';font-size:12.5px;white-space:nowrap}
+@media screen and (max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}.row{grid-template-columns:repeat(3,1fr)}.row.n{grid-template-columns:repeat(4,1fr)}.page{padding:28px 20px}h1{font-size:44px}}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  html,body{background:var(--cream)}
+  body{max-width:none;padding:0}
+  .page{box-shadow:none;border:0;margin:0 auto;padding:24px 32px;width:1100px;break-after:page;break-inside:avoid;min-height:0;zoom:.9}
+  .cover{min-height:0}
+  .page:last-child{break-after:auto}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<section class="page cover">
+  <img src="logo/lockup/dbm-lockup-horizontal-light.svg" alt="Don't Be Michael">
+  <h1 style="margin-top:36px">Brand guide</h1>
+  <p>The short version of the Don't Be Michael design system, for anyone making something with the brand: a slide, a sticker, a partner page, a new screen. The full rules are in <code>DESIGN.md</code> in this folder.</p>
+  <div class="stamp">EDITION 2026-09-24</div>
+</section>
+
+<section class="page">
+  <div class="eyebrow">01 · THE IDEA</div>
+  <h2>Michael kept every job on his own desk.</h2>
+  <p>He delegated nothing that mattered and called it leadership. Don't Be Michael is the office he should have run: a team of AI agents that does the work, while the owner signs off on it.</p>
+  <p>Everything the brand makes should say one of two things: <b>the work is delegated</b>, or <b>you stay in control by approving it</b>.</p>
+  <h3>ONE FAMILY, TWO VOLUMES</h3>
+  <table>
+    <tr><th></th><th>THE APP</th><th>THE WEBSITE AND MARKETING</th></tr>
+    <tr><td>Job</td><td>A workspace people sit in all day</td><td>A page that has to earn attention in seconds</td></tr>
+    <tr><td>Volume</td><td>Calm: muted colors, Inter text, thin lines</td><td>Loud: bright colors, pixel headlines, chunky frames</td></tr>
+    <tr><td>Shared</td><td colspan="2">The logo, the cream and ink neutrals, the six color hues and what they mean, the hard offset shadow, the voice</td></tr>
+  </table>
+  <p style="margin-top:14px">Rule of thumb: <b>anything outside the app is the website's volume.</b> Slides, social posts, merch and partner pages use the loud palette.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">02 · THE LOGO</div>
+  <h2>The Struck M</h2>
+  <p>A pixel M with a coral slash through it. Read it as "don't be M". It is built on a 16 × 16 pixel grid and is always drawn as square pixels, never smoothed.</p>
+  <div class="grid g4" style="margin-top:18px">
+    <div class="tile cream"><img src="logo/mark/struck-m-light.svg" width="112" alt=""><span class="cap">struck-m-light</span></div>
+    <div class="tile dark"><img src="logo/mark/struck-m-dark.svg" width="112" alt=""><span class="cap">struck-m-dark</span></div>
+    <div class="tile cream"><img src="logo/lockup/dbm-lockup-stacked-light.svg" width="200" alt=""><span class="cap">lockup-stacked-light</span></div>
+    <div class="tile dark"><img src="logo/lockup/dbm-lockup-stacked-dark.svg" width="200" alt=""><span class="cap">lockup-stacked-dark</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="tile cream"><img src="logo/lockup/dbm-lockup-horizontal-light.svg" width="420" alt=""><span class="cap">lockup-horizontal-light</span></div>
+    <div class="tile dark"><img src="logo/lockup/dbm-lockup-horizontal-dark.svg" width="420" alt=""><span class="cap">lockup-horizontal-dark</span></div>
+  </div>
+  <div class="grid g3" style="margin-top:8px">
+    <div><h3>COLORS ARE FIXED</h3><p>M in ink <code>#1A1320</code> (cream <code>#FFFDF5</code> on dark). Slash always coral <code>#FF6B6B</code>. The logo never changes color with a theme.</p></div>
+    <div><h3>SIZE</h3><p>Smallest: 16 px. Use sizes that are multiples of 16 (32, 48, 64 and up) or the SVG, so every pixel stays square and sharp.</p></div>
+    <div><h3>CLEAR SPACE</h3><p>Keep 2 grid cells (1/8 of the mark's width) empty on every side. Nothing else goes inside that margin.</p></div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="eyebrow">03 · LOGO DON'TS</div>
+  <h2>Leave the mark alone.</h2>
+  <div class="grid g4" style="margin-top:16px">
+    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="transform:rotate(14deg)" alt=""><span class="cap">rotate it</span></div>
+    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="filter:hue-rotate(160deg) saturate(3)" alt=""><span class="cap">recolor it</span></div>
+    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="filter:blur(1.4px) drop-shadow(6px 8px 6px rgba(0,0,0,.4))" alt=""><span class="cap">blur, glow or soft shadow</span></div>
+    <div class="tile don" style="background:#FF6B6B"><img src="logo/mark/struck-m-light.svg" width="96" alt=""><span class="cap">put it on coral</span></div>
+  </div>
+  <ul style="margin-top:20px">
+    <li>Don't stretch it, outline it, or redraw the slash as a smooth line.</li>
+    <li>Don't use a character portrait, a necktie or a rubber stamp as the logo. Those ideas were tried and retired.</li>
+    <li>Don't use NBC or <i>The Office</i> logos, title lettering, cast photos or likenesses anywhere. Michael is an archetype, not a licensed character.</li>
+  </ul>
+</section>
+
+<section class="page">
+  <div class="eyebrow">04 · COLOR</div>
+  <h2>Six hues, two volumes.</h2>
+  <p>Each hue means the same thing everywhere. The website uses the bright set. The app uses the calm set of the same hues.</p>
+  <h3>NEUTRALS (BOTH)</h3>
+  <div class="row n">
+    <div class="sw" style="background:#FFFDF5"><b>cream-50</b><span>#FFFDF5</span></div>
+    <div class="sw" style="background:#FFF8E7"><b>cream-100</b><span>#FFF8E7</span></div>
+    <div class="sw" style="background:#F4E9C7"><b>cream-200</b><span>#F4E9C7</span></div>
+    <div class="sw" style="background:#E8D9A0"><b>cream-300</b><span>#E8D9A0</span></div>
+    <div class="sw" style="background:#FCFAF0"><b>paper-100</b><span>#FCFAF0</span></div>
+    <div class="sw" style="background:#F0EAD2"><b>paper-200</b><span>#F0EAD2</span></div>
+    <div class="sw" style="background:#1A1320;color:#FFFDF5"><b>ink-900</b><span>#1A1320</span></div>
+    <div class="sw" style="background:#3D2E4A;color:#FFFDF5"><b>ink-700</b><span>#3D2E4A</span></div>
+    <div class="sw" style="background:#6B5878;color:#FFFDF5"><b>ink-500</b><span>#6B5878</span></div>
+    <div class="sw" style="background:#A899B5"><b>ink-300</b><span>#A899B5</span></div>
+    <div class="sw" style="background:#D9CFE0"><b>ink-100</b><span>#D9CFE0</span></div>
+  </div>
+  <h3>WEBSITE AND MARKETING (LOUD)</h3>
+  <div class="row">
+    <div class="sw" style="background:#FF6B6B"><b>coral</b><span>#FF6B6B</span><i>Stop, needs you, Michael</i></div>
+    <div class="sw" style="background:#6BCF7F"><b>mint</b><span>#6BCF7F</span><i>Done, good, go</i></div>
+    <div class="sw" style="background:#4ECDC4"><b>sky</b><span>#4ECDC4</span><i>Thinking, info</i></div>
+    <div class="sw" style="background:#FFD93D"><b>lemon</b><span>#FFD93D</span><i>Working, highlight</i></div>
+    <div class="sw" style="background:#B197FC"><b>lilac</b><span>#B197FC</span><i>Web, integrations</i></div>
+    <div class="sw" style="background:#FFA07A"><b>peach</b><span>#FFA07A</span><i>Warm highlight</i></div>
+  </div>
+  <h3>APP (CALM)</h3>
+  <div class="row">
+    <div class="sw" style="background:#D96A62"><b>coral</b><span>#D96A62</span></div>
+    <div class="sw" style="background:#5CA97A"><b>mint</b><span>#5CA97A</span></div>
+    <div class="sw" style="background:#4F9FAF"><b>sky</b><span>#4F9FAF</span></div>
+    <div class="sw" style="background:#DCAB3C"><b>lemon</b><span>#DCAB3C</span></div>
+    <div class="sw" style="background:#9482D3"><b>lilac</b><span>#9482D3</span></div>
+    <div class="sw" style="background:#D99168"><b>peach</b><span>#D99168</span></div>
+  </div>
+  <p style="margin-top:14px">Text on any colored fill is ink <code>#1A1320</code>. Never pure black or pure white. No gradients. Color files for design tools are in <code>colors/</code>.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">05 · TYPE</div>
+  <h2>Pixel faces shout. Inter reads.</h2>
+  <div class="grid g2" style="margin-top:12px">
+    <div>
+      <h3>WEBSITE AND MARKETING</h3>
+      <div style="font-family:VT323" class="spec">We reviewed Michael.</div>
+      <p class="mono">VT323 · headlines and ALL CAPS labels (tracking .06em)</p>
+      <div style="font-family:'Pixelify Sans';font-size:32px;line-height:1.15;margin-top:14px">The software is free.</div>
+      <p class="mono">Pixelify Sans 400 · section headings</p>
+      <div style="font-size:17px;margin-top:14px">A team of AI agents that runs your business, on your own machine.</div>
+      <p class="mono">Inter 400 · everything people read</p>
+    </div>
+    <div>
+      <h3>THE APP</h3>
+      <div style="font-family:'Press Start 2P';font-size:16px;line-height:1.6">Office Hours</div>
+      <p class="mono">Press Start 2P · small brand labels only, Title Case</p>
+      <div style="font-size:16px;margin-top:14px">Oscar is reconciling March. He needs your OK on two invoices.</div>
+      <p class="mono">Inter 400 to 700 · all UI text, 13 px minimum</p>
+      <div style="font-family:'JetBrains Mono';font-size:14px;margin-top:14px">&gt; reconcile --month 2026-03</div>
+      <p class="mono">JetBrains Mono · terminal and code</p>
+    </div>
+  </div>
+  <p style="margin-top:16px">Pixel faces are never bold and never italic. All five families are free (SIL Open Font License) and included in <code>fonts/</code>.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">06 · VOICE</div>
+  <h2>Short, human, a little dry.</h2>
+  <div class="grid g2" style="margin-top:10px">
+    <div>
+      <h3>ALWAYS</h3>
+      <ul>
+        <li>Name who is acting: "Oscar is reconciling March", never "the agent is processing".</li>
+        <li>Keep system messages under 12 words, in second person.</li>
+        <li>Aim the joke at Michael, never at the customer.</li>
+        <li>Stay honest: no price on a page without prices, no download button before a real release.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>NEVER</h3>
+      <ul>
+        <li>Em dashes or en dashes. Use a period, comma, colon or parentheses.</li>
+        <li>Emoji in copy.</li>
+        <li>Exclamation marks, except for completions and notifications.</li>
+        <li>"Dont". Real apostrophes, always.</li>
+      </ul>
+    </div>
+  </div>
+  <table style="margin-top:14px">
+    <tr><th>DON'T WRITE</th><th>WRITE</th></tr>
+    <tr><td>An error has occurred</td><td>Oscar hit a snag</td></tr>
+    <tr><td>Permission denied</td><td>Oscar needs your permission</td></tr>
+    <tr><td>Loading...</td><td>One sec...</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <div class="eyebrow">07 · APP ICON AND LINK PREVIEWS</div>
+  <h2>The same mark, everywhere.</h2>
+  <div class="grid g2" style="margin-top:14px;align-items:start">
+    <div class="tile" style="background:#E8E4DA"><img src="app-icon/icon-512.png" width="240" alt="App icon"><span class="cap">app-icon/icon-1024.png · .icns · .ico</span></div>
+    <div class="tile cream" style="padding:18px"><img src="social/og-card-1200x630.png" width="440" alt="Social card" style="image-rendering:auto"><span class="cap">social/og-card-1200x630.png</span></div>
+  </div>
+  <p style="margin-top:14px">App icon: the mark on a cream tile with rounded corners, which macOS expects. That tile is the only place in the brand with rounded corners. Everything else is square.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">08 · WHAT'S IN THIS FOLDER</div>
+  <h2>Grab what you need.</h2>
+  <table class="files">
+    <tr><th>FOLDER</th><th>WHAT</th><th>USE IT FOR</th></tr>
+    <tr><td>logo/mark/</td><td>The Struck M in SVG, and PNG from 16 to 1024 px. Light, dark, on cream, on ink.</td><td>Avatars, stickers, small spaces</td></tr>
+    <tr><td>logo/lockup/</td><td>Mark plus name, horizontal and stacked, light and dark. Text is outlined, so no font is needed.</td><td>Headers, slides, documents</td></tr>
+    <tr><td>app-icon/</td><td>App icon: SVG, PNG 128 to 1024, macOS .icns, Windows .ico</td><td>Stores, installers, press</td></tr>
+    <tr><td>web/</td><td>Favicons and the Apple touch icon</td><td>Websites</td></tr>
+    <tr><td>social/</td><td>1200 × 630 link preview card</td><td>Link sharing, social posts</td></tr>
+    <tr><td>colors/</td><td>CSS, JSON, Adobe swatches (.ase), palette image</td><td>Design tools and code</td></tr>
+    <tr><td>fonts/</td><td>VT323, Pixelify Sans, Press Start 2P, Inter, JetBrains Mono, each with its license</td><td>Installing the brand type</td></tr>
+    <tr><td>DESIGN.md</td><td>The full design system: every token, component and rule</td><td>Building product</td></tr>
+    <tr><td>source/build.py</td><td>Regenerates every asset above</td><td>Changing the brand</td></tr>
+  </table>
+  <p style="margin-top:16px">Questions or requests: <b>hello@dontbemichael.com</b></p>
+</section>
+
+</body>
+</html>

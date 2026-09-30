@@ -1,4 +1,4 @@
-# Don't Be Michael: Design System
+# Don't Be Michael: Design System (v2, Studio)
 
 This is the single design spec for everything that carries the Don't Be Michael name:
 the desktop app (this repo) and the marketing site, dontbemichael.com
@@ -18,7 +18,14 @@ point here.
 4. Tokens are the contract. If a value you need is not a token, add the token here
    and in the token files (§14). Do not paste a hex value into a component.
 
-Last full audit against code: 2026-09-24 (app `main` @ `82ae65fb`, site `main` @ `7f404a7`).
+**Version.** v2 "Studio", adopted 2026-09-30. It replaces the v1 pixel system
+(`archive/DESIGN-v1-pixel.md`). As of adoption, **neither the app nor the site has been
+migrated**: both still render v1. The migration is tracked in §17. Until an item there is
+closed, the code is behind the spec, not the other way round.
+
+**Reference screens.** The approved v2 screens are in [`reference/studio/`](./reference/studio/)
+(§20). When this text and a reference screen disagree, this text wins; the screens predate
+the contrast corrections in §3.
 
 ---
 
@@ -28,23 +35,40 @@ Last full audit against code: 2026-09-24 (app `main` @ `82ae65fb`, site `main` @
 
 Michael is the boss who kept every job on his own desk and called it leadership.
 Don't Be Michael is the office he should have run: a team of AI agents that does the
-work, while the owner signs off on it. Every design decision should reinforce one of
-two things. Either **the work is delegated**, or **you stay in control by approving it**.
+work, while the owner signs off on it. Every design decision reinforces one of two
+things. Either **the work is delegated**, or **you stay in control**.
 
-### 1.2 One family, two volumes
+v2 makes the first one visible. The home screen is an office you can watch: work comes in
+through mailboxes, goes to Michael, and he hands it to whoever's job it is. Only what
+Michael can't settle comes to you.
 
-The app and the site are one brand at two volumes.
+### 1.2 Why v2
+
+The app was forked from Munder Difflin, and v1 kept its shape: a pixel office floor in
+the middle, a strip of agent cards along the bottom, a Command Center on the right, and
+pixel type and arcade color throughout. People read the fork as a copy. v2 keeps what is
+ours (the name, the Struck M, Michael, the cast, the delegation idea, the business
+features) and replaces everything that was shared: the floor, the layout, the pixel UI
+and the arcade palette.
+
+### 1.3 One system, two scales
+
+The app and the site use **the same tokens**: the same colors, fonts, radii and studio
+illustration. The difference is scale, not volume.
 
 | | App | Web |
 |---|---|---|
 | Job | A workspace people sit in all day | A page that has to earn attention in seconds |
-| Volume | Calm: muted accents, readable UI type, hairline structure | Loud: full-saturation accents, pixel display type, chunky frames |
-| Shared | Ink and cream neutrals, the logo, the six accent hues, the hard shadow, the 4 px grid, the voice |
+| Scale | Dense: 12 to 13 px UI text, compact cards | Large: 18 px body, 56 to 64 px headlines, full width studio art |
+| Attention comes from | The coral Needs you signal and live motion on the stage | Headline size and the studio illustration |
 
-The two accent sets map one to one (§3.3). A hue never changes meaning between
-surfaces. Coral means "Michael, stop, needs you" on both, and mint means "done, good".
+There is no louder web palette. A hue means the same thing everywhere: coral means
+"needs you", green means "done" or "on", blue means "working".
 
-### 1.3 The mark: Struck M
+### 1.4 The mark: Struck M
+
+The mark is unchanged from v1. It is the one pixel element in the brand, kept on
+purpose as a signature.
 
 A pixel capital M with a coral slash through it. Read it as "don't be M".
 
@@ -53,240 +77,285 @@ A pixel capital M with a coral slash through it. Read it as "don't be M".
 - Stems: columns 2, 3, 12 and 13, rows 3 to 13.
 - Diagonals, each two cells thick: (4,3) (4,4) (5,4) (5,5) (6,5) (6,6) (7,6) (7,7),
   mirrored across x = 7.5 for the right side.
-- Slash: every cell with `x + y ∈ {15, 16}` for `1 ≤ x ≤ 14`. It is drawn over the M.
-  There is no knockout gap. A 1 px gap was tried and rejected because it erases the
-  right diagonal, so the mark reads as an N.
+- Slash: every cell with `x + y ∈ {15, 16}` for `1 ≤ x ≤ 14`, drawn over the M with no
+  knockout gap.
 
-**Colors.** The mark does not follow the theme. Its colors are fixed.
+**Colors.** The mark does not follow the theme.
 
 | Use | M | Slash | Ground |
 |---|---|---|---|
-| On light | `#1A1320` (ink-900) | `#FF6B6B` (web coral) | transparent or `#FFFDF5` |
-| On dark | `#FFFDF5` (cream-50) | `#FF6B6B` | transparent or `#1A1320` |
+| On light | `#1A1320` | `#FF6B6B` | transparent or `#F7F7FB` |
+| On dark | `#ECEAF4` | `#FF6B6B` | transparent or `#14131C` |
 
-The slash is always the web coral `#FF6B6B`, including inside the app. The mark is a
-logo, not UI, so it does not recalibrate with the calm palette.
+The slash is always `#FF6B6B`, which is the logo coral, not the UI coral (§3.2). The mark
+is a logo, not UI.
 
 **Size and space**
 
-- Render only at integer multiples of 16 px (16, 32, 48, 64 and up), or as SVG with
-  `shape-rendering: crispEdges`. Never blur, anti-alias or resample it at a fraction.
-- Minimum size is 16 px. At 16 px each cell is one device pixel, which is the floor.
+- Render only at integer multiples of 16 px, or as SVG with `shape-rendering:
+  crispEdges`. Never blur, anti-alias or resample it at a fraction. Minimum 16 px.
 - Clear space is 2 cells (1/8 of the mark's width) on every side.
-- Beside the wordmark, the mark is as tall as the cap height of the wordmark, rounded
-  down to an integer size. Gap is 10 px (8 px below 480 px viewport).
+- In the app top bar the mark is 26 px, drawn as SVG (the one allowed non-multiple,
+  because it is vector and crisp-edged).
 
 **Don't**
 
 - Don't rotate, outline, add a shadow to, or recolor the mark.
 - Don't redraw the slash as a smooth line. It is pixels.
 - Don't put the mark on coral or on a busy image.
-- Don't use a character portrait, a necktie or a stamp as the brand mark. Those were
-  explored and rejected on 2026-09-24.
+- Don't use pixel art anywhere else in the brand. The mark is the only one.
 
-**Files.** Every file is generated from one grid definition by
-`branding/source/build.py`, so they cannot drift. Hand people the `branding/` folder.
+### 1.5 Wordmark
 
-| File | Where | Use |
-|---|---|---|
-| `logo/mark/struck-m-{light,dark,on-cream,on-ink}.svg` and `png/` 16 to 1024 | `branding/` | The mark on its own |
-| `logo/lockup/dbm-lockup-{horizontal,stacked}-{light,dark}.svg` and `png/` | `branding/` | Mark plus wordmark, text outlined so no font is needed |
-| `app-icon/icon.{svg,icns,ico}`, `icon-{128..1024}.png` | `branding/` | App icon per §1.5 |
-| `social/og-card-1200x630.png` | `branding/` | Link previews |
-| `logo.svg` | site `public/assets/` | Mark, transparent ground |
-| `favicon.svg` | site `public/` | Mark on `#FFFDF5` |
-| `favicon.ico` (16, 32, 48) | site `public/` | Browsers that request `/favicon.ico` |
-| `favicon-32.png` | site `public/assets/` | PNG favicon |
-| `apple-touch-icon.png` (180) | site `public/assets/` | iOS home screen |
-| `build/icon.*` | app | **Not yet migrated.** Copy from `branding/app-icon/`. See §17. |
+`Don't Be Michael` in **Sora SemiBold (600)**, sentence case with the apostrophe,
+letter-spacing `-0.02em`, all in ink. Coral appears only in the mark's slash.
 
-### 1.4 Wordmark
+- Beside the mark, the wordmark's cap height is 55 to 60% of the mark's height, and the
+  gap is 10 px at 26 px mark size (scale proportionally).
+- In the app the lockup sits at the left of the top bar (§7.1). On the web it is the nav
+  logo.
+- The lockup files in `logo/lockup/` are outlined, so no font is needed.
 
-`DON'T BE MICHAEL`, set in VT323, all caps, with `MICHAEL` in coral. Letter-spacing
-`.06em`. It sits to the right of the mark. On the web it is the nav logo. In the app it
-appears only where the brand is announced (About, onboarding welcome, update notes),
-never in working chrome.
+### 1.6 App icon [App]
 
-### 1.5 App icon [App]
+Unchanged: the Struck M on a tile. Canvas 1024 × 1024, tile inset 100 px (824 × 824),
+macOS continuous corner radius 185 px, tile fill `#FFFDF5` with a 2 px inner line
+`#1A1320` at 12% opacity, mark at 512 × 512 centered. Windows `.ico` and Linux PNGs use
+the square tile with no radius. Favicons and the Apple touch icon use the same `#FFFDF5`
+ground.
 
-The app icon is the Struck M on a tile. It replaced the old portrait icon on 2026-09-25;
-`build/icon.*` are copies of `branding/app-icon/`.
-
-- Canvas 1024 × 1024. Tile inset 100 px on each side (824 × 824), macOS continuous
-  corner radius 185 px. The tile is the one place a radius is allowed, because the OS
-  expects it.
-- Tile fill `#FFFDF5`, 2 px inner line `#1A1320` at 12% opacity.
-- Mark at 512 × 512 (32 px per cell), centered.
-- Windows `.ico` and Linux PNGs use the square tile with no radius.
-
-### 1.6 Name, parody and legal lines
+### 1.7 Name, cast, parody and legal lines
 
 - The product name is **Don't Be Michael**. Always with the apostrophe.
-- Michael is an archetype of the boss who won't delegate. Copy can nod to office
-  comedy, but never uses NBC or *The Office* logos, title typography, cast likenesses
-  or photos.
+- The team members use *The Office* character names (Michael, Pam, Kelly, Dwight, Oscar
+  and the rest). Names only: never NBC or show logos, title lettering, cast photos,
+  likenesses or show quotes presented as official material.
+- Office humor lives in words (names, empty states, the idle quote bubbles in §8.8),
+  never in chrome, and never on anything the owner has to act on.
 
 ---
 
 ## 2. Principles [Both]
 
-1. **Pixel-snapped.** Integer coordinates, integer scales. No half pixels, no CSS blur,
-   no glassmorphism.
-2. **Structure through contrast, not chrome.** App panels separate by surface tone and
-   a single hairline. The web gets heavier frames because it is louder, but the
-   separating job is the same.
-3. **Limited palette.** One screen uses at most 8 colors. A sprite uses at most 5.
-4. **Motion carries information, or it does not happen.** An avatar walking *is* the
-   status. UI chrome stays still.
-5. **Friendly, never cute for its own sake.** Short and human copy. Dry beats cute.
-6. **Everything has a home.** Named panels, framed groups, status windows, the way a
-   90s game manual lays out information.
+1. **Delegation is the picture.** The main view shows work arriving, going through
+   Michael, and landing with the right person. If a screen hides who is doing what, it
+   is wrong.
+2. **Calm by default. Coral only for you.** Everything is quiet pastel except the things
+   that need the owner. If coral appears, the owner has something to do.
+3. **Every state has words.** Status is never color or motion alone. A pod that glows
+   also has a pill that says "Working".
+4. **Only what's real.** The UI shows what the app actually does. No switch, chip or
+   button for a capability that isn't enforced. (The mockup era learned this: web
+   switches and "spending asks you" chips were removed because nothing enforced them.)
+5. **Art carries information.** The studio illustration is a status display, not
+   decoration. Lit screens, glows, beacons and tokens all mean something (§8).
+6. **Fields first.** Screens show fields, values and actions. Explanations go behind a
+   small (i) info icon, in short text.
+7. **Modern and flat, with depth only where it explains.** Soft shadows lift cards off
+   the stage; the isometric studio gives the office a place. No skeuomorphism beyond that.
 
-**Not:** Material, iOS, glassmorphism, gradients as decoration, "retro filter on a
-normal app", pixel art that serves no function.
+**Not:** pixel UI or pixel type (the mark excepted), arcade saturation, hard offset
+shadows, chunky frames, glassmorphism as a style (Michael's glass pod is illustration,
+not UI), gradients as decoration (the exceptions are listed in §3.8), dense tables as a
+home screen, an email client look.
 
 ---
 
 ## 3. Color
 
+All values below are the contract. Each token has a light and a dark value; the site is
+light only (§15).
+
 ### 3.1 Neutrals [Both]
 
-The neutrals are identical on both surfaces in light mode.
-
-| Token | Light | Dark [App] | Use |
+| Token | Light | Dark | Use |
 |---|---|---|---|
-| `cream-50` | `#FFFDF5` | `#17171B` | App ground (dark), innermost dialog fill |
-| `cream-100` | `#FFF8E7` | `#1D1D22` | Default panel fill |
-| `cream-200` | `#F4E9C7` | `#26262C` | Inset, alt row, web nav bar |
-| `cream-300` | `#E8D9A0` | `#313139` | Disabled fill |
-| `paper-100` | `#FCFAF0` | `#1A1A1F` | Cards, inputs, terminals |
-| `paper-200` | `#F0EAD2` | `#222229` | Subtle panel variant, web page ground |
-| `ink-900` | `#1A1320` | `#DEDBD6` | Body text, outer lines. **Never `#000` or `#FFF`.** |
-| `ink-700` | `#3D2E4A` | `#B3B0AC` | Secondary text |
-| `ink-500` | `#6B5878` | `#96919F` | Tertiary text, hints, dialog border |
-| `ink-300` | `#A899B5` | `#787684` | Structural borders. Target 3:1 against its surface. Dark measures 3.1 to 4.0:1. Light measures 2.2 to 2.6:1 (§17). |
-| `ink-100` | `#D9CFE0` | `#3E3D46` | Dividers that should recede |
-| `on-accent` | `#1A1320` | `#1A1320` | Text on an accent fill. Dark in both themes on purpose. |
+| `bg` | `#F7F7FB` | `#14131C` | App and page ground, stage ground |
+| `floor` | `#E9E7F7` | `#26223B` | Studio platform floor, subtle fills |
+| `card` | `#FFFFFF` | `#1F1E2B` | Cards, panels, inputs, popovers |
+| `card-2` | `#FAFAFD` | `#24233A` | Inset rows inside a card (stats strip, input fill) |
+| `rail` | `#F8F7FC` | `#181722` | Right column ground (§3.8 allows a 2 stop gradient `#FBFBFE` to `#F6F5FB` in light) |
+| `chrome` | `#F1F0F8` | `#1B1A26` | macOS title bar strip, top bar ground under 70% white |
+| `ink` | `#1E1B2E` | `#ECEAF4` | Primary text, primary buttons (light), icons |
+| `ink-2` | `#4A4660` | `#CFCCDD` | Secondary text, captions, tab labels |
+| `ink-3` | `#6C6884` | `#A5A2B8` | Tertiary text: meta, placeholders, hints, legends |
+| `ink-4` | `#B4B1C6` | `#8C89A0` | **Non-text only**: disabled icons, info icon ring, decorative dots |
+| `line` | `#E8E6F2` | `rgba(255,255,255,.09)` | Card borders, dividers (decorative) |
+| `line-2` | `#DAD7EA` | `rgba(255,255,255,.14)` | Stronger dividers, secondary button border |
+| `line-input` | `#8F8AA6` | `#76728C` | Boundaries that identify a control (input, textarea, select, switch track off). 3:1 or better |
+| `neutral-soft` | `#F0EFF5` | `#2A2938` | Idle pill fill, quiet chips |
 
-### 3.2 Why the accents differ by surface
+Never `#000` or `#FFF` for text in dark mode. White text on dark fills is `#FFFFFF`
+only on `ink` buttons in light mode.
 
-The original arcade accents are full-saturation. In a dense working UI they read as
-noise, so the app recalibrated them in v0.3.4 to the same hues at a calmer saturation.
-The web keeps the arcade set because a marketing page has the opposite problem: it
-needs to be noticed.
+### 3.2 Semantic accents [Both]
 
-### 3.3 Accent map
+Each accent has three roles: the **base** (dots, strokes, icons, fills without text),
+**soft** (a tinted fill behind text), and **text** (text on white or on its own soft).
 
-| Hue | Meaning | App light | App light `-light` | App dark | App dark `-light` | Web | Web `-light` |
+| Hue | Meaning | Base light | Soft light | Text light | Base dark | Soft dark | Text dark |
 |---|---|---|---|---|---|---|---|
-| coral | Stop, needs you, Michael | `#D96A62` | `#F3D3CD` | `#E08C82` | `#3B2724` | `#FF6B6B` | `#FFB4B4` |
-| mint | Done, good, go | `#5CA97A` | `#D2E7DA` | `#74C096` | `#1E3227` | `#6BCF7F` | `#B4E5BD` |
-| sky | Thinking, info | `#4F9FAF` | `#CFE5E9` | `#6FB3C4` | `#1F3238` | `#4ECDC4` | `#A8E6E0` |
-| lemon | Working, highlight | `#DCAB3C` | `#F3E4BC` | `#CFAA57` | `#332C1D` | `#FFD93D` | `#FFEC99` |
-| lilac | Web, MCP, compacting | `#9482D3` | `#E0DAF2` | `#A896E3` | `#2B2740` | `#B197FC` | `#D6C5FF` |
-| peach | Warm highlight, tabs | `#D99168` | `#F3DACA` | `#DFA57F` | `#352822` | `#FFA07A` | `#FFD0B5` |
+| `coral` | Needs you. Only the owner's to-dos | `#FF5A5F` | `#FFECEC` | `#C8303A` | `#FF5A5F` | `rgba(255,90,95,.16)` | `#FF8C90` |
+| `green` | Done, on, live, good | `#1FB872` | `#E3F7EC` | `#157D4D` | `#34CD8A` | `rgba(52,205,138,.14)` | `#34CD8A` |
+| `blue` | Working | `#4C6FFF` | `#E8EDFF` | `#3553E8` | `#8FA3FF` | `rgba(124,147,255,.16)` | `#8FA3FF` |
+| `violet` | Thinking, a question between teammates | `#8B5CF6` | `#F0EAFE` | `#7043E6` | `#B69CFF` | `rgba(167,139,250,.17)` | `#B69CFF` |
+| `amber` | Sticky notes, a proposal, a loop warning | `#F2A93B` | `#FFF4DF` | `#8F5C07` | `#F2B45A` | `rgba(242,180,90,.15)` | `#F2B45A` |
+| `indigo` | Michael, links, focus, requests | `#6C5CE7` | `#EEEBFD` | `#4338CA` | `#9D90FF` | `rgba(157,144,255,.16)` | `#A99FFF` |
+
+**Coral fills that carry text** (the Needs you button, count badges, a coral primary
+button) use `coral-strong` `#D4363D` in light mode (4.78:1 with white). In dark mode they
+keep `#FF5A5F` and use `ink-on-coral` `#14131C` text (6.0:1). Plain `#FF5A5F` with white
+text measures 3.05:1 and is not allowed for text under 18.66 px bold.
 
 Rules:
 
-- A new accent must be added to all six columns at once, or not at all.
-- Never use a web accent in the app, or an app accent on the web. The one exception is
-  the logo's slash (§1.3).
-- Text on any accent fill uses `on-accent`.
+- Coral is reserved. No decorative coral, no coral CTA on the website, no coral for
+  errors that the owner doesn't have to act on (use `ink-2` with an icon).
+- A new accent needs all six columns at once, or none.
+- The logo coral `#FF6B6B` (§1.4) is not a UI token.
 
-### 3.4 Status [App]
+### 3.3 Message acts [Both]
 
-Status colors are the app's semantic layer. Labels read from the user's side of the
-screen, not the token name.
+Work moving between people is drawn as tokens on paths (§8.6). Their color comes from the
+hive message act:
 
-| Token | Light | Dark | Label | Means |
-|---|---|---|---|---|
-| `status-idle` | `#A199AB` | `#6F6C77` | idle | At desk, awaiting |
-| `status-thinking` | `#4F9FAF` | `#64ACBB` | thinking | Reasoning, en route to a station |
-| `status-working` | `#DCAB3C` | `#D8B052` | working | At a station, using a tool |
-| `status-waiting` | `#6D87D6` | `#8095DC` | waiting | Stalled on the boss agent or another agent |
-| `status-blocked` | `#D96A62` | `#DF8078` | needs you | Needs the user |
-| `status-success` | `#5CA97A` | `#6FB88B` | done | Just finished |
-| `status-ghost` | `#D9D3DE` | `#6C6A76` | closing | Pane closed, fading out |
-| `status-compacting` | `#8F7CC7` | `#9D8BD2` | compacting | Boxing up context |
-| `status-looping` | `#D6903F` | `#D69A55` | looping | Circuit breaker armed |
-| `status-typing` | `#C89838` | `#CBA24A` | your draft | **Not an agent state.** The user has unsent text on that agent's prompt, which holds its message queue. See [`docs/message-queue.md`](../docs/message-queue.md). |
+| Act | Token | Color | Glyph |
+|---|---|---|---|
+| `request` | `act-request` | light `#5B55C9`, dark `#8F89F2` | envelope |
+| `query` | `act-question` | `violet` base | `?` |
+| `propose` | `act-propose` | `amber` base | envelope with a dot |
+| `inform` | `act-inform` | `ink-4` | envelope, outline only |
+| `agree`, `done` | `act-done` | `green` base | check |
+| `refuse` | `act-refuse` | `ink-2` | envelope with a slash |
+| `needsHuman` (escalated to the owner) | `act-you` | `coral` base | `!` |
 
-Status is always shown by color **and** a label or icon **and** position. Never by
-color alone.
+Only `act-you` tokens travel from Michael to the right column. A team member never sends
+one directly: they go to Michael first (§8.6).
 
-### 3.5 World [App]
+### 3.4 Departments [Both]
 
-The office floor. Theme-independent.
+Pods, avatars and illustration faces use a pastel family per department. Each family has
+`l` (lit screen, lightest face), `m` (main face), `d` (shaded face) and `acc` (glow,
+avatar letter, tag rule).
 
-| Token | Hex | Use |
+| Department | Roles today | `l` | `m` | `d` | `acc` |
+|---|---|---|---|---|---|
+| `front-desk` | Executive Admin | `#FFE4EC` | `#F7C3D2` | `#EBA6BA` | `#E25A83` |
+| `support` | Customer Support | `#DDEEFF` | `#B4D5F8` | `#93BEEE` | `#3D8BE6` |
+| `sales` | Sales Director | `#FFF3CC` | `#F8DF95` | `#EDCB6E` | `#D29B0B` |
+| `finance` | Finance | `#D8F5E8` | `#AEE6CD` | `#8DD5B5` | `#1FA872` |
+| `marketing` | Marketing | `#FFE6D8` | `#F9C8AE` | `#EEB090` | `#E57B45` |
+| `people` | HR Manager | `#EFE6FC` | `#D6C5F4` | `#C1AAEA` | `#8A63E0` |
+| `it` | IT Engineer, IT Security | `#E0E6F7` | `#BAC5E8` | `#9DABDA` | `#5468C4` |
+| `operations` | Supply Chain, Inventory & Shipping, Quality Control | `#D5F3F4` | `#A9E3E5` | `#86D2D5` | `#169BA3` |
+| `team` | A new job written in the hire wizard | `#EDEBF6` | `#D8D5EA` | `#C4C0DE` | `#6C6884` |
+| `manager` | Michael | glass (§8.4) | | | `#6C5CE7` |
+
+**Dark derivation.** In dark mode each family is derived from its `m` value in HLS:
+`l` = L .36 S .34, `m` = L .28 S .30, `d` = L .22 S .28, `acc` = L .70 S .80 of `acc`.
+Lit screens keep the light `l` value in both themes, so a working screen glows in the dark.
+
+The role to department mapping is data, not art: it lives next to `OFFICE_ROLES`
+(`src/shared/officeRoles.ts`) when the app migrates (§17).
+
+### 3.5 Status [App]
+
+Status reads from the owner's side. Every status has a pill with a word (§7.13) and a pod
+treatment (§8.5).
+
+| Status (store) | Pill label | Pill colors | Pod treatment |
+|---|---|---|---|
+| `working` | Working | `blue` text on `blue` soft | Screen lit (`l`), floor glow in `acc` |
+| `thinking` | Thinking | `violet` text on soft | Three dot bubble over the monitor |
+| `waiting` (at a prompt, not busy) | Waiting | `ink-3` on `neutral-soft` | Screen on, no glow |
+| `blocked` on the owner | Needs you | white on `coral-strong` | Coral beacon above the pod, pulsing |
+| `compacting` | Tidying up | `violet` text on soft | Small box glyph on the desk |
+| `looping` | Stuck | `amber` text on soft | Amber ring around the chair, rotating |
+| `success` | Done | `green` text on soft | Check burst, then back to idle |
+| `idle` | Idle | `ink-3` on `neutral-soft` | Pod desaturated (saturate .25, opacity .82) |
+| on hold (1:1 with the owner) | 1:1 with you | `indigo` text on soft | Headset glyph; no tokens arrive from Michael |
+| draft in the terminal | typing dot | `indigo` base dot | none |
+
+Separate from status: a **for you** badge (§7.15) counts the Ask me cards tagged to that
+person. A person can be Working and still have "1 for you".
+
+### 3.6 Logo colors
+
+`#1A1320` (M on light), `#ECEAF4` (M on dark), `#FF6B6B` (slash). Fixed. See §1.4.
+
+### 3.7 Shadows as color
+
+| Token | Light | Dark |
 |---|---|---|
-| `grass-light` | `#D4EAB0` | Light tile |
-| `grass-dark` | `#B5D589` | Dark tile, checkerboard |
-| `wood-light` | `#E5C896` | Room floor light tile |
-| `wood-dark` | `#C9A66B` | Room floor dark tile |
-| `path` | `#E8D8B0` | Pathways between rooms |
-| `wall` | `#8B6F47` | Room walls, 3 px stroke |
+| `shadow-sm` | `0 1px 2px rgba(30,27,46,.05)` | `0 1px 2px rgba(0,0,0,.35)` |
+| `shadow-md` | `shadow-sm, 0 6px 18px rgba(62,52,140,.08)` | `shadow-sm, 0 8px 22px rgba(0,0,0,.32)` |
+| `shadow-lg` | `shadow-sm, 0 10px 30px rgba(62,52,140,.10)` | `shadow-sm, 0 12px 32px rgba(0,0,0,.40)` |
+| `shadow-hub` | `shadow-sm, 0 10px 26px rgba(92,76,220,.14)` | `shadow-sm, 0 10px 26px rgba(0,0,0,.45)` |
+| `shadow-coral` | `0 4px 14px rgba(212,54,61,.30)` | `0 4px 14px rgba(255,90,95,.25)` |
+| `ring-select` | `0 0 0 3px rgba(30,27,46,.08)` | `0 0 0 3px rgba(236,234,244,.12)` |
 
-### 3.6 Gradients [Both]
+### 3.8 Gradients [Both]
 
-None. Every surface is flat.
+Allowed only here: the stage's radial light (white at 0 to transparent at 70%, 900 × 520
+ellipse at the stage center), the rail's two stop vertical gradient, the context meter
+fill (`#8E83F5` to `#6C5CE7`), glass and glow in the studio illustration (§8), and the
+web hero's backdrop (the same radial light). Nowhere else.
 
 ---
 
 ## 4. Typography
 
-### 4.1 Faces
+### 4.1 Faces [Both]
 
-| Role | App | Web | Why they differ |
-|---|---|---|---|
-| Brand label | Press Start 2P, small caps labels only | VT323 | Press Start 2P is too loud and too wide at web display sizes |
-| Display / headings | Press Start 2P (8, 12, 16 px) | VT323 (h1), Pixelify Sans (h2, h3) | The web needs large, characterful display type |
-| Reading text | Inter | Inter | Shared. Pixel faces were the app's main readability drag |
-| Code / terminal | JetBrains Mono | not used | The site shows no code |
+| Face | Role | Source |
+|---|---|---|
+| **Sora** (400, 500, 600, 700) | All UI and display text, the wordmark | Google Fonts, OFL. `fonts/sora/` |
+| **IBM Plex Mono** (400, 500, 600) | Numbers, times, counts, ids, email addresses, file paths, schedule "when" lines | Google Fonts, OFL. `fonts/ibmplexmono/` |
+| **JetBrains Mono** | The live terminal only (xterm), for its box drawing and ligature-free metrics | Bundled today. `fonts/jetbrainsmono/` |
 
-- **[App]** Fonts are bundled (`src/renderer/src/design/fonts.css`, `assets/fonts/*.woff2`),
-  never loaded from a CDN. Press Start 2P is Latin-only. CJK and Arabic fall through to
-  the system faces listed in the `--cth-font-*` stacks.
-- **[Web]** Fonts load from Google Fonts: VT323, Pixelify Sans (400 to 700), Inter (400, 500).
-- **[Both]** Every text element declares a family from its surface's set. No bare
-  `system-ui` as a display face.
+Fallbacks: Sora → `system-ui, -apple-system, "Segoe UI", sans-serif`; for Simplified
+Chinese add `"PingFang SC", "Noto Sans SC"`; for Arabic add `"SF Arabic", "Noto Sans
+Arabic"` (Sora has Latin only). Mono → `ui-monospace, "SF Mono", monospace`.
+
+Retired: Press Start 2P, VT323, Pixelify Sans, Inter. They stay in `fonts/` only until
+the app and site have migrated (§17), then leave the kit.
+
+Rules:
+
+- Numbers that the owner scans or compares (counts, times, money, ids) are mono.
+- Sora tracking: `-0.03em` at 20 px and up, `-0.02em` at 15 to 19 px, `-0.01em` at 12 to
+  14 px, `0` below 12 px. Mono is always `0`.
+- Uppercase is only for micro labels (department tabs, field labels, eyebrows) with
+  `+0.05em` to `+0.08em` tracking. Never uppercase a sentence.
+- Weights: 400 body, 500 labels and tabs, 600 names, titles and buttons, 700 only for
+  avatar initials.
 
 ### 4.2 App scale [App]
 
-| Token | Size / line height | Face | Use |
+| Token | Size / line | Weight | Use |
 |---|---|---|---|
-| `display-lg` | 16 / 24 | Press Start 2P | Screen titles |
-| `display-md` | 12 / 20 | Press Start 2P | Section headers, modal titles |
-| `display-sm` | 8 / 12 | Press Start 2P | Badges, chip labels |
-| `body-lg` | 16 / 24 | Inter | Primary reading text |
-| `body-md` | 14 / 20 | Inter | Default UI text |
-| `body-sm` | 13 / 18 | Inter | Secondary text, captions |
-| `mono-md` | 14 / 20 | JetBrains Mono | Terminal stream |
-| `mono-sm` | 13 / 20 | JetBrains Mono | Inline log lines, paths |
+| `t-view` | 20 / 26 | 600 | View title on the stage ("Office", "Tasks") |
+| `t-panel` | 15 / 20 | 600 | Right column heading, person name in the panel header |
+| `t-ui` | 13 / 18 | 400 to 600 | Base UI: tabs, buttons, inputs, body |
+| `t-body` | 12 / 16.5 | 400 | Card body text, Michael's questions, descriptions |
+| `t-meta` | 11 / 15 | 400 to 600 | Captions, chips, meta lines, hints |
+| `t-micro` | 10 / 13 | 600 | Uppercase micro labels, status pills, badges |
 
-- Floor: 13 px for any text a user reads. 11 px tooltips are debt (§17).
-- Inter and JetBrains Mono may use weights 400 to 700. Press Start 2P is single-weight
-  and is never faux-bolded.
-- Case: Press Start 2P in Title Case. UI text in sentence case. Status labels lowercase.
-- Letter-spacing: 0 for everything in the app.
+Floor: nothing below 10 px, and 10 px only for uppercase micro labels, pills and
+badges. The reference screens use 9 to 9.5 px in places; the build rounds those up to
+10 px (§17).
 
 ### 4.3 Web scale [Web]
 
-| Role | Face | Size (desktop / ≤ 980 px) | Line height | Tracking | Case |
-|---|---|---|---|---|---|
-| h1 | VT323 | 62 / 40 | 1.04 | 0 | Sentence |
-| h2 | Pixelify Sans 400 | 37 / 27 | 1.12 | 0 | Sentence |
-| h3 | Pixelify Sans 400 | 21 | inherit | 0 | Sentence |
-| Body | Inter 400 | 17 | 1.6 | 0 | Sentence |
-| Lede | Inter 400 | 19 | 1.6 | 0 | Sentence |
-| Label: nav, button, chip, tab | VT323 | 21 (19 on phones) | 1 | `.06em` | ALL CAPS |
-| Eyebrow (`.sechead`) | VT323 | 20 | inherit | `.12em` | ALL CAPS |
-| Wordmark | VT323 | 28 (22 on phones) | 1 | `.06em` | ALL CAPS |
-
-- Allowed tracking values on the web: `0`, `.06em`, `.12em`. Nothing else. Existing
-  strays are listed in §17.
-- Pixel faces never go bold on the web. `h1` to `h4` are weight 400.
-- Measure: body copy 62 to 70 ch. Lede 50 ch.
+| Token | Desktop | Phone (≤ 480 px) | Weight | Use |
+|---|---|---|---|---|
+| `w-display` | 64 / 68 | 40 / 44 | 600 | Hero headline |
+| `w-h2` | 40 / 46 | 30 / 36 | 600 | Section headline |
+| `w-h3` | 22 / 30 | 20 / 28 | 600 | Feature titles, card titles |
+| `w-lead` | 20 / 30 | 18 / 28 | 400 | Hero and section sublines |
+| `w-body` | 17 / 27 | 16 / 25 | 400 | Body text |
+| `w-small` | 14 / 20 | 14 / 20 | 400 to 500 | Captions, footer |
+| `w-eyebrow` | 12 / 16 mono | 12 / 16 | 600 | Uppercase eyebrow, `+0.08em` |
 
 ---
 
@@ -294,351 +363,603 @@ None. Every surface is flat.
 
 ### 5.1 Grid [Both]
 
-Base unit **4 px**. Margins, padding, gaps and positions are multiples of 4.
+4 px base. Spacing tokens: `s-1` 4, `s-2` 8, `s-3` 12, `s-4` 16, `s-5` 20, `s-6` 24,
+`s-8` 32, `s-10` 40, `s-12` 48, `s-16` 64, `s-24` 96. Odd values in the reference
+screens (7, 9, 11, 13 px) snap to the nearest token in the build.
 
-| Token | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-|---|---|---|---|---|---|---|---|---|---|
-| `space-*` | 0 | 4 | 8 | 12 | 16 | 24 | 32 | 48 | 64 |
+### 5.2 App shell [App]
 
-Pixel snapping: `translate` values are integers, `image-rendering: pixelated` on every
-canvas and sprite image, and zoom is 1×, 2× or 3×, never 1.5×.
-
-### 5.2 App layout [App]
-
-- Minimum window 1280 × 800. Standard gutter 16 px. Panel padding 12 px.
-- Floor canvas tile grid: 32 × 32 px.
+One window, four regions. Nothing else is permanent.
 
 ```
-┌──────────────────────── Title bar ────────────────────────────┐
-├───────────────────────────────────────┬───────────────────────┤
-│  Floor canvas (Pixi), fills width      │  Selected agent panel │
-│                                        │  360 px: portrait,    │
-│                                        │  terminal, command    │
-│                                        │  bar, status          │
-├───────────────────────────────────────┴───────────────────────┤
-│  Agent strip: horizontal scroll of AgentCards, 80 px tall      │
-└────────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------+
+| macOS title bar (28, hiddenInset)                             |
+| Top bar (56): lockup, view tabs, clock, version, icons, Needs  |
++---------------------------------------------+-----------------+
+| Stage (fills)                               | Right column    |
+|   Office / Tasks / Who talks to whom        | (380, resizable)|
+|                                             |                 |
+| Bottom bar (50, floats 24 above the edge)   |                 |
++---------------------------------------------+-----------------+
 ```
 
-Below 1024 px wide, the right panel collapses to a bottom drawer.
+| Region | Size | Holds |
+|---|---|---|
+| Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
+| Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Who talks to whom (§7.22) |
+| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets) | Needs you board by default; the selected person's panel; Michael's panel. Work tab widens it to 480 |
+| Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Brief Michael composer, next job chip, pack and Hire (§7.19) |
 
-| z | Layer |
-|---|---|
-| 0 | Floor canvas |
-| 1 | UI chrome |
-| 2 | Drawer, sidebar |
-| 3 | Toasts |
-| 4 | Modals |
-| 5 | Tooltips |
+Rules:
+
+- **No bottom strip of agent cards, no left floor, no permanent Command Center.** People
+  live on the stage.
+- Minimum window 1280 × 800: the studio scales down to fit the stage beside a 340 px
+  right column. Below 1100 px of stage width the platform scales, never crops.
+- Focus mode (full screen terminal) keeps its v1 behavior with v2 styling.
+- RTL: the right column moves to the left, bars mirror, the studio art does not (§8.10).
 
 ### 5.3 Web layout [Web]
 
-- Content max width 1160 px, side padding 24 px.
-- Sections: 62 px vertical padding (46 px at ≤ 980 px), 3 px `ink-900` rule between them.
-- Breakpoints:
-
-| Width | What changes |
-|---|---|
-| ≤ 1040 px | Nav switches to two rows (§8.1). Anchor offset becomes 112 px. |
-| ≤ 980 px | Type steps down (§4.3). Section padding 46 px. |
-| ≤ 480 px | Wordmark 22 px, mark 24 px, nav button 19 px. |
-| ≤ 360 px | Wordmark 20 px, nav gap 8 px, nav button padding 8 px 10 px, so the bar with `DOWNLOAD` fits at 320 px. |
-
-- No horizontal page scroll at any width from 320 px up. This is a release check.
+- Container 1200 px max, 24 px gutters, 16 px under 480 px.
+- Section rhythm: 96 px between sections on desktop, 64 px on phone.
+- Check at 1440, 1040, 980, 480, 390 and 320 px.
+- The hero is two columns on desktop (text left, studio right, studio bleeds to the
+  container edge) and stacked on phone (text, then studio at full width).
 
 ---
 
-## 6. Surfaces, borders and shadow
+## 6. Surfaces, borders, shadow, radius [Both]
 
-### 6.1 App panels [App]
+### 6.1 Surfaces
 
-Single 1 px inset hairlines. Structure comes from surface contrast.
+- Cards: `card` fill, 1 px `line` border, `shadow-md`. Nested rows use `card-2`.
+- Elevated cards (Michael's hub card, the Brief Michael composer, overlays): `shadow-lg`
+  or `shadow-hub`.
+- Selected card: 1 px `ink` border plus `ring-select`.
+- Overlay backdrop: `bg` at 60% with no blur (light), `#000` at 45% (dark).
+- Label cards on the stage use `card` at 96% opacity with a 6 px backdrop blur, so the
+  studio reads through slightly. Idle ones at 86%.
 
-| Variant | Border | Fill | Use |
-|---|---|---|---|
-| `default` | `inset 0 0 0 1px ink-300` | `cream-100` | Standard panel |
-| `inset` | `inset 0 0 0 1px ink-100` | `cream-200` | Recessed area |
-| `terminal` | `inset 0 0 0 1px ink-300` | `paper-100` | Terminal |
-| `dialog` | `inset 0 0 0 1px ink-500` | `cream-50` | Modals, notifications |
-| `active` | 1 px `ink-900`, 3 px accent, 5 px ring | `cream-100` | Selected agent, focused input. The only three-layer border left. |
+### 6.2 Radius
 
-### 6.2 Web frames [Web]
+| Token | Value | Use |
+|---|---|---|
+| `r-xs` | 3 px | Sticky note corner accents, tiny marks |
+| `r-sm` | 6 px | Department tabs, tags, small icon buttons |
+| `r-md` | 9 px | Buttons, inputs, view tabs, textareas |
+| `r-lg` | 12 px | Chips, bottom bar chips, menus |
+| `r-xl` | 14 px | Cards, Ask me cards, label cards |
+| `r-2xl` | 16 px | Composer, hub card, overlays |
+| `r-pill` | 999 px | Pills, badges, clock, Needs you button |
 
-The web keeps the chunky frame, because volume is the point.
+The v1 "no radius" rule is retired.
 
-- `.panel` and `.file`: three-layer inset (2 px `ink-900`, 2 px `cream-200`, 1 px
-  `ink-700`) plus the hard shadow.
-- Buttons, chips, tabs: 2 px `ink-900` border.
-- Nav: 4 px `ink-900` bottom border. Section rules are 3 px.
+### 6.3 Borders
 
-### 6.3 Hard shadow [Both]
-
-The only shadow. Offset, no blur.
-
-| Surface | Value |
-|---|---|
-| App light | `3px 3px 0 rgba(26,19,32,.14)` |
-| App dark | `4px 4px 0 rgba(0,0,0,.45)` |
-| Web | `4px 4px 0 rgba(26,19,32,.25)` |
-
-### 6.4 Radius [Both]
-
-0 everywhere. The one exception is the app icon tile (§1.5), and circles that are
-genuinely round things (a status dot, an avatar ring). Existing 2 px radii are debt (§17).
+Hairlines only: 1 px. The one exception is the 2.5 px top rule on mailbox tags (§7.18)
+and the 3 px coral left rule on Ask me cards (§7.8).
 
 ---
 
 ## 7. App components [App]
 
-All live in `src/renderer/src/components/`. States not listed are "no change".
+Names in parentheses are today's components that the v2 component replaces or restyles.
 
-### 7.1 `PixelPanel`
+### 7.1 Top bar
 
-Variants per §6.1. `title?` renders a title bar. `accent?` tints the active ring.
-Panels do not hover. Focused: the active variant with the accent.
+Left to right: lockup (§1.5, 26 px mark); view tabs (§7.2); then, pushed right: clock
+pill (§7.3), version chip (§7.4), icon buttons (theme, focus mode, Settings; 32 × 32,
+`r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
+(§7.5). The bar is a drag region; interactive children are `no-drag`.
 
-### 7.2 `PixelButton`
+### 7.2 View tabs (FloorViewToggle)
 
-| Variant | Fill | Hover fill | Text | Border |
+Office, Tasks, Who talks to whom. Tab: `t-ui` 500, `ink-2`, padding 7 × 13, `r-md`.
+Active: `ink` fill, white text (dark mode: `ink` fill `#ECEAF4`, text `#14131C`). Tasks
+carries a count badge of blocked tasks: `coral-strong` pill, mono 10.5 px 600, white. The
+choice persists (`cth.floorView`).
+
+### 7.3 Clock pill
+
+Pill, `card` fill, `line` border, padding 6 × 12. Green live dot (7 px with a 3 px
+`green` soft halo), mono time in `ink` 600, "closes 6:00 PM" in `ink-2`, a chevron. Click
+opens a menu: **Office schedule** (opens Michael's Office schedule tab), **Closing time**
+(starts the closing time flow). When the office is closed the dot is `ink-4` and the text
+reads "Closed, opens 8:00 AM".
+
+### 7.4 Version chip (UpdateBadge, CliUpdateBadge)
+
+Mono 11 px, `card` fill, `line` border, `r-sm`, a 6 px dot: `blue` when current, `green`
+with "Update ready" when a download is ready, `amber` with "Team upgrade ready" for a
+Claude Code update. Click behaves as today's badges.
+
+### 7.5 Needs you button
+
+Pill, `coral-strong` fill, white `t-ui` 600 text, `shadow-coral`, padding 6 × 7 × 6 × 14.
+A 7 px white dot that pulses (§11) and a white count bubble (mono 12 px 600, `coral-strong`
+text). With zero waiting it becomes a quiet pill: `card` fill, `line` border, `ink-3`
+text "Nothing needs you", no dot. Click shows the Needs you board in the right column.
+
+### 7.6 Right column
+
+Three states, one region:
+
+1. **Needs you board** (default). Heading "Needs you" (`t-panel`), a count bubble, an
+   info icon. Cards stack newest first (§7.8, §7.9) with 12 px gaps. "Earlier answers"
+   link pinned at the bottom.
+2. **Person panel** when a pod is selected (§7.10 to §7.12).
+3. **Michael's panel** when Michael's pod is selected (§7.12).
+
+In states 2 and 3 a compact coral strip sits at the top: "Needs you N" with a chevron,
+`coral` soft fill, `coral` text, `r-lg`. It returns to the board. With nothing waiting
+the strip is hidden.
+
+A "Bring back last session's team" banner (restore all, dismiss one; today's restore
+team control) sits at the top of the board when there is a team to restore.
+
+### 7.7 Buttons
+
+| Kind | Fill | Text | Border | Use |
 |---|---|---|---|---|
-| primary | `ink-900` | `ink-700` | `cream-50` | `ink-900` |
-| secondary | `cream-100` | `cream-200` | `ink-900` | `ink-300` |
-| ghost | transparent | `cream-200` | `ink-700` | `ink-300` |
-| destructive | `coral` | `coral-light` | `on-accent` | `ink-500` |
+| Primary | `ink` | white | none | The main action in a card or dialog ("Respond and unblock", "Approve", "Save", "Brief Michael") |
+| Secondary | `card` | `ink` | 1 px `line-2` | Other actions ("Decline", "Open Mailboxes", "Hire", "Edit") |
+| Quiet | none | `ink-2` | none | Tertiary links in a row ("Earlier answers", "change") |
+| Coral | `coral-strong` | white | none | Only the Needs you button. Never a general CTA |
 
-Sizes: sm 24, md 32, lg 40 px tall. Disabled (every variant): `cream-300` fill and
-`ink-500` text. `ink-500` is the one text color that stays readable on `cream-300` in
-both themes. Focus: see §12.
-Hover and press must also respond to keyboard (`:focus-visible`, Space, Enter).
-Today they are mouse-only (§17).
+Height 28 px in cards, 32 px in bars, 36 px in the composer and dialogs. `t-meta` 600 at
+28, `t-ui` 600 above. Radius `r-md`. Focus per §12. Disabled: 45% opacity, no shadow.
 
-The sections from 7.3 to 7.7 carry over from the previous spec. The component files
-exist, but their sizes were not re-measured in the 2026-09-24 audit. Verify against the
-component before relying on a pixel value.
+### 7.8 Ask me card (AskMeTab)
 
-### 7.3 `PixelBadge`
+The owner's only inbox. Michael raises a card only when he could not re-delegate or
+unblock the work himself.
 
-Status per §3.4. An 8 px dot, 4 px gap, lowercase label at `body-sm`. Background is
-the status color at 20% over `cream-100`.
+- `card`, `line` border, `r-xl`, padding 10 × 12 × 10 × 13, 3 px `coral` rule on the left
+  inset 12 px top and bottom.
+- Row 1: task title as a link (`t-ui` 600 at 12.5, `indigo` text, underline at 28%
+  opacity), opens the task detail (§7.21). A dismiss `x` (20 × 20) on the right.
+- Row 2: the tagged person chip (17 px avatar plus name, `neutral-soft` fill) and "From
+  Michael" (ink avatar plus name).
+- Michael's question: `t-body`, rendered markdown, `ink`.
+- Answer: textarea, 2 rows default, `card-2` fill, `line-input` border, `r-md`,
+  placeholder "Your answer, or done if you handled it" in `ink-3`. Cmd or Ctrl+Enter
+  sends; Enter respects IME composition.
+- Actions: primary "Respond and unblock"; optional secondary actions Michael attached
+  (for a broken mailbox: "Open Mailboxes").
+- Hint under the actions: bookmark icon plus "Saved to Kelly's memory" (`t-meta`, `ink-3`).
+- If tasks wait on it: a divider, then "Blocking N task(s)" in `coral` text 600 and the
+  titles in `ink-2`, up to 6, then "+N more".
+- "View N earlier answers" link when the task has answered questions.
 
-### 7.4 `AgentCard` and `AgentStrip`
+### 7.9 Schedule request card (ScheduleRequestCards)
 
-Card: portrait, name at `body-md`, status badge. Second row: current project at
-`body-sm` `ink-500`, and the current tool. Selected: `PixelPanel` active with the
-agent's accent. The strip scrolls horizontally and is 80 px tall.
+Same card frame as §7.8. Title row plain (not a link): the requester avatar plus "Dwight
+asks to change a schedule". A definition list with uppercase micro labels (`t-micro`,
+`ink-3`, 64 px column): ADD / CHANGE / PAUSE / DELETE, WHY, MICHAEL (his note). Actions
+right aligned: secondary "Decline", primary "Approve". When the request is stale, Approve
+is disabled and a `t-meta` line explains it. This is the only card type with Approve and
+Decline.
 
-### 7.5 `CommandBar` and `MessageQueueComposer`
+### 7.10 Person panel header
 
-Inset panel. Prompt prefix `> ` in the agent's accent at `mono-md`. Text input with no
-border. Send is a primary md button. Busy: the border tints `lemon`. Blocked: the border
-tints `coral`, with helper text.
+- 44 px avatar (department `l` fill, `acc` letter, 700), name `t-panel`, role `t-meta`
+  `ink-3`, status pill (§7.13), caption with a dot (`t-meta`, `ink-2`).
+- Right: "Edit" secondary button with a pencil (opens EditAgentModal), close `x` (secondary,
+  32 × 32).
+- Private note row: `amber` soft fill, `r-md`, note icon, "Note:" 600 plus the first line,
+  pencil to edit.
+- The cleared conversation banner (ClearedBanner) sits under the note when present.
 
-### 7.6 Terminal (`PtyTerminalView`)
+### 7.11 Panel tabs (SidebarTabs)
 
-Terminal panel variant, JetBrains Mono at `mono-md`. The xterm palette follows the
-theme and is defined in `PtyTerminalView.tsx`. Do not restate it here. The rule is:
-background `paper-100`, foreground `ink-900`, cursor `coral`, selection `lemon-light`,
-and ANSI colors mapped to the accent set of the active theme.
+Underline tabs: `t-ui` 500 `ink-3`, active `ink` 600 with a 2 px `ink` underline, 16 px
+gaps, a 1 px `line` rule under the row. Arrow keys, Home and End move focus; RTL mirrors.
 
-### 7.7 Toast, modal, drawer
+- Person: **Profile, Access, Messages, Memory, Work**. Traces, Git and IDE stay behind
+  their build flags and append after Work when on.
+- Michael: **Profile, Access, Work, Office schedule, Memory, Advanced**, plus **History**
+  after Office schedule only once a webhook exists. Ask me is not a tab; it is the board.
+- The chosen tab is shared across people, as today.
 
-- Toast: dialog panel, 320 px wide, a 12 px stripe of the agent's accent at the top,
-  at most two actions, hard shadow. Non-blocking toasts auto-dismiss. Blocking ones wait.
-- Modal: dialog panel, backdrop `ink-900` at 60%, no blur, always a close button and at
-  least one action.
-- Drawer: slides from the right, 480 px wide.
+### 7.12 Tab contents
 
-### 7.8 `PackTile`
+**Access** (CapabilitiesTab). Grouped rows in cards (`card`, `line`, `r-xl`). Only what is
+enforced today:
 
-Business-type picker, onboarding step 1. Three columns at ≥ 560 px, two below, 8 px gap.
-Unselected: `paper-100` with a 1 px `ink-300` inset. Selected: `mint-light` with a 2 px
-`mint` inset. Height is set by content, because titles wrap to two lines in Arabic and
-Chinese. The last tile is always **Something else**, a real path in which Michael asks
-questions and builds from the core pack. This grid has no empty state and no dead end.
+| Group | Controls |
+|---|---|
+| Email | Switch. When on: Mailbox select (mono value), Sending segmented control [Draft only, Can send] |
+| QuickBooks | Shown only when QuickBooks is on in Settings. Switch; when on, segmented [Read only, Can make changes]. When off, one `ink-3` line |
+| Files | Read only row: lock icon, "Own folder only", the folder name, "Open folder" link |
+| On a schedule | "+ Add" link. Rows: switch, job name (`t-ui` 600), when line (mono 11, `ink-2`), provenance ("added by Michael, approved by you") in `t-meta` `ink-3` |
 
-Pack titles and subtitles come from pack JSON, not i18n. A pack is data, and translating
-third-party packs is not something the app can promise.
+The group list is data driven: a new enforced capability adds a group. Nothing appears
+before it is enforced (§2.4).
 
-### 7.9 Tooltip
+**Work** (terminal). A row: eye icon plus "Watching" and a live dot; zoom (minus, 100%,
+plus) as a segmented group; "Focus" secondary. Then the terminal pane: `#1B1A28` fill in
+both themes, `r-lg`, JetBrains Mono 12 px, padding 14. Locked input line at the bottom:
+lock icon plus "Locked while Michael runs Kelly. Talk 1:1 to type." Under the pane:
+secondary "Message Michael about Kelly", primary "Talk 1:1", hint "Michael sends Kelly no
+work during a 1:1". In a 1:1 the input unlocks and the message queue composer (attach,
+queue, send now) replaces the two buttons, with "End 1:1".
 
-CSS-only `.cth-tip`, 400 ms show delay. Text at 13 px (currently 11 px, §17).
+**Office schedule** (Michael, read only). "Office hours 8:00 AM to 6:00 PM" line with an
+info icon. Groups by person: avatar plus name, "Edit on Access" link with a chevron. Rows:
+job name, mono when line, right aligned "next" label (`t-micro`) over a mono time. Paused
+jobs show a muted switch and "Paused".
 
-### 7.10 Schedule row (`triggers/ScheduleList`)
+**Profile, Messages, Memory, Advanced** keep today's content (§17 lists them for
+restyle): Profile's does and asks first lists, key facts and Open folder; Messages'
+day grouped threads; Memory's notes by kind, procedures and search; Advanced's monitor,
+dispatch, model and engine, archived list and activity log.
 
-A divided list, never boxed tiles: one `ink-100` hairline between rows. Row: a when
-chip (Inter 14 px, `lemon-light` when on, `cream-300` with `ink-500` text when paused),
-the job name at 14 px, and a 13 px `ink-500` sub-line ("fired 2h ago, next in 40m,
-added by you"), then the `Toggle` (`role="switch"`). The open row's editor uses the
-`inset` variant (§6.1). Delete asks first: the ghost `Delete` becomes "Sure?" with a
-`destructive` "delete it" (§7.2) and a secondary "keep". A failed save reverts the row
-and says "Didn't save. Try again." in coral with a `!`. Read-only rows (Michael's office
-schedule) end in `›` and open that agent's Schedules tab.
+### 7.13 Status pill
 
-The agent panel tab strip uses Inter 14 px labels and scrolls sideways when four tabs
-outgrow the panel.
+`t-micro` 600, padding 2 × 7, `r-pill`, a 5 px dot in `currentColor` before the word.
+Colors per §3.5.
 
-### 7.10a Radio row (`CapabilitiesTab`, Sending)
+### 7.14 Pod label card
 
-For a choice between a few options where each option needs its reason beside it
-(first use: Can send or Draft only). Rows follow §7.10: a divided list, one `ink-100`
-hairline between rows. Each row: a 16 px circle (`paper-100` fill, 1 px `ink-500`
-inset; the chosen one gets an 8 px `ink-900` dot), the option at 14 px, and a 13 px
-`ink-500` line under it saying what it does. The rows form one `role="radiogroup"`
-with a name; only the chosen row is in the Tab order, and the arrow keys move the
-choice (§12). No pill or segmented control.
+The card floating by each pod on the stage.
 
-### 7.11 Memory notes (`MemoryNotes`, the Memory tab)
+- `r-xl`, padding 12 × 10 × 0 × 9, `card` at 96%, `line` border, `shadow-md`.
+- Department tab on the top edge, offset −9 px: uppercase `t-micro` in a `card` chip with
+  a `line-2` border and `r-sm`. Beside it: the sticky count (§7.16) and the for you badge
+  (§7.15).
+- Row: 24 px avatar, name (12.5 → `t-ui` 600), role (`t-micro` 400 `ink-3`, not
+  uppercase), status pill top right.
+- Caption: `t-meta`, `ink-2`, one line, ellipsis. The live action, else the first words of
+  the last prompt, else the next scheduled job.
+- A second person in the same pod: a dashed `line-2` divider, then the same row and
+  caption. Up to four people per card (§8.9).
+- Idle: card at 86%, name and caption in `ink-3`.
+- Selected: `ink` border plus `ring-select`. Everything else on the stage dims to 45%.
+- Click selects the person. Tab and arrow keys move between cards (§12).
 
-The memory index is shown as notes, never its raw lines (the `[m3]` id, kind word and
-pipes stay in "Show the file"). Memory comes first: the agent's name in Press Start 2P
-12 px with the picker beside it, then a 13 px `ink-500` count line ("12 things
-remembered, 3 notes waiting to be sorted in"). Groups in this order, each an Inter 13 px
-semibold `ink-700` heading with its count: Your preferences, How to, Facts, Where things
-live, Other notes. Rows follow §7.10: a divided list on the panel ground, entry text
-Inter 14 px, a 13 px `ink-500` line under it ("learned on a task, Sep 25"). A future
-"check again" date is a `lemon-light` chip; a passed one is `coral-light` with a `!`.
-Procedures are disclosure buttons that open to their steps (markdown, `card` variant).
-One search box sits below the memory with an "Exact words / By meaning" switch.
+### 7.15 For you badge
 
-### 7.12 Agent profile (`ProfileTab`)
+Pill, `coral` soft fill, 1 px `#FFC7C9` border (dark: `coral` at 35%), `coral` text
+`#C8303A` (dark `#FF8C90`), `t-micro` 600, a 5 px `coral` dot, "1 for you". Shown only
+when an Ask me card is tagged to this person.
 
-The first tab on every agent. Job title in Press Start 2P 12 px, then what the job is in
-Inter 16/24 (`body-lg`), then sections with Inter 13 px semibold `ink-700` headings as in
-§7.11: "What {{name}} does"
-with a mint ✓; "Asks you first"; Key facts as a two-column definition list (13 px `ink-500`
-labels, 14 px values, the folder in mono); the full instructions collapsed behind a text
-button, rendered as markdown (`card`) on `paper-100`. 72ch measure, 16 px padding.
+### 7.16 Sticky count
+
+17 px square, `#FFE58A` fill, `#6B5200` mono 10 px 600 text (5.9:1), rotated −5°, corner
+radius 2 2 6 2, `shadow-sm` tinted amber. Count of tasks this person is doing. Click opens
+the first task.
+
+### 7.17 Michael's hub card
+
+196 px wide, `r-2xl`, `shadow-hub`, under Michael's glass pod.
+
+- Top: 26 px ink avatar "M", name, "Office Manager", status pill, caption.
+- Stats strip (`card-2`): three columns, mono 16 px 600 numbers: **delegated** (today's
+  hive messages from Michael with act `request`), **to you** (open Ask me cards), **kept**
+  (tasks assigned to Michael himself). Labels `t-micro` 400 `ink-3`. "to you" in `coral`
+  text when above zero.
+- Task board strip: To do, Doing, Blocked, Done with 6 px square keys (`ink-4`, `blue`,
+  `coral`, `green`) and mono counts. Click opens Tasks.
+- Context meter: label, 5 px bar with the indigo gradient (§3.8), mono percent.
+
+### 7.18 Mailbox tag
+
+Beside each mailbox post on the stage. 36 px tall, `card`, `line` border, `r-lg`,
+`shadow-md`, a 2.5 px top rule in the owner's department `acc`. Mono address (11 px 600)
+over the owner's name (`t-micro` 400 `ink-3`). Broken mailbox: coral soft fill, `#FFC7C9`
+border, coral top rule, a second line "Password stopped working" in `coral` text 600, and
+a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
+
+### 7.19 Bottom bar
+
+- **Brief Michael composer** (MessageQueueComposer for Michael): 400 px, 50 px tall,
+  `card`, `line-2` border, `r-2xl`, `shadow-lg`. Attach button (34 × 34, `neutral-soft`,
+  `r-md`), input with placeholder "Brief Michael...", primary button "Brief Michael" with
+  an arrow. Queued messages show as a count chip on the composer; the full queue opens
+  above it.
+- **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.
+  `card`, `line`, `r-lg`, 40 px tall. Click opens Office schedule.
+- **Pack and Hire**, pushed right: "Team from the Pro Services pack" `t-meta` `ink-3`, then
+  secondary "Hire" with a plus (opens the hire wizard).
+
+### 7.20 Tasks view (TasksKanban)
+
+- Header on the stage: "Tasks" `t-view`, count chips (To do, Doing, Blocked in coral soft,
+  Done in green soft), right aligned lock icon plus "New work goes through Michael"
+  (`t-meta`, `ink-3`). No add button; the board is read only.
+- Four columns on a `floor` tinted ground, `r-xl`, 16 px gaps. Column head: key dot, name
+  `t-ui` 600, mono count. Blocked column tinted `coral` soft.
+- Task card: `card`, `line`, `r-lg`, padding 12. Mono id (`#112`, `ink-3`), title `t-ui` 600
+  up to 2 lines, assignee avatar plus name. Waiting on the owner: a 18 px coral "?"
+  circle top right. Done: a small green check, text in `ink-2`. Hover shows the dismiss
+  `x`. Done shows the last 5 and "N more".
+
+### 7.21 Task detail (TaskDetailOverlay)
+
+Centered overlay over the stage (never over the right column), 528 px wide, `r-2xl`,
+`shadow-lg`, backdrop per §6.1.
+
+- Header: mono id chip, title `t-panel`, close `x`.
+- Four fields in a row with uppercase micro labels: STATUS (select, `coral` text when
+  Blocked), ASSIGNEE (person chip), PRIORITY (5 dots, filled `ink`), CREATED (mono).
+- DESCRIPTION (markdown, `dir=auto`), QUESTIONS (the Q and A trail; an open question sits
+  in a coral soft box with a "Waiting for you" pill; answered ones are plain), DEPENDENCIES
+  (rows with a link icon, mono id, title, "waits on this").
+- Footer: secondary "Assign" with the hint "Sends it to Michael to hand out"; secondary
+  "Close" with an `Esc` key hint. Esc closes (new; today it doesn't).
+
+### 7.22 Who talks to whom (MemoryGraphPanel)
+
+- Canvas on the stage: `floor` tinted, `r-2xl`, a 24 × 18 px dot grid at 55%.
+- Toolbar card top left: title `t-panel`, "Last 200 messages" `t-meta` `ink-3`, a Topics
+  switch, a Refresh icon button.
+- Person nodes: avatar circles (Michael 72 px, others 48 px) with a 3 px department `acc`
+  ring and the name under them. A pinned node shows a small pin badge.
+- Topic nodes: `card` pills with a `line-2` border and a 6 px `ink-4` dot.
+- Edges behind nodes: `ink-4` at 40% to 70%, 1 to 6 px wide by message count.
+- Hovering an edge: the edge turns `violet` 3 px with a handle dot; non neighbors dim to
+  30%; a tooltip card (`r-lg`, `shadow-lg`) shows both avatars, "Dwight and Oscar",
+  "6 messages today" in `violet` text, and "Last: ..." with a mono time.
+- Hovering a node shows its memory snippet instead (one card at a time). Drag pins a node.
+  Click a person opens their Memory tab.
+- Legend card bottom left: Person, Topic, Messages, and an info icon.
+
+### 7.23 Menus, tooltips, info tips, toasts, dialogs
+
+- Menus and popovers: `card`, `line`, `r-lg`, `shadow-lg`, 6 px padding, rows 32 px.
+- Info tip: a 15 px circle, 1 px `ink-4` ring, "i" in `ink-3`. Hover or focus shows a
+  tooltip: `ink` fill, white `t-meta`, `r-md`, max 260 px. (Dark: `#ECEAF4` fill, `#14131C`
+  text.)
+- Toasts (completion, update, Claude Code update): bottom right above the bottom bar,
+  `card`, `line`, `r-xl`, `shadow-lg`, 360 px max, up to 4 stacked. Auto dismiss per today.
+- Dialogs (Settings, hire wizard, closing time, quit warning, office folder missing):
+  `card`, `r-2xl`, `shadow-lg`, backdrop per §6.1, `role=dialog`, focus trapped, Esc closes
+  (Settings and onboarding lack this today, §17).
+
+### 7.24 Empty and starting states
+
+- **Starting** (Michael clocking in): the studio shows empty pods and Michael's glass pod
+  with a slow indigo pulse and the caption "Clocking in".
+- **No team yet**: the platform with Michael's pod only, a centered card "Your office is
+  empty" and a primary "Hire" button.
+- **Needs you empty**: a small illustration of Michael's pod and "Nothing needs you right
+  now." with one line of Office humor allowed here.
+- **Office folder missing** and **GPU or render failure** keep their dedicated screens,
+  restyled.
+
+### 7.25 Onboarding (OnboardingWizard)
+
+Full window, no app chrome.
+
+- Header: lockup left; step indicator center: seven labelled steps (Business, Details,
+  Meet, Team, Home, Manager, Permissions) in a `card` pill container, each a 22 px circle
+  (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
+  number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
+- Body: a 560 px left card with the step's fields; the right side is the studio (§8)
+  reacting to the step.
+- **Team step**: heading "Your team" with an info icon, one line "Suggested for Pro
+  Services. You can hire more later." Rows: checkbox, 36 px avatar, name 600, role `ink-3`,
+  tags ("in every pack" green soft; "always on" indigo soft for Michael, who has a lock and
+  no checkbox), connection chips ("needs: Email" with an indigo dot on `card-2`, "optional:
+  Calendar" with a dashed `line-2` border, "nothing to connect" `ink-3`), and a mono
+  "Works in Harbor & Pine/Finance" line with a "change" link. Unchecked rows at 55%.
+  Footer: "N picked, M to connect" and Back (secondary), Next (primary).
+- The studio on the right fills with a pod per picked person around Michael's glass pod,
+  each with a small name tag and a check on its screen; unpicked people show as dashed
+  ghost pods with a "+" and a "Name, not picked" tag.
+
+### 7.26 Settings, hire wizard, closing time
+
+Keep every section, control and save rule from v1 (see the functional map in
+`docs/designs/studio-home.md`), restyled with §7.7 buttons, §7.12 row groups, §7.23 dialogs.
+No new screens are specified yet; they follow these components.
 
 ---
 
-## 8. Web components [Web]
+## 8. The studio illustration [Both]
 
-All in `public/assets/site.css` unless noted as page-local in `index.html`.
+The studio is both the app's Office view and the website's hero. One construction, two
+uses: live in the app, a curated still or light loop on the web.
 
-### 8.1 Nav
+### 8.1 Projection
 
-- Left: the mark (30 px) and the wordmark. Center: four section links. Right: one
-  primary `DOWNLOAD` button that goes to `/download`. Nothing else: Discord, GitHub and
-  the FAQ live in the footer (§8.5), so the bar has one action.
-- Section labels are one or two words: HOW IT WORKS, TEAM, LIMITS, OPEN SOURCE. The
-  label promises what the section delivers. There is no paid tier, so nothing is labelled
-  PLANS or PRICING.
-  Sections without a link (Dwight, the day log, business types, FAQ) light up the link
-  of the chapter they sit in.
-- Links that leave the site carry `↗` wherever they appear.
-- Current section: `ink-900` text, a 3 px coral underline and `aria-current="true"`. It is
-  set by a scroll check: the last section whose top has passed the bottom of the nav.
-  Nothing is marked above the first section.
-- At ≤ 1040 px the links move to a second sticky row that scrolls sideways, with
-  44 px tap targets and the current link scrolled into view. Both rows stay sticky.
-  `section { scroll-margin-top }` matches the header height: 66 px wide, 112 px narrow.
+Isometric, 2:1. With grid unit `S` (50 px at a 1060 × 816 stage) and origin `(cx, cy)`:
 
-### 8.2 Button (`.btn`)
+```
+P(gx, gy, z) = ( cx + (gx - gy) * S,  cy + (gx + gy) * S / 2 - z )
+```
 
-VT323 label per §4.3, 2 px `ink-900` border, hard shadow, `cream-50` fill. Primary:
-`coral` fill. Hover: one step lighter. Active: `translate(4px,4px)` and the shadow
-disappears (`steps(1)`, 60 ms). Focus: 3 px `ink-900` outline at 3 px offset.
+Every shape is built from boxes (top, left and right faces) and ellipses on this grid.
+Faces: top = lightest, left = `m`, right = `d` of the object's family. A 1 px white rim
+at 75% (dark: 13%) runs along the top front edges. Strokes match fills; no outlines.
 
-### 8.3 Chip, stamp, tabs, file, panel
+### 8.2 Platform
 
-- Chip: VT323 17 px, 2 px border, hard shadow, an optional 9 px square status dot.
-- Stamp: VT323 19 px coral, 3 px coral border, rotated −3°. Used for jokes and verdicts
-  such as NOT ON RECORD. Never as a logo.
-- Tabs and file: folder tabs (VT323 19 px, current tab `peach`) over a `paper-100`
-  frame. Used to present an artifact as a document in a cabinet.
+A raised floor slab in `floor` tones: top `#F1EFFB` to `#E4E1F5` (dark `#302B49` to
+`#26223B`), left `#D7D3EF`, right `#C6C0E6`, a white grid at 70% (dark 5%), a soft
+`#8A82C9` shadow at 22% beneath (dark black at 55%). The stage ground carries the radial
+light (§3.8) and a faint dot grid masked to the edges.
 
-### 8.4 Section header
+### 8.3 Pods
 
-An eyebrow (`.sechead`, §4.3) above the h2, then one supporting sentence (`.sub`, 62 ch).
-One job per section.
+A department pod is a desk block, a monitor on a stand, a chair, a keyboard, and a small
+plant or mug, all in the department family (§3.4) on a paper pad slab. A pod holds one to
+four desks (§8.9). The monitor screen is the status surface:
 
-### 8.5 Footer
+- Lit: `l` fill with a soft inner light and a floor glow ellipse in `acc` at 42% core,
+  14% edge (dark 62% and 22%).
+- Off: `#5E5A74` (dark `#23212F`).
 
-`ink-900` ground, Pixelify Sans 17 px, `peach` links with `lemon` hover. Links: Download,
-FAQ, GitHub, Discord, License, Contact.
+### 8.4 Michael's glass pod
+
+A raised platform with a glass box (back wall white at 78%, front at 42%; dark: indigo
+tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, a small ink "M"
+badge floating above, and a tiny task board on the back glass (colored bars for the
+board columns). It sits at the center of the platform and every path passes through it.
+
+### 8.5 States on the stage
+
+As §3.5. In addition:
+
+- **Selection**: a dashed `ink` ellipse (6 4 dash) on the floor around the selected pod;
+  everything else at 45% opacity.
+- **Needs you beacon**: a coral sphere on a thin pole above the pod with a ring that scales
+  from .6 to 1.5 and fades, every 1.8 s. Only for status `blocked` on the owner.
+- **Thinking**: a white bubble with three `violet` dots over the monitor.
+- **Idle**: the pod desaturated; screen off.
+
+### 8.6 Paths and tokens
+
+- Paths are thin curves (1.5 px) in `line-2` tones between mailbox posts, Michael's pod and
+  department pods, with a faint drop line to the floor.
+- Tokens are small isometric cards or glyph circles in the act color (§3.3), white ring,
+  traveling along paths. Speed about 240 px/s with ease in out. At most 16 in flight;
+  beyond that, counts on paths (a mono number pill) replace extra tokens.
+- Flow rules, which mirror the product: mailbox posts and schedules feed Michael or the
+  mailbox's owner; Michael feeds everyone; teammates exchange `query` tokens directly;
+  a teammate who is stuck sends a `query` to Michael; only Michael sends `act-you` tokens,
+  which leave the stage toward the right column.
+- A finished job sends a green check token from the pod to Michael's task board.
+
+### 8.7 Mailbox posts
+
+Small isometric posts at the platform's front left edge, one per mailbox, in white and
+lavender with a slot, each with a mailbox tag (§7.18). A broken mailbox's post is coral
+tinted with a red "x" on its path.
+
+### 8.8 Idle quote bubble
+
+One at a time, over an idle pod: `neutral-soft` bubble, `line` border, `r-lg` with a tail
+at the bottom left, italic `t-meta` `ink-3`. Lines come from the in-character list
+(`cafeteriaLines.ts`). Shown every 45 to 90 s, visible 6 s, 400 ms fade. Never over a pod
+that is working or needs you.
+
+### 8.9 Scaling rule
+
+- Departments, not seats. Each department has one pod holding up to 4 desks (1: single
+  desk; 2: side by side; 3 and 4: a 2 × 2 cluster). A fifth person in a department opens a
+  second pod for it.
+- Up to 8 department pods sit on a ring around Michael's pod. 9 to 12 use an outer ring on
+  a larger platform scaled to fit.
+- Above about 30 people the Office view switches to a compact grid of label cards grouped
+  by department, with the same states and badges.
+- One person (Michael only): the platform with the glass pod alone.
+
+### 8.10 Themes and direction
+
+- Dark mode: every face value has a dark twin (§3.4 derivation, platform per §8.2).
+- RTL: the art never mirrors (it is a picture of a room). Labels keep their positions.
+- Reduced motion: §11.3.
+
+### 8.11 Web use [Web]
+
+- Hero: a curated still of the studio at hero size (the reference home screen's stage,
+  without the Needs you column), exported as SVG. Optional light loop: tokens travel,
+  screens pulse. No live data.
+- Feature vignettes: crop to one idea: the mailbox posts feeding pods (mailboxes), the
+  onboarding studio filling (packs), one pod with its Access card (limits), Michael's pod
+  sending a token to a Needs you card (Ask me).
+- Screenshots of the app go in a macOS window frame: `r-2xl`, `shadow-lg`, the title bar
+  with traffic lights.
 
 ---
 
-## 9. Characters and sprites [App]
+## 9. Web components [Web]
 
-Sprites are drawn in code (`scene/office/portraitArt.ts`, `scene/office/cast.ts`).
+### 9.1 Nav
 
-- Portrait cell 18 × 28 px. In-scene sprite 18 × 32 px.
-- Frames: walk × 3, type × 2, read × 2, laid out in three rows.
-- Each character has one identifying shirt color, used for its selection glow. Those
-  colors live in `cast.ts` and are not design tokens (§17).
-- Agents can also carry one of the six accents (§3.3). The accent drives the agent's
-  badge, selection ring and prompt prefix.
-- Walking adds a ±1 px vertical bob. Reduced motion turns walks into instant moves and
-  disables the bob (§11). This is not yet implemented in the Pixi layer (§17).
+72 px, `bg` at 85% with a 1 px `line` rule on scroll. Lockup left; four links center
+right (`w-small` 500, `ink-2`, active `ink`); "Download for Mac" primary button (ink).
+Phone: lockup plus a menu button; the sheet lists the links and the button.
 
-Status overlays (drawn above the sprite, 8 × 8 px): `thinking` has three cycling dots,
-`blocked` has a pulsing coral `!`, `success` has a four-frame sparkle, and `ghost` is 50%
-opacity. *Spec. Not verified against `scene/` in the 2026-09-24 audit.*
+### 9.2 Buttons
 
-Office scene themes (`office`, `brooklyn99`) live in `scene/office/themeRegistry.ts`.
-They restyle the floor and do not change UI tokens.
+Primary `ink` fill, white `w-small` 600 text, 44 px tall, `r-md`, padding 0 × 20.
+Secondary `card` with `line-2`. Never coral (§3.2).
+
+### 9.3 Hero
+
+Eyebrow (mono, `ink-3`), `w-display` headline, `w-lead` subline in `ink-2`, primary and
+secondary buttons, then the studio (§8.11). The radial light sits behind the studio.
+
+### 9.4 Feature rows
+
+Alternating text and vignette, 96 px apart. Title `w-h3` or `w-h2`, one or two short
+paragraphs, an optional mono eyebrow. Vignettes sit on `card` with `r-2xl` and
+`shadow-md`, or bleed without a card when they are studio art.
+
+### 9.5 Cards, chips, pills
+
+Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
+
+### 9.6 Footer
+
+`chrome` ground, lockup, link columns (`w-small`), Discord, GitHub, FAQ, legal line.
+
+### 9.7 Social card
+
+1200 × 630, `bg` ground, lockup at left top, `w-h2` headline in `ink`, a line in
+`ink-2`, and the studio crop on the right. Generated by `source/build.py` (§14).
 
 ---
 
-## 10. Iconography [App]
+## 10. Iconography [Both]
 
-- 16 × 16 px, integer coordinates, at most two colors (ink plus one accent),
-  hand-drawn inline SVG through `Icon.tsx`. Integer scaling only.
-- Provider marks go through `ProviderLogo.tsx`.
-- **Pack glyphs are not icons.** A pack's `glyph` renders as an emoji inside a
-  `PackTile` and nowhere else. An unknown glyph shows `?` on a `cream-200` tile, never a
-  broken image. Promoting stable packs to real `Icon` entries is the upgrade path, and
-  the tile's API does not change.
-- **[Web]** Business-type glyphs on the site are 32 px pixel SVGs, drawn to the same
-  rules. The site uses no emoji.
+- Outline icons, 1.75 px stroke at 16 px (1.5 at 14, 2 at 20), round caps and joins,
+  `currentColor`. The Lucide set (ISC license) is the reference style; custom icons match
+  it.
+- Sizes: 14 (inline in meta), 16 (buttons, rows), 18 (top bar), 20 (empty states).
+- Every icon only button has an `aria-label` and a tooltip.
+- The v1 pixel icon set (`components/Icon.tsx`) is retired (§17).
 
 ---
 
 ## 11. Motion
 
-### 11.1 App [App]
+### 11.1 Tokens [Both]
 
-| What | Duration | Easing |
+| Token | Value | Use |
 |---|---|---|
-| Hover | 0 | none |
-| Button press | 0 | none |
-| Settings button | 80 ms | `steps(2)` |
-| Tooltip | 90 ms after a 400 ms delay | ease-out |
-| Blink, pulse keyframes | 700 to 1200 ms | `steps(2)` |
-| Sprite frame | 125 ms | step |
+| `dur-fast` | 120 ms | Hover, press |
+| `dur-base` | 200 ms | Panel swaps, menus, tab underline |
+| `dur-slow` | 320 ms | Overlays, the right column changing state |
+| `ease` | `cubic-bezier(.2,.7,.2,1)` | Everything that moves in or out |
+| `pulse` | 1.6 s, opacity 1 to .35 | The Needs you dot, the live dot |
+| `breathe` | 2.4 s, opacity 1 to .55 | Lit screens while working |
+| `ring` | 1.8 s, scale .6 to 1.5, fade out | Needs you beacon |
+| `burst` | 900 ms | Done check burst |
 
-Forbidden: spring physics, bounce, parallax, and idle animation on static UI panels.
-Animation belongs to the game layer.
+### 11.2 App [App]
 
-### 11.2 Web [Web]
-
-- Button press: `steps(1)`, 60 ms.
-- Anchor jumps use smooth scroll.
-- Nothing else moves. No entrance animations, no hover zooms, no marquees.
+Motion carries information or it doesn't happen: token travel, beacons, screens breathing,
+the check burst, the quote bubble fade. UI chrome does not move on its own. The stage
+pauses all animation when the window is hidden, in focus mode, or when another view is
+showing (as today's floor does).
 
 ### 11.3 Reduced motion [Both]
 
-When `prefers-reduced-motion: reduce`, set all durations to 0, turn smooth scroll off,
-turn walks into instant moves, and turn particles off. The app's CSS already does
-this. The Pixi layer and the website's smooth scroll do not yet (§17).
+With `prefers-reduced-motion: reduce`: no token travel (a token appears at its
+destination for 1 s), no pulses or rings (static dot and static beacon), no breathing, no
+quote bubbles, instant panel swaps. The web hero shows the still.
 
 ---
 
 ## 12. Accessibility [Both]
 
-- Contrast: body text 4.5:1 or better on every surface it can appear on. Structural
-  borders 3:1 or better. The app's dark palette is measured. Keep it measured.
-- Focus is always visible and at least 3:1 against its surroundings.
-  - **[Web]** 3 px `ink-900` outline, 3 px offset.
-  - **[App]** 2 px `ink-900` outline, 2 px offset for buttons and links. Inputs get a
-    2 px `ink-700` inset. (The current global ring is 1 px `ink-300`, which is too weak, §17.)
-- Touch targets 44 px or larger on the web's phone layout.
-- Keyboard: everything reachable by Tab. Enter and Escape handlers respect IME
-  composition (`isComposingKey`) so CJK input is never cut off.
-- Never communicate by color alone (§3.4).
-- **[Web]** One `nav aria-label="Main"`. The duplicate phone link row is `display:none`
-  when hidden, so screen readers hear one set.
+- Contrast: text 4.5:1 or better on every surface it can appear on; 3:1 for text 18.66 px
+  bold and up; 3:1 for control boundaries (`line-input`) and focus indicators. The values in
+  §3 are measured; keep them measured. Decorative lines (`line`, `line-2`) are not control
+  boundaries.
+- Focus: 2 px `indigo` (`#6C5CE7`, 4.9:1 on `card`) outline with 2 px offset on every
+  interactive element, including pod label cards and graph nodes. Web: 3 px, 3 px offset.
+- Keyboard: Tab reaches everything. On the stage, Tab enters the pods, arrow keys move
+  between label cards in reading order, Enter selects, Esc returns focus to the board.
+  Every overlay closes on Esc. Enter and Esc respect IME composition (`isComposingKey`).
+- Never color alone (§2.3). Pills carry words; badges carry counts and words.
+- Touch targets 44 px on the web's phone layout. In the desktop app, 28 px minimum.
+- Dialogs: `role=dialog`, `aria-modal`, labelled, focus trapped and restored.
+- `dir=auto` on user and agent authored text; bidi isolates around paths and addresses.
 
 ---
 
@@ -646,38 +967,34 @@ this. The Pixi layer and the website's smooth scroll do not yet (§17).
 
 ### 13.1 Shared rules
 
-- Name the actor. "Oscar is reconciling March", never "the agent is processing".
-- Keep system feedback under 12 words. Second person to the user.
-- No emoji in copy. The app has icons, and the site has pixel glyphs.
-- Exclamation marks only for completions and notifications.
+- Name the actor. "Oscar is matching September payments", never "the agent is processing".
+- Keep system feedback under 12 words. Second person to the owner.
+- Fields first; explanations behind an info icon, short.
+- No emoji in UI copy.
+- Exclamation marks only for completions.
 - Real punctuation: "don't", never "dont".
-- **No em dashes or en dashes in user-facing copy.** Use a period, a comma, a colon or
-  parentheses. The website and its repo were cleaned of them on 2026-09-18. The app's
-  strings have not been audited (§17).
+- **No em dashes, en dashes, or hyphens used as dashes in user-facing copy.** Use a period,
+  a comma, a colon or parentheses.
 
 ### 13.2 App tone
 
-Friendly and factual. A villager who happens to be technically literate.
+Plain and factual, owner words, not developer words (no "MCP", "PTY", "tokens",
+"runtime"). Michael speaks in the first person on his cards ("I can't approve money").
+Office humor only where nothing needs doing: idle quotes, empty states, the booting
+caption.
 
 | Don't | Do |
 |---|---|
 | "An error has occurred" | "Oscar hit a snag" |
-| "Permission denied" | "Oscar needs your permission" |
+| "Permission denied" | "Oscar needs your OK" |
+| "Task blocked on human input" | "Waiting for you" |
 | "Loading..." | "One sec..." |
-| "Confirm operation" | "Sure?" |
 
 ### 13.3 Web tone
 
-Dry. The site is written as a performance review of Michael: section eyebrows read like
-file references (REVIEW 05 · SCORECARD), verdicts are stamped, and each agent has a
-WON'T list with one line of humor. The joke is always at Michael's expense, never the
-customer's.
-
-- Headlines are sentence case statements, and they land in one line when they can.
-  "The software is free. The setup is what costs."
-- Claims stay honest. No price on a page with no prices. A download button only points
-  at a real release (met from v0.0.1; the button goes to `/download`, which reads the latest
-  release from GitHub).
+Dry and confident. The joke is on Michael, never the customer. Headlines are sentence case
+statements that land on one line when they can. Claims stay honest: a download button only
+points at a real release.
 
 ---
 
@@ -685,77 +1002,66 @@ customer's.
 
 | Surface | File | Holds |
 |---|---|---|
-| App | `src/renderer/src/design/tokens.css` | CSS custom properties `--cth-*`, light in `:root`, dark under `:root[data-cth-theme='dark']` |
-| App | `src/renderer/src/design/tokens.ts` | TS mirror for Pixi and inline styles. **Currently missing four statuses and all dark values** (§17). |
-| App | `src/renderer/src/design/global.css`, `fonts.css` | Base styles, font faces |
-| App | `src/renderer/src/design/theme.ts` | Theme switch: `data-cth-theme` on `<html>`, stored in `localStorage` key `cth.theme`, default light |
-| Web | `public/assets/site.css` `:root` | Web tokens: neutrals, web accents, `--hard`, `--panel` |
-| Kit | `branding/colors/colors.{css,json}`, `dont-be-michael.ase` | Every color in formats for design tools. Generated, do not hand-edit. |
+| Kit | `branding/colors/colors.{css,json}`, `dont-be-michael.ase`, `palette.png` | Every §3 token, light and dark, generated by `source/build.py`. Do not hand edit |
+| App | `src/renderer/src/design/tokens.css` | `--cth-*` custom properties with the same names after the prefix as the kit (`--cth-ink-3` = kit `--dbm-ink-3`); light in `:root`, dark under `:root[data-cth-theme='dark']` |
+| App | `src/renderer/src/design/tokens.ts` | TS mirror for the SVG stage and inline styles. Changes with `tokens.css` in the same commit |
+| Web | `public/assets/site.css` `:root` | `--dbm-*` copied from the kit's `colors.css` (light values only) |
 
 Rules:
 
-- `tokens.css` and `tokens.ts` change in the same commit.
-- A web token must name its app twin in a comment if it has one.
+- Change §3 here, then `source/build.py`, then run it; then the app and site files.
+- A token that exists on one surface only says so in a comment.
 - **[Web]** Any edit to `site.css` bumps the `?v=` query in `index.html` and `404.html`.
-  The file is cached for five minutes, and a stale stylesheet has shipped invisible
-  changes before.
 
 ---
 
-## 15. Themes [App]
+## 15. Themes
 
-Light and dark, one token swap for the whole app. Terminals and per-agent sessions
-follow the switch, and the terminal is told about the change (dark = 1, light = 2, see
-`test/theme-notify.test.cjs`). The dark theme is warm and lifted: the ground is never
-`#000`, text is never `#FFF`, and the accents hold a narrow luminance band so no hue
-fluoresces.
-
-The website is light only. That is a decision, not an omission: the brand is cream paper.
+- **[App]** Light and dark, one token swap. The terminal follows the switch as today.
+  Dark is lifted: the ground is `#14131C`, never `#000`; text is `#ECEAF4`, never `#FFF`.
+- **[App]** The TV show office themes (`OfficeThemePicker`) are retired with the floor.
+- **[Web]** Light only. The brand's first impression is the light studio.
 
 ---
 
 ## 16. Making changes
 
-1. Decide at the right level. If it changes what a color or face *means*, it is a
-   brand change (§1 to §4), and it is decided for both surfaces at once.
-2. Edit this file, then the token files, then components.
-3. Before merging a visual change, check at 1440, 1040, 980, 480, 390 and 320 px (web),
-   or at 1280 × 800 in both themes (app).
+1. Decide at the right level. If it changes what a color, face or shape *means*, it is a
+   brand change (§1 to §4, §8) and is decided for both surfaces at once.
+2. Edit this file, then `source/build.py` and the token files, then components.
+3. Before merging a visual change, check the app at 1280 × 800 and 1440 × 900 in both
+   themes and in Arabic, and the web at the §5.3 widths.
 4. Record deliberate deviations in §17 with a reason, or remove them.
 5. Add a line to §18.
 
 ---
 
-## 17. Deviation and debt register
+## 17. Migration and debt register
 
-Known gaps between this spec and the code, as of 2026-09-24. Each one is either
-**Accepted** (with a reason) or **Fix** (the spec wins and the code should change).
+v2 is adopted in the spec and the kit. The code has not moved yet. Each row is **Fix**
+(the spec wins), **Accepted** (with a reason) or **Done**.
 
 | # | Surface | Gap | Where | Status |
 |---|---|---|---|---|
-| 1 | App | App icon is the Michael portrait, not the Struck M | `build/icon.*` | Done 2026-09-25: `build/icon.*` are copies of `branding/app-icon/`, checked by `test/header-lockup.test.cjs` |
-| 2 | App | `tokens.ts` lacks `waiting`, `compacting`, `looping`, `typing` and all dark values | `design/tokens.ts:37-44` | Fix |
-| 3 | App | `CodeEditor` asks for VT323, which is no longer bundled | `components/CodeEditor.tsx:22` | Fix: JetBrains Mono |
-| 4 | App | Tooltips at 11 px, below the 13 px floor | `global.css:132` | Fix |
-| 5 | App | Global focus ring is 1 px `ink-300`, too weak | `global.css:67-70` | Fix: §12 |
-| 6 | App | `PixelButton` hover and press are mouse-only | `PixelButton.tsx:85-88` | Fix |
-| 7 | App | Pixi walk and bob ignore reduced motion | `scene/` | Fix |
-| 8 | App | `color-scheme: light` hard-coded in dark mode | `global.css:9` | Fix |
-| 9 | App | Thirteen 2 px radii | `App.tsx`, `FullscreenTerminal.tsx`, `IdePanel.tsx`, `global.css`, `UpdateBadge.tsx` | Fix to 0, or accept with a reason |
-| 10 | App | Character shirt colors are raw hex, not tokens | `scene/office/cast.ts:30-49` | Accepted for now: they are sprite art, not UI. Revisit with #11. |
-| 11 | App | The cast uses *The Office* character names | `scene/office/cast.ts` | Open decision (§19) |
-| 12 | App | No shared motion tokens | components | Fix: add `--cth-dur-*` |
-| 13 | App | UI strings not audited for em and en dashes | `src/renderer/src/i18n` | Fix: audit |
-| 14 | App | The release-notes modal paints with its own palette (paper `#FFFDF7`, ink `#1B1B1B`, yellow `#FFCA54`, sky `#72C2DF`, maroon `#B23A4E`) instead of app tokens | `components/ReleaseDrop.tsx:46-55`, `shared/releaseDrop.ts:126` | Fix: move to `--cth-*` tokens |
-| 15 | Web | Eight different letter-spacing values (.02 to .12em) | `site.css`, `index.html` | Fix: normalize to §4.3 |
-| 16 | Web | Off-grid padding and gaps (13, 22, 26 px and others) | `site.css`, `index.html` | Fix gradually: touch it, snap it |
-| 17 | Web | `.btn-primary:hover` uses the raw hex `#ff8080` | `site.css` | Fix: token |
-| 18 | Web | Smooth scroll ignores reduced motion | `site.css` (`html{scroll-behavior:smooth}`) | Fix |
-| 19 | Web | No social card image (`og:image`) | `index.html` | Fix: use `branding/social/og-card-1200x630.png` |
-| 20 | Web | Body text in Inter, not a pixel face | `site.css` | Accepted: readability, and it matches the app |
-| 21 | Web | ALL CAPS and tracking on VT323 labels, which the app forbids | `site.css` | Accepted: web volume, limited to §4.3 values |
-| 22 | App | Destructive button text is `ink-900`, which turns off-white in dark mode: 1.85:1 on dark coral | `PixelButton.tsx` (destructive `text`) | Fix: use `on-accent` |
-| 23 | App | Light-theme `ink-300` borders measure 2.2 to 2.6:1 on cream surfaces, under the 3:1 border floor | `tokens.css` light `ink-300` | Fix: darken light `ink-300`, re-measure every surface |
+| 1 | App | Pixel office floor (Pixi.js) is the main view | `src/renderer/src/scene/office/` | Fix: replace with the SVG studio (§8) |
+| 2 | App | Bottom agent strip and right Command Center layout | `AgentStrip`, `AgentCard`, `CommandCenterPanel`, `App.tsx` | Fix: §5.2 shell |
+| 3 | App | Pixel primitives and pixel fonts | `PixelPanel`, `PixelButton`, `PixelBadge`, `fonts.css`, `tokens.css` | Fix: §6, §7, §4 |
+| 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Fix: §3 |
+| 5 | App | Ask me is a tab in Michael's panel | `AskMeTab`, `CommandCenterPanel` | Fix: the Needs you board (§7.6, §7.8) |
+| 6 | App | Pixel icon set | `components/Icon.tsx` | Fix: §10 |
+| 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Fix: §7.23 |
+| 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Fix: §7.21 |
+| 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Fix: §3.4 |
+| 10 | App | No counters for delegated and kept | hive | Fix: §7.17 definitions, derived from existing hive history and tasks (no behavior change) |
+| 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Fix: §13.1 |
+| 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Accepted in mockups; the build uses §4.2 and §5.1 |
+| 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Accepted in mockups; the build uses §3 |
+| 14 | Kit | Retired fonts still in `fonts/` | `branding/fonts/` | Fix: remove once #3 and #15 are done |
+| 15 | Web | Whole site is v1 (arcade palette, pixel type, hard shadows, chunky frames) | site repo `public/` | Fix: §9 |
+| 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
+| 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
+| 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Fix: tokens |
+| 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
 
 ---
 
@@ -763,24 +1069,37 @@ Known gaps between this spec and the code, as of 2026-09-24. Each one is either
 
 | Date | Change |
 |---|---|
-| 2026-09-28 | Web: Pro offering removed; the site is open source only. PLANS becomes OPEN SOURCE (§8.1). |
-| 2026-09-28 | Web: nav cut to four links plus a `DOWNLOAD` button (§8.1); Discord, GitHub and FAQ moved to the footer (§8.5); ≤ 360 px row added (§5.3); download rule met (§13.3). |
-| 2026-09-24 | Moved into `branding/` with the full brand kit: logos, lockups, app icon, favicons, social card, color files, fonts, a printable brand guide and the build script. |
-| 2026-09-24 | Rewritten as one spec for app and web. Documented the v0.3.4 recalibration (calm accents, Inter and JetBrains Mono, hairline panels, dark theme) that the old doc predated. Added brand, logo (Struck M), web profile, accent map and the deviation register. Retired the three-layer panel, Pixelify and VT323 in the app, and "no dark mode". |
-| 2026-09-24 | Web: nav rebuilt (§8.1), Struck M logo and favicons shipped, Discord added. |
-| v0.3.4 | App recalibration: calmer accents, bundled Inter and JetBrains Mono, hairline borders, measured dark theme. |
+| 2026-09-30 | **v2 Studio adopted.** Pixel floor, bottom strip, Command Center layout, pixel UI, pixel type and the arcade web palette retired. One token set for app and web (§1.3). Sora and IBM Plex Mono replace Inter, VT323, Press Start 2P and Pixelify Sans. Wordmark in Sora; the Struck M mark kept. Studio illustration system (§8). Contrast corrected against the mockups: `ink-3` `#6C6884`, accent text colors, `coral-strong` for coral fills with text, `line-input` for control boundaries. v1 archived at `archive/DESIGN-v1-pixel.md`. Decisions and the functional map: `docs/designs/studio-home.md`. |
+| 2026-09-28 | (v1) Web: Pro offering removed; nav cut to four links plus Download. |
+| 2026-09-24 | (v1) One spec for app and web, moved into `branding/` with the brand kit. |
 
 ---
 
 ## 19. Open decisions
 
-1. **Character names.** The office cast uses *The Office* character names (Michael, Jim,
-   Pam and others). The product's premise is a nod to the show, but using the names
-   directly is a legal and brand risk. Decide whether to keep them, rename them, or make
-   names user-set with neutral defaults.
-2. **App dash audit scope.** Confirm that the no-em-dash rule (§13.1) applies to app UI
-   strings and release notes, not just the website.
-3. **Custom sprite art** versus programmatic sprites, long term.
-4. **Social card and press kit.** Define a 1200 × 630 card and a downloadable logo pack
-   once the app icon has migrated.
-5. **Sound.** 8-bit sound effects are specced but deferred. Off by default if they ship.
+1. **Today timeline** (Day Lanes). Designed as a later view; not in the first v2 release.
+2. **Operations and team colors** (§3.4) have no reference screen yet. Confirm when a pack
+   with Supply Chain or Quality is shown.
+3. **Web hero loop.** Still image first; decide on a light CSS loop after the site ships.
+4. **Settings and hire wizard screens** have no v2 reference screens; they follow the
+   components. Design them if the restyle raises questions.
+
+---
+
+## 20. Reference screens
+
+Approved 2026-09-30, in `reference/studio/` (PNG, 1440 × 900):
+
+| File | Shows |
+|---|---|
+| `home-light.png` | Office view, Needs you board, light |
+| `home-dark.png` | The same, dark |
+| `kelly-access.png` | A person selected, Access tab |
+| `kelly-work.png` | A person selected, Work tab (terminal, Talk 1:1) |
+| `michael-office-schedule.png` | Michael selected, Office schedule tab |
+| `tasks-detail.png` | Tasks view with a task detail open |
+| `who-talks-to-whom.png` | Who talks to whom, an edge hovered |
+| `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
+
+Sources (HTML and generators) live with the design session in
+`~/.gstack/projects/agentvivekkumar-dontbemichael/designs/business-first-redesign-20260930/`.

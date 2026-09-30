@@ -6,245 +6,239 @@
 <title>Don't Be Michael brand guide</title>
 <link rel="icon" href="web/favicon.svg" type="image/svg+xml">
 <style>
-@font-face{font-family:'VT323';src:url('fonts/vt323/VT323-Regular.ttf')}
-@font-face{font-family:'Pixelify Sans';src:url('fonts/pixelifysans/PixelifySans-Variable.ttf');font-weight:400 700}
-@font-face{font-family:'Press Start 2P';src:url('fonts/pressstart2p/PressStart2P-Regular.ttf')}
-@font-face{font-family:'Inter';src:url('fonts/inter/Inter-Variable.ttf');font-weight:100 900}
-@font-face{font-family:'JetBrains Mono';src:url('fonts/jetbrainsmono/JetBrainsMono-Variable.ttf');font-weight:100 800}
+@font-face{font-family:'Sora';src:url('fonts/sora/Sora-Variable.ttf');font-weight:100 800}
+@font-face{font-family:'IBM Plex Mono';src:url('fonts/ibmplexmono/IBMPlexMono-Regular.ttf');font-weight:400}
+@font-face{font-family:'IBM Plex Mono';src:url('fonts/ibmplexmono/IBMPlexMono-Medium.ttf');font-weight:500}
+@font-face{font-family:'IBM Plex Mono';src:url('fonts/ibmplexmono/IBMPlexMono-SemiBold.ttf');font-weight:600}
 
 :root{
-  --ink:#1A1320;--ink7:#3D2E4A;--ink5:#6B5878;--ink3:#A899B5;--ink1:#D9CFE0;
-  --cream:#FFFDF5;--cream1:#FFF8E7;--cream2:#F4E9C7;--paper:#F0EAD2;--coral:#FF6B6B;
-  --hard:4px 4px 0 rgba(26,19,32,.25);
+  --bg:#F7F7FB;--card:#FFFFFF;--card2:#FAFAFD;--floor:#E9E7F7;
+  --ink:#1E1B2E;--ink2:#4A4660;--ink3:#6C6884;--ink4:#B4B1C6;--line:#E8E6F2;--line2:#DAD7EA;
+  --coral:#FF5A5F;--coralSoft:#FFECEC;--coralText:#C8303A;--coralStrong:#D4363D;
+  --green:#1FB872;--greenSoft:#E3F7EC;--greenText:#157D4D;
+  --blue:#4C6FFF;--blueSoft:#E8EDFF;--blueText:#3553E8;
+  --violet:#8B5CF6;--violetSoft:#F0EAFE;--violetText:#7043E6;
+  --indigo:#6C5CE7;
+  --shadow:0 1px 2px rgba(30,27,46,.05),0 6px 18px rgba(62,52,140,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{background:var(--paper)}
-body{font-family:Inter,sans-serif;font-size:15px;line-height:1.55;color:var(--ink);max-width:1100px;margin:0 auto;padding:32px 16px 80px}
-.page{background:var(--cream);border:2px solid var(--ink);box-shadow:var(--hard);padding:48px 52px;margin-bottom:32px}
-.eyebrow{font-family:VT323;font-size:20px;letter-spacing:.12em;color:var(--ink5)}
-h1{font-family:VT323;font-weight:400;font-size:64px;line-height:1.02;margin:8px 0 14px}
-h2{font-family:'Pixelify Sans';font-weight:400;font-size:34px;line-height:1.1;margin:6px 0 12px}
-h3{font-family:VT323;font-weight:400;font-size:22px;letter-spacing:.06em;margin:26px 0 10px}
-p{max-width:64ch;color:var(--ink7);margin-bottom:10px}
-code,.mono{font-family:'JetBrains Mono',monospace;font-size:12.5px}
-.grid{display:grid;gap:20px}
+html{background:var(--bg)}
+body{font-family:Sora,system-ui,sans-serif;font-size:15px;line-height:1.6;color:var(--ink);max-width:1100px;margin:0 auto;padding:32px 16px 80px;-webkit-font-smoothing:antialiased}
+.page{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:48px 52px;margin-bottom:28px}
+.eyebrow{font-family:'IBM Plex Mono';font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+h1{font-weight:600;font-size:56px;line-height:1.05;letter-spacing:-.035em;margin:10px 0 16px}
+h2{font-weight:600;font-size:34px;line-height:1.15;letter-spacing:-.03em;margin:8px 0 14px}
+h3{font-weight:600;font-size:15px;letter-spacing:-.01em;margin:26px 0 10px}
+p{max-width:66ch;color:var(--ink2);margin-bottom:10px}
+code,.mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+.grid{display:grid;gap:18px}
 .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
-.tile{border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;padding:28px;min-height:170px;position:relative}
-.tile .cap{position:absolute;left:10px;bottom:6px;font-size:11px;font-family:'JetBrains Mono';opacity:.75}
-.tile img{max-width:100%;display:block;image-rendering:pixelated}
-.dark{background:var(--ink);color:var(--cream)}
-.cream{background:var(--cream)}
-.don{border-color:var(--coral);position:relative}
-.don::after{content:"DON'T";position:absolute;top:8px;right:10px;font-family:VT323;font-size:18px;letter-spacing:.06em;color:var(--coral)}
-.sw{border:2px solid var(--ink);padding:10px;height:112px;display:flex;flex-direction:column;font-size:12px}
-.sw b{font-weight:500}.sw span{font-family:'JetBrains Mono';font-size:11px}.sw i{font-style:normal;margin-top:auto;font-size:11px;opacity:.85}
-.row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.row.n{grid-template-columns:repeat(11,1fr)}
-.row.n .sw{height:96px;padding:6px;font-size:10px}.row.n .sw span{font-size:9.5px}
-table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:8px}
-th,td{border-bottom:1px solid var(--ink1);padding:8px 10px 8px 0;text-align:left;vertical-align:top}
-th{font-family:VT323;font-weight:400;font-size:18px;letter-spacing:.06em;color:var(--ink5)}
-.spec{font-size:44px;line-height:1.1}
-.cover{display:flex;flex-direction:column;justify-content:center;min-height:560px}
-.cover img{width:640px;max-width:100%}
-.stamp{display:inline-block;font-family:VT323;font-size:22px;letter-spacing:.08em;color:var(--coral);border:3px solid var(--coral);padding:4px 12px;transform:rotate(-3deg);margin-top:28px;align-self:flex-start}
-ul{padding-left:20px;max-width:64ch;color:var(--ink7)}li{margin-bottom:6px}
-.files td:first-child{font-family:'JetBrains Mono';font-size:12.5px;white-space:nowrap}
-@media screen and (max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}.row{grid-template-columns:repeat(3,1fr)}.row.n{grid-template-columns:repeat(4,1fr)}.page{padding:28px 20px}h1{font-size:44px}}
-@media print{
-  @page{size:A4 landscape;margin:10mm}
-  html,body{background:var(--cream)}
-  body{max-width:none;padding:0}
-  .page{box-shadow:none;border:0;margin:0 auto;padding:24px 32px;width:1100px;break-after:page;break-inside:avoid;min-height:0;zoom:.9}
-  .cover{min-height:0}
-  .page:last-child{break-after:auto}
-  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
+.tile{border:1px solid var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:28px;min-height:170px;position:relative;background:var(--card2)}
+.tile .cap{position:absolute;left:12px;bottom:8px;font-size:11px;font-family:'IBM Plex Mono';color:var(--ink3)}
+.tile img{max-width:100%;display:block}
+.tile img.px{image-rendering:pixelated}
+.dark{background:#14131C;border-color:#14131C}.dark .cap{color:#A5A2B8}
+.don{border-color:#FFC7C9;background:#FFF7F7}
+.don::after{content:"Don't";position:absolute;top:8px;right:12px;font-size:12px;font-weight:600;color:var(--coralText)}
+.sw{border:1px solid var(--line);border-radius:12px;padding:10px;height:104px;display:flex;flex-direction:column;font-size:12px}
+.sw b{font-weight:600}.sw span{font-family:'IBM Plex Mono';font-size:11px}.sw i{font-style:normal;margin-top:auto;font-size:11px;opacity:.9;line-height:1.3}
+ul{margin:6px 0 10px 20px;color:var(--ink2)}li{margin:3px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:6px 0 10px}
+td,th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:999px;padding:2px 9px}
+.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.shot{border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);width:100%;display:block}
+.cover{display:flex;flex-direction:column;justify-content:center;min-height:640px;background:radial-gradient(800px 460px at 75% 55%,#FFFFFF 0%,rgba(255,255,255,0) 70%),var(--bg)}
+.cover img.lock{width:420px;margin-bottom:34px}
+.cover p{font-size:19px}
+.dont{color:var(--coralText);font-weight:600}
+@media print{.sw{height:78px}.grid{gap:12px}h3{margin:18px 0 8px}html{background:#fff}body{padding:0;max-width:none}.page{box-shadow:none;border:0;border-radius:0;page-break-after:always;margin:0;min-height:100vh}}
+@media (max-width:720px){.g2,.g3,.g4{grid-template-columns:1fr}.page{padding:28px 22px}h1{font-size:40px}}
 </style>
 </head>
 <body>
 
 <section class="page cover">
-  <img src="logo/lockup/dbm-lockup-horizontal-light.svg" alt="Don't Be Michael">
-  <h1 style="margin-top:36px">Brand guide</h1>
-  <p>The short version of the Don't Be Michael design system, for anyone making something with the brand: a slide, a sticker, a partner page, a new screen. The full rules are in <code>DESIGN.md</code> in this folder.</p>
-  <div class="stamp">EDITION 2026-09-24</div>
+  <img class="lock" src="logo/lockup/dbm-lockup-horizontal-light.svg" alt="Don't Be Michael">
+  <div class="eyebrow">Brand guide, v2 Studio, 2026</div>
+  <h1>Michael finally learned to delegate.</h1>
+  <p>How the Don't Be Michael brand looks, sounds and moves: in the app and on dontbemichael.com.
+  The full system, every token and component, is in <code>DESIGN.md</code>. This is the short version.</p>
 </section>
 
 <section class="page">
-  <div class="eyebrow">01 · THE IDEA</div>
-  <h2>Michael kept every job on his own desk.</h2>
-  <p>He delegated nothing that mattered and called it leadership. Don't Be Michael is the office he should have run: a team of AI agents that does the work, while the owner signs off on it.</p>
-  <p>Everything the brand makes should say one of two things: <b>the work is delegated</b>, or <b>you stay in control by approving it</b>.</p>
-  <h3>ONE FAMILY, TWO VOLUMES</h3>
-  <table>
-    <tr><th></th><th>THE APP</th><th>THE WEBSITE AND MARKETING</th></tr>
-    <tr><td>Job</td><td>A workspace people sit in all day</td><td>A page that has to earn attention in seconds</td></tr>
-    <tr><td>Volume</td><td>Calm: muted colors, Inter text, thin lines</td><td>Loud: bright colors, pixel headlines, chunky frames</td></tr>
-    <tr><td>Shared</td><td colspan="2">The logo, the cream and ink neutrals, the six color hues and what they mean, the hard offset shadow, the voice</td></tr>
-  </table>
-  <p style="margin-top:14px">Rule of thumb: <b>anything outside the app is the website's volume.</b> Slides, social posts, merch and partner pages use the loud palette.</p>
+  <div class="eyebrow">01 The idea</div>
+  <h2>The office Michael should have run.</h2>
+  <p>Michael is the boss who kept every job on his own desk. Don't Be Michael is a team of AI agents that
+  does the work, with Michael as the office manager who finally delegates. The owner stays in control:
+  only what Michael can't settle comes to them.</p>
+  <p>Every design choice says one of two things. <b>The work is delegated.</b> Or <b>you stay in control.</b></p>
+  <h3>One system, two scales</h3>
+  <p>The app and the website use the same colors, type and illustration. The app is dense; the website is
+  large. There is no louder web palette: coral always means "needs you", green means "done", blue means "working".</p>
+  <img class="shot" src="reference/studio/home-light.png" alt="The Office view: the studio, with Michael's glass pod in the middle and the Needs you board on the right">
 </section>
 
 <section class="page">
-  <div class="eyebrow">02 · THE LOGO</div>
-  <h2>The Struck M</h2>
-  <p>A pixel M with a coral slash through it. Read it as "don't be M". It is built on a 16 × 16 pixel grid and is always drawn as square pixels, never smoothed.</p>
-  <div class="grid g4" style="margin-top:18px">
-    <div class="tile cream"><img src="logo/mark/struck-m-light.svg" width="112" alt=""><span class="cap">struck-m-light</span></div>
-    <div class="tile dark"><img src="logo/mark/struck-m-dark.svg" width="112" alt=""><span class="cap">struck-m-dark</span></div>
-    <div class="tile cream"><img src="logo/lockup/dbm-lockup-stacked-light.svg" width="200" alt=""><span class="cap">lockup-stacked-light</span></div>
-    <div class="tile dark"><img src="logo/lockup/dbm-lockup-stacked-dark.svg" width="200" alt=""><span class="cap">lockup-stacked-dark</span></div>
+  <div class="eyebrow">02 The logo</div>
+  <h2>The Struck M, and the name in Sora.</h2>
+  <p>A pixel M with a coral slash: "don't be M". It is the one pixel element in the brand, on purpose.
+  The name is set in Sora SemiBold, sentence case, with the apostrophe.</p>
+  <div class="grid g2" style="margin-top:18px">
+    <div class="tile"><img src="logo/lockup/dbm-lockup-horizontal-light.svg" style="width:88%"><span class="cap">horizontal, light</span></div>
+    <div class="tile dark"><img src="logo/lockup/dbm-lockup-horizontal-dark.svg" style="width:88%"><span class="cap">horizontal, dark</span></div>
+    <div class="tile"><img src="logo/lockup/dbm-lockup-stacked-light.svg" style="width:52%"><span class="cap">stacked</span></div>
+    <div class="grid g2">
+      <div class="tile"><img class="px" src="logo/mark/png/struck-m-light-128.png" width="96"><span class="cap">mark, light</span></div>
+      <div class="tile dark"><img class="px" src="logo/mark/png/struck-m-dark-128.png" width="96"><span class="cap">mark, dark</span></div>
+    </div>
   </div>
-  <div class="grid g2" style="margin-top:20px">
-    <div class="tile cream"><img src="logo/lockup/dbm-lockup-horizontal-light.svg" width="420" alt=""><span class="cap">lockup-horizontal-light</span></div>
-    <div class="tile dark"><img src="logo/lockup/dbm-lockup-horizontal-dark.svg" width="420" alt=""><span class="cap">lockup-horizontal-dark</span></div>
-  </div>
-  <div class="grid g3" style="margin-top:8px">
-    <div><h3>COLORS ARE FIXED</h3><p>M in ink <code>#1A1320</code> (cream <code>#FFFDF5</code> on dark). Slash always coral <code>#FF6B6B</code>. The logo never changes color with a theme.</p></div>
-    <div><h3>SIZE</h3><p>Smallest: 16 px. Use sizes that are multiples of 16 (32, 48, 64 and up) or the SVG, so every pixel stays square and sharp.</p></div>
-    <div><h3>CLEAR SPACE</h3><p>Keep 2 grid cells (1/8 of the mark's width) empty on every side. Nothing else goes inside that margin.</p></div>
-  </div>
-</section>
-
-<section class="page">
-  <div class="eyebrow">03 · LOGO DON'TS</div>
-  <h2>Leave the mark alone.</h2>
-  <div class="grid g4" style="margin-top:16px">
-    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="transform:rotate(14deg)" alt=""><span class="cap">rotate it</span></div>
-    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="filter:hue-rotate(160deg) saturate(3)" alt=""><span class="cap">recolor it</span></div>
-    <div class="tile cream don"><img src="logo/mark/struck-m-light.svg" width="96" style="filter:blur(1.4px) drop-shadow(6px 8px 6px rgba(0,0,0,.4))" alt=""><span class="cap">blur, glow or soft shadow</span></div>
-    <div class="tile don" style="background:#FF6B6B"><img src="logo/mark/struck-m-light.svg" width="96" alt=""><span class="cap">put it on coral</span></div>
-  </div>
-  <ul style="margin-top:20px">
-    <li>Don't stretch it, outline it, or redraw the slash as a smooth line.</li>
-    <li>Don't use a character portrait, a necktie or a rubber stamp as the logo. Those ideas were tried and retired.</li>
-    <li>Don't use NBC or <i>The Office</i> logos, title lettering, cast photos or likenesses anywhere. Michael is an archetype, not a licensed character.</li>
+  <h3>Rules</h3>
+  <ul>
+    <li>Use the SVG, or a PNG at a multiple of 16 px. Minimum 16 px.</li>
+    <li>Keep 2 grid cells (1/8 of the mark) clear on every side.</li>
+    <li>The slash is always <code>#FF6B6B</code>. The M is <code>#1A1320</code> on light, <code>#ECEAF4</code> on dark.</li>
   </ul>
 </section>
 
 <section class="page">
-  <div class="eyebrow">04 · COLOR</div>
-  <h2>Six hues, two volumes.</h2>
-  <p>Each hue means the same thing everywhere. The website uses the bright set. The app uses the calm set of the same hues.</p>
-  <h3>NEUTRALS (BOTH)</h3>
-  <div class="row n">
-    <div class="sw" style="background:#FFFDF5"><b>cream-50</b><span>#FFFDF5</span></div>
-    <div class="sw" style="background:#FFF8E7"><b>cream-100</b><span>#FFF8E7</span></div>
-    <div class="sw" style="background:#F4E9C7"><b>cream-200</b><span>#F4E9C7</span></div>
-    <div class="sw" style="background:#E8D9A0"><b>cream-300</b><span>#E8D9A0</span></div>
-    <div class="sw" style="background:#FCFAF0"><b>paper-100</b><span>#FCFAF0</span></div>
-    <div class="sw" style="background:#F0EAD2"><b>paper-200</b><span>#F0EAD2</span></div>
-    <div class="sw" style="background:#1A1320;color:#FFFDF5"><b>ink-900</b><span>#1A1320</span></div>
-    <div class="sw" style="background:#3D2E4A;color:#FFFDF5"><b>ink-700</b><span>#3D2E4A</span></div>
-    <div class="sw" style="background:#6B5878;color:#FFFDF5"><b>ink-500</b><span>#6B5878</span></div>
-    <div class="sw" style="background:#A899B5"><b>ink-300</b><span>#A899B5</span></div>
-    <div class="sw" style="background:#D9CFE0"><b>ink-100</b><span>#D9CFE0</span></div>
+  <div class="eyebrow">03 Logo don'ts</div>
+  <h2>Leave it alone.</h2>
+  <div class="grid g3" style="margin-top:18px">
+    <div class="tile don"><img class="px" src="logo/mark/png/struck-m-light-128.png" width="96" style="transform:rotate(12deg)"><span class="cap">rotate it</span></div>
+    <div class="tile don"><img src="logo/mark/png/struck-m-light-128.png" width="96" style="filter:blur(1.5px)"><span class="cap">smooth or blur it</span></div>
+    <div class="tile don"><img class="px" src="logo/mark/png/struck-m-light-128.png" width="96" style="filter:hue-rotate(160deg)"><span class="cap">recolor it</span></div>
+    <div class="tile don" style="background:#FF5A5F"><img class="px" src="logo/mark/png/struck-m-light-128.png" width="96"><span class="cap" style="color:#fff">put it on coral</span></div>
+    <div class="tile don"><img class="px" src="logo/mark/png/struck-m-light-128.png" width="96" style="filter:drop-shadow(4px 4px 0 rgba(30,27,46,.4))"><span class="cap">add a shadow</span></div>
+    <div class="tile don"><span style="font-family:monospace;font-size:34px;letter-spacing:.1em">DON'T BE MICHAEL</span><span class="cap">set the name in pixel type</span></div>
   </div>
-  <h3>WEBSITE AND MARKETING (LOUD)</h3>
-  <div class="row">
-    <div class="sw" style="background:#FF6B6B"><b>coral</b><span>#FF6B6B</span><i>Stop, needs you, Michael</i></div>
-    <div class="sw" style="background:#6BCF7F"><b>mint</b><span>#6BCF7F</span><i>Done, good, go</i></div>
-    <div class="sw" style="background:#4ECDC4"><b>sky</b><span>#4ECDC4</span><i>Thinking, info</i></div>
-    <div class="sw" style="background:#FFD93D"><b>lemon</b><span>#FFD93D</span><i>Working, highlight</i></div>
-    <div class="sw" style="background:#B197FC"><b>lilac</b><span>#B197FC</span><i>Web, integrations</i></div>
-    <div class="sw" style="background:#FFA07A"><b>peach</b><span>#FFA07A</span><i>Warm highlight</i></div>
-  </div>
-  <h3>APP (CALM)</h3>
-  <div class="row">
-    <div class="sw" style="background:#D96A62"><b>coral</b><span>#D96A62</span></div>
-    <div class="sw" style="background:#5CA97A"><b>mint</b><span>#5CA97A</span></div>
-    <div class="sw" style="background:#4F9FAF"><b>sky</b><span>#4F9FAF</span></div>
-    <div class="sw" style="background:#DCAB3C"><b>lemon</b><span>#DCAB3C</span></div>
-    <div class="sw" style="background:#9482D3"><b>lilac</b><span>#9482D3</span></div>
-    <div class="sw" style="background:#D99168"><b>peach</b><span>#D99168</span></div>
-  </div>
-  <p style="margin-top:14px">Text on any colored fill is ink <code>#1A1320</code>. Never pure black or pure white. No gradients. Color files for design tools are in <code>colors/</code>.</p>
+  <p style="margin-top:16px">No pixel art anywhere else, no NBC or show logos, no title lettering, no cast photos or likenesses.
+  The team uses <i>The Office</i> character names, and that is all it uses.</p>
 </section>
 
 <section class="page">
-  <div class="eyebrow">05 · TYPE</div>
-  <h2>Pixel faces shout. Inter reads.</h2>
+  <div class="eyebrow">04 Color</div>
+  <h2>Calm by default. Coral only for you.</h2>
+  <p>Quiet lavender neutrals, one ink, and six meaning colors. If coral shows up, the owner has something to do.</p>
+  <h3>Neutrals</h3>
+  <div class="grid g4">
+    <div class="sw" style="background:#F7F7FB"><b>bg</b><span>#F7F7FB</span><i>Grounds</i></div>
+    <div class="sw" style="background:#E9E7F7"><b>floor</b><span>#E9E7F7</span><i>The studio floor</i></div>
+    <div class="sw" style="background:#FFFFFF"><b>card</b><span>#FFFFFF</span><i>Cards and panels</i></div>
+    <div class="sw" style="background:#1E1B2E;color:#fff;border-color:#1E1B2E"><b>ink</b><span>#1E1B2E</span><i>Text, primary buttons</i></div>
+  </div>
+  <h3>Meaning</h3>
+  <div class="grid g4">
+    <div class="sw" style="background:#FF5A5F;color:#1E1B2E;border-color:#FF5A5F"><b>coral</b><span>#FF5A5F</span><i>Needs you. Nothing else.</i></div>
+    <div class="sw" style="background:#1FB872;color:#1E1B2E;border-color:#1FB872"><b>green</b><span>#1FB872</span><i>Done, on, live</i></div>
+    <div class="sw" style="background:#4C6FFF;color:#fff;border-color:#4C6FFF"><b>blue</b><span>#4C6FFF</span><i>Working</i></div>
+    <div class="sw" style="background:#8B5CF6;color:#fff;border-color:#8B5CF6"><b>violet</b><span>#8B5CF6</span><i>Thinking, a question</i></div>
+    <div class="sw" style="background:#F2A93B;color:#1E1B2E;border-color:#F2A93B"><b>amber</b><span>#F2A93B</span><i>Sticky notes, proposals</i></div>
+    <div class="sw" style="background:#6C5CE7;color:#fff;border-color:#6C5CE7"><b>indigo</b><span>#6C5CE7</span><i>Michael, links, focus</i></div>
+  </div>
+  <h3>Departments</h3>
+  <p>Each team member's pod has a pastel family: front desk, support, sales, finance, marketing, people, IT, operations.</p>
+  <div class="grid g4">
+    <div class="sw" style="background:#F7C3D2"><b>front desk</b><span>#F7C3D2</span></div>
+    <div class="sw" style="background:#B4D5F8"><b>support</b><span>#B4D5F8</span></div>
+    <div class="sw" style="background:#F8DF95"><b>sales</b><span>#F8DF95</span></div>
+    <div class="sw" style="background:#AEE6CD"><b>finance</b><span>#AEE6CD</span></div>
+    <div class="sw" style="background:#F9C8AE"><b>marketing</b><span>#F9C8AE</span></div>
+    <div class="sw" style="background:#D6C5F4"><b>people</b><span>#D6C5F4</span></div>
+    <div class="sw" style="background:#BAC5E8"><b>IT</b><span>#BAC5E8</span></div>
+    <div class="sw" style="background:#A9E3E5"><b>operations</b><span>#A9E3E5</span></div>
+  </div>
+  <p style="margin-top:12px">Text colors, soft fills and dark mode values are in <code>colors/</code> and <code>DESIGN.md</code> section 3. They are measured for contrast; use them rather than the base colors for text.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">05 Type</div>
+  <h2>Sora for words. Plex Mono for numbers.</h2>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="tile" style="flex-direction:column;align-items:flex-start;justify-content:flex-start">
+      <div style="font-size:44px;font-weight:600;letter-spacing:-.035em;line-height:1.05">Sora</div>
+      <p style="margin-top:10px">All UI and display text, and the wordmark. 400 body, 500 labels, 600 names, titles and buttons.</p>
+      <div style="font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:8px">Refund for Northwind Cafe</div>
+      <div style="font-size:14px;color:var(--ink2)">Kelly can't issue refunds, and I can't approve money.</div>
+      <span class="cap">fonts/sora</span>
+    </div>
+    <div class="tile" style="flex-direction:column;align-items:flex-start;justify-content:flex-start">
+      <div style="font-family:'IBM Plex Mono';font-size:40px;font-weight:600;line-height:1.05">Plex Mono</div>
+      <p style="margin-top:10px">Numbers the owner scans: counts, times, money, ids, email addresses, schedule lines.</p>
+      <div style="font-family:'IBM Plex Mono';font-size:20px;font-weight:600;margin-top:8px">38 delegated · 3 to you</div>
+      <div style="font-family:'IBM Plex Mono';font-size:14px;color:var(--ink2)">support@harborpine.com · 10:42 AM</div>
+      <span class="cap">fonts/ibmplexmono</span>
+    </div>
+  </div>
+  <p style="margin-top:14px">The live terminal in the app uses JetBrains Mono. Pixel fonts are retired: nothing in the UI or on the site is set in pixel type.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">06 The studio</div>
+  <h2>An office you can watch.</h2>
+  <p>The studio is the app's home screen and the website's hero: an isometric office with one pod per department
+  and Michael's glass pod in the middle. Work arrives at the mailbox posts, goes to Michael, and travels to whoever's
+  job it is. It is a status display, not decoration.</p>
   <div class="grid g2" style="margin-top:12px">
-    <div>
-      <h3>WEBSITE AND MARKETING</h3>
-      <div style="font-family:VT323" class="spec">We reviewed Michael.</div>
-      <p class="mono">VT323 · headlines and ALL CAPS labels (tracking .06em)</p>
-      <div style="font-family:'Pixelify Sans';font-size:32px;line-height:1.15;margin-top:14px">The software is free.</div>
-      <p class="mono">Pixelify Sans 400 · section headings</p>
-      <div style="font-size:17px;margin-top:14px">A team of AI agents that runs your business, on your own machine.</div>
-      <p class="mono">Inter 400 · everything people read</p>
-    </div>
-    <div>
-      <h3>THE APP</h3>
-      <div style="font-family:'Press Start 2P';font-size:16px;line-height:1.6">Office Hours</div>
-      <p class="mono">Press Start 2P · small brand labels only, Title Case</p>
-      <div style="font-size:16px;margin-top:14px">Oscar is reconciling March. He needs your OK on two invoices.</div>
-      <p class="mono">Inter 400 to 700 · all UI text, 13 px minimum</p>
-      <div style="font-family:'JetBrains Mono';font-size:14px;margin-top:14px">&gt; reconcile --month 2026-03</div>
-      <p class="mono">JetBrains Mono · terminal and code</p>
-    </div>
+    <table>
+      <tr><th>You see</th><th>It means</th></tr>
+      <tr><td>A lit screen and a soft glow</td><td><span class="pill" style="color:var(--blueText);background:var(--blueSoft)">Working</span></td></tr>
+      <tr><td>Three dots over the monitor</td><td><span class="pill" style="color:var(--violetText);background:var(--violetSoft)">Thinking</span></td></tr>
+      <tr><td>A coral beacon</td><td><span class="pill" style="color:#fff;background:var(--coralStrong)">Needs you</span></td></tr>
+      <tr><td>A faded pod</td><td><span class="pill" style="color:var(--ink3);background:#F0EFF5">Idle</span></td></tr>
+      <tr><td>An envelope, a ?, a check</td><td>A request, a question, a finished job</td></tr>
+      <tr><td>A coral token leaving Michael</td><td>He is asking you, on the Needs you board</td></tr>
+    </table>
+    <img class="shot" src="reference/studio/onboarding-team.png" alt="Onboarding: the studio fills with a pod for each person picked">
   </div>
-  <p style="margin-top:16px">Pixel faces are never bold and never italic. All five families are free (SIL Open Font License) and included in <code>fonts/</code>.</p>
+  <p style="margin-top:12px">Every state also has words. Never color or motion alone.</p>
 </section>
 
 <section class="page">
-  <div class="eyebrow">06 · VOICE</div>
-  <h2>Short, human, a little dry.</h2>
-  <div class="grid g2" style="margin-top:10px">
-    <div>
-      <h3>ALWAYS</h3>
-      <ul>
-        <li>Name who is acting: "Oscar is reconciling March", never "the agent is processing".</li>
-        <li>Keep system messages under 12 words, in second person.</li>
-        <li>Aim the joke at Michael, never at the customer.</li>
-        <li>Stay honest: no price on a page without prices, no download button before a real release.</li>
-      </ul>
-    </div>
-    <div>
-      <h3>NEVER</h3>
-      <ul>
-        <li>Em dashes or en dashes. Use a period, comma, colon or parentheses.</li>
-        <li>Emoji in copy.</li>
-        <li>Exclamation marks, except for completions and notifications.</li>
-        <li>"Dont". Real apostrophes, always.</li>
-      </ul>
-    </div>
-  </div>
-  <table style="margin-top:14px">
-    <tr><th>DON'T WRITE</th><th>WRITE</th></tr>
+  <div class="eyebrow">07 Voice</div>
+  <h2>Short, plain, a little dry.</h2>
+  <ul>
+    <li>Name the actor: "Oscar is matching September payments", not "the agent is processing".</li>
+    <li>Owner words, not developer words. Fields first; explanations behind an info icon.</li>
+    <li>Michael speaks for himself on his cards: "I can't approve money."</li>
+    <li>Office humor only where nothing needs doing: idle quotes, empty states. The joke is on Michael, never the customer.</li>
+    <li class="dont">No em dashes, no en dashes, no hyphens used as dashes. No emoji in copy.</li>
+  </ul>
+  <table style="margin-top:10px">
+    <tr><th>Don't</th><th>Do</th></tr>
     <tr><td>An error has occurred</td><td>Oscar hit a snag</td></tr>
-    <tr><td>Permission denied</td><td>Oscar needs your permission</td></tr>
-    <tr><td>Loading...</td><td>One sec...</td></tr>
+    <tr><td>Task blocked on human input</td><td>Waiting for you</td></tr>
+    <tr><td>Permission denied</td><td>Oscar needs your OK</td></tr>
   </table>
 </section>
 
 <section class="page">
-  <div class="eyebrow">07 · APP ICON AND LINK PREVIEWS</div>
-  <h2>The same mark, everywhere.</h2>
-  <div class="grid g2" style="margin-top:14px;align-items:start">
-    <div class="tile" style="background:#E8E4DA"><img src="app-icon/icon-512.png" width="240" alt="App icon"><span class="cap">app-icon/icon-1024.png · .icns · .ico</span></div>
-    <div class="tile cream" style="padding:18px"><img src="social/og-card-1200x630.png" width="440" alt="Social card" style="image-rendering:auto"><span class="cap">social/og-card-1200x630.png</span></div>
+  <div class="eyebrow">08 The app icon</div>
+  <h2>The mark on a tile.</h2>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="tile"><img src="app-icon/icon-256.png" width="160"><span class="cap">macOS, 1024 master</span></div>
+    <div class="tile"><img class="px" src="web/favicon-32.png" width="64"><span class="cap">favicon</span></div>
+    <div class="tile"><img src="web/apple-touch-icon.png" width="120"><span class="cap">apple touch icon</span></div>
   </div>
-  <p style="margin-top:14px">App icon: the mark on a cream tile with rounded corners, which macOS expects. That tile is the only place in the brand with rounded corners. Everything else is square.</p>
+  <p style="margin-top:14px">A <code>#FFFDF5</code> tile, a faint ink line, the mark at half size. Favicons use the same ground.</p>
 </section>
 
 <section class="page">
-  <div class="eyebrow">08 · WHAT'S IN THIS FOLDER</div>
-  <h2>Grab what you need.</h2>
-  <table class="files">
-    <tr><th>FOLDER</th><th>WHAT</th><th>USE IT FOR</th></tr>
-    <tr><td>logo/mark/</td><td>The Struck M in SVG, and PNG from 16 to 1024 px. Light, dark, on cream, on ink.</td><td>Avatars, stickers, small spaces</td></tr>
-    <tr><td>logo/lockup/</td><td>Mark plus name, horizontal and stacked, light and dark. Text is outlined, so no font is needed.</td><td>Headers, slides, documents</td></tr>
-    <tr><td>app-icon/</td><td>App icon: SVG, PNG 128 to 1024, macOS .icns, Windows .ico</td><td>Stores, installers, press</td></tr>
-    <tr><td>web/</td><td>Favicons and the Apple touch icon</td><td>Websites</td></tr>
-    <tr><td>social/</td><td>1200 × 630 link preview card</td><td>Link sharing, social posts</td></tr>
-    <tr><td>colors/</td><td>CSS, JSON, Adobe swatches (.ase), palette image</td><td>Design tools and code</td></tr>
-    <tr><td>fonts/</td><td>VT323, Pixelify Sans, Press Start 2P, Inter, JetBrains Mono, each with its license</td><td>Installing the brand type</td></tr>
-    <tr><td>DESIGN.md</td><td>The full design system: every token, component and rule</td><td>Building product</td></tr>
-    <tr><td>source/build.py</td><td>Regenerates every asset above</td><td>Changing the brand</td></tr>
+  <div class="eyebrow">09 What's in this folder</div>
+  <h2>Everything, generated from one script.</h2>
+  <table>
+    <tr><th>Folder</th><th>For</th></tr>
+    <tr><td><code>logo/</code></td><td>The mark and the lockups, SVG and PNG, light and dark</td></tr>
+    <tr><td><code>app-icon/</code>, <code>web/</code></td><td>App icon and favicons</td></tr>
+    <tr><td><code>colors/</code></td><td><code>colors.css</code>, <code>colors.json</code>, Adobe swatches, a palette sheet</td></tr>
+    <tr><td><code>fonts/</code></td><td>Sora, IBM Plex Mono, JetBrains Mono, each with its OFL license</td></tr>
+    <tr><td><code>reference/studio/</code></td><td>The approved screens of the app</td></tr>
+    <tr><td><code>social/</code></td><td>The 1200 × 630 link preview</td></tr>
+    <tr><td><code>DESIGN.md</code></td><td>The full design system: every token, component and rule</td></tr>
+    <tr><td><code>source/build.py</code></td><td>Regenerates every asset above</td></tr>
   </table>
-  <p style="margin-top:16px">Questions or requests: <b>hello@dontbemichael.com</b></p>
+  <p>Questions or requests: <b>hello@dontbemichael.com</b></p>
 </section>
 
 </body>
