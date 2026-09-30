@@ -55,3 +55,15 @@ test('whitespace-only steers are ignored and never fill the queue', () => {
   assert.equal(control.snapshot('dev9').pendingSteers, 1);
   assert.equal(control.takeSteer('dev9'), 'real guidance');
 });
+
+test('removeSteer drops only the matching note', () => {
+  // Value: protects=closing time can withdraw its own note without losing the owner's; fails_when=removeSteer clears other notes or misses a trimmed match; why_new=ship run 3 Step 11 adversarial F1; seam=none
+  const control = new ControlRegistry();
+  control.steer('a', 'keep me');
+  control.steer('a', '  drop me  ');
+  control.steer('a', 'drop me');
+  control.removeSteer('a', 'drop me');
+  control.removeSteer('nobody', 'drop me');
+  assert.equal(control.takeSteer('a'), 'keep me');
+  assert.equal(control.takeSteer('a'), undefined);
+});

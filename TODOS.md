@@ -109,6 +109,228 @@
 **Effort:** XS
 **Priority:** P3
 
+## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
+
+### Retry the secrets rename on Windows
+
+**What:** Retry `renameSync` a few times with a short backoff on EPERM/EBUSY/EACCES in `src/main/atomicFile.ts`.
+
+**Why:** On Windows, antivirus or backup tools holding the file open make the rename fail; the save then fails (safely) and the owner sees an error.
+
+**Effort:** S
+**Priority:** P3
+
+### Sweep leftover secrets temp files
+
+**What:** On first secret-store access, remove `integration-secrets.json.*.tmp` older than a minute.
+
+**Why:** A crash inside the write window leaves a 0600 ciphertext temp file that nothing reads.
+
+**Effort:** S
+**Priority:** P4
+
+### Say when deleting a secret did nothing
+
+**What:** `deleteSecret` stays lenient on an unreadable file (right for callers without error handling), but callers report success while the old ciphertext stays.
+
+**Why:** A removed mailbox or key can look deleted while its encrypted secret remains in the file.
+
+**Effort:** S
+**Priority:** P3
+
+## QuickBooks through the Claude account (deferred from ship of feat/qbo-claude-channel, 2026-09-30)
+
+### Stop a nested Claude from reaching the account's connectors
+
+**What:** Keep agents from starting their own `claude` (for example `claude -p`) outside the app's hooks, or turn off the Claude account's connectors for such runs.
+
+**Why:** The QuickBooks switch and Capabilities are enforced by the app's PreToolUse hook, which reaches an agent only through `--settings` (`src/main/hive.ts`). A nested Claude started from Bash has no hook but inherits the account's QuickBooks (and email), so the switch off is not a hard guarantee. Stated in CHANGELOG 0.0.11.
+
+**Effort:** M
+**Priority:** P1
+
+### Recognise the connector behind an opaque server name
+
+**What:** When the connector's server has a UUID-like name, 16 of its tools (including `money_onboarding_application_submit`) are not recognised as QuickBooks and are not gated.
+
+**Why:** Claude Code names claude.ai connectors `claude_ai_Intuit_QuickBooks`, which matches; a differently named server would not. Match on the connector URL from `claude mcp list` or on the full tool catalog.
+
+**Effort:** S
+**Priority:** P2
+
+### Subagents keep their parent's QuickBooks access
+
+**What:** Tag hook payloads with the harness agent id so a subagent's own `agent_id` does not replace it.
+
+**Why:** If Claude Code sends a subagent id, the hook finds no capability and refuses Oscar's delegated QuickBooks reads (fails closed).
+
+**Effort:** S
+**Priority:** P3
+
+### Base the QuickBooks default on the role, not the agent id
+
+**What:** Give hired agents with a books role the on + Read only default.
+
+**Why:** Only an agent whose id is literally `oscar` gets it (`booksReadRoleIds` in `src/main/index.ts`); a bookkeeper hired later starts off.
+
+**Effort:** S
+**Priority:** P3
+
+### Say "couldn't reach QuickBooks" when the connector failed
+
+**What:** Show a separate message for `✘ Failed to connect` instead of "needs you to sign in again".
+
+**Why:** A network or server failure tells the owner to sign in.
+
+**Effort:** S
+**Priority:** P3
+
+### Status check on Windows with the npm Claude shim
+
+**What:** Run `claude.cmd` through the Windows shim handling the pty module uses.
+
+**Why:** `execFile` refuses `.cmd` files, so the status is always "Couldn't check" on Windows npm installs. Windows builds are not shipped yet.
+
+**Effort:** S
+**Priority:** P3
+
+### Status check side effects
+
+**What:** Stop child MCP servers `claude mcp list` starts when the 30 s timeout kills it; avoid overlapping runs.
+
+**Why:** The check starts every configured MCP server; a timeout can leave them running.
+
+**Effort:** S
+**Priority:** P3
+
+### Show a locally added QuickBooks server in the status
+
+**What:** Read non-`claude.ai` QuickBooks servers from `claude mcp list` too.
+
+**Why:** A QuickBooks server added with `claude mcp add` is gated but Settings says it is not connected.
+
+**Effort:** S
+**Priority:** P3
+
+### Validate the agent id when saving QuickBooks access
+
+**What:** Refuse ids that are not on the roster in `quickbooks:setAccess`.
+
+**Why:** Any string is written into `agentCapabilities` and would apply to a future agent with that id.
+
+**Effort:** S
+**Priority:** P4
+
+## Closing time (deferred from ship of feat/closing-time-progress, 2026-09-29)
+
+### Feed each row's latest line from the agent's transcript
+
+**What:** Show the last thing each agent said under its row, read from its Claude transcript.
+
+**Why:** The row's "latest line" was removed before release because `recentAssistantText` is only set by `src/renderer/src/mocks/mockEvents.ts`; real agents never fill it. The owner asked for it to tell a long process from a stuck one.
+
+**Effort:** M
+**Priority:** P2
+
+### Rows in a second window
+
+**What:** Give the closing-time rows names and detail in every window, not only the one that saw the hook events.
+
+**Why:** Detail lives in the renderer store of the window that received `hive:hookEvent`; another window shows names but no detail.
+
+**Effort:** S
+**Priority:** P3
+
+### An agent respawned mid-close
+
+**What:** Decide what happens to a row when an agent's terminal restarts while closing time runs.
+
+**Why:** A respawned worker becomes live again and is waited on, but its row and Michael's "terminal ended" note may already be gone.
+
+**Effort:** S
+**Priority:** P3
+
+### Row still names a finished tool
+
+**What:** After PostToolUse the row falls back to the action caption ("using Bash") and keeps counting minutes.
+
+**Why:** The owner can read a finished step as still running.
+
+**Effort:** S
+**Priority:** P3
+
+### A refused tool call still shows its detail
+
+**What:** PreToolUse that the hook denies (paused or gated) still sends `detail`.
+
+**Why:** The row names a step that never ran.
+
+**Effort:** S
+**Priority:** P3
+
+### Parallel tool calls clear each other's detail
+
+**What:** Track detail per tool call so one call's PostToolUse does not clear another's.
+
+**Why:** With parallel calls, the row goes blank while a call is still running.
+
+**Effort:** S
+**Priority:** P3
+
+### Visible focus when the list takes focus
+
+**What:** The row list's focus fallback (`tabIndex={-1}`, no outline) is invisible, including after Michael's Remind.
+
+**Why:** Keyboard users lose their place after an action.
+
+**Effort:** S
+**Priority:** P3
+
+### Tests for the focus fallback and a post-tool row
+
+**What:** Add tests for the listRef focus fallback and a describeRow case after PostToolUse; fix the stale `actionAt` docstring.
+
+**Why:** Both paths are untested.
+
+**Effort:** S
+**Priority:** P3
+
+### Replace the source-regex dialog tests with pure helpers
+
+**What:** Move the checks in `test/closing-time-dialog.test.cjs` that grep component source into tested helpers.
+
+**Why:** They break on harmless edits (comments, added props) and passed review cycles several times only after loosening.
+
+**Effort:** M
+**Priority:** P3
+
+### Archiving a live agent during closing time
+
+**What:** Archiving through voice or `hive:setArchived` drops the agent from the wait list but does not call `closingTime.refresh` or tell Michael.
+
+**Why:** Michael can keep waiting for an ACK that never comes until the 6-minute timeout.
+
+**Effort:** S
+**Priority:** P3
+
+### Mark the detail line as the agent's own words
+
+**What:** The detail is agent-written text shown where the owner decides to close without someone.
+
+**Why:** An agent can write "safe to close without me"; the owner's choice is steered by untrusted text.
+
+**Effort:** S
+**Priority:** P3
+
+### Limit combining marks in the detail line
+
+**What:** Collapse long runs of combining marks, or clip the line's overflow.
+
+**Why:** A line of stacked marks can draw over the neighbouring rows' buttons (visual only).
+
+**Effort:** S
+**Priority:** P3
+
 ## Schedules
 
 ### Starter jobs in an agent's empty Schedules tab

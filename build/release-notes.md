@@ -1,3 +1,3 @@
-- **A cleaner repo:** the old project's website, blog posts and promo media are gone.
-- **Docs match the app:** release drops, the message queue and company knowledge.
-- **No changes to the app itself** since 0.0.8.
+- **Closing time shows who is still working,** with Remind and Close without them.
+- **QuickBooks through your Claude account:** one switch in Settings, Read only by default.
+- **Saved passwords and keys survive a crash mid-save.**

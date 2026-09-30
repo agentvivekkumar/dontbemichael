@@ -88,6 +88,13 @@ export class ControlRegistry {
     }
     q.push(t.slice(0, 10000)); // hook additionalContext cap
   }
+  /** Drop the queued copies of one note, leaving the agent's other notes. */
+  removeSteer(id: string, text: string): void {
+    const q = this.map.get(id)?.steerQueue;
+    if (!q) return;
+    const t = text.trim().slice(0, 10000);
+    for (let i = q.length - 1; i >= 0; i--) if (q[i] === t) q.splice(i, 1);
+  }
   /** Request a graceful stop at the next hook boundary. */
   halt(id: string): void { this.ensure(id).halted = true; }
   /** Drop all queued-but-undelivered steer notes (e.g. closing time cancelled

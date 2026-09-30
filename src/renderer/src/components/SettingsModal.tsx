@@ -1,4 +1,5 @@
 import { MailboxesSettings } from './MailboxesSettings';
+import { QuickBooksSettings } from './QuickBooksSettings';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { agentModels, type HarnessConfig } from '@/store/config';
@@ -1635,6 +1636,12 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       {/* Mailboxes first: every connected mailbox, then the
                           Your Claude account switch (docs/designs/multi-mailbox.md). */}
                       <MailboxesSettings />
+
+                      <div style={sectionRule} />
+
+                      {/* QuickBooks through the Claude account: the one switch;
+                          who may use it is on each Capabilities tab. */}
+                      <QuickBooksSettings />
 
                       <div style={sectionRule} />
 

@@ -65,6 +65,14 @@ export interface Agent {
   recentAssistantText?: string;
   /** epoch ms — used to drive the typewriter so identical strings still re-stream */
   recentTextTs?: number;
+  /** What the current tool call is doing, in one safe line (the hook's
+   *  `detail`: Claude's description of a command, a file name). Set and
+   *  cleared by hook events only; the closing-time rows show it. */
+  actionDetail?: string;
+  /** When the current tool call (or idle spell) started, epoch ms. Hook
+   *  events only: the terminal parser rewrites `action` constantly and must
+   *  not restart the clock. */
+  actionAt?: number;
   /** populated when status === 'blocked' */
   blockReason?: BlockReason;
   /** present iff this agent has a real PTY in the main process */
@@ -417,7 +425,7 @@ export function actionText(action: string, t: (key: string) => string): string {
   return action;
 }
 
-type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt'>;
+type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt' | 'actionDetail' | 'actionAt'>;
 
 // ─── The roster mirror ──────────────────────────────────────────────────────
 //
@@ -507,8 +515,8 @@ try {
 } catch { /* not a browser context (unit tests) */ }
 
 function slimAgents(agents: Agent[]): PersistedAgent[] {
-  return agents.map(({ recentAssistantText, recentTextTs, blockReason, contextTokens, contextLimit, seedPrompt, ...rest }) => {
-    void recentAssistantText; void recentTextTs; void blockReason; void contextTokens; void contextLimit; void seedPrompt;
+  return agents.map(({ recentAssistantText, recentTextTs, blockReason, contextTokens, contextLimit, seedPrompt, actionDetail, actionAt, ...rest }) => {
+    void recentAssistantText; void recentTextTs; void blockReason; void contextTokens; void contextLimit; void seedPrompt; void actionDetail; void actionAt;
     return rest;
   });
 }
@@ -531,7 +539,7 @@ function persistAgents(agents: Agent[], selectedId: string | null): void {
 const VOLATILE_AGENT_FIELDS = new Set<keyof Agent>([
   'status', 'action', 'progress', 'currentStation', 'carrying',
   'recentAssistantText', 'recentTextTs', 'blockReason',
-  'contextTokens', 'contextLimit', 'lastPrompt'
+  'contextTokens', 'contextLimit', 'lastPrompt', 'actionDetail', 'actionAt'
 ]);
 
 function touchesDurableAgentField(patch: Partial<Agent>): boolean {
@@ -607,8 +615,8 @@ function persistRestorable(restorable: Agent[]): void {
   // Keeps contextTokens/contextLimit, unlike the other two: a restorable entry
   // is a spawn recipe for a session that has not been re-entered yet, so its
   // last known context size is still meaningful.
-  const slim: PersistedAgent[] = restorable.map(({ recentAssistantText, recentTextTs, blockReason, seedPrompt, ...rest }) => {
-    void recentAssistantText; void recentTextTs; void blockReason; void seedPrompt;
+  const slim: PersistedAgent[] = restorable.map(({ recentAssistantText, recentTextTs, blockReason, seedPrompt, actionDetail, actionAt, ...rest }) => {
+    void recentAssistantText; void recentTextTs; void blockReason; void seedPrompt; void actionDetail; void actionAt;
     return rest;
   });
   try {

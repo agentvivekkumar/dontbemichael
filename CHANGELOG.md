@@ -6,6 +6,63 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.0.12] (2026-09-30)
+
+### Fixed
+
+- **Saved passwords and keys can't be lost to a crash mid-save.** Every mailbox password, engine
+  key and integration secret lives in one file. It is now written to a temporary file, flushed to
+  disk and swapped in whole, so a crash, power cut or full disk leaves the old file or the new one,
+  never a torn one. A write that stops short is never swapped in.
+- **A file that can't be read is never saved over.** If the saved secrets file is there but can't
+  be read at that moment, saving a new secret now fails with a message instead of writing a file
+  that holds only the new secret and loses all the others.
+- The secrets file is always owner-only (0600), even if an older copy was readable by others.
+
+## [0.0.11] (2026-09-30)
+
+### Added
+
+- **QuickBooks through your Claude account, with you in control.** The app does not connect to
+  Intuit itself: team members use the QuickBooks connected to your Claude account.
+- **One switch in Settings > Connections > QuickBooks, off by default.** Off, no team member can use
+  QuickBooks and it doesn't show on anyone's Capabilities. On, the app checks whether your Claude
+  account has QuickBooks connected and, if not, shows the steps to connect it in Claude.
+- **Who may use it, on each Capabilities tab:** Can use QuickBooks, then Read only or Can make
+  changes. Before you choose, Oscar is on and Read only; everyone else is off. A change applies on
+  the team member's next step, with no restart.
+- **Read only means a fixed list of reads.** Reports, invoices, customers and payroll details to look
+  at. Anything else, including any tool Intuit adds later, shopping for loans and peer loan offers,
+  is refused until it is known to be safe.
+
+### Known limitation
+
+- The switch and Capabilities are checked on every QuickBooks call a team member makes. A team member
+  that starts its own separate Claude from its terminal is outside that check and can reach your
+  Claude account's QuickBooks. The same is true today for email through your Claude account. A fix
+  is planned (TODOS.md, P1).
+
+## [0.0.10] (2026-09-29)
+
+### Added
+
+- **Closing time shows who is still working.** The quit dialog lists every team member and
+  Michael: confirmed, still working, waiting at a prompt, or nothing to do. It also shows what
+  each one is doing and for how long, for example "Run the test suite · 7 min". The line is the
+  agent's own description of the step, a file name or a site's host, never the command itself. It
+  is redacted, cut to one 80-character line, and never saved to disk.
+- **Remind.** Sends one agent, or Michael, the closing steps again: a note in their inbox and a
+  nudge at their next step. At most once every 30 seconds per agent.
+- **Close without them.** Stops waiting for one team member and tells Michael so the office can
+  close. Nothing is stopped: the agent keeps its work and its terminal ends with the others when
+  the app quits.
+- A row goes when that agent's terminal ends, and Michael is told so he stops waiting for it.
+
+### Changed
+
+- Closing time can be started again while it is running, and refuses once the app is already
+  closing or when Michael's terminal has ended.
+
 ## [0.0.9] (2026-09-28)
 
 No changes to the app itself.

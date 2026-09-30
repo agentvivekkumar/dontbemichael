@@ -112,6 +112,9 @@ export interface HarnessConfig {
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
+  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
+   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  quickbooksClaude?: boolean;
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];

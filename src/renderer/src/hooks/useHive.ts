@@ -597,26 +597,29 @@ export function useHive(config: HarnessConfig | null): void {
       // pty-stream parser only refines the on-floor action/station).
       if (e.event === 'PreCompact') {
         // #5C — agent entered /compact; show it's boxing up context, not frozen.
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'compacting', action: 'compacting context', carrying: undefined });
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'compacting', action: 'compacting context', carrying: undefined, actionDetail: undefined, actionAt: Date.now() });
       } else if (e.event === 'PostCompact') {
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', action: 'resumed', carrying: undefined });
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', action: 'resumed', carrying: undefined, actionDetail: undefined, actionAt: Date.now() });
       } else if (e.event === 'PreToolUse' && e.tool) {
         const m = stationForTool(e.tool);
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', currentStation: m.station, carrying: m.carry, action: `using ${e.tool}` });
+        // Each tool call restarts the clock the closing-time rows show.
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', currentStation: m.station, carrying: m.carry, action: `using ${e.tool}`, actionDetail: e.detail, actionAt: Date.now() });
         useStore.getState().bumpToolCount(e.agentId); // usage proxy for the command center
       } else if (e.event === 'PostToolUse' || e.event === 'UserPromptSubmit') {
         // A turn is in progress (prompt submitted / tool just finished) — keep
-        // it working so it doesn't flicker idle between tool calls.
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'working' });
+        // it working so it doesn't flicker idle between tool calls. The
+        // finished tool's detail goes, so the closing-time row never shows a
+        // tool that already ended as still running (owner, 2026-09-29).
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', actionDetail: undefined, actionAt: Date.now() });
       } else if (e.event === 'PreInvocation') {
         // Antigravity (agy): the model is being called — it's thinking/working.
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', action: 'thinking' });
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'working', action: 'thinking', actionDetail: undefined, actionAt: Date.now() });
       } else if (e.event === 'PostInvocation') {
         // agy's per-turn boundary. Unlike Claude, agy's Stop fires only on process
         // EXIT, so without this an agy worker would never register as idle and the
         // inbox-wake nudge (idle-only) could never reach it — its mail would sit
         // undrained. Treat it as idle; a follow-up tool/turn re-sets working.
-        if (!breakerArmed) updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined });
+        if (!breakerArmed) updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined, actionDetail: undefined, actionAt: Date.now() });
       } else if (e.event === 'Stop' || e.event === 'SubagentStop') {
         // A blocked Stop means the agent is being re-engaged to process its
         // inbox — it's NOT idle, so keep it working until it genuinely stops.
@@ -625,7 +628,7 @@ export function useHive(config: HarnessConfig | null): void {
         } else {
           // A genuine stop clears any breaker override — the run is over.
           breakerLevel.current[e.agentId] = 'healthy';
-          updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined });
+          updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined, actionDetail: undefined, actionAt: Date.now() });
         }
       } else if (e.event === 'Notification' && !breakerArmed) {
         // Claude Code fires Notification for two very different situations:
@@ -647,10 +650,10 @@ export function useHive(config: HarnessConfig | null): void {
         if (needsHuman && !idleWaiting) {
           // Only the god agent escalates to the human; sub-agents are autonomous
           // and read as "waiting" (parked on god, not on you).
-          updateAgent(e.agentId, self.isGod ? { status: 'blocked' } : { status: 'waiting', action: ACTION_AT_PROMPT });
+          updateAgent(e.agentId, self.isGod ? { status: 'blocked' } : { status: 'waiting', action: ACTION_AT_PROMPT, actionDetail: undefined, actionAt: Date.now() });
         } else {
           // Idle notification — responded, nothing to do. Linger, don't flag.
-          updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined });
+          updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined, actionDetail: undefined, actionAt: Date.now() });
         }
       }
     });

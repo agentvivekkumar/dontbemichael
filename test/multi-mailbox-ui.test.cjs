@@ -51,7 +51,9 @@ test('Draft only is chosen the first time email is turned on (6A); Sending is a 
   assert.match(cap, /mailboxes\.length === 0 \? \(/, 'no mailbox set up: the Settings link instead');
   assert.match(cap, /<button type="button" onClick=\{openSettings\} style=\{\{ \.\.\.link, marginInlineStart: 'auto' \}\}>\{t\('capabilities\.addMailbox'\)\}<\/button>/, 'add new mailbox beside the list');
   // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
-  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'one switch');
+  // QuickBooks has its own switch in its own header (owner, 2026-09-29).
+  assert.equal((cap.match(/<Toggle /g) || []).length, 2, 'one switch per section');
+  assert.match(cap, /action=\{<Toggle on=\{books\.enabled\}/);
   assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);
   assert.doesNotMatch(cap, /PROVIDER_PRESETS/, 'no service name under the address');
   assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /\{action !== undefined && <div/, 'the switch sits beside the fold button, not inside it');
@@ -104,9 +106,9 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
 test('schedules live in Capabilities: Email and On a schedule fold separately, closed by default (owner, 2026-09-26)', () => {
   const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
   assert.ok(cap.indexOf("title={t('capabilities.email')}") < cap.indexOf("title={t('capabilities.schedules')}"), 'Email first, then schedules');
-  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|schedules)', open\)\}/g) || []).length, 2, 'both sections fold');
+  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|books|schedules)', open\)\}/g) || []).length, 3, 'every section folds');
   assert.match(cap, /<AgentSchedules agentId=\{agent\.id\} agentName=\{name\} \/>/);
-  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, schedules: true \}\)/, 'both start closed');
+  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, books: true, schedules: true \}\)/, 'all start closed');
   assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /aria-expanded=\{open\}/);
   assert.doesNotMatch(read('src/renderer/src/components/SidebarTabs.tsx'), /key: 'schedules'/);
   assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);

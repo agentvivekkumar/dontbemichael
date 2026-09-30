@@ -293,6 +293,9 @@ export interface HarnessConfig {
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
+  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
+   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  quickbooksClaude?: boolean;
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
@@ -498,9 +501,21 @@ export interface PowerResumeEvent {
 /** Closing-time progress event (mirrors src/main/closingTime.ts). */
 export interface ClosingTimeEvent {
   phase: 'started' | 'progress' | 'complete' | 'timeout' | 'cancelled';
-  /** Workers that have ACKed so far / total workers being waited on. */
+  /** Workers that have ACKed so far / every worker closing time started
+   *  with, including any later closed without or whose terminal ended (see
+   *  `waiting` for who is still waited on). */
   acked: number;
   total: number;
+  /** Team members who confirmed. */
+  confirmed: string[];
+  /** Team members still being waited on. */
+  waiting: string[];
+  /** Team members the owner chose to close without. */
+  excused: string[];
+  /** Michael's id, for his own row. */
+  godId: string;
+  /** False once Michael's terminal has ended. */
+  godLive: boolean;
   /** The app reopens itself after closing. */
   relaunch: boolean;
 }
@@ -858,6 +873,13 @@ const api = {
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
+  /** Whether the owner's Claude account has QuickBooks: 'connected' | 'needs-sign-in' | 'not-added' | 'unknown'. Takes a few seconds. */
+  quickbooksClaudeStatus: (): Promise<'connected' | 'needs-sign-in' | 'not-added' | 'unknown'> => ipcRenderer.invoke('quickbooks:claudeStatus'),
+  /** Agents that may use QuickBooks, Read only, before the owner chooses (Oscar). */
+  quickbooksRoleDefaults: (): Promise<string[]> => ipcRenderer.invoke('quickbooks:roleDefaults'),
+  /** Save one agent's QuickBooks capability (through the owner's Claude account). */
+  quickbooksSetAccess: (agentId: string, cap: { enabled: boolean; changes: boolean }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('quickbooks:setAccess', agentId, cap),
   /** Received and sent messages for an agent's Messages tab, newest first, redacted. */
   hiveHistory: (id: string): Promise<Array<VoiceMessage & { dir: 'in' | 'out' }>> => ipcRenderer.invoke('hive:history', id),
   /** Voice read-layer: recent message CONTENT (inbox/outbox bodies), REDACTED in
@@ -1085,8 +1107,15 @@ const api = {
     ipcRenderer.invoke('app:startClosingTime', opts),
   /** Abort an in-progress closing time and tell the floor to resume work. */
   cancelClosingTime: (): Promise<void> => ipcRenderer.invoke('app:cancelClosingTime'),
-  /** Progress events for the quit dialog: started → progress (ACK counts) →
-   *  complete (the app tears down moments later) | timeout | cancelled. */
+  /** Re-send the closing-time note to one agent (Michael included). */
+  closingTimeRemind: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeRemind', id),
+  /** Close without one team member: stop waiting on it; it is back tomorrow. */
+  closingTimeExcuse: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeExcuse', id),
+  /** Progress events for the quit dialog: started → progress → complete (the
+   *  app tears down moments later) | timeout | cancelled. Each carries the ACK
+   *  counts and the rows: who confirmed, who is still waited on, who the owner
+   *  closed without, and Michael's id. Progress also fires on Close without
+   *  them and when a waited-on terminal ends. */
   onClosingTime: (cb: (ev: ClosingTimeEvent) => void): (() => void) => {
     const listener = (_e: IpcRendererEvent, ev: ClosingTimeEvent) => cb(ev);
     ipcRenderer.on('app:closingTime', listener);

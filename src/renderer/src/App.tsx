@@ -177,9 +177,11 @@ export function App() {
   // dialog stays up through the whole protocol; on 'complete' the main process
   // tears down and quits by itself moments later.
   useEffect(() => window.cth.onClosingTime?.((ev) => {
-    if (ev.phase === 'cancelled') { setClosing(null); return; }
-    setClosing({ phase: ev.phase, acked: ev.acked, total: ev.total, relaunch: ev.relaunch });
-    if (ev.phase === 'started' || ev.phase === 'progress') setQuitWarn((w) => w ?? { ptyCount: 0 });
+    const { phase, ...rows } = ev;
+    if (phase === 'cancelled') { setClosing(null); return; }
+    // Every field main sends reaches the dialog; none is copied by hand.
+    setClosing({ phase, ...rows });
+    if (phase === 'started' || phase === 'progress') setQuitWarn((w) => w ?? { ptyCount: 0 });
   }), []);
 
   const startClosingTime = async (opts?: { relaunch?: boolean }) => {
