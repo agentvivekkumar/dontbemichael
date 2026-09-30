@@ -1312,7 +1312,14 @@
     "legendAgreeDone": "同意/完成",
     "legendRefuse": "拒绝",
     "legendInformTopic": "告知/主题",
-    "noMessages": "团队之间还没有消息。所有人都显示在下方。"
+    "noMessages": "团队之间还没有消息。所有人都显示在下方。",
+    "lastN": "最近 {{count}} 条消息",
+    "pair": "{{a}} 和 {{b}}",
+    "messagesCount": "{{count}} 条消息",
+    "last": "最近：{{subject}}",
+    "legendPerson": "成员",
+    "legendTopic": "主题",
+    "legendMessages": "消息"
   },
   "integrations": {
     "errLabel": "请给它一个名称。",
@@ -1380,7 +1387,7 @@
   },
   "kanban": {
     "count": "{{count}} 项任务",
-    "newWorkHint": "有新工作？派发给 {{godName}}（监控标签页）",
+    "newWorkHint": "新工作交由 {{godName}} 分派",
     "colTodo": "待办",
     "colDoing": "进行中",
     "colBlocked": "已阻塞",
@@ -1392,12 +1399,23 @@
     "taskTitle": "任务",
     "unassigned": "未分配",
     "noDescription": "（此卡片没有描述）",
-    "humanQA": "人工问答",
-    "awaitingAnswer": "等待你的回答：「问我」标签页",
+    "humanQA": "问题",
+    "awaitingAnswer": "等你回答",
     "dependsOn": "依赖",
-    "assign": "分配",
+    "assign": "分派",
     "priority": "优先级 {{level}}/5",
-    "askReplaced": "已被更新的问题取代。"
+    "askReplaced": "已被更新的问题取代。",
+    "empty": "暂无",
+    "showFewer": "收起",
+    "more": "还有 {{count}} 个",
+    "status": "状态",
+    "assignee": "负责人",
+    "priorityLabel": "优先级",
+    "created": "创建时间",
+    "description": "描述",
+    "question": "问题",
+    "answer": "回答",
+    "assignHint": "交给 {{godName}} 分派"
   },
   "queueComposer": {
     "recording": "● 录音中，点击停止转写",
@@ -1532,7 +1550,8 @@
     "tasksIntroTitle": "团队的待办清单。",
     "tasksIntro": "团队的每项工作按阶段排列：待办、进行中、已阻塞、已完成。每张卡片显示负责人；带 ? 的卡片在等你处理（请在“问我”标签页回答）。点击卡片查看详情。",
     "graphIntroTitle": "谁在和谁交流。",
-    "graphIntro": "每个方框是一位团队成员，每条线是他们之间的消息，按类型着色：提问、回答、同意等。打开“主题”可查看每个人记住了什么。点击某人即可在 {{godName}} 的面板上查看其记忆。"
+    "graphIntro": "每个方框是一位团队成员，每条线是他们之间的消息，按类型着色：提问、回答、同意等。打开“主题”可查看每个人记住了什么。点击某人即可在 {{godName}} 的面板上查看其记忆。",
+    "graphIntroShort": "每个圆圈是一位成员，每条线是他们之间的消息。点击成员可打开其记忆；拖动可固定位置。"
   },
   "companyProfile": {
     "intro": "关于您公司的关键信息。每位成员，包括 {{godName}}，都会以此为依据工作。只填简短的答案，较长的内容请放进“记忆与知识”。",

@@ -5,7 +5,6 @@ import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
 import { DEFAULT_ORG_TRIGGER } from '@shared/triggers';
 import { StudioStage } from '@/scene/studio/StudioStage';
-import { FloorViewIntro } from '@/components/FloorViewToggle';
 import { TasksKanban } from '@/components/TasksKanban';
 import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
 import { useHive } from '@/hooks/useHive';
@@ -341,7 +340,6 @@ export function App() {
               paddingBottom: 96,
               background: 'var(--cth-bg)'
             }}>
-              <FloorViewIntro view={floorView} />
               {floorView === 'tasks' && <TasksKanban />}
               {floorView === 'graph' && (
                 <MemoryGraphPanel godId={godId} onJumpToMemory={(id) => useStore.getState().openAgentMemory(id)} />

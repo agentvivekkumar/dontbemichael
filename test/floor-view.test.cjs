@@ -94,15 +94,13 @@ test('clicking an agent in the graph opens its memory on Michael\'s panel', () =
   assert.doesNotMatch(cc, /MemoryGraphPanel|key: 'graph'/);
 });
 
-test('TASKS and GRAPH open with a plain line on what they are', () => {
-  const app = read('src/renderer/src/App.tsx');
-  const board = app.indexOf("{floorView !== 'office' && (");
-  assert.match(app.slice(board, board + 900), /<FloorViewIntro view=\{floorView\} \/>\s*\{floorView === 'tasks' && <TasksKanban \/>\}/);
+// Design v2: the explanation sits behind an info icon in each view's header
+// (fields first, DESIGN.md 2.6), not in a line above it.
+test('TASKS and GRAPH explain themselves behind an info icon', () => {
+  assert.match(read('src/renderer/src/components/TasksKanban.tsx'), /<InfoTip text=\{t\('floorView\.tasksIntro'\)\} \/>/);
+  assert.match(read('src/renderer/src/components/MemoryGraphPanel.tsx'), /<InfoTip text=\{t\('floorView\.graphIntroShort'\)\} \/>/);
   for (const l of ['en', 'zh-CN', 'ar']) {
     const j = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`));
-    for (const k of ['tasksIntroTitle', 'tasksIntro', 'graphIntroTitle', 'graphIntro']) assert.ok(j.floorView[k], `${l} ${k}`);
-    // The intro names the board's own columns, so they must match.
-    const cols = [j.kanban.colBlocked, j.kanban.colDone].map((c) => c.toLowerCase());
-    for (const c of cols) assert.ok(j.floorView.tasksIntro.toLowerCase().includes(c), `${l} intro names "${c}"`);
+    for (const k of ['tasksIntro', 'graphIntroShort']) assert.ok(j.floorView[k], `${l} ${k}`);
   }
 });

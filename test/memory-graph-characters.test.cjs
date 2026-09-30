@@ -10,13 +10,13 @@ const path = require('node:path');
 
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
-test('agents are drawn as their characters', () => {
+// Design v2 (branding/DESIGN.md 7.22): a person is an avatar in their
+// department's colors with an accent ring, Michael in ink; no pixel sprites.
+test('agents are drawn as department avatars, Michael in ink', () => {
   const panel = read('src/renderer/src/components/MemoryGraphPanel.tsx');
-  assert.match(panel, /\{n\.kind === 'agent' \? \([\s\S]{0,900}<image\s+href=\{portraitDataUrl\(n\.character\)\}/);
-  assert.match(panel, /style=\{\{ imageRendering: 'pixelated' \}\}/);
+  assert.match(panel, /family\(departmentOf\(a\), dark\)/);
+  assert.match(panel, /fill=\{n\.isGod \? 'var\(--cth-ink\)' : fam\?\.l \?\? 'var\(--cth-neutral-soft\)'\}/);
+  assert.doesNotMatch(panel, /portraitDataUrl|imageRendering: 'pixelated'/);
   const graph = read('src/renderer/src/components/memoryGraph/buildGraph.ts');
   assert.match(graph, /character: a\.character,/);
-  const sprite = read('src/renderer/src/components/SpritePortrait.tsx');
-  assert.match(sprite, /export function portraitDataUrl\(character: OfficeCharacterName, scale = 4\): string \{/);
-  assert.match(sprite, /portraitUrls\.set\(key, url\);/, 'painted once per character');
 });
