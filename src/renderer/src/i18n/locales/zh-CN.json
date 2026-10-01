@@ -1855,7 +1855,11 @@
     "michaelBoard": "正在更新看板",
     "minutes": "{{count}} 分钟",
     "sendFailed": "没有发送成功。请重试。",
-    "michaelEnded": "终端已结束：请点“cancel and go back to work”，或点“force quit now”"
+    "michaelEnded": "终端已结束：请点“取消，回去工作”，或点“立即强制退出”",
+    "confirmedCount": "{{acked}} / {{total}} 名成员已确认",
+    "noWorkers": "办公室里没有成员",
+    "waitingOrchestrator": "正在等待协调者",
+    "orchestratorEnded": "协调者的终端已结束"
   },
   "shell": {
     "needsYou": "需要你处理",
@@ -1931,5 +1935,31 @@
   "workTab": {
     "live": "实时",
     "focus": "专注"
+  },
+  "quit": {
+    "title": "现在退出？",
+    "closingTitle": "下班时间",
+    "running": "{{count}} 个智能体仍在运行",
+    "runningPlural": "{{count}} 个智能体仍在运行",
+    "body": "关闭程序会终止正在运行的 claude 会话，并丢弃它在内存中尚未保存的进度。PTY 退出后，会话内的对话记录也会丢失。",
+    "bodyPlural": "关闭程序会终止全部 {{count}} 个正在运行的 claude 会话，并丢弃它们在内存中尚未保存的进度。PTY 退出后，每个会话内的对话记录都会丢失。",
+    "tip": "提示：下班时间是安全的退出方式。协调者会让每个智能体提交工作并保存记忆，全体确认后应用会自动关闭。不会丢失数据。",
+    "keepRunning": "让它们继续运行",
+    "closingTime": "下班时间",
+    "killQuit": "结束并退出",
+    "killQuitPlural": "全部结束并退出",
+    "killing": "正在结束…",
+    "startFailed": "下班时间未能开始。",
+    "wrapping": "正在收尾",
+    "stillWrapping": "仍在收尾…",
+    "saved": "全部已保存。明天见",
+    "savedReopen": "全部已保存。正在重新打开",
+    "savedBody": "每个智能体都已保存记忆，协调者已确认关闭。程序马上会自动关闭。",
+    "savedBodyRelaunch": "每个智能体都已保存记忆，协调者已确认关闭。应用马上会用新版 Claude Code 自动重新打开。",
+    "wrappingBody": "协调者宣布了下班时间。每个成员会暂停工作、保存记忆并回报。只有在协调者确认不会丢失任何内容后，应用才会关闭。",
+    "wrappingBodyRelaunch": "协调者宣布了下班时间。每个成员会暂停工作、保存记忆并回报。只有在协调者确认不会丢失任何内容后，应用才会关闭，然后用新版 Claude Code 重新打开。",
+    "slow": "这需要一些时间（可能有智能体正在压缩上下文，或正在执行工具调用）。继续等待，或强制退出并接受数据丢失。",
+    "cancelBack": "取消，回去工作",
+    "forceQuit": "立即强制退出"
   }
 }

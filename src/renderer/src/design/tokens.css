@@ -41,6 +41,8 @@
   --cth-shadow-sm:    0 1px 2px rgba(30, 27, 46, .05);
   --cth-shadow-md:    0 1px 2px rgba(30, 27, 46, .05), 0 6px 18px rgba(62, 52, 140, .08);
   --cth-shadow-lg:    0 1px 2px rgba(30, 27, 46, .05), 0 10px 30px rgba(62, 52, 140, .10);
+  /* Behind a dialog (DESIGN.md 6.1). */
+  --cth-backdrop:     color-mix(in srgb, #F7F7FB 60%, transparent);
   --cth-shadow-hub:   0 1px 2px rgba(30, 27, 46, .05), 0 10px 26px rgba(92, 76, 220, .14);
   --cth-shadow-coral: 0 4px 14px rgba(212, 54, 61, .30);
   --cth-ring-select:  0 0 0 3px rgba(30, 27, 46, .08);
@@ -172,6 +174,7 @@
   --cth-shadow-sm:    0 1px 2px rgba(0, 0, 0, .35);
   --cth-shadow-md:    0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px rgba(0, 0, 0, .32);
   --cth-shadow-lg:    0 1px 2px rgba(0, 0, 0, .35), 0 12px 32px rgba(0, 0, 0, .40);
+  --cth-backdrop:     rgba(0, 0, 0, .45);
   --cth-shadow-hub:   0 1px 2px rgba(0, 0, 0, .35), 0 10px 26px rgba(0, 0, 0, .45);
   --cth-shadow-coral: 0 4px 14px rgba(255, 90, 95, .25);
   --cth-ring-select:  0 0 0 3px rgba(236, 234, 244, .12);

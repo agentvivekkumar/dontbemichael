@@ -255,7 +255,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
       if (e.key === 'Escape') {
         // A modal above fullscreen owns the interaction until it closes. Without
         // this guard, Esc from the Add Agent form unexpectedly exits fullscreen.
-        if (addAgentOpen || editAgentOpen) return;
+        if (addAgentOpen || editAgentOpen || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
         e.preventDefault();
         setFullscreen(null);
       }

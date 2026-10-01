@@ -37,7 +37,7 @@ test('the dialog keeps its safety invariants: Michael by id, never excused, no t
   assert.match(src, /\{confirming !== id && <MiniButton [^\n]*?onClick=\{\(\) => setConfirming\(id\)\}>/);
   // A refusal is shown, never taken as success (review R1, owner 2026-09-29).
   assert.match(src, /const message = actionMessage\(res, t\('closingTime\.sendFailed'\)\);\n(?:\s*\/\/[^\n]*\n)*\s+if \(message\) \{ setFailed/);
-  assert.match(src, /\{headerLine\(closing!\)\}/, 'the counter strip comes from the tested headerLine()');
+  assert.match(src, /\{headerLine\(closing!, t\)\}/, 'the counter strip comes from the tested headerLine()');
 });
 
 test('App passes the new event fields through to the dialog', () => {
@@ -105,8 +105,8 @@ test('the non-English "terminal ended" hint names the buttons as they appear on 
   // Value: protects=a Chinese or Arabic owner is pointed at labels that exist; fails_when=the hint translates the English-only button names; why_new=review run 2 pass B; seam=none
   for (const lang of ['zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${lang}.json`));
-    assert.match(d.closingTime.michaelEnded, /cancel and go back to work/, lang);
-    assert.match(d.closingTime.michaelEnded, /force quit now/, lang);
+    assert.ok(d.closingTime.michaelEnded.includes(d.quit.cancelBack), lang);
+    assert.ok(d.closingTime.michaelEnded.includes(d.quit.forceQuit), lang);
   }
 });
 

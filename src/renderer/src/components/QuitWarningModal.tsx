@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
-import { Icon } from './Icon';
+import { Dialog } from '@/shell/Dialog';
 import { MiniButton } from './triggers/ui';
 import { ACTION_AT_PROMPT, actionText, useStore, type Agent } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -40,6 +39,7 @@ export interface QuitWarningModalProps {
 }
 
 export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClosingTime }: QuitWarningModalProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
   const confirm = async () => {
@@ -49,186 +49,107 @@ export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClo
   };
 
   const inClosingTime = !!closing && closing.phase !== 'error';
+  const many = ptyCount !== 1;
+
+  // Above EVERY modal, not just most of them (zIndex 1000). Modals in this app
+  // sit at 500 (add agent, edit agent, the release drop) and overlays below
+  // that. At 300 this dialog opened BEHIND the release drop, so clicking quit
+  // with a drop on screen looked like quit did nothing, while a hidden dialog
+  // held the app open. This is the last thing the user is asked before the
+  // process dies; it outranks whatever it interrupts.
+  if (inClosingTime) {
+    const c = closing!;
+    return (
+      <Dialog
+        title={t('quit.closingTitle')}
+        onClose={onCancel}
+        closable={false}
+        width={520}
+        zIndex={1000}
+        footer={c.phase !== 'complete' ? (
+          <>
+            <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>{t('quit.cancelBack')}</PixelButton>
+            <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>{busy ? t('quit.killing') : t('quit.forceQuit')}</PixelButton>
+          </>
+        ) : undefined}
+      >
+        <Lead
+          tone={c.phase === 'complete' ? 'green' : 'amber'}
+          title={c.phase === 'complete'
+            ? (c.relaunch ? t('quit.savedReopen') : t('quit.saved'))
+            : c.phase === 'timeout' ? t('quit.stillWrapping') : t('quit.wrapping')}
+          body={c.phase === 'complete'
+            ? (c.relaunch ? t('quit.savedBodyRelaunch') : t('quit.savedBody'))
+            : (c.relaunch ? t('quit.wrappingBodyRelaunch') : t('quit.wrappingBody'))}
+        />
+        <div style={strip}>
+          <span style={{ fontFamily: 'var(--cth-font-mono)', fontWeight: 500 }}>{headerLine(closing!, t)}</span>
+          {/* "Keep waiting" is wrong once Michael's terminal has ended. */}
+          {closing!.phase === 'timeout' && closing!.godLive !== false && (
+            <div style={{ marginTop: 6 }}>{t('quit.slow')}</div>
+          )}
+        </div>
+        <ClosingTimeRows closing={c} />
+      </Dialog>
+    );
+  }
 
   return (
-    <div
-      onClick={inClosingTime ? undefined : onCancel}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(26, 19, 32, 0.7)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        // Above EVERY modal, not just most of them. Modals in this app sit at
-        // 500 (add agent, edit agent, the release drop) and overlays below that.
-        // At 300 this dialog opened BEHIND the release drop, so clicking quit
-        // with a drop on screen looked like quit did nothing — while a hidden
-        // dialog held the app open. This is the last thing the user is asked
-        // before the process dies; it outranks whatever it interrupts.
-        zIndex: 1000
-      }}
+    <Dialog
+      title={t('quit.title')}
+      onClose={onCancel}
+      busy={busy}
+      width={520}
+      zIndex={1000}
+      footer={(
+        <>
+          <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>{t('quit.keepRunning')}</PixelButton>
+          {onClosingTime && (
+            <PixelButton variant="primary" size="md" onClick={onClosingTime} disabled={busy}>{t('quit.closingTime')}</PixelButton>
+          )}
+          <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>
+            {busy ? t('quit.killing') : many ? t('quit.killQuitPlural') : t('quit.killQuit')}
+          </PixelButton>
+        </>
+      )}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: 480, maxWidth: '92vw' }}
-      >
-        <PixelPanel variant="dialog" title={inClosingTime ? 'CLOSING TIME' : 'QUITTING NOW?'} noPadding>
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {inClosingTime ? (
-              <>
-                {/* ── Graceful shutdown in progress ──────────────────────── */}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: 32, height: 32,
-                    background: closing!.phase === 'complete' ? 'var(--cth-mint-light, #cdeccd)' : 'var(--cth-lemon-light, #f6ecc4)',
-                    boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Icon name="bell" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontFamily: 'var(--cth-font-display)',
-                      fontSize: 12, lineHeight: '20px',
-                      color: 'var(--cth-ink-900)',
-                      marginBottom: 4
-                    }}>
-                      {closing!.phase === 'complete'
-                        ? (closing!.relaunch ? 'FLOOR SAVED. REOPENING' : 'FLOOR SAVED. SEE YOU TOMORROW')
-                        : closing!.phase === 'timeout'
-                          ? 'STILL WRAPPING UP…'
-                          : 'WRAPPING UP THE FLOOR'}
-                    </div>
-                    <div style={{ fontSize: 15, lineHeight: '22px', color: 'var(--cth-ink-700)' }}>
-                      {closing!.phase === 'complete' ? (
-                        closing!.relaunch ? (
-                          <>Every agent saved its memory and the orchestrator confirmed the
-                          shutdown. The app reopens itself in a moment on the new Claude Code.</>
-                        ) : (
-                          <>Every agent saved its memory and the orchestrator confirmed the
-                          shutdown. The harness closes itself in a moment.</>
-                        )
-                      ) : (
-                        <>The orchestrator broadcast closing time. Every worker parks its
-                        work, saves its memory, and reports back. The app closes only
-                        after the orchestrator confirms nothing will be lost
-                        {closing!.relaunch ? ', then reopens on the new Claude Code.' : '.'}</>
-                      )}
-                    </div>
-                  </div>
-                </div>
+      <Lead
+        tone="coral"
+        title={many ? t('quit.runningPlural', { count: ptyCount }) : t('quit.running', { count: ptyCount })}
+        body={many ? t('quit.bodyPlural', { count: ptyCount }) : t('quit.body')}
+      />
+      <div style={strip}>{t('quit.tip')}</div>
+      {closing?.phase === 'error' && (
+        <div role="alert" style={errorStyle}>{closing.error ?? t('quit.startFailed')}</div>
+      )}
+    </Dialog>
+  );
+}
 
-                {/* ACK progress */}
-                <div style={{
-                  padding: 8,
-                  background: 'var(--cth-cream-200)',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                  fontSize: 12, lineHeight: '18px',
-                  color: 'var(--cth-ink-700)',
-                  fontFamily: 'var(--cth-font-display)'
-                }}>
-                  {headerLine(closing!)}
-                  {/* "Keep waiting" is wrong once Michael's terminal has ended. */}
-                  {closing!.phase === 'timeout' && closing!.godLive !== false && (
-                    <div style={{ marginTop: 6, fontFamily: 'var(--cth-font-body, inherit)' }}>
-                      This is taking a while (an agent may be in the middle of compacting or deep in a
-                      tool call). Keep waiting, or force quit and accept the data loss.
-                    </div>
-                  )}
-                </div>
-
-                <ClosingTimeRows closing={closing!} />
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  {closing!.phase !== 'complete' && (
-                    <>
-                      <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>
-                        cancel and go back to work
-                      </PixelButton>
-                      <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>
-                        {busy ? 'killing...' : 'force quit now'}
-                      </PixelButton>
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                {/* ── The classic quit warning ────────────────────────────── */}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: 32, height: 32,
-                    background: 'var(--cth-coral-light)',
-                    boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Icon name="bell" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontFamily: 'var(--cth-font-display)',
-                      fontSize: 12, lineHeight: '20px',
-                      color: 'var(--cth-ink-900)',
-                      marginBottom: 4
-                    }}>
-                      {ptyCount} {ptyCount === 1 ? 'AGENT' : 'AGENTS'} STILL RUNNING
-                    </div>
-                    <div style={{ fontSize: 15, lineHeight: '22px', color: 'var(--cth-ink-700)' }}>
-                      Closing the harness will terminate{' '}
-                      {ptyCount === 1 ? 'the running claude session' : `all ${ptyCount} running claude sessions`}{' '}
-                      and discard any unsaved progress they were holding in memory. The conversation
-                      history inside each session is lost when the PTY exits.
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{
-                  padding: 8,
-                  background: 'var(--cth-cream-200)',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                  fontSize: 12, lineHeight: '18px',
-                  color: 'var(--cth-ink-700)'
-                }}>
-                  Tip: <strong>closing time</strong> is the safe way out. The orchestrator has
-                  every agent commit its work and save its memory, and the app closes itself
-                  once the whole floor has confirmed. No data loss.
-                </div>
-
-                {closing?.phase === 'error' && (
-                  <div style={{
-                    padding: 8,
-                    background: 'var(--cth-coral-light)',
-                    boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                    fontSize: 12, lineHeight: '18px',
-                    color: 'var(--cth-ink-900)'
-                  }}>
-                    {closing.error ?? 'Closing time could not start.'}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-                  <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>
-                    keep them running
-                  </PixelButton>
-                  {onClosingTime && (
-                    <PixelButton variant="primary" size="md" onClick={onClosingTime} disabled={busy}>
-                      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                        <Icon name="clock" /> closing time
-                      </span>
-                    </PixelButton>
-                  )}
-                  <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>
-                    {busy ? 'killing...' : `kill ${ptyCount === 1 ? 'it' : 'all'} & quit`}
-                  </PixelButton>
-                </div>
-              </>
-            )}
-          </div>
-        </PixelPanel>
+/** The icon, headline and sentence at the top of the dialog. */
+function Lead({ tone, title, body }: { tone: 'coral' | 'amber' | 'green'; title: string; body: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <span aria-hidden="true" style={{
+        width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+        background: `var(--cth-${tone}-soft)`, color: `var(--cth-${tone}-text)`
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          {tone === 'green' ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>}
+        </svg>
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink)', marginBottom: 3 }}>{title}</div>
+        <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>{body}</div>
       </div>
     </div>
   );
 }
+
+const strip: CSSProperties = {
+  padding: '9px 12px', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-card-2)',
+  boxShadow: 'inset 0 0 0 1px var(--cth-line)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)'
+};
 
 
 /**
@@ -363,10 +284,10 @@ function ClosingTimeRows({ closing }: { closing: ClosingTimeState }) {
   );
 }
 
-const row: CSSProperties = { padding: '8px 0', borderTop: '1px solid var(--cth-ink-100)', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' };
-/** Captions and status words: body-sm 13/18 (branding/DESIGN.md §4.2). */
-const hint: CSSProperties = { fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' };
-/** A failed Remind or Close without them: coral box, dark text, so it reads
- *  as an error and still meets small-text contrast. */
-const errorStyle: CSSProperties = { marginTop: 6, padding: '4px 8px', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)', background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)' };
-const detailStyle: CSSProperties = { fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' };
+const row: CSSProperties = { padding: '9px 0', borderTop: '1px solid var(--cth-line)', fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink)' };
+/** Captions and status words (branding/DESIGN.md 4.2). */
+const hint: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-3)' };
+/** A failed Remind or Close without them, or a closing time that would not
+ *  start: coral soft box, coral text, so it reads as an error at AA contrast. */
+const errorStyle: CSSProperties = { marginTop: 6, padding: '6px 10px', borderRadius: 'var(--cth-r-md)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-coral-text)', background: 'var(--cth-coral-soft)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-coral) 35%, transparent)' };
+const detailStyle: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)' };

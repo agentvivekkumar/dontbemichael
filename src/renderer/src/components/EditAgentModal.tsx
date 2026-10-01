@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { InfoTip } from './InfoTip';
-import { useBackdropClose } from '@/hooks/useBackdropClose';
+import { Dialog } from '@/shell/Dialog';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
@@ -111,7 +110,6 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   };
 
   const preset = providerPreset(provider);
-  const backdrop = useBackdropClose(onClose);
 
   const save = async () => {
     if (saving || writing) return;
@@ -177,24 +175,23 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   };
 
   return (
-    <div
-      {...backdrop}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(26, 19, 32, 0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 500
-      }}
+    // Same box as Add Agent (940 wide). They are the two halves of one job,
+    // describe an agent, and a tall narrow dialog next to a wide one reads as
+    // two unrelated screens.
+    <Dialog
+      title="Edit agent"
+      onClose={onClose}
+      busy={saving || writing}
+      width={940}
+      zIndex={500}
+      footer={(
+        <>
+          <PixelButton variant="ghost" size="md" onClick={onClose}>Cancel</PixelButton>
+          <div style={{ flex: 1 }} />
+          <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? 'Writing instructions…' : 'Save changes'}</PixelButton>
+        </>
+      )}
     >
-      {/* Same box as Add Agent (940 / 95vw / 86vh). They are the two halves of
-          one job — describe an agent — and a tall narrow dialog next to a wide
-          one reads as two unrelated screens. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 940, maxWidth: '95vw' }}>
-        <PixelPanel variant="dialog" title="EDIT AGENT" style={{ padding: 16 }} noPadding>
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 14,
-            padding: 16, maxHeight: '86vh', overflowY: 'auto'
-          }}>
             {/* Two columns so the extra width is used rather than padded.
                 Identity and Engine are short field lists; Briefing is free
                 text and takes the taller side. minHeight keeps the dialog from
@@ -204,18 +201,19 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               gap: 16, alignItems: 'start', minHeight: 260
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-            <Section label="Identity" hint="name · character · color">
+            <Section label="Identity" hint="Name, character, color">
               <Row label="Name">
                 <input
                   value={name}
                   onChange={(e) => { setName(e.target.value); setNameError(undefined); }}
                   placeholder="Stanley"
                   aria-invalid={nameError ? true : undefined}
-                  style={nameError ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral)' } : inputStyle}
+                  className="cth-input"
+                  style={nameError ? { ...inputStyle, boxShadow: 'inset 0 0 0 1.5px var(--cth-coral)' } : inputStyle}
                   autoFocus
                 />
                 {nameError && (
-                  <span role="alert" style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>{nameError}</span>
+                  <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>{nameError}</span>
                 )}
               </Row>
 
@@ -229,24 +227,18 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                         type="button"
                         onClick={() => { setCharacter(c.name); setName(c.displayName); }}
                         title={c.blurb}
+                        aria-pressed={active}
                         style={{
-                          padding: 4,
-                          background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
-                          boxShadow: active
-                            ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                            : 'inset 0 0 0 1px var(--cth-ink-100)',
-                          cursor: 'pointer', border: 'none', width: 52,
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2
+                          height: 30, padding: '0 10px 0 4px', borderRadius: 999,
+                          background: active ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+                          boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)',
+                          cursor: 'pointer', border: 'none',
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: active ? 600 : 500, color: 'var(--cth-ink)'
                         }}
                       >
-                        <div style={{
-                          width: 40, height: 48,
-                          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-                          overflow: 'hidden'
-                        }}>
-                          <SpritePortrait character={c.name} scale={1.5} />
-                        </div>
-                        <span style={{ fontSize: 10, color: 'var(--cth-ink-700)' }}>{c.displayName}</span>
+                        <SpritePortrait character={c.name} scale={0.5} />
+                        {c.displayName}
                       </button>
                     );
                   })}
@@ -254,19 +246,21 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               </Row>
 
               <Row label="Color">
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 10, padding: '2px 4px' }}>
                   {ACCENTS.map((a) => (
                     <button
                       key={a}
                       type="button"
                       onClick={() => setAccent(a)}
                       title={a}
+                      aria-label={a}
+                      aria-pressed={accent === a}
                       style={{
-                        width: 28, height: 28,
+                        width: 26, height: 26, borderRadius: '50%',
                         background: `var(--cth-${a})`,
                         boxShadow: accent === a
-                          ? 'inset 0 0 0 1.5px var(--cth-ink-500), 0 0 0 2px var(--cth-ink-900)'
-                          : 'inset 0 0 0 1px var(--cth-ink-300)',
+                          ? '0 0 0 2px var(--cth-card), 0 0 0 4px var(--cth-ink)'
+                          : 'inset 0 0 0 1px color-mix(in srgb, var(--cth-ink) 12%, transparent)',
                         cursor: 'pointer', border: 'none'
                       }}
                     />
@@ -275,7 +269,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               </Row>
             </Section>
 
-            <Section label="Engine" hint="provider · model">
+            <Section label="Engine" hint="Provider, model">
               <Row label="Provider">
                 {/* A list, not a grid of buttons. Only the engines this build
                     offers (BUILD_ENGINES, like setup), plus the agent's own if it
@@ -283,6 +277,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 <select
                   value={provider}
                   onChange={(e) => pickProvider(e.target.value as AgentProvider)}
+                  className="cth-input"
                   style={inputStyle}
                 >
                   {AGENT_PROVIDER_PRESETS
@@ -296,6 +291,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   <select
                     value={model ?? ''}
                     onChange={(e) => setModel(e.target.value || undefined)}
+                    className="cth-input"
                     style={inputStyle}
                   >
                     {/* Always list the current model: a <select> whose value
@@ -311,19 +307,20 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                 </Row>
               )}
 
-              <span style={{ fontSize: 14, color: 'var(--cth-ink-500)', lineHeight: '18px' }}>
+              <span style={helperStyle}>
                 A new engine or model takes effect the next time this team member starts.
               </span>
             </Section>
 
               </div>
               <div style={{ minWidth: 0 }}>
-            <Section label="Briefing" hint="role · work style">
+            <Section label="Briefing" hint="Role, work style">
               <Row label="Role">
                 <input
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   placeholder="For example: Finance"
+                  className="cth-input"
                   style={inputStyle}
                 />
               </Row>
@@ -337,6 +334,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   onChange={(e) => setRoleDescription(e.target.value)}
                   placeholder="For example: Answers customers who write to the support inbox, and passes refund requests to Oscar."
                   rows={3}
+                  className="cth-input"
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                 />
               </Row>
@@ -351,56 +349,52 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
                   aria-invalid={goalError || undefined}
                   placeholder={`The job: what ${name.trim() || agent.name} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.`}
                   rows={4}
+                  className="cth-input"
                   style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
                 />
               </Row>
               {goalError && (
-                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-900)' }}>
-                  ! Work style is required: write how {agent.name} does the job.
+                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
+                  Work style is required: write how {agent.name} does the job.
                 </span>
               )}
-              {describing && <span aria-live="polite" style={helperStyle}>Putting the job into plain words...</span>}
+              {describing && <span aria-live="polite" style={helperStyle}>Putting the job into plain words…</span>}
               {writeError && (
-                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-900)' }}>
-                  ! The instructions could not be written. Try saving again.
+                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
+                  The instructions could not be written. Try saving again.
                 </span>
               )}
             </Section>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-              <PixelButton variant="ghost" size="md" onClick={onClose}>cancel</PixelButton>
-              <div style={{ flex: 1 }} />
-              <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? 'writing instructions...' : 'save changes'}</PixelButton>
-            </div>
-          </div>
-        </PixelPanel>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
 /** A plain note under a field: what it is for, in the owner's words. */
 const helperStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 12.5,
   lineHeight: '18px',
-  color: 'var(--cth-ink-500)'
+  color: 'var(--cth-ink-3)'
 };
 
+/** A v2 input (DESIGN.md 7.19): card fill; the ring and radius come from
+ *  .cth-input, so focus can thicken it. */
 const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '6px 8px 4px',
-  background: 'var(--cth-paper-100)',
+  minHeight: 34,
+  padding: '7px 10px',
+  background: 'var(--cth-card)',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
   fontFamily: 'var(--cth-font-ui)',
-  fontSize: 16,
-  color: 'var(--cth-ink-900)',
+  fontSize: 13,
+  color: 'var(--cth-ink)',
   outline: 'none',
   boxSizing: 'border-box'
 };
 
+/** A titled group of fields: a section title, then its note in ink-3. */
 function Section({
   label,
   hint,
@@ -411,15 +405,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--cth-font-display)',
-          fontSize: 10, fontWeight: 600, lineHeight: '12px',
-          color: 'var(--cth-ink-900)',
-          textTransform: 'uppercase'
-        }}>{label}</span>
-        <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{hint}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, paddingBottom: 6, borderBottom: '1px solid var(--cth-line)' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--cth-ink-3)' }}>{hint}</span>
       </div>
       {children}
     </div>
@@ -430,14 +419,9 @@ function Section({
  *  (owner, 2026-09-27: less verbose everywhere). */
 function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <span style={{
-          fontFamily: 'var(--cth-font-display)',
-          fontSize: 10, fontWeight: 600, lineHeight: '12px',
-          color: 'var(--cth-ink-700)',
-          textTransform: 'uppercase'
-        }}>{label}</span>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}</span>
         {info && <InfoTip text={info} label={label} />}
       </span>
       {children}
