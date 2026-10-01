@@ -113,7 +113,13 @@ function deskState(a: Agent): DeskState {
 
 /* ── Stage ────────────────────────────────────────────────────────────────── */
 
-export function StudioStage({ config: initialConfig }: { config: HarnessConfig }) {
+/**
+ * `bleed`: px the stage runs on under the floating right panel (owner,
+ * 2026-09-30: the column read as a slab apart from the office). The room's
+ * light and tint reach under the panel; the scene still fits the space left
+ * of it.
+ */
+export function StudioStage({ config: initialConfig, bleed = 0 }: { config: HarnessConfig; bleed?: number }) {
   const { t } = useTranslation();
   const dark = useAppTheme() === 'dark';
   const T = sceneTokens(dark);
@@ -149,8 +155,9 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     return () => ro.disconnect();
   }, []);
   // Leave room for the floating bottom bar under the platform.
-  const k = Math.min(box.w / STAGE_W, (box.h - 40) / STAGE_H, 1.25);
-  const ox = (box.w - STAGE_W * k) / 2;
+  const fitW = Math.max(200, box.w - bleed);
+  const k = Math.min(fitW / STAGE_W, (box.h - 40) / STAGE_H, 1.25);
+  const ox = (fitW - STAGE_W * k) / 2;
   const oy = Math.max(0, (box.h - 70 - STAGE_H * k) / 2);
   const at = (x: number, y: number): CSSProperties => ({ position: 'absolute', left: ox + x * k, top: oy + y * k });
 
@@ -271,18 +278,18 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
 
   if (plan.compact) {
     return (
-      <div ref={hostRef} style={{ position: 'absolute', inset: 0 }}>
+      <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: -bleed }}>
         <CompactGrid plan={plan} families={families} snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId} />
       </div>
     );
   }
 
   return (
-    <div ref={hostRef} className={`cth-studio${paused ? ' cth-studio-paused' : ''}`} onKeyDown={onKeyDown} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+    <div ref={hostRef} className={`cth-studio${paused ? ' cth-studio-paused' : ''}`} onKeyDown={onKeyDown} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: -bleed, overflow: 'hidden', background: 'var(--cth-bg)' }}>
       {/* The stage's light (DESIGN.md 3.8) and a faint dot grid toward the edges. */}
       <div aria-hidden="true" style={{
         position: 'absolute', inset: 0,
-        background: `radial-gradient(900px 520px at 50% 48%, ${dark ? '#211F31' : '#FFFFFF'} 0%, transparent 70%)`
+        background: `radial-gradient(900px 520px at ${fitW / 2}px 48%, ${dark ? '#211F31' : '#FFFFFF'} 0%, transparent 70%)`
       }} />
       <svg
         ref={svgRef}

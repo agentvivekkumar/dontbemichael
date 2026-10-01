@@ -80,7 +80,7 @@ test('a card above its pod is anchored by its bottom edge, so it grows away from
 
 test('the app shows the studio, not the pixel floor', () => {
   const app = read('src/renderer/src/App.tsx');
-  assert.match(app, /<StudioStage config=\{config\} \/>/);
+  assert.match(app, /<StudioStage config=\{config\} bleed=\{sidebarWidth \+ 10\} \/>/);
   assert.doesNotMatch(app, /<OfficeFloor \/>/);
 });
 
@@ -232,4 +232,15 @@ test('Michael\'s office has a name plate by the door, not an M badge (owner, 202
   assert.match(art, /return \[Math\.min\(0\.6, 0\.97 - plateWidth\(name\) \/ 100\), 1\.06, 44\];/);
   assert.doesNotMatch(art, /fontSize=\{12\} fill="#fff">M<\/text>/, 'the M badge is gone');
   assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /<Hub key="hub" T=\{T\} dark=\{dark\} board=\{snap\.board\} busy=\{godBusy\} name=\{god\?\.name\} plateLit=/);
+});
+
+test('the right column floats over the office as frosted glass (owner, 2026-09-30)', () => {
+  const app = read('src/renderer/src/App.tsx');
+  assert.match(app, /<StudioStage config=\{config\} bleed=\{sidebarWidth \+ 10\} \/>/);
+  assert.match(app, /background: 'color-mix\(in srgb, var\(--cth-rail\) 48%, transparent\)',/);
+  assert.match(app, /backdropFilter: 'blur\(18px\) saturate\(1\.15\)'/);
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  // The scene still fits the space left of the panel; only the room runs under it.
+  assert.match(stage, /const fitW = Math\.max\(200, box\.w - bleed\);/);
+  assert.match(stage, /right: -bleed, overflow: 'hidden'/);
 });

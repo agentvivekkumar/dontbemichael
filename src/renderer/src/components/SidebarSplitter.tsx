@@ -56,31 +56,24 @@ export function SidebarSplitter({
       }}
       onDoubleClick={() => onChange(420)}
       title="Drag to resize · double-click to reset"
+      className="cth-splitter"
       style={{
         width: 10,
         cursor: 'ew-resize',
         flexShrink: 0,
         position: 'relative',
-        background: active ? 'var(--cth-cream-300)' : 'transparent'
+        zIndex: 61
       }}
     >
-      {/* The visible 2px stripe with hash marks in the middle */}
-      <div style={{
+      {/* Invisible until hovered or dragged: a small rounded grip, no stripe
+          (design v2; owner, 2026-09-30). */}
+      <div className="cth-splitter-grip" style={{
         position: 'absolute',
-        top: 0, bottom: 0, left: 4,
-        width: 2,
-        background: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-300)'
+        top: '50%', left: 3, transform: 'translateY(-50%)',
+        width: 4, height: 36, borderRadius: 2,
+        background: active ? 'var(--cth-indigo)' : 'var(--cth-ink-4)',
+        opacity: active ? 1 : undefined
       }} />
-      <div style={{
-        position: 'absolute',
-        top: '50%', left: 2, transform: 'translateY(-50%)',
-        width: 6, height: 24,
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-      }}>
-        <span style={{ height: 2, background: 'var(--cth-ink-900)' }} />
-        <span style={{ height: 2, background: 'var(--cth-ink-900)' }} />
-        <span style={{ height: 2, background: 'var(--cth-ink-900)' }} />
-      </div>
     </div>
   );
 }

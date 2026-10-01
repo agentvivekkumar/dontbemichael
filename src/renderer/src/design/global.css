@@ -515,3 +515,5 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-askme-dismiss:hover { background: var(--cth-neutral-soft) !important; color: var(--cth-ink-2) !important; }
 .cth-askme-q p:first-child { margin-top: 0; }
 .cth-askme-q p:last-child { margin-bottom: 0; }
+.cth-splitter .cth-splitter-grip { opacity: 0; transition: opacity 120ms var(--cth-ease); }
+.cth-splitter:hover .cth-splitter-grip { opacity: .9; }

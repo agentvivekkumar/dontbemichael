@@ -387,7 +387,7 @@ One window, four regions. Nothing else is permanent.
 |---|---|---|
 | Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
 | Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Who talks to whom (§7.22) |
-| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets) | Needs you board by default; the selected person's panel; Michael's panel. Work tab widens it to 480 |
+| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets; its grip shows only on hover) | Needs you board by default; the selected person's panel; Michael's panel. Work tab widens it to 480. It floats over the stage as frosted glass (owner, 2026-09-30): 10 px from the edges, `r-2xl`, `rail` at 48% with an 18 px backdrop blur, a soft `line-2` ring and `shadow-lg`. The stage runs on underneath it (`StudioStage` `bleed`), so the room's light and the time of day tint reach the panel; the scene still fits the space left of it |
 | Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip, pack and Hire (§7.19) |
 
 Rules:

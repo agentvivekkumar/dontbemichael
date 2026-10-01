@@ -328,7 +328,7 @@ export function App() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', background: 'var(--cth-bg)' }}>
-          <StudioStage config={config} />
+          <StudioStage config={config} bleed={sidebarWidth + 10} />
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
           {agentCount === 0 && godStatus !== 'booting' && (
             <div style={{
@@ -383,11 +383,15 @@ export function App() {
           viewportWidth={vpWidth}
         />
 
+        {/* The right column floats over the office as frosted glass (owner,
+            2026-09-30): the room's light and tint show through, no slab beside it. */}
         <div style={{
-          width: sidebarWidth, flexShrink: 0, minHeight: 0,
-          display: 'flex', flexDirection: 'column',
-          background: 'linear-gradient(var(--cth-rail), var(--cth-rail))',
-          borderInlineStart: '1px solid var(--cth-line)'
+          width: sidebarWidth, flexShrink: 0, minHeight: 0, position: 'relative', zIndex: 60,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          margin: '10px 10px 10px 0', borderRadius: 'var(--cth-r-2xl)',
+          background: 'color-mix(in srgb, var(--cth-rail) 48%, transparent)',
+          backdropFilter: 'blur(18px) saturate(1.15)', WebkitBackdropFilter: 'blur(18px) saturate(1.15)',
+          boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-line-2) 70%, transparent), var(--cth-shadow-lg)'
         }}>
           {needsYouOpen || !agent ? (
             <NeedsYouBoard config={config} />
