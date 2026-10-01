@@ -33,6 +33,9 @@ test('one card is open at a time, the newest by default; folded cards show the h
   assert.match(src, /const expanded = openId === undefined \? idx === 0 : openId === t\.id;/);
   assert.match(src, /\{askHeadline\(open\.q\)\}/);
   assert.match(src, /WebkitLineClamp: 2/);
+  // A chevron under dismiss shows a card folds and opens, and turns as it opens.
+  assert.match(src, /className="cth-askme-chevron"/);
+  assert.match(src, /transform: expanded \? 'rotate\(180deg\)' : undefined/);
   // Nothing the owner relies on went away: answering, routing and memory are unchanged.
   assert.match(src, /window\.cth\.hiveRememberOwnerAnswer\(/);
   assert.match(src, /\{translate\('askMe\.openTask'\)\}/);

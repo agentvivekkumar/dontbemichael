@@ -239,20 +239,34 @@ export function AskMeTab() {
               {/* Dismiss: clears this ask off the board without answering it. The
                   card's Q&A history is kept (the question stays on the task,
                   marked dismissed). */}
-              <button
-                onClick={() => void dismiss(t)}
-                disabled={sending === t.id}
-                title={translate('askMe.dismissTitle')}
-                aria-label={translate('askMe.dismissAria')}
-                className="cth-askme-dismiss"
-                style={{
-                  flexShrink: 0, width: 24, height: 24, padding: 0, marginTop: -3, marginInlineEnd: -5,
-                  display: 'grid', placeItems: 'center', border: 'none', borderRadius: 6, background: 'transparent',
-                  cursor: sending === t.id ? 'default' : 'pointer', color: 'var(--cth-ink-4)'
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: -3, marginInlineEnd: -5 }}>
+                <button
+                  onClick={() => void dismiss(t)}
+                  disabled={sending === t.id}
+                  title={translate('askMe.dismissTitle')}
+                  aria-label={translate('askMe.dismissAria')}
+                  className="cth-askme-dismiss"
+                  style={{
+                    width: 24, height: 24, padding: 0,
+                    display: 'grid', placeItems: 'center', border: 'none', borderRadius: 6, background: 'transparent',
+                    cursor: sending === t.id ? 'default' : 'pointer', color: 'var(--cth-ink-4)'
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+                {/* Folded or open, at a glance: a chevron that turns as the card opens. */}
+                <span
+                  aria-hidden="true"
+                  onClick={toggle}
+                  className="cth-askme-chevron"
+                  style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', borderRadius: 6, cursor: 'pointer', color: 'var(--cth-ink-3)' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transform: expanded ? 'rotate(180deg)' : undefined, transition: 'transform 160ms var(--cth-ease)' }}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </div>
             </div>
             {expanded && <>
             {/* The question, as markdown: Michael writes lists, emphasis and code. */}
