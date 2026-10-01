@@ -641,7 +641,8 @@ instead of its label card, so an idle office stays calm (owner, 2026-09-30).
 - A 28 px pill: `card` at 92% with a 6 px blur, `line` ring, `shadow-sm`; the members'
   20 px avatars overlapping by 6 px, their names in `t-meta` 600 `ink-2`, and the For you
   badge (§7.15) when anything waits on the owner.
-- Sits just above the pod (below it for the right and front slots); no stem.
+- Sits just over the pod's monitors, for every slot (owner, 2026-10-01: hung under the
+  right and front pods, Oscar's and IT's chips floated on empty floor); no stem.
 - The full card (§7.14) shows while anyone in the pod is thinking, working, blocked,
   compacting or looping, while a member is selected, and while the pointer is on the
   chip or the card. Clicking the chip opens the first member's panel.
@@ -1225,6 +1226,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too (§7.14a). |
 | 2026-10-01 | Idle lines: only the Office lines in `cafeteriaLines.ts`, dealt with no repeats until a pool runs out; banter, two quiet people trading an exchange as paper planes or envelopes, each line shown where it lands; every 15 to 30 s (§8.8). |
 | 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |
 | 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |

@@ -28,6 +28,8 @@ import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plate
 const POLL_MS = 5000;
 /** Space kept over the highest card above a pod (its department tab sits on top). */
 const CARD_ROOM = 18;
+/** Stage px from a pod's slot point up to the bottom of its chip: just over the monitors. */
+const CHIP_LIFT = 80;
 
 type Board = { todo: number; doing: number; blocked: number; done: number };
 
@@ -418,20 +420,23 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
         const isAwake = awake(pod);
         const above = pod.slot.mode === 'above';
         const r = cardRect(pod.slot, pod.members.length);
+        // Every chip sits just over its pod's monitors, whichever side the
+        // card opens on: hung under a pod, it floated on empty floor (Oscar's
+        // and IT's, owner 2026-10-01).
         const chipX = ox + pod.slot.x * k;
-        const chipY = oy + (above ? r.stem.y2 - 4 : r.stem.y2 + 6) * k;
+        const chipY = oy + (pod.slot.y - CHIP_LIFT) * k;
         const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
         const chip = !isAwake && (
           <PodChip
             key={`chip-${pod.members[0].id}`}
             style={{
               position: 'absolute', left: chipX, top: chipY,
-              transform: above ? 'translate(-50%, -100%)' : 'translateX(-50%)'
+              transform: 'translate(-50%, -100%)'
             }}
             dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
             onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
             quote={speaking}
-            quoteSpot={speaking ? quoteSpot(pod, chipX, above ? chipY - 28 : chipY) : 'up'}
+            quoteSpot={speaking ? quoteSpot(pod, chipX, chipY - 28) : 'up'}
           />
         );
         if (!isAwake && peek !== key) return chip;
