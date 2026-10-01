@@ -145,35 +145,6 @@ export function AskMeTab() {
     setSending(null);
   };
 
-  // Dismiss the open ask off the ASK ME board WITHOUT answering it. We mark the
-  // open humanQA entry `dismissedAt` (no fabricated answer) so openQuestion()
-  // stops returning it and the card leaves this view — the question itself stays
-  // on the card, so the Q&A history is never dropped (protocol). The task stays
-  // blocked on the kanban; the god can re-ask by appending a fresh humanQA entry.
-  const dismiss = async (task: HiveTask) => {
-    const open = openQuestion(task);
-    if (!open || sending === task.id) return;
-    const next = tasks.map((t) => {
-      if (t.id !== task.id) return t;
-      const qa = (t.humanQA ?? []).map((e) =>
-        e === open || (e.q === open.q && !e.a && !e.dismissedAt)
-          ? { ...e, dismissedAt: new Date().toISOString() }
-          : e
-      );
-      return { ...t, humanQA: qa };
-    });
-    setTasks(next); // optimistic — the card disappears immediately
-    try {
-      const updated = next.find((candidate) => candidate.id === task.id);
-      const result = updated
-        ? await window.cth.hivePatchTask(task.id, { humanQA: updated.humanQA })
-        : { ok: false };
-      if (!result.ok) throw new Error('task changed before ask could be dismissed');
-    } catch {
-      setTasks(tasks); // restore on failure so the user can retry
-    }
-  };
-
   return (
     // Design v2 (branding/DESIGN.md 7.8): plain white cards. Michael's question,
     // a one row answer, and what is stuck behind it. Scrolls on its own so the
@@ -204,7 +175,7 @@ export function AskMeTab() {
           // list (title, who, when, the ask in a line or two); one opens to the
           // full question, a one row reply and what it holds up.
           <section key={t.id} aria-label={t.title} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
-            {/* The header folds and unfolds the card; dismiss sits apart. */}
+            {/* The header folds and unfolds the card. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div
                 role="button"
@@ -236,24 +207,9 @@ export function AskMeTab() {
                   }}>{askHeadline(open.q)}</div>
                 )}
               </div>
-              {/* Dismiss: clears this ask off the board without answering it. The
-                  card's Q&A history is kept (the question stays on the task,
-                  marked dismissed). */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: -3, marginInlineEnd: -5 }}>
-                <button
-                  onClick={() => void dismiss(t)}
-                  disabled={sending === t.id}
-                  title={translate('askMe.dismissTitle')}
-                  aria-label={translate('askMe.dismissAria')}
-                  className="cth-askme-dismiss"
-                  style={{
-                    width: 24, height: 24, padding: 0,
-                    display: 'grid', placeItems: 'center', border: 'none', borderRadius: 6, background: 'transparent',
-                    cursor: sending === t.id ? 'default' : 'pointer', color: 'var(--cth-ink-4)'
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                </button>
+              {/* An ask is cleared by answering it, never dismissed (owner,
+                  2026-10-01). The chevron shows the card folds and opens. */}
+              <div style={{ flexShrink: 0, marginTop: -3, marginInlineEnd: -5 }}>
                 {/* Folded or open, at a glance: a chevron that turns as the card opens. */}
                 <span
                   aria-hidden="true"

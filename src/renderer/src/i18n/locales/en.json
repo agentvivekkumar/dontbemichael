@@ -97,8 +97,6 @@
     "emptyTitle": "Nothing needs you right now. 🌿",
     "emptySub": "When the team blocks a task on your input (a question to answer, or something only you can do), it shows up here and on the ASK ME board on the floor.",
     "openDetail": "open the full task detail",
-    "dismissTitle": "Dismiss: clear this off the board without answering (history kept)",
-    "dismissAria": "dismiss this ask",
     "answerPlaceholder": "Your answer, or done if you handled it",
     "sending": "Sending…",
     "respond": "Reply",

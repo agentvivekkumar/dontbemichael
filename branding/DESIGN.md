@@ -525,10 +525,10 @@ ring and a soft two layer shadow so it stands on its own.
   the person it is for as a 22 px chip in their department colors, how long ago Michael
   asked ("just now", "5h ago"), a "Draft" tag if an answer is half written, and the ask
   itself in at most two lines (`askHeadline`: his bold first sentence, as plain text, in
-  `ink-2`). The whole header is one target; Enter and Space open it. On the right, a quiet
-  dismiss `x` (24 × 24, `ink-4`) and under it a 14 px chevron (`ink-3`, darker on hover)
-  that points down while folded and turns up when the card opens, so every card shows it
-  can open.
+  `ink-2`). The whole header is one target; Enter and Space open it. On the right, a 14 px
+  chevron (`ink-3`, darker on hover) that points down while folded and turns up when the
+  card opens. There is no dismiss (owner, 2026-10-01): an ask is cleared only by answering
+  it, including "done" when the owner handled it.
 - Open (one at a time; the newest until the owner picks another, `line-2` ring and
   `shadow-md`): the same header, then Michael's full question as markdown at 12.5 / 18 in
   `ink`; one row with the answer (one line, growing to three; placeholder "Your answer, or

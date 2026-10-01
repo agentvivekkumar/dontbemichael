@@ -33,7 +33,7 @@ test('one card is open at a time, the newest by default; folded cards show the h
   assert.match(src, /const expanded = openId === undefined \? idx === 0 : openId === t\.id;/);
   assert.match(src, /\{askHeadline\(open\.q\)\}/);
   assert.match(src, /WebkitLineClamp: 2/);
-  // A chevron under dismiss shows a card folds and opens, and turns as it opens.
+  // A chevron shows a card folds and opens, and turns as it opens.
   assert.match(src, /className="cth-askme-chevron"/);
   assert.match(src, /transform: expanded \? 'rotate\(180deg\)' : undefined/);
   // Nothing the owner relies on went away: answering, routing and memory are unchanged.
@@ -41,4 +41,13 @@ test('one card is open at a time, the newest by default; folded cards show the h
   assert.match(src, /\{translate\('askMe\.openTask'\)\}/);
   // The cards sit on the app's own background, no tinted slab behind them.
   assert.match(read('src/renderer/src/shell/NeedsYouBoard.tsx'), /padding: '14px 16px 12px'\n\s+\}\}>/);
+});
+
+test('an ask is cleared only by answering it: no dismiss on the board (owner, 2026-10-01)', () => {
+  const src = read('src/renderer/src/components/AskMeTab.tsx');
+  assert.doesNotMatch(src, /const dismiss = /);
+  assert.doesNotMatch(src, /dismissedAt: new Date/);
+  assert.doesNotMatch(src, /askMe\.dismiss/);
+  // Older dismissed entries are still read as closed (askMeRouting openAskIndex).
+  assert.match(read('src/shared/askMeRouting.ts'), /dismissedAt/);
 });
