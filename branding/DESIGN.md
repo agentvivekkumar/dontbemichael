@@ -520,10 +520,10 @@ Owner, 2026-09-30: a plain card. No side rule (every card had it), no "From Mich
 he raises these), no "saved to memory" note, no underlined titles.
 
 - `card`, `line` border, `r-xl`, padding 12 × 14.
-- Row 1: the person it is for as a 26 px avatar in their department colors, then the task
-  title (`t-ui` 600 at 13, `ink`, `indigo` on hover; opens the task detail, §7.21) with
-  their name under it in `t-meta` `ink-3`, plus "N earlier answers" when there are any. A
-  quiet dismiss `x` (24 × 24, `ink-4`) on the right.
+- Row 1: the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover; opens the task
+  detail, §7.21) and a quiet dismiss `x` (24 × 24, `ink-4`) on the right.
+- Row 2: the person it is for as a 22 px chip in their department colors (16 px avatar plus
+  name), and "N earlier answers" beside it when there are any.
 - Michael's question: rendered markdown at 12.5 / 18, `ink`.
 - One row: the answer (one line that grows to three as you type, placeholder "Your answer,
   or done if you handled it") and a primary "Reply" beside it. Cmd or Ctrl+Enter sends;

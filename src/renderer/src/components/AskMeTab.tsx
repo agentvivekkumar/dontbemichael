@@ -197,43 +197,19 @@ export function AskMeTab() {
           // Michael" (only he raises these), no memory note. Who it is for, the
           // title, his question, a one row reply, and what it holds up.
           <section key={t.id} aria-label={t.title} style={card} className="cth-askme-card">
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-              {who && (
-                <span aria-hidden="true" title={who} style={{
-                  ...avatarDot,
-                  ...(fam ? { background: fam.l, color: fam.acc, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {})
-                }}>{who.slice(0, 1).toUpperCase()}</span>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <button
-                  onClick={() => openTaskDetail(t.id)}
-                  title={translate('askMe.openDetail')}
-                  className="cth-askme-title"
-                  style={{
-                    display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start',
-                    fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)'
-                  }}
-                >
-                  {t.title}
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1, fontSize: 11, color: 'var(--cth-ink-3)' }}>
-                  {who && <span>{who}</span>}
-                  {answered > 0 && (
-                    <>
-                      {who && <span aria-hidden="true">·</span>}
-                      <button
-                        onClick={() => openTaskDetail(t.id)}
-                        title={translate('askMe.viewAnswersHistory')}
-                        style={quietLink}
-                      >
-                        {answered === 1
-                          ? translate('askMe.viewAnswers', { count: answered })
-                          : translate('askMe.viewAnswersPlural', { count: answered })}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+            {/* The title (opens the task) and dismiss. */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <button
+                onClick={() => openTaskDetail(t.id)}
+                title={translate('askMe.openDetail')}
+                className="cth-askme-title"
+                style={{
+                  flex: 1, minWidth: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start',
+                  fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)'
+                }}
+              >
+                {t.title}
+              </button>
               {/* Dismiss: clears this ask off the board without answering it. The
                   card's Q&A history is kept (the question stays on the task,
                   marked dismissed). */}
@@ -252,6 +228,24 @@ export function AskMeTab() {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
+            {/* Who it is for, as a chip, and any earlier answers. */}
+            {(who || answered > 0) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7, flexWrap: 'wrap' }}>
+                {who && (
+                  <span style={{ ...personChip, ...(fam ? { background: fam.l, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {}) }}>
+                    <span aria-hidden="true" style={{ ...chipAvatar, ...(fam ? { background: fam.m, color: fam.acc } : {}) }}>{who.slice(0, 1).toUpperCase()}</span>
+                    {who}
+                  </span>
+                )}
+                {answered > 0 && (
+                  <button onClick={() => openTaskDetail(t.id)} title={translate('askMe.viewAnswersHistory')} style={quietLink}>
+                    {answered === 1
+                      ? translate('askMe.viewAnswers', { count: answered })
+                      : translate('askMe.viewAnswersPlural', { count: answered })}
+                  </button>
+                )}
+              </div>
+            )}
             {/* The question, as markdown: Michael writes lists, emphasis and code. */}
             <div dir={rtl ? 'auto' : undefined} className="cth-askme-q" style={{ margin: '9px 0 10px', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)' }}>
               <MarkdownPreview source={open.q} variant="card" />
@@ -324,9 +318,13 @@ const card: CSSProperties = {
   padding: '12px 14px 12px', borderRadius: 'var(--cth-r-xl)',
   background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
 };
-const avatarDot: CSSProperties = {
-  width: 26, height: 26, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', flexShrink: 0, marginTop: 1,
-  background: 'var(--cth-indigo-soft)', color: 'var(--cth-indigo-text)', fontSize: 11.5, fontWeight: 700
+const personChip: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px 0 3px', borderRadius: 'var(--cth-r-pill)',
+  background: 'var(--cth-neutral-soft)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-ink-2)'
+};
+const chipAvatar: CSSProperties = {
+  width: 16, height: 16, borderRadius: '50%', display: 'inline-grid', placeItems: 'center',
+  background: 'var(--cth-indigo-soft)', color: 'var(--cth-indigo-text)', fontSize: 9, fontWeight: 700
 };
 const quietLink: CSSProperties = {
   padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
