@@ -900,11 +900,38 @@
     "activity": {
       "waiting": "waiting",
       "needsYou": "needs you",
-      "compacting": "compacting context",
-      "looping": "looping: breaker armed",
+      "compacting": "Organizing their notes",
+      "looping": "Going in circles, paused",
       "runningFloor": "running the floor",
       "idle": "nothing to do",
-      "clockingIn": "clocking in…"
+      "clockingIn": "clocking in…",
+      "readingInbox": "Reading messages",
+      "waitingInput": "Waiting for an answer",
+      "restarting": "Restarting…",
+      "backAtIt": "Back at it",
+      "mainFolder": "Working in the main folder",
+      "thinking": "Thinking",
+      "tool": {
+        "computer": "Running a task on the computer",
+        "reading": "Reading a file",
+        "writing": "Writing a document",
+        "editing": "Editing a document",
+        "looking": "Looking through files",
+        "webPage": "Reading a web page",
+        "search": "Searching the web",
+        "web": "Browsing the web",
+        "helper": "Getting help on part of the job",
+        "todo": "Updating the to do list",
+        "playbook": "Following a playbook",
+        "plan": "Making a plan",
+        "checkingEmail": "Checking email",
+        "draftingEmail": "Drafting an email",
+        "sendingEmail": "Sending an email",
+        "calendar": "Checking the calendar",
+        "team": "Talking to the team",
+        "inApp": "Working in {{app}}",
+        "working": "Working"
+      }
     }
   },
   "setupPanel": {

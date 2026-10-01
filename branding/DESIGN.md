@@ -1030,6 +1030,13 @@ quote bubbles, instant panel swaps. The web hero shows the still.
 
 ### 13.1 Shared rules
 
+- Activity captions are office words, never engine words (owner, 2026-09-30). `actionText`
+  turns tool calls and engine states into plain phrases on every card, panel header and
+  closing time row: Bash is "Running a task on the computer", Read "Reading a file",
+  WebSearch "Searching the web", mail tools "Checking email" or "Sending an email", a
+  connected app "Working in HubSpot", anything unknown "Working"; "compacting context" is
+  "Organizing their notes". The stored action does not change.
+
 - Name the actor. "Oscar is matching September payments", never "the agent is processing".
 - Keep system feedback under 12 words. Second person to the owner.
 - Fields first; explanations behind an info icon, short.

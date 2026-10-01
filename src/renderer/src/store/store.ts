@@ -417,12 +417,78 @@ export const ACTION_AT_PROMPT = 'waiting at a prompt';
 export const ACTION_CLOCKING_IN = 'clocking in…';
 /** An agent's action for display: the app's own captions in the owner's
  *  language, anything else as it is. */
-export function actionText(action: string, t: (key: string) => string): string {
+export function actionText(action: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (action === ACTION_CLOCKING_IN) return t('office.activity.clockingIn');
   // The hook marks a finished agent "idle"; the office says it more kindly
   // (owner, 2026-09-27: "nothing to do").
-  if (action.trim().toLowerCase() === 'idle') return t('office.activity.idle');
+  const plain = action.trim().toLowerCase();
+  if (plain === 'idle') return t('office.activity.idle');
+  // Engine words become office words (owner, 2026-09-30: "using Bash" confuses
+  // a business owner). Only the words shown change; the stored action does not.
+  const said = OFFICE_WORDS[plain];
+  if (said) return t(`office.activity.${said}`);
+  const tool = toolOfAction(action);
+  if (tool) return toolText(tool, t);
   return action;
+}
+
+/** Fixed captions the app sets, in office words (keys under office.activity). */
+const OFFICE_WORDS: Record<string, string> = {
+  'reading inbox': 'readingInbox',
+  awaiting: 'waiting',
+  'waiting at a prompt': 'waitingInput',
+  'compacting context': 'compacting',
+  'recreating terminal…': 'restarting',
+  resumed: 'backAtIt',
+  'revived after sleep': 'backAtIt',
+  'worktree gone, using base repo': 'mainFolder',
+  thinking: 'thinking',
+  'running the floor': 'runningFloor'
+};
+
+/** Tools an engine reports, as named in hook events and terminal output. */
+const KNOWN_TOOLS = /^(bash|bashoutput|killshell|read|write|edit|multiedit|notebookedit|grep|glob|ls|webfetch|websearch|task|agent|todowrite|skill|exitplanmode)$/i;
+
+/** The tool behind an action: "using Bash" from a hook, or "bash npm test" /
+ *  "read src/app.ts" from the terminal parser. */
+export function toolOfAction(action: string): string | null {
+  const using = /^using (\S+)/i.exec(action.trim());
+  if (using) return using[1];
+  const first = action.trim().split(/\s+/)[0] ?? '';
+  if (KNOWN_TOOLS.test(first) || /^mcp__/.test(first)) return first;
+  return null;
+}
+
+/** A tool call in words a business owner reads at a glance. */
+export function toolText(tool: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const k = (key: string, opts?: Record<string, unknown>) => t(`office.activity.tool.${key}`, opts);
+  const mail = /^mcp__md-mail__([a-z_]+)$/i.exec(tool);
+  if (mail) return mail[1] === 'send' ? k('sendingEmail') : mail[1] === 'draft' ? k('draftingEmail') : k('checkingEmail');
+  const mcp = /^mcp__(.+?)__(.+)$/i.exec(tool);
+  if (mcp) {
+    const server = mcp[1].replace(/^claude_ai_/i, '').replace(/[_-]+/g, ' ').trim();
+    if (/quickbooks|qbo|intuit/i.test(server)) return k('inApp', { app: 'QuickBooks' });
+    if (/calendar/i.test(server)) return k('calendar');
+    if (/gmail|outlook|e?mail/i.test(server)) return k('checkingEmail');
+    if (/^hive$/i.test(server)) return k('team');
+    if (/browser|playwright|chrome|puppeteer/i.test(server)) return k('web');
+    const app = server.split(' ').map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+    return k('inApp', { app });
+  }
+  switch (tool.toLowerCase()) {
+    case 'bash': case 'bashoutput': case 'killshell': return k('computer');
+    case 'read': return k('reading');
+    case 'write': return k('writing');
+    case 'edit': case 'multiedit': case 'notebookedit': return k('editing');
+    case 'grep': case 'glob': case 'ls': return k('looking');
+    case 'webfetch': return k('webPage');
+    case 'websearch': return k('search');
+    case 'task': case 'agent': return k('helper');
+    case 'todowrite': return k('todo');
+    case 'skill': return k('playbook');
+    case 'exitplanmode': return k('plan');
+    default: return k('working');
+  }
 }
 
 /** What an agent is doing right now, for a card or a caption: its action, else

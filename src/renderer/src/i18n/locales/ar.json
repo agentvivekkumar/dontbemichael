@@ -900,11 +900,38 @@
     "activity": {
       "waiting": "ينتظر",
       "needsYou": "بحاجة إليك",
-      "compacting": "يضغط السياق",
-      "looping": "يدور في حلقة: القاطع مسلَّح",
+      "compacting": "ينظّم ملاحظاته",
+      "looping": "يدور في حلقة، تم الإيقاف مؤقتًا",
       "runningFloor": "يُدير الأرضية",
       "idle": "لا شيء لأفعله",
-      "clockingIn": "يسجّل الحضور…"
+      "clockingIn": "يسجّل الحضور…",
+      "readingInbox": "يقرأ الرسائل",
+      "waitingInput": "ينتظر ردًا",
+      "restarting": "جارٍ إعادة التشغيل…",
+      "backAtIt": "عاد إلى العمل",
+      "mainFolder": "يعمل في المجلد الرئيسي",
+      "thinking": "يفكر",
+      "tool": {
+        "computer": "ينفذ مهمة على الحاسوب",
+        "reading": "يقرأ ملفًا",
+        "writing": "يكتب مستندًا",
+        "editing": "يحرر مستندًا",
+        "looking": "يبحث في الملفات",
+        "webPage": "يقرأ صفحة ويب",
+        "search": "يبحث في الويب",
+        "web": "يتصفح الويب",
+        "helper": "يستعين بمساعدة في جزء من العمل",
+        "todo": "يحدّث قائمة المهام",
+        "playbook": "يتبع دليل العمل",
+        "plan": "يضع خطة",
+        "checkingEmail": "يتفقد البريد",
+        "draftingEmail": "يكتب مسودة رسالة",
+        "sendingEmail": "يرسل رسالة",
+        "calendar": "يتفقد التقويم",
+        "team": "يتحدث مع الفريق",
+        "inApp": "يعمل في {{app}}",
+        "working": "يعمل"
+      }
     }
   },
   "setupPanel": {

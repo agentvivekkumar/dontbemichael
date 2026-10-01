@@ -900,11 +900,38 @@
     "activity": {
       "waiting": "等待中",
       "needsYou": "需要你",
-      "compacting": "正在压缩上下文",
-      "looping": "循环中：断路器已启动",
+      "compacting": "正在整理笔记",
+      "looping": "在原地打转，已暂停",
       "runningFloor": "正在管理楼层",
       "idle": "没事可做",
-      "clockingIn": "正在打卡上班…"
+      "clockingIn": "正在打卡上班…",
+      "readingInbox": "正在看消息",
+      "waitingInput": "正在等回复",
+      "restarting": "正在重启…",
+      "backAtIt": "回来继续工作",
+      "mainFolder": "在主文件夹中工作",
+      "thinking": "正在思考",
+      "tool": {
+        "computer": "正在电脑上执行任务",
+        "reading": "正在阅读文件",
+        "writing": "正在撰写文档",
+        "editing": "正在编辑文档",
+        "looking": "正在查找文件",
+        "webPage": "正在阅读网页",
+        "search": "正在网上搜索",
+        "web": "正在浏览网页",
+        "helper": "正在为部分工作找帮手",
+        "todo": "正在更新待办清单",
+        "playbook": "正在按手册操作",
+        "plan": "正在制定计划",
+        "checkingEmail": "正在查看邮件",
+        "draftingEmail": "正在起草邮件",
+        "sendingEmail": "正在发送邮件",
+        "calendar": "正在查看日历",
+        "team": "正在和团队沟通",
+        "inApp": "正在使用 {{app}}",
+        "working": "正在工作"
+      }
     }
   },
   "setupPanel": {
