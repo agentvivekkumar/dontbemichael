@@ -21,8 +21,8 @@ test('startup captions are office words, and shown translated', () => {
   for (const f of ['src/renderer/src/store/store.ts', 'src/renderer/src/hooks/useHive.ts', 'src/renderer/src/hooks/useRestoreTeam.ts', 'src/renderer/src/components/AddAgentModal.tsx']) {
     assert.doesNotMatch(read(f), /action: '(?:reconnecting…|starting up)'/, f);
   }
-  assert.match(read('src/renderer/src/components/AgentCard.tsx'), /actionText\(action, t\)/);
-  assert.match(read('src/renderer/src/scene/office/OfficeFloor.tsx'), /c\.showThought\(actionText\(liveActivity\(agent\), t\)/);
+  assert.match(read('src/renderer/src/shell/PanelChrome.tsx'), /actionText\(agent\.action\.trim\(\), t\)/);
+  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /const caption = \(live \? actionText\(live, t\) : ''\)/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).office.activity.clockingIn, loc);
   }

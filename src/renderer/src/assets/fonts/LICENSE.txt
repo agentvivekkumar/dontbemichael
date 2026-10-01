@@ -6,11 +6,6 @@ src/renderer/src/assets/fonts/. They are NOT ours. All of them are licensed unde
 the SIL Open Font License, Version 1.1, whose full text follows the attributions
 below. The OFL requires this notice to travel with every copy of the software.
 
-  press-start-2p-latin-400.woff2
-    Press Start 2P (latin subset, weight 400)
-    Copyright (c) 2012, Cody "CodeMan38" Boisclair (cody@zone38.net)
-    https://fonts.google.com/specimen/Press+Start+2P
-
   sora-latin-var.woff2
     Sora (latin subset, variable, weights 100 to 800)
     Copyright 2019 The Sora Project Authors

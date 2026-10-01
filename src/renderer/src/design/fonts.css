@@ -2,8 +2,8 @@
  *
  * The app's faces used to load from fonts.googleapis.com at runtime. Both that
  * host and fonts.gstatic.com are blocked in mainland China, so the app booted
- * there with every face silently falling back: the Press Start 2P brand chrome
- * rendered as generic monospace and the whole UI looked broken to exactly the
+ * there with every face silently falling back: the brand chrome
+ * rendered as generic fallbacks and the whole UI looked broken to exactly the
  * users we had just added a zh-CN locale for. A desktop app should not need the
  * network to render its own typography, so the files ship inside the bundle.
  *
@@ -55,14 +55,4 @@
   font-weight: 400 700;
   font-display: swap;
   src: url('../assets/fonts/jetbrains-mono-latin-var.woff2') format('woff2');
-}
-
-/* Only the Pixi office floor still draws in this face, until the studio replaces
-   it (branding/DESIGN.md section 17, row 1). */
-@font-face {
-  font-family: 'Press Start 2P';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('../assets/fonts/press-start-2p-latin-400.woff2') format('woff2');
 }

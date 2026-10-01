@@ -29,7 +29,7 @@ import { acquireTerminal } from '@/components/terminalPool';
 import { FullscreenTerminal } from '@/components/FullscreenTerminal';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { IdePanel } from '@/ide/IdePanel';
-import { SHOW_IDE, SHOW_OFFICE_THEME } from '@shared/buildFeatures';
+import { SHOW_IDE } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import { useTranslation } from 'react-i18next';
 import { TopBar, NeedsYouStrip } from '@/shell/TopBar';
@@ -106,10 +106,6 @@ export function App() {
       // show the voice button disabled-with-tooltip when Free Flow is on but no
       // Groq key is set (Settings keeps this in sync on save).
       useStore.getState().setHasGroqKey(!!c.groqApiKey);
-      // Mirror the active office theme so OfficeFloor renders it (gated on the
-      // tvShowOffices flag; off = always the office). Settings keeps this synced.
-      // With the picker hidden (SHOW_OFFICE_THEME) it is always the office.
-      useStore.getState().setOfficeTheme(SHOW_OFFICE_THEME && c.tvShowOffices ? (c.officeTheme ?? 'office') : 'office');
       // Mirror the triggers so Settings → Connections and the Command Center's
       // Triggers tab read one list, not two copies that drift — whichever surface
       // saves calls these same setters and the other repaints. No extra IPC: main

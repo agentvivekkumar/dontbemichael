@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore, type Agent } from '@/store/store';
+import { useStore, actionText, type Agent } from '@/store/store';
 import { PixelBadge, type StatusKind } from '@/components/PixelBadge';
 import { useRtl } from '@/i18n/useDirection';
 import { isComposingKey } from '@shared/imeGuard';
@@ -20,7 +20,7 @@ export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
   const { t } = useTranslation();
   const dark = useAppTheme() === 'dark';
   const c = agent.isGod ? null : family(departmentOf(agent), dark);
-  const caption = agent.action?.trim();
+  const caption = agent.action?.trim() ? actionText(agent.action.trim(), t) : '';
   return (
     <div style={{ flexShrink: 0, padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>

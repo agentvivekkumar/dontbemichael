@@ -16,15 +16,13 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const FONT_DIR = 'src/renderer/src/assets/fonts';
 // Design system v2 (branding/DESIGN.md 4.1): Sora for words, IBM Plex Mono for
-// numbers, JetBrains Mono for the terminal. Press Start 2P stays only for the
-// Pixi floor until the studio replaces it.
+// numbers, JetBrains Mono for the terminal.
 const FILES = [
   'sora-latin-var.woff2',
   'ibm-plex-mono-regular.woff2',
   'ibm-plex-mono-medium.woff2',
   'ibm-plex-mono-semibold.woff2',
-  'jetbrains-mono-latin-var.woff2',
-  'press-start-2p-latin-400.woff2'
+  'jetbrains-mono-latin-var.woff2'
 ];
 
 test('the bundled faces are real woff2 files inside the repo', () => {
@@ -46,7 +44,7 @@ test('bundling stays small: no CJK face was quietly added', () => {
 test('the OFL license and attribution ship with the fonts', () => {
   const lic = read(`${FONT_DIR}/LICENSE.txt`);
   assert.match(lic, /SIL OPEN FONT LICENSE Version 1\.1/);
-  for (const name of ['Sora', 'IBM Plex Mono', 'JetBrains Mono', 'Press Start 2P']) {
+  for (const name of ['Sora', 'IBM Plex Mono', 'JetBrains Mono']) {
     assert.ok(lic.includes(name), `${name} has no attribution`);
   }
 });

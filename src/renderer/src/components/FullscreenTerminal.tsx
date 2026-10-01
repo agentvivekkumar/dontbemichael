@@ -12,7 +12,6 @@ import { CommandCenterPanel } from './CommandCenterPanel';
 import { EditAgentModal } from './EditAgentModal';
 import { Icon } from './Icon';
 import { SpritePortrait } from './SpritePortrait';
-import { PORTRAIT_W } from '@/scene/office/portraitArt';
 import { RealtimeMichaelToggle } from './RealtimeMichaelToggle';
 import { CostHud } from '@/realtime/CostHud';
 import { useStore, type Agent } from '@/store/store';
@@ -54,7 +53,8 @@ function rosterScale(zoom: number) {
     group: clamp(zoom * 0.45, 7, 13),
     note: clamp(zoom * 0.68, 10, 20),
     portraitScale,
-    portrait: Math.round(PORTRAIT_W * portraitScale)
+    // The avatar's width (SpritePortrait: 16 per step plus 8).
+    portrait: Math.round(Math.max(22, 16 * portraitScale + 8))
   };
 }
 
@@ -146,7 +146,7 @@ interface RowDrag {
 
 export interface FullscreenTerminalProps {
   /** Only needed to rebuild a spawn command for a restorable agent saved before
-   *  the `command` field existed — same role as in AgentStrip. */
+   *  the `command` field existed. */
   config?: HarnessConfig | null;
 }
 

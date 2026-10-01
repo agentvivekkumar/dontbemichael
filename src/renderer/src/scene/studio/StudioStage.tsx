@@ -8,7 +8,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore, type Agent } from '@/store/store';
+import { useStore, actionText, liveActivity, type Agent } from '@/store/store';
 import type { HarnessConfig } from '@/store/config';
 import type { DepartmentName } from '@/design/tokens';
 import { useAppTheme } from '@/design/theme';
@@ -396,10 +396,8 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
     const first = times.sort((x, y) => x.at - y.at)[0];
     return `${new Date(first.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}: ${first.label}`;
   })();
-  const caption = a.action?.trim()
-    || (a.status !== 'idle' && a.lastPrompt ? a.lastPrompt.split(/\s+/).slice(0, 6).join(' ') : '')
-    || next
-    || '';
+  const live = a.status !== 'idle' ? liveActivity(a) : '';
+  const caption = (live ? actionText(live, t) : '') || next || '';
   const pct = Math.min(8, Math.max(0, a.progress ?? 0)) / 8;
   const gauge = (a.progress ?? 0) >= 7 ? 'var(--cth-coral-base)' : (a.progress ?? 0) >= 6 ? 'var(--cth-amber)' : c.acc;
   return (
@@ -490,7 +488,7 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
           <PixelBadge status={god.status as StatusKind} style={{ position: 'absolute', insetInlineEnd: 11, top: 9, fontSize: 10, lineHeight: '13px', padding: '1px 7px' }} />
         </div>
         <div style={{ marginTop: 6, fontSize: 10.5, lineHeight: '14px', color: 'var(--cth-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {god.action?.trim() || t('studio.runningTheOffice')}
+          {god.action?.trim() ? actionText(god.action.trim(), t) : t('studio.runningTheOffice')}
         </div>
       </button>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid var(--cth-line)', background: 'var(--cth-card-2)' }}>
@@ -589,7 +587,8 @@ function useHiveTokens(seatOf: SeatMap, godId: string, paused: boolean) {
 
   useEffect(() => {
     let n = 0;
-    return window.cth.onHiveMessage((e) => {
+    type Msg = { id: string; from: string; to: string; targets?: string[]; needsHuman?: boolean; act?: string };
+    const fly = (e: Msg) => {
       if (pausedRef.current) return;
       const node = (id: string): Pt | 'hub' | 'you' | null => {
         if (id === godId || id === 'god') return 'hub';
@@ -612,7 +611,15 @@ function useHiveTokens(seatOf: SeatMap, godId: string, paused: boolean) {
       if (!add.length) return;
       setFlights((prev) => [...prev, ...add].slice(-MAX_TOKENS));
       window.setTimeout(() => setFlights((prev) => prev.filter((f) => !add.includes(f))), 2000);
-    });
+    };
+    const off = window.cth.onHiveMessage(fly);
+    // Demo mode has no real hive, so the mock loop sends its own handoffs.
+    const onDemo = (ev: Event) => {
+      const d = (ev as CustomEvent<{ from: string; to: string; act: string }>).detail;
+      fly({ id: 'demo', from: d.from, to: d.to, act: d.act });
+    };
+    window.addEventListener('cth:demo-handoff', onDemo);
+    return () => { off(); window.removeEventListener('cth:demo-handoff', onDemo); };
   }, [godId]);
 
   return flights.map((f) => <Token key={f.key} d={f.d} kind={f.kind} T={T} />);

@@ -13,8 +13,8 @@
  *
  * Click behaviour: status==='off' → connect(); anything else → disconnect().
  *
- * Rendered in two places (AgentCard for the god card, FullscreenTerminal header when
- * Michael is fullscreen). It is intentionally state-only / hook-only so both can mount it.
+ * Rendered in the FullscreenTerminal header when Michael is fullscreen. It is
+ * state-only / hook-only so any other surface can mount it too.
  */
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -121,7 +121,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
 
   // Jump straight to the tab that holds the key. App owns the Settings modal's
   // open state, so this goes through the `cth:` window-event convention rather
-  // than threading a callback down through AgentCard/FullscreenTerminal.
+  // than threading a callback down through FullscreenTerminal.
   // Target is VOICE, not Agents & Models: the key is settable in both, but only
   // one of them explains what it is for.
   const openKeySettings = (e: MouseEvent): void => {

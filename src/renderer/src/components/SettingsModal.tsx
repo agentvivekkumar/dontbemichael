@@ -18,7 +18,7 @@ import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_OFFICE_THEME, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
@@ -26,7 +26,6 @@ import { SettingsHeroCard } from './SettingsHeroCard';
 import { CompanyProfileSettings } from './CompanyProfileSettings';
 import { SetupPanel } from './SetupPanel';
 import { Icon } from './Icon';
-import { OfficeThemePicker } from './OfficeThemePicker';
 import { McpDefaultsSettings } from './McpDefaultsSettings';
 import { IntegrationsRegistry } from './IntegrationsRegistry';
 import { AiEnginesSettings } from './AiEnginesSettings';
@@ -1297,9 +1296,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </>)}
                       </div>
 
-                      {/* Office Theme: TV show office maps (flag tvShowOffices, default off).
-                          Hidden in this build (SHOW_OFFICE_THEME). */}
-                      {SHOW_OFFICE_THEME && <OfficeThemePicker config={config} />}
                     </>
                   )}
 

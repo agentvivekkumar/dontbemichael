@@ -1042,21 +1042,21 @@ Rules:
 
 ## 17. Migration and debt register
 
-v2 is adopted in the spec and the kit. The code has not moved yet. Each row is **Fix**
+v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio-v2`). Each row is **Fix**
 (the spec wins), **Accepted** (with a reason) or **Done**.
 
 | # | Surface | Gap | Where | Status |
 |---|---|---|---|---|
-| 1 | App | Pixel office floor (Pixi.js) is the main view | `src/renderer/src/scene/office/` | Fix: replace with the SVG studio (§8) |
-| 2 | App | Bottom agent strip and right Command Center layout | `AgentStrip`, `AgentCard`, `CommandCenterPanel`, `App.tsx` | Fix: §5.2 shell |
-| 3 | App | Pixel primitives and pixel fonts | `PixelPanel`, `PixelButton`, `PixelBadge`, `fonts.css`, `tokens.css` | Fix: §6, §7, §4 |
-| 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Fix: §3 |
-| 5 | App | Ask me is a tab in Michael's panel | `AskMeTab`, `CommandCenterPanel` | Fix: the Needs you board (§7.6, §7.8) |
+| 1 | App | Pixel office floor (Pixi.js) is the main view | `src/renderer/src/scene/office/` | Done: `scene/studio/`; the Pixi files, tilesets and maps are deleted (only `cast.ts` and `cafeteriaLines.ts` remain, as data) |
+| 2 | App | Bottom agent strip and right Command Center layout | `AgentStrip`, `AgentCard`, `CommandCenterPanel`, `App.tsx` | Done: `shell/`; strip and card deleted |
+| 3 | App | Pixel primitives and pixel fonts | `PixelPanel`, `PixelButton`, `PixelBadge`, `fonts.css`, `tokens.css` | Done; Press Start 2P removed with the floor |
+| 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Done |
+| 5 | App | Ask me is a tab in Michael's panel | `AskMeTab`, `CommandCenterPanel` | Done |
 | 6 | App | Pixel icon set | `components/Icon.tsx` | Fix: §10 |
-| 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Fix: §7.23 |
-| 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Fix: §7.21 |
-| 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Fix: §3.4 |
-| 10 | App | No counters for delegated and kept | hive | Fix: §7.17 definitions, derived from existing hive history and tasks (no behavior change) |
+| 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Done for Settings (`shell/useDialog.ts`); other dialogs follow in phase 6 |
+| 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Done |
+| 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Done: `departmentOf` in `scene/studio/layout.ts` |
+| 10 | App | No counters for delegated and kept | hive | Done: the hub card counts from the hive log and tasks |
 | 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Fix: §13.1 |
 | 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Accepted in mockups; the build uses §4.2 and §5.1 |
 | 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Accepted in mockups; the build uses §3 |
@@ -1065,9 +1065,11 @@ v2 is adopted in the spec and the kit. The code has not moved yet. Each row is *
 | 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
 | 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
 | 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Fix: tokens |
-| 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` (unused) | Fix: phases 3 and 4 |
+| 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header, reorder in the focus mode roster |
 | 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Accepted: §7.3 is the rule |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
+| 22 | App | `pixi.js` stays in `package.json` though nothing imports it | `package.json` | Fix: remove on the next dependency change (reinstalling reruns electron-rebuild) |
+| 23 | Both | README still credits LimeZu art the app no longer ships | `README.md` | Fix with #17 |
 
 ---
 

@@ -106,9 +106,6 @@
   --cth-font-ui:      "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", sans-serif;
   --cth-font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
   --cth-font-terminal: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", "Segoe UI Historic", monospace;
-  /* The Pixi office floor still draws its bubbles in the pixel face until it is
-     replaced (DESIGN.md section 17, row 1). Nothing else may use this. */
-  --cth-font-pixel:   "Press Start 2P", monospace;
 
   /* Type scale (DESIGN.md 4.2). v1 "display" sizes were pixel sizes; they are
      lifted so a Sora label is never under the 10px floor. */

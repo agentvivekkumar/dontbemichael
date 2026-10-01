@@ -8,13 +8,13 @@ import { Toggle as V2Toggle } from './triggers/ui';
 import { useAppTheme } from '@/design/theme';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
-import type { MessageAct } from '@/scene/office/MessageEnvelope';
 import {
   buildGraph,
   type GraphData,
   type GraphNode,
   type GraphEdge,
-  type MessageLogEntry
+  type MessageLogEntry,
+  type MessageAct
 } from './memoryGraph/buildGraph';
 import { forceLayout, type Positions } from './memoryGraph/forceLayout';
 

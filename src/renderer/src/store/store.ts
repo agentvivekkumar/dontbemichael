@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { AccentColorName } from '@/design/tokens';
 import type { OfficeCharacterName } from '@/scene/office/cast';
-import type { ThemeId } from '@/scene/office/themeRegistry';
 import type { StatusKind } from '@/components/PixelBadge';
 import type { AgentProvider } from '@shared/agentProvider';
 import type { HireManifest } from '@shared/hire';
@@ -269,7 +268,7 @@ interface State {
   removeArchivedAgent: (id: string) => void;
   /** Drop one agent from the restorable list (it was respawned or dismissed). */
   removeRestorableAgent: (id: string) => void;
-  reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (AgentStrip drag-reorder) and persist the new order
+  reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (drag-reorder) and persist the new order
   /** One-shot request to open a Command-Center tab (e.g. the boss-room calendar
    *  → 'triggers'; 'tasks' and 'graph' switch the floor view instead). `seq`
    *  makes repeated identical requests distinct. */
@@ -321,10 +320,6 @@ interface State {
    *  window.cth.realtimeHasOpenAiKey(). */
   hasOpenAiKey: boolean;
   setHasOpenAiKey: (has: boolean) => void;
-  /** Mirror of the active office theme (set by App on config load + by Settings
-   *  on switch). OfficeFloor depends on this and rebuilds the scene on change. */
-  officeTheme: ThemeId;
-  setOfficeTheme: (theme: ThemeId) => void;
   /** Mirror of config.webhookTriggers — the inbound HTTP endpoints. Webhooks are
    *  editable from BOTH Settings → Connections and the Triggers tab, so neither
    *  surface keeps its own copy: both render off this list and both call the
@@ -428,6 +423,18 @@ export function actionText(action: string, t: (key: string) => string): string {
   // (owner, 2026-09-27: "nothing to do").
   if (action.trim().toLowerCase() === 'idle') return t('office.activity.idle');
   return action;
+}
+
+/** What an agent is doing right now, for a card or a caption: its action, else
+ *  the first words of the last prompt it was given (the studio label cards and
+ *  panel headers, DESIGN.md 7.14). */
+export function liveActivity(agent: Pick<Agent, 'action' | 'lastPrompt'>, fallback = ''): string {
+  const action = (agent.action || '').trim();
+  if (action) return action;
+  const prompt = (agent.lastPrompt || '').trim();
+  if (!prompt) return fallback;
+  const out = prompt.split(/\s+/).slice(0, 6).join(' ');
+  return out.length > 42 ? `${out.slice(0, 41)}…` : out;
 }
 
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt' | 'actionDetail' | 'actionAt'>;
@@ -901,7 +908,7 @@ export const useStore = create<State>((set, get) => ({
       // BOSS card fourth — and persistAgents() then wrote that order to disk, so
       // it stuck across restarts instead of flickering once.
       //
-      // Fixed at insertion rather than by sorting in AgentStrip: the strip has
+      // Fixed at insertion rather than by sorting at render time: the order has
       // drag-reorder (reorderAgents) whose whole point is a persisted manual
       // order, and a god-first sort at render time would silently override the
       // user's own arrangement every frame. This just makes the head the honest
@@ -1013,8 +1020,6 @@ export const useStore = create<State>((set, get) => ({
   setHasGroqKey: (has) => set({ hasGroqKey: has }),
   hasOpenAiKey: false,
   setHasOpenAiKey: (has) => set({ hasOpenAiKey: has }),
-  officeTheme: 'office',
-  setOfficeTheme: (theme) => set({ officeTheme: theme }),
   webhookTriggers: [],
   setWebhookTriggers: (list) => set({ webhookTriggers: list }),
   // A copy, not the shared DEFAULT_ORG_TRIGGER instance — main takes the same

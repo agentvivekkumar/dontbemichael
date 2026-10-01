@@ -216,7 +216,7 @@ test('voice Michael cannot hire', () => {
  */
 test('voice is off everywhere', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_VOICE, false);
-  for (const f of ['AgentCard.tsx', 'FullscreenTerminal.tsx']) {
+  for (const f of ['FullscreenTerminal.tsx']) {
     const src = read(`src/renderer/src/components/${f}`);
     assert.match(src, /\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/, `${f}: Talk toggle behind SHOW_VOICE`);
     assert.doesNotMatch(src.replace(/\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/g, ''), /<RealtimeMichaelToggle \/>/, `${f}: no ungated toggle`);
@@ -230,10 +230,11 @@ test('voice is off everywhere', () => {
   assert.match(read('src/main/index.ts'), /ipcMain\.handle\('freeflow:transcribe'[\s\S]{0,200}if \(!SHOW_VOICE\) return \{ ok: false/);
 });
 
-test('this build hides the office theme, and a theme picked earlier falls back to the office', () => {
+test('the pixel office themes are gone with the floor', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_OFFICE_THEME, false);
-  assert.match(read('src/renderer/src/components/SettingsModal.tsx'), /\{SHOW_OFFICE_THEME && <OfficeThemePicker config=\{config\} \/>\}/);
-  assert.match(read('src/renderer/src/App.tsx'), /setOfficeTheme\(SHOW_OFFICE_THEME && c\.tvShowOffices \?/);
+  assert.doesNotMatch(read('src/renderer/src/components/SettingsModal.tsx'), /OfficeThemePicker/);
+  assert.doesNotMatch(read('src/renderer/src/App.tsx'), /setOfficeTheme/);
+  assert.equal(fs.existsSync(path.resolve(__dirname, '../src/renderer/src/scene/office/themeRegistry.ts')), false);
 });
 
 test('this build hides the automatic updates switch; Check for updates stays', () => {

@@ -1,85 +1,33 @@
-import { useEffect, useRef } from 'react';
-import { paintCastPortrait, type OfficeCharacterName } from '@/scene/office/cast';
-import { paintPortrait } from '@/scene/office/portraitArt';
-import { PORTRAIT_W, PORTRAIT_H } from '@/scene/office/portraitArt';
-
-const FRAME_W = PORTRAIT_W;
-const FRAME_H = PORTRAIT_H;
+import type { OfficeCharacterName } from '@/scene/office/cast';
+import { useAppTheme } from '@/design/theme';
+import { departmentOf } from '@/scene/studio/layout';
+import { family } from '@/scene/studio/theme';
 
 export interface SpritePortraitProps {
   character: OfficeCharacterName;
-  /** Pixels per source pixel. Whole numbers are exact; half-steps (1.5, 2.5)
-   *  double every other row, which pixel art survives. The blit runs with
-   *  smoothing off, so nothing here is ever interpolated. */
+  /** Size step, kept from the pixel-portrait days: 1 is 24px, 1.5 is 32px,
+   *  2 is 40px. */
   scale?: number;
   background?: string;
 }
 
-/** Static standing portrait of an Office cast member (recolored LimeZu sprite). */
-export function SpritePortrait({
-  character,
-  scale = 2,
-  background = 'transparent'
-}: SpritePortraitProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let cancelled = false;
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (background !== 'transparent') {
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    paintCastPortrait(ctx, character, scale).catch(() => { /* asset load race */ });
-    return () => { cancelled = true; void cancelled; };
-  }, [character, scale, background]);
-
-  // A fractional scale can land on a fractional pixel count; the canvas
-  // attributes are integers either way, so round once and use the same number
-  // for the backing store and the CSS box (a mismatch is what makes pixel art
-  // blurry).
-  const w = Math.round(FRAME_W * scale);
-  const h = Math.round(FRAME_H * scale);
-
+/**
+ * A cast member as a design v2 avatar (branding/DESIGN.md 3.4, 7.10): the
+ * initial on their usual department's pastel, Michael in ink. The pixel
+ * portraits this used to paint are gone: the Struck M is the brand's only
+ * pixel art. The name stays for its call sites.
+ */
+export function SpritePortrait({ character, scale = 2 }: SpritePortraitProps) {
+  const dark = useAppTheme() === 'dark';
+  const size = Math.round(Math.max(22, 16 * scale + 8));
+  const isMichael = character === 'michael';
+  const fam = isMichael ? null : family(departmentOf({ id: character, character }), dark);
   return (
-    <canvas
-      ref={canvasRef}
-      width={w}
-      height={h}
-      style={{
-        width: w,
-        height: h,
-        imageRendering: 'pixelated'
-      }}
-    />
+    <span aria-hidden="true" style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, display: 'inline-grid', placeItems: 'center',
+      background: fam ? fam.l : 'var(--cth-ink)', color: fam ? fam.acc : 'var(--cth-bg)',
+      boxShadow: fam ? `inset 0 0 0 1px ${fam.m}` : 'none',
+      fontFamily: 'var(--cth-font-ui)', fontSize: Math.round(size * 0.42), fontWeight: 700, lineHeight: 1
+    }}>{character.slice(0, 1).toUpperCase()}</span>
   );
-}
-
-const portraitUrls = new Map<string, string>();
-
-/** A cast member's portrait as an image URL, for places that draw in SVG (the
- *  memory graph). Painted once per character and scale, then cached. */
-export function portraitDataUrl(character: OfficeCharacterName, scale = 4): string {
-  const key = `${character}@${scale}`;
-  const hit = portraitUrls.get(key);
-  if (hit) return hit;
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(FRAME_W * scale);
-    canvas.height = Math.round(FRAME_H * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-    ctx.imageSmoothingEnabled = false;
-    paintPortrait(ctx, character, scale);
-    const url = canvas.toDataURL('image/png');
-    portraitUrls.set(key, url);
-    return url;
-  } catch {
-    return '';
-  }
 }

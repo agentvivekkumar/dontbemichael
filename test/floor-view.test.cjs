@@ -38,10 +38,9 @@ test('the view tabs sit in the top bar, and the board covers the office above th
 });
 
 test('the office pauses while the board covers it, and its whiteboard opens the board', () => {
-  const floor = read('src/renderer/src/scene/office/OfficeFloor.tsx');
-  assert.match(floor, /const paused = !!fullscreenAgentId \|\| ideOpen \|\| docHidden \|\| floorView !== 'office';/);
-  const board = floor.indexOf("boardG.on('pointertap'");
-  assert.match(floor.slice(board, board + 300), /setFloorView\('tasks'\)/);
+  const floor = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(floor, /const paused = docHidden \|\| floorView !== 'office' \|\| !!fullscreenAgentId;/);
+  assert.match(floor, /onClick=\{\(\) => useStore\.getState\(\)\.setFloorView\('tasks'\)\}/);
 });
 
 test('the toggle counts blocked cards so trouble shows on the office view too', () => {
