@@ -35,3 +35,12 @@ test('in the lab every card stays folded until hovered or spotlit, one at a time
   assert.match(stage, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => \(!quietCards && ACTIVE\.has\(a\.status\)\) \|\| a\.id === selected\);/);
   assert.match(stage, /window\.addEventListener\('cth:demo-spotlight', onSpot\);/);
 });
+
+test('autoplay tells the day: closed from the first frame, the opening, then random events (owner, 2026-10-01)', () => {
+  const fs = require('node:fs');
+  const lab = fs.readFileSync(path.resolve(__dirname, '../tools/studio-lab/lab.tsx'), 'utf8');
+  assert.match(lab, /if \(params\.has\('autoplay'\)\) closeOffice\(\);/, 'dark before the first paint');
+  assert.match(lab, /const allIn = openOffice\(1800, timers\);/);
+  assert.match(lab, /timers\.push\(at\(allIn \+ 1200, \(\) => \{/, 'events start once everyone is in');
+  assert.match(lab, /if \(k === last\) k = \(k \+ 1\) % steps\.length;/, 'never the same event twice running');
+});

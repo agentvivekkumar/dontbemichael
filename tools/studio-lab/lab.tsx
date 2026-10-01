@@ -12,7 +12,8 @@
  *   #dark            dark theme
  *   ?hour=22         time of day (8 morning, 12 day, 17 evening, 22 night)
  *   ?play=<label>    fire one button after load, by its label
- *   ?autoplay        start autoplay on load
+ *   ?autoplay        start autoplay on load (closed office, opening, then
+ *                    everyday events in random order)
  *   ?clean           hide the controls (press H to toggle them any time)
  */
 import './mock';
@@ -53,6 +54,16 @@ useStore.setState({
   godStatus: 'ready'
 } as never);
 
+/** What each person is doing on a normal day, so the opening can restore it. */
+const normal = new Map(useStore.getState().agents.map((a) => [a.id, { status: a.status, action: a.action }]));
+
+/** The office closed: everyone clocked out, every light off. */
+function closeOffice() {
+  useStore.setState({ godStatus: 'booting', agents: useStore.getState().agents.map((a) => ({ ...a, status: 'idle', action: 'clocking in…' })) } as never);
+}
+// Autoplay starts from a closed office, dark from the very first frame.
+if (params.has('autoplay')) closeOffice();
+
 const config = {
   mailboxes: [
     { id: 'ceo', address: 'ceo@harborpine.com', status: 'connected' },
@@ -81,6 +92,22 @@ const spot = (agentId: string, ms = 0) => at(ms, () => window.dispatchEvent(new 
 const team = () => useStore.getState().agents.filter((a) => !a.isGod).map((a) => a.id);
 let n = 0;
 
+/** The office opening: every light off, then Michael and each person clock in
+ *  one by one. `hold` is how long the office stays dark first. Returns when
+ *  (ms from now) the last person is in. */
+function openOffice(hold: number, timers?: number[]): number {
+  closeOffice();
+  const order = ['god', ...team()];
+  order.forEach((id, i) => {
+    const t = at(hold + i * 700, () => {
+      if (id === 'god') useStore.setState({ godStatus: 'ready' } as never);
+      useStore.getState().updateAgent(id, (normal.get(id) ?? { status: 'idle', action: '' }) as never);
+    });
+    timers?.push(t);
+  });
+  return hold + (order.length - 1) * 700;
+}
+
 interface Play { group: string; label: string; run: () => void; loop?: boolean }
 const PLAYS: Play[] = [
   { group: 'Everyday work', label: 'Someone starts working', loop: true, run: () => {
@@ -105,15 +132,7 @@ const PLAYS: Play[] = [
   { group: 'Michael and you', label: 'A scheduled job starts', loop: true, run: () => { msg('scheduler', 'ryan', 'inform', 'Weekly LinkedIn post'); spot('ryan', 1800); } },
   { group: 'Michael and you', label: 'Michael asks you (paper plane)', loop: true, run: () => msg('god', 'human', 'query', 'Refund or explain?', { needsHuman: true }) },
   { group: 'Michael and you', label: 'You talk to Michael', loop: true, run: () => msg('human', 'god', 'request', 'Can someone call Lakeview?') },
-  { group: 'The office day', label: 'Office opens, lights come up', run: () => {
-    const st = useStore.getState();
-    const before = new Map(st.agents.map((a) => [a.id, { status: a.status, action: a.action }]));
-    useStore.setState({ godStatus: 'booting', agents: st.agents.map((a) => ({ ...a, status: 'idle', action: 'clocking in…' })) } as never);
-    ['god', ...team()].forEach((id, i) => at(900 + i * 700, () => {
-      if (id === 'god') useStore.setState({ godStatus: 'ready' } as never);
-      useStore.getState().updateAgent(id, before.get(id) as never);
-    }));
-  } },
+  { group: 'The office day', label: 'Office opens, lights come up', run: () => { openOffice(900); } },
   { group: 'The office day', label: 'A new hire arrives', run: () => {
     const id = `jim${n++}`;
     useStore.setState({ agents: [...useStore.getState().agents, agent({ id, name: 'Jim', character: 'jim', status: 'idle', extra: { description: 'Sales rep' } })] } as never);
@@ -148,20 +167,38 @@ function Lab() {
     if (params.has('hour')) at(200, () => setHour(Number(params.get('hour'))));
     const play = params.get('play');
     if (play) at(1500, () => PLAYS.find((p) => p.label === play)?.run());
-    if (params.has('autoplay')) at(800, () => toggleAuto());
+    if (params.has('autoplay')) toggleAuto();
     return () => window.removeEventListener('keydown', onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pickHour = (h: number) => { setHourState(h); setHour(h); };
+  // Autoplay tells the office's day: closed (all lights off), the opening,
+  // then everyday events in random order, never the same one twice running.
   const toggleAuto = () => {
-    if (w.__auto) { window.clearInterval(w.__auto); w.__auto = undefined; setAuto(false); return; }
+    if (w.__auto) {
+      window.clearInterval(w.__auto.loop);
+      w.__auto.timers.forEach((t: number) => window.clearTimeout(t));
+      w.__auto = undefined;
+      setAuto(false);
+      return;
+    }
     setAuto(true);
+    const timers: number[] = [];
+    w.__auto = { loop: undefined, timers };
     const steps = PLAYS.filter((p) => p.loop);
-    let k = 0;
-    const tick = () => { steps[k % steps.length].run(); k++; };
-    tick();
-    w.__auto = window.setInterval(tick, 2600);
+    let last = -1;
+    const tick = () => {
+      let k = Math.floor(Math.random() * steps.length);
+      if (k === last) k = (k + 1) % steps.length;
+      last = k;
+      steps[k].run();
+    };
+    const allIn = openOffice(1800, timers);
+    timers.push(at(allIn + 1200, () => {
+      tick();
+      if (w.__auto) w.__auto.loop = window.setInterval(tick, 2600);
+    }));
   };
   const groups = [...new Set(PLAYS.map((p) => p.group))];
 
@@ -173,7 +210,7 @@ function Lab() {
           <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-3)', margin: '3px 0 14px' }}>
             Every button fires the event the app listens to. Press H to hide these controls for a recording.
           </div>
-          <button style={btn(auto)} onClick={toggleAuto}>{auto ? 'Stop autoplay' : 'Autoplay'}</button>
+          <button style={btn(auto)} onClick={toggleAuto}>{auto ? 'Stop autoplay' : 'Autoplay the day'}</button>
           {groups.map((g) => (
             <div key={g} style={{ marginTop: 14 }}>
               <div style={groupHead}>{g}</div>

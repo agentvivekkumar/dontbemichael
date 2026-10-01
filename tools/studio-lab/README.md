@@ -27,7 +27,9 @@ design change to show the office as the app now draws it.
 ## Recording
 
 - Press **H** to hide the controls.
-- **Autoplay** loops the everyday animations every 2.6 s.
+- **Autoplay the day** starts with the office closed (every light off), plays the
+  opening (Michael first, then each pod as its people clock in), then everyday
+  events in random order every 2.6 s, never the same one twice running.
 - URL options for scripted shots:
   - `#dark`: dark theme
   - `?hour=22`: time of day (8 morning, 12 day, 17 evening, 22 night)
