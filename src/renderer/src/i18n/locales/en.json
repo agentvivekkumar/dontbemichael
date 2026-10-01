@@ -1598,7 +1598,6 @@
     "label": "What the main area shows",
     "office": "Office",
     "tasks": "Tasks",
-    "blockedTitle": "{{count}} blocked",
     "graph": "Who talks to whom",
     "tasksIntroTitle": "Your team's to do list.",
     "tasksIntro": "Every job the team has, by stage. A ? means it waits on you: answer it on Needs you. Click a card for the details.",

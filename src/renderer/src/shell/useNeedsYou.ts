@@ -28,28 +28,3 @@ export function useNeedsYouCount(): number {
 
   return asks + requests.length;
 }
-
-/** Tasks board counts, for the Tasks tab badge (blocked) and Michael's hub card. */
-export function useTaskCounts(): { todo: number; doing: number; blocked: number; done: number } {
-  const [counts, setCounts] = useState({ todo: 0, doing: 0, blocked: 0, done: 0 });
-  useEffect(() => {
-    let alive = true;
-    const poll = () => {
-      if (document.hidden) return;
-      void window.cth.hiveTasks()
-        .then((raw) => {
-          if (!alive) return;
-          const c = { todo: 0, doing: 0, blocked: 0, done: 0 };
-          for (const t of parseTasks(raw)) {
-            if (t.status === 'todo' || t.status === 'doing' || t.status === 'blocked' || t.status === 'done') c[t.status]++;
-          }
-          setCounts(c);
-        })
-        .catch(() => { /* keep the last counts */ });
-    };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => { alive = false; clearInterval(timer); };
-  }, []);
-  return counts;
-}

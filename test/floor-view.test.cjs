@@ -43,11 +43,16 @@ test('the office pauses while the board covers it, and its whiteboard opens the 
   assert.match(floor, /onClick=\{\(\) => useStore\.getState\(\)\.setFloorView\('tasks'\)\}/);
 });
 
-test('the toggle counts blocked cards so trouble shows on the office view too', () => {
+/**
+ * Only Needs you carries a coral count (owner, 2026-10-01): a blocked count on
+ * the Tasks tab beside it read as the same thing with a different number
+ * (7 blocked, 6 waiting on you). Blocked work shows on the board itself.
+ */
+test('the Tasks tab carries no count; Needs you is the one number for the owner', () => {
   const src = read('src/renderer/src/shell/TopBar.tsx');
-  assert.match(src, /const \{ blocked \} = useTaskCounts\(\);/);
-  assert.match(src, /tab\('tasks', t\('floorView\.tasks'\), blocked\)/);
-  assert.match(read('src/renderer/src/shell/useNeedsYou.ts'), /for \(const t of parseTasks\(raw\)\)/);
+  assert.match(src, /tab\('tasks', t\('floorView\.tasks'\)\)/);
+  assert.doesNotMatch(src, /useTaskCounts/);
+  assert.doesNotMatch(src, /blockedTitle/);
 });
 
 /**

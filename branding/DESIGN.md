@@ -457,9 +457,11 @@ pill (§7.3), version chip (§7.4), icon buttons (theme, Settings; focus mode hi
 ### 7.2 View tabs (FloorViewToggle)
 
 Office, Tasks, Who talks to whom. Tab: `t-ui` 500, `ink-2`, padding 7 × 13, `r-md`.
-Active: `ink` fill, white text (dark mode: `ink` fill `#ECEAF4`, text `#14131C`). Tasks
-carries a count badge of blocked tasks: `coral-strong` pill, mono 10.5 px 600, white. The
-choice persists (`cth.floorView`).
+Active: `ink` fill, white text (dark mode: `ink` fill `#ECEAF4`, text `#14131C`). No tab
+carries a count: the Needs you button (§7.5) is the one coral number, what is waiting on
+the owner. A blocked count on Tasks beside it read as the same thing with a different
+number (owner, 2026-10-01); blocked work shows in the board's Blocked column and on
+Michael's wall. The choice persists (`cth.floorView`).
 
 ### 7.3 Clock pill
 
@@ -1207,6 +1209,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |
 | 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |
 | 2026-10-01 | Needs you: no dismiss (an ask is cleared only by answering), "See full context" replaces "Open task", a chevron shows each card opens. Focus mode hidden (`SHOW_FOCUS_MODE`). The studio lab (§8.13) for demos and videos. |
 | 2026-09-30 | Studio refinements after the first build: quiet pods show a chip (§7.14a); the office's life (§8.12) with no standing wires (§8.6); lights come up as people clock in and go out at closing time, which is a bar on the floor, not a dialog (§7.23); Michael's numbers on his walls, a name plate on his door that opens his card (§7.17, §8.4); idle quotes belong to the chip (§8.8); captions in office words (§13.1); Ask me cards fold, one open at a time, straight on the stage (§7.8, §5.2); "Talk to Michael" (§7.19); one dialog frame (§7.23); outline icons (§10). |

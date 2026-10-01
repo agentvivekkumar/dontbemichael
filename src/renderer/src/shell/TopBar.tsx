@@ -7,7 +7,7 @@ import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import { notifyThemeChangeAll } from '@/components/terminalPool';
 import { UpdateBadge } from '@/components/UpdateBadge';
 import { CliUpdateBadge } from '@/components/CliUpdateNotice';
-import { useNeedsYouCount, useTaskCounts } from './useNeedsYou';
+import { useNeedsYouCount } from './useNeedsYou';
 import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
 import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 
@@ -84,9 +84,12 @@ export function ViewTabs() {
   const { t } = useTranslation();
   const view = useStore((s) => s.floorView);
   const setView = useStore((s) => s.setFloorView);
-  const { blocked } = useTaskCounts();
 
-  const tab = (key: FloorView, label: string, badge?: number) => {
+  // No count on Tasks (owner, 2026-10-01): a blocked count beside the Needs
+  // you count read as the same thing with a different number. Coral numbers
+  // mean "waiting on you", and only Needs you shows one; blocked work is the
+  // board's Blocked column.
+  const tab = (key: FloorView, label: string) => {
     const on = view === key;
     return (
       <button
@@ -104,9 +107,6 @@ export function ViewTabs() {
         }}
       >
         {label}
-        {!!badge && (
-          <span title={t('floorView.blockedTitle', { count: badge })} style={countBubble}>{badge}</span>
-        )}
       </button>
     );
   };
@@ -114,7 +114,7 @@ export function ViewTabs() {
   return (
     <div role="group" aria-label={t('floorView.label')} style={{ display: 'flex', gap: 4, marginInlineStart: 26 }}>
       {tab('office', t('floorView.office'))}
-      {tab('tasks', t('floorView.tasks'), blocked)}
+      {tab('tasks', t('floorView.tasks'))}
       {tab('graph', t('floorView.graph'))}
     </div>
   );
