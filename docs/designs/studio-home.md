@@ -24,10 +24,10 @@ that three part layout go.
 
 | Region | What it holds |
 |---|---|
-| Top bar | Struck M logo, view tabs (Office, Tasks, Who talks to whom), clock pill (office hours, closing time), update badges, theme, focus mode, Settings, coral **Needs you N** |
+| Top bar | Struck M logo, view tabs (Office, Tasks, Who talks to whom), clock pill (office open, closing time), update badges, theme, Settings, coral **Needs you N** (focus mode hidden since 2026-10-01, `SHOW_FOCUS_MODE`) |
 | Stage (Office view) | Isometric studio: Michael's glass pod in the center, one pod per team member, mailbox posts on the edge, work tokens moving on paths |
 | Right column | Contextual inspector, resizable (keeps SidebarSplitter). Default: the Needs you feed. Pod selected: that person's panel. Michael's pod: Michael's panel |
-| Bottom bar | Brief Michael composer (today's Michael MessageQueueComposer: attach, queue), next scheduled job chip, Hire |
+| Bottom bar | Talk to Michael composer (today's Michael MessageQueueComposer: attach, queue; renamed from Brief Michael 2026-09-30), next scheduled job chip, Hire |
 
 Other views: **Tasks** (kanban, as today) and **Who talks to whom** (today's Graph). Settings stays a
 modal. A **Today** timeline (Day Lanes) is a later, separate piece.
@@ -77,7 +77,7 @@ settings A/B/C/D).
 | S11 restore team | Banner at the top of the right column: restore all, dismiss one |
 | C1 to C8 title bar, updates, theme, settings, focus, toasts | Top bar and bottom right toasts, same behavior |
 | C9 Michael booting, empty floor | Stage shows empty pods with Michael's pod "clocking in"; empty office shows the platform with a Hire call to action |
-| C10 office folder missing, C11 quit and closing time | Same screens, restyled |
+| C10 office folder missing, C11 quit and closing time | Office folder missing restyled; quitting now starts closing time at once, shown as a closing bar on the floor (2026-09-30) |
 | C12 cleared banner | Person panel |
 | C13 keyboard | Same, plus pod navigation; Esc on every overlay |
 | C14 menu, notifications (only Michael) | Unchanged |
@@ -136,15 +136,21 @@ mockups and the build.
    answers in words: a decision, a standing rule for next time (answers go into that team
    member's memory), or "done" when the owner takes it off the office and handles it. Schedule
    requests are the only cards with Approve and Decline. Cards keep: task title (opens detail),
-   tagged team member, dismiss, Michael's question, answer box, respond and unblock, earlier
+   tagged team member, Michael's question, answer box, reply, earlier
    answers, tasks blocked behind it. A pod shows a coral "1 for you" badge only when an Ask me card
    is tagged to that person; only Michael raises cards.
 2. **Access panel shows today's capabilities only:** mailbox and Can send or Draft only,
    QuickBooks and Read only or Can make changes (when QuickBooks is on), own folder, schedules.
    No web switch, no spending chips.
-3. **Terminal:** composer first. Brief Michael from the bottom bar; each person's terminal, Talk
-   1:1 and message queue live in their Work tab; focus mode unchanged.
+3. **Terminal:** composer first. Talk to Michael from the bottom bar; each person's terminal, Talk
+   1:1 and message queue live in their Work tab; focus mode hidden (2026-10-01).
 4. **Team size:** department pods, up to 4 people per pod; a compact grid above about 30 people.
    Must fit a 1280 x 800 window.
 5. **Idle life:** one occasional in-character quote bubble over an idle pod.
 6. **Today timeline:** later, not in this release.
+
+## Updates after the build
+
+- 2026-10-01: an Ask me is cleared only by answering it; the board's dismiss is gone.
+- 2026-10-01: focus mode hidden (`SHOW_FOCUS_MODE`); the code stays behind the switch.
+- See branding/DESIGN.md §18 for every design change since 2026-09-30.

@@ -489,8 +489,8 @@ text "Nothing needs you", no dot. Click shows the Needs you board in the right c
 Three states, one region:
 
 1. **Needs you board** (default). Heading "Needs you" (`t-panel`), a count bubble, an
-   info icon. Cards stack newest first (§7.8, §7.9) with 12 px gaps. "Earlier answers"
-   link pinned at the bottom.
+   info icon. Cards stack newest first (§7.8, §7.9) with 12 px gaps, straight on the
+   stage (the column has no ground of its own, §5.2).
 2. **Person panel** when a pod is selected (§7.10 to §7.12).
 3. **Michael's panel** when Michael's pod is selected (§7.12).
 
@@ -519,9 +519,10 @@ The owner's only inbox. Michael raises a card only when he could not re-delegate
 unblock the work himself.
 
 Owner, 2026-09-30: a plain card, and a board you can scan. No side rule, no "From Michael"
-(only he raises these), no "saved to memory" note, no underlined titles. The cards sit on
-the right column's own `rail` (no tinted slab behind them), 12 px apart, each with a `line`
-ring and a soft two layer shadow so it stands on its own.
+(only he raises these), no "saved to memory" note (the answer is still saved to the
+person's memory and routed to whoever asked), no underlined titles. The cards sit straight
+on the stage, 12 px apart, each with a `line` ring and a soft two layer shadow so it
+stands on its own.
 
 - Folded (every card but one): the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover),
   the person it is for as a 22 px chip in their department colors, how long ago Michael
@@ -538,12 +539,9 @@ ring and a soft two layer shadow so it stands on its own.
   a footer with "See full context" (the ask's full background and history; owner,
   2026-10-01: it is context, not a task) and "N earlier answers". Cmd or Ctrl+Enter sends; Enter
   respects IME composition.
-- Optional secondary actions Michael attached
-  (for a broken mailbox: "Open Mailboxes").
-- Hint under the actions: bookmark icon plus "Saved to Kelly's memory" (`t-meta`, `ink-3`).
-- If tasks wait on it: a divider, then "Blocking N task(s)" in `coral` text 600 and the
-  titles in `ink-2`, up to 6, then "+N more".
-- "View N earlier answers" link when the task has answered questions.
+- "Holding up N tasks", when tasks wait on the answer, opens to their titles in `ink-2`
+  (a status dot each, up to 6, then "+N more").
+- Optional secondary actions Michael attached (for a broken mailbox: "Open Mailboxes").
 
 ### 7.9 Schedule request card (ScheduleRequestCards)
 
@@ -591,15 +589,15 @@ The group list is data driven: a new enforced capability adds a group. Nothing a
 before it is enforced (§2.4).
 
 **Work** (terminal). A row: eye icon plus "Watching" and a live dot; zoom (minus, 100%,
-plus) as a segmented group; "Focus" secondary. Then the terminal pane: `#1B1A28` fill in
+plus) as a segmented group ("Focus" only when focus mode is on, `SHOW_FOCUS_MODE`). Then the terminal pane: `#1B1A28` fill in
 both themes, `r-lg`, JetBrains Mono 12 px, padding 14. Locked input line at the bottom:
 lock icon plus "Locked while Michael runs Kelly. Talk 1:1 to type." Under the pane:
 secondary "Message Michael about Kelly", primary "Talk 1:1", hint "Michael sends Kelly no
 work during a 1:1". In a 1:1 the input unlocks and the message queue composer (attach,
 queue, send now) replaces the two buttons, with "End 1:1".
 
-**Office schedule** (Michael, read only). "Office hours 8:00 AM to 6:00 PM" line with an
-info icon. Groups by person: avatar plus name, "Edit on Access" link with a chevron. Rows:
+**Office schedule** (Michael, read only). No office hours line: office hours are not a
+setting (§7.3). Groups by person: avatar plus name, "Edit on Access" link with a chevron. Rows:
 job name, mono when line, right aligned "next" label (`t-micro`) over a mono time. Paused
 jobs show a muted switch and "Paused".
 
@@ -643,6 +641,10 @@ instead of its label card, so an idle office stays calm (owner, 2026-09-30).
 - The full card (§7.14) shows while anyone in the pod is thinking, working, blocked,
   compacting or looping, while a member is selected, and while the pointer is on the
   chip or the card. Clicking the chip opens the first member's panel.
+- An idle line belongs to the chip: its speech bubble's tail points at the speaker's
+  avatar there (§8.8).
+- Demo mode (`quietCards`, the studio lab only, §8.13): every pod shows its chip even
+  while people work; a card opens on hover or for a moment when the lab spotlights someone.
 
 ### 7.15 For you badge
 
@@ -656,7 +658,7 @@ when an Ask me card is tagged to this person.
 radius 2 2 6 2, `shadow-sm` tinted amber. Count of tasks this person is doing. Click opens
 the first task.
 
-### 7.17 Michael's chip and hub card
+### 7.17 Michael's name plate and hub card
 
 Michael's numbers live on his glass walls (§8.4; owner, 2026-09-30: a card always on screen
 was a distraction). There is no chip: the name plate on his glass is the way in. Hovering
@@ -719,7 +721,7 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   in a coral soft box with a "Waiting for you" pill; answered ones are plain), DEPENDENCIES
   (rows with a link icon, mono id, title, "waits on this").
 - Footer: secondary "Assign" with the hint "Sends it to Michael to hand out"; secondary
-  "Close" with an `Esc` key hint. Esc closes (new; today it doesn't).
+  "Close" with an `Esc` key hint. Esc closes.
 
 ### 7.22 Who talks to whom (MemoryGraphPanel)
 
@@ -750,14 +752,17 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   moon mark, "Closing time" and the counter strip ("5 / 8 workers confirmed"), a progress
   line, "3 still working" opening the rows (Remind, Close without them), "Cancel and go back
   to work", and "Force quit now", which asks once because unsaved work is lost.
-- Dialogs (Settings, hire wizard, office folder missing):
-  `card`, `r-2xl`, `shadow-lg`, backdrop per §6.1, `role=dialog`, focus trapped, Esc closes
-  (Settings and onboarding lack this today, §17).
+- Dialogs (Settings, hire wizard, edit person, add mailbox; `shell/Dialog.tsx`): `card`,
+  `r-2xl`, `shadow-lg`, title row with a close, an optional footer for the actions,
+  backdrop per §6.1 (a drag that ends past the edge never closes it), `role=dialog`, focus
+  trapped and restored, Esc closes only the top dialog and never from inside a field.
+  Office folder missing is a launch screen, not a dialog: the lockup over one card.
 
 ### 7.24 Empty and starting states
 
-- **Starting** (Michael clocking in): the studio shows empty pods and Michael's glass pod
-  with a slow indigo pulse and the caption "Clocking in".
+- **Starting**: the office opens dark and the lights come up as people clock in (§8.12).
+  Before any team member exists, a small card over the studio says Michael is clocking in,
+  with a slow `indigo` pulse.
 - **No team yet**: the platform with Michael's pod only, a centered card "Your office is
   empty" and a primary "Hire" button.
 - **Needs you empty**: a small illustration of Michael's pod and "Nothing needs you right
@@ -783,14 +788,16 @@ Full window, no app chrome.
   "Works in Harbor & Pine/Finance" line with a "change" link. Unchecked rows at 55%.
   Footer: "N picked, M to connect" and Back (secondary), Next (primary).
 - The studio on the right fills with a pod per picked person around Michael's glass pod,
-  each with a small name tag and a check on its screen; unpicked people show as dashed
-  ghost pods with a "+" and a "Name, not picked" tag.
+  each with a small name tag and a check on its screen; an unpicked department shows as a
+  dashed outline with a centered "Name, not picked" tag.
 
-### 7.26 Settings, hire wizard, closing time
+### 7.26 Settings and the hire wizard
 
 Keep every section, control and save rule from v1 (see the functional map in
-`docs/designs/studio-home.md`), restyled with §7.7 buttons, §7.12 row groups, §7.23 dialogs.
-No new screens are specified yet; they follow these components.
+`docs/designs/studio-home.md`), restyled with §7.7 buttons, §7.12 row groups and §7.23
+dialogs. The hire wizard's steps are numbered circles (done `green` with a check, current
+`ink`), its character tiles and job rows use the `indigo` soft selection, and its strings
+are sentence case. Closing time is the closing bar (§7.23), not a dialog.
 
 ---
 
@@ -834,8 +841,8 @@ A raised platform with a glass box (back wall white at 78%, front at 42%; dark: 
 tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, and a name plate on
 the front glass just right of his door, sized to the glass: a 12 px tall ink plate, his name
 in white Sora 600 at 8 px (shortened with an ellipsis past 12 letters), and a status light
-that glows green while he works; it always ends before the glass's corner (owner, 2026-09-30: an "M" badge said nothing; a door
-plate says whose office it is). It sits at the center of the platform. The glass is taller
+that glows green while he works; it always ends before the glass's corner (owner,
+2026-09-30: an "M" badge said nothing; a door plate says whose office it is). It sits at the center of the platform. The glass is taller
 than a desk (72) so his walls carry his numbers:
 
 - Left wall: the task board. To do, Doing, Blocked, Done read left to right, each column's
@@ -867,19 +874,20 @@ As §3.5. In addition:
   while mail moves, and a conversation arc while two people talk (§8.12). A broken mailbox
   shows its warning on the post and its tag, not a line.
 - Tokens are small isometric cards or glyph circles in the act color (§3.3), white ring,
-  traveling along paths. Speed about 240 px/s with ease in out. At most 16 in flight;
-  beyond that, counts on paths (a mono number pill) replace extra tokens.
+  traveling along paths, 2.2 s each with ease in out. At most 16 in flight; past that the
+  oldest leave first.
 - Flow rules, which mirror the product: each mailbox post feeds the person who watches it
   (a team member reads its own mailbox; mail does not pass through Michael); Michael feeds everyone; teammates exchange `query` tokens directly;
   a teammate who is stuck sends a `query` to Michael; only Michael sends `act-you` tokens,
   which leave the stage toward the right column.
-- A finished job sends a green check token from the pod to Michael's task board.
+- A `done` message travels as a green check token; a task reaching Done bursts a check over
+  its owner's pod and pops a sticky onto Michael's board (§8.12).
 
 ### 8.7 Mailbox posts
 
 Small isometric posts at the platform's front left edge, one per mailbox, in white and
-lavender with a slot, each with a mailbox tag (§7.18). A broken mailbox's post is coral
-tinted with a red "x" on its path.
+lavender with a slot and a flag, each with a mailbox tag (§7.18). A broken mailbox's post
+is coral tinted with a blinking red "!" above it (there is no path to carry it, §8.6).
 
 ### 8.8 Idle quote bubble
 
@@ -915,6 +923,17 @@ clocking in.
 - RTL: the art never mirrors (it is a picture of a room). Labels keep their positions.
 - Reduced motion: §11.3.
 
+### 8.11 Web use [Web]
+
+- Hero: a curated still of the studio at hero size (the reference home screen's stage,
+  without the Needs you column), exported as SVG. Optional light loop: record the studio lab
+  (§8.13, `?clean&autoplay`). No live data.
+- Feature vignettes: crop to one idea: the mailbox posts feeding pods (mailboxes), the
+  onboarding studio filling (packs), one pod with its Access card (limits), Michael's pod
+  sending a token to a Needs you card (Ask me).
+- Screenshots of the app go in a macOS window frame: `r-2xl`, `shadow-lg`, the title bar
+  with traffic lights.
+
 ### 8.12 Life on the stage
 
 The office moves when the work moves (owner, 2026-09-30: the first build felt static).
@@ -924,14 +943,14 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | Trigger (real) | What moves |
 |---|---|
 | Hive message between people | The token travels its wire with a bright trail, a puff where it leaves and a ping where it lands (2.2 s, eased) |
-| Message from the scheduler (a scheduled run) | The clock on Michael's back wall (real time) rings, then an amber clock token travels to the pod; the job's name shows in front of the pod for 4.5 s |
+| Message from the scheduler (a scheduled run) | The clock on Michael's left wall (real time) rings, then an amber clock token travels to the pod; the job's name shows in front of the pod for 4.5 s |
 | Mail tool call (`md-mail` search or read, draft or send) | The watcher's mailbox hops and raises its flag, its wire flows, and an envelope travels in (read) or out (draft, send) |
 | Any other tool call | A 26 px glyph rises off the desk: web, terminal, file, search, books, or a spark (one per person per 1.4 s) |
 | A task reaches Done | A green check bursts over its owner's pod; a new sticky pops onto Michael's board |
 | Counts change | Michael's numbers tick up into place |
 | Someone starts working | Michael's wire to the pod appears, flows toward it and fades (3.2 s) |
 | Someone working | Their screen scrolls, their mug steams |
-| Michael working | His screens scroll, his marker writes on the board, his badge floats; Doing stickies breathe |
+| Michael working | His screens scroll, his marker writes on the board, his name plate's light glows; Doing stickies breathe |
 | Thinking | The three dots bounce in turn |
 | Always | Plants sway slightly (5.5 s) |
 | Michael hands work out (`request` from Michael) | He points first: a soft beam from his office lights the pod's floor, then the envelope leaves |
@@ -946,16 +965,20 @@ Every effect starts from a real event or state; nothing is decorative noise.
 All of it pauses with the stage (§11.2). With reduced motion the loops stop and a token
 appears at its destination for one second.
 
-### 8.11 Web use [Web]
+### 8.13 Studio lab [Both]
 
-- Hero: a curated still of the studio at hero size (the reference home screen's stage,
-  without the Needs you column), exported as SVG. Optional light loop: tokens travel,
-  screens pulse. No live data.
-- Feature vignettes: crop to one idea: the mailbox posts feeding pods (mailboxes), the
-  onboarding studio filling (packs), one pod with its Access card (limits), Michael's pod
-  sending a token to a Needs you card (Ask me).
-- Screenshots of the app go in a macOS window frame: `r-2xl`, `shadow-lg`, the title bar
-  with traffic lights.
+`tools/studio-lab` (owner, 2026-10-01): the real studio on a fictional office (Harbor &
+Pine), with a button for every effect in §8.12, each firing the event the app listens to.
+`npm run lab` writes `docs/demo/studio-lab.html`, one self-contained file (script, styles,
+fonts, images inlined) for demos, screenshots and videos. It is the live reference for the
+studio until the reference screens (§20) are re-shot.
+
+- Every pod shows its chip (`quietCards`); a card opens on hover, or for a moment when a
+  button involves someone (`cth:demo-spotlight`), one at a time.
+- "Autoplay the day": the office closed (every light off from the first frame), the
+  opening, then everyday events in random order every 2.6 s, never the same twice running.
+- H hides the controls. URL: `#dark`, `?hour=22`, `?play=<label>`, `?autoplay`, `?clean`.
+- A test keeps it building, self-contained, and free of any real office's data.
 
 ---
 
@@ -1139,7 +1162,8 @@ Rules:
 
 ## 17. Migration and debt register
 
-v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio-v2`). Each row is **Fix**
+v2 is adopted in the spec, the kit and the app (phases 1 to 6, the studio life work and the
+Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 (the spec wins), **Accepted** (with a reason) or **Done**.
 
 | # | Surface | Gap | Where | Status |
@@ -1153,7 +1177,7 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 | 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Done: `shell/Dialog.tsx` and `useDialog` for Settings, hire, edit, quit and closing time; Esc reaches only the top dialog |
 | 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Done |
 | 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Done: `departmentOf` in `scene/studio/layout.ts` |
-| 10 | App | No counters for delegated and kept | hive | Done: the hub card counts from the hive log and tasks |
+| 10 | App | No counters for delegated and kept | hive | Done: counted from the hive log and tasks, shown on Michael's wall sign and hub card |
 | 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Done: `test/no-dashes.test.cjs`; ALL CAPS strings moved to sentence case (§4) |
 | 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Accepted in mockups; the build uses §4.2 and §5.1 |
 | 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Accepted in mockups; the build uses §3 |
@@ -1162,11 +1186,14 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 | 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
 | 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
 | 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Chrome done; the frame keeps the website tokens until the site moves to v2 (#15) |
-| 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header, reorder in the focus mode roster |
+| 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header. Reorder lives in the focus mode roster, which is hidden (#24) |
 | 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Accepted: §7.3 is the rule |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
 | 22 | App | `pixi.js` stays in `package.json` though nothing imports it | `package.json` | Fix: remove on the next dependency change (reinstalling reruns electron-rebuild) |
 | 23 | Both | README still credits LimeZu art the app no longer ships | `README.md` | Fix with #17 |
+| 24 | App | Focus mode is hidden (`SHOW_FOCUS_MODE`), so drag to reorder people has no visible home | `FullscreenTerminal` | Accepted: the order is kept; give reorder a home if it is missed |
+| 25 | Both | Reference screens (§20) predate 2026-09-30 and 10-01: cards on every pod, the hub card and M badge, the old Ask me cards, the solid right column, Brief Michael | `reference/studio/`, the brand guide | Fix: re-shoot from the app or the studio lab (§8.13); until then the lab is the reference |
+| 26 | App | Ask me can no longer be dismissed; older dismissed entries still read as closed | `AskMeTab`, `shared/askMeRouting.ts` | Done (owner, 2026-10-01: an ask is handled with a response) |
 
 ---
 
@@ -1174,6 +1201,8 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Needs you: no dismiss (an ask is cleared only by answering), "See full context" replaces "Open task", a chevron shows each card opens. Focus mode hidden (`SHOW_FOCUS_MODE`). The studio lab (§8.13) for demos and videos. |
+| 2026-09-30 | Studio refinements after the first build: quiet pods show a chip (§7.14a); the office's life (§8.12) with no standing wires (§8.6); lights come up as people clock in and go out at closing time, which is a bar on the floor, not a dialog (§7.23); Michael's numbers on his walls, a name plate on his door that opens his card (§7.17, §8.4); idle quotes belong to the chip (§8.8); captions in office words (§13.1); Ask me cards fold, one open at a time, straight on the stage (§7.8, §5.2); "Talk to Michael" (§7.19); one dialog frame (§7.23); outline icons (§10). |
 | 2026-09-30 | **v2 Studio adopted.** Pixel floor, bottom strip, Command Center layout, pixel UI, pixel type and the arcade web palette retired. One token set for app and web (§1.3). Sora and IBM Plex Mono replace Inter, VT323, Press Start 2P and Pixelify Sans. Wordmark in Sora; the Struck M mark kept. Studio illustration system (§8). Contrast corrected against the mockups: `ink-3` `#6C6884`, accent text colors, `coral-strong` for coral fills with text, `line-input` for control boundaries. v1 archived at `archive/DESIGN-v1-pixel.md`. Decisions and the functional map: `docs/designs/studio-home.md`. |
 | 2026-09-28 | (v1) Web: Pro offering removed; nav cut to four links plus Download. |
 | 2026-09-24 | (v1) One spec for app and web, moved into `branding/` with the brand kit. |
@@ -1185,15 +1214,17 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 1. **Today timeline** (Day Lanes). Designed as a later view; not in the first v2 release.
 2. **Operations and team colors** (§3.4) have no reference screen yet. Confirm when a pack
    with Supply Chain or Quality is shown.
-3. **Web hero loop.** Still image first; decide on a light CSS loop after the site ships.
+3. **Web hero loop.** Still image first; a loop can be recorded from the studio lab (§8.13).
 4. **Settings and hire wizard screens** have no v2 reference screens; they follow the
    components. Design them if the restyle raises questions.
+5. **Reference screens** need re-shooting after the 2026-09-30 and 10-01 changes (§17 #25).
 
 ---
 
 ## 20. Reference screens
 
-Approved 2026-09-30, in `reference/studio/` (PNG, 1440 × 900):
+Approved 2026-09-30, in `reference/studio/` (PNG, 1440 × 900). They predate the refinements
+in §18 (§17 #25); where they differ, this document and the studio lab (§8.13) win.
 
 | File | Shows |
 |---|---|
