@@ -324,7 +324,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
             stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}

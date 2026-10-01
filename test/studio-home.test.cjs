@@ -124,7 +124,7 @@ test('the studio moves on real events only: scheduled runs, mail, tools, done ta
   assert.match(stage, /if \(!seat \|\| !life\.postActive\[m\.id\]\) return null;/);
   assert.match(stage, /plan\.pods\.map\(\(pod\) => kickoff\[pod\.members\[0\]\.id\] \? \(/);
   assert.doesNotMatch(stage, /dash="5 5"/, 'no standing red line from a broken mailbox');
-  assert.match(stage, /busy=\{godBusy\} ringing=\{life\.clockRinging\}/);
+  assert.match(stage, /busy=\{godBusy\} name=\{god\?\.name\} ringing=\{life\.clockRinging\}/);
   // Reduced motion: the ambient loops stop.
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-scroll, \.cth-st-steam, \.cth-st-sway, \.cth-st-dot, \.cth-st-write, \.cth-st-bob, \.cth-st-flow, \.cth-st-doing \{ animation: none !important; \}/);
 });
@@ -210,7 +210,7 @@ test('Michael\'s numbers live on his walls; a chip replaces the always-on card (
   assert.match(art, /\{stats && <StatsSign at=\{P\(-0\.6, -a \+ 0\.01, z1 - 3\)\}/);
   assert.match(art, /<text key=\{n\} className="cth-st-tick"/, 'numbers tick when they change');
   // Board columns read left to right on the wall: To do, Doing, Blocked, Done.
-  assert.match(art, /\[0\.3, '#9C97CC', board\.todo\], \[-0\.1, T\.blue, board\.doing\], \[-0\.5, T\.coral, board\.blocked\], \[-0\.9, T\.green, board\.done\]/);
+  assert.match(art, /\[0\.15, '#9C97CC', board\.todo\], \[-0\.21, T\.blue, board\.doing\], \[-0\.57, T\.coral, board\.blocked\], \[-0\.93, T\.green, board\.done\]/);
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(stage, /\{!sel && \(\n\s+<HubChip/);
   assert.match(stage, /\{\(sel \|\| peeking\) && \(/);
@@ -220,4 +220,11 @@ test('a terminal that survived a reload is not shown clocking in', () => {
   const app = read('src/renderer/src/App.tsx');
   assert.match(app, /const running = new Set\(list\.filter\(\(p\) => p\.hasOutput\)\.map\(\(p\) => p\.id\)\);/);
   assert.match(app, /a\.ptyId && running\.has\(a\.ptyId\) && a\.action === ACTION_CLOCKING_IN\) useStore\.getState\(\)\.updateAgent\(a\.id, \{ action: '' \}\)/);
+});
+
+test('Michael\'s office has a name plate by the door, not an M badge (owner, 2026-09-30)', () => {
+  const art = read('src/renderer/src/scene/studio/StudioArt.tsx');
+  assert.match(art, /<NamePlate at=\{P\(0\.58, a \+ 0\.01, z0 \+ 36\)\} name=\{name\} busy=\{busy\}/);
+  assert.doesNotMatch(art, /fontSize=\{12\} fill="#fff">M<\/text>/, 'the M badge is gone');
+  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /<Hub key="hub" T=\{T\} dark=\{dark\} board=\{snap\.board\} busy=\{godBusy\} name=\{god\?\.name\}/);
 });

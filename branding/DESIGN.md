@@ -818,17 +818,21 @@ four desks (§8.9). The monitor screen is the status surface:
 ### 8.4 Michael's glass pod
 
 A raised platform with a glass box (back wall white at 78%, front at 42%; dark: indigo
-tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, and a small ink "M"
-badge floating above the walls. It sits at the center of the platform. The glass is taller
+tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, and a name plate on
+the front glass just right of his door: ink plate, his name in white Sora 600, and a status
+light that glows green while he works (owner, 2026-09-30: an "M" badge said nothing; a door
+plate says whose office it is). It sits at the center of the platform. The glass is taller
 than a desk (72) so his walls carry his numbers:
 
 - Left wall: the task board. To do, Doing, Blocked, Done read left to right, each column's
-  count in mono at its head in the column color, up to four stickies under it. Stickies pop
+  count in mono inside the board's top (never on its edge) in the column color, up to four
+  stickies under it. Stickies pop
   on; Doing breathes; his marker writes under the columns while he works.
 - Right wall, above the monitors: a lit sign (ink, indigo rim) with three mono numbers and
   glyphs: handed out today, waiting on you (coral when above zero), kept; his context gauge
   along its bottom (indigo, amber at 65%, coral at 85%). Numbers tick when they change.
-- The clock (real time, rings for scheduled jobs) at the front end of the left wall.
+- The clock (real time, rings for scheduled jobs) at the front end of the left wall, with
+  clear space between it and the board.
 
 ### 8.5 States on the stage
 

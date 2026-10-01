@@ -292,7 +292,7 @@ function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── Michael's glass pod ──────────────────────────────────────────────────── */
 
-export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false, stats }: {
+export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false, stats, name = 'Michael' }: {
   T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number };
   /** Michael is at work: his screens scroll, the marker writes on the board. */
   busy?: boolean;
@@ -300,6 +300,8 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
   ringing?: boolean;
   /** Closing time is done: Michael's office goes dark last. */
   lightsOut?: boolean;
+  /** His name, on the plate by his door. */
+  name?: string;
   /** His numbers, shown on the sign on his right wall (DESIGN.md 8.4). */
   stats?: { delegated: number; toYou: number; kept: number; ctx: number | null };
 }) {
@@ -314,11 +316,9 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
   const bz1 = z0 + 62;
   // Left to right as you read the wall: To do, Doing, Blocked, Done.
   const cols: [number, string, number][] = [
-    [0.3, '#9C97CC', board.todo], [-0.1, T.blue, board.doing], [-0.5, T.coral, board.blocked], [-0.9, T.green, board.done]
+    [0.15, '#9C97CC', board.todo], [-0.21, T.blue, board.doing], [-0.57, T.coral, board.blocked], [-0.93, T.green, board.done]
   ];
   const hubFlicker = useLightsOn(lightsOut);
-  const [mx, my] = P(0, -0.2, 130);
-  const beam = [P(-0.15, -0.2, ph + 50), P(0.15, -0.2, ph + 50)];
   return (
     <g className={lightsOut ? 'cth-st-lightsout' : hubFlicker}>
       <EllipseAt gx={0} gy={0} z={0} r={2.2} fill="url(#st-glow-hub)" />
@@ -329,10 +329,10 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
       <polygon points={pts([P(-a, -a, z0), P(-a, a, z0), P(-a, a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
       <polygon points={pts([P(-a, -a, z0), P(a, -a, z0), P(a, -a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
       {/* the task board on the back glass: one sticky per task, up to 4 per column */}
-      <polygon points={pts([P(-a + 0.01, -0.97, bz0), P(-a + 0.01, 0.64, bz0), P(-a + 0.01, 0.64, bz1), P(-a + 0.01, -0.97, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
+      <polygon points={pts([P(-a + 0.01, -0.97, bz0), P(-a + 0.01, 0.47, bz0), P(-a + 0.01, 0.47, bz1), P(-a + 0.01, -0.97, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
       {/* Each column's count at its head, written on the board's plane. */}
       {cols.map(([g0, col, n]) => {
-        const [tx, ty] = P(-a + 0.02, g0 + 0.15, bz1 - 4);
+        const [tx, ty] = P(-a + 0.02, g0 + 0.155, bz1 - 13);
         return (
           <g key={`n-${g0}`} transform={`matrix(1,-0.5,0,1,${tx.toFixed(1)},${ty.toFixed(1)})`}>
             <text key={n} className="cth-st-tick" y={0} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontWeight={600} fontSize={11} fill={col}>{n}</text>
@@ -342,17 +342,17 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
       {/* A sticky pops onto its column when it arrives; the Doing column's
           stickies breathe, since that work is in progress right now. */}
       {cols.map(([g0, col, n], ci) => Array.from({ length: Math.min(n, 4) }, (_, j) => {
-        const zz = bz1 - 18 - j * 6;
+        const zz = bz1 - 19 - j * 6;
         return <polygon key={`${g0}-${j}`} className={ci === 1 ? 'cth-st-pop cth-st-doing' : 'cth-st-pop'}
           style={ci === 1 ? { animationDelay: `0s, ${j * 0.3}s` } : undefined}
           points={pts([P(-a + 0.02, g0 + 0.03, zz - 4.2), P(-a + 0.02, g0 + 0.28, zz - 4.2), P(-a + 0.02, g0 + 0.28, zz), P(-a + 0.02, g0 + 0.03, zz)])} fill={col} opacity={0.9} />;
       }))}
       {/* Michael's marker writing a line under the columns while he works. */}
       {busy && (() => {
-        const [p0, p1] = [P(-a + 0.02, 0.55, bz0 + 4), P(-a + 0.02, -0.85, bz0 + 4)];
+        const [p0, p1] = [P(-a + 0.02, 0.4, bz0 + 3), P(-a + 0.02, -0.88, bz0 + 3)];
         return <line x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} pathLength={1} className="cth-st-write" stroke={T.req} strokeWidth={1.4} strokeLinecap="round" strokeDasharray="1 1" />;
       })()}
-      <WallClock at={P(-a + 0.01, 0.86, z1 - 22)} plane="left" ringing={ringing} T={T} />
+      <WallClock at={P(-a + 0.01, 0.8, z1 - 30)} plane="left" ringing={ringing} T={T} />
       {stats && <StatsSign at={P(-0.6, -a + 0.01, z1 - 3)} stats={stats} T={T} dark={dark} />}
       {[[P(-a, a, z0), P(-a, a, z1)], [P(-a, -a, z0), P(-a, -a, z1)], [P(a, -a, z0), P(a, -a, z1)]].map(([p0, p1], i) => (
         <line key={i} x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} stroke={T.wall} strokeWidth={1.4} />
@@ -386,18 +386,13 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
       <Box gx={-0.03} gy={0.28} w={0.06} d={0.06} h={12} z0={ph} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
       <Box gx={-0.2} gy={0.18} w={0.4} d={0.34} h={4} z0={ph + 10} top={T.hseat[0]} left={T.hseat[1]} right={T.hseat[2]} T={T} />
       <Box gx={-0.2} gy={0.46} w={0.4} d={0.07} h={20} z0={ph + 14} top={T.hback[0]} left={T.hback[1]} right={T.hback[2]} T={T} />
-      <path d={`M${beam[0][0]},${beam[0][1]} L${mx - 13},${my} L${mx + 13},${my} L${beam[1][0]},${beam[1][1]} Z`} fill="url(#st-beam)" />
-      <g className={busy ? 'cth-st-bob' : undefined}>
-        <circle cx={mx} cy={my} r={17} fill="#7C6CF2" opacity={0.14} />
-        <circle cx={mx} cy={my} r={12.5} fill={T.mbg} />
-        <text x={mx} y={my + 4.3} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={12} fill="#fff">M</text>
-      </g>
       <polygon points={pts([P(-a, a, z0), P(a, a, z0), P(a, a, z1), P(-a, a, z1)])} fill="url(#st-glassF)" />
       <polygon points={pts([P(a, -a, z0), P(a, a, z0), P(a, a, z1), P(a, -a, z1)])} fill="url(#st-glassF)" />
       {[[-0.7, -0.45], [-0.3, -0.2]].map(([g0, g1]) => (
         <polygon key={g0} points={pts([P(g0, a, z0 + 6), P(g1, a, z0 + 6), P(g1 + 0.25, a, z1 - 6), P(g0 + 0.25, a, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[0]} />
       ))}
       <polygon points={pts([P(a, 0.2, z0 + 6), P(a, 0.38, z0 + 6), P(a, 0.13, z1 - 6), P(a, -0.05, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[1]} />
+      <NamePlate at={P(0.58, a + 0.01, z0 + 36)} name={name} busy={busy} T={T} dark={dark} />
       <polyline points={pts([P(-a, a, z1), P(a, a, z1), P(a, -a, z1)])} fill="none" stroke={T.wall} strokeWidth={1.8} />
       <line x1={P(a, a, z0)[0]} y1={P(a, a, z0)[1]} x2={P(a, a, z1)[0]} y2={P(a, a, z1)[1]} stroke={T.wall} strokeWidth={1.6} />
       <line x1={P(-0.25, a, z0)[0]} y1={P(-0.25, a, z0)[1]} x2={P(0.25, a, z0)[0]} y2={P(0.25, a, z0)[1]} stroke="#7C6CF2" strokeOpacity={0.5} strokeWidth={2} strokeLinecap="round" />
@@ -463,6 +458,20 @@ function StatsSign({ at: [x, y], stats, T, dark }: { at: Pt; stats: { delegated:
           <rect x={4} y={H - 3} width={(W - 8) * Math.min(1, stats.ctx / 100)} height={1.4} rx={0.7} fill={stats.ctx >= 85 ? '#FF8C90' : stats.ctx >= 65 ? '#F2B45A' : '#9D90FF'} />
         </>
       )}
+    </g>
+  );
+}
+
+/** The name plate on the glass beside Michael's door, in the glass's plane:
+ *  ink plate, his name in white, and a status light that glows while he works. */
+function NamePlate({ at: [x, y], name, busy, T, dark }: { at: Pt; name: string; busy: boolean; T: SceneTokens; dark: boolean }) {
+  const w = Math.round(22 + name.length * 6.1);
+  return (
+    <g transform={`matrix(1,0.5,0,1,${x.toFixed(1)},${y.toFixed(1)})`}>
+      <rect x={-w / 2} y={-8} width={w} height={16} rx={3.5} fill={dark ? '#0F0E17' : T.mbg} />
+      <rect x={-w / 2} y={-8} width={w} height={16} rx={3.5} fill="none" stroke={T.req} strokeOpacity={0.55} strokeWidth={0.8} />
+      <circle cx={-w / 2 + 7.5} cy={0} r={2.4} fill={busy ? '#7CF0B4' : '#8A86A3'} className={busy ? 'cth-st-breathe' : undefined} />
+      <text x={-w / 2 + 13} y={3.4} fontFamily="Sora, sans-serif" fontWeight={600} fontSize={9.5} letterSpacing={0.2} fill="#FFFFFF">{name}</text>
     </g>
   );
 }
