@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Changed
+
+- **A new look, Studio.** The pixel floor is gone. The office is now a calm isometric studio:
+  each team sits at a pod with a chip over it, lights come up as the office opens, and work
+  moves across the floor as it happens (handoffs, mail arriving, Michael's numbers on his
+  walls). Every screen, dialog, setup step, Settings field and the release notes use the same
+  fonts, colors and inputs, in light and dark.
+- **Quiet people still have personality.** Idle team members say lines from The Office, and two
+  idle people trade a line by paper plane or envelope, "that's what she said" included.
+- **Cards open where they belong.** A quiet pod's card rolls down from under its chip, and
+  selecting someone dims everyone else.
+- **Needs you is the one number.** The Tasks tab no longer shows its own blocked count.
+- **Ask me cards read plainly.** Titles drop ids, dates and bracketed notes, and the answer box
+  grows as you type. Talk to Michael (formerly Brief Michael) grows the same way and takes
+  pasted screenshots and files.
+- **Task detail** puts the title under the id row and shows the card's notes.
+- **Closing time runs on the floor**, with Cancel and Force quit in a bar instead of a dialog.
+  It now starts from the clock menu too, and open dialogs stay open behind it.
+
+### Removed
+
+- The traces tab, the old command bar, the files tab and other screens nothing opened any more.
+
 ## [0.0.13] (2026-09-30)
 
 ### Added
