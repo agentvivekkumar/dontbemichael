@@ -506,3 +506,5 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
   0% { filter: brightness(.66) saturate(.3); } 12% { filter: brightness(1.12); } 22% { filter: brightness(.7) saturate(.4); }
   34% { filter: brightness(1.08); } 46% { filter: brightness(.85); } 60%, 100% { filter: none; }
 }
+/* Michael's name plate is drawn on the glass; this is its invisible hit area. */
+.cth-st-plate { padding: 0; border: none; background: transparent; cursor: pointer; border-radius: 4px; z-index: 2; }

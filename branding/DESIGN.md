@@ -647,9 +647,9 @@ the first task.
 ### 7.17 Michael's chip and hub card
 
 Michael's numbers live on his glass walls (§8.4; owner, 2026-09-30: a card always on screen
-was a distraction). Under his pod he shows a chip like a quiet pod's (§7.14a): 22 px ink
-avatar, name, status pill. The full hub card below opens while he is selected, or while
-the pointer is on the chip or the card.
+was a distraction). There is no chip: the name plate on his glass is the way in. Hovering
+or focusing it opens the full hub card just under the plate and lights the plate's rim in
+`indigo`; a click selects him, which keeps the card open.
 
 The hub card: 196 px wide, `r-2xl`, `shadow-hub`.
 
@@ -819,8 +819,9 @@ four desks (§8.9). The monitor screen is the status surface:
 
 A raised platform with a glass box (back wall white at 78%, front at 42%; dark: indigo
 tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, and a name plate on
-the front glass just right of his door: ink plate, his name in white Sora 600, and a status
-light that glows green while he works (owner, 2026-09-30: an "M" badge said nothing; a door
+the front glass just right of his door, sized to the glass: a 12 px tall ink plate, his name
+in white Sora 600 at 8 px (shortened with an ellipsis past 12 letters), and a status light
+that glows green while he works; it always ends before the glass's corner (owner, 2026-09-30: an "M" badge said nothing; a door
 plate says whose office it is). It sits at the center of the platform. The glass is taller
 than a desk (72) so his walls carry his numbers:
 

@@ -292,7 +292,7 @@ function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── Michael's glass pod ──────────────────────────────────────────────────── */
 
-export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false, stats, name = 'Michael' }: {
+export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false, stats, name = 'Michael', plateLit = false }: {
   T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number };
   /** Michael is at work: his screens scroll, the marker writes on the board. */
   busy?: boolean;
@@ -302,6 +302,8 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
   lightsOut?: boolean;
   /** His name, on the plate by his door. */
   name?: string;
+  /** His card is open (hovered or selected): the plate's rim lights up. */
+  plateLit?: boolean;
   /** His numbers, shown on the sign on his right wall (DESIGN.md 8.4). */
   stats?: { delegated: number; toYou: number; kept: number; ctx: number | null };
 }) {
@@ -392,7 +394,7 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
         <polygon key={g0} points={pts([P(g0, a, z0 + 6), P(g1, a, z0 + 6), P(g1 + 0.25, a, z1 - 6), P(g0 + 0.25, a, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[0]} />
       ))}
       <polygon points={pts([P(a, 0.2, z0 + 6), P(a, 0.38, z0 + 6), P(a, 0.13, z1 - 6), P(a, -0.05, z1 - 6)])} fill="#FFFFFF" opacity={T.reflOp[1]} />
-      <NamePlate at={P(0.58, a + 0.01, z0 + 36)} name={name} busy={busy} T={T} dark={dark} />
+      <NamePlate at={P(...plateAt(name))} name={name} busy={busy} lit={plateLit} T={T} dark={dark} />
       <polyline points={pts([P(-a, a, z1), P(a, a, z1), P(a, -a, z1)])} fill="none" stroke={T.wall} strokeWidth={1.8} />
       <line x1={P(a, a, z0)[0]} y1={P(a, a, z0)[1]} x2={P(a, a, z1)[0]} y2={P(a, a, z1)[1]} stroke={T.wall} strokeWidth={1.6} />
       <line x1={P(-0.25, a, z0)[0]} y1={P(-0.25, a, z0)[1]} x2={P(0.25, a, z0)[0]} y2={P(0.25, a, z0)[1]} stroke="#7C6CF2" strokeOpacity={0.5} strokeWidth={2} strokeLinecap="round" />
@@ -462,16 +464,29 @@ function StatsSign({ at: [x, y], stats, T, dark }: { at: Pt; stats: { delegated:
   );
 }
 
+/** The name as the plate shows it: long names are shortened to fit the glass. */
+export function plateName(name: string): string { return name.length > 12 ? `${name.slice(0, 11)}…` : name; }
+/** The plate's width in stage px, sized to the glass (owner, 2026-09-30: the
+ *  first plate was too big for the wall and ran onto the next one). */
+export function plateWidth(name: string): number { return Math.round(16 + plateName(name).length * 4.7); }
+/** Where Michael's name plate sits (grid x, y, height): on the front glass,
+ *  right of his door, ending before the corner however long the name. The
+ *  stage puts its hover target here too. */
+export function plateAt(name: string): [number, number, number] {
+  return [Math.min(0.6, 0.97 - plateWidth(name) / 100), 1.06, 44];
+}
+
 /** The name plate on the glass beside Michael's door, in the glass's plane:
  *  ink plate, his name in white, and a status light that glows while he works. */
-function NamePlate({ at: [x, y], name, busy, T, dark }: { at: Pt; name: string; busy: boolean; T: SceneTokens; dark: boolean }) {
-  const w = Math.round(22 + name.length * 6.1);
+function NamePlate({ at: [x, y], name, busy, lit, T, dark }: { at: Pt; name: string; busy: boolean; lit: boolean; T: SceneTokens; dark: boolean }) {
+  const w = plateWidth(name);
   return (
     <g transform={`matrix(1,0.5,0,1,${x.toFixed(1)},${y.toFixed(1)})`}>
-      <rect x={-w / 2} y={-8} width={w} height={16} rx={3.5} fill={dark ? '#0F0E17' : T.mbg} />
-      <rect x={-w / 2} y={-8} width={w} height={16} rx={3.5} fill="none" stroke={T.req} strokeOpacity={0.55} strokeWidth={0.8} />
-      <circle cx={-w / 2 + 7.5} cy={0} r={2.4} fill={busy ? '#7CF0B4' : '#8A86A3'} className={busy ? 'cth-st-breathe' : undefined} />
-      <text x={-w / 2 + 13} y={3.4} fontFamily="Sora, sans-serif" fontWeight={600} fontSize={9.5} letterSpacing={0.2} fill="#FFFFFF">{name}</text>
+      {lit && <rect x={-w / 2 - 2.5} y={-8.5} width={w + 5} height={17} rx={5} fill={T.indigo} opacity={0.22} />}
+      <rect x={-w / 2} y={-6} width={w} height={12} rx={2.5} fill={dark ? '#0F0E17' : T.mbg} />
+      <rect x={-w / 2} y={-6} width={w} height={12} rx={2.5} fill="none" stroke={lit ? T.indigo : T.req} strokeOpacity={lit ? 1 : 0.55} strokeWidth={lit ? 1.2 : 0.7} />
+      <circle cx={-w / 2 + 5.5} cy={0} r={1.8} fill={busy ? '#7CF0B4' : '#8A86A3'} className={busy ? 'cth-st-breathe' : undefined} />
+      <text x={-w / 2 + 10} y={2.9} fontFamily="Sora, sans-serif" fontWeight={600} fontSize={8} fill="#FFFFFF">{plateName(name)}</text>
     </g>
   );
 }

@@ -124,7 +124,7 @@ test('the studio moves on real events only: scheduled runs, mail, tools, done ta
   assert.match(stage, /if \(!seat \|\| !life\.postActive\[m\.id\]\) return null;/);
   assert.match(stage, /plan\.pods\.map\(\(pod\) => kickoff\[pod\.members\[0\]\.id\] \? \(/);
   assert.doesNotMatch(stage, /dash="5 5"/, 'no standing red line from a broken mailbox');
-  assert.match(stage, /busy=\{godBusy\} name=\{god\?\.name\} ringing=\{life\.clockRinging\}/);
+  assert.match(stage, /busy=\{godBusy\} name=\{god\?\.name\} plateLit=\{[^}]+\} ringing=\{life\.clockRinging\}/);
   // Reduced motion: the ambient loops stop.
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-scroll, \.cth-st-steam, \.cth-st-sway, \.cth-st-dot, \.cth-st-write, \.cth-st-bob, \.cth-st-flow, \.cth-st-doing \{ animation: none !important; \}/);
 });
@@ -212,8 +212,11 @@ test('Michael\'s numbers live on his walls; a chip replaces the always-on card (
   // Board columns read left to right on the wall: To do, Doing, Blocked, Done.
   assert.match(art, /\[0\.15, '#9C97CC', board\.todo\], \[-0\.21, T\.blue, board\.doing\], \[-0\.57, T\.coral, board\.blocked\], \[-0\.93, T\.green, board\.done\]/);
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
-  assert.match(stage, /\{!sel && \(\n\s+<HubChip/);
-  assert.match(stage, /\{\(sel \|\| peeking\) && \(/);
+  // The name plate on his glass is the way in; no floating chip (owner, 2026-09-30).
+  assert.doesNotMatch(stage, /HubChip/);
+  assert.match(stage, /className="cth-st-plate"/);
+  assert.match(stage, /onMouseEnter=\{\(\) => openPeek\('hub'\)\}\n\s+onMouseLeave=\{closePeek\}\n\s+onFocus=\{\(\) => openPeek\('hub'\)\}/);
+  assert.match(stage, /\{\(sel \|\| peek === 'hub'\) && \(/);
 });
 
 test('a terminal that survived a reload is not shown clocking in', () => {
@@ -224,7 +227,9 @@ test('a terminal that survived a reload is not shown clocking in', () => {
 
 test('Michael\'s office has a name plate by the door, not an M badge (owner, 2026-09-30)', () => {
   const art = read('src/renderer/src/scene/studio/StudioArt.tsx');
-  assert.match(art, /<NamePlate at=\{P\(0\.58, a \+ 0\.01, z0 \+ 36\)\} name=\{name\} busy=\{busy\}/);
+  assert.match(art, /<NamePlate at=\{P\(\.\.\.plateAt\(name\)\)\} name=\{name\} busy=\{busy\}/);
+  // The plate ends before the glass's corner (gx 1.05) for any name.
+  assert.match(art, /return \[Math\.min\(0\.6, 0\.97 - plateWidth\(name\) \/ 100\), 1\.06, 44\];/);
   assert.doesNotMatch(art, /fontSize=\{12\} fill="#fff">M<\/text>/, 'the M badge is gone');
-  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /<Hub key="hub" T=\{T\} dark=\{dark\} board=\{snap\.board\} busy=\{godBusy\} name=\{god\?\.name\}/);
+  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /<Hub key="hub" T=\{T\} dark=\{dark\} board=\{snap\.board\} busy=\{godBusy\} name=\{god\?\.name\} plateLit=/);
 });

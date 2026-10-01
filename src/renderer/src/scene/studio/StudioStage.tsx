@@ -23,7 +23,7 @@ import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
 import { HUB, HUB_CARD, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
 import { bendFor, useStudioLife } from './life';
-import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, type DeskState } from './StudioArt';
+import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
 
@@ -233,7 +233,11 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
       const t = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
       return { l, t, r: l + r.w, b: t + r.h };
     });
-    if (god && (selected === god.id || peek === 'hub')) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 230 });
+    if (god && (selected === god.id || peek === 'hub')) {
+      const pb = plateBox(god.name);
+      const l = (pb.l + pb.r) / 2 - HUB_CARD.w / 2;
+      boxes.push({ l, t: pb.b + 8, r: l + HUB_CARD.w, b: pb.b + 8 + 230 });
+    }
     const spots: [QuoteSpot, number, number][] = [
       ['up', left, chipTop - GAP - QH],
       ['up-end', left + 32 - QW, chipTop - GAP - QH],
@@ -241,6 +245,14 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     ];
     const free = spots.find(([, l, t]) => !boxes.some((q) => l < q.r && l + QW > q.l && t < q.b && t + QH > q.t));
     return (free ?? spots[0])[0];
+  };
+
+  /** Michael's name plate, in screen px: the plate is drawn in the glass's
+   *  plane (a 0.5 shear), so its box is taller than the plate itself. */
+  const plateBox = (name: string) => {
+    const [px, py] = P(...plateAt(name));
+    const w = plateWidth(name);
+    return { l: ox + (px - w / 2) * k, t: oy + (py - 6 - w / 4) * k, r: ox + (px + w / 2) * k, b: oy + (py + 6 + w / 4) * k };
   };
 
   /** A pod shows its full card while someone in it is at work, or it is selected. */
@@ -324,7 +336,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} plateLit={!!god && (selected === god.id || peek === 'hub')} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
             stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}
@@ -401,23 +413,28 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         ];
       })}
 
-      {/* Michael: a chip under his office (his numbers live on his walls); his
-          full card shows while he is selected or the pointer is on the chip or card. */}
+      {/* Michael: his name plate on the glass is the way in (owner, 2026-09-30).
+          Hover shows his full card under the plate; a click selects him, which
+          keeps the card open. His numbers live on his walls. */}
       {god && (() => {
         const sel = selected === god.id;
-        const peeking = peek === 'hub';
+        const plate = plateBox(god.name);
         return (
           <>
-            {!sel && (
-              <HubChip
-                style={{ ...at(HUB_CARD.left + HUB_CARD.w / 2, HUB_CARD.top + 4), transform: 'translateX(-50%)' }}
-                god={god} toYou={toYou} onSelect={() => select(god.id)}
-                onEnter={() => openPeek('hub')} onLeave={closePeek}
-              />
-            )}
-            {(sel || peeking) && (
-              <div onMouseEnter={sel ? undefined : () => openPeek('hub')} onMouseLeave={sel ? undefined : closePeek}
-                style={{ ...at(HUB_CARD.left, HUB_CARD.top + (sel ? 0 : 38)), width: HUB_CARD.w, zIndex: 3 }}>
+            <button
+              data-studio-card=""
+              onClick={() => select(god.id)}
+              onMouseEnter={() => openPeek('hub')}
+              onMouseLeave={closePeek}
+              onFocus={() => openPeek('hub')}
+              onBlur={closePeek}
+              aria-label={`${god.name}, ${t('studio.officeManager')}`}
+              className="cth-st-plate"
+              style={{ position: 'absolute', left: plate.l, top: plate.t, width: plate.r - plate.l, height: plate.b - plate.t }}
+            />
+            {(sel || peek === 'hub') && (
+              <div onMouseEnter={() => openPeek('hub')} onMouseLeave={closePeek}
+                style={{ position: 'absolute', left: (plate.l + plate.r) / 2 - HUB_CARD.w / 2, top: plate.b + 8, width: HUB_CARD.w, zIndex: 3 }}>
                 <HubCard
                   style={{ width: '100%' }}
                   god={god} selected={sel} onSelect={() => select(god.id)}
@@ -641,30 +658,6 @@ const forYouBadge: CSSProperties = {
 };
 
 /* ── Michael's hub card (DESIGN.md 7.17) ──────────────────────────────────── */
-
-/** Michael's chip (DESIGN.md 7.17): his avatar in ink, his name, his status. */
-function HubChip({ style, god, toYou, onSelect, onEnter, onLeave }: {
-  style: CSSProperties; god: Agent; toYou: number; onSelect: () => void; onEnter: () => void; onLeave: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <button data-studio-card="" onClick={onSelect} onMouseEnter={onEnter} onMouseLeave={onLeave}
-      aria-label={`${god.name}, ${t('studio.officeManager')}`}
-      style={{
-        ...style, display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 5px 0 4px',
-        border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--cth-font-ui)',
-        background: 'color-mix(in srgb, var(--cth-card) 94%, transparent)', backdropFilter: 'blur(6px)',
-        boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
-      }}>
-      <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--cth-ink)', color: 'var(--cth-bg)', fontSize: 11, fontWeight: 700 }}>
-        {god.name.slice(0, 1).toUpperCase()}
-      </span>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--cth-ink)' }}>{god.name}</span>
-      <PixelBadge status={god.status as StatusKind} style={{ fontSize: 10, lineHeight: '13px', padding: '1px 7px' }} />
-      {toYou > 0 && <span className="cth-sr-only">{t('studio.toYou')}: {toYou}</span>}
-    </button>
-  );
-}
 
 function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board }: {
   style: CSSProperties; god: Agent; selected: boolean; onSelect: () => void;
