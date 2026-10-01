@@ -15,7 +15,7 @@ import { AgentControlStrip } from './AgentControlStrip';
 import { ClearedBanner } from './ClearedBanner';
 import { EditAgentModal } from './EditAgentModal';
 import { GitTab } from './GitTab';
-import { SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
@@ -159,7 +159,7 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
                     }
                     void window.cth.historyAdd({ agentId: agent.id, cwd: agent.cwd, text: t });
                   }}
-                  onToggleFullscreen={() => setFullscreen(agent.id)}
+                  onToggleFullscreen={SHOW_FOCUS_MODE ? () => setFullscreen(agent.id) : undefined}
                   fullscreen={false}
                   embedded
                   // Team members take work from Michael; the owner types to

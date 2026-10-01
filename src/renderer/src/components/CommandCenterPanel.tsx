@@ -12,7 +12,7 @@ import { ProfileTab } from './ProfileTab';
 import { MemoryNotes, memorySummary } from './MemoryNotes';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { memoryView } from '@shared/memoryIndex';
-import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
 import { TriggerCard } from './triggers/ui';
@@ -238,7 +238,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
                     }
                     void window.cth.historyAdd({ agentId: agent.id, cwd: agent.cwd, text: t });
                   }}
-                  onToggleFullscreen={() => setFullscreen(fullscreen ? null : agent.id)}
+                  onToggleFullscreen={SHOW_FOCUS_MODE || fullscreen ? () => setFullscreen(fullscreen ? null : agent.id) : undefined}
                   fullscreen={fullscreen}
                   embedded={!fullscreen}
                 />

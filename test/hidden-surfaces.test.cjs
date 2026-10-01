@@ -306,3 +306,14 @@ test('the hire wizard has no worktree, resume, projects or engine choices (owner
   assert.match(src, /\{SHOW_ENGINE_PICKER && <>[\s\S]*?addAgent\.provider[\s\S]*?addAgent\.command[\s\S]*?<\/>\}/, 'engine and command are gated');
   assert.match(src, /const model = customModel \?\? defaultModel;/, 'the model starts on the Settings default');
 });
+
+test('focus mode is hidden: no button opens it and a saved preference cannot reopen it (owner, 2026-10-01)', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_FOCUS_MODE, false);
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /if \(id && !SHOW_FOCUS_MODE\) return;/, 'setFullscreen opens nothing');
+  assert.match(store, /fullscreenAgentId: SHOW_FOCUS_MODE \? focusOnLoad\(initialPrefersFocusMode, initialSelectedId\) : null,/, 'never at launch');
+  assert.match(store, /if \(!SHOW_FOCUS_MODE\) return s;/, 'restoreFocusMode does nothing');
+  assert.match(read('src/renderer/src/shell/TopBar.tsx'), /\{SHOW_FOCUS_MODE && \(\n\s+<IconButton label=\{fullscreenAgentId \? t\('shell\.exitFocus'\)/);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \? /);
+  assert.match(read('src/renderer/src/components/CommandCenterPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \|\| fullscreen \? /);
+});

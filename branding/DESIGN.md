@@ -396,7 +396,9 @@ Rules:
   live on the stage.
 - Minimum window 1280 × 800: the studio scales down to fit the stage beside a 340 px
   right column. Below 1100 px of stage width the platform scales, never crops.
-- Focus mode (full screen terminal) keeps its v1 behavior with v2 styling.
+- Focus mode (full screen terminal) keeps its v1 behavior with v2 styling. Hidden in this
+  build (`SHOW_FOCUS_MODE`, owner, 2026-10-01): no button opens it and a saved preference
+  does not reopen it.
 - RTL: the right column moves to the left, bars mirror, the studio art does not (§8.10).
 
 ### 5.3 Web layout [Web]
@@ -449,7 +451,7 @@ Names in parentheses are today's components that the v2 component replaces or re
 ### 7.1 Top bar
 
 Left to right: lockup (§1.5, 26 px mark); view tabs (§7.2); then, pushed right: clock
-pill (§7.3), version chip (§7.4), icon buttons (theme, focus mode, Settings; 32 × 32,
+pill (§7.3), version chip (§7.4), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
 `r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
 (§7.5). The bar is a drag region; interactive children are `no-drag`.
 

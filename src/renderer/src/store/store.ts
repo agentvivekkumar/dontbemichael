@@ -15,7 +15,7 @@ import { DEFAULT_ORG_TRIGGER, type OrgTriggerConfig, type WebhookTrigger } from 
 import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
-import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
 import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
@@ -860,7 +860,7 @@ export const useStore = create<State>((set, get) => ({
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
-  fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
+  fullscreenAgentId: SHOW_FOCUS_MODE ? focusOnLoad(initialPrefersFocusMode, initialSelectedId) : null,
   prefersFocusMode: initialPrefersFocusMode,
   floorView: initialFloorView,
   ideInitialFile: null,
@@ -1206,6 +1206,8 @@ export const useStore = create<State>((set, get) => ({
     set({ floorView: view });
   },
   setFullscreen: (id) => {
+    // Focus mode is hidden in this build: nothing opens it (buildFeatures.ts).
+    if (id && !SHOW_FOCUS_MODE) return;
     // Entering focus mode makes it the default view; leaving it clears that.
     // Only an explicit toggle writes the preference, so an agent closing under
     // you never silently changes how the app opens next time. Every non-explicit
@@ -1216,6 +1218,7 @@ export const useStore = create<State>((set, get) => ({
   refocusFullscreen: (id) => set({ fullscreenAgentId: id }),
   restoreFocusMode: () =>
     set((s) => {
+      if (!SHOW_FOCUS_MODE) return s;
       const id = restoreFocus(s.prefersFocusMode, s.fullscreenAgentId, s.agents, s.selectedId);
       return id === s.fullscreenAgentId ? s : { fullscreenAgentId: id };
     }),

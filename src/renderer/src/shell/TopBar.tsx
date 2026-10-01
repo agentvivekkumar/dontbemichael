@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { SHOW_FOCUS_MODE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { useStore, type FloorView } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -63,9 +64,11 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
         <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} aria="Toggle dark mode" onClick={toggleTheme}>
           {theme === 'dark' ? <SunGlyph /> : <MoonGlyph />}
         </IconButton>
-        <IconButton label={fullscreenAgentId ? t('shell.exitFocus') : t('shell.focus')} aria="Toggle focus mode" onClick={toggleFocus}>
-          {fullscreenAgentId ? <CollapseGlyph /> : <ExpandGlyph />}
-        </IconButton>
+        {SHOW_FOCUS_MODE && (
+          <IconButton label={fullscreenAgentId ? t('shell.exitFocus') : t('shell.focus')} aria="Toggle focus mode" onClick={toggleFocus}>
+            {fullscreenAgentId ? <CollapseGlyph /> : <ExpandGlyph />}
+          </IconButton>
+        )}
         <IconButton label={t('shell.settings')} aria="Settings" onClick={onOpenSettings}>
           <GearGlyph />
         </IconButton>

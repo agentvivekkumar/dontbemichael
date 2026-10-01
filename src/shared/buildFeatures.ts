@@ -21,6 +21,12 @@ export const SHOW_DEV_TOOLS = false;
  *  the file in Finder instead (owner, 2026-09-23). */
 export const SHOW_IDE = false;
 
+/** Focus mode: the full window terminal with a roster of everyone, opened from
+ *  the top bar, from Focus on a Work tab terminal, and reopened at launch by a
+ *  saved preference. Hidden: the office, the panels and the Work tab cover
+ *  what an owner needs (owner, 2026-10-01). */
+export const SHOW_FOCUS_MODE = false;
+
 /** Temporary helpers Michael starts on his own (spawn requests → ephemeral
  *  workers), plus the Settings toggle that allowed it and the WORKERS tab that
  *  listed them. Off in this build: starting an agent is a spend the owner never
