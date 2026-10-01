@@ -1,3 +1,4 @@
+import { askTitle } from './askHeadline';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -95,7 +96,11 @@ export function parseTasks(raw: unknown): HiveTask[] {
         ? t.id
         : stableId(`${typeof t.title === 'string' ? t.title : ''}|${typeof t.createdAt === 'string' ? t.createdAt : ''}|${i}`),
       title: typeof t.title === 'string' ? t.title : '(untitled)',
-      description: typeof t.description === 'string' ? t.description : undefined,
+      // Agents keep a card's running notes in "notes" (owner, 2026-10-01: the
+      // detail's description was empty on every card); "description" is the
+      // older name.
+      description: typeof t.description === 'string' && t.description.trim() ? t.description
+        : typeof t.notes === 'string' ? t.notes : undefined,
       assignee: typeof t.assignee === 'string' ? t.assignee : undefined,
       status: (['todo', 'doing', 'blocked', 'done'] as const).includes(t.status as Status)
         ? (t.status as Status) : 'todo',
@@ -276,7 +281,7 @@ function TaskCard({ task, done, assigneeName, onOpen, onDismiss }: {
         <span style={{
           fontSize: 12.5, fontWeight: 600, lineHeight: '17px', letterSpacing: '-0.01em', color: done ? 'var(--cth-ink-2)' : 'var(--cth-ink)',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-        }}>{task.title}</span>
+        }}>{askTitle(task.title)}</span>
         {assigneeName && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--cth-ink-3)' }}>
             <span style={{ width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)', fontSize: 9, fontWeight: 700 }}>
@@ -359,17 +364,20 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={task.title} onClick={(e) => e.stopPropagation()} style={{
+      <div role="dialog" aria-modal="true" aria-label={askTitle(task.title)} onClick={(e) => e.stopPropagation()} style={{
         width: 560, maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column',
         background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
       }}>
-        {/* Header: id, title, close */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '18px 20px 14px' }}>
-          <span style={{ flexShrink: 0, marginTop: 1, padding: '2px 8px', borderRadius: 6, background: 'var(--cth-neutral-soft)', fontFamily: 'var(--cth-font-mono)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-ink-2)' }}>#{task.id.replace(/^#/, '')}</span>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: '22px', letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{task.title}</div>
-          <button onClick={onClose} aria-label={t('common.close')} style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 'var(--cth-r-md)', border: 'none', cursor: 'pointer', background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-2)', display: 'grid', placeItems: 'center' }}>
+        {/* Header: the id and close on one row, the title under them at full
+            width (owner, 2026-10-01: side by side, a long id squeezed the title). */}
+        <div style={{ padding: '16px 20px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span title={task.id} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 8px', borderRadius: 6, background: 'var(--cth-neutral-soft)', fontFamily: 'var(--cth-font-mono)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-ink-2)' }}>#{task.id.replace(/^#/, '')}</span>
+          <button onClick={onClose} aria-label={t('common.close')} style={{ marginInlineStart: 'auto', flexShrink: 0, width: 30, height: 30, borderRadius: 'var(--cth-r-md)', border: 'none', cursor: 'pointer', background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-2)', display: 'grid', placeItems: 'center' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 16, fontWeight: 600, lineHeight: '22px', letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{askTitle(task.title)}</div>
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--cth-line)' }}>
           {/* Facts */}
@@ -399,12 +407,14 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
             </div>
           </div>
 
-          {/* The contract, preserved line by line */}
-          <div>{label(t('kanban.description'))}
-            <div style={{ fontSize: 12.5, lineHeight: '19px', color: 'var(--cth-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} dir={rtl ? 'auto' : undefined}>
-              {task.description?.trim() || <span style={{ color: 'var(--cth-ink-3)' }}>{t('kanban.noDescription')}</span>}
+          {/* The card's notes, line by line; nothing when there are none. */}
+          {task.description?.trim() && (
+            <div>{label(t('kanban.description'))}
+              <div style={{ fontSize: 12.5, lineHeight: '19px', color: 'var(--cth-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} dir={rtl ? 'auto' : undefined}>
+                {task.description.trim()}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* The owner Q&A trail: every decision documented on the card. */}
           {(task.humanQA?.length ?? 0) > 0 && (

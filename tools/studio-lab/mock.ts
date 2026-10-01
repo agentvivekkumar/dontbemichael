@@ -9,7 +9,7 @@ try { localStorage.setItem('cth.theme', location.hash.includes('dark') ? 'dark' 
 const now = new Date().toISOString();
 const ago = (h: number) => new Date(Date.now() - h * 3600e3).toISOString();
 const tasks = { tasks: [
-  { id: 'T112', title: 'Refund for Northwind Cafe, Invoice #4471', status: 'blocked', assignee: 'kelly', priority: 4, createdAt: now, description: 'Maria at Northwind Cafe was charged twice for September. Refund $240 or explain.', humanQA: [{ q: 'Refund it, or tell Kelly what to say?', askedAt: now, raisedBy: 'god' }] },
+  { id: 'T112', title: 'Refund for Northwind Cafe, Invoice #4471', status: 'blocked', assignee: 'kelly', priority: 4, createdAt: now, notes: 'Maria at Northwind Cafe was charged twice for September. Refund $240 or explain.', humanQA: [{ q: 'Refund it, or tell Kelly what to say?', askedAt: now, raisedBy: 'god' }] },
   { id: 'T118', title: 'Build sales pipeline and first forecast', status: 'blocked', assignee: 'dwight', createdAt: now, humanQA: [{ q: '**Two deals passed their 30 Sep close date and are still open in the CRM. Where does each stand?**\n\n1. `Lakeview Dental`, website refresh, `$10,000`, last contact 21 Sep.\n2. `Bayside Books`, training, `$8,000`, last contact 31 Aug.\n\nFor each: won, lost, or a new close date.', askedAt: ago(1), raisedBy: 'god' }] },
   { id: 'T119', title: 'Pipeline report', status: 'todo', assignee: 'dwight', dependsOn: ['T118'] },
   { id: 'T121', title: 'Close September support tickets', status: 'todo', assignee: 'kelly', dependsOn: ['T112'] },

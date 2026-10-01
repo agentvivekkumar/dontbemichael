@@ -1451,7 +1451,6 @@
     "dismissAria": "忽略任务",
     "taskTitle": "任务",
     "unassigned": "未分配",
-    "noDescription": "（此卡片没有描述）",
     "humanQA": "问题",
     "awaitingAnswer": "等你回答",
     "dependsOn": "依赖",
@@ -1465,7 +1464,7 @@
     "assignee": "负责人",
     "priorityLabel": "优先级",
     "created": "创建时间",
-    "description": "描述",
+    "description": "备注",
     "question": "问题",
     "answer": "回答",
     "assignHint": "交给 {{godName}} 分派"

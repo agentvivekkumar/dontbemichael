@@ -1451,7 +1451,6 @@
     "dismissAria": "dismiss task",
     "taskTitle": "Task",
     "unassigned": "unassigned",
-    "noDescription": "(no description on this card)",
     "humanQA": "Questions",
     "awaitingAnswer": "Waiting for you",
     "dependsOn": "Dependencies",
@@ -1465,7 +1464,7 @@
     "assignee": "Assignee",
     "priorityLabel": "Priority",
     "created": "Created",
-    "description": "Description",
+    "description": "Notes",
     "question": "Question",
     "answer": "Answer",
     "assignHint": "Sends it to {{godName}} to hand out"

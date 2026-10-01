@@ -73,3 +73,18 @@ test('an Ask me card title drops opaque ids and bracketed metadata', () => {
   assert.match(hive, /Give the card a TITLE the owner can read at a glance/);
   assert.match(hive, /- give the card a title the owner reads at a glance/);
 });
+
+/**
+ * Task detail (owner, 2026-10-01): the id and close sit on one row with the
+ * title below at full width, and the card's notes show (agents write "notes";
+ * the dialog read only "description", so it was empty on every card).
+ */
+test('task detail: title under the id row, and the card\'s notes show', () => {
+  const src = read('src/renderer/src/components/TasksKanban.tsx');
+  // "description" when it has text, else the agents' "notes".
+  assert.match(src, /description: typeof t\.description === 'string' && t\.description\.trim\(\) \? t\.description\n\s*: typeof t\.notes === 'string' \? t\.notes : undefined,/);
+  assert.match(src, /\{task\.description\?\.trim\(\) && \(/, 'no empty section');
+  assert.doesNotMatch(src, /noDescription/);
+  assert.match(src, /<div style=\{\{ marginTop: 10, fontSize: 16, fontWeight: 600[^}]*\}\}>\{askTitle\(task\.title\)\}<\/div>/);
+  assert.match(read('src/main/hive.ts'), /Keep the card\\'s "notes" to what the work is and where it stands/);
+});

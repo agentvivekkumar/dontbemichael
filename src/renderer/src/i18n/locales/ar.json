@@ -1451,7 +1451,6 @@
     "dismissAria": "تجاهل المهمة",
     "taskTitle": "المهمة",
     "unassigned": "غير مُسنَدة",
-    "noDescription": "(لا وصف على هذه البطاقة)",
     "humanQA": "الأسئلة",
     "awaitingAnswer": "بانتظارك",
     "dependsOn": "يعتمد على",
@@ -1465,7 +1464,7 @@
     "assignee": "المسؤول",
     "priorityLabel": "الأولوية",
     "created": "أُنشئت",
-    "description": "الوصف",
+    "description": "ملاحظات",
     "question": "سؤال",
     "answer": "إجابة",
     "assignHint": "يرسلها إلى {{godName}} لتوزيعها"

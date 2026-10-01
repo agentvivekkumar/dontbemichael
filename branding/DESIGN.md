@@ -730,10 +730,15 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
 Centered overlay over the stage (never over the right column), 528 px wide, `r-2xl`,
 `shadow-lg`, backdrop per §6.1.
 
-- Header: mono id chip, title `t-panel`, close `x`.
+- Header: the mono id chip (one line, ellipsis) and close `x` on the first row; the title
+  `t-panel` under them at full width, cleaned like an Ask me title (§7.8) (owner,
+  2026-10-01: side by side, a long id squeezed the title).
 - Four fields in a row with uppercase micro labels: STATUS (select, `coral` text when
   Blocked), ASSIGNEE (person chip), PRIORITY (5 dots, filled `ink`), CREATED (mono).
-- DESCRIPTION (markdown, `dir=auto`), QUESTIONS (the Q and A trail; an open question sits
+- NOTES: the card's `description`, else the `notes` agents keep on it (owner, 2026-10-01:
+  the dialog read only `description`, so it was empty on every card); Michael is told to
+  keep them to what the work is and where it stands. No section when a card has none.
+  QUESTIONS (the Q and A trail; an open question sits
   in a coral soft box with a "Waiting for you" pill; answered ones are plain), DEPENDENCIES
   (rows with a link icon, mono id, title, "waits on this").
 - Footer: secondary "Assign" with the hint "Sends it to Michael to hand out"; secondary
@@ -1237,6 +1242,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Task detail: title under the id row, the card's notes shown, no empty section (§7.21). |
 | 2026-10-01 | Ask me titles read plain: agents are told how to title a card, and the card drops opaque ids and bracketed metadata (§7.8). |
 | 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down in its chip's place (§7.14a). |
 | 2026-10-01 | Idle lines: only the Office lines in `cafeteriaLines.ts`, dealt with no repeats until a pool runs out; banter, two quiet people trading an exchange as paper planes or envelopes, each line shown where it lands; every 15 to 30 s (§8.8). |
