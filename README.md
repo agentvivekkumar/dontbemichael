@@ -38,7 +38,7 @@ own memory, working on your Mac.
 ---
 
 > [!NOTE]
-> **Brief Michael. Let the office do the rest.**
+> **Talk to Michael. Let the office do the rest.**
 > Tell Michael what you need. He hands the work to whoever's job it is, keeps the team moving, and
 > brings you only the calls that need you.
 
@@ -126,7 +126,7 @@ account are separate: one switch in Mailboxes allows or blocks them for the whol
 
 ### Talk to Michael, not the whole team
 
-Michael is the one you brief. He sends each job to the team member whose role fits, keeps an eye
+Michael is the one you talk to. He sends each job to the team member whose role fits, keeps an eye
 on the task board, and brings you only what needs you. He is the only one who hands out work: when
 one team member needs another to do something, the request goes to Michael and he decides who
 does it. Team members can still ask each other questions directly. Once an hour he runs a standup

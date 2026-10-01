@@ -6,15 +6,15 @@ by release.
 
 ## Part 1: Feature highlights
 
-**One line:** An AI office for your small business. Brief Michael, your office manager, and a team
-of AI employees does the work on your Mac.
+**One line:** An AI office for your small business. Talk to Michael, your office manager, and a
+team of AI employees does the work on your Mac.
 
 **Short pitch:** Pick your kind of business and your team. Every team member is an AI agent with a
 job, its own folder, its own mailbox and its own memory. Michael hands out the work, keeps the team
 moving, and brings you only the decisions that need you.
 
 ### 1. Michael runs the office
-- You brief one person. Michael sends each job to whoever's job it is, runs an hourly standup,
+- You talk to one person. Michael sends each job to whoever's job it is, runs an hourly standup,
   keeps the task board right and brings you only what needs you.
 - Only Michael assigns work. When one team member needs another to do something, it goes through
   Michael, so work never bounces between two agents. Teammates can still ask each other questions.
