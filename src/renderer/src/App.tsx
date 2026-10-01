@@ -153,6 +153,7 @@ export function App() {
   useEffect(() => { setDialogsSuspended(closingOpen); }, [closingOpen]);
   useEffect(() => window.cth.onCloseRequested(() => {
     if (closingOpenRef.current) return;
+    closingOpenRef.current = true; // a second request in the same tick sees it before the render
     setClosingOpen(true);
     void startClosingTimeRef.current(reopenAsked.current ? { relaunch: true } : undefined);
   }), []);

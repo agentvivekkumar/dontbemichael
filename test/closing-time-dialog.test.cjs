@@ -143,7 +143,7 @@ test('a tool call\'s detail and clock stay in memory: no save, and never in the 
 test('quitting starts closing time on the floor, with no dialog (owner, 2026-09-30)', () => {
   const app = read('src/renderer/src/App.tsx');
   assert.doesNotMatch(app, /QuitWarningModal/);
-  assert.match(app, /window\.cth\.onCloseRequested\(\(\) => \{\n\s+if \(closingOpenRef\.current\) return;\n\s+setClosingOpen\(true\);\n\s+void startClosingTimeRef\.current\(/);
+  assert.match(app, /window\.cth\.onCloseRequested\(\(\) => \{\n\s+if \(closingOpenRef\.current\) return;\n\s+closingOpenRef\.current = true;[^\n]*\n\s+setClosingOpen\(true\);\n\s+void startClosingTimeRef\.current\(/);
   // The bar takes the bottom bar's place; Cancel calls closing time off and tells main.
   assert.match(app, /\{closingOpen \? \(\n\s+<ClosingTimeBar/);
   assert.match(app, /if \(closing && closing\.phase !== 'error'\) cancelClosingTime\(\);\n\s+window\.cth\.cancelClose\(\);/);
