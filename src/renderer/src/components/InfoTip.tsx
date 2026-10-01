@@ -5,7 +5,9 @@ import { useId, useState, type CSSProperties } from 'react';
  * show the fields and keep the explanations one step away (owner, 2026-09-27:
  * "one of the design goal every where should be make design less verbose").
  */
-export function InfoTip({ text, label }: { text: string; label?: string }) {
+/** `align="end"` opens the bubble toward the start side, for an icon at the
+ *  end of a row inside a clipping card (it would run off the card's edge). */
+export function InfoTip({ text, label, align = 'start' }: { text: string; label?: string; align?: 'start' | 'end' }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
@@ -33,7 +35,7 @@ export function InfoTip({ text, label }: { text: string; label?: string }) {
         </svg>
       </button>
       {open && (
-        <span id={id} role="tooltip" style={bubble}>{text}</span>
+        <span id={id} role="tooltip" style={align === 'end' ? { ...bubble, insetInlineStart: 'auto', insetInlineEnd: -8 } : bubble}>{text}</span>
       )}
     </span>
   );

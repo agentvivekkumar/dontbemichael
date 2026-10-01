@@ -1,13 +1,16 @@
-// Cafeteria small-talk — The Office edition.
+// The studio's idle talk, The Office edition (branding/DESIGN.md 8.8).
 //
-// The cast ARE Dunder Mifflin (see cast.ts), so an agent's coffee break is an
-// excuse for a one-liner in character. Two kinds of line:
-//   • solo  — one quip shown above a single agent at a break spot
-//   • pair  — a two-beat exchange between two agents at the same table
+// The cast ARE Dunder Mifflin (see cast.ts), so a quiet team member says a line
+// in character. Two kinds:
+//   * solo: one line on the speaker's chip. createIdleLines deals the
+//     speaker's own lines about 60% of the time, else a break-room line
+//     (SHARED_SOLO), never repeating until a pool runs out.
+//   * pair: an exchange two quiet people trade as paper planes or envelopes.
+//     createBanter deals EXCHANGES, the "that's what she said" bits and each
+//     character's signature opener.
 //
-// Lines are kept short so they fit the studio's quote bubble (250 px). Character
-// keys match OfficeCharacterName; anyone without bespoke lines falls back to the
-// shared GENERIC pool so the floor never feels empty.
+// Lines are kept short for the 250 px quote bubble. Character keys match
+// OfficeCharacterName.
 
 import type { OfficeCharacterName } from './cast';
 
@@ -117,10 +120,9 @@ export function createIdleLines(random: () => number = Math.random): (character:
 
 // ─── paired exchanges (two agents at one table) ──────────────────────────────
 //
-// Each exchange is a list of beats that ALTERNATE between the two agents:
-// beat[0] = the speaker who sat down, beat[1] = their table-mate, beat[2] =
-// speaker again, and so on. The director plays them out one beat at a time.
-// Lines are trimmed to fit the thought cloud; longer ones auto-truncate.
+// Each exchange is a list of beats that ALTERNATE between the two people:
+// beat[0] = the one who opens, beat[1] = the other, beat[2] = the opener again,
+// and so on. The studio plays them out one beat at a time.
 
 type Exchange = readonly string[];
 

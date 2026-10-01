@@ -11,12 +11,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
-test('closing time closes every dialog first, and its bar sits above dialogs', () => {
-  // Value: protects=quitting with Settings open shows the closing bar; fails_when=dialogs stop listening or the bar drops below them; why_new=red team found the bar hidden behind modals; seam=none
+test('closing time leaves dialogs open but pauses their keyboard traps; the bar sits above them', () => {
+  // Value: protects=quitting with Settings or the hire wizard open shows the bar and loses nothing; fails_when=dialogs close on closing time again, or the trap keeps the keyboard; why_new=review pass 2 found closing dialogs lost hire queues and edits; seam=none
   const dialog = read('src/renderer/src/shell/useDialog.ts');
-  assert.match(dialog, /window\.addEventListener\(CLOSING_TIME_EVENT, onClosingTime\);/);
-  assert.match(dialog, /window\.removeEventListener\(CLOSING_TIME_EVENT, onClosingTime\);/);
-  assert.match(read('src/renderer/src/components/ClosingTimeBar.tsx'), /zIndex: 550,/);
+  assert.match(dialog, /if \(suspended \|\| !ref\.current \|\| stack\[stack\.length - 1\] !== me\) return;/);
+  assert.match(read('src/renderer/src/App.tsx'), /useEffect\(\(\) => \{ setDialogsSuspended\(closingOpen\); \}, \[closingOpen\]\);/);
+  const bar = read('src/renderer/src/components/ClosingTimeBar.tsx');
+  assert.match(bar, /zIndex: 650,/);
+  assert.match(bar, /regionRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
 });
 
 test('the task detail is a real dialog: Esc from a field stays in the field, focus trapped', () => {
@@ -59,4 +61,40 @@ test('top bar buttons speak the app language; the release notes backdrop needs a
   assert.doesNotMatch(top, /aria="(Toggle dark mode|Settings|Toggle focus mode)"/);
   assert.match(top, /aria-label=\{label\}/);
   assert.match(read('src/renderer/src/components/ReleaseDrop.tsx'), /\{\.\.\.backdrop\}/);
+});
+
+test('a paste attaches a screenshot or Finder files, and leaves text (even with an image) as text', () => {
+  // Value: protects=pasting into either composer; fails_when=text pastes get swallowed, screenshots stop attaching, or spreadsheet cells become a picture; why_new=review pass 2: the shared helper had no test; seam=none
+  const calls = { saved: 0 };
+  globalThis.window = { cth: {
+    saveClipboardImage: async () => { calls.saved++; return { ok: true, file: { path: '/tmp/shot.png', name: 'shot.png' } }; },
+    pathForFile: (f) => f.path ?? ''
+  } };
+  const { attachmentsFromPaste } = require('./load-ts.cjs')('src/renderer/src/components/pasteAttachments.ts');
+  const ev = (items, files = []) => { const e = { prevented: false, preventDefault() { this.prevented = true; }, clipboardData: { items, files } }; return e; };
+  const shot = ev([{ kind: 'file', type: 'image/png' }]);
+  const p1 = attachmentsFromPaste(shot);
+  assert.ok(p1 && shot.prevented, 'a screenshot is taken');
+  const cells = ev([{ kind: 'string', type: 'text/plain' }, { kind: 'file', type: 'image/png' }]);
+  assert.equal(attachmentsFromPaste(cells), null, 'cells with an image paste as text');
+  assert.equal(cells.prevented, false);
+  const text = ev([{ kind: 'string', type: 'text/plain' }]);
+  assert.equal(attachmentsFromPaste(text), null);
+  const finder = ev([], [{ path: '/Users/x/a.pdf', name: 'a.pdf' }, { name: 'nopath' }]);
+  const p2 = attachmentsFromPaste(finder);
+  assert.ok(p2 && finder.prevented, 'files with paths attach');
+  return Promise.all([p1, p2]).then(([a, b]) => {
+    assert.deepEqual(a, [{ path: '/tmp/shot.png', name: 'shot.png' }]);
+    assert.deepEqual(b, [{ path: '/Users/x/a.pdf', name: 'a.pdf' }]);
+  });
+});
+
+test('Closing time in the clock menu quits like Cmd-Q, and closes only its own floor', () => {
+  // Value: protects=the menu item never leaves the app windowless in the Dock; fails_when=the IPC is renamed or the menu goes back to window.close(); why_new=review pass 2; seam=none
+  const main = read('src/main/index.ts');
+  assert.match(main, /ipcMain\.handle\('app:requestQuit', \(evt\) => \{\n\s*const win = BrowserWindow\.fromWebContents\(evt\.sender\);\n\s*if \(win && win !== mainWindow\) \{ win\.close\(\); return; \}\n\s*app\.quit\(\);/);
+  assert.match(read('src/preload/index.ts'), /requestQuit: \(\): Promise<void> => ipcRenderer\.invoke\('app:requestQuit'\),/);
+  const top = read('src/renderer/src/shell/TopBar.tsx');
+  assert.match(top, /void window\.cth\.requestQuit\(\);/);
+  assert.doesNotMatch(top, /^\s*window\.close\(\);/m);
 });

@@ -619,7 +619,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                       aria-required
                       aria-invalid={gapShown('name')}
                       className="cth-input"
-                      style={fieldStyle(gapShown('name'))}
+                      style={inputStyle}
                     />
                   </label>
 
@@ -731,7 +731,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                         <Icon name={f.icon} />
                       </span>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{t(f.labelKey, { godName })}</span>
-                      <InfoTip text={t(f.descKey)} />
+                      <InfoTip text={t(f.descKey)} align="end" />
                     </div>
                   ))}
                 </div>
@@ -1348,25 +1348,26 @@ function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
         borderRadius: 'var(--cth-r-md)',
         textAlign: 'left', cursor: 'pointer', border: 'none',
         padding: 10, display: 'flex', gap: 10, alignItems: 'flex-start',
-        background: selected ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
+        // Selection is indigo, as in the hire wizard; green means done or on.
+        background: selected ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
         boxShadow: missing && !selected
-          ? 'inset 0 0 0 2px var(--cth-coral)'
-          : `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
+          ? 'inset 0 0 0 2px var(--cth-coral-base)'
+          : `inset 0 0 0 1px ${selected ? 'var(--cth-indigo)' : 'var(--cth-line-2)'}`
       }}
     >
       <span style={{
         borderRadius: 'var(--cth-r-md)',
         width: 28, height: 28, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
+        background: 'var(--cth-neutral-soft)',
         fontSize: 16, lineHeight: '28px'
       }}>{glyph}</span>
       {/* minWidth:0 lets this flex child shrink below its content width;
           without it the text column refuses to narrow and pushes past the tile. */}
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{
-          display: 'block', fontFamily: 'var(--cth-font-display)',
-          fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-900)',
+          display: 'block', fontFamily: 'var(--cth-font-ui)',
+          fontSize: 13, fontWeight: 600, lineHeight: '17px', color: 'var(--cth-ink)',
           // Pack names are DATA, not copy we control: a bundled or community pack
           // can supply a long token with no space in it ("SaaS/Consulting"), and
           // no browser breaks a line at a slash. Break anywhere rather than let a
@@ -1375,7 +1376,7 @@ function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
         }}>{title}</span>
         <span style={{
           display: 'block', fontSize: 12, lineHeight: '16px',
-          color: 'var(--cth-ink-700)', overflowWrap: 'anywhere'
+          color: 'var(--cth-ink-2)', overflowWrap: 'anywhere'
         }}>
           {subtitle}
         </span>
@@ -1583,9 +1584,6 @@ function prevStep(s: Step): Step {
     : 'business';
 }
 
-/** An input that is flagged as missing gets a coral ring, matching the error box. */
-const fieldStyle = (missing: boolean): React.CSSProperties =>
-  missing ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral-base)' } : inputStyle;
 
 /** The v2 field (DESIGN.md 7.9): the ring and the indigo focus ring come from
  *  the `cth-input` class every caller sets. */

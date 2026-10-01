@@ -246,11 +246,11 @@
       "askFirst": "يسأل أولًا",
       "breaker": "قاطع الدائرة",
       "breakerDesc": "يراقب عضو الفريق العالق في حلقة أو الذي ينفق كثيرًا: يوجّهه أولًا، ثم يوقفه مؤقتًا، ثم يوقفه.",
-      "floorBudget": "ميزانية رموز المكتب",
+      "floorBudget": "ميزانية استخدام المكتب",
       "budgetPlaceholder": "مثال: 1000000",
       "budgetEquals": "= {{value}} رمز",
       "budgetTotal": "كل أعضاء الفريق معًا",
-      "velocity": "رموز في الدقيقة",
+      "velocity": "الاستخدام في الدقيقة",
       "velocityPlaceholder": "مثال: 200000",
       "repeatedLimit": "تكرار الخطوة نفسها",
       "errorStormLimit": "أخطاء متتالية",
@@ -1914,6 +1914,11 @@
     "tryAgain": "حاول مجددًا"
   },
   "releaseDrop": {
-    "loading": "لحظة…"
+    "loading": "لحظة…",
+    "title": "ما الجديد",
+    "dialogLabel": "ما الجديد في الإصدار {{version}}",
+    "frameTitle": "ما الجديد في {{version}}",
+    "close": "إغلاق ملاحظات الإصدار",
+    "closeTip": "إغلاق (Esc)"
   }
 }

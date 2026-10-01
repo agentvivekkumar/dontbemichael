@@ -12,7 +12,10 @@ export interface PastedFile { path: string; name: string }
  */
 export function attachmentsFromPaste(e: ClipboardEvent<HTMLElement>): Promise<PastedFile[]> | null {
   const items = Array.from(e.clipboardData?.items ?? []);
-  if (items.some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
+  // A screenshot carries only an image. Cells copied from a spreadsheet or a
+  // slide carry text too: then the text is what the owner meant to paste.
+  const hasText = items.some((it) => it.kind === 'string' && it.type === 'text/plain');
+  if (!hasText && items.some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
     e.preventDefault();
     return window.cth.saveClipboardImage().then((res) => (res.ok ? [res.file] : []));
   }

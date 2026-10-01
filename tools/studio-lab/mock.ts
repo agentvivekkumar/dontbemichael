@@ -17,7 +17,7 @@ const tasks = { tasks: [
   { id: 'T116', title: 'Returns', status: 'doing', assignee: 'kelly' },
   { id: 'T114', title: 'Lakeview follow up', status: 'doing', assignee: 'dwight' },
   { id: 'T113', title: 'Match payments', status: 'doing', assignee: 'oscar' },
-  { id: 'T120', title: 'billing@ mailbox', status: 'blocked', assignee: 'oscar', humanQA: [{ q: 'Sign in again?', askedAt: ago(5), raisedBy: 'god' }] },
+  { id: 'T120', title: 'Billing email sign in', status: 'blocked', assignee: 'oscar', humanQA: [{ q: 'Sign in again?', askedAt: ago(5), raisedBy: 'god' }] },
   ...([['Board packet for Lakeview', 'pam'], ['Quarterly referral note', 'ryan'], ['Rotate shared passwords', 'nick'], ['Update PTO policy draft', 'toby'], ['Order printer toner', 'pam']] as const)
     .map(([title, assignee], i) => ({ id: `T${130 + i}`, title, status: 'todo', assignee })),
   ...([['August close', 'oscar'], ['3 lead follow ups', 'dwight'], ['Standup notes', 'god'], ['Website uptime report', 'nick'], ['Timesheet reminder', 'toby'], ['Weekly LinkedIn post', 'ryan'],

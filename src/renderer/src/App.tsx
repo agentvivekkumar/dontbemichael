@@ -31,7 +31,7 @@ import { SHOW_IDE } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import { useTranslation } from 'react-i18next';
 import { TopBar, NeedsYouStrip } from '@/shell/TopBar';
-import { CLOSING_TIME_EVENT } from '@/shell/useDialog';
+import { setDialogsSuspended } from '@/shell/useDialog';
 import { useRestoreTeam } from '@/hooks/useRestoreTeam';
 import { NeedsYouBoard } from '@/shell/NeedsYouBoard';
 import { BottomBar } from '@/shell/BottomBar';
@@ -146,13 +146,13 @@ export function App() {
   // Quitting with people at work starts closing time straight away (owner,
   // 2026-09-30: no dialog; the floor shows the lights going out). The bar
   // offers Cancel and Force quit. A second quit request while closing is a no-op.
-  // Open dialogs close first, so the bar is never hidden behind one.
   const closingOpenRef = useRef(false);
   closingOpenRef.current = closingOpen;
+  // However closing time starts (quit, the update toast, main), open dialogs
+  // stay as they are but let go of the keyboard while the bar is up.
+  useEffect(() => { setDialogsSuspended(closingOpen); }, [closingOpen]);
   useEffect(() => window.cth.onCloseRequested(() => {
     if (closingOpenRef.current) return;
-    window.dispatchEvent(new Event(CLOSING_TIME_EVENT));
-    useStore.getState().closeTaskDetail();
     setClosingOpen(true);
     void startClosingTimeRef.current(reopenAsked.current ? { relaunch: true } : undefined);
   }), []);

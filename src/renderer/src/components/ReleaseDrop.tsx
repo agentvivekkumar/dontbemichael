@@ -53,6 +53,7 @@ const REVEAL_TIMEOUT_MS = 2500;
 export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
   const srcDoc = useMemo(() => buildDropSrcDoc(html), [html]);
   const backdrop = useBackdropClose(onDismiss);
+  const { t } = useTranslation();
 
   // The loader covers the frame until it is ready to be seen. `revealed` latches
   // true on the FIRST of two signals — the iframe's onLoad or the timeout cap —
@@ -89,7 +90,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`What's new in Don't Be Michael ${version}`}
+        aria-label={t('releaseDrop.dialogLabel', { version })}
         style={{
           margin: 'auto',
           height: 'min(82vh, 720px)',
@@ -109,15 +110,15 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
           padding: '14px 16px 12px 22px', borderBottom: '1px solid var(--cth-line)'
         }}>
           <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            What&apos;s new
+            {t('releaseDrop.title')}
             <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 12, fontWeight: 500, color: 'var(--cth-ink-3)', letterSpacing: 0 }}>
               v{version.replace(/^v/, '')}
             </span>
           </span>
           <button
             onClick={onDismiss}
-            aria-label="Close release notes"
-            title="Close (Esc)"
+            aria-label={t('releaseDrop.close')}
+            title={t('releaseDrop.closeTip')}
             style={{
               flexShrink: 0, width: 30, height: 30, padding: 0, border: 'none', cursor: 'pointer',
               borderRadius: 'var(--cth-r-md)', background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
@@ -138,7 +139,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
               authored <a target="_blank"> reach the OS browser, and it carries no
               script, same-origin, form or navigation rights with it. */}
           <iframe
-            title={`What's new in ${version}`}
+            title={t('releaseDrop.frameTitle', { version })}
             srcDoc={srcDoc}
             sandbox="allow-popups"
             referrerPolicy="no-referrer"
@@ -200,7 +201,9 @@ function DropLoader() {
           />
         ))}
       </span>
-      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-3)' }}>
+      {/* The frame is white in both themes (an authored page), so the text
+          keeps the light theme's ink-3 rather than the token, which flips. */}
+      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: '#6C6884' }}>
         {t('releaseDrop.loading')}
       </span>
     </div>

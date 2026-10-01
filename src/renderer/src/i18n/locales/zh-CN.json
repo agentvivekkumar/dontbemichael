@@ -246,11 +246,11 @@
       "askFirst": "先询问",
       "breaker": "断路器",
       "breakerDesc": "留意陷入循环或花费过多的团队成员：先引导，再暂停，最后停止。",
-      "floorBudget": "办公室令牌预算",
+      "floorBudget": "办公室用量预算",
       "budgetPlaceholder": "例如 1000000",
       "budgetEquals": "= {{value}} 令牌",
       "budgetTotal": "所有团队成员合计",
-      "velocity": "每分钟令牌数",
+      "velocity": "每分钟用量",
       "velocityPlaceholder": "例如 200000",
       "repeatedLimit": "同一步骤重复次数",
       "errorStormLimit": "连续错误次数",
@@ -1914,6 +1914,11 @@
     "tryAgain": "重试"
   },
   "releaseDrop": {
-    "loading": "稍等…"
+    "loading": "稍等…",
+    "title": "新功能",
+    "dialogLabel": "{{version}} 版本的新功能",
+    "frameTitle": "{{version}} 的新功能",
+    "close": "关闭版本说明",
+    "closeTip": "关闭 (Esc)"
   }
 }

@@ -155,10 +155,10 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   // The office re-renders only when something it draws changes (review,
   // 2026-10-01: every agent update re-rendered the whole stage), and keeps
   // its last picture while the Tasks or graph view covers it.
-  const liveAgents = useStoreWithEqualityFn(useStore, (s) => s.agents, sameDrawnAgents);
-  const shownAgents = useRef(liveAgents);
-  if (floorView === 'office' && !fullscreenAgentId) shownAgents.current = liveAgents;
-  const agents = shownAgents.current;
+  const agents = useStoreWithEqualityFn(useStore, (s) => s.agents, (a, b) => {
+    const st = useStore.getState();
+    return st.floorView !== 'office' || !!st.fullscreenAgentId || sameDrawnAgents(a, b);
+  });
   const god = agents.find((a) => a.isGod);
   const godId = god?.id ?? 'god';
   const snap = useTaskSnapshot(godId);
@@ -381,7 +381,9 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
         <StudioDefs T={T} families={families} />
         <Platform T={T} />
         {plan.pods.map((pod) => (
-          <PodGlow key={`glow-${pod.dept}-${pod.members[0].id}`} grid={pod.grid} famKey={pod.dept} desks={pod.members.map((a) => ({ st: deskState(a) }))} />
+          <g key={`glow-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
+            <PodGlow grid={pod.grid} famKey={pod.dept} desks={pod.members.map((a) => ({ st: deskState(a) }))} />
+          </g>
         ))}
         {/* No standing wires (owner, 2026-09-30: lines everywhere looked busy).
             A wire shows only while something moves along it: Michael's wire to a
@@ -404,7 +406,8 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
             const owner = ownerOf(m.id);
             return {
               depth: gx + POST_GY,
-              node: <g key={`p-${m.id}`} style={dimStyle(!!selected)}><MailPost gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} /></g>
+              // A mailbox stays bright when its watcher is the one selected.
+              node: <g key={`p-${m.id}`} style={dimStyle(dimmed(owner ? [owner.id] : []))}><MailPost gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} /></g>
             };
           }),
           ...plan.pods.map((pod) => ({
@@ -453,7 +456,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
           const r = cardRect(pod.slot, pod.members.length);
           const x = ox + r.stem.x * k;
           return (
-            <g key={`stem-${pod.members[0].id}`}>
+            <g key={`stem-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
               <line x1={x} y1={oy + r.stem.y1 * k} x2={x} y2={oy + r.stem.y2 * k} stroke={T.stem} strokeWidth={1} strokeDasharray="2 3" />
               <circle cx={x} cy={oy + r.stem.y2 * k} r={2.2} fill={T.stem} />
             </g>
@@ -491,7 +494,8 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
           return (
             <PodCard
               key={`card-${pod.members[0].id}`}
-              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
+              // The selected person's card sits above any dimmed neighbour it overlaps.
+              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, zIndex: selected && pod.members.some((a) => a.id === selected) ? 2 : undefined, ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
               dept={pod.dept} members={pod.members} c={families[pod.dept]}
               snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
             />
@@ -549,7 +553,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
         const broken = m.status === 'needs-attention';
         const w = broken ? 170 : 96;
         return (
-          <MailTag key={m.id} style={{ position: 'absolute', left: ox + x * k - (broken ? w / 2 - 16 : w / 2), top: oy + (y + 20) * k, minWidth: w, width: 'max-content', maxWidth: 230 }}
+          <MailTag key={m.id} style={{ position: 'absolute', left: ox + x * k - (broken ? w / 2 - 16 : w / 2), top: oy + (y + 20) * k, minWidth: w, width: 'max-content', maxWidth: 230, ...dimStyle(dimmed(owner ? [owner.id] : [])) }}
             width={w} address={m.address} owner={owner?.name} acc={owner ? families[departmentOf(owner)].acc : T.req}
             broken={broken} reason={m.statusReason} />
         );
@@ -870,7 +874,7 @@ function CompactGrid({ plan, families, snap, selected, onSelect, missions, godId
       {plan.groups.map((g) => (
         <div key={g.dept} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(186px, 1fr))', gap: 18, paddingTop: 10 }}>
           {g.members.map((a) => (
-            <PodCard key={a.id} style={{ position: 'relative' }} dept={g.dept} members={[a]} c={families[g.dept]}
+            <PodCard key={a.id} style={{ position: 'relative', opacity: selected && a.id !== selected ? 0.45 : 1, transition: 'opacity var(--cth-dur-base) var(--cth-ease)' }} dept={g.dept} members={[a]} c={families[g.dept]}
               snap={snap} selected={selected} onSelect={onSelect} missions={missions} godId={godId} />
           ))}
         </div>
@@ -891,11 +895,16 @@ function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, num
   const timers = useRef(new Set<number>());
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
   const sig = pods.map((p) => `${p.members[0].id}:${p.members.map((a) => a.status).join('.')}`).join('|');
+  // Coming back from the Tasks or graph view, whoever started meanwhile is
+  // just the new baseline: no handoff beams for work handed out minutes ago.
+  const wasPaused = useRef(paused);
   useEffect(() => {
     const now = new Map(pods.flatMap((p) => p.members.map((a) => [a.id, ACTIVE.has(a.status)] as [string, boolean])));
     const before = prev.current;
     prev.current = now;
-    if (!before || paused) return;
+    const resumed = wasPaused.current;
+    wasPaused.current = paused;
+    if (!before || paused || resumed) return;
     for (const pod of pods) {
       if (!pod.members.some((a) => now.get(a.id) && before.get(a.id) === false)) continue;
       const key = pod.members[0].id;
@@ -911,7 +920,7 @@ function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, num
       timers.current.add(id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig]);
+  }, [sig, paused]);
   return kick;
 }
 

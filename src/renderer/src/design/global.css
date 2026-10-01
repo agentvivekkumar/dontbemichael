@@ -76,6 +76,11 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-input { box-shadow: inset 0 0 0 1px var(--cth-line-input); border-radius: var(--cth-r-md); }
 .cth-input:focus,
 .cth-input:focus-visible { box-shadow: inset 0 0 0 2px var(--cth-indigo); }
+/* A field flagged as missing (aria-invalid) wears a coral ring, and still shows
+   focus: the indigo ring with a coral halo. */
+.cth-input[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--cth-coral-base); }
+.cth-input[aria-invalid="true"]:focus,
+.cth-input[aria-invalid="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--cth-indigo), 0 0 0 3px var(--cth-coral-soft); }
 
 /* Scrollbars: thin and quiet. The thumb is the only visible part. */
 ::-webkit-scrollbar { width: 10px; height: 10px; }

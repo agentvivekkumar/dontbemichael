@@ -20,7 +20,7 @@ test('every business tile is highlighted when no type is picked', () => {
   assert.equal(tiles.length, 2, 'the pack tiles and the "something else" tile');
   for (const tile of tiles) assert.match(tile, /missing=\{gapShown\('type'\)\}/);
   assert.match(src, /function PackTile\(\{[^}]*missing/);
-  assert.match(src, /missing && !selected[\s\S]{0,80}var\(--cth-coral\)/);
+  assert.match(src, /missing && !selected[\s\S]{0,80}var\(--cth-coral-base\)/);
 });
 
 test('business name and business type are marked required', () => {

@@ -45,6 +45,10 @@ export interface ClosingTimeBarProps {
  * Force quit asks once, because unsaved work is lost.
  */
 export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: ClosingTimeBarProps) {
+  // Focus comes to the bar as it appears, so the keyboard reaches Cancel and
+  // Force quit even with a dialog open behind it.
+  const regionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { regionRef.current?.focus({ preventScroll: true }); }, []);
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
@@ -65,10 +69,10 @@ export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: Clos
         : headerLine(c, t);
 
   return (
-    <div role="region" aria-label={t('closingBar.title')} style={{
-      // Above every dialog's backdrop (they close when closing time starts),
-      // below only the release notes.
-      position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 550,
+    <div ref={regionRef} tabIndex={-1} role="region" aria-label={t('closingBar.title')} style={{
+      // Above every dialog and the release notes, which stay open behind it
+      // (their keyboard traps pause while closing time runs).
+      position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 650,
       width: 'min(720px, calc(100% - 48px))', display: 'flex', flexDirection: 'column',
       background: 'var(--cth-card)', borderRadius: 'var(--cth-r-xl)', fontFamily: 'var(--cth-font-ui)',
       boxShadow: `inset 0 0 0 1px ${error ? 'color-mix(in srgb, var(--cth-coral) 45%, transparent)' : 'var(--cth-line)'}, var(--cth-shadow-lg)`

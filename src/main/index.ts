@@ -4515,8 +4515,13 @@ function teardownAndQuit(): void {
 }
 // The clock menu's Closing time: the same path as Cmd-Q. before-quit starts
 // closing time when terminals are running and lets the app quit when none are
-// (window.close() only closed the window, leaving the app in the Dock).
-ipcMain.handle('app:requestQuit', () => { app.quit(); });
+// (window.close() only closed the window, leaving the app in the Dock). From a
+// floor window it closes just that floor, through the floor's own confirm.
+ipcMain.handle('app:requestQuit', (evt) => {
+  const win = BrowserWindow.fromWebContents(evt.sender);
+  if (win && win !== mainWindow) { win.close(); return; }
+  app.quit();
+});
 ipcMain.handle('app:confirmClose', () => {
   closingTime.cancel(); // a hard quit overrides a closing time in progress
   teardownAndQuit();
