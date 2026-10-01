@@ -200,7 +200,7 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
   // Only someone in a quiet pod (a chip) speaks; never someone clocking in.
   assert.match(stage, /const idle = quiet;/);
   assert.match(stage, /a\.status === 'idle' && a\.action !== ACTION_CLOCKING_IN/);
-  assert.match(stage, /const wait = first \? 8000 \+ Math\.random\(\) \* 7000 : 25_000 \+ Math\.random\(\) \* 25_000;/);
+  assert.match(stage, /const wait = first \? 8000 \+ Math\.random\(\) \* 7000 : 15_000 \+ Math\.random\(\) \* 15_000;/);
   // Up from the chip, up and leftward, or down under it: the first that covers no card.
   assert.match(stage, /const free = spots\.find\(/);
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-quote-text \{ font-size: 12\.5px;/);

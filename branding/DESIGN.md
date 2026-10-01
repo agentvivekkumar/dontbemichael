@@ -906,10 +906,13 @@ department color, the line in quotes at 12.5 / 17 `ink`, with the speaker's name
 when the chip holds more than one person. Its tail points at the speaker's avatar on the
 chip, which gets a 3 px ring in the same color and a small hop. It opens up from the chip,
 or up and leftward, or down under it, whichever first covers no open card or Michael's.
-It pops in from the tail, holds, and fades. Lines come from the in-character list
-(`cafeteriaLines.ts`). The first comes 8 to 15 s after the office opens, then every 25 to
-50 s, visible 8 s. Never from a pod with someone at work, and never from someone still
-clocking in.
+It pops in from the tail, holds, and fades. Lines come from `cafeteriaLines.ts`
+(`createIdleLines`): about 60% in the speaker's own voice (at least 14 lines each), the rest
+from a shared pool of desk and break-room lines, over 200 in all, original, never show
+quotes. No line comes back until its pool has run out, and the same person never speaks
+twice running when someone else could. The first comes 8 to 15 s after the office opens,
+then every 15 to 30 s, visible 8 s (owner, 2026-10-01: more lines, more often). Never from a
+pod with someone at work, and never from someone still clocking in.
 
 ### 8.9 Scaling rule
 
@@ -1209,6 +1212,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Idle lines: over 200, each person's own voice most of the time, no repeats until a pool runs out, every 15 to 30 s (§8.8). |
 | 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |
 | 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |
 | 2026-10-01 | Needs you: no dismiss (an ask is cleared only by answering), "See full context" replaces "Open task", a chevron shows each card opens. Focus mode hidden (`SHOW_FOCUS_MODE`). The studio lab (§8.13) for demos and videos. |

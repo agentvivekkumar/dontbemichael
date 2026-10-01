@@ -17,7 +17,7 @@ import { useHasTerminalDraft } from '@/components/terminalPool';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
-import { pickSoloLine } from '@/scene/office/cafeteriaLines';
+import { createIdleLines } from '@/scene/office/cafeteriaLines';
 import { useNeedsYouCount } from '@/shell/useNeedsYou';
 import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
@@ -915,12 +915,15 @@ function useIdleQuote(pods: PodPlan<Agent>[], paused: boolean): { agentId: strin
   const [quote, setQuote] = useState<{ agentId: string; text: string; key: number } | null>(null);
   const podsRef = useRef(pods);
   podsRef.current = pods;
+  // One deck of lines for the studio's life, so nothing repeats until it must.
+  const [lines] = useState(() => createIdleLines());
+  const lastSpeaker = useRef('');
   useEffect(() => {
     if (paused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setQuote(null); return; }
     let timer: number | undefined;
     let hide: number | undefined;
     let n = 0;
-    // The first line comes soon after the office opens, then every 25 to 50 s.
+    // The first line comes soon after the office opens, then every 15 to 30 s.
     let first = true;
     const say = () => {
       // Someone idle and in (not still clocking in) says something; people in
@@ -930,15 +933,18 @@ function useIdleQuote(pods: PodPlan<Agent>[], paused: boolean): { agentId: strin
       // Lines belong to a chip, so only someone in a quiet pod speaks.
       const idle = quiet;
       if (idle.length) {
-        const a = idle[Math.floor(Math.random() * idle.length)];
-        const text = pickSoloLine(a.character, 'coffee', Math.floor(Math.random() * 1000));
+        // Someone other than the last speaker, when there is a choice.
+        const others = idle.length > 1 ? idle.filter((x) => x.id !== lastSpeaker.current) : idle;
+        const a = others[Math.floor(Math.random() * others.length)];
+        lastSpeaker.current = a.id;
+        const text = lines(a.character);
         setQuote({ agentId: a.id, text, key: n++ });
         window.clearTimeout(hide);
         hide = window.setTimeout(() => setQuote(null), 8000);
       }
     };
     const schedule = () => {
-      const wait = first ? 8000 + Math.random() * 7000 : 25_000 + Math.random() * 25_000;
+      const wait = first ? 8000 + Math.random() * 7000 : 15_000 + Math.random() * 15_000;
       first = false;
       timer = window.setTimeout(() => { say(); schedule(); }, wait);
     };
