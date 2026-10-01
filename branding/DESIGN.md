@@ -918,9 +918,9 @@ at each other). Each beat flies pod to pod as a paper plane or an envelope (one 
 conversation) in the sender's department color, and on landing shows in the catcher's
 bubble with the sender's name on top and the sender's color on the ring. Each line holds 2
 to 3.6 s by its length while the reply flies back, so the conversation reads in order; the
-last one holds a little longer. Exchanges are the file's `EXCHANGES` and each character's
-signature opener (once a day); the "that's what she said" set stays out, since the studio
-sits on a business owner's screen. A conversation ends early if either person gets work.
+last one holds a little longer. Exchanges are the full set in the file: `EXCHANGES`, the "that's
+what she said" bits (owner, 2026-10-01: "bring full set back") and each character's
+signature opener (once a day). A conversation ends early if either person gets work.
 
 The first line or conversation comes 8 to 15 s after the office opens, then every 15 to
 30 s. A single line is visible 8 s. Never from a pod with someone at work, and never from

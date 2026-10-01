@@ -58,19 +58,21 @@ test('studio idle lines come from this file and never repeat before their pool r
   for (const line of [...first, ...d]) assert.ok(src.includes(line.replace(/'/g, "\\'")) || src.includes(line), `"${line}" is one of the file's lines`);
 });
 
-test('studio conversations are the Office exchanges, without the innuendo set', () => {
+test('studio conversations are the full set of Office exchanges', () => {
   let seed = 11;
   const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
   const twss = src.slice(src.indexOf('const TWSS_EXCHANGES'), src.indexOf('const PAIR_POOL'));
   const next = createBanter(random);
   const seen = new Set();
+  let twssSeen = 0;
   for (let i = 0; i < 120; i++) {
     const ex = next('ryan');
     assert.ok(ex.length >= 2, 'at least a line and a reply');
     seen.add(ex.join(' / '));
-    assert.ok(!twss.includes(`['${ex[0]}', '${ex[1]}'`), `not from the innuendo set: ${ex.join(' / ')}`);
+    if (twss.includes(`['${ex[0]}', '${ex[1]}'`)) twssSeen++;
   }
-  assert.ok(seen.size >= 40, `${seen.size} different exchanges`);
+  assert.ok(seen.size >= 100, `${seen.size} different exchanges`);
+  assert.ok(twssSeen > 0, 'the that\'s what she said bits are in');
   // A signature opener plays once at most for the same person.
   const keyed = createBanter(() => 0);
   assert.deepEqual([...keyed('stanley')], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);

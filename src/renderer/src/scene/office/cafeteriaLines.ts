@@ -281,13 +281,13 @@ const KEYED_EXCHANGES: Partial<Record<OfficeCharacterName, Exchange>> = {
 
 /**
  * Conversations for the studio (DESIGN.md 8.8): two idle people trade the
- * beats of an exchange as paper planes or envelopes. From EXCHANGES and the
- * signature openers; the "that's what she said" set stays out of the studio,
- * which sits on a business owner's screen. No exchange comes back until all
- * have played; `random` is there for tests.
+ * beats of an exchange as paper planes or envelopes. The full set: EXCHANGES,
+ * the "that's what she said" bits (owner, 2026-10-01: "bring full set back")
+ * and the signature openers. No exchange comes back until all have played;
+ * `random` is there for tests.
  */
 export function createBanter(random: () => number = Math.random): (opener: OfficeCharacterName) => Exchange {
-  const next = deck(EXCHANGES, random);
+  const next = deck(PAIR_POOL, random);
   const keyedUsed = new Set<string>();
   return (opener) => {
     const keyed = KEYED_EXCHANGES[opener];
