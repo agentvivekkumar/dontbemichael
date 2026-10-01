@@ -120,3 +120,15 @@ test('every label card is a button, and arrow keys move between them', () => {
   assert.match(src, /data-studio-card=""/);
   assert.match(src, /\['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'\]\.includes\(e\.key\)/);
 });
+
+test('a quiet pod is a chip; its card shows while someone works, it is selected, or hovered (owner, 2026-09-30)', () => {
+  const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(src, /const ACTIVE = new Set<string>\(\['thinking', 'working', 'blocked', 'compacting', 'looping'\]\);/);
+  assert.match(src, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => ACTIVE\.has\(a\.status\) \|\| a\.id === selected\);/);
+  assert.match(src, /if \(!isAwake && peek !== key\) return chip;/);
+  // The chip still carries anything waiting on the owner.
+  const chip = src.slice(src.indexOf('function PodChip('));
+  assert.match(chip.slice(0, 2500), /forYou > 0 &&/);
+  // No stem to a card that is not showing.
+  assert.match(src, /if \(!awake\(pod\) && peek !== podKey\(pod\)\) return null;/);
+});

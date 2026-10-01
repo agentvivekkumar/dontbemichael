@@ -188,6 +188,19 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
   const selected = needsYouOpen ? null : selectedId;
   const select = (id: string) => useStore.getState().select(id);
 
+  // A quiet pod shows a small chip on the pod; its full card opens while the
+  // pointer is on the chip or the card (owner, 2026-09-30: cards on every idle
+  // pod made the office look cluttered). The close waits a moment so the
+  // pointer can travel from the chip up to the card.
+  const [peek, setPeek] = useState<string | null>(null);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const openPeek = (key: string) => { window.clearTimeout(closeTimer.current); setPeek(key); };
+  const closePeek = () => { window.clearTimeout(closeTimer.current); closeTimer.current = window.setTimeout(() => setPeek(null), 220); };
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  const podKey = (pod: PodPlan<Agent>) => `${pod.dept}-${pod.members[0].id}`;
+  /** A pod shows its full card while someone in it is at work, or it is selected. */
+  const awake = (pod: PodPlan<Agent>) => pod.members.some((a) => ACTIVE.has(a.status) || a.id === selected);
+
   // Arrow keys move between cards in reading order (DESIGN.md 12).
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
@@ -272,6 +285,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
       {/* Stems from each card to its pod. */}
       <svg aria-hidden="true" width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         {plan.pods.map((pod) => {
+          if (!awake(pod) && peek !== podKey(pod)) return null;
           const r = cardRect(pod.slot, pod.members.length);
           const x = ox + r.stem.x * k;
           return (
@@ -285,20 +299,37 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
 
       {/* Label cards. */}
       {plan.pods.map((pod) => {
-        const r = cardRect(pod.slot, pod.members.length);
-        // A card above its pod is anchored by its bottom edge, so a taller card
-        // (more people, a context bar) grows away from the pod, not onto it.
+        const key = podKey(pod);
+        const isAwake = awake(pod);
         const above = pod.slot.mode === 'above';
-        const cx = ox + r.left * k;
-        const cy = oy + (above ? r.top + r.h : r.top) * k;
-        return (
-          <PodCard
-            key={`card-${pod.members[0].id}`}
-            style={{ position: 'absolute', left: cx, top: cy, width: r.w, transform: above ? 'translateY(-100%)' : undefined }}
-            dept={pod.dept} members={pod.members} c={families[pod.dept]}
-            snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+        const r = cardRect(pod.slot, pod.members.length);
+        const chip = !isAwake && (
+          <PodChip
+            key={`chip-${pod.members[0].id}`}
+            style={{
+              position: 'absolute', left: ox + pod.slot.x * k,
+              top: oy + (above ? r.stem.y2 - 4 : r.stem.y2 + 6) * k,
+              transform: above ? 'translate(-50%, -100%)' : 'translateX(-50%)'
+            }}
+            dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
+            onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
           />
         );
+        if (!isAwake && peek !== key) return chip;
+        // A card above its pod is anchored by its bottom edge, so a taller card
+        // (more people, a context bar) grows away from the pod, not onto it.
+        const cx = ox + r.left * k;
+        const cy = oy + (above ? r.top + r.h : r.top) * k;
+        return [
+          chip,
+          <PodCard
+            key={`card-${pod.members[0].id}`}
+            style={{ position: 'absolute', left: cx, top: cy, width: r.w, transform: above ? 'translateY(-100%)' : undefined, zIndex: isAwake ? undefined : 2 }}
+            dept={pod.dept} members={pod.members} c={families[pod.dept]}
+            snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+            onEnter={isAwake ? undefined : () => openPeek(key)} onLeave={isAwake ? undefined : closePeek}
+          />
+        ];
       })}
 
       {/* Michael's hub card. */}
@@ -328,7 +359,9 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         const seat = seatOf.get(quote.agentId);
         if (!seat) return null;
         const [x, y] = P(seat.pod.grid[0], seat.pod.grid[1] - 0.42, 57);
-        return <div key={quote.key} className="cth-st-quote" style={{ ...at(x + 6, y - 16), transform: 'translateY(-100%)' }}>{quote.text}</div>;
+        // Over a quiet pod the chip sits there, so the bubble rises above it.
+        const lift = awake(seat.pod) || seat.pod.slot.mode !== 'above' ? 0 : 40;
+        return <div key={quote.key} className="cth-st-quote" style={{ ...at(x + 6, y - 16 - lift), transform: 'translateY(-100%)' }}>{quote.text}</div>;
       })()}
 
       <div className="cth-sr-only" aria-live="polite">{t('studio.summary', { count: agents.length })}</div>
@@ -343,9 +376,10 @@ function bendFor([gx, gy]: Pt): number {
 
 /* ── Label card (DESIGN.md 7.14) ──────────────────────────────────────────── */
 
-function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, godId }: {
+function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, godId, onEnter, onLeave }: {
   style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
   selected: string | null; onSelect: (id: string) => void; missions: ReturnType<typeof useMissions>['missions']; godId: string;
+  onEnter?: () => void; onLeave?: () => void;
 }) {
   const { t } = useTranslation();
   const lead = members[0];
@@ -354,7 +388,7 @@ function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, 
   const isSel = members.some((a) => a.id === selected);
   const allIdle = members.every((a) => a.status === 'idle');
   return (
-    <div style={{
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{
       ...style, borderRadius: 'var(--cth-r-xl)', padding: '12px 10px 0 9px',
       background: `color-mix(in srgb, var(--cth-card) ${allIdle ? 86 : 96}%, transparent)`, backdropFilter: 'blur(6px)',
       boxShadow: isSel ? 'inset 0 0 0 1px var(--cth-ink), var(--cth-ring-select), var(--cth-shadow-md)' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-md)'
@@ -397,7 +431,7 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
     return `${new Date(first.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}: ${first.label}`;
   })();
   const live = a.status !== 'idle' ? liveActivity(a) : '';
-  const caption = (live ? actionText(live, t) : '') || next || '';
+  const caption = sentence((live ? actionText(live, t) : '') || next || '');
   const pct = Math.min(8, Math.max(0, a.progress ?? 0)) / 8;
   const gauge = (a.progress ?? 0) >= 7 ? 'var(--cth-coral-base)' : (a.progress ?? 0) >= 6 ? 'var(--cth-amber)' : c.acc;
   return (
@@ -431,6 +465,56 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
       )}
     </button>
   );
+}
+
+/** A quiet pod's chip (DESIGN.md 7.14a): who sits there, and anything waiting
+ *  on the owner, without the full card. Hover shows the card; a click opens
+ *  that person's panel. */
+function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave }: {
+  style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
+  onSelect: (id: string) => void; onEnter: () => void; onLeave: () => void;
+}) {
+  const { t } = useTranslation();
+  const forYou = members.reduce((n, a) => n + (snap.forYouBy[a.id] ?? 0), 0);
+  const names = members.map((a) => a.name).join(', ');
+  return (
+    <button
+      data-studio-card=""
+      onClick={() => onSelect(members[0].id)}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      aria-label={`${t(`studio.dept.${dept}`)}: ${names}`}
+      title={t(`studio.dept.${dept}`)}
+      style={{
+        ...style, display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px 0 4px',
+        border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--cth-font-ui)',
+        background: 'color-mix(in srgb, var(--cth-card) 92%, transparent)', backdropFilter: 'blur(6px)',
+        boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+      }}
+    >
+      <span style={{ display: 'inline-flex' }}>
+        {members.map((a, i) => (
+          <span key={a.id} style={{
+            width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', marginInlineStart: i ? -6 : 0,
+            background: c.l, color: c.acc, boxShadow: `0 0 0 1.5px var(--cth-card), inset 0 0 0 1px ${c.m}`, fontSize: 10, fontWeight: 700
+          }}>{a.name.slice(0, 1).toUpperCase()}</span>
+        ))}
+      </span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{names}</span>
+      {forYou > 0 && (
+        <span style={forYouBadge}><i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cth-coral-base)', display: 'block' }} />{t('studio.forYou', { count: forYou })}</span>
+      )}
+    </button>
+  );
+}
+
+/** Statuses that mean someone is at work, so their pod shows its full card. */
+const ACTIVE = new Set<string>(['thinking', 'working', 'blocked', 'compacting', 'looping']);
+
+/** Activity captions are stored lower case ("nothing to do"); a caption on
+ *  its own line starts with a capital. */
+function sentence(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 const deptTab: CSSProperties = {
@@ -488,7 +572,7 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
           <PixelBadge status={god.status as StatusKind} style={{ position: 'absolute', insetInlineEnd: 11, top: 9, fontSize: 10, lineHeight: '13px', padding: '1px 7px' }} />
         </div>
         <div style={{ marginTop: 6, fontSize: 10.5, lineHeight: '14px', color: 'var(--cth-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {god.action?.trim() ? actionText(god.action.trim(), t) : t('studio.runningTheOffice')}
+          {god.action?.trim() ? sentence(actionText(god.action.trim(), t)) : t('studio.runningTheOffice')}
         </div>
       </button>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid var(--cth-line)', background: 'var(--cth-card-2)' }}>

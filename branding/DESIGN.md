@@ -619,6 +619,19 @@ The card floating by each pod on the stage.
 - Selected: `ink` border plus `ring-select`. Everything else on the stage dims to 45%.
 - Click selects the person. Tab and arrow keys move between cards (§12).
 
+### 7.14a Quiet pod chip
+
+A pod where nobody is at work (every member idle or waiting) shows a chip on the pod
+instead of its label card, so an idle office stays calm (owner, 2026-09-30).
+
+- A 28 px pill: `card` at 92% with a 6 px blur, `line` ring, `shadow-sm`; the members'
+  20 px avatars overlapping by 6 px, their names in `t-meta` 600 `ink-2`, and the For you
+  badge (§7.15) when anything waits on the owner.
+- Sits just above the pod (below it for the right and front slots); no stem.
+- The full card (§7.14) shows while anyone in the pod is thinking, working, blocked,
+  compacting or looping, while a member is selected, and while the pointer is on the
+  chip or the card. Clicking the chip opens the first member's panel.
+
 ### 7.15 For you badge
 
 Pill, `coral` soft fill, 1 px `#FFC7C9` border (dark: `coral` at 35%), `coral` text

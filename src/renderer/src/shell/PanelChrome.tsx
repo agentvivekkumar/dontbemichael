@@ -20,7 +20,8 @@ export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
   const { t } = useTranslation();
   const dark = useAppTheme() === 'dark';
   const c = agent.isGod ? null : family(departmentOf(agent), dark);
-  const caption = agent.action?.trim() ? actionText(agent.action.trim(), t) : '';
+  const raw = agent.action?.trim() ? actionText(agent.action.trim(), t) : '';
+  const caption = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
   return (
     <div style={{ flexShrink: 0, padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
