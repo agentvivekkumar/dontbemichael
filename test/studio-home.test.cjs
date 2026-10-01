@@ -73,7 +73,7 @@ test('a fifth person opens a second pod; past the ring the view goes compact', (
 test('a card above its pod is anchored by its bottom edge, so it grows away from the pod', () => {
   const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(src, /const cy = oy \+ \(above \? r\.top \+ r\.h : r\.top\) \* k;/);
-  assert.match(src, /transform: above \? 'translateY\(-100%\)' : undefined/);
+  assert.match(src, /transform: open\.bottomAt !== undefined \? 'translateY\(-100%\)' : undefined/);
   const r = L.cardRect({ x: 660, y: 270, mode: 'above', dx: 84, gap: 92 }, 2);
   assert.equal(r.top + r.h, 270 - 92, 'the bottom edge sits a fixed gap above the pod');
 });
@@ -146,15 +146,31 @@ test('every label card is a button, and arrow keys move between them', () => {
 test('a quiet pod is a chip; its card shows while someone works, it is selected, or hovered (owner, 2026-09-30)', () => {
   const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(src, /const ACTIVE = new Set<string>\(\['thinking', 'working', 'blocked', 'compacting', 'looping'\]\);/);
-  assert.match(src, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => \(!quietCards && ACTIVE\.has\(a\.status\)\) \|\| a\.id === selected\);/);
+  assert.match(src, /const working = \(pod: PodPlan<Agent>\) => !quietCards && pod\.members\.some\(\(a\) => ACTIVE\.has\(a\.status\)\);/);
+  assert.match(src, /const rolled = \(pod: PodPlan<Agent>\) => !working\(pod\) && \(peek === podKey\(pod\) \|\| pod\.members\.some\(\(a\) => a\.id === selected\)\);/);
   // In the app quietCards is off, so a pod at work shows its card.
   assert.doesNotMatch(read('src/renderer/src/App.tsx'), /quietCards/);
-  assert.match(src, /if \(!isAwake && peek !== key\) return chip;/);
+  assert.match(src, /const open = openCard\(pod\);\n\s*if \(!open\) return chip;/);
   // The chip still carries anything waiting on the owner.
   const chip = src.slice(src.indexOf('function PodChip('));
   assert.match(chip.slice(0, 6000), /forYou > 0 &&/);
   // No stem to a card that is not showing.
-  assert.match(src, /if \(!awake\(pod\) && peek !== podKey\(pod\)\) return null;/);
+  assert.match(src, /if \(!working\(pod\)\) return null;/);
+});
+
+/**
+ * Owner, 2026-10-01: an opened card sat off at its slot, away from the chip.
+ * A quiet pod's card rolls down from just under its chip, over the monitors;
+ * every chip sits over its pod; no browser tooltip on the chip.
+ */
+test('a quiet pod\'s card rolls down from under its chip; every chip sits over its pod', () => {
+  const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(src, /const chipAt = \(pod: PodPlan<Agent>\) => \(\{ x: ox \+ pod\.slot\.x \* k, y: oy \+ \(pod\.slot\.y - CHIP_LIFT\) \* k \}\);/);
+  assert.match(src, /return \{ l, t: c\.y \+ CHIP_GAP, r: l \+ r\.w, b: c\.y \+ CHIP_GAP \+ r\.h, down: true \};/);
+  assert.match(src, /className=\{open\.down \? 'cth-st-roll' : undefined\}/);
+  assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-roll \{ animation: cth-roll 240ms var\(--cth-ease\) backwards; \}/);
+  const chip = src.slice(src.indexOf('function PodChip('), src.indexOf('function PodChip(') + 4000);
+  assert.doesNotMatch(chip, /title=\{t\(`studio\.dept\./, 'no native tooltip over the pod');
 });
 
 test('more life: plane to Needs you, pointing, conversations, owner messages, hires, closing lights, daylight (owner, 2026-09-30)', () => {

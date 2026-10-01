@@ -192,6 +192,13 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-st-idle { filter: saturate(.25); opacity: .82; }
 :root[data-cth-theme='dark'] .cth-st-idle { filter: saturate(.45) brightness(1.15); opacity: .95; }
 .cth-studio-paused * { animation-play-state: paused !important; }
+/* A quiet pod's card rolls down from under its chip (DESIGN.md 7.14a). The clip
+   only runs while it opens, so the card's shadow and tab are whole after. */
+.cth-st-roll { animation: cth-roll 240ms var(--cth-ease) backwards; }
+@keyframes cth-roll {
+  from { clip-path: inset(-16px -16px 100% -16px); transform: translateY(-6px); opacity: .5; }
+  to { clip-path: inset(-16px -16px -40px -16px); transform: none; opacity: 1; }
+}
 .cth-st-quote {
   position: absolute; pointer-events: none; max-width: 250px; width: max-content; z-index: 2;
   display: flex; flex-direction: column; gap: 3px; padding: 7px 11px 8px;

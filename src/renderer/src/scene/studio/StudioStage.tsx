@@ -30,6 +30,8 @@ const POLL_MS = 5000;
 const CARD_ROOM = 18;
 /** Stage px from a pod's slot point up to the bottom of its chip: just over the monitors. */
 const CHIP_LIFT = 80;
+/** Chip bottom to the top of a card rolled down under it (the department tab sits in it). */
+const CHIP_GAP = 12;
 
 type Board = { todo: number; doing: number; blocked: number; done: number };
 
@@ -250,12 +252,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     const names = pod.members.map((a) => a.name).join(', ');
     const w = 30 + 14 * (pod.members.length - 1) + names.length * 6.6;
     const left = cx - w / 2;
-    const boxes = plan.pods.filter((p) => p !== pod && (awake(p) || peek === podKey(p))).map((p) => {
-      const r = cardRect(p.slot, p.members.length);
-      const l = ox + r.left * k;
-      const t = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
-      return { l, t, r: l + r.w, b: t + r.h };
-    });
+    const boxes = plan.pods.filter((p) => p !== pod).map(openCard).flatMap((b) => (b ? [{ l: b.l, t: b.t, r: b.r, b: b.b }] : []));
     if (god && (selected === god.id || peek === 'hub')) {
       const pb = plateBox(god.name);
       const l = (pb.l + pb.r) / 2 - HUB_CARD.w / 2;
@@ -279,7 +276,30 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   };
 
   /** A pod shows its full card while someone in it is at work, or it is selected. */
-  const awake = (pod: PodPlan<Agent>) => pod.members.some((a) => (!quietCards && ACTIVE.has(a.status)) || a.id === selected);
+  /** Someone in the pod is at work: its card stays open at its slot, with a stem. */
+  const working = (pod: PodPlan<Agent>) => !quietCards && pod.members.some((a) => ACTIVE.has(a.status));
+  /** A quiet pod opened by hover, a spotlight or a selection: its card rolls
+   *  down from under the chip (owner, 2026-10-01). */
+  const rolled = (pod: PodPlan<Agent>) => !working(pod) && (peek === podKey(pod) || pod.members.some((a) => a.id === selected));
+  /** Stage px of a pod's chip: centered on the pod, its bottom edge just over the monitors. */
+  const chipAt = (pod: PodPlan<Agent>) => ({ x: ox + pod.slot.x * k, y: oy + (pod.slot.y - CHIP_LIFT) * k });
+  /** Where a pod's open card is, or null when it shows only its chip. */
+  const openCard = (pod: PodPlan<Agent>): { l: number; t: number; r: number; b: number; down: boolean; bottomAt?: number } | null => {
+    const r = cardRect(pod.slot, pod.members.length);
+    if (working(pod)) {
+      const l = ox + r.left * k;
+      // A card above its pod is anchored by its bottom edge, so a taller card
+      // (more people, a context bar) grows away from the pod, not onto it.
+      const above = pod.slot.mode === 'above';
+      const cy = oy + (above ? r.top + r.h : r.top) * k;
+      const t = above ? cy - r.h : cy;
+      return { l, t, r: l + r.w, b: t + r.h, down: false, bottomAt: above ? cy : undefined };
+    }
+    if (!rolled(pod)) return null;
+    const c = chipAt(pod);
+    const l = Math.min(Math.max(c.x - r.w / 2, 8), fitW - r.w - 8);
+    return { l, t: c.y + CHIP_GAP, r: l + r.w, b: c.y + CHIP_GAP + r.h, down: true };
+  };
 
   // A demo can pop one person's card for a moment, the way a hover does.
   const planRef = useRef(plan);
@@ -402,7 +422,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
       {/* Stems from each card to its pod. */}
       <svg aria-hidden="true" width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         {plan.pods.map((pod) => {
-          if (!awake(pod) && peek !== podKey(pod)) return null;
+          if (!working(pod)) return null;
           const r = cardRect(pod.slot, pod.members.length);
           const x = ox + r.stem.x * k;
           return (
@@ -417,41 +437,34 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
       {/* Label cards. */}
       {plan.pods.map((pod) => {
         const key = podKey(pod);
-        const isAwake = awake(pod);
-        const above = pod.slot.mode === 'above';
-        const r = cardRect(pod.slot, pod.members.length);
-        // Every chip sits just over its pod's monitors, whichever side the
-        // card opens on: hung under a pod, it floated on empty floor (Oscar's
-        // and IT's, owner 2026-10-01).
-        const chipX = ox + pod.slot.x * k;
-        const chipY = oy + (pod.slot.y - CHIP_LIFT) * k;
+        const isWorking = working(pod);
+        const { x: chipX, y: chipY } = chipAt(pod);
         const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
-        const chip = !isAwake && (
+        // A quiet pod shows its chip just over its monitors (owner, 2026-10-01:
+        // the right and front chips used to hang under the pod, on empty floor).
+        const chip = !isWorking && (
           <PodChip
             key={`chip-${pod.members[0].id}`}
-            style={{
-              position: 'absolute', left: chipX, top: chipY,
-              transform: 'translate(-50%, -100%)'
-            }}
+            style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)' }}
             dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
             onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
             quote={speaking}
             quoteSpot={speaking ? quoteSpot(pod, chipX, chipY - 28) : 'up'}
           />
         );
-        if (!isAwake && peek !== key) return chip;
-        // A card above its pod is anchored by its bottom edge, so a taller card
-        // (more people, a context bar) grows away from the pod, not onto it.
-        const cx = ox + r.left * k;
-        const cy = oy + (above ? r.top + r.h : r.top) * k;
+        const open = openCard(pod);
+        if (!open) return chip;
         return [
           chip,
           <PodCard
             key={`card-${pod.members[0].id}`}
-            style={{ position: 'absolute', left: cx, top: cy, width: r.w, transform: above ? 'translateY(-100%)' : undefined, zIndex: isAwake ? undefined : 2 }}
+            // Opened from the chip, the card rolls down just under it, over the
+            // monitors; a working pod's card keeps its slot and its stem.
+            className={open.down ? 'cth-st-roll' : undefined}
+            style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, zIndex: open.down ? 3 : undefined }}
             dept={pod.dept} members={pod.members} c={families[pod.dept]}
             snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
-            onEnter={isAwake ? undefined : () => openPeek(key)} onLeave={isAwake ? undefined : closePeek}
+            onEnter={isWorking ? undefined : () => openPeek(key)} onLeave={isWorking ? undefined : closePeek}
           />
         ];
       })}
@@ -519,8 +532,8 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
 
 /* ── Label card (DESIGN.md 7.14) ──────────────────────────────────────────── */
 
-function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, godId, onEnter, onLeave }: {
-  style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
+function PodCard({ className, style, dept, members, c, snap, selected, onSelect, missions, godId, onEnter, onLeave }: {
+  className?: string; style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
   selected: string | null; onSelect: (id: string) => void; missions: ReturnType<typeof useMissions>['missions']; godId: string;
   onEnter?: () => void; onLeave?: () => void;
 }) {
@@ -531,7 +544,7 @@ function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, 
   const isSel = members.some((a) => a.id === selected);
   const allIdle = members.every((a) => a.status === 'idle');
   return (
-    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{
+    <div className={className} onMouseEnter={onEnter} onMouseLeave={onLeave} style={{
       ...style, borderRadius: 'var(--cth-r-xl)', padding: '12px 10px 0 9px',
       background: `color-mix(in srgb, var(--cth-card) ${allIdle ? 86 : 96}%, transparent)`, backdropFilter: 'blur(6px)',
       boxShadow: isSel ? 'inset 0 0 0 1px var(--cth-ink), var(--cth-ring-select), var(--cth-shadow-md)' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-md)'
@@ -652,7 +665,6 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave, qu
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       aria-label={`${t(`studio.dept.${dept}`)}: ${names}`}
-      title={t(`studio.dept.${dept}`)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px 0 4px',
         border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--cth-font-ui)',

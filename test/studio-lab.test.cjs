@@ -32,7 +32,7 @@ test('in the lab every card stays folded until hovered or spotlit, one at a time
   assert.match(lab, /new CustomEvent\('cth:demo-spotlight', \{ detail: agentId \}\)/);
   const stage = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/scene/studio/StudioStage.tsx'), 'utf8');
   // Quiet cards: work alone no longer opens a card; selection, hover and a spotlight do.
-  assert.match(stage, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => \(!quietCards && ACTIVE\.has\(a\.status\)\) \|\| a\.id === selected\);/);
+  assert.match(stage, /const working = \(pod: PodPlan<Agent>\) => !quietCards && pod\.members\.some\(\(a\) => ACTIVE\.has\(a\.status\)\);/);
   assert.match(stage, /window\.addEventListener\('cth:demo-spotlight', onSpot\);/);
 });
 
