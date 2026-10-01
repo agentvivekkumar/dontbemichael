@@ -30,7 +30,12 @@ const SHOTS = [
   ['michael-office-schedule', '?shot=michael-office-schedule'],
   ['tasks-detail', '?shot=tasks-detail'],
   ['who-talks-to-whom', '?shot=who-talks-to-whom'],
-  ['onboarding-team', '?shot=onboarding-team']
+  ['onboarding-team', '?shot=onboarding-team'],
+  ['onboarding-business', '?shot=onboarding-business'],
+  ['onboarding-meet', '?shot=onboarding-meet'],
+  ['kelly-memory', '?shot=kelly-memory'],
+  ['hire', '?shot=hire'],
+  ['settings-autonomy', '?shot=settings-autonomy']
 ];
 
 const only = process.argv.slice(2);

@@ -10,6 +10,7 @@ import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?u
 import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 import { PixelButton } from './PixelButton';
 import { Icon, type IconName } from './Icon';
+import { InfoTip } from './InfoTip';
 import { SpritePortrait } from './SpritePortrait';
 import { ProviderLogo } from './ProviderLogo';
 import { modelsForProvider, onboardingEngineChoices, teamDefaultsFromMichael, type AgentProvider, type HarnessConfig } from '@/store/config';
@@ -24,7 +25,6 @@ import {
   OFFICE_KEY, folderNames, initialPicks, folderFor, michaelFolderFor, connectionsNeeded, teamPlan,
   type FolderSuggestions
 } from '@shared/teamPlan';
-import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { missingBusinessFields, type BusinessField } from '@shared/businessProfile';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { teamPlanFromRecord, type OfficeRecord } from '@shared/officeRecord';
@@ -34,7 +34,7 @@ export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
   /** Open on a later step with the first answers filled in. Only for the
    *  reference screens (tools/studio-lab/reference.tsx); the app never sets it. */
-  preview?: { step: 'team'; businessType: string; businessName: string };
+  preview?: { step: 'business' | 'welcome' | 'team'; businessType: string; businessName: string };
 }
 
 type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
@@ -63,45 +63,37 @@ interface Feature {
   icon: IconName;
   labelKey: string;
   descKey: string;
-  tint: string;          // tile background token
-  edge: string;          // tile border token
 }
 const FEATURES: Feature[] = [
   {
     icon: 'sparkle',
     labelKey: 'onboarding.welcome.features.team.label',
-    descKey: 'onboarding.welcome.features.team.desc',
-    tint: 'var(--cth-lilac-light)', edge: 'var(--cth-lilac)'
+    descKey: 'onboarding.welcome.features.team.desc'
   },
   {
     icon: 'gear',
     labelKey: 'onboarding.welcome.features.manager.label',
-    descKey: 'onboarding.welcome.features.manager.desc',
-    tint: 'var(--cth-sky-light)', edge: 'var(--cth-sky)'
+    descKey: 'onboarding.welcome.features.manager.desc'
   },
   {
     icon: 'ledger',
     labelKey: 'onboarding.welcome.features.memory.label',
-    descKey: 'onboarding.welcome.features.memory.desc',
-    tint: 'var(--cth-mint-light)', edge: 'var(--cth-mint)'
+    descKey: 'onboarding.welcome.features.memory.desc'
   },
   {
     icon: 'expand',
     labelKey: 'onboarding.welcome.features.commandCenter.label',
-    descKey: 'onboarding.welcome.features.commandCenter.desc',
-    tint: 'var(--cth-lemon-light)', edge: 'var(--cth-lemon)'
+    descKey: 'onboarding.welcome.features.commandCenter.desc'
   },
   {
     icon: 'check',
     labelKey: 'onboarding.welcome.features.guardrails.label',
-    descKey: 'onboarding.welcome.features.guardrails.desc',
-    tint: 'var(--cth-coral-light)', edge: 'var(--cth-coral)'
+    descKey: 'onboarding.welcome.features.guardrails.desc'
   },
   {
     icon: 'plus',
     labelKey: 'onboarding.welcome.features.hires.label',
-    descKey: 'onboarding.welcome.features.hires.desc',
-    tint: 'var(--cth-peach-light)', edge: 'var(--cth-peach)'
+    descKey: 'onboarding.welcome.features.hires.desc'
   }
 ];
 
@@ -555,7 +547,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
 
             {step === 'resume' && found && (
               <>
-                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
                   {t('onboarding.resume.headline')}
                 </div>
                 <p style={{ margin: 0, lineHeight: '22px' }}>
@@ -604,7 +596,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   </div>
                   <div>
                     <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '18px' }}>
-                      {t('onboarding.business.headline', { godName: godName.toUpperCase() })}
+                      {t('onboarding.business.headline', { godName })}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '19px' }}>
                       {t('onboarding.business.body')}
@@ -626,13 +618,14 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                       placeholder={t('onboarding.business.namePlaceholder')}
                       aria-required
                       aria-invalid={gapShown('name')}
+                      className="cth-input"
                       style={fieldStyle(gapShown('name'))}
                     />
                   </label>
 
                 </div>
 
-                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
                   {t('onboarding.business.ask')} *
                 </div>
 
@@ -725,35 +718,20 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {FEATURES.map((f) => (
+                {/* What the office does, one quiet row each with its explanation
+                    behind an info icon (review, 2026-10-01: a grid of tinted
+                    tiles, one in coral, with six paragraphs). */}
+                <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 'var(--cth-r-lg)', boxShadow: 'inset 0 0 0 1px var(--cth-line)' }}>
+                  {FEATURES.map((f, i) => (
                     <div key={f.labelKey} style={{
-                      borderRadius: 'var(--cth-r-md)',
-                      display: 'flex', gap: 10, alignItems: 'flex-start',
-                      padding: 10,
-                      background: f.tint,
-                      boxShadow: `inset 0 0 0 2px ${f.edge}`
+                      display: 'flex', gap: 10, alignItems: 'center', padding: '9px 12px',
+                      borderTop: i ? '1px solid var(--cth-line)' : undefined
                     }}>
-                      <div style={{
-                        borderRadius: 'var(--cth-r-md)',
-                        width: 28, height: 28, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--cth-paper-100)',
-                        boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
-                      }}>
+                      <span style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)' }}>
                         <Icon name={f.icon} />
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{
-                          fontFamily: 'var(--cth-font-display)',
-                          fontSize: 10, lineHeight: '14px', marginBottom: 3
-                          // These labels are literal caps to match their siblings, so
-                          // the orchestrator's name has to arrive upper-cased too.
-                        }}>{t(f.labelKey, { godName: godName.toUpperCase() })}</div>
-                        <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
-                          {t(f.descKey)}
-                        </div>
-                      </div>
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{t(f.labelKey, { godName })}</span>
+                      <InfoTip text={t(f.descKey)} />
                     </div>
                   ))}
                 </div>
@@ -770,7 +748,9 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     value={home}
                     onChange={(e) => setHome(e.target.value)}
                     placeholder={t('onboarding.home.placeholder')}
-                    style={inputStyle}
+                    className="cth-input"
+                    // A folder path: mono, as DESIGN.md 4.1 sets for paths.
+                    style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12.5 }}
                   />
                   <PixelButton variant="secondary" size="md" onClick={pickHome}>
                     <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
@@ -805,7 +785,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     <Icon name="info" />
                   </span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', marginBottom: 3 }}>
+                    <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, lineHeight: '16px', marginBottom: 3 }}>
                       {t('onboarding.home.syncWarningTitle')}
                     </div>
                     <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
@@ -871,7 +851,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: 'block', fontFamily: 'var(--cth-font-display)', fontSize: 11 }}>
-                            {p.label.toUpperCase()}
+                            {p.label}
                           </span>
                           {PROVIDER_BLURB_KEYS[p.id] && (
                             <span style={{ display: 'block', fontSize: 11, color: 'var(--cth-ink-500)' }}>
@@ -929,7 +909,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: 'block', fontFamily: 'var(--cth-font-display)', fontSize: 11, color: 'var(--cth-ink-500)' }}>
-                          {p.label.toUpperCase()}
+                          {p.label}
                         </span>
                         <span style={{ display: 'block', fontSize: 11, color: 'var(--cth-ink-500)' }}>
                           {t('onboarding.orchestrator.workersOnlyHint')}
@@ -970,6 +950,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   <select
                     value={godModel ?? ''}
                     onChange={(e) => setGodModel(e.target.value || undefined)}
+                    className="cth-input"
                     style={inputStyle}
                   >
                     {/* A <select> whose value matches no option shows its FIRST
@@ -1079,7 +1060,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                 {/* AUTONOMY — one choice that maps to each engine's flag: autoMode →
                     claude bypassPermissions / codex -a never -s workspace-write
                     (sandbox kept), etc.; off → each engine's ask-first default. */}
-                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
                   {t('onboarding.permissions.autonomyHead')}
                 </div>
                 <label style={{
@@ -1097,7 +1078,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     style={{ width: 18, height: 18, flexShrink: 0 }}
                   />
                   <div>
-                    <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px' }}>
+                    <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, lineHeight: '16px' }}>
                       {t('onboarding.permissions.autoLabel')}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--cth-ink-700)' }}>
@@ -1112,7 +1093,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                 <div style={{ height: 1, background: 'var(--cth-ink-300)', margin: '2px 0' }} />
 
                 {/* RELIABILITY — keeping work firing while you're away. */}
-                <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)' }}>
+                <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
                   {t('onboarding.permissions.reliabilityHead')}
                 </div>
                 <p style={{ margin: 0, lineHeight: '20px', fontSize: 12, color: 'var(--cth-ink-700)' }}>
@@ -1180,7 +1161,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   </span>
                   <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div>
-                      <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', marginBottom: 3 }}>
+                      <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, lineHeight: '16px', marginBottom: 3 }}>
                         {t('onboarding.permissions.stayAwake')}
                       </div>
                       <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
@@ -1331,7 +1312,7 @@ function StepIndicator({ current }: { current: number }) {
               width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0,
               fontFamily: 'var(--cth-font-mono)', fontSize: 11, fontWeight: 600,
               background: done ? 'var(--cth-green)' : now ? 'var(--cth-ink)' : 'transparent',
-              color: done || now ? '#FFFFFF' : 'var(--cth-ink-3)',
+              color: done || now ? 'var(--cth-bg)' : 'var(--cth-ink-3)',
               boxShadow: done || now ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)'
             }}>
               {done ? (
@@ -1421,10 +1402,6 @@ const CHIP_FG: Record<TeamChip['tone'], string> = {
   optional: 'var(--cth-ink-2)',
   ok: 'var(--cth-ink-3)'
 };
-
-/** A portrait we know how to draw; anything else from a pack falls back rather than breaking. */
-const castName = (c?: string): OfficeCharacterName =>
-  OFFICE_CAST.some((m) => m.name === c) ? (c as OfficeCharacterName) : DEFAULT_CHARACTER;
 
 /**
  * One member of the starter team (wireframe screen 2, plus the folder they work
@@ -1556,7 +1533,7 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
         <Icon name={icon} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', marginBottom: 3 }}>
+        <span style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, lineHeight: '16px', marginBottom: 3 }}>
           {label}
         </span>
         <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
@@ -1608,16 +1585,16 @@ function prevStep(s: Step): Step {
 
 /** An input that is flagged as missing gets a coral ring, matching the error box. */
 const fieldStyle = (missing: boolean): React.CSSProperties =>
-  missing ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral)' } : inputStyle;
+  missing ? { ...inputStyle, boxShadow: 'inset 0 0 0 2px var(--cth-coral-base)' } : inputStyle;
 
+/** The v2 field (DESIGN.md 7.9): the ring and the indigo focus ring come from
+ *  the `cth-input` class every caller sets. */
 const inputStyle: React.CSSProperties = {
   flex: 1,
-  padding: '6px 8px 4px',
-  background: 'var(--cth-paper-100)',
+  padding: '7px 10px',
+  background: 'var(--cth-card)',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-  fontFamily: 'var(--cth-font-mono)',
+  fontFamily: 'var(--cth-font-ui)',
   fontSize: 13,
-  color: 'var(--cth-ink-900)',
-  outline: 'none'
+  color: 'var(--cth-ink)'
 };

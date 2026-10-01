@@ -8,9 +8,10 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { useStore, actionText, liveActivity, ACTION_CLOCKING_IN, type Agent } from '@/store/store';
 import type { HarnessConfig } from '@/store/config';
-import type { DepartmentName } from '@/design/tokens';
+import { departments, type DepartmentName } from '@/design/tokens';
 import { useAppTheme } from '@/design/theme';
 import { PixelBadge, type StatusKind } from '@/components/PixelBadge';
 import { useHasTerminalDraft } from '@/components/terminalPool';
@@ -26,6 +27,13 @@ import { FLIGHT_MS, bendFor, useStudioLife } from './life';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
+
+/** The agent fields the office draws. Changes to anything else (the terminal
+ *  parser's station bookkeeping, timestamps) leave it alone. */
+const DRAWN_FIELDS = ['id', 'name', 'character', 'status', 'action', 'progress', 'contextTokens', 'contextLimit', 'isGod', 'sourceCard', 'description', 'ptyId', 'lastPrompt'] as const;
+function sameDrawnAgents(a: Agent[], b: Agent[]): boolean {
+  return a === b || (a.length === b.length && a.every((x, i) => x === b[i] || DRAWN_FIELDS.every((k) => Object.is(x[k], b[i][k]))));
+}
 /** Space kept over the highest card above a pod (its department tab sits on top). */
 const CARD_ROOM = 18;
 /** Stage px from a pod's slot point up to the bottom of its chip: just over the monitors. */
@@ -140,11 +148,17 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const dark = useAppTheme() === 'dark';
   const T = sceneTokens(dark);
   const config = useLiveConfig(initialConfig);
-  const agents = useStore((s) => s.agents);
   const selectedId = useStore((s) => s.selectedId);
   const needsYouOpen = useStore((s) => s.needsYouOpen);
   const floorView = useStore((s) => s.floorView);
   const fullscreenAgentId = useStore((s) => s.fullscreenAgentId);
+  // The office re-renders only when something it draws changes (review,
+  // 2026-10-01: every agent update re-rendered the whole stage), and keeps
+  // its last picture while the Tasks or graph view covers it.
+  const liveAgents = useStoreWithEqualityFn(useStore, (s) => s.agents, sameDrawnAgents);
+  const shownAgents = useRef(liveAgents);
+  if (floorView === 'office' && !fullscreenAgentId) shownAgents.current = liveAgents;
+  const agents = shownAgents.current;
   const god = agents.find((a) => a.isGod);
   const godId = god?.id ?? 'god';
   const snap = useTaskSnapshot(godId);
@@ -155,7 +169,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const plan = useMemo(() => planStudio(agents), [agents]);
   const families = useMemo(() => {
     const out: Record<string, Family> = {};
-    for (const d of ['front-desk', 'support', 'sales', 'finance', 'marketing', 'people', 'it', 'operations', 'team'] as DepartmentName[]) out[d] = family(d, dark);
+    for (const d of Object.keys(departments) as DepartmentName[]) out[d] = family(d, dark);
     return out;
   }, [dark]);
 
@@ -169,7 +183,9 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     ro.observe(el);
     setBox({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
-  }, []);
+  // The compact grid and the ring render different host elements: follow the
+  // switch, or the stage stops tracking the window's size.
+  }, [plan.compact]);
   // Leave room for the floating bottom bar under the platform.
   const fitW = Math.max(200, box.w - bleed);
   // A card above its pod keeps its size while the stage scales, so on a short
@@ -237,6 +253,10 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const night = hour >= 19 || hour < 6;
 
   const selected = needsYouOpen ? null : selectedId;
+  // With someone selected, everything else on the stage dims to 45%
+  // (DESIGN.md 7.14 and 8.5).
+  const dimmed = (ids: string[]) => !!selected && !ids.includes(selected);
+  const dimStyle = (on: boolean): CSSProperties => ({ opacity: on ? 0.45 : 1, transition: 'opacity var(--cth-dur-base) var(--cth-ease)' });
   const select = (id: string) => useStore.getState().select(id);
 
   // A quiet pod shows a small chip on the pod; its full card opens while the
@@ -335,7 +355,9 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
 
   if (plan.compact) {
     return (
-      <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: -bleed }}>
+      // The grid of cards does not run under the right column (only the ring
+      // does), or its last column would sit beneath it (review, 2026-10-01).
+      <div ref={hostRef} style={{ position: 'absolute', inset: 0 }}>
         <CompactGrid plan={plan} families={families} snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId} />
       </div>
     );
@@ -382,14 +404,14 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
             const owner = ownerOf(m.id);
             return {
               depth: gx + POST_GY,
-              node: <MailPost key={`p-${m.id}`} gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} />
+              node: <g key={`p-${m.id}`} style={dimStyle(!!selected)}><MailPost gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} /></g>
             };
           }),
           ...plan.pods.map((pod) => ({
             depth: pod.grid[0] + pod.grid[1],
             node: (
+              <g key={`pod-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
               <Pod
-                key={`pod-${pod.dept}-${pod.members[0].id}`}
                 grid={pod.grid}
                 desks={pod.members.map((a) => ({ st: deskState(a), away: away.has(a.id) }))}
                 c={families[pod.dept]} famKey={pod.dept}
@@ -398,10 +420,11 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
                 arriving={pod.members.some((a) => life.arriving.has(a.id))}
                 lightsOut={(!!closing && pod.members.every((a) => closing.out.has(a.id))) || pod.members.every((a) => away.has(a.id))}
               />
+              </g>
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} plateLit={!!god && (selected === god.id || peek === 'hub')} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
-            stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /> }
+          { depth: 0, node: <g key="hub" style={dimStyle(dimmed(god ? [god.id] : []))}><Hub T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} plateLit={!!god && (selected === god.id || peek === 'hub')} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
+            stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /></g> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}
       </svg>
@@ -468,7 +491,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
           return (
             <PodCard
               key={`card-${pod.members[0].id}`}
-              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined }}
+              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
               dept={pod.dept} members={pod.members} c={families[pod.dept]}
               snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
             />
@@ -477,7 +500,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
         return (
           <PodChip
             key={`chip-${pod.members[0].id}`}
-            style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)' }}
+            style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)', ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
             dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
             onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
             quote={speaking}
@@ -604,7 +627,9 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
     return `${new Date(first.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}: ${first.label}`;
   })();
   const live = a.status !== 'idle' ? liveActivity(a) : '';
-  const caption = sentence((live ? actionText(live, t) : '') || next || '');
+  // Office words for what the agent is doing; the owner's own prompt, the
+  // fallback, shows as written (it would read "Read the contract" as a tool).
+  const caption = sentence((live ? (a.action?.trim() ? actionText(live, t) : live) : '') || next || '');
   const pct = Math.min(8, Math.max(0, a.progress ?? 0)) / 8;
   const gauge = (a.progress ?? 0) >= 7 ? 'var(--cth-coral-base)' : (a.progress ?? 0) >= 6 ? 'var(--cth-amber)' : c.acc;
   return (
@@ -862,7 +887,8 @@ function CompactGrid({ plan, families, snap, selected, onSelect, missions, godId
 function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, number> {
   const [kick, setKick] = useState<Record<string, number>>({});
   const prev = useRef<Map<string, boolean> | null>(null);
-  const timers = useRef<number[]>([]);
+  // Pending timeouts only; each leaves the set when it fires.
+  const timers = useRef(new Set<number>());
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
   const sig = pods.map((p) => `${p.members[0].id}:${p.members.map((a) => a.status).join('.')}`).join('|');
   useEffect(() => {
@@ -875,10 +901,14 @@ function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, num
       const key = pod.members[0].id;
       const stamp = Date.now();
       setKick((k) => ({ ...k, [key]: stamp }));
-      timers.current.push(window.setTimeout(() => setKick((k) => {
-        if (k[key] !== stamp) return k;
-        const n = { ...k }; delete n[key]; return n;
-      }), 3200));
+      const id = window.setTimeout(() => {
+        timers.current.delete(id);
+        setKick((k) => {
+          if (k[key] !== stamp) return k;
+          const n = { ...k }; delete n[key]; return n;
+        });
+      }, 3200);
+      timers.current.add(id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);

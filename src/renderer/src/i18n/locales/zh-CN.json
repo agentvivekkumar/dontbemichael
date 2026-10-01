@@ -82,20 +82,12 @@
     "steerAria": "给该智能体发送一条笔记"
   },
   "agentCard": {
-    "boss": "老板",
-    "contextTitle": "上下文：{{used}} / {{limit}} 令牌（{{pct}}%）",
-    "contextGaugeTitle": "上下文指示条：智能体上报活动后开始填充",
-    "doingTasks": "正在执行 {{count}} 项任务，点击查看",
-    "doingTasksPlural": "正在执行 {{count}} 项任务，点击查看",
     "editNote": "编辑私人笔记",
     "addNote": "添加私人笔记",
     "editNoteAria": "编辑 {{name}} 的笔记",
-    "noteAria": "{{name}} 的笔记",
-    "nextRun": "下次工作：{{time}}"
+    "noteAria": "{{name}} 的笔记"
   },
   "askMe": {
-    "emptyTitle": "现在没有需要你的事。🌿",
-    "emptySub": "当团队把任务卡在你的输入上（要回答的问题，或只有你能完成的待办），就会出现在这里（也会出现在楼层的「问我」看板上）。",
     "openDetail": "这个问题的完整背景，以及之前的回答",
     "answerPlaceholder": "你的回答，或者如果你已处理，写“完成”",
     "sending": "正在发送…",
@@ -122,21 +114,11 @@
     "justNow": "刚刚"
   },
   "agentStrip": {
-    "privateNote": "私人笔记 · {{name}}",
-    "done": "完成",
-    "closeNoteEditor": "关闭笔记编辑器",
     "notePlaceholder": "每行一条…",
     "oneLineOneBullet": "一行 = 一条 · Esc 关闭",
     "addAgent": "添加智能体",
-    "restoringTitle": "上次会话的智能体正在以原始 ID 重新生成，以便记忆和收件箱重新挂载。",
-    "restoreTitle": "上次会话：{{names}}",
     "restoringTeam": "正在恢复你的团队…",
-    "restoreTeam": "恢复团队（{{count}}）",
-    "previousSession": "上次会话",
-    "restorable": "{{name}}：可从上次会话恢复",
-    "dismiss": "忽略 {{name}}，从恢复列表中永久移除",
-    "dismissAria": "忽略 {{name}}",
-    "restoreAll": "全部恢复（{{count}}）"
+    "restoreTeam": "恢复团队（{{count}}）"
   },
   "sidebar": {
     "terminal": "工作",
@@ -182,26 +164,6 @@
     "starOnGitHub": "在 GitHub 上标星",
     "reportProblem": "反馈问题",
     "fullChangelog": "完整更新日志 →"
-  },
-  "officeTheme": {
-    "title": "办公室主题",
-    "tvShow": "电视剧办公室主题",
-    "experimental": "实验性",
-    "desc": "把像素办公室换皮成电视剧场景。切换会开启一套全新演员阵容。",
-    "current": "当前",
-    "soon": "即将推出",
-    "notBuiltYet": "{{label}} 尚未构建，暂时显示办公室。",
-    "switchAborted": "切换中止，终端无法关闭：{{error}}",
-    "confirmTitle": "切换到「{{label}}」？",
-    "startsFreshCast": "开启全新演员阵容",
-    "deleteCount": "你的 {{count}} 个当前智能体将被删除，它们的终端会关闭，进行中的工作会停止。",
-    "deleteCountPlural": "你的 {{count}} 个当前智能体将被删除，它们的终端会关闭，进行中的工作会停止。",
-    "onlyCarries": "只有 {{god}} 会保留。",
-    "stillWorking": "⚠ {{count}} 个智能体仍在工作。",
-    "stillWorkingPlural": "⚠ {{count}} 个智能体仍在工作。",
-    "cantUndo": "此操作无法撤销。",
-    "switching": "切换中…",
-    "deleteSwitch": "删除 {{count}} 个并切换"
   },
   "settings": {
     "title": "设置",
@@ -270,8 +232,6 @@
     "agentsModels": {
       "defaultModel": "默认智能体模型",
       "defaultModelDesc": "每个新生成的 Claude 智能体（含 {{godName}}）默认使用此模型，除非按智能体单独选择。在模型选择器中标记为「· 默认」。",
-      "savedNote": "已保存，适用于新生成的智能体",
-      "saveFailed": "保存失败",
       "advanced": "高级",
       "maxTurns": "每次运行最大轮数",
       "unlimited": "无限制",
@@ -279,27 +239,26 @@
     },
     "autonomy": {
       "autonomy": "自主权",
-      "autoOn": "自主模式：智能体无需询问即可行动",
-      "autoOff": "先询问：智能体在工具批准前暂停",
-      "autoDesc": "适用于新生成的智能体（每个智能体的命令仍可覆盖）。",
+      "autoOn": "团队成员无需询问即可行动",
+      "autoOff": "团队成员使用工具前先询问",
+      "autoDesc": "适用于从现在起启动的团队成员。",
       "autonomous": "自主",
       "askFirst": "先询问",
       "breaker": "断路器",
-      "breakerDesc": "防范失控智能体和超支。断路器会对越界的智能体先引导、再约束、最后停止。",
-      "floorBudget": "全楼层令牌预算",
+      "breakerDesc": "留意陷入循环或花费过多的团队成员：先引导，再暂停，最后停止。",
+      "floorBudget": "办公室令牌预算",
       "budgetPlaceholder": "例如 1000000",
       "budgetEquals": "= {{value}} 令牌",
-      "budgetTotal": "整个楼层的令牌总数",
-      "velocity": "令牌速度（tok/分）",
+      "budgetTotal": "所有团队成员合计",
+      "velocity": "每分钟令牌数",
       "velocityPlaceholder": "例如 200000",
-      "repeatedLimit": "重复工具上限",
-      "errorStormLimit": "错误风暴上限",
+      "repeatedLimit": "同一步骤重复次数",
+      "errorStormLimit": "连续错误次数",
       "defaultPlaceholder": "默认",
-      "hardStop": "硬停止",
-      "hardStopDesc": "触发时直接终止智能体，而不仅是约束。关闭 = 先引导（推荐）。",
-      "killOnTrip": "触发即终止",
-      "steerFirst": "先引导",
-      "saved": "已保存"
+      "hardStop": "达到上限时",
+      "hardStopDesc": "立即停止该团队成员，而不是先引导。建议先引导。",
+      "killOnTrip": "立即停止",
+      "steerFirst": "先引导"
     },
     "memory": {
       "semanticMemory": "语义记忆",
@@ -336,8 +295,6 @@
       "start": "启动",
       "connectedBtn": "已连接",
       "stop": "停止",
-      "listening": "监听中",
-      "stopped": "已停止",
       "requestUrl": "请求 URL：粘贴到 Slack 事件订阅中",
       "lastRequestUrl": "上次的请求 URL：在你停止前 Slack 会继续使用",
       "slackHint": "在你的 Slack 应用中：启用事件订阅，添加 message.channels / message.groups 机器人事件，把上面的请求 URL 填进去，然后重新安装到你的工作区。隧道 URL 每次重启都会变化，所以再次点击「启动」后需要重新粘贴。",
@@ -409,8 +366,6 @@
     }
   },
   "commandCenter": {
-    "title": "命令中心",
-    "runsTheFloor": "{{name}} 掌管楼层",
     "deliveryPaused": "已暂停",
     "deliveryAuto": "自动",
     "deliveryPausedTitle": "队列消息正为楼上的每个智能体保留。不会丢失任何内容；重新开启后即会送达。",
@@ -419,7 +374,6 @@
     "ide": "IDE",
     "tabs": {
       "terminal": "工作",
-      "human": "问我",
       "history": "历史",
       "memory": "记忆",
       "workers": "工人",
@@ -641,17 +595,6 @@
     }
   },
   "onboarding": {
-    "titles": {
-      "resume": "欢迎回来",
-      "welcome": "第 3 步，共 7 步 · 认识你的办公室",
-      "home": "第 5 步，共 7 步 · 为应用找一个家",
-      "orchestrator": "第 6 步，共 7 步 · 您的经理",
-      "permissions": "第 7 步，共 7 步 · 权限与可靠性",
-      "done": "全部就绪",
-      "business": "第 1 步，共 7 步 · 您的业务",
-      "details": "第 2 步，共 7 步 · 公司详情",
-      "team": "第 4 步，共 7 步 · 您的团队"
-    },
     "resume": {
       "headline": "我们找到了你的办公室",
       "desc": "这台 Mac 上已有一个办公室，位于 {{folder}}：{{business}}，共有 {{count}} 位团队成员。继续使用它，可以保留你的团队、他们的文件夹、记忆和工作。",
@@ -1353,18 +1296,10 @@
     "topics": "主题",
     "refresh": "刷新",
     "readingMemory": "正在读取记忆…",
-    "topicsShown": "显示 {{shown}} / {{total}} 个主题",
     "loadingMemory": "正在加载记忆…",
     "messageLinks": "{{count}} 条消息连接",
     "knowsAbout": "{{a}} 知道关于「{{b}}」",
-    "messagesLast": "{{count}} 条消息 · 最近：{{act}}",
     "noMemory": "尚未记录记忆。",
-    "legendRequest": "请求",
-    "legendQuery": "询问",
-    "legendPropose": "提议",
-    "legendAgreeDone": "同意/完成",
-    "legendRefuse": "拒绝",
-    "legendInformTopic": "告知/主题",
     "noMessages": "团队之间还没有消息。所有人都显示在下方。",
     "lastN": "最近 {{count}} 条消息",
     "pair": "{{a}} 和 {{b}}",
@@ -1464,7 +1399,8 @@
     "assignee": "负责人",
     "priorityLabel": "优先级",
     "created": "创建时间",
-    "description": "备注",
+    "description": "描述",
+    "notes": "备注",
     "question": "问题",
     "answer": "回答",
     "assignHint": "交给 {{godName}} 分派"
@@ -1598,10 +1534,7 @@
     "office": "办公室",
     "tasks": "任务",
     "graph": "谁在和谁交流",
-    "tasksIntroTitle": "团队的待办清单。",
     "tasksIntro": "团队的每项工作按阶段排列：待办、进行中、已阻塞、已完成。每张卡片显示负责人；带 ? 的卡片在等你处理（请在“问我”标签页回答）。点击卡片查看详情。",
-    "graphIntroTitle": "谁在和谁交流。",
-    "graphIntro": "每个方框是一位团队成员，每条线是他们之间的消息，按类型着色：提问、回答、同意等。打开“主题”可查看每个人记住了什么。点击某人即可在 {{godName}} 的面板上查看其记忆。",
     "graphIntroShort": "每个圆圈是一位成员，每条线是他们之间的消息。点击成员可打开其记忆；拖动可固定位置。"
   },
   "companyProfile": {
@@ -1893,7 +1826,6 @@
     "boardEmptySub": "{{godName}} 正在处理。给你的问题会出现在这里。",
     "backToBoard": "返回“需要你处理”",
     "officeOpen": "办公室开放中",
-    "officeMenu": "办公室",
     "officeSchedule": "办公室日程",
     "closingTime": "下班时间",
     "themeLight": "浅色主题",
@@ -1963,11 +1895,11 @@
     "focus": "专注"
   },
   "quit": {
-    "killing": "正在结束…",
+    "killing": "正在退出…",
     "startFailed": "下班时间未能开始。",
     "saved": "全部已保存。明天见",
     "savedReopen": "全部已保存。正在重新打开",
-    "slow": "这需要一些时间（可能有智能体正在压缩上下文，或正在执行工具调用）。继续等待，或强制退出并接受数据丢失。",
+    "slow": "还有人在收尾。继续等待，或强制退出并丢失未保存的工作。",
     "cancelBack": "取消，回去工作",
     "forceQuit": "立即强制退出"
   },
@@ -1980,5 +1912,8 @@
     "confirmForce": "不等了直接退出？未保存的工作会丢失。",
     "keepClosing": "继续收尾",
     "tryAgain": "重试"
+  },
+  "releaseDrop": {
+    "loading": "稍等…"
   }
 }

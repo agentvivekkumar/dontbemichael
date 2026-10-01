@@ -53,7 +53,7 @@ test('strings about ONE agent interpolate {{name}}, not the orchestrator', () =>
   // These describe whichever agent is on screen. Naming god here is not a
   // translation nit: "This restarts Michael" on a dialog that restarts Kevin is
   // a destructive action describing the wrong target.
-  const perAgent = ['commandCenter.runsTheFloor', 'commandCenter.noTerminal',
+  const perAgent = ['commandCenter.noTerminal',
                     'commandCenter.confirmRestartEngine', 'commandCenter.restartContinueTitle'];
   for (const l of LOCALES) {
     const f = flatten(locale(l));

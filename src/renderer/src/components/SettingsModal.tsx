@@ -14,12 +14,12 @@ import {
   type TriggerMode,
   type WebhookTrigger
 } from '@shared/triggers';
-import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
 import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
+import { InfoTip } from './InfoTip';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
@@ -1394,14 +1394,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.autonomy.autonomy')}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {autoModeOn ? t('settings.autonomy.autoOn') : t('settings.autonomy.autoOff')}
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.autonomy.autoDesc')}
-                            </span>
-                          </div>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                            {autoModeOn ? t('settings.autonomy.autoOn') : t('settings.autonomy.autoOff')}
+                            <InfoTip text={t('settings.autonomy.autoDesc')} />
+                          </span>
                           <PixelButton variant={autoModeOn ? 'primary' : 'secondary'} size="sm" onClick={toggleAutoMode}>
                             {autoModeOn ? t('settings.autonomy.autonomous') : t('settings.autonomy.askFirst')}
                           </PixelButton>
@@ -1437,13 +1433,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                       {/* Circuit breaker — the FULL unit (v0.3.4: all fields have UI) */}
                       <div>
-                        <div style={sectionHead}>
-                          {t('settings.autonomy.breaker')}
-                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.autonomy.breakerDesc')}
+                            <span style={{ ...sectionHead, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
+                              {t('settings.autonomy.breaker')}
+                              <InfoTip text={t('settings.autonomy.breakerDesc')} />
                             </span>
                             <PixelButton variant={brkEnabled ? 'primary' : 'secondary'} size="sm"
                               onClick={() => { setBrkEnabled(!brkEnabled); }}>
@@ -1459,7 +1453,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 placeholder={t('settings.autonomy.budgetPlaceholder')}
                                 style={{ ...slackInputStyle, width: 180 }}
                               />
-                              <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>
+                              <span style={{ fontSize: 11, color: 'var(--cth-ink-500)', textTransform: 'none', letterSpacing: 0 }}>
                                 {fmtBudgetTokens(agentBudget) ? t('settings.autonomy.budgetEquals', { value: fmtBudgetTokens(agentBudget) }) : t('settings.autonomy.budgetTotal')}
                               </span>
                             </label>
@@ -1492,12 +1486,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             </label>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('settings.autonomy.hardStop')}</span>
-                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                                {t('settings.autonomy.hardStopDesc')}
-                              </span>
-                            </div>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                              {t('settings.autonomy.hardStop')}
+                              <InfoTip text={t('settings.autonomy.hardStopDesc')} />
+                            </span>
                             <PixelButton variant={brkHardStop ? 'destructive' : 'secondary'} size="sm"
                               onClick={() => { setBrkHardStop(!brkHardStop); }}>
                               {brkHardStop ? t('settings.autonomy.killOnTrip') : t('settings.autonomy.steerFirst')}

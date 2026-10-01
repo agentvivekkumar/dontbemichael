@@ -5,6 +5,11 @@ import { escapeBelongsToField } from '@/hooks/useBackdropClose';
  *  dialog opened from inside another closes alone. */
 const stack: object[] = [];
 
+/** Sent when closing time starts. Every open dialog closes, so the closing
+ *  bar is never hidden behind one or kept from the keyboard by its focus trap
+ *  (review, 2026-10-01). */
+export const CLOSING_TIME_EVENT = 'cth:closing-time';
+
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -43,9 +48,12 @@ export function useDialog(ref: RefObject<HTMLElement | null>, onClose: () => voi
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
+    const onClosingTime = () => closeRef.current();
     window.addEventListener('keydown', onKey);
+    window.addEventListener(CLOSING_TIME_EVENT, onClosingTime);
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener(CLOSING_TIME_EVENT, onClosingTime);
       stack.splice(stack.indexOf(me), 1);
       if (before && document.contains(before)) before.focus({ preventScroll: true });
     };

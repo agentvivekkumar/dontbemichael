@@ -32,7 +32,9 @@
  * out here even though the drop itself holds none.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { buildDropSrcDoc } from '../../../shared/releaseDrop';
+import { useBackdropClose } from '@/hooks/useBackdropClose';
 
 export interface ReleaseDropProps {
   version: string;
@@ -41,17 +43,16 @@ export interface ReleaseDropProps {
   onDismiss: () => void;
 }
 
-// Landing site palette (docs/DESIGN.md §2). Restated here because the modal is
-// app chrome and cannot reach the site's stylesheet; kept in one place so the
-// frame's tokens in shared/releaseDrop.ts and this chrome never drift apart.
-/** The frame's own ground (shared/releaseDrop.ts --paper), so the area under
- *  the loader never flashes a different color before the page paints. */
-const PAPER = '#FFFDF7';
+/** The frame's own ground (shared/releaseDrop.ts --paper, the v2 `card`), so
+ *  the area under the loader never flashes a different color before the page
+ *  paints. */
+const PAPER = '#FFFFFF';
 
 const REVEAL_TIMEOUT_MS = 2500;
 
 export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
   const srcDoc = useMemo(() => buildDropSrcDoc(html), [html]);
+  const backdrop = useBackdropClose(onDismiss);
 
   // The loader covers the frame until it is ready to be seen. `revealed` latches
   // true on the FIRST of two signals — the iframe's onLoad or the timeout cap —
@@ -77,7 +78,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
   return (
     <div
       // Backdrop. A press and release on it dismisses, same meaning as "later".
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onDismiss(); }}
+      {...backdrop}
       style={{
         position: 'fixed', inset: 0, zIndex: 600, background: 'var(--cth-backdrop)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -162,6 +163,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
  *  chrome — it carries no control; dismissal stays Esc / close / backdrop. It is
  *  removed the instant the frame is revealed, so it is only ever seen briefly. */
 function DropLoader() {
+  const { t } = useTranslation();
   return (
     <div
       // aria-hidden: the dialog's own label already announces the drop, and a
@@ -185,7 +187,8 @@ function DropLoader() {
         }
       `}</style>
       <span aria-hidden style={{ display: 'flex', gap: 8 }}>
-        {['var(--cth-coral)', 'var(--cth-amber)', 'var(--cth-indigo)'].map((c, i) => (
+        {/* Coral only ever means "needs you" (DESIGN.md 3.2). */}
+        {['var(--cth-blue)', 'var(--cth-amber)', 'var(--cth-indigo)'].map((c, i) => (
           <i
             key={c}
             className="drop-load-dot"
@@ -197,8 +200,8 @@ function DropLoader() {
           />
         ))}
       </span>
-      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: '#6C6884' }}>
-        Loading…
+      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-3)' }}>
+        {t('releaseDrop.loading')}
       </span>
     </div>
   );

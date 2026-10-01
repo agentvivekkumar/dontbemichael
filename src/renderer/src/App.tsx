@@ -8,7 +8,6 @@ import { StudioStage } from '@/scene/studio/StudioStage';
 import { TasksKanban } from '@/components/TasksKanban';
 import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
 import { useHive } from '@/hooks/useHive';
-import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useGodNameSync } from '@/i18n/useGodNameSync';
 import { useDirectionSync } from '@/i18n/useDirection';
 import { useArabicTerminalSync } from '@/terminal/useArabicTerminalSync';
@@ -22,7 +21,6 @@ import { CompletionToast } from '@/realtime/CompletionToast';
 import { UpdateToast } from '@/components/UpdateToast';
 import { CliUpdateToast } from '@/components/CliUpdateNotice';
 import { SettingsModal, type Section as SettingsSection } from '@/components/SettingsModal';
-import { PixelPanel } from '@/components/PixelPanel';
 import { PixelButton } from '@/components/PixelButton';
 import { SidebarSplitter } from '@/components/SidebarSplitter';
 import { acquireTerminal } from '@/components/terminalPool';
@@ -33,6 +31,8 @@ import { SHOW_IDE } from '@shared/buildFeatures';
 import { useHoldOptionToTalk } from '@/freeflow/holdOption';
 import { useTranslation } from 'react-i18next';
 import { TopBar, NeedsYouStrip } from '@/shell/TopBar';
+import { CLOSING_TIME_EVENT } from '@/shell/useDialog';
+import { useRestoreTeam } from '@/hooks/useRestoreTeam';
 import { NeedsYouBoard } from '@/shell/NeedsYouBoard';
 import { BottomBar } from '@/shell/BottomBar';
 
@@ -137,13 +137,22 @@ export function App() {
   // moment anything saves a setting.
   useEffect(() => window.cth.onConfigChanged(setConfig), []);
 
+  // Last session's team comes back on launch from here, where it is always
+  // mounted: the Needs you board also shows its banner, but it unmounts when a
+  // person is picked, which used to cancel the pending restore (review,
+  // 2026-10-01). The hook's state is shared, so the two never double restore.
+  useRestoreTeam(config);
+
   // Quitting with people at work starts closing time straight away (owner,
   // 2026-09-30: no dialog; the floor shows the lights going out). The bar
   // offers Cancel and Force quit. A second quit request while closing is a no-op.
+  // Open dialogs close first, so the bar is never hidden behind one.
   const closingOpenRef = useRef(false);
   closingOpenRef.current = closingOpen;
   useEffect(() => window.cth.onCloseRequested(() => {
     if (closingOpenRef.current) return;
+    window.dispatchEvent(new Event(CLOSING_TIME_EVENT));
+    useStore.getState().closeTaskDetail();
     setClosingOpen(true);
     void startClosingTimeRef.current(reopenAsked.current ? { relaunch: true } : undefined);
   }), []);
@@ -337,13 +346,13 @@ export function App() {
               pointerEvents: 'none'
             }}>
               <div style={{ pointerEvents: 'auto', width: 340 }}>
-                <PixelPanel variant="dialog" noPadding>
+                <div style={{ background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)' }}>
                   <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>{t('shell.noAgentTitle')}</div>
                     <p style={{ margin: 0, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>{t('shell.noAgentBody')}</p>
                     <PixelButton variant="primary" size="md" onClick={() => setAddAgentOpen(true)}>{t('shell.hire')}</PixelButton>
                   </div>
-                </PixelPanel>
+                </div>
               </div>
             </div>
           )}

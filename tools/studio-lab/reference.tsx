@@ -10,6 +10,11 @@
  *   ?shot=tasks-detail            Tasks, one task open
  *   ?shot=who-talks-to-whom       Who talks to whom
  *   ?shot=onboarding-team         Setup, the Team step
+ *   ?shot=onboarding-business     Setup, step 1 (your business)
+ *   ?shot=onboarding-meet         Setup, the Meet step (Michael shows you around)
+ *   ?shot=kelly-memory            Kelly's panel, Memory tab
+ *   ?shot=hire                    The hire wizard over the office
+ *   ?shot=settings-autonomy       Settings, Autonomy & Budgets
  *   #dark                         dark theme
  *   ?at=10:42                     the time of day the clock shows
  */
@@ -30,6 +35,9 @@ import { TasksKanban } from '@/components/TasksKanban';
 import { TaskDetailOverlay } from '@/components/TaskDetailOverlay';
 import { MemoryGraphPanel } from '@/components/MemoryGraphPanel';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
+import { AddAgentModal } from '@/components/AddAgentModal';
+import { SettingsModal } from '@/components/SettingsModal';
+import { renderIndex } from '@shared/memoryIndex';
 import pro from '../../resources/packs/pro-services.json';
 import core from '../../resources/packs/core.json';
 
@@ -66,6 +74,15 @@ Object.assign(w.cth, {
   // Kelly's Work tab: what her session printed this morning.
   onPtyData: (_id: string, cb: (chunk: string) => void) => { window.setTimeout(() => cb(KELLY_WORK), 300); return () => {}; },
   onPtyExit: () => () => {},
+  // Kelly's Memory tab: what she has learned, as the app keeps it.
+  hiveMemoryDetail: async () => ({ waiting: 0, index: renderIndex('Kelly', 'kelly', [
+    { id: 'm1', kind: 'preference', text: 'Refunds over $200 go to Oscar first, then to the owner.', source: 'owner', date: '2026-09-21' },
+    { id: 'm2', kind: 'preference', text: 'Sign replies "Kelly, Harbor & Pine support". No emoji.', source: 'owner', date: '2026-09-18' },
+    { id: 'm3', kind: 'fact', text: 'Northwind Cafe prefers email over phone; Maria handles their billing.', source: 'task', date: '2026-09-29' },
+    { id: 'm4', kind: 'fact', text: 'Late fees are waived once per client per year.', source: 'michael', date: '2026-09-24' },
+    { id: 'm5', kind: 'reference', text: 'Invoices live in Support/Invoices, one PDF per invoice number.', source: 'task', date: '2026-09-20' },
+    { id: 'm6', kind: 'procedure', text: 'Double charge: steps in memory/procedures/double-charge.md', source: 'task', date: '2026-09-29' }
+  ]) }),
   onPtyRelaunch: () => () => {}
 });
 
@@ -100,8 +117,12 @@ const SHOTS: Record<string, Record<string, unknown>> = {
   'kelly-work': { selectedId: 'kelly', needsYouOpen: false, sidebarTab: 'terminal' },
   'michael-office-schedule': { selectedId: 'god', needsYouOpen: false, ccTabRequest: { tab: 'triggers', seq: 1 } },
   'tasks-detail': { floorView: 'tasks', taskDetailId: 'T112' },
-  'who-talks-to-whom': { floorView: 'graph' }
+  'who-talks-to-whom': { floorView: 'graph' },
+  'kelly-memory': { selectedId: 'kelly', needsYouOpen: false, sidebarTab: 'memory' },
+  hire: {},
+  'settings-autonomy': {}
 };
+const ONBOARDING: Record<string, 'business' | 'welcome' | 'team'> = { 'onboarding-team': 'team', 'onboarding-business': 'business', 'onboarding-meet': 'welcome' };
 
 useStore.setState({
   agents: roster().map((a) =>
@@ -115,7 +136,7 @@ useStore.setState({
   ...SHOTS[shot]
 } as never);
 
-const config = { ...officeConfig, businessType: pro.businessType, businessName: 'Harbor & Pine Consulting', onboardingComplete: true, quickbooksClaude: true } as never;
+const config = { ...officeConfig, businessType: pro.businessType, businessName: 'Harbor & Pine Consulting', onboardingComplete: true, quickbooksClaude: true, registeredRepos: [], harnessHome: '/Users/owner/Harbor & Pine' } as never;
 const SIDEBAR = 400;
 
 // The home shots show one idle line, fully in. The app's own first line comes
@@ -157,6 +178,8 @@ function Shell() {
         </div>
       </div>
       <TaskDetailOverlay />
+      {shot === 'hire' && <AddAgentModal onClose={() => {}} config={config} onConfigChange={() => {}} />}
+      {shot === 'settings-autonomy' && <SettingsModal config={config} initialSection="Autonomy & Budgets" onClose={() => {}} />}
     </div>
   );
 }
@@ -185,8 +208,8 @@ class Boundary extends Component<{ children: ReactNode }, { error: unknown }> {
 
 createRoot(document.getElementById('root')!).render(
   <Boundary>
-    {shot === 'onboarding-team'
-      ? <OnboardingWizard onComplete={() => {}} preview={{ step: 'team', businessType: pro.businessType, businessName: 'Harbor & Pine Consulting' }} />
+    {ONBOARDING[shot]
+      ? <OnboardingWizard onComplete={() => {}} preview={{ step: ONBOARDING[shot], businessType: pro.businessType, businessName: 'Harbor & Pine Consulting' }} />
       : <Shell />}
     <TrafficLights />
   </Boundary>

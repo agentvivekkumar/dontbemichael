@@ -144,11 +144,11 @@ someone who has.
 |---|---|
 | `src/main/` | Electron main process — PTYs (`pty.ts`), fs/git bridges, the hive (`hive.ts`, `hooks.ts`, `memory.ts`), config. |
 | `src/preload/` | Context-bridge IPC surface. |
-| `src/renderer/` | React UI, Pixi.js office scene (`scene/office/`), components, design system, stores. |
+| `src/renderer/` | React UI: the office studio (`scene/studio/`), the shell (`shell/`), components, design system, stores. |
 | `src/shared/` | Code both processes use: engine presets, Office Pack schema (`officePack.ts`), business profile, team plan, build switches (`buildFeatures.ts`), app name and URL scheme (`appName.ts`). |
 | `resources/packs/` | The bundled Office Packs, one JSON file per business type plus `core.json`. |
 | `test/` | The `node:test` suite that `npm run test:focused` runs. |
-| `tools/mapgen/` | Python helpers for building/rendering the Tiled office map. |
+| `tools/studio-lab/` | The studio lab and the reference screens (`npm run lab`, `npm run shoot`). |
 
 See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the data-flow overview,
 the module by module layout, and the design system.

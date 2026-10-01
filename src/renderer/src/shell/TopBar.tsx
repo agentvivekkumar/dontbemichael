@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { SHOW_FOCUS_MODE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
 import { useStore, type FloorView } from '@/store/store';
-import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import { notifyThemeChangeAll } from '@/components/terminalPool';
 import { UpdateBadge } from '@/components/UpdateBadge';
@@ -61,15 +60,15 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
           <UpdateBadge />
           <CliUpdateBadge />
         </span>
-        <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} aria="Toggle dark mode" onClick={toggleTheme}>
+        <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} onClick={toggleTheme}>
           {theme === 'dark' ? <SunGlyph /> : <MoonGlyph />}
         </IconButton>
         {SHOW_FOCUS_MODE && (
-          <IconButton label={fullscreenAgentId ? t('shell.exitFocus') : t('shell.focus')} aria="Toggle focus mode" onClick={toggleFocus}>
+          <IconButton label={fullscreenAgentId ? t('shell.exitFocus') : t('shell.focus')} onClick={toggleFocus}>
             {fullscreenAgentId ? <CollapseGlyph /> : <ExpandGlyph />}
           </IconButton>
         )}
-        <IconButton label={t('shell.settings')} aria="Settings" onClick={onOpenSettings}>
+        <IconButton label={t('shell.settings')} onClick={onOpenSettings}>
           <GearGlyph />
         </IconButton>
         <NeedsYouButton />
@@ -161,9 +160,9 @@ export function ClockPill() {
   };
   const closingTime = () => {
     setOpen(false);
-    // Same path as the window close button: main intercepts it and the app
-    // offers Closing time.
-    window.close();
+    // Same path as Cmd-Q: closing time when terminals are running, a plain
+    // quit when none are (window.close() left the app windowless in the Dock).
+    void window.cth.requestQuit();
   };
 
   return (
@@ -290,20 +289,17 @@ export function NeedsYouStrip() {
   );
 }
 
-/** Michael's name for {{godName}} copy in the shell. */
-export function useGodName(): string {
-  return useResolvedGodName();
-}
 
 /* ── Icon buttons and glyphs (DESIGN.md 10: outline, 1.75 stroke) ──────────── */
 
-function IconButton({ label, aria, onClick, children }: { label: string; aria: string; onClick: () => void; children: ReactNode }) {
+/** The visible tip doubles as the accessible name, so both read in the app's language. */
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
     <button
       className="cth-titlebar-nodrag cth-settings-btn cth-tip"
       onClick={onClick}
       data-tip={label}
-      aria-label={aria}
+      aria-label={label}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 32, height: 32, padding: 0, border: 'none', borderRadius: 'var(--cth-r-md)',

@@ -5,17 +5,11 @@
 //   • solo  — one quip shown above a single agent at a break spot
 //   • pair  — a two-beat exchange between two agents at the same table
 //
-// Lines are kept short so they fit the ThoughtBubble (≈MAX_WIDTH). Character
+// Lines are kept short so they fit the studio's quote bubble (250 px). Character
 // keys match OfficeCharacterName; anyone without bespoke lines falls back to the
 // shared GENERIC pool so the floor never feels empty.
 
 import type { OfficeCharacterName } from './cast';
-
-/** Where an agent is lingering — picks a contextual line pool. */
-export type BreakSpot = 'coffee' | 'vending' | 'snack' | 'table';
-
-const pick = <T,>(arr: readonly T[], seed: number): T =>
-  arr[((seed % arr.length) + arr.length) % arr.length];
 
 // ─── solo lines, by spot ─────────────────────────────────────────────────────
 
@@ -54,10 +48,6 @@ const TABLE: readonly string[] = [
   'do NOT tell Michael I’m in here',
 ];
 
-const SPOT_POOL: Record<BreakSpot, readonly string[]> = {
-  coffee: COFFEE, vending: VENDING, snack: SNACK, table: TABLE,
-};
-
 // ─── character flavour — overrides the generic pool when present ─────────────
 
 // Every character has lines of their own (owner, 2026-09-27: "add some for
@@ -85,14 +75,6 @@ const BY_CHARACTER: Record<OfficeCharacterName, readonly string[]> = {
   sadiq:    ['your password isn’t “password”, right?', 'removed another virus. kids game site.', 'I set up security, not spying. mostly.', 'the phishing test results… wow', 'every day is patch day'],
 };
 
-/** A solo break-room line. Character flavour ~60% of the time, else the line
- *  fits the spot the agent is standing at. `seed` keeps it deterministic per
- *  call site (avoids Math.random, which Pixi/Electron CSP-safe code prefers). */
-export function pickSoloLine(character: OfficeCharacterName, spot: BreakSpot, seed: number): string {
-  const flavour = BY_CHARACTER[character];
-  if (flavour?.length && seed % 5 < 3) return pick(flavour, Math.floor(seed / 5));
-  return pick(SPOT_POOL[spot], seed);
-}
 
 /** A shuffled deck over `pool`: every item once, then a fresh shuffle that
  *  never opens with the one just drawn. */
@@ -291,16 +273,8 @@ export function createBanter(random: () => number = Math.random): (opener: Offic
   const keyedUsed = new Set<string>();
   return (opener) => {
     const keyed = KEYED_EXCHANGES[opener];
-    // A signature bit once per person per day, when they happen to open.
+    // A signature bit at most once per person while the studio is open, when they happen to open.
     if (keyed && !keyedUsed.has(opener) && random() < 0.35) { keyedUsed.add(opener); return keyed; }
     return next();
   };
-}
-
-/** A multi-beat exchange for two agents sharing a table. Beats alternate:
- *  index 0 = `speaker`, 1 = the table-mate, 2 = speaker, … */
-export function pickExchange(speaker: OfficeCharacterName, seed: number): Exchange {
-  const keyed = KEYED_EXCHANGES[speaker];
-  if (keyed && seed % 4 === 0) return keyed;
-  return pick(PAIR_POOL, seed);
 }

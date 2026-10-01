@@ -732,11 +732,11 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ### Record demo videos of Don't Be Michael
 
-**What:** New demo videos of this app: a short hero clip for the top of the README, and an agents-at-work clip with a poster image to replace the one in the README's demo section.
+**What:** New demo videos of this app: a short hero clip for the top of the README, and an agents-at-work clip with a poster image for the README's "Watch the office work" section, which now shows a still.
 
-**Why:** `README.md` still embeds the old project's recordings, `docs/media/hero.mp4` (lines 28 and 29) and `docs/media/demo/agents.mp4` with `agents-poster.jpg` (line 197). They show the Munder Difflin UI from May to July, not business mode, Michael running the office or the hire wizard. The old landing demos (`hero-demo.mp4`, `hero-demo-9x16.mp4`, `floor.png`, `home-screen.png`) were deleted on 2026-09-28 for the same reason.
+**Why:** The README shows stills only. The old project's recordings (`docs/media/hero.mp4`, `docs/media/demo/agents.mp4`) were removed on 2026-10-01 with the v2 redesign, since they showed the Munder Difflin pixel UI.
 
-**Context:** Record the real app on a neutral example office (not MoblizeIT). Keep files small enough for the repo (the old ones were 1.5 to 4.7 MB), commit an mp4 plus a jpg poster, and point the README at them. Once replaced, delete the old files and whatever of `docs/media/demo/` and `landing-remotion/` is no longer used. The website repo may want the same clips.
+**Context:** The studio lab (`npm run lab`, `docs/demo/studio-lab.html?clean&autoplay`) plays the office on a neutral example office and is made for recording. Keep files small (under 5 MB), commit an mp4 plus a jpg poster under `docs/media/`, and point the README at them. Delete whatever of `landing-remotion/` is no longer used. The website repo may want the same clips.
 
 **Effort:** S
 **Priority:** P2

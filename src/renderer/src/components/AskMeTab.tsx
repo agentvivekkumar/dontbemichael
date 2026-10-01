@@ -162,13 +162,17 @@ export function AskMeTab() {
         const open = openQuestion(t)!;
         const stuck = dependentsTree(t.id, tasks);
         const owner = t.assignee ? agents.find((a) => a.id === t.assignee) : undefined;
-        const who = nameFor(t.assignee);
+        // Agents write tasks.json: a card's assignee may not be a string.
+        const who = nameFor(typeof t.assignee === 'string' ? t.assignee : undefined);
         const fam = owner && !owner.isGod ? family(departmentOf(owner), dark) : null;
         const answered = t.humanQA?.filter((e) => e.a).length ?? 0;
         const draft = drafts[t.id] ?? '';
         const showStuck = openStuck[t.id] ?? false;
         // One card open at a time; the newest is open until the owner picks another.
-        const expanded = openId === undefined ? idx === 0 : openId === t.id;
+        // The newest is open by default, and after the open card is answered
+        // (it leaves the list) the newest opens again.
+        const pinned = openId !== undefined && (openId === null || waiting.some((x) => x.id === openId));
+        const expanded = pinned ? openId === t.id : idx === 0;
         const toggle = () => setOpenId(expanded ? null : t.id);
         const ago = askedAgo(open.askedAt, Date.now(), i18n.language, translate('askMe.justNow'));
         return (
@@ -185,7 +189,7 @@ export function AskMeTab() {
                 onClick={toggle}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
                 className="cth-askme-head"
-                style={{ flex: 1, minWidth: 0, cursor: 'pointer', outline: 'none' }}
+                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
               >
                 <div className="cth-askme-title" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
                   {askTitle(t.title)}
@@ -237,6 +241,8 @@ export function AskMeTab() {
                 dir={rtl ? 'auto' : undefined}
                 value={draft}
                 onChange={(e) => setAnswerDraft(t.id, e.target.value)}
+                // Typing pins this card open, so a newer ask arriving never folds it mid answer.
+                onFocus={() => setOpenId(t.id)}
                 onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(t); }}
                 placeholder={translate('askMe.answerPlaceholder')}
                 style={{

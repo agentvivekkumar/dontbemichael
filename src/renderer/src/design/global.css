@@ -52,9 +52,9 @@ input, textarea, [contenteditable='true'] {
 .cth-scroll-hidden { scrollbar-width: none; -ms-overflow-style: none; }
 .cth-scroll-hidden::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
-/* Pixel-snapping only where the art is pixels: the Pixi floor canvas and the
-   sprite portraits. Vector art (the studio, the lockup, icons) renders smooth. */
-canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
+/* Canvases (the terminal's renderer) keep crisp pixel edges. Vector art (the
+   studio, the lockup, icons) renders smooth. */
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 
 /* Focus ring: 2px indigo, 2px offset, on everything (DESIGN.md 12). */
 :focus-visible {
@@ -186,7 +186,6 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-st-breathe { animation: cth-breathe 2.4s ease-in-out infinite; }
 .cth-st-blink { animation: cth-blink 1.6s ease-in-out infinite; }
 .cth-st-ring { transform-box: fill-box; transform-origin: center; animation: cth-ring 1.8s ease-out infinite; }
-.cth-st-think { animation: cth-breathe 1.8s ease-in-out infinite; }
 .cth-st-spin { transform-box: fill-box; transform-origin: center; animation: cth-spin 2.4s linear infinite; }
 .cth-st-burst { transform-box: fill-box; transform-origin: center; animation: cth-burst 900ms var(--cth-ease) both; }
 .cth-st-idle { filter: saturate(.25); opacity: .82; }
@@ -457,8 +456,6 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-st-doing { animation: cth-burst 700ms var(--cth-ease) both, cth-breathe 2.4s ease-in-out 700ms infinite; }
 .cth-st-write { animation: cth-write 4.5s ease-in-out infinite; }
 @keyframes cth-write { 0% { stroke-dashoffset: 1; opacity: .9; } 55% { stroke-dashoffset: 0; opacity: .9; } 85% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
-.cth-st-bob { animation: cth-bob 3.2s ease-in-out infinite; }
-@keyframes cth-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
 .cth-st-shake { transform-box: fill-box; transform-origin: center; animation: cth-shake 1.6s ease-in-out both; }
 @keyframes cth-shake { 0%, 100% { transform: rotate(0); } 10%, 30%, 50% { transform: rotate(-12deg); } 20%, 40%, 60% { transform: rotate(12deg); } 70% { transform: rotate(0); } }
 .cth-st-ringout { transform-box: fill-box; transform-origin: center; animation: cth-ringout 1.1s ease-out both; }
@@ -488,7 +485,7 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
   animation: cth-fade 4.5s var(--cth-ease) both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cth-st-scroll, .cth-st-steam, .cth-st-sway, .cth-st-dot, .cth-st-write, .cth-st-bob, .cth-st-flow, .cth-st-doing { animation: none !important; }
+  .cth-st-scroll, .cth-st-steam, .cth-st-sway, .cth-st-dot, .cth-st-write, .cth-st-flow, .cth-st-doing { animation: none !important; }
 }
 .cth-st-beam { animation: cth-beam 1.3s var(--cth-ease) both; }
 @keyframes cth-beam { 0% { opacity: 0; } 25% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
@@ -524,3 +521,10 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-askme-q p:last-child { margin-bottom: 0; }
 .cth-splitter .cth-splitter-grip { opacity: 0; transition: opacity 120ms var(--cth-ease); }
 .cth-splitter:hover .cth-splitter-grip { opacity: .9; }
+
+/* Talk to Michael (DESIGN.md 7.19): its ring, and a focus ring around the whole
+   composer while its message box has focus. */
+.cth-composer { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); }
+.cth-composer:focus-within { box-shadow: inset 0 0 0 2px var(--cth-indigo), var(--cth-shadow-lg); }
+/* The bottom bar on a narrow stage: the pack note goes first. */
+@container (max-width: 960px) { .cth-bb-pack { display: none; } }

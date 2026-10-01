@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore, type QueuedMessage } from '@/store/store';
 import type { HarnessConfig } from '@/store/config';
@@ -7,6 +7,7 @@ import { useMissions } from '@/components/triggers/ScheduleList';
 import { nextRunAt } from '@shared/missions';
 import { isComposingKey } from '@shared/imeGuard';
 import { GrowingTextarea } from '@/components/GrowingTextarea';
+import { attachmentsFromPaste } from '@/components/pasteAttachments';
 
 const EMPTY_QUEUE: QueuedMessage[] = [];
 
@@ -20,7 +21,10 @@ export function BottomBar({ config }: { config: HarnessConfig }) {
   return (
     <div style={{
       position: 'absolute', insetInlineStart: 24, insetInlineEnd: 22, bottom: 24, zIndex: 70,
-      display: 'flex', alignItems: 'flex-end', gap: 14, pointerEvents: 'none'
+      display: 'flex', alignItems: 'flex-end', gap: 14, pointerEvents: 'none',
+      // A narrow window drops the pack note first (global.css), so the
+      // composer keeps its width.
+      containerType: 'inline-size'
     }}>
       <TalkToMichael />
       {/* Centered on the composer's resting height, so they stay put while a
@@ -51,6 +55,8 @@ function TalkToMichael() {
     return [...prev, ...incoming.filter((a) => a.path && !seen.has(a.path))];
   });
   const pick = async () => { const res = await window.cth.attachFiles(); if (res.ok) add(res.files); };
+  // A pasted screenshot or Finder files attach, as on Michael's Work tab.
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => { void attachmentsFromPaste(e)?.then(add); };
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer?.files ?? []);
@@ -80,12 +86,15 @@ function TalkToMichael() {
     <div
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
+      // The ring and its focus state live in global.css (.cth-composer).
+      className="cth-composer"
       style={{
         pointerEvents: 'auto', position: 'relative',
         // The buttons stay on the bottom row while the message grows upward.
-        width: 420, minHeight: 50, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '7px 7px 7px 8px',
-        background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
-        boxShadow: 'inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg)'
+        // It gives up to 120 px before anything else (owner check at 1280 x 800:
+        // squeezed, the placeholder wrapped onto two lines).
+        flex: '0 1 420px', minWidth: 300, minHeight: 50, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '7px 7px 7px 8px',
+        background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)'
       }}
     >
       <button onClick={() => void pick()} aria-label={t('shell.attach')} title={t('shell.attach')} style={{
@@ -116,6 +125,7 @@ function TalkToMichael() {
           value={text}
           onChange={(e) => setDraft(godId, e.target.value)}
           onKeyDown={onKey}
+          onPaste={onPaste}
           placeholder={t('shell.briefPlaceholder', { godName })}
           aria-label={t('shell.brief', { godName })}
           maxHeight={140}
@@ -213,7 +223,7 @@ function PackAndHire({ config }: { config: HarnessConfig }) {
 
   return (
     <div style={{ marginInlineStart: 'auto', pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-      {pack && <span style={{ fontSize: 11.5, color: 'var(--cth-ink-3)', whiteSpace: 'nowrap' }}>{t('shell.teamFromPack', { pack })}</span>}
+      {pack && <span className="cth-bb-pack" style={{ fontSize: 11.5, color: 'var(--cth-ink-3)', whiteSpace: 'nowrap' }}>{t('shell.teamFromPack', { pack })}</span>}
       <button onClick={() => useStore.getState().setAddAgentOpen(true)} style={{
         height: 32, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 6,
         border: 'none', borderRadius: 10, cursor: 'pointer',

@@ -13,14 +13,13 @@ import {
   type GraphData,
   type GraphNode,
   type GraphEdge,
-  type MessageLogEntry,
-  type MessageAct
+  type MessageLogEntry
 } from './memoryGraph/buildGraph';
 import { forceLayout, type Positions } from './memoryGraph/forceLayout';
 
-/** The memory-graph tab: hive agents as nodes, messages as edges, an optional
- *  topic layer from each agent's memory file. SVG-rendered (DESIGN.md neo-pixel:
- *  square nodes, hard offset shadows, VT323/Pixelify). See MEMORY_GRAPH_SPEC.md.
+/** Who talks to whom: hive agents as nodes, messages as edges, an optional
+ *  topic layer from each agent's memory file. SVG-rendered as avatars in
+ *  department colors on a dot grid (branding/DESIGN.md 7.22).
  *
  *  All data comes from the existing preload bridge: store.agents + hiveLog +
  *  hiveMemory. No new IPC. Click an agent to jump to its memory; hover to peek. */
@@ -468,23 +467,6 @@ function Tooltip({ x, y, wrap, children }: { x: number; y: number; wrap: { w: nu
 const GRAPH_HEADER_H = 52;
 const GRAPH_LEGEND_H = 56;
 
-const MARKER_ACTS: MessageAct[] = ['request', 'inform', 'propose', 'query', 'agree', 'refuse', 'done'];
-
-/** Speech-act → colour. Mirrors ACT_COLOR in MessageEnvelope.ts so the graph
- *  speaks the same visual language as the floor's flying envelopes. */
-function actColor(act?: MessageAct): string {
-  switch (act) {
-    case 'request': return 'var(--cth-sky)';
-    case 'query': return 'var(--cth-lilac)';
-    case 'propose': return 'var(--cth-lemon)';
-    case 'agree': return 'var(--cth-mint)';
-    case 'done': return 'var(--cth-mint)';
-    case 'refuse': return 'var(--cth-coral)';
-    case 'inform':
-    default: return 'var(--cth-ink-300)';
-  }
-}
-
 // Avatars: Michael 72px, everyone else 48px (DESIGN.md 7.22).
 function nodeSize(n: GraphNode): number {
   if (n.kind === 'agent') return n.isGod ? 72 : 48;
@@ -492,12 +474,6 @@ function nodeSize(n: GraphNode): number {
   return 30; // pseudo
 }
 function nodeRadius(n: GraphNode): number { return nodeSize(n) / 2; }
-
-function nodeFill(n: GraphNode): string {
-  if (n.kind === 'agent') return `var(--cth-${n.accent})`;
-  if (n.kind === 'topic') return 'var(--cth-cream-200)';
-  return n.id === 'human' ? 'var(--cth-lemon-light)' : 'var(--cth-ink-300)';
-}
 
 function isNeighbor(graph: GraphData, a: string, b: string): boolean {
   for (const e of graph.edges) {

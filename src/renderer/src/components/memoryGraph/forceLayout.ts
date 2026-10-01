@@ -56,8 +56,14 @@ export function forceLayout(
   const padding = opts.padding ?? 28;
   const iterations = opts.iterations ?? 320;
   const pinned = opts.pinned ?? {};
-  const top = padding + (opts.insetTop ?? 0);
-  const bottom = height - padding - (opts.insetBottom ?? 0);
+  // The insets give way on a short canvas: they shrink together so at least
+  // half the height stays free for nodes (else every node sat on one line).
+  const insetTop = opts.insetTop ?? 0;
+  const insetBottom = opts.insetBottom ?? 0;
+  const room = Math.max(0, height / 2 - 2 * padding);
+  const fit = insetTop + insetBottom > room ? room / (insetTop + insetBottom || 1) : 1;
+  const top = padding + insetTop * fit;
+  const bottom = Math.max(top, height - padding - insetBottom * fit);
 
   const ids = nodes.map((n) => n.id);
   const cx = width / 2;

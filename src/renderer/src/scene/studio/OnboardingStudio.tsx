@@ -61,7 +61,6 @@ export function OnboardingStudio({ picked, unpicked, businessName }: {
               // A dashed outline where this department would sit.
               const hw = 0.7;
               const ring = [P(gx - hw, gy - hw, 2), P(gx + hw, gy - hw, 2), P(gx + hw, gy + hw, 2), P(gx - hw, gy + hw, 2)];
-              const [cx, cy] = P(gx, gy, 2);
               return {
                 depth: gx + gy,
                 node: (

@@ -1,4 +1,5 @@
 import { ClipboardEvent, DragEvent, KeyboardEvent, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { attachmentsFromPaste } from './pasteAttachments';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
@@ -109,25 +110,8 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
 
   // Paste a screenshot (no path → persist the native clipboard image to a temp
   // file) or paste files copied from the OS file manager (carry a real path).
-  const onPaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = Array.from(e.clipboardData?.items ?? []);
-    const hasImage = items.some((it) => it.kind === 'file' && it.type.startsWith('image/'));
-    if (hasImage) {
-      e.preventDefault();
-      const res = await window.cth.saveClipboardImage();
-      if (res.ok) addAttachments([res.file]);
-      return;
-    }
-    const files = Array.from(e.clipboardData?.files ?? []);
-    if (files.length) {
-      const atts = files
-        .map((f) => ({ path: window.cth.pathForFile(f), name: f.name }))
-        .filter((a) => a.path);
-      if (atts.length) {
-        e.preventDefault();
-        addAttachments(atts);
-      }
-    }
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    void attachmentsFromPaste(e)?.then(addAttachments);
   };
 
   const canSend = !!text.trim() || attachments.length > 0;

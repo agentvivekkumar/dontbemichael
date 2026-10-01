@@ -96,18 +96,18 @@ function stripActiveContent(html: string): string {
 }
 
 /** The design fonts, self-hosted as `data:` URIs so the frame needs no network.
- *  Inter answers `--font-sans` (the drop's declared substitute for Geist) and
+ *  Sora (the brand type, branding/DESIGN.md 4) answers `--font-sans` and
  *  JetBrains Mono answers `--font-mono` exactly; both are variable, so one face
  *  each spans weight 400–700. `font-display: swap` means text paints in the
  *  fallback immediately and reflows when the face is ready — but the face is a
  *  data: URI, so "ready" is the same tick and there is nothing to wait on. */
 const FRAME_FONT_CSS = `
   @font-face {
-    font-family: 'Inter';
+    font-family: 'Sora';
     font-style: normal;
     font-weight: 400 700;
     font-display: swap;
-    src: url(data:font/woff2;base64,${DROP_FONT_WOFF2_BASE64.inter}) format('woff2');
+    src: url(data:font/woff2;base64,${DROP_FONT_WOFF2_BASE64.sora}) format('woff2');
   }
   @font-face {
     font-family: 'JetBrains Mono';
@@ -123,36 +123,37 @@ const FRAME_FONT_CSS = `
  *  here — an author writing `var(--ink)` gets the app's palette for free, while
  *  a fully bespoke drop can ignore them entirely. */
 const FRAME_BASE_CSS = `
-  /* The landing site palette (docs/DESIGN.md §2): warm paper, near-black ink,
-     one yellow CTA, sky for a highlighted phrase, maroon for the brand. Square
-     corners and hard offset shadows are the look; --radius is 0 on purpose.
-     --accent and --line are kept as aliases so older drops still resolve. */
+  /* The v2 Studio palette (branding/DESIGN.md 3): lavender neutrals, one ink,
+     indigo for links and the brand accent, soft rounded cards. The older names
+     (--paper, --cream, --yellow, --sky, --maroon and the pastel fills) are kept
+     and point at their v2 counterparts, so drops written for the old site
+     palette still resolve. */
   :root {
-    --paper: #FFFDF7;
-    --cream: #F5F2E8;
-    --cream-2: #F5ECD7;
+    --paper: #FFFFFF;
+    --cream: #F7F7FB;
+    --cream-2: #FAFAFD;
     --white: #FFFFFF;
-    --ink: #1B1B1B;
-    --ink-dim: #57544C;
-    --ink-faint: #8A867A;
-    --ink-soft: #57544C;
-    --yellow: #FFCA54;
-    --sky: #72C2DF;
-    --maroon: #B23A4E;
-    --lilac: #E4DEFB; --peach: #FBDDBE; --mint: #D6F3E1;
-    --tan: #F1E6CC; --rose: #FBE0DF; --sky-soft: #DCEFF7;
-    --accent: #B23A4E;
-    --line: rgba(27,27,27,0.16);
-    --border: 2px solid var(--ink);
-    --border-bold: 3px solid var(--ink);
-    --shadow-card: 10px 10px 0 var(--ink);
-    --shadow-card-sm: 6px 6px 0 var(--ink);
-    --shadow-btn: 4px 4px 0 var(--ink);
-    --shadow-chip: 3px 3px 0 var(--ink);
-    --radius: 0px;
+    --ink: #1E1B2E;
+    --ink-dim: #4A4660;
+    --ink-faint: #6C6884;
+    --ink-soft: #4A4660;
+    --yellow: #F2A93B;
+    --sky: #4C6FFF;
+    --maroon: #6C5CE7;
+    --lilac: #F0EAFE; --peach: #FFE6D8; --mint: #E3F7EC;
+    --tan: #FFF4DF; --rose: #FFECEC; --sky-soft: #E8EDFF;
+    --accent: #6C5CE7;
+    --line: #E8E6F2;
+    --border: 1px solid #DAD7EA;
+    --border-bold: 1px solid #1E1B2E;
+    --shadow-card: 0 1px 2px rgba(30, 27, 46, .05), 0 10px 30px rgba(62, 52, 140, .10);
+    --shadow-card-sm: 0 1px 2px rgba(30, 27, 46, .05), 0 6px 18px rgba(62, 52, 140, .08);
+    --shadow-btn: 0 1px 2px rgba(30, 27, 46, .05);
+    --shadow-chip: 0 1px 2px rgba(30, 27, 46, .05);
+    --radius: 14px;
     --pad: clamp(24px, 4.5vw, 48px);
     --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", "Geeza Pro", "Noto Naskh Arabic", monospace;
-    --font-sans: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", sans-serif;
+    --font-sans: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Geeza Pro", "Noto Naskh Arabic", sans-serif;
     --font-ui: var(--font-sans);
   }
   * { box-sizing: border-box; }
@@ -178,7 +179,7 @@ const FRAME_BASE_CSS = `
     font-size: 11px; font-weight: 500; letter-spacing: .28em; text-transform: uppercase;
     color: var(--ink-faint); margin: 0 0 14px;
   }
-  h1, h2, h3 { font-family: var(--font-mono); }
+  h1, h2, h3 { font-family: var(--font-sans); }
   h1 {
     font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.04;
     letter-spacing: -0.04em; font-weight: 600; margin: 0 0 .35em;
@@ -194,9 +195,9 @@ const FRAME_BASE_CSS = `
     text-wrap: pretty;
   }
   p { margin: 0 0 1em; }
-  a { color: var(--ink); text-decoration-thickness: 2px; text-underline-offset: 3px; }
-  a:hover { color: var(--maroon); }
-  hr { border: none; border-top: 2px solid var(--ink); margin: 2.2em 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--ink); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 2.2em 0; }
 
   /* Feature list: stacked rows, each with its own media block. */
   ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: clamp(28px, 5vw, 48px); }
@@ -207,7 +208,7 @@ const FRAME_BASE_CSS = `
      built with placeholders looks identical once real assets land. */
   img, video, canvas, svg, .placeholder {
     display: block; width: 100%; max-width: 100%; height: auto;
-    border-radius: 0; border: var(--border);
+    border-radius: var(--radius); border: var(--border);
   }
   figure { margin: 0; }
   figcaption { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); margin-top: 10px; }
@@ -219,7 +220,7 @@ const FRAME_BASE_CSS = `
     display: flex; align-items: center; justify-content: center;
     background:
       repeating-linear-gradient(135deg,
-        rgba(27,27,27,0.04) 0 10px, rgba(27,27,27,0.07) 10px 20px);
+        rgba(30,27,46,0.03) 0 10px, rgba(30,27,46,0.06) 10px 20px);
     color: var(--ink-faint); font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em;
   }
   .placeholder::after { content: attr(data-label); }

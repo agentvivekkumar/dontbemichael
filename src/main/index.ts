@@ -4513,6 +4513,10 @@ function teardownAndQuit(): void {
   try { ptyManager.killAll(); } catch (e) { console.error('[quit] killAll:', e); }
   app.quit();
 }
+// The clock menu's Closing time: the same path as Cmd-Q. before-quit starts
+// closing time when terminals are running and lets the app quit when none are
+// (window.close() only closed the window, leaving the app in the Dock).
+ipcMain.handle('app:requestQuit', () => { app.quit(); });
 ipcMain.handle('app:confirmClose', () => {
   closingTime.cancel(); // a hard quit overrides a closing time in progress
   teardownAndQuit();

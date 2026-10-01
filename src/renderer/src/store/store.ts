@@ -15,7 +15,7 @@ import { DEFAULT_ORG_TRIGGER, type OrgTriggerConfig, type WebhookTrigger } from 
 import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
-import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_TRACES, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
 import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
@@ -777,7 +777,9 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory' || v === 'traces') return v;
+    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory') return v;
+    // A saved TRACES tab opens on Profile while this build hides traces.
+    if (v === 'traces') return SHOW_TRACES ? v : 'profile';
     // Schedules is a section of Capabilities now (owner, 2026-09-26).
     if (v === 'schedules') return 'capabilities';
     // A saved GIT tab opens on the terminal while this build hides git.
@@ -879,6 +881,11 @@ export const useStore = create<State>((set, get) => ({
   setNeedsYouOpen: (open) => set({ needsYouOpen: open }),
   updateAgent: (id, patch) =>
     set((s) => {
+      // The pty parser calls this on every chunk of output, mostly with what
+      // is already there: no change means no new state, so the studio and
+      // everything else subscribed to `agents` skip the render.
+      const current = s.agents.find((a) => a.id === id) as Record<string, unknown> | undefined;
+      if (!current || Object.entries(patch).every(([k, v]) => Object.is(current[k], v))) return s;
       const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);
       // Persist only when something DURABLE changed. `updateAgent` is also the
       // pty parser's per-chunk write (status/action/progress), so persisting

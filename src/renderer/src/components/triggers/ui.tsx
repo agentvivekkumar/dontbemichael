@@ -26,7 +26,7 @@ export const inputStyle: CSSProperties = {
   background: 'var(--cth-card)', border: 'none', borderRadius: 'var(--cth-r-md)',
   boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
   fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, lineHeight: '17px',
-  color: 'var(--cth-ink)', outline: 'none'
+  color: 'var(--cth-ink)'
 };
 
 export const monoInputStyle: CSSProperties = {

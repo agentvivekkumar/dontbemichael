@@ -11,8 +11,8 @@ Two data planes feed one renderer:
 ┌───────────────────────────────────────────────────────────────┐
 │                     Electron Renderer (React)                  │
 │   ┌──────────────────┐    ┌──────────────────────────────┐    │
-│   │ Office Floor      │    │ Terminal + Command Bar       │    │
-│   │ (Pixi.js)        │    │ Files + Git tabs (xterm.js)  │    │
+│   │ Office studio    │    │ Terminal + Talk to Michael   │    │
+│   │ (SVG, React)     │    │ person panels (xterm.js)     │    │
 │   └─────────▲────────┘    └────────────▲─────────────────┘    │
 │             │ avatar state             │ pty bytes / fs / git  │
 └─────────────┼──────────────────────────┼───────────────────────┘
@@ -131,15 +131,17 @@ src/
     TasksKanban,             dependency-aware kanban board (the floor's TASKS view)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
     MessageQueueComposer,    park messages for a busy agent
-    scene/office/            Pixi office floor: OfficeFloor, Character, Camera, cast, pathfinding, …
+    scene/studio/            the office studio: isometric SVG stage, pods, Michael's office, life layer (branding/DESIGN.md 8)
+    scene/office/            the cast and the idle lines (data only)
+    shell/                   top bar, bottom bar, Needs you board, panel chrome, dialogs
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
-    assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
+    assets/                  fonts (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)
 resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarded to the broker
 docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime)
 docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
                              (the old project's website files still here are tracked for removal in TODOS.md)
-docs/media/                  media the README embeds (see docs/media/README.md)
+branding/reference/studio/   the app's reference screens, also the README's images (npm run shoot)
 landing-remotion/            Remotion project that renders the landing page's "how it works" clips
 HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 docs/message-queue.md        who may type into an agent's terminal, and when

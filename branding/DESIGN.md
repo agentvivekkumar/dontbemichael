@@ -709,7 +709,10 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
   `r-md`), a message box with placeholder "Talk to Michael…", primary button "Send" with
   an arrow. The box grows with the text up to 140 px, then scrolls; the composer grows
   upward from the bar's bottom edge with its buttons on the bottom row, and the chips
-  beside it stay put. Enter sends, Shift+Enter starts a new line (owner, 2026-10-01).
+  beside it stay put. Enter sends, Shift+Enter starts a new line (owner, 2026-10-01). It
+  keeps at least 300 px; on a narrow stage the pack note hides first, so the placeholder never
+  wraps. A pasted screenshot or Finder files attach, as on Michael's Work tab. Focus rings the
+  whole composer in `indigo`.
   Queued messages show as a count chip on the composer; the full queue opens
   above it.
 - **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.
@@ -806,7 +809,10 @@ Full window, no app chrome.
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
   number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
 - Body: a 560 px left card with the step's fields; the right side is the studio (§8)
-  reacting to the step.
+  reacting to the step. Labels `t-ui` 600 at 12, fields v2 (`cth-input`: Sora, `line-input`
+  ring, indigo focus ring; the folder path in mono). The Meet step lists what the office does
+  as quiet rows in one `line` card, a 26 px neutral icon and a label each, the explanation
+  behind an info icon (review, 2026-10-01: it was a grid of tinted tiles, one coral).
 - **Team step**: heading "Your team" with an info icon, one line "Suggested for Pro
   Services. You can hire more later." Rows: checkbox, 36 px avatar, name 600, role `ink-3`,
   tags ("in every pack" green soft; "always on" indigo soft for Michael, who has a lock and
@@ -1091,6 +1097,7 @@ Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
 | `breathe` | 2.4 s, opacity 1 to .55 | Lit screens while working |
 | `ring` | 1.8 s, scale .6 to 1.5, fade out | Needs you beacon |
 | `burst` | 900 ms | Done check burst |
+| `bump` | 700 ms, a small overshoot (`cubic-bezier(.3,1.6,.5,1)`) | The Needs you button catching a paper plane, and a new hire's pod dropping in: the two arrivals; everything else uses `ease` |
 
 ### 11.2 App [App]
 
@@ -1226,16 +1233,16 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Done: `test/no-dashes.test.cjs`; ALL CAPS strings moved to sentence case (§4) |
 | 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Done: re-shot from the build (#25) |
 | 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Done: re-shot from the build (#25) |
-| 14 | Kit | Retired fonts still in `fonts/` | `branding/fonts/` | Fix: remove once #3 and #15 are done |
+| 14 | Kit | Retired fonts still in `fonts/` | `branding/fonts/` | Done: VT323, Pixelify Sans, Press Start 2P and Inter removed (2026-10-01); the site repo keeps its own copies |
 | 15 | Web | Whole site is v1 (arcade palette, pixel type, hard shadows, chunky frames) | site repo `public/` | Fix: §9 |
-| 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
-| 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
-| 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Chrome done; the frame keeps the website tokens until the site moves to v2 (#15) |
+| 16 | Web | Hero shows the pixel office video | site repo | Fix: §8.11 still (the app repo's copy of the video is removed) |
+| 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Done (2026-10-01): the README shows the reference screens (§20); the old project's videos and screenshots are removed; new demo videos are a TODO |
+| 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Done (2026-10-01): the frame uses the v2 palette and Sora; the older token names still resolve for drops written against the site palette |
 | 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header. Reorder lives in the focus mode roster, which is hidden (#24) |
 | 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Done: re-shot from the build (#25) |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
-| 22 | App | `pixi.js` stays in `package.json` though nothing imports it | `package.json` | Fix: remove on the next dependency change (reinstalling reruns electron-rebuild) |
-| 23 | Both | README still credits LimeZu art the app no longer ships | `README.md` | Fix with #17 |
+| 22 | App | `pixi.js` stays in `package.json` though nothing imports it | `package.json` | Done (2026-10-01): removed from `package.json` and the lock (npm 10) |
+| 23 | Both | README still credits LimeZu art the app no longer ships | `README.md`, `LICENSE-ASSETS` | Done (2026-10-01): the credit, the asset licence block and `LICENSE-ASSETS` are gone; no third party art ships |
 | 24 | App | Focus mode is hidden (`SHOW_FOCUS_MODE`), so drag to reorder people has no visible home | `FullscreenTerminal` | Accepted: the order is kept; give reorder a home if it is missed |
 | 25 | Both | Reference screens (§20) predate 2026-09-30 and 10-01: cards on every pod, the hub card and M badge, the old Ask me cards, the solid right column, Brief Michael | `reference/studio/`, the brand guide | Done: re-shot 2026-10-01 with `npm run shoot` (§20); brand guide, PDF and social card rebuilt |
 | 26 | App | Ask me can no longer be dismissed; older dismissed entries still read as closed | `AskMeTab`, `shared/askMeRouting.ts` | Done (owner, 2026-10-01: an ask is handled with a response) |
@@ -1246,6 +1253,8 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
+| 2026-10-01 | In repo register items closed (§17): retired kit fonts and `pixi.js` removed, the README shows the reference screens with no LimeZu credit, the release notes frame on v2. Five more reference screens (§20). Settings and setup copy in sentence case. |
 | 2026-10-01 | The Ask me answer box and the Talk to Michael box grow with the text (§7.8, §7.19). |
 | 2026-10-01 | Task detail: title under the id row, the card's notes shown, no empty section (§7.21). |
 | 2026-10-01 | Ask me titles read plain: agents are told how to title a card, and the card drops opaque ids and bracketed metadata (§7.8). |
@@ -1274,7 +1283,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 ## 20. Reference screens
 
-In `reference/studio/` (PNG, 1440 × 900). First approved as mockups 2026-09-30; re-shot
+In `reference/studio/` (PNG, 1440 × 900); the README uses them too. First approved as mockups 2026-09-30; re-shot
 2026-10-01 from the app's own components on the fictional Harbor & Pine office, so they show
 the build as it is. `npm run shoot` re-shoots them all (or `npm run shoot -- home-dark` for
 one) from `tools/studio-lab/reference.tsx`, with the clock fixed at 10:42 and a seeded
@@ -1292,6 +1301,11 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 | `tasks-detail.png` | Tasks view with a task detail open |
 | `who-talks-to-whom.png` | Who talks to whom |
 | `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
+| `onboarding-business.png` | Onboarding step 1, Your business |
+| `onboarding-meet.png` | Onboarding step 3, Meet your office |
+| `kelly-memory.png` | A person selected, Memory tab |
+| `hire.png` | The hire wizard, step 1 (Who) |
+| `settings-autonomy.png` | Settings, Autonomy & Budgets |
 
 The original mockups (HTML and generators) live with the design session in
 `~/.gstack/projects/agentvivekkumar-dontbemichael/designs/business-first-redesign-20260930/`.

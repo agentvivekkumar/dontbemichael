@@ -8,7 +8,6 @@ export interface SpritePortraitProps {
   /** Size step, kept from the pixel-portrait days: 1 is 24px, 1.5 is 32px,
    *  2 is 40px. */
   scale?: number;
-  background?: string;
 }
 
 /**

@@ -3,7 +3,7 @@ import { type SidebarTab } from '@/store/store';
 import { type AccentColorName } from '@/design/tokens';
 import { type IconName } from './Icon';
 import { PanelTabs } from '@/shell/PanelChrome';
-import { SHOW_GIT } from '@shared/buildFeatures';
+import { SHOW_GIT, SHOW_TRACES } from '@shared/buildFeatures';
 
 // v0.3.4: the files tab is gone — the per-agent IDE button (header) opens the
 // full Monaco editor + file tree, which superseded the read-only browser.
@@ -22,8 +22,8 @@ const ALL_TABS: { key: SidebarTab; labelKey: string; icon: IconName }[] = [
   { key: 'git',      labelKey: 'sidebar.git',      icon: 'code' },
   { key: 'traces',   labelKey: 'sidebar.traces',   icon: 'web' }
 ];
-/** GIT is hidden in this build (src/shared/buildFeatures.ts). */
-const TABS = ALL_TABS.filter((tab) => tab.key !== 'git' || SHOW_GIT);
+/** GIT and TRACES are hidden in this build (src/shared/buildFeatures.ts). */
+const TABS = ALL_TABS.filter((tab) => (tab.key !== 'git' || SHOW_GIT) && (tab.key !== 'traces' || SHOW_TRACES));
 
 export interface SidebarTabsProps {
   current: SidebarTab;

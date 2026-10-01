@@ -25,7 +25,7 @@ source of truth. The brand guide is the summary.
 | [`web/`](./web/) | `favicon.svg`, `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png` | Websites |
 | [`social/`](./social/) | `og-card-1200x630.png` link preview | Link sharing, social posts |
 | [`colors/`](./colors/) | `colors.css` (light and dark `--dbm-*` tokens), `colors.json`, `dont-be-michael.ase` (Adobe swatches), `palette.png` | Design tools and code |
-| [`fonts/`](./fonts/) | Sora and IBM Plex Mono (the brand type), JetBrains Mono (the app terminal), each with its `OFL.txt`. VT323, Pixelify Sans, Press Start 2P and Inter are retired and leave once the app and site migrate | Installing the brand type |
+| [`fonts/`](./fonts/) | Sora and IBM Plex Mono (the brand type), JetBrains Mono (the app terminal), each with its `OFL.txt`. The v1 pixel fonts are retired and removed | Installing the brand type |
 | [`reference/studio/`](./reference/studio/) | The approved v2 screens of the app, 1440 × 900 | Building the app and the website |
 | [`source/build.py`](./source/build.py) | Regenerates every asset above | Changing the brand |
 

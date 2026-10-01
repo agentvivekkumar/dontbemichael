@@ -61,7 +61,7 @@ export function TaskDetailOverlay() {
     const st = useStore.getState();
     const god = st.agents.find((a) => a.isGod);
     if (god) st.select(god.id);
-    const desc = task.description?.trim() ? task.description.trim() : '(no description)';
+    const desc = task.description?.trim() || task.notes?.trim() || '(no description)';
     st.requestDispatchSeed(`Task: ${task.title}\nContext: ${desc}\n`);
     st.requestCommandCenterTab('floor');
     closeTaskDetail();

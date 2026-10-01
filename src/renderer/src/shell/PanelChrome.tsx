@@ -55,7 +55,8 @@ export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
           </button>
         </div>
       </div>
-      {withNote && !agent.isGod && <NoteRow agent={agent} />}
+      {/* Keyed by person, so a half written note never saves onto whoever is picked next. */}
+      {withNote && !agent.isGod && <NoteRow key={agent.id} agent={agent} />}
     </div>
   );
 }

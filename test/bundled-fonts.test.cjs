@@ -77,10 +77,9 @@ test('the app HTML no longer reaches for Google, and its CSP forbids it', () => 
 
 // --- the token stacks -------------------------------------------------------
 
-/** Every font stack the app exposes, from BOTH files that define them. */
+/** Every font stack the app exposes (tokens.css; tokens.ts no longer mirrors them). */
 function stacks() {
   const css = read('src/renderer/src/design/tokens.css');
-  const ts = read('src/renderer/src/design/tokens.ts');
   const pick = (s, re) => {
     const m = s.match(re);
     assert.ok(m, `no match for ${re}`);
@@ -89,10 +88,7 @@ function stacks() {
   return {
     cssDisplay: pick(css, /--cth-font-display:\s*(.+);/),
     cssUi: pick(css, /--cth-font-ui:\s*(.+);/),
-    cssMono: pick(css, /--cth-font-mono:\s*(.+);/),
-    tsDisplay: pick(ts, /display: '(.+)',/),
-    tsUi: pick(ts, /ui: '(.+)',/),
-    tsMono: pick(ts, /mono: '(.+)'/)
+    cssMono: pick(css, /--cth-font-mono:\s*(.+);/)
   };
 }
 
@@ -102,15 +98,6 @@ test('every stack falls through to a system CJK face and an Arabic face', () => 
     assert.match(stack, /PingFang SC|Microsoft YaHei|Noto Sans( Mono)? CJK SC/, `${name} has no CJK fallback`);
     assert.match(stack, /Geeza Pro|Noto Naskh Arabic/, `${name} has no Arabic fallback`);
   }
-});
-
-test('tokens.css and tokens.ts do not drift apart', () => {
-  // tokens.ts says "mirrors tokens.css — update both together". Nothing enforced
-  // that, so a stack could be widened in one file and not the other.
-  const s = stacks();
-  assert.equal(s.tsDisplay, s.cssDisplay);
-  assert.equal(s.tsUi, s.cssUi);
-  assert.equal(s.tsMono, s.cssMono);
 });
 
 test('the release-drop iframe also falls through to a system CJK face', () => {

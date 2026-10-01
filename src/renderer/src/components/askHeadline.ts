@@ -19,28 +19,39 @@ export function askHeadline(q: string): string {
 
 const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
 /** A bracketed note that is metadata, not part of the name: a date, a mailbox
- *  (`support@`), "per Kelly", "via the form", a ticket or row number. */
-const META = new RegExp(`\\d{1,2}\\s+${MONTH}|${MONTH}\\s+\\d{1,2}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}|\\w*@|\\bper\\s|\\bvia\\s|#\\d+|\\b\\d{3,}\\b`, 'i');
+ *  (`support@`), "per Kelly", "via the form", a ticket number (`#4471`). */
+const META = new RegExp(`\\d{1,2}\\s+${MONTH}|${MONTH}\\s+\\d{1,2}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}|\\w*@|\\bper\\s|\\bvia\\s|#\\d+`, 'i');
+/** Longer than any title a card can show; agents write the file, so cap it. */
+const TITLE_MAX = 300;
 
 /**
  * The title an Ask me card shows (owner, 2026-10-01: headers looked cryptic,
- * e.g. "ScanBuddy.ai user xd3bKoXtgcdFUls8HOxirM0BRkx2 requested Salesforce
- * setup (support@, 1 Oct)"). Agents are told to write plain titles; this
- * cleans the ones that aren't: opaque ids (uuids, hashes, long tokens that
- * mix letters and digits) and trailing bracketed metadata go, the rest stays.
+ * e.g. "Acme app user Xk29fLq8ZpR3mN7tV2wB requested CRM setup (support@,
+ * 1 Oct)"). Agents are told to write plain titles; this cleans the ones that
+ * aren't: opaque ids (uuids, and long tokens with three or more digits) and
+ * trailing bracketed metadata go, the rest stays. Agents write tasks.json, so
+ * the title may be missing, not a string, or huge: it never throws, and it
+ * peels brackets with string search, not a regex that can backtrack.
  */
-export function askTitle(title: string): string {
-  let t = title.trim();
-  for (let m = /\s*\(([^()]*)\)\s*$/.exec(t); m && META.test(m[1]); m = /\s*\(([^()]*)\)\s*$/.exec(t)) {
-    t = t.slice(0, m.index);
+export function askTitle(title: unknown): string {
+  const raw = typeof title === 'string' ? title.trim().slice(0, TITLE_MAX) : '';
+  let t = raw;
+  for (;;) {
+    const end = t.trimEnd();
+    if (!end.endsWith(')')) break;
+    const open = end.lastIndexOf('(');
+    if (open < 0) break;
+    const inner = end.slice(open + 1, -1);
+    if (inner.includes(')') || !META.test(inner)) break;
+    t = end.slice(0, open);
   }
   t = t
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '')
-    .replace(/\b(?=[A-Za-z0-9_]*\d)(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]{16,}\b/g, '')
+    .replace(/\b(?=(?:[A-Za-z]*\d){3})(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{16,}\b/g, '')
     .replace(/\s+([,.:;])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  return t || title.trim();
+  return t || raw;
 }
 
 /** "just now", "5m ago", "2h ago", "3 days ago" in the app's language. */

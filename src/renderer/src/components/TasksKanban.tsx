@@ -3,14 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { InfoTip } from './InfoTip';
-import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
-import { PixelBadge } from './PixelBadge';
-import { Icon } from './Icon';
 import { useStore } from '@/store/store';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useRtl } from '@/i18n/useDirection';
 import { isReplacedAsk, openAskIndex } from '@shared/askMeRouting';
+import { useDialog } from '@/shell/useDialog';
+import { useBackdropClose } from '@/hooks/useBackdropClose';
 
 /** A card on the task kanban. Mirrors HiveTask in the main/preload process —
  *  re-declared locally so the renderer doesn't reach into the preload package
@@ -33,6 +32,8 @@ export interface HiveTask {
   id: string;
   title: string;
   description?: string;
+  /** The running notes agents keep on a card (Michael is told the owner reads them). */
+  notes?: string;
   assignee?: string;
   status: 'todo' | 'doing' | 'blocked' | 'done';
   dependsOn: string[];
@@ -96,11 +97,11 @@ export function parseTasks(raw: unknown): HiveTask[] {
         ? t.id
         : stableId(`${typeof t.title === 'string' ? t.title : ''}|${typeof t.createdAt === 'string' ? t.createdAt : ''}|${i}`),
       title: typeof t.title === 'string' ? t.title : '(untitled)',
-      // Agents keep a card's running notes in "notes" (owner, 2026-10-01: the
-      // detail's description was empty on every card); "description" is the
-      // older name.
-      description: typeof t.description === 'string' && t.description.trim() ? t.description
-        : typeof t.notes === 'string' ? t.notes : undefined,
+      // The app writes "description" (a Slack or webhook request); agents keep
+      // their running "notes" (owner, 2026-10-01: the detail showed neither on
+      // most cards). The detail shows both.
+      description: typeof t.description === 'string' ? t.description : undefined,
+      notes: typeof t.notes === 'string' ? t.notes : undefined,
       assignee: typeof t.assignee === 'string' ? t.assignee : undefined,
       status: (['todo', 'doing', 'blocked', 'done'] as const).includes(t.status as Status)
         ? (t.status as Status) : 'todo',
@@ -206,7 +207,8 @@ export function TasksKanban() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
         {COLUMNS.map((col) => {
           const all = tasks.filter((x) => x.status === col.key);
-          const cards = col.key === 'done' && !showAllDone ? all.slice(-DONE_SHOWN).reverse() : all;
+          // Done reads newest first, folded or not (it is kept in creation order).
+          const cards = col.key === 'done' ? (showAllDone ? [...all].reverse() : all.slice(-DONE_SHOWN).reverse()) : all;
           return (
             <div key={col.key} style={{
               flex: '1 1 0', minWidth: 200, display: 'flex', flexDirection: 'column', borderRadius: 'var(--cth-r-xl)',
@@ -346,25 +348,25 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
     .map((id) => all.find((t) => t.id === id))
     .filter((t): t is HiveTask => !!t);
   const created = new Date(task.createdAt);
-  // Esc closes, as every overlay does (DESIGN.md 7.21, 12); IME-safe.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.isComposing) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // The shared dialog behavior (DESIGN.md 7.21, 7.23, 12): Esc closes it but
+  // never from a field such as the status select, focus stays inside and
+  // goes back where it was; the backdrop closes on a full click.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useDialog(dialogRef, onClose);
+  const backdrop = useBackdropClose(onClose);
   const label = (text: string) => (
     <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cth-ink-3)', marginBottom: 5 }}>{text}</div>
   );
   return (
     <div
-      onClick={onClose}
+      {...backdrop}
       style={{
         position: 'fixed', inset: 0, zIndex: 280,
         background: 'color-mix(in srgb, var(--cth-bg) 60%, transparent)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={askTitle(task.title)} onClick={(e) => e.stopPropagation()} style={{
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={askTitle(task.title)} style={{
         width: 560, maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column',
         background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
       }}>
@@ -407,14 +409,15 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
             </div>
           </div>
 
-          {/* The card's notes, line by line; nothing when there are none. */}
-          {task.description?.trim() && (
-            <div>{label(t('kanban.description'))}
+          {/* What the card is for, and the notes kept on it, line by line;
+              nothing for either when the card has none. */}
+          {([['description', task.description], ['notes', task.notes]] as const).map(([key, text]) => text?.trim() ? (
+            <div key={key}>{label(t(`kanban.${key}`))}
               <div style={{ fontSize: 12.5, lineHeight: '19px', color: 'var(--cth-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} dir={rtl ? 'auto' : undefined}>
-                {task.description.trim()}
+                {text.trim()}
               </div>
             </div>
-          )}
+          ) : null)}
 
           {/* The owner Q&A trail: every decision documented on the card. */}
           {(task.humanQA?.length ?? 0) > 0 && (

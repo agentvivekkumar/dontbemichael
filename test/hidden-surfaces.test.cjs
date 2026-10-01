@@ -20,8 +20,11 @@ test('this build hides git', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_GIT, false);
 });
 
-test('the agent sidebar drops the GIT tab, and a saved GIT tab opens the terminal', () => {
-  assert.match(read('src/renderer/src/components/SidebarTabs.tsx'), /ALL_TABS\.filter\(\(tab\) => tab\.key !== 'git' \|\| SHOW_GIT\)/);
+test('the agent sidebar drops the GIT and TRACES tabs; saved ones open elsewhere', () => {
+  assert.match(read('src/renderer/src/components/SidebarTabs.tsx'), /ALL_TABS\.filter\(\(tab\) => \(tab\.key !== 'git' \|\| SHOW_GIT\) && \(tab\.key !== 'traces' \|\| SHOW_TRACES\)\)/);
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_TRACES, false);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /SHOW_TRACES && sidebarTab === 'traces'/);
+  assert.match(read('src/renderer/src/store/store.ts'), /if \(v === 'traces'\) return SHOW_TRACES \? v : 'profile';/);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /SHOW_GIT && sidebarTab === 'git'/);
   assert.match(read('src/renderer/src/store/store.ts'), /if \(v === 'git'\) return SHOW_GIT \? v : 'terminal';/);
 });

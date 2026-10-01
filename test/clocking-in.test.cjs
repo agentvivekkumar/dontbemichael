@@ -22,7 +22,7 @@ test('startup captions are office words, and shown translated', () => {
     assert.doesNotMatch(read(f), /action: '(?:reconnecting…|starting up)'/, f);
   }
   assert.match(read('src/renderer/src/shell/PanelChrome.tsx'), /const raw = agent\.action\?\.trim\(\) \? actionText\(agent\.action\.trim\(\), t\) : '';/);
-  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /const caption = sentence\(\(live \? actionText\(live, t\) : ''\)/);
+  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /const caption = sentence\(\(live \? \(a\.action\?\.trim\(\) \? actionText\(live, t\) : live\) : ''\)/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).office.activity.clockingIn, loc);
   }

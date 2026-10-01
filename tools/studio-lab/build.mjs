@@ -39,7 +39,7 @@ const urlAsDataUrl = {
 
 /** Build the lab; returns the HTML. Writes it to `out` unless `out` is null.
  *  `entry` builds another page the same way (reference.tsx, for `npm run shoot`). */
-export async function buildLab(out = DEFAULT_OUT, { entry = 'lab.tsx', title = 'Studio lab' } = {}) {
+export async function buildLab(out = DEFAULT_OUT, { entry = 'lab.tsx', title = 'Studio lab', minify = true } = {}) {
   const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
   const res = await build({
     entryPoints: [path.join(here, entry)],
@@ -48,7 +48,7 @@ export async function buildLab(out = DEFAULT_OUT, { entry = 'lab.tsx', title = '
     outdir: path.join(here, '.out'),
     format: 'iife',
     jsx: 'automatic',
-    minify: true,
+    minify,
     target: 'chrome120',
     nodePaths: [path.join(root, 'node_modules')],
     alias: {

@@ -66,7 +66,9 @@ export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: Clos
 
   return (
     <div role="region" aria-label={t('closingBar.title')} style={{
-      position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 80,
+      // Above every dialog's backdrop (they close when closing time starts),
+      // below only the release notes.
+      position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 550,
       width: 'min(720px, calc(100% - 48px))', display: 'flex', flexDirection: 'column',
       background: 'var(--cth-card)', borderRadius: 'var(--cth-r-xl)', fontFamily: 'var(--cth-font-ui)',
       boxShadow: `inset 0 0 0 1px ${error ? 'color-mix(in srgb, var(--cth-coral) 45%, transparent)' : 'var(--cth-line)'}, var(--cth-shadow-lg)`
@@ -112,7 +114,7 @@ export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: Clos
             <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <span style={{ fontSize: 12, color: 'var(--cth-ink-2)', maxWidth: 170 }}>{t('closingBar.confirmForce')}</span>
               <button type="button" className="cth-toast-btn" autoFocus onClick={() => setConfirmForce(false)}>{t('closingBar.keepClosing')}</button>
-              <button type="button" className="cth-toast-btn" style={{ background: 'var(--cth-coral-strong)', color: '#fff', boxShadow: 'none' }} disabled={busy} onClick={() => { void force(); }}>
+              <button type="button" className="cth-toast-btn" style={{ background: 'var(--cth-coral-strong)', color: 'var(--cth-on-coral)', boxShadow: 'none' }} disabled={busy} onClick={() => { void force(); }}>
                 {busy ? t('quit.killing') : t('quit.forceQuit')}
               </button>
             </div>

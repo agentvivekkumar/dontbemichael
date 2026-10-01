@@ -130,8 +130,13 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
   // Read the latest inputs from inside long-lived listeners.
   const live = useRef({ seatOf, godId, paused, posts, accentOf });
   live.current = { seatOf, godId, paused, posts, accentOf };
-  const timers = useRef<number[]>([]);
-  const later = (ms: number, fn: () => void) => { timers.current.push(window.setTimeout(fn, ms)); };
+  // Pending timeouts only: each leaves the set when it fires, so a day of
+  // events doesn't pile up ids (review, 2026-10-01).
+  const timers = useRef(new Set<number>());
+  const later = (ms: number, fn: () => void) => {
+    const id = window.setTimeout(() => { timers.current.delete(id); fn(); }, ms);
+    timers.current.add(id);
+  };
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const lastPop = useRef<Record<string, number>>({});

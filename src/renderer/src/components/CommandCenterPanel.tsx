@@ -1,7 +1,6 @@
 import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PixelPanel } from './PixelPanel';
 import { PanelCard, PanelHeader, PanelTabs } from '@/shell/PanelChrome';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';

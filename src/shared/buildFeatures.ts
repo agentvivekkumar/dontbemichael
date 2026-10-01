@@ -8,6 +8,11 @@
  *  control, and a diff view reads as something broken (owner, 2026-09-23). */
 export const SHOW_GIT = false;
 
+/** Traces: the per agent tool call trace tab. A developer view; in the 380 px
+ *  person panel it also pushed the tab row past the edge ("Trac", review
+ *  2026-10-01). DESIGN.md 7.11 keeps it behind a flag. */
+export const SHOW_TRACES = false;
+
 /** Developer tools on Settings → Prerequisites: the git and Node.js rows, and
  *  every agent engine this build doesn't offer (BUILD_ENGINES). Owners only need
  *  Claude Code, uv and MemPalace; the rest read as problems ("NOT SET UP") that

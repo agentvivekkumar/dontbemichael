@@ -1,5 +1,5 @@
 /**
- * What each closing-time row says (QuitWarningModal's ClosingTimeRows), kept
+ * What each closing-time row says (ClosingTimeBar's list of who is still working), kept
  * out of the component so it can be tested without rendering React.
  */
 import type { Agent } from '@/store/store';

@@ -9,9 +9,12 @@
 
 **[dontbemichael.com](https://dontbemichael.com)**
 
-<img src="./docs/media/command-center.jpg" alt="The office floor: eight team members at their desks, with Michael's Command Center on the right showing his profile and the team" width="1240">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./branding/reference/studio/home-dark.png">
+  <img src="./branding/reference/studio/home-light.png" alt="The office: a pod for each department around Michael's glass office, and the Needs you board on the right with what waits on you" width="1240">
+</picture>
 
-Pick your kind of business, pick your team, and Michael, your office manager, runs the floor
+Pick your kind of business, pick your team, and Michael, your office manager, runs the office
 while you run the business. Every team member is an AI agent with a job, its own folder and its
 own memory, working on your Mac.
 
@@ -23,13 +26,6 @@ own memory, working on your Mac.
 </p>
 
 <br>
-
-<!-- Inline player renders on github.com (raw URL required; relative paths only link). -->
-<video src="https://github.com/agentvivekkumar/dontbemichael/raw/main/docs/media/hero.mp4" controls muted loop playsinline width="820">
-  <a href="https://github.com/agentvivekkumar/dontbemichael/raw/main/docs/media/hero.mp4">▶ Watch the office at work</a>
-</video>
-
-<br><br>
 
 **[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
 
@@ -70,8 +66,9 @@ customer support, sales, marketing and so on. Michael is the office manager. You
 routes the work, answers the team's questions, and asks you only when something needs your
 decision.
 
-Everything runs on your Mac, on the Claude plan you already have. Each team member shows up as a
-character on a pixel office floor, so you can see who is working on what.
+Everything runs on your Mac, on the Claude plan you already have. Each team member has a desk in
+an office you can watch, a pod for each department around Michael's glass office, so you can see
+who is working on what.
 
 ## Your team
 
@@ -135,7 +132,7 @@ directly, open it and choose **Talk 1:1**; Michael sends it no work until you en
 
 </td>
 <td width="50%">
-  <img src="./docs/media/command-center.jpg" alt="Michael's Command Center: his profile, what he does, what he asks you first, and the team of eight on the office floor" width="100%">
+  <img src="./branding/reference/studio/michael-office-schedule.png" alt="Michael selected: his card in the office and his Office schedule, every job on a clock across the team" width="100%">
 </td>
 </tr>
 <tr>
@@ -152,7 +149,7 @@ working.
 
 </td>
 <td width="50%">
-  <img src="./docs/screenshots/add-agent.png" alt="The hire dialog" width="100%">
+  <img src="./branding/reference/studio/hire.png" alt="The hire wizard: pick a character, then their job, role and work style" width="100%">
 </td>
 </tr>
 <tr>
@@ -166,7 +163,7 @@ merges and updates them, so memory gets better instead of piling up.
 
 </td>
 <td width="50%">
-  <img src="./docs/screenshots/memory.png" alt="Searching memory" width="100%">
+  <img src="./branding/reference/studio/kelly-memory.png" alt="Kelly's Memory tab: her preferences, facts, where things live and the steps she knows" width="100%">
 </td>
 </tr>
 <tr>
@@ -181,7 +178,7 @@ quotes.
 
 </td>
 <td width="50%">
-  <img src="./docs/screenshots/autonomy.png" alt="Autonomy and approval settings" width="100%">
+  <img src="./branding/reference/studio/settings-autonomy.png" alt="Settings, Autonomy and Budgets: approvals and the circuit breaker" width="100%">
 </td>
 </tr>
 <tr>
@@ -189,12 +186,13 @@ quotes.
 
 ### Watch the office work
 
-Team members walk to their stations as they work, and envelopes fly between desks when they
-message each other. Click any desk to see that team member's work live.
+Desks light up as team members clock in and go dark at closing time. Envelopes fly between pods
+as work moves, Michael points before he hands a job out, scheduled jobs ring his wall clock, and
+idle teammates trade lines across the office. Click any pod to see that team member's work live.
 
 </td>
 <td width="50%">
-  <a href="https://github.com/agentvivekkumar/dontbemichael/raw/main/docs/media/demo/agents.mp4"><img src="./docs/media/demo/agents-poster.jpg" alt="Team members working on the office floor" width="100%"></a>
+  <img src="./branding/reference/studio/kelly-work.png" alt="Kelly selected: her pod in the office and her Work tab, her session live" width="100%">
 </td>
 </tr>
 <tr>
@@ -209,26 +207,26 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 </td>
 <td width="50%">
-  <img src="./docs/screenshots/setup-business.png" alt="Setup step 1: your business name, kind of business, owner and headquarters address" width="100%">
+  <img src="./branding/reference/studio/onboarding-business.png" alt="Setup step 1: your business name, kind of business, owner and headquarters address" width="100%">
 </td>
 </tr>
 <tr>
 <td width="50%">
-  <img src="./docs/screenshots/setup-office.png" alt="Setup step 3: Michael explains the starter team, the floor, memory and approvals" width="100%">
+  <img src="./branding/reference/studio/onboarding-meet.png" alt="Setup step 3: Michael explains the starter team, how he runs the office, memory and approvals" width="100%">
 </td>
 <td width="50%">
-  <img src="./docs/screenshots/setup-team.png" alt="Setup step 4: pick your starter team and the folder each one works in" width="100%">
+  <img src="./branding/reference/studio/onboarding-team.png" alt="Setup step 4: pick your starter team; the office fills with a pod for each person picked" width="100%">
 </td>
 </tr>
 </table>
 
 **Running the office**
-- **Ask me.** When the team needs a decision, it goes on Michael's Ask me board. Your answer goes back to whoever asked, and they remember it.
+- **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Capabilities tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you in Ask me only when he can't settle it. Michael's Office schedule tab lists every job that is on.
 - **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Capabilities tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
 - **QuickBooks through your Claude account.** The app does not connect to Intuit itself. Turn QuickBooks on in Settings, Connections, QuickBooks (it is off by default); the app then shows whether your Claude account has QuickBooks connected, or the steps to connect it. On each team member's Capabilities tab, choose Can use QuickBooks, then Read only or Can make changes. Oscar starts on and Read only; everyone else starts off.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Capabilities (email, QuickBooks when you turn it on, and schedules), Messages as a day by day history, and Memory as readable notes.
-- **Tasks and the floor.** A switch in the corner of the floor shows the animated office, the whole task board, or who talks to whom.
+- **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
 - **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.
 
@@ -278,7 +276,7 @@ Windows and Linux will follow.
 
 ## For developers
 
-Don't Be Michael is an Electron app (React, TypeScript, Pixi.js, xterm.js, node-pty). Each team
+Don't Be Michael is an Electron app (React, TypeScript, xterm.js, node-pty). Each team
 member is a real Claude Code process in its own terminal. The team coordinates through the hive,
 a folder of plain files with a mailbox, memory and a task board per agent; only the app commits to
 it.
@@ -334,21 +332,9 @@ The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LIC
 copyright notice of the project this is forked from is kept in `LICENSE`, as the MIT license
 requires.
 
-> [!IMPORTANT]
-> **Asset licensing.** The bundled pixel art (tilesets and maps) is **Modern Interiors - RPG Tileset
-> [16X16]** by [LimeZu](https://limezu.itch.io/moderninteriors), used under the **Complete Version
-> licence**, which permits editing and use in commercial and non-commercial projects. **That licence
-> requires credit to LimeZu**, and the credit must stay in place. The office cast is not LimeZu art.
-> It is drawn procedurally in `portraitArt.ts`. See
-> [`src/renderer/src/assets/ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md).
-
-The MIT license covers only the code. The bundled pixel art is licensed separately by LimeZu and is
-excluded in [`LICENSE-ASSETS`](./LICENSE-ASSETS). *Don't Be Michael* is not affiliated with NBC,
-*The Office*, or Dunder Mifflin.
+*Don't Be Michael* is not affiliated with NBC, *The Office*, or Dunder Mifflin.
 
 ## Acknowledgements
 
 - [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors, the open-source project this product is forked from.
-- [LimeZu](https://limezu.itch.io/) for the *Modern Interiors* pixel-art tilesets (Complete Version licence).
-- [`shahar061/the-office`](https://github.com/shahar061/the-office) for the office tileset and map vendoring.
-- [Pixi.js](https://pixijs.com/) · [xterm.js](https://xtermjs.org/) · [node-pty](https://github.com/microsoft/node-pty) · [electron-vite](https://electron-vite.org/) · [CodeMirror](https://codemirror.net/) for the libraries this is built on.
+- [xterm.js](https://xtermjs.org/) · [node-pty](https://github.com/microsoft/node-pty) · [electron-vite](https://electron-vite.org/) · [CodeMirror](https://codemirror.net/) for the libraries this is built on.

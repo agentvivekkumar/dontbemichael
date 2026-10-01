@@ -14,7 +14,7 @@ const loadTs = require('./load-ts.cjs');
 const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/scene/office/cafeteriaLines.ts'), 'utf8');
 const castSrc = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/scene/office/cast.ts'), 'utf8');
 const cast = [...new Set([...castSrc.matchAll(/name: '([a-z]+)'/g)].map((m) => m[1]))];
-const { pickSoloLine, pickExchange, createIdleLines, createBanter } = loadTs('src/renderer/src/scene/office/cafeteriaLines.ts');
+const { createIdleLines, createBanter } = loadTs('src/renderer/src/scene/office/cafeteriaLines.ts');
 
 test('every character has at least four lines of their own', () => {
   assert.match(src, /const BY_CHARACTER: Record<OfficeCharacterName, readonly string\[\]> = \{/, 'a full record: a new character fails to compile without lines');
@@ -30,12 +30,13 @@ test('every character has at least four lines of their own', () => {
 test('the new characters speak in their own voice, briefly and without dashes', () => {
   for (const c of ['darryl', 'erin', 'nick', 'sadiq']) {
     const seen = new Set();
-    for (let seed = 0; seed < 200; seed++) seen.add(pickSoloLine(c, 'coffee', seed * 5));
+    const own = createIdleLines(() => 0);
+    for (let i = 0; i < 20; i++) seen.add(own(c));
     for (const line of seen) {
       assert.ok(line.length <= 44, `${c}: "${line}" fits the bubble`);
       assert.doesNotMatch(line, /[–—]| - /, `${c}: "${line}"`);
     }
-    assert.ok(pickExchange(c, 0).length >= 2, `${c} opens with a bit of their own`);
+    assert.ok(createBanter(() => 0)(c).length >= 2, `${c} opens with a bit of their own`);
   }
 });
 
