@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useStore, selectedAgent, ROSTER_BOOT_HOME } from '@/store/store';
+import { useStore, selectedAgent, ROSTER_BOOT_HOME, ACTION_CLOCKING_IN } from '@/store/store';
 import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
 import type { HarnessConfig } from '@/store/config';
@@ -255,6 +255,13 @@ export function App() {
     window.cth.listPtys().then((list) => {
       if (cancelled) return;
       useStore.getState().reconcileWithLivePtys(list.map((p) => p.id));
+      // A terminal that survived the reload and has already printed was never
+      // away: it is not clocking in, so its desk light and caption must not
+      // say so (the saved roster loads everyone as clocking in).
+      const running = new Set(list.filter((p) => p.hasOutput).map((p) => p.id));
+      for (const a of useStore.getState().agents) {
+        if (a.ptyId && running.has(a.ptyId) && a.action === ACTION_CLOCKING_IN) useStore.getState().updateAgent(a.id, { action: '' });
+      }
     }).catch(() => { /* ignore — keep restored agents as-is */ });
     return () => { cancelled = true; };
   }, [config?.onboardingComplete]);

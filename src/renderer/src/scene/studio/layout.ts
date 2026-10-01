@@ -171,4 +171,4 @@ export const HUB_CARD = { left: 447, top: 494, w: 196 };
 /** Where an escalation leaves the stage, toward the Needs you board. */
 export const EXIT: Pt = [1056, 196];
 /** The top of Michael's pod, where his tokens start. */
-export const HUB_TOP: Pt = P(0, -0.2, 96);
+export const HUB_TOP: Pt = P(0, -0.2, 130);

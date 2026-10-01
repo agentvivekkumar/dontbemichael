@@ -203,3 +203,21 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
   assert.match(stage, /const free = spots\.find\(/);
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-quote-text \{ font-size: 12\.5px;/);
 });
+
+test('Michael\'s numbers live on his walls; a chip replaces the always-on card (owner, 2026-09-30)', () => {
+  const art = read('src/renderer/src/scene/studio/StudioArt.tsx');
+  assert.match(art, /function StatsSign\(/);
+  assert.match(art, /\{stats && <StatsSign at=\{P\(-0\.6, -a \+ 0\.01, z1 - 3\)\}/);
+  assert.match(art, /<text key=\{n\} className="cth-st-tick"/, 'numbers tick when they change');
+  // Board columns read left to right on the wall: To do, Doing, Blocked, Done.
+  assert.match(art, /\[0\.3, '#9C97CC', board\.todo\], \[-0\.1, T\.blue, board\.doing\], \[-0\.5, T\.coral, board\.blocked\], \[-0\.9, T\.green, board\.done\]/);
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(stage, /\{!sel && \(\n\s+<HubChip/);
+  assert.match(stage, /\{\(sel \|\| peeking\) && \(/);
+});
+
+test('a terminal that survived a reload is not shown clocking in', () => {
+  const app = read('src/renderer/src/App.tsx');
+  assert.match(app, /const running = new Set\(list\.filter\(\(p\) => p\.hasOutput\)\.map\(\(p\) => p\.id\)\);/);
+  assert.match(app, /a\.ptyId && running\.has\(a\.ptyId\) && a\.action === ACTION_CLOCKING_IN\) useStore\.getState\(\)\.updateAgent\(a\.id, \{ action: '' \}\)/);
+});

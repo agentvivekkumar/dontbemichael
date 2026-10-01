@@ -275,7 +275,7 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
     if (!before || Date.now() - openedAt.current < 6000 || live.current.paused) return;
     for (const [id, owner] of Object.entries(done)) {
       if (id in before || !owner) continue;
-      const at = deskTop(owner) ?? (owner === live.current.godId || owner === 'god' ? P(0, -0.2, 110) : null);
+      const at = deskTop(owner) ?? (owner === live.current.godId || owner === 'god' ? P(0, -0.2, 148) : null);
       if (!at) continue;
       const b: Burst = { key: `k${seqRef.current++}`, at };
       setBursts((prev) => [...prev, b]);

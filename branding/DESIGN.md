@@ -644,9 +644,14 @@ when an Ask me card is tagged to this person.
 radius 2 2 6 2, `shadow-sm` tinted amber. Count of tasks this person is doing. Click opens
 the first task.
 
-### 7.17 Michael's hub card
+### 7.17 Michael's chip and hub card
 
-196 px wide, `r-2xl`, `shadow-hub`, under Michael's glass pod.
+Michael's numbers live on his glass walls (§8.4; owner, 2026-09-30: a card always on screen
+was a distraction). Under his pod he shows a chip like a quiet pod's (§7.14a): 22 px ink
+avatar, name, status pill. The full hub card below opens while he is selected, or while
+the pointer is on the chip or the card.
+
+The hub card: 196 px wide, `r-2xl`, `shadow-hub`.
 
 - Top: 26 px ink avatar "M", name, "Office Manager", status pill, caption.
 - Stats strip (`card-2`): three columns, mono 16 px 600 numbers: **delegated** (today's
@@ -813,9 +818,17 @@ four desks (§8.9). The monitor screen is the status surface:
 ### 8.4 Michael's glass pod
 
 A raised platform with a glass box (back wall white at 78%, front at 42%; dark: indigo
-tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, a small ink "M"
-badge floating above, and a tiny task board on the back glass (colored bars for the
-board columns). It sits at the center of the platform and every path passes through it.
+tinted at 20% and 10%), two monitors, a ring on the floor in `indigo`, and a small ink "M"
+badge floating above the walls. It sits at the center of the platform. The glass is taller
+than a desk (72) so his walls carry his numbers:
+
+- Left wall: the task board. To do, Doing, Blocked, Done read left to right, each column's
+  count in mono at its head in the column color, up to four stickies under it. Stickies pop
+  on; Doing breathes; his marker writes under the columns while he works.
+- Right wall, above the monitors: a lit sign (ink, indigo rim) with three mono numbers and
+  glyphs: handed out today, waiting on you (coral when above zero), kept; his context gauge
+  along its bottom (indigo, amber at 65%, coral at 85%). Numbers tick when they change.
+- The clock (real time, rings for scheduled jobs) at the front end of the left wall.
 
 ### 8.5 States on the stage
 

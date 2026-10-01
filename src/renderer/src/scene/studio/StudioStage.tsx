@@ -233,7 +233,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
       const t = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
       return { l, t, r: l + r.w, b: t + r.h };
     });
-    if (god) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 190 });
+    if (god && (selected === god.id || peek === 'hub')) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 230 });
     const spots: [QuoteSpot, number, number][] = [
       ['up', left, chipTop - GAP - QH],
       ['up-end', left + 32 - QW, chipTop - GAP - QH],
@@ -324,7 +324,8 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway} /> }
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
+            stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}
       </svg>
@@ -400,14 +401,33 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         ];
       })}
 
-      {/* Michael's hub card. */}
-      {god && (
-        <HubCard
-          style={{ ...at(HUB_CARD.left, HUB_CARD.top), width: HUB_CARD.w }}
-          god={god} selected={selected === god.id} onSelect={() => select(god.id)}
-          delegated={delegated} toYou={toYou} kept={snap.kept} board={snap.board}
-        />
-      )}
+      {/* Michael: a chip under his office (his numbers live on his walls); his
+          full card shows while he is selected or the pointer is on the chip or card. */}
+      {god && (() => {
+        const sel = selected === god.id;
+        const peeking = peek === 'hub';
+        return (
+          <>
+            {!sel && (
+              <HubChip
+                style={{ ...at(HUB_CARD.left + HUB_CARD.w / 2, HUB_CARD.top + 4), transform: 'translateX(-50%)' }}
+                god={god} toYou={toYou} onSelect={() => select(god.id)}
+                onEnter={() => openPeek('hub')} onLeave={closePeek}
+              />
+            )}
+            {(sel || peeking) && (
+              <div onMouseEnter={sel ? undefined : () => openPeek('hub')} onMouseLeave={sel ? undefined : closePeek}
+                style={{ ...at(HUB_CARD.left, HUB_CARD.top + (sel ? 0 : 38)), width: HUB_CARD.w, zIndex: 3 }}>
+                <HubCard
+                  style={{ width: '100%' }}
+                  god={god} selected={sel} onSelect={() => select(god.id)}
+                  delegated={delegated} toYou={toYou} kept={snap.kept} board={snap.board}
+                />
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Mailbox tags. */}
       {mailboxes.map((m, i) => {
@@ -621,6 +641,30 @@ const forYouBadge: CSSProperties = {
 };
 
 /* ── Michael's hub card (DESIGN.md 7.17) ──────────────────────────────────── */
+
+/** Michael's chip (DESIGN.md 7.17): his avatar in ink, his name, his status. */
+function HubChip({ style, god, toYou, onSelect, onEnter, onLeave }: {
+  style: CSSProperties; god: Agent; toYou: number; onSelect: () => void; onEnter: () => void; onLeave: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button data-studio-card="" onClick={onSelect} onMouseEnter={onEnter} onMouseLeave={onLeave}
+      aria-label={`${god.name}, ${t('studio.officeManager')}`}
+      style={{
+        ...style, display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 5px 0 4px',
+        border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--cth-font-ui)',
+        background: 'color-mix(in srgb, var(--cth-card) 94%, transparent)', backdropFilter: 'blur(6px)',
+        boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+      }}>
+      <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--cth-ink)', color: 'var(--cth-bg)', fontSize: 11, fontWeight: 700 }}>
+        {god.name.slice(0, 1).toUpperCase()}
+      </span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--cth-ink)' }}>{god.name}</span>
+      <PixelBadge status={god.status as StatusKind} style={{ fontSize: 10, lineHeight: '13px', padding: '1px 7px' }} />
+      {toYou > 0 && <span className="cth-sr-only">{t('studio.toYou')}: {toYou}</span>}
+    </button>
+  );
+}
 
 function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board }: {
   style: CSSProperties; god: Agent; selected: boolean; onSelect: () => void;

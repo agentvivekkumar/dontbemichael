@@ -292,7 +292,7 @@ function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── Michael's glass pod ──────────────────────────────────────────────────── */
 
-export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false }: {
+export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false, stats }: {
   T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number };
   /** Michael is at work: his screens scroll, the marker writes on the board. */
   busy?: boolean;
@@ -300,19 +300,24 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
   ringing?: boolean;
   /** Closing time is done: Michael's office goes dark last. */
   lightsOut?: boolean;
+  /** His numbers, shown on the sign on his right wall (DESIGN.md 8.4). */
+  stats?: { delegated: number; toYou: number; kept: number; ctx: number | null };
 }) {
   const a = 1.05;
   const ph = 14;
-  const wh = 58;
+  // Taller glass than the pods' desks, so the board and the sign have room
+  // above the monitors (owner, 2026-09-30: his numbers live on his walls).
+  const wh = 72;
   const z0 = ph;
   const z1 = ph + wh;
-  const bz0 = z0 + 26;
-  const bz1 = z0 + 50;
+  const bz0 = z0 + 18;
+  const bz1 = z0 + 62;
+  // Left to right as you read the wall: To do, Doing, Blocked, Done.
   const cols: [number, string, number][] = [
-    [-0.9, '#B7B2DD', board.todo], [-0.52, T.blue, board.doing], [-0.14, T.coral, board.blocked], [0.24, T.green, board.done]
+    [0.3, '#9C97CC', board.todo], [-0.1, T.blue, board.doing], [-0.5, T.coral, board.blocked], [-0.9, T.green, board.done]
   ];
   const hubFlicker = useLightsOn(lightsOut);
-  const [mx, my] = P(0, -0.2, 96);
+  const [mx, my] = P(0, -0.2, 130);
   const beam = [P(-0.15, -0.2, ph + 50), P(0.15, -0.2, ph + 50)];
   return (
     <g className={lightsOut ? 'cth-st-lightsout' : hubFlicker}>
@@ -324,21 +329,31 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
       <polygon points={pts([P(-a, -a, z0), P(-a, a, z0), P(-a, a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
       <polygon points={pts([P(-a, -a, z0), P(a, -a, z0), P(a, -a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
       {/* the task board on the back glass: one sticky per task, up to 4 per column */}
-      <polygon points={pts([P(-a + 0.01, -0.95, bz0), P(-a + 0.01, 0.55, bz0), P(-a + 0.01, 0.55, bz1), P(-a + 0.01, -0.95, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
+      <polygon points={pts([P(-a + 0.01, -0.97, bz0), P(-a + 0.01, 0.64, bz0), P(-a + 0.01, 0.64, bz1), P(-a + 0.01, -0.97, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
+      {/* Each column's count at its head, written on the board's plane. */}
+      {cols.map(([g0, col, n]) => {
+        const [tx, ty] = P(-a + 0.02, g0 + 0.15, bz1 - 4);
+        return (
+          <g key={`n-${g0}`} transform={`matrix(1,-0.5,0,1,${tx.toFixed(1)},${ty.toFixed(1)})`}>
+            <text key={n} className="cth-st-tick" y={0} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontWeight={600} fontSize={11} fill={col}>{n}</text>
+          </g>
+        );
+      })}
       {/* A sticky pops onto its column when it arrives; the Doing column's
           stickies breathe, since that work is in progress right now. */}
       {cols.map(([g0, col, n], ci) => Array.from({ length: Math.min(n, 4) }, (_, j) => {
-        const zz = bz1 - 5 - j * 5;
+        const zz = bz1 - 18 - j * 6;
         return <polygon key={`${g0}-${j}`} className={ci === 1 ? 'cth-st-pop cth-st-doing' : 'cth-st-pop'}
           style={ci === 1 ? { animationDelay: `0s, ${j * 0.3}s` } : undefined}
-          points={pts([P(-a + 0.02, g0 + 0.04, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz), P(-a + 0.02, g0 + 0.04, zz)])} fill={col} opacity={0.9} />;
+          points={pts([P(-a + 0.02, g0 + 0.03, zz - 4.2), P(-a + 0.02, g0 + 0.28, zz - 4.2), P(-a + 0.02, g0 + 0.28, zz), P(-a + 0.02, g0 + 0.03, zz)])} fill={col} opacity={0.9} />;
       }))}
       {/* Michael's marker writing a line under the columns while he works. */}
       {busy && (() => {
-        const [p0, p1] = [P(-a + 0.02, -0.9, bz0 + 3.5), P(-a + 0.02, 0.5, bz0 + 3.5)];
+        const [p0, p1] = [P(-a + 0.02, 0.55, bz0 + 4), P(-a + 0.02, -0.85, bz0 + 4)];
         return <line x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} pathLength={1} className="cth-st-write" stroke={T.req} strokeWidth={1.4} strokeLinecap="round" strokeDasharray="1 1" />;
       })()}
-      <WallClock at={P(0.6, -a + 0.01, z1 - 17)} ringing={ringing} T={T} />
+      <WallClock at={P(-a + 0.01, 0.86, z1 - 22)} plane="left" ringing={ringing} T={T} />
+      {stats && <StatsSign at={P(-0.6, -a + 0.01, z1 - 3)} stats={stats} T={T} dark={dark} />}
       {[[P(-a, a, z0), P(-a, a, z1)], [P(-a, -a, z0), P(-a, -a, z1)], [P(a, -a, z0), P(a, -a, z1)]].map(([p0, p1], i) => (
         <line key={i} x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} stroke={T.wall} strokeWidth={1.4} />
       ))}
@@ -392,7 +407,7 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
 
 /** The office clock on Michael's back wall, showing the real time. It rings
  *  when a scheduled job starts. Drawn in the wall's plane (a 0.5 shear). */
-function WallClock({ at: [x, y], ringing, T }: { at: Pt; ringing: boolean; T: SceneTokens }) {
+function WallClock({ at: [x, y], ringing, T, plane = 'right' }: { at: Pt; ringing: boolean; T: SceneTokens; plane?: 'left' | 'right' }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 30_000);
@@ -402,7 +417,7 @@ function WallClock({ at: [x, y], ringing, T }: { at: Pt; ringing: boolean; T: Sc
   const h = (now.getHours() % 12) + m / 60;
   const hand = (deg: number, len: number) => `M0,0 L${(Math.sin((deg * Math.PI) / 180) * len).toFixed(2)},${(-Math.cos((deg * Math.PI) / 180) * len).toFixed(2)}`;
   return (
-    <g transform={`matrix(1,0.5,0,1,${x},${y})`}>
+    <g transform={`matrix(1,${plane === 'left' ? -0.5 : 0.5},0,1,${x},${y})`}>
       <g className={ringing ? 'cth-st-shake' : undefined}>
         {ringing && [0, 1].map((i) => (
           <circle key={i} r={13} fill="none" stroke={T.amber} strokeWidth={1.6} className="cth-st-ringout" style={{ animationDelay: `${i * 0.35}s` }} />
@@ -413,6 +428,41 @@ function WallClock({ at: [x, y], ringing, T }: { at: Pt; ringing: boolean; T: Sc
         <path d={hand(m * 6, 8.5)} stroke={T.req} strokeWidth={1.3} strokeLinecap="round" />
         <circle r={1.2} fill={T.req} />
       </g>
+    </g>
+  );
+}
+
+/** Michael's numbers as a lit sign on his right glass wall, above his
+ *  monitors: jobs he handed out today, things waiting on the owner (coral), and
+ *  jobs he kept, with his context gauge along the bottom. Numbers tick when
+ *  they change. Drawn in the wall's plane (a 0.5 shear). */
+function StatsSign({ at: [x, y], stats, T, dark }: { at: Pt; stats: { delegated: number; toYou: number; kept: number; ctx: number | null }; T: SceneTokens; dark: boolean }) {
+  const W = 80; const H = 17;
+  const bg = dark ? '#0F0E17' : '#1E1B2E';
+  const items: [string, number, string][] = [
+    // arrow out of a box: handed out
+    ['M2,7 L7,2 M4,2 H7 V5 M1,3 V8 H6', stats.delegated, '#C9C3FF'],
+    // a bell: waiting on the owner
+    ['M2,6 Q2,2 4.5,2 Q7,2 7,6 L8,7 H1 Z M3.6,8 H5.4', stats.toYou, stats.toYou > 0 ? '#FF8C90' : '#C9C3FF'],
+    // a pin: kept for himself
+    ['M4.5,1 L7,3.5 L5.5,4 L4,6.5 L2.5,5 L5,3.5 Z M3,6 L1,8', stats.kept, '#C9C3FF']
+  ];
+  return (
+    <g transform={`matrix(1,0.5,0,1,${x.toFixed(1)},${y.toFixed(1)})`}>
+      <rect x={0} y={0} width={W} height={H} rx={3} fill={bg} />
+      <rect x={0} y={0} width={W} height={H} rx={3} fill="none" stroke={T.req} strokeOpacity={0.6} strokeWidth={0.8} />
+      {items.map(([d, n, col], i) => (
+        <g key={i} transform={`translate(${4 + i * 25.5},3)`}>
+          <path d={d} fill="none" stroke={col} strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
+          <text key={n} className="cth-st-tick" x={11} y={8.5} fontFamily="IBM Plex Mono, monospace" fontWeight={600} fontSize={10} fill={col}>{n}</text>
+        </g>
+      ))}
+      {stats.ctx !== null && (
+        <>
+          <rect x={4} y={H - 3} width={W - 8} height={1.4} rx={0.7} fill="#FFFFFF" opacity={0.15} />
+          <rect x={4} y={H - 3} width={(W - 8) * Math.min(1, stats.ctx / 100)} height={1.4} rx={0.7} fill={stats.ctx >= 85 ? '#FF8C90' : stats.ctx >= 65 ? '#F2B45A' : '#9D90FF'} />
+        </>
+      )}
     </g>
   );
 }
