@@ -39,8 +39,29 @@ design change to show the office as the app now draws it.
 
 For example: `studio-lab.html?hour=22&clean&autoplay#dark`.
 
+## Reference screens
+
+```
+npm run shoot
+```
+
+re-shoots the brand kit's reference screens (`branding/reference/studio/*.png`,
+1440 x 900) from the app's real shell and panels on the same office:
+the Office view in light and dark, Kelly's Access and Work tabs, Michael's
+office schedule, a task open, who talks to whom, and the Team step of setup.
+`npm run shoot -- home-dark` re-shoots just the ones named. The clock reads
+10:42 and the dice are seeded, so a re-shoot changes only what the app changed.
+Then rebuild what uses them:
+
+```
+python3 branding/source/build.py social guide
+```
+
 ## Files
 
 - `lab.tsx`: the page, the fictional office and the buttons.
-- `mock.ts`: a stand in for the app's preload bridge.
-- `build.mjs`: bundles everything into the single HTML file.
+- `reference.tsx`: the app's shell, one reference screen per `?shot=`.
+- `mock.ts`: a stand in for the app's preload bridge, and the office itself.
+- `clock.ts`: the fixed clock and seeded dice for the reference screens.
+- `build.mjs`: bundles a page into one self-contained HTML file.
+- `shoot.mjs`: builds `reference.tsx` and captures each screen with headless Chrome.

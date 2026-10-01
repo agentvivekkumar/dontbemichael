@@ -37,11 +37,12 @@ const urlAsDataUrl = {
   }
 };
 
-/** Build the lab; returns the HTML. Writes it to `out` unless `out` is null. */
-export async function buildLab(out = DEFAULT_OUT) {
+/** Build the lab; returns the HTML. Writes it to `out` unless `out` is null.
+ *  `entry` builds another page the same way (reference.tsx, for `npm run shoot`). */
+export async function buildLab(out = DEFAULT_OUT, { entry = 'lab.tsx', title = 'Studio lab' } = {}) {
   const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
   const res = await build({
-    entryPoints: [path.join(here, 'lab.tsx')],
+    entryPoints: [path.join(here, entry)],
     bundle: true,
     write: false,
     outdir: path.join(here, '.out'),
@@ -67,7 +68,7 @@ export async function buildLab(out = DEFAULT_OUT) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Don't Be Michael · Studio lab</title>
+<title>Don't Be Michael · ${title}</title>
 <style>${css}</style>
 </head>
 <body>
@@ -83,7 +84,7 @@ export async function buildLab(out = DEFAULT_OUT) {
   return html;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const out = process.argv[2] ? path.resolve(process.argv[2]) : DEFAULT_OUT;
   buildLab(out).then((html) => {
     console.log(`studio lab: ${path.relative(process.cwd(), out)} (${(html.length / 1024 / 1024).toFixed(1)} MB)`);

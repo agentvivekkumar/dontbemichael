@@ -23,9 +23,9 @@ point here.
 migrated**: both still render v1. The migration is tracked in §17. Until an item there is
 closed, the code is behind the spec, not the other way round.
 
-**Reference screens.** The approved v2 screens are in [`reference/studio/`](./reference/studio/)
-(§20). When this text and a reference screen disagree, this text wins; the screens predate
-the contrast corrections in §3.
+**Reference screens.** The v2 screens are in [`reference/studio/`](./reference/studio/)
+(§20), shot from the app's own components. When this text and a reference screen disagree,
+this text wins.
 
 ---
 
@@ -342,8 +342,7 @@ Rules:
 | `t-micro` | 10 / 13 | 600 | Uppercase micro labels, status pills, badges |
 
 Floor: nothing below 10 px, and 10 px only for uppercase micro labels, pills and
-badges. The reference screens use 9 to 9.5 px in places; the build rounds those up to
-10 px (§17).
+badges.
 
 ### 4.3 Web scale [Web]
 
@@ -628,6 +627,9 @@ The card floating by each pod on the stage.
 - Idle: card at 86%, name and caption in `ink-3`.
 - Selected: `ink` border plus `ring-select`. Everything else on the stage dims to 45%.
 - Click selects the person. Tab and arrow keys move between cards (§12).
+- Height: 66 px for one person, 78 px more for each other person (`CARD_ROW_H`). A card
+  above its pod keeps its size while the stage scales, so on a short window the stage moves
+  down, or shrinks, until that card's tab clears the top edge by 18 px.
 
 ### 7.14a Quiet pod chip
 
@@ -738,6 +740,8 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 - Hovering a node shows its memory snippet instead (one card at a time). Drag pins a node.
   Click a person opens their Memory tab.
 - Legend card bottom left: Person, Topic, Messages, and an info icon.
+- Nodes stay clear of both cards: the layout keeps 44 px from every edge, plus 52 px under
+  the toolbar and 56 px above the legend.
 
 ### 7.23 Menus, tooltips, info tips, toasts, dialogs
 
@@ -786,10 +790,12 @@ Full window, no app chrome.
   no checkbox), connection chips ("needs: Email" with an indigo dot on `card-2`, "optional:
   Calendar" with a dashed `line-2` border, "nothing to connect" `ink-3`), and a mono
   "Works in Harbor & Pine/Finance" line with a "change" link. Unchecked rows at 55%.
-  Footer: "N picked, M to connect" and Back (secondary), Next (primary).
+  Footer: "N picked, M to connect" and Back (secondary), Next (primary). The footer sticks
+  to the window's bottom edge, so Next stays in reach on a long step.
 - The studio on the right fills with a pod per picked person around Michael's glass pod,
   each with a small name tag and a check on its screen; an unpicked department shows as a
-  dashed outline with a centered "Name, not picked" tag.
+  dashed outline with a "Name, not picked" tag on its back corner, clear of the pods in
+  front of it.
 
 ### 7.26 Settings and the hire wizard
 
@@ -970,8 +976,8 @@ appears at its destination for one second.
 `tools/studio-lab` (owner, 2026-10-01): the real studio on a fictional office (Harbor &
 Pine), with a button for every effect in §8.12, each firing the event the app listens to.
 `npm run lab` writes `docs/demo/studio-lab.html`, one self-contained file (script, styles,
-fonts, images inlined) for demos, screenshots and videos. It is the live reference for the
-studio until the reference screens (§20) are re-shot.
+fonts, images inlined) for demos, screenshots and videos. Its sibling page
+`reference.tsx` composes the app's shell for the reference screens (§20).
 
 - Every pod shows its chip (`quietCards`); a card opens on hover, or for a moment when a
   button involves someone (`cth:demo-spotlight`), one at a time.
@@ -1179,20 +1185,20 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Done: `departmentOf` in `scene/studio/layout.ts` |
 | 10 | App | No counters for delegated and kept | hive | Done: counted from the hive log and tasks, shown on Michael's wall sign and hub card |
 | 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Done: `test/no-dashes.test.cjs`; ALL CAPS strings moved to sentence case (§4) |
-| 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Accepted in mockups; the build uses §4.2 and §5.1 |
-| 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Accepted in mockups; the build uses §3 |
+| 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Done: re-shot from the build (#25) |
+| 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Done: re-shot from the build (#25) |
 | 14 | Kit | Retired fonts still in `fonts/` | `branding/fonts/` | Fix: remove once #3 and #15 are done |
 | 15 | Web | Whole site is v1 (arcade palette, pixel type, hard shadows, chunky frames) | site repo `public/` | Fix: §9 |
 | 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
 | 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
 | 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Chrome done; the frame keeps the website tokens until the site moves to v2 (#15) |
 | 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header. Reorder lives in the focus mode roster, which is hidden (#24) |
-| 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Accepted: §7.3 is the rule |
+| 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Done: re-shot from the build (#25) |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
 | 22 | App | `pixi.js` stays in `package.json` though nothing imports it | `package.json` | Fix: remove on the next dependency change (reinstalling reruns electron-rebuild) |
 | 23 | Both | README still credits LimeZu art the app no longer ships | `README.md` | Fix with #17 |
 | 24 | App | Focus mode is hidden (`SHOW_FOCUS_MODE`), so drag to reorder people has no visible home | `FullscreenTerminal` | Accepted: the order is kept; give reorder a home if it is missed |
-| 25 | Both | Reference screens (§20) predate 2026-09-30 and 10-01: cards on every pod, the hub card and M badge, the old Ask me cards, the solid right column, Brief Michael | `reference/studio/`, the brand guide | Fix: re-shoot from the app or the studio lab (§8.13); until then the lab is the reference |
+| 25 | Both | Reference screens (§20) predate 2026-09-30 and 10-01: cards on every pod, the hub card and M badge, the old Ask me cards, the solid right column, Brief Michael | `reference/studio/`, the brand guide | Done: re-shot 2026-10-01 with `npm run shoot` (§20); brand guide, PDF and social card rebuilt |
 | 26 | App | Ask me can no longer be dismissed; older dismissed entries still read as closed | `AskMeTab`, `shared/askMeRouting.ts` | Done (owner, 2026-10-01: an ask is handled with a response) |
 
 ---
@@ -1201,6 +1207,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |
 | 2026-10-01 | Needs you: no dismiss (an ask is cleared only by answering), "See full context" replaces "Open task", a chevron shows each card opens. Focus mode hidden (`SHOW_FOCUS_MODE`). The studio lab (§8.13) for demos and videos. |
 | 2026-09-30 | Studio refinements after the first build: quiet pods show a chip (§7.14a); the office's life (§8.12) with no standing wires (§8.6); lights come up as people clock in and go out at closing time, which is a bar on the floor, not a dialog (§7.23); Michael's numbers on his walls, a name plate on his door that opens his card (§7.17, §8.4); idle quotes belong to the chip (§8.8); captions in office words (§13.1); Ask me cards fold, one open at a time, straight on the stage (§7.8, §5.2); "Talk to Michael" (§7.19); one dialog frame (§7.23); outline icons (§10). |
 | 2026-09-30 | **v2 Studio adopted.** Pixel floor, bottom strip, Command Center layout, pixel UI, pixel type and the arcade web palette retired. One token set for app and web (§1.3). Sora and IBM Plex Mono replace Inter, VT323, Press Start 2P and Pixelify Sans. Wordmark in Sora; the Struck M mark kept. Studio illustration system (§8). Contrast corrected against the mockups: `ink-3` `#6C6884`, accent text colors, `coral-strong` for coral fills with text, `line-input` for control boundaries. v1 archived at `archive/DESIGN-v1-pixel.md`. Decisions and the functional map: `docs/designs/studio-home.md`. |
@@ -1217,25 +1224,29 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 3. **Web hero loop.** Still image first; a loop can be recorded from the studio lab (§8.13).
 4. **Settings and hire wizard screens** have no v2 reference screens; they follow the
    components. Design them if the restyle raises questions.
-5. **Reference screens** need re-shooting after the 2026-09-30 and 10-01 changes (§17 #25).
 
 ---
 
 ## 20. Reference screens
 
-Approved 2026-09-30, in `reference/studio/` (PNG, 1440 × 900). They predate the refinements
-in §18 (§17 #25); where they differ, this document and the studio lab (§8.13) win.
+In `reference/studio/` (PNG, 1440 × 900). First approved as mockups 2026-09-30; re-shot
+2026-10-01 from the app's own components on the fictional Harbor & Pine office, so they show
+the build as it is. `npm run shoot` re-shoots them all (or `npm run shoot -- home-dark` for
+one) from `tools/studio-lab/reference.tsx`, with the clock fixed at 10:42 and a seeded
+random, so a re-shoot changes only what the app changed. Then
+`python3 branding/source/build.py social guide` rebuilds the social card and the brand
+guide PDF, which use them. Re-shoot after any visible change to these screens.
 
 | File | Shows |
 |---|---|
 | `home-light.png` | Office view, Needs you board, light |
 | `home-dark.png` | The same, dark |
 | `kelly-access.png` | A person selected, Access tab |
-| `kelly-work.png` | A person selected, Work tab (terminal, Talk 1:1) |
+| `kelly-work.png` | A person selected, Work tab (her session, Talk 1:1) |
 | `michael-office-schedule.png` | Michael selected, Office schedule tab |
 | `tasks-detail.png` | Tasks view with a task detail open |
-| `who-talks-to-whom.png` | Who talks to whom, an edge hovered |
+| `who-talks-to-whom.png` | Who talks to whom |
 | `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
 
-Sources (HTML and generators) live with the design session in
+The original mockups (HTML and generators) live with the design session in
 `~/.gstack/projects/agentvivekkumar-dontbemichael/designs/business-first-redesign-20260930/`.

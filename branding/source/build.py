@@ -446,7 +446,7 @@ def build_social():
     svg, w, h = lockup_svg("horizontal", "#1E1B2E", INK)
     ref = os.path.join(KIT, "reference", "studio", "home-light.png")
     crop = out("social/_studio.png")
-    Image.open(ref).crop((40, 150, 1060, 830)).save(crop)
+    Image.open(ref).crop((40, 50, 1000, 690)).save(crop)
     html = (f"<html><head><style>{fonts_css('../')}body{{margin:0;width:1200px;height:630px;overflow:hidden;background:{GROUND_LIGHT};"
             f"font-family:Sora;color:#1E1B2E;position:relative}}"
             f".t{{position:absolute;left:72px;top:0;bottom:0;width:470px;display:flex;flex-direction:column;justify-content:center}}"
@@ -454,10 +454,10 @@ def build_social():
             f"h1{{font-weight:600;font-size:46px;line-height:1.08;letter-spacing:-.035em;margin:34px 0 14px}}"
             f"p{{font-size:20px;line-height:1.45;margin:0;color:#4A4660}}"
             f".u{{font-family:'IBM Plex Mono';font-weight:600;font-size:15px;letter-spacing:.08em;margin-top:28px;color:#6C6884}}"
-            f".s{{position:absolute;right:-40px;top:40px;width:660px;-webkit-mask-image:radial-gradient(420px 330px at 55% 52%,#000 60%,transparent 100%)}}"
+            f".s{{position:absolute;right:0;top:95px;width:660px;-webkit-mask-image:radial-gradient(420px 330px at 55% 52%,#000 60%,transparent 100%)}}"
             f"</style></head><body><img class='s' src='_studio.png'><div class='t'><div class='l'>{svg}</div>"
             f"<h1>Michael finally learned to delegate.</h1>"
-            f"<p>An AI office for your small business. Brief Michael; the team does the work on your Mac.</p>"
+            f"<p>An AI office for your small business. Talk to Michael; the team does the work on your Mac.</p>"
             f"<div class='u'>DONTBEMICHAEL.COM</div></div></body></html>")
     p = write("social/_card.html", html)
     chrome(f"file://{p}", out("social/og-card-1200x630.png"), 1200, 630, transparent=False)

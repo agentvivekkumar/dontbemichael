@@ -23,6 +23,7 @@
     "test:focused": "node --test test/*.test.cjs",
     "check:links": "node tools/check-release-links.cjs",
     "lab": "node tools/studio-lab/build.mjs",
+    "shoot": "node tools/studio-lab/shoot.mjs",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
