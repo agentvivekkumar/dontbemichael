@@ -525,6 +525,10 @@ person's memory and routed to whoever asked), no underlined titles. The cards si
 on the stage, 12 px apart, each with a `line` ring and a soft two layer shadow so it
 stands on its own.
 
+- Title: a few plain words naming the matter, under 60 characters. Agents are told to
+  write it that way (no ids, dates, mailbox names or bracketed notes), and the card cleans
+  any that still arrive (`askTitle`: opaque ids and trailing bracketed metadata go; owner,
+  2026-10-01: a header full of a user id and "(support@, 1 Oct)" read as cryptic).
 - Folded (every card but one): the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover),
   the person it is for as a 22 px chip in their department colors, how long ago Michael
   asked ("just now", "5h ago"), a "Draft" tag if an answer is half written, and the ask
@@ -1233,6 +1237,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | Ask me titles read plain: agents are told how to title a card, and the card drops opaque ids and bracketed metadata (§7.8). |
 | 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down in its chip's place (§7.14a). |
 | 2026-10-01 | Idle lines: only the Office lines in `cafeteriaLines.ts`, dealt with no repeats until a pool runs out; banter, two quiet people trading an exchange as paper planes or envelopes, each line shown where it lands; every 15 to 30 s (§8.8). |
 | 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |

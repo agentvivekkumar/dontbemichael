@@ -11,7 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
-const { askHeadline, askedAgo } = loadTs('src/renderer/src/components/askHeadline.ts');
+const { askHeadline, askTitle, askedAgo } = loadTs('src/renderer/src/components/askHeadline.ts');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 test('the headline is Michael\'s bold lead, else the first sentence, as plain text', () => {
@@ -50,4 +50,26 @@ test('an ask is cleared only by answering it: no dismiss on the board (owner, 20
   assert.doesNotMatch(src, /askMe\.dismiss/);
   // Older dismissed entries are still read as closed (askMeRouting openAskIndex).
   assert.match(read('src/shared/askMeRouting.ts'), /dismissedAt/);
+});
+
+/**
+ * Card titles read clean (owner, 2026-10-01: a header full of a user id and
+ * "(support@, 1 Oct)" looked cryptic). Agents are told to write plain titles,
+ * and the card cleans the ones that aren't.
+ */
+test('an Ask me card title drops opaque ids and bracketed metadata', () => {
+  assert.equal(askTitle('Acme app user Xk29fLq8ZpR3mN7tV2wB requested CRM setup (support@, 1 Oct)'), 'Acme app user requested CRM setup');
+  assert.equal(askTitle('Billing export errors (30 Sep)'), 'Billing export errors');
+  assert.equal(askTitle('Check mail is reaching help@example.com (nothing since 21 Sep, per Kelly)'), 'Check mail is reaching help@example.com');
+  assert.equal(askTitle('Order 550e8400-e29b-41d4-a716-446655440000 is stuck'), 'Order is stuck');
+  // Plain titles, and brackets that are part of the name, stay as they are.
+  assert.equal(askTitle('New lead: Jane Doe, example.org (website form)'), 'New lead: Jane Doe, example.org (website form)');
+  assert.equal(askTitle('Refund for Northwind Cafe, Invoice #4471'), 'Refund for Northwind Cafe, Invoice #4471');
+  const tab = read('src/renderer/src/components/AskMeTab.tsx');
+  assert.match(tab, /\{askTitle\(t\.title\)\}/);
+  // And at the source: Michael and the team are told how to title a card.
+  const hive = read('src/main/hive.ts');
+  assert.match(hive, /The card(\\'|')s title is its headline: a few plain words naming the matter, under 60 characters/);
+  assert.match(hive, /Give the card a TITLE the owner can read at a glance/);
+  assert.match(hive, /- give the card a title the owner reads at a glance/);
 });

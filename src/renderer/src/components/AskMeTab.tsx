@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppTheme } from '@/design/theme';
-import { askHeadline, askedAgo } from './askHeadline';
+import { askHeadline, askTitle, askedAgo } from './askHeadline';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
 import { PixelButton } from './PixelButton';
@@ -174,7 +174,7 @@ export function AskMeTab() {
           // Design v2 (DESIGN.md 7.8; owner, 2026-09-30): folded cards read as a
           // list (title, who, when, the ask in a line or two); one opens to the
           // full question, a one row reply and what it holds up.
-          <section key={t.id} aria-label={t.title} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
+          <section key={t.id} aria-label={askTitle(t.title)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
             {/* The header folds and unfolds the card. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div
@@ -187,7 +187,7 @@ export function AskMeTab() {
                 style={{ flex: 1, minWidth: 0, cursor: 'pointer', outline: 'none' }}
               >
                 <div className="cth-askme-title" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
-                  {t.title}
+                  {askTitle(t.title)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6, flexWrap: 'wrap' }}>
                   {who && (
