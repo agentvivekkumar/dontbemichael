@@ -40,7 +40,7 @@ export function MailboxesSettings() {
   const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? id;
   const usersOf = (mailboxId: string): string[] =>
     Object.entries(config.agentCapabilities ?? {})
-      .filter(([, c]) => c.email?.enabled && c.email.mailboxes[0] === mailboxId)
+      .filter(([, c]) => c.email?.enabled && c.email.mailboxes?.[0] === mailboxId)
       .map(([id]) => nameOf(id));
   const list = (names: string[]): string => names.join(t('profile.listJoiner'));
 

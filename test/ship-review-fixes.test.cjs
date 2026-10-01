@@ -110,3 +110,10 @@ test('Settings fields are the v2 input, with its focus ring', () => {
   assert.equal(ringed, uses, 'every Settings field carries the cth-input class');
   assert.doesNotMatch(modal, /cth-paper-100[^\n]*\n[^\n]*border: 'none',\n\s*boxShadow: 'inset 0 0 0 1px var\(--cth-ink-100\)'/);
 });
+
+test('a saved capability with email on but no mailbox list does not crash the office', () => {
+  // Value: protects=the studio renders with a hand-edited or partial config; fails_when=the owner lookup indexes mailboxes without a guard; why_new=adversarial review (local model); seam=none
+  for (const f of ['src/renderer/src/scene/studio/StudioStage.tsx', 'src/renderer/src/components/MailboxesSettings.tsx']) {
+    assert.match(read(f), /c\.email\?\.enabled && c\.email\.mailboxes\?\.\[0\] === mailboxId/);
+  }
+});

@@ -225,7 +225,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const mailboxes = config.mailboxes ?? [];
   const ownerOf = (mailboxId: string): Agent | undefined => {
     const entry = Object.entries(config.agentCapabilities ?? {})
-      .find(([, c]) => c.email?.enabled && c.email.mailboxes[0] === mailboxId);
+      .find(([, c]) => c.email?.enabled && c.email.mailboxes?.[0] === mailboxId);
     return entry ? agents.find((a) => a.id === entry[0]) : undefined;
   };
 

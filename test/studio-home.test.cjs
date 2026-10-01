@@ -87,7 +87,7 @@ test('the app shows the studio, not the pixel floor', () => {
 test('only what is real: mail paths run to the person who watches the mailbox, and nothing is invented', () => {
   const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
   // A mailbox's owner is whoever has it on their Capabilities (config.agentCapabilities).
-  assert.match(src, /c\.email\?\.enabled && c\.email\.mailboxes\[0\] === mailboxId/);
+  assert.match(src, /c\.email\?\.enabled && c\.email\.mailboxes\?\.\[0\] === mailboxId/);
   // A broken mailbox is the config's own needs-attention status, with a Fix into Settings.
   assert.match(src, /m\.status === 'needs-attention'/);
   assert.match(src, /section: 'Connections'/);
