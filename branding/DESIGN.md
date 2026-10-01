@@ -646,10 +646,12 @@ instead of its label card, so an idle office stays calm (owner, 2026-09-30).
 - While anyone in the pod is thinking, working, blocked, compacting or looping, the chip
   gives way to the full card (§7.14) at the pod's card slot, with its stem.
 - Hovering the chip, selecting someone in the pod, or a lab spotlight opens the full card
-  under the chip instead: it rolls down from 12 px below the chip (240 ms, a clip from the
-  top with a 6 px drop), centered on it and allowed to cover the pod's monitors; the chip
-  stays (owner, 2026-10-01: the card used to open at its slot, away from the chip). It
-  closes 220 ms after the pointer leaves both. No browser tooltip on the chip. Clicking the
+  in the chip's place instead (owner, 2026-10-01: it used to open at its slot, away from
+  the chip, and then both showed the same names and badges). The chip hides; the card's tab
+  row (department, sticky count, For you) lands where the chip was, and the card rolls down
+  from there (240 ms, a clip from the top with a 6 px drop), centered on the pod and
+  allowed to cover its monitors. A 24 px invisible margin keeps it open while the pointer
+  crosses the chip's old spot; it closes 220 ms after the pointer leaves. No browser tooltip on the chip. Clicking the
   chip opens the first member's panel.
 - An idle line belongs to the chip: its speech bubble's tail points at the speaker's
   avatar there (§8.8).
@@ -1231,7 +1233,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
-| 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down from under its chip (§7.14a). |
+| 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down in its chip's place (§7.14a). |
 | 2026-10-01 | Idle lines: only the Office lines in `cafeteriaLines.ts`, dealt with no repeats until a pool runs out; banter, two quiet people trading an exchange as paper planes or envelopes, each line shown where it lands; every 15 to 30 s (§8.8). |
 | 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |
 | 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |

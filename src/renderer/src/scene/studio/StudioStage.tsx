@@ -30,8 +30,12 @@ const POLL_MS = 5000;
 const CARD_ROOM = 18;
 /** Stage px from a pod's slot point up to the bottom of its chip: just over the monitors. */
 const CHIP_LIFT = 80;
-/** Chip bottom to the top of a card rolled down under it (the department tab sits in it). */
-const CHIP_GAP = 12;
+/** A card opened from a chip takes the chip's place: its top sits this far
+ *  above the chip's bottom edge, so its tab row lands where the chip was. */
+const ROLL_TOP = 14;
+/** Invisible margin around a rolled card that keeps it open while the pointer
+ *  crosses the spot where the chip was. */
+const ROLL_PAD = 24;
 
 type Board = { todo: number; doing: number; blocked: number; done: number };
 
@@ -298,7 +302,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     if (!rolled(pod)) return null;
     const c = chipAt(pod);
     const l = Math.min(Math.max(c.x - r.w / 2, 8), fitW - r.w - 8);
-    return { l, t: c.y + CHIP_GAP, r: l + r.w, b: c.y + CHIP_GAP + r.h, down: true };
+    return { l, t: c.y - ROLL_TOP, r: l + r.w, b: c.y - ROLL_TOP + r.h, down: true };
   };
 
   // A demo can pop one person's card for a moment, the way a hover does.
@@ -437,12 +441,40 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
       {/* Label cards. */}
       {plan.pods.map((pod) => {
         const key = podKey(pod);
-        const isWorking = working(pod);
         const { x: chipX, y: chipY } = chipAt(pod);
         const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
-        // A quiet pod shows its chip just over its monitors (owner, 2026-10-01:
-        // the right and front chips used to hang under the pod, on empty floor).
-        const chip = !isWorking && (
+        const open = openCard(pod);
+        // Opened from the chip, the card takes the chip's place and rolls down
+        // over the monitors; the chip hides, so nothing shows twice (owner,
+        // 2026-10-01). A margin keeps it open while the pointer leaves the
+        // chip's spot.
+        if (open?.down) {
+          return (
+            <div key={`card-${pod.members[0].id}`} className="cth-st-roll"
+              onMouseEnter={() => openPeek(key)} onMouseLeave={closePeek}
+              style={{ position: 'absolute', left: open.l - ROLL_PAD, top: open.t - ROLL_PAD, padding: `${ROLL_PAD}px ${ROLL_PAD}px 0`, zIndex: 3 }}>
+              <PodCard
+                style={{ position: 'relative', width: open.r - open.l }}
+                dept={pod.dept} members={pod.members} c={families[pod.dept]}
+                snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+              />
+            </div>
+          );
+        }
+        // A pod at work shows its card at its slot, with a stem; a quiet pod
+        // its chip, just over its monitors (the right and front chips used to
+        // hang under the pod, on empty floor).
+        if (open) {
+          return (
+            <PodCard
+              key={`card-${pod.members[0].id}`}
+              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined }}
+              dept={pod.dept} members={pod.members} c={families[pod.dept]}
+              snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+            />
+          );
+        }
+        return (
           <PodChip
             key={`chip-${pod.members[0].id}`}
             style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)' }}
@@ -452,21 +484,6 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
             quoteSpot={speaking ? quoteSpot(pod, chipX, chipY - 28) : 'up'}
           />
         );
-        const open = openCard(pod);
-        if (!open) return chip;
-        return [
-          chip,
-          <PodCard
-            key={`card-${pod.members[0].id}`}
-            // Opened from the chip, the card rolls down just under it, over the
-            // monitors; a working pod's card keeps its slot and its stem.
-            className={open.down ? 'cth-st-roll' : undefined}
-            style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, zIndex: open.down ? 3 : undefined }}
-            dept={pod.dept} members={pod.members} c={families[pod.dept]}
-            snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
-            onEnter={isWorking ? undefined : () => openPeek(key)} onLeave={isWorking ? undefined : closePeek}
-          />
-        ];
       })}
 
       {/* Michael: his name plate on the glass is the way in (owner, 2026-09-30).
@@ -532,8 +549,8 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
 
 /* ── Label card (DESIGN.md 7.14) ──────────────────────────────────────────── */
 
-function PodCard({ className, style, dept, members, c, snap, selected, onSelect, missions, godId, onEnter, onLeave }: {
-  className?: string; style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
+function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, godId, onEnter, onLeave }: {
+  style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
   selected: string | null; onSelect: (id: string) => void; missions: ReturnType<typeof useMissions>['missions']; godId: string;
   onEnter?: () => void; onLeave?: () => void;
 }) {
@@ -544,7 +561,7 @@ function PodCard({ className, style, dept, members, c, snap, selected, onSelect,
   const isSel = members.some((a) => a.id === selected);
   const allIdle = members.every((a) => a.status === 'idle');
   return (
-    <div className={className} onMouseEnter={onEnter} onMouseLeave={onLeave} style={{
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{
       ...style, borderRadius: 'var(--cth-r-xl)', padding: '12px 10px 0 9px',
       background: `color-mix(in srgb, var(--cth-card) ${allIdle ? 86 : 96}%, transparent)`, backdropFilter: 'blur(6px)',
       boxShadow: isSel ? 'inset 0 0 0 1px var(--cth-ink), var(--cth-ring-select), var(--cth-shadow-md)' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-md)'

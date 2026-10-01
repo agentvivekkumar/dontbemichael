@@ -150,7 +150,7 @@ test('a quiet pod is a chip; its card shows while someone works, it is selected,
   assert.match(src, /const rolled = \(pod: PodPlan<Agent>\) => !working\(pod\) && \(peek === podKey\(pod\) \|\| pod\.members\.some\(\(a\) => a\.id === selected\)\);/);
   // In the app quietCards is off, so a pod at work shows its card.
   assert.doesNotMatch(read('src/renderer/src/App.tsx'), /quietCards/);
-  assert.match(src, /const open = openCard\(pod\);\n\s*if \(!open\) return chip;/);
+  assert.match(src, /const open = openCard\(pod\);/);
   // The chip still carries anything waiting on the owner.
   const chip = src.slice(src.indexOf('function PodChip('));
   assert.match(chip.slice(0, 6000), /forYou > 0 &&/);
@@ -163,11 +163,12 @@ test('a quiet pod is a chip; its card shows while someone works, it is selected,
  * A quiet pod's card rolls down from just under its chip, over the monitors;
  * every chip sits over its pod; no browser tooltip on the chip.
  */
-test('a quiet pod\'s card rolls down from under its chip; every chip sits over its pod', () => {
+test('a quiet pod\'s card rolls down in place of its chip; every chip sits over its pod', () => {
   const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(src, /const chipAt = \(pod: PodPlan<Agent>\) => \(\{ x: ox \+ pod\.slot\.x \* k, y: oy \+ \(pod\.slot\.y - CHIP_LIFT\) \* k \}\);/);
-  assert.match(src, /return \{ l, t: c\.y \+ CHIP_GAP, r: l \+ r\.w, b: c\.y \+ CHIP_GAP \+ r\.h, down: true \};/);
-  assert.match(src, /className=\{open\.down \? 'cth-st-roll' : undefined\}/);
+  // It takes the chip's place: the tab row where the chip was, the chip hidden.
+  assert.match(src, /return \{ l, t: c\.y - ROLL_TOP, r: l \+ r\.w, b: c\.y - ROLL_TOP \+ r\.h, down: true \};/);
+  assert.match(src, /if \(open\?\.down\) \{\n\s*return \(\n\s*<div key=\{`card-\$\{pod\.members\[0\]\.id\}`\} className="cth-st-roll"/);
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-roll \{ animation: cth-roll 240ms var\(--cth-ease\) backwards; \}/);
   const chip = src.slice(src.indexOf('function PodChip('), src.indexOf('function PodChip(') + 4000);
   assert.doesNotMatch(chip, /title=\{t\(`studio\.dept\./, 'no native tooltip over the pod');
