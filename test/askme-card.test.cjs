@@ -99,3 +99,12 @@ test('the Ask me answer box grows with what is typed, then scrolls', () => {
   assert.match(grow, /el\.style\.overflowY = full > maxHeight \? 'auto' : 'hidden';/);
   assert.match(grow, /new ResizeObserver/);
 });
+
+/** Talk to Michael grows the same way (owner, 2026-10-01). */
+test('the Talk to Michael box grows upward; Enter sends, Shift+Enter is a new line', () => {
+  const bar = read('src/renderer/src/shell/BottomBar.tsx');
+  assert.match(bar, /<GrowingTextarea\n\s*value=\{text\}/);
+  assert.match(bar, /if \(e\.key === 'Enter' && !e\.shiftKey\) \{ e\.preventDefault\(\); send\(\); \}/);
+  assert.match(bar, /bottom: 24, zIndex: 70,\n\s*display: 'flex', alignItems: 'flex-end'/);
+  assert.match(bar, /<div style=\{\{ height: 50, display: 'flex', alignItems: 'center', gap: 14 \}\}>/);
+});

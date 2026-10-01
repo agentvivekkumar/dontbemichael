@@ -6,6 +6,7 @@ import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { nextRunAt } from '@shared/missions';
 import { isComposingKey } from '@shared/imeGuard';
+import { GrowingTextarea } from '@/components/GrowingTextarea';
 
 const EMPTY_QUEUE: QueuedMessage[] = [];
 
@@ -19,11 +20,15 @@ export function BottomBar({ config }: { config: HarnessConfig }) {
   return (
     <div style={{
       position: 'absolute', insetInlineStart: 24, insetInlineEnd: 22, bottom: 24, zIndex: 70,
-      display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'none'
+      display: 'flex', alignItems: 'flex-end', gap: 14, pointerEvents: 'none'
     }}>
       <TalkToMichael />
-      <NextJobChip />
-      <PackAndHire config={config} />
+      {/* Centered on the composer's resting height, so they stay put while a
+          long message grows the composer upward. */}
+      <div style={{ height: 50, display: 'flex', alignItems: 'center', gap: 14 }}>
+        <NextJobChip />
+        <PackAndHire config={config} />
+      </div>
     </div>
   );
 }
@@ -65,9 +70,10 @@ function TalkToMichael() {
     setDraft(godId, '');
     setAttachments([]);
   };
-  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+  // Enter sends; Shift+Enter starts a new line (the box grows with it).
+  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposingKey(e)) return;
-    if (e.key === 'Enter') { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
   return (
@@ -76,7 +82,8 @@ function TalkToMichael() {
       onDrop={onDrop}
       style={{
         pointerEvents: 'auto', position: 'relative',
-        width: 420, minHeight: 50, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 7px 7px 8px',
+        // The buttons stay on the bottom row while the message grows upward.
+        width: 420, minHeight: 50, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '7px 7px 7px 8px',
         background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
         boxShadow: 'inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg)'
       }}
@@ -89,7 +96,7 @@ function TalkToMichael() {
           <path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" />
         </svg>
       </button>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {attachments.length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {attachments.map((a) => (
@@ -105,15 +112,17 @@ function TalkToMichael() {
             ))}
           </div>
         )}
-        <input
+        <GrowingTextarea
           value={text}
           onChange={(e) => setDraft(godId, e.target.value)}
           onKeyDown={onKey}
           placeholder={t('shell.briefPlaceholder', { godName })}
           aria-label={t('shell.brief', { godName })}
+          maxHeight={140}
           style={{
+            display: 'block', boxSizing: 'border-box', padding: '1px 0', margin: 0,
             border: 'none', outline: 'none', background: 'transparent', width: '100%',
-            fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink)'
+            fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink)'
           }}
         />
       </div>

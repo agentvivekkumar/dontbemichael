@@ -706,8 +706,11 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
 - **Talk to Michael composer** (MessageQueueComposer for Michael; owner, 2026-09-30: "Brief
   Michael" was unclear): 400 px, 50 px tall,
   `card`, `line-2` border, `r-2xl`, `shadow-lg`. Attach button (34 × 34, `neutral-soft`,
-  `r-md`), input with placeholder "Talk to Michael…", primary button "Send" with
-  an arrow. Queued messages show as a count chip on the composer; the full queue opens
+  `r-md`), a message box with placeholder "Talk to Michael…", primary button "Send" with
+  an arrow. The box grows with the text up to 140 px, then scrolls; the composer grows
+  upward from the bar's bottom edge with its buttons on the bottom row, and the chips
+  beside it stay put. Enter sends, Shift+Enter starts a new line (owner, 2026-10-01).
+  Queued messages show as a count chip on the composer; the full queue opens
   above it.
 - **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.
   `card`, `line`, `r-lg`, 40 px tall. Click opens Office schedule.
@@ -1243,7 +1246,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
-| 2026-10-01 | The Ask me answer box grows with the text, to about eight lines (§7.8). |
+| 2026-10-01 | The Ask me answer box and the Talk to Michael box grow with the text (§7.8, §7.19). |
 | 2026-10-01 | Task detail: title under the id row, the card's notes shown, no empty section (§7.21). |
 | 2026-10-01 | Ask me titles read plain: agents are told how to title a card, and the card drops opaque ids and bracketed metadata (§7.8). |
 | 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down in its chip's place (§7.14a). |
