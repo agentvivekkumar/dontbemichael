@@ -388,7 +388,7 @@ One window, four regions. Nothing else is permanent.
 | Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
 | Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Who talks to whom (§7.22) |
 | Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets) | Needs you board by default; the selected person's panel; Michael's panel. Work tab widens it to 480 |
-| Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Brief Michael composer, next job chip, pack and Hire (§7.19) |
+| Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip, pack and Hire (§7.19) |
 
 Rules:
 
@@ -414,7 +414,7 @@ Rules:
 ### 6.1 Surfaces
 
 - Cards: `card` fill, 1 px `line` border, `shadow-md`. Nested rows use `card-2`.
-- Elevated cards (Michael's hub card, the Brief Michael composer, overlays): `shadow-lg`
+- Elevated cards (Michael's hub card, the Talk to Michael composer, overlays): `shadow-lg`
   or `shadow-hub`.
 - Selected card: 1 px `ink` border plus `ring-select`.
 - Overlay backdrop: `bg` at 60% with no blur (light), `#000` at 45% (dark).
@@ -503,7 +503,7 @@ team control) sits at the top of the board when there is a team to restore.
 
 | Kind | Fill | Text | Border | Use |
 |---|---|---|---|---|
-| Primary | `ink` | white | none | The main action in a card or dialog ("Respond and unblock", "Approve", "Save", "Brief Michael") |
+| Primary | `ink` | white | none | The main action in a card or dialog ("Respond and unblock", "Approve", "Save", "Send") |
 | Secondary | `card` | `ink` | 1 px `line-2` | Other actions ("Decline", "Open Mailboxes", "Hire", "Edit") |
 | Quiet | none | `ink-2` | none | Tertiary links in a row ("Earlier answers", "change") |
 | Coral | `coral-strong` | white | none | Only the Needs you button. Never a general CTA |
@@ -672,9 +672,10 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
 
 ### 7.19 Bottom bar
 
-- **Brief Michael composer** (MessageQueueComposer for Michael): 400 px, 50 px tall,
+- **Talk to Michael composer** (MessageQueueComposer for Michael; owner, 2026-09-30: "Brief
+  Michael" was unclear): 400 px, 50 px tall,
   `card`, `line-2` border, `r-2xl`, `shadow-lg`. Attach button (34 × 34, `neutral-soft`,
-  `r-md`), input with placeholder "Brief Michael...", primary button "Brief Michael" with
+  `r-md`), input with placeholder "Talk to Michael…", primary button "Send" with
   an arrow. Queued messages show as a count chip on the composer; the full queue opens
   above it.
 - **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.

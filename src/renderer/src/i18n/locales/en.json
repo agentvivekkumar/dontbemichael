@@ -1904,8 +1904,8 @@
     "focus": "Focus mode",
     "exitFocus": "Exit focus mode (Esc)",
     "settings": "Settings",
-    "briefPlaceholder": "Brief {{godName}}...",
-    "brief": "Brief {{godName}}",
+    "briefPlaceholder": "Talk to {{godName}}…",
+    "brief": "Talk to {{godName}}",
     "attach": "Attach files",
     "removeAttachment": "Remove {{name}}",
     "next": "Next:",
@@ -1917,7 +1917,8 @@
     "dismiss": "Leave {{name}} out",
     "noAgentTitle": "Your office is empty",
     "noAgentBody": "Hire your first team member to get started.",
-    "queued": "Waiting for {{godName}}: {{count}}"
+    "queued": "Waiting for {{godName}}: {{count}}",
+    "send": "Send"
   },
   "studio": {
     "summary": "{{count}} people in the office",

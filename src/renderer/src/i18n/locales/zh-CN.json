@@ -1904,8 +1904,8 @@
     "focus": "专注模式",
     "exitFocus": "退出专注模式（Esc）",
     "settings": "设置",
-    "briefPlaceholder": "给 {{godName}} 布置工作…",
-    "brief": "交给 {{godName}}",
+    "briefPlaceholder": "和 {{godName}} 说点什么…",
+    "brief": "和 {{godName}} 说",
     "attach": "附加文件",
     "removeAttachment": "移除 {{name}}",
     "next": "下一项：",
@@ -1917,7 +1917,8 @@
     "dismiss": "不带回 {{name}}",
     "noAgentTitle": "你的办公室还是空的",
     "noAgentBody": "招聘第一位团队成员即可开始。",
-    "queued": "等待 {{godName}} 处理：{{count}}"
+    "queued": "等待 {{godName}} 处理：{{count}}",
+    "send": "发送"
   },
   "studio": {
     "summary": "办公室里有 {{count}} 人",

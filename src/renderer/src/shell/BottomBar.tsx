@@ -21,7 +21,7 @@ export function BottomBar({ config }: { config: HarnessConfig }) {
       position: 'absolute', insetInlineStart: 24, insetInlineEnd: 22, bottom: 24, zIndex: 70,
       display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'none'
     }}>
-      <BriefMichael />
+      <TalkToMichael />
       <NextJobChip />
       <PackAndHire config={config} />
     </div>
@@ -30,7 +30,7 @@ export function BottomBar({ config }: { config: HarnessConfig }) {
 
 interface Attachment { path: string; name: string }
 
-function BriefMichael() {
+function TalkToMichael() {
   const { t } = useTranslation();
   const godName = useResolvedGodName();
   const god = useStore((s) => s.agents.find((a) => a.isGod));
@@ -123,7 +123,7 @@ function BriefMichael() {
         background: canSend ? 'var(--cth-ink)' : 'var(--cth-neutral-soft)', color: canSend ? 'var(--cth-bg)' : 'var(--cth-ink-3)',
         fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 600
       }}>
-        {t('shell.brief', { godName })}
+        {t('shell.send')}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
