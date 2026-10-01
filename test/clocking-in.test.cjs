@@ -32,7 +32,7 @@ test('startup captions are office words, and shown translated', () => {
 
 test('an idle agent says "nothing to do" in the office (owner, 2026-09-27)', () => {
   const store = read('src/renderer/src/store/store.ts');
-  assert.match(store, /if \(action\.trim\(\)\.toLowerCase\(\) === 'idle'\) return t\('office\.activity\.idle'\);/);
+  assert.match(store, /const plain = action\.trim\(\)\.toLowerCase\(\);\n\s+if \(plain === 'idle'\) return t\('office\.activity\.idle'\);/);
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
   assert.equal(en.office.activity.idle, 'nothing to do');
   for (const loc of ['zh-CN', 'ar']) {
