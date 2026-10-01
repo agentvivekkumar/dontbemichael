@@ -989,7 +989,7 @@
     "schedules": "Schedules",
     "organisation": "Organisation",
     "organisationBlurb": "Let a teammate's office message yours.",
-    "officeBlurb": "Every job that is on, {{godName}}'s included. To change a job, open that team member and go to their Capabilities tab."
+    "officeBlurb": "Every job that is on, {{godName}}'s included. To change a job, open that team member and go to their Access tab."
   },
   "orgSection": {
     "acceptMessages": "Accept messages from your organisation",
@@ -1381,7 +1381,7 @@
     "colBlocked": "Blocked",
     "colDone": "Done",
     "openTaskDetails": "open task details",
-    "needsYouTitle": "waiting on YOUR answer; see the ASK ME tab",
+    "needsYouTitle": "waiting on your answer; see Needs you",
     "dismissTitle": "dismiss this task (removes it from the board)",
     "dismissAria": "dismiss task",
     "taskTitle": "Task",
@@ -1693,7 +1693,7 @@
   },
   "mailboxes": {
     "title": "Mailboxes",
-    "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Capabilities tab.",
+    "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Access tab.",
     "add": "Add a mailbox",
     "empty": "No mailboxes yet. Add sales@, support@ or your own inbox, then choose which team member works in it.",
     "needsCount": "{{count}} needs you",
@@ -1739,7 +1739,7 @@
     "claudeAccessLabel": "Team members can use the email and calendar in your Claude account",
     "claudeAccessOn": "allowed",
     "claudeAccessOff": "blocked",
-    "claudeAccessDesc": "Allowed lets every team member use the Gmail and Google Calendar connected to your Claude account. Blocked stops everyone. The mailboxes above are separate: give them to team members on their Capabilities tab."
+    "claudeAccessDesc": "Allowed lets every team member use the Gmail and Google Calendar connected to your Claude account. Blocked stops everyone. The mailboxes above are separate: give them to team members on their Access tab."
   },
   "capabilities": {
     "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
@@ -1781,8 +1781,8 @@
   },
   "quickbooksSettings": {
     "title": "QuickBooks",
-    "introOff": "Off: no team member can use QuickBooks, and it doesn't show on their Capabilities tabs.",
-    "introOn": "On: team members use the QuickBooks connected to your Claude account. Choose who, and who may make changes, on each Capabilities tab.",
+    "introOff": "Off: no team member can use QuickBooks, and it doesn't show on their Access tabs.",
+    "introOn": "On: team members use the QuickBooks connected to your Claude account. Choose who, and who may make changes, on each Access tab.",
     "label": "Team members can use the QuickBooks in your Claude account",
     "checking": "Checking your Claude account for QuickBooks…",
     "connected": "QuickBooks is connected in your Claude account.",

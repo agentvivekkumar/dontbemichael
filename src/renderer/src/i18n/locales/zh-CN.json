@@ -989,7 +989,7 @@
     "schedules": "计划任务",
     "organisation": "组织",
     "organisationBlurb": "让队友的办公室给你的办公室发消息。",
-    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。要修改某项工作，请打开该成员，进入其能力页。"
+    "officeBlurb": "所有开启中的定时工作，包括 {{godName}} 的。要修改某项工作，请打开该成员，进入其“权限”标签页。"
   },
   "orgSection": {
     "acceptMessages": "接受来自你组织的消息",
@@ -1381,7 +1381,7 @@
     "colBlocked": "已阻塞",
     "colDone": "已完成",
     "openTaskDetails": "打开任务详情",
-    "needsYouTitle": "等待你的回答，见「问我」标签页",
+    "needsYouTitle": "等待你的回答，见「需要你处理」",
     "dismissTitle": "忽略此任务（从看板上移除）",
     "dismissAria": "忽略任务",
     "taskTitle": "任务",
@@ -1781,8 +1781,8 @@
   },
   "quickbooksSettings": {
     "title": "QuickBooks",
-    "introOff": "已关闭：团队成员都不能使用 QuickBooks，它也不会出现在他们的“能力”标签页中。",
-    "introOn": "已开启：团队成员使用你 Claude 账户连接的 QuickBooks。在每个“能力”标签页中选择谁可以使用，以及谁可以做更改。",
+    "introOff": "已关闭：团队成员都不能使用 QuickBooks，它也不会出现在他们的“权限”标签页中。",
+    "introOn": "已开启：团队成员使用你 Claude 账户连接的 QuickBooks。在每个“权限”标签页中选择谁可以使用，以及谁可以做更改。",
     "label": "团队成员可以使用你 Claude 账户中的 QuickBooks",
     "checking": "正在检查你的 Claude 账户是否连接了 QuickBooks…",
     "connected": "QuickBooks 已在你的 Claude 账户中连接。",

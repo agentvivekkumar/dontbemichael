@@ -24,6 +24,8 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
   grows as you type. Talk to Michael (formerly Brief Michael) grows the same way and takes
   pasted screenshots and files.
 - **Task detail** puts the title under the id row and shows the card's notes.
+- A team member's tabs are now Profile, Access, Messages, Memory and Work (Capabilities became
+  Access, Terminal became Work), and Ask me lives on the Needs you board.
 - **Closing time runs on the floor**, with Cancel and Force quit in a bar instead of a dialog.
   It now starts from the clock menu too, and open dialogs stay open behind it.
 

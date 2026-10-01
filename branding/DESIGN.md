@@ -317,8 +317,8 @@ Fallbacks: Sora → `system-ui, -apple-system, "Segoe UI", sans-serif`; for Simp
 Chinese add `"PingFang SC", "Noto Sans SC"`; for Arabic add `"SF Arabic", "Noto Sans
 Arabic"` (Sora has Latin only). Mono → `ui-monospace, "SF Mono", monospace`.
 
-Retired: Press Start 2P, VT323, Pixelify Sans, Inter. They stay in `fonts/` only until
-the app and site have migrated (§17), then leave the kit.
+Retired: Press Start 2P, VT323, Pixelify Sans, Inter. They left the kit and the app on
+2026-10-01 (§17).
 
 Rules:
 
@@ -454,7 +454,7 @@ pill (§7.3), version chip (§7.4), icon buttons (theme, Settings; focus mode hi
 `r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
 (§7.5). The bar is a drag region; interactive children are `no-drag`.
 
-### 7.2 View tabs (FloorViewToggle)
+### 7.2 View tabs (TopBar)
 
 Office, Tasks, Who talks to whom. Tab: `t-ui` 500, `ink-2`, padding 7 × 13, `r-md`.
 Active: `ink` fill, white text (dark mode: `ink` fill `#ECEAF4`, text `#14131C`). No tab

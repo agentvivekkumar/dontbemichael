@@ -155,10 +155,10 @@ the module by module layout, and the design system.
 
 ## Good first areas
 
-- **Fuller avatar coverage.** Real Claude Code hook events drive the avatars;
-  the synthetic loop in `src/renderer/src/store/mockEvents.ts` runs only in demo
-  mode or when no agent is live. Some station visits and tool bubbles still
-  need their real events.
+- **More life from real events.** Real Claude Code hook events drive the studio
+  (`src/renderer/src/scene/studio/life.tsx`); the synthetic loop in
+  `src/renderer/src/store/mockEvents.ts` runs only in demo mode or when no agent
+  is live. More events could show on the floor.
 - The add-agent flow and config drawer.
 - Cross-platform smoke-testing. Windows and Linux builds don't ship yet, and
   real-world coverage (WSL2, various distros, uncommon shells) is thin.
@@ -180,11 +180,10 @@ the module by module layout, and the design system.
 
 ## A note on assets
 
-The bundled tilesets are LimeZu's *Modern Interiors*, used under the **Complete
-Version licence**. See [`ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md).
-That licence requires credit to LimeZu, so don't remove the acknowledgement from
-the README, the app, or the website. The Office cast is drawn procedurally in
-`portraitArt.ts` and carries no third-party licence.
+The only bundled assets are fonts, each with its own licence file. See
+[`ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md). The office studio is
+drawn in code (`scene/studio/`) and team members are shown as letters in their
+department's colors, so no third party art ships.
 If you contribute new art, it must be either your own work or compatibly
 licensed, and you must add it to `ATTRIBUTION.md`. Don't add unlicensed assets.
 

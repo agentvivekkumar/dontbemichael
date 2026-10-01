@@ -39,7 +39,7 @@ moving, and brings you only the decisions that need you.
 - Choose Can send or Draft only for each one. A team member can't reach a mailbox you didn't give it.
 
 ### 4. Jobs on a clock
-- Each team member's schedules sit on its Capabilities tab. Name the job ("Check the support
+- Each team member's schedules sit on its Access tab. Name the job ("Check the support
   inbox") and when, and it does the job the way its work style says.
 - One job can run at several times: every 2 hours on weekdays between 8 and 6, plus 2 pm at weekends.
 - Closing time pauses the office; opening it runs a missed job once, never a backlog.
@@ -53,16 +53,17 @@ moving, and brings you only the decisions that need you.
   whole team, searchable by meaning.
 
 ### 6. You stay in charge
-- Spending money, deleting things and anything public come to you first, on the Ask me board.
+- Spending money, deleting things and anything public come to you first, on the Needs you board.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
   change it. Enforced by Claude Code's sandbox and checked again by the app.
 - House rules for every agent: say where a fact came from, say when it doesn't know, never make up
   people, customers or quotes. A looping agent is steered, then held, then stopped.
 
 ### 7. An office you can watch
-- A pixel office floor with the cast of The Office: team members walk to their stations, envelopes
-  fly between desks, and idle agents chat by the coffee machine in character.
-- Every team member has a Profile, Capabilities, Messages and Memory tab written for owners, not
+- A pod for each department around Michael's glass office. Desks light up as team members clock
+  in and go dark at closing time, envelopes fly between pods as work moves, and idle teammates
+  trade lines across the office.
+- Every team member has a Profile, Access, Messages, Memory and Work tab written for owners, not
   developers. Views for the task board and for who talks to whom.
 
 ### 8. Built for small business owners

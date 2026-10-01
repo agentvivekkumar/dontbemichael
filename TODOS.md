@@ -543,9 +543,9 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 **What:** A close dialog with a safe default and keyboard contract, and a tray so the office keeps running.
 
-**Why:** Closing the window stops every agent without warning today.
+**Why:** Closing the window ends the day for the whole office; there is no way to keep it running in the background.
 
-**Context:** `src/renderer/src/components/QuitWarningModal.tsx` exists for quit; the close path does not use it.
+**Context:** Since the Studio redesign, closing the main window with terminals running starts closing time on the floor (`ClosingTimeBar`, via `app:closeRequested` in `src/main/index.ts`), the same as quitting. What is left is the tray, and a choice between closing the window and quitting.
 
 **Effort:** M
 **Priority:** P1
@@ -720,7 +720,7 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ### Remove or rewrite the old project's website files in docs/
 
-**What:** What is left of the old project's website: `docs/blog/` with its source in `blog/`, `docs/sitemap.xml`, `.github/workflows/blog.yml`, and the upstream promo media in `docs/media/`. (The site pages, `docs/CNAME`, `robots.txt`, the Google verification file, the research, drops, hires gallery, evidence and deck were removed on 2026-09-28. `docs/llms.txt` and `docs/llms-full.txt` went in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
+**What:** What is left of the old project's website: `docs/blog/` with its source in `blog/`, `docs/sitemap.xml`, `.github/workflows/blog.yml`, and the upstream promo media that was in `docs/media/` (removed on 2026-10-01 with the v2 redesign). (The site pages, `docs/CNAME`, `robots.txt`, the Google verification file, the research, drops, hires gallery, evidence and deck were removed on 2026-09-28. `docs/llms.txt` and `docs/llms-full.txt` went in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
 
 **Why:** They describe the other product.
 

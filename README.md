@@ -102,7 +102,7 @@ business runs on, and each team member works from the one that matches its job.
 - **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
   saved, and the password stays in your Mac's keychain, never in a file an agent can read.
-- **Hand it out per team member.** On a team member's Capabilities tab, turn email on, pick its
+- **Hand it out per team member.** On a team member's Access tab, turn email on, pick its
   mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
 - **Each one stays in its lane.** A team member can only read, search and draft in the mailbox you
@@ -110,7 +110,7 @@ business runs on, and each team member works from the one that matches its job.
 - **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
   and the team member sorts new mail, drafts replies and tells Michael what needs you.
 - **You hear when it breaks.** If a provider stops accepting the password, the mailbox shows
-  "needs you" and Michael asks you to fix it once, on Ask me.
+  "needs you" and Michael asks you to fix it once, on the Needs you board.
 
 Outlook and Microsoft 365 are not supported yet. The Gmail and Calendar connected to your Claude
 account are separate: one switch in Mailboxes allows or blocks them for the whole team.
@@ -222,10 +222,10 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 **Running the office**
 - **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it.
-- **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Capabilities tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you in Ask me only when he can't settle it. Michael's Office schedule tab lists every job that is on.
-- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Capabilities tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
-- **QuickBooks through your Claude account.** The app does not connect to Intuit itself. Turn QuickBooks on in Settings, Connections, QuickBooks (it is off by default); the app then shows whether your Claude account has QuickBooks connected, or the steps to connect it. On each team member's Capabilities tab, choose Can use QuickBooks, then Read only or Can make changes. Oscar starts on and Read only; everyone else starts off.
-- **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Capabilities (email, QuickBooks when you turn it on, and schedules), Messages as a day by day history, and Memory as readable notes.
+- **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
+- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
+- **QuickBooks through your Claude account.** The app does not connect to Intuit itself. Turn QuickBooks on in Settings, Connections, QuickBooks (it is off by default); the app then shows whether your Claude account has QuickBooks connected, or the steps to connect it. On each team member's Access tab, choose Can use QuickBooks, then Read only or Can make changes. Oscar starts on and Read only; everyone else starts off.
+- **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, QuickBooks when you turn it on, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
 - **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.
@@ -307,7 +307,7 @@ If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
 - [`docs/FEATURES.md`](./docs/FEATURES.md): every feature, and every change release by release.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md): diagrams and the module map.
 - [`HIVE.md`](./HIVE.md): how agents coordinate.
-- [`SPEC.md`](./SPEC.md): the terminal and event planes.
+- [`SPEC.md`](./SPEC.md): the original spec. Its terminal and event planes still hold; the pixel canvas and command bar it describes were replaced by the Studio.
 - [`branding/DESIGN.md`](./branding/DESIGN.md): the design system, for any new UI.
 
 ### What this build leaves out
