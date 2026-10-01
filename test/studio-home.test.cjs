@@ -186,3 +186,18 @@ test('lights come up as people clock in, the way closing time turns them off (ow
   assert.match(art, /if \(was\.current && !off\) \{/, 'a light flickers only as it comes on');
   assert.match(read('src/renderer/src/store/store.ts'), /status: 'idle',\n\s+action: ACTION_CLOCKING_IN,/, 'a saved team loads clocking in');
 });
+
+test('the idle quote is easy to see and never covers a card (owner, 2026-09-30)', () => {
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  // A speech bubble with who says it, in their department's color.
+  assert.match(stage, /<span className="cth-st-quote-who">/);
+  assert.match(stage, /'--q-acc': c\.acc/);
+  // Sooner and longer than before; quiet pods first; never someone clocking in.
+  assert.match(stage, /const wait = first \? 8000 \+ Math\.random\(\) \* 7000 : 25_000 \+ Math\.random\(\) \* 25_000;/);
+  assert.match(stage, /hide = window\.setTimeout\(\(\) => setQuote\(null\), 8000\);/);
+  assert.match(stage, /a\.status === 'idle' && a\.action !== ACTION_CLOCKING_IN/);
+  // The first of four spots that covers no open card wins.
+  assert.match(stage, /const spot = spots\.find\(\(sp\) => !covers\(sp\)\) \?\? spots\[0\];/);
+  const css = read('src/renderer/src/design/global.css');
+  assert.match(css, /\.cth-st-quote-text \{ font-size: 12\.5px;/);
+});

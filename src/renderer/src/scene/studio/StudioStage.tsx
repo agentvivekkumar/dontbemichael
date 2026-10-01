@@ -399,10 +399,45 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
       {quote && (() => {
         const seat = seatOf.get(quote.agentId);
         if (!seat) return null;
-        const [x, y] = P(seat.pod.grid[0], seat.pod.grid[1] - 0.42, 57);
-        // Over a quiet pod the chip sits there, so the bubble rises above it.
+        const who = seat.pod.members[seat.index];
+        const c = families[seat.pod.dept];
+        // Where the bubble goes: above the pod (over its chip), opening right or
+        // left of the tail, else in front of the pod with the tail up. The first
+        // spot that covers no open card (or Michael's) wins.
+        const QW = 250; const QH = 64;
+        const boxes = plan.pods.filter((p) => awake(p) || peek === podKey(p)).map((p) => {
+          const r = cardRect(p.slot, p.members.length);
+          const left = ox + r.left * k;
+          const top = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
+          return { l: left, t: top, r: left + r.w, b: top + r.h };
+        });
+        if (god) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 190 });
+        const [gx, gy] = seat.pod.grid;
         const lift = awake(seat.pod) || seat.pod.slot.mode !== 'above' ? 0 : 40;
-        return <div key={quote.key} className="cth-st-quote" style={{ ...at(x + 6, y - 16 - lift), transform: 'translateY(-100%)' }}>{quote.text}</div>;
+        const [ax, ay] = P(gx, gy - 0.42, 57);
+        const [fx, fy] = P(gx + 0.55, gy + 0.55, 0);
+        const spots = [
+          { front: false, flip: false, x: ox + (ax - 10) * k, y: oy + (ay - 18) * k - lift },
+          { front: false, flip: true, x: ox + (ax - 10) * k, y: oy + (ay - 18) * k - lift },
+          { front: true, flip: false, x: ox + (fx - 10) * k, y: oy + (fy + 10) * k },
+          { front: true, flip: true, x: ox + (fx - 10) * k, y: oy + (fy + 10) * k }
+        ];
+        const covers = (sp: typeof spots[number]) => {
+          const l = sp.flip ? sp.x + 20 - QW : sp.x;
+          const t = sp.front ? sp.y : sp.y - QH;
+          return boxes.some((q) => l < q.r && l + QW > q.l && t < q.b && t + QH > q.t);
+        };
+        const spot = spots.find((sp) => !covers(sp)) ?? spots[0];
+        const cls = ['cth-st-quote', spot.front ? 'cth-st-quote-below' : '', spot.flip ? 'cth-st-quote-left' : ''].filter(Boolean).join(' ');
+        return (
+          <div key={quote.key} className={cls} style={{ left: spot.flip ? spot.x + 20 : spot.x, top: spot.y, position: 'absolute', '--q-acc': c.acc } as CSSProperties}>
+            <span className="cth-st-quote-who">
+              <i style={{ background: c.l, color: c.acc, boxShadow: `inset 0 0 0 1px ${c.m}` }}>{who.name.slice(0, 1).toUpperCase()}</i>
+              {who.name}
+            </span>
+            <span className="cth-st-quote-text">“{quote.text}”</span>
+          </div>
+        );
       })()}
 
       {/* A scheduled job's name, as it starts. */}
@@ -803,20 +838,31 @@ function useIdleQuote(pods: PodPlan<Agent>[], paused: boolean): { agentId: strin
     let timer: number | undefined;
     let hide: number | undefined;
     let n = 0;
+    // The first line comes soon after the office opens, then every 25 to 50 s.
+    let first = true;
+    const say = () => {
+      // Someone idle and in (not still clocking in) says something; people in
+      // a quiet pod first, so the bubble never sits on an open card.
+      const isIn = (a: Agent) => a.status === 'idle' && a.action !== ACTION_CLOCKING_IN;
+      const quiet = podsRef.current.filter((p) => !p.members.some((a) => ACTIVE.has(a.status))).flatMap((p) => p.members).filter(isIn);
+      const idle = quiet.length ? quiet : podsRef.current.flatMap((p) => p.members).filter(isIn);
+      if (idle.length) {
+        const a = idle[Math.floor(Math.random() * idle.length)];
+        const text = pickSoloLine(a.character, 'coffee', Math.floor(Math.random() * 1000));
+        setQuote({ agentId: a.id, text, key: n++ });
+        window.clearTimeout(hide);
+        hide = window.setTimeout(() => setQuote(null), 8000);
+      }
+    };
     const schedule = () => {
-      timer = window.setTimeout(() => {
-        const idle = podsRef.current.flatMap((p) => p.members).filter((a) => a.status === 'idle');
-        if (idle.length) {
-          const a = idle[Math.floor(Math.random() * idle.length)];
-          const text = pickSoloLine(a.character, 'coffee', Math.floor(Math.random() * 1000));
-          setQuote({ agentId: a.id, text, key: n++ });
-          hide = window.setTimeout(() => setQuote(null), 6000);
-        }
-        schedule();
-      }, 45_000 + Math.random() * 45_000);
+      const wait = first ? 8000 + Math.random() * 7000 : 25_000 + Math.random() * 25_000;
+      first = false;
+      timer = window.setTimeout(() => { say(); schedule(); }, wait);
     };
     schedule();
-    return () => { window.clearTimeout(timer); window.clearTimeout(hide); };
+    // Demo mode (and the design lab) can ask for a line now.
+    window.addEventListener('cth:demo-quote', say);
+    return () => { window.clearTimeout(timer); window.clearTimeout(hide); window.removeEventListener('cth:demo-quote', say); };
   }, [paused]);
   return quote;
 }

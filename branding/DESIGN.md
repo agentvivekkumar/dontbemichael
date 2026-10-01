@@ -852,10 +852,14 @@ tinted with a red "x" on its path.
 
 ### 8.8 Idle quote bubble
 
-One at a time, over an idle pod: `neutral-soft` bubble, `line` border, `r-lg` with a tail
-at the bottom left, italic `t-meta` `ink-3`. Lines come from the in-character list
-(`cafeteriaLines.ts`). Shown every 45 to 90 s, visible 6 s, 400 ms fade. Never over a pod
-that is working or needs you.
+One at a time, over an idle pod (owner, 2026-09-30: the first version was easy to miss): a
+`card` speech bubble, max 250 px, with a 1.5 px ring and tail in the speaker's department
+color, the speaker's avatar and name on top (`t-meta` 600), and the line in quotes at
+12.5 / 17 `ink`. It pops in from its tail (scale .7 to 1.04 to 1), holds, and fades. Lines come
+from the in-character list (`cafeteriaLines.ts`). The first comes 8 to 15 s after the office
+opens, then every 25 to 50 s, visible 8 s. Never from someone working, needing you, or
+still clocking in. It sits above the pod (over its chip) opening right of its tail; if that would
+cover an open card or Michael's, it opens left, then in front of the pod with the tail up.
 
 ### 8.9 Scaling rule
 
