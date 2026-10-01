@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { PixelButton } from './PixelButton';
-import { Dialog } from '@/shell/Dialog';
 import { MiniButton } from './triggers/ui';
 import { ACTION_AT_PROMPT, actionText, useStore, type Agent } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -27,130 +25,114 @@ export interface ClosingTimeState {
   relaunch?: boolean;
 }
 
-export interface QuitWarningModalProps {
-  ptyCount: number;
-  /** Non-null while the closing-time protocol runs — switches the dialog into
-   *  the "wrapping up the floor" progress view. */
-  closing?: ClosingTimeState | null;
+export interface ClosingTimeBarProps {
+  /** Null until main's first event; the bar still shows "starting". */
+  closing: ClosingTimeState | null;
+  /** Back to work: closing time is called off and nothing quits. */
   onCancel: () => void;
-  onConfirm: () => void;
-  /** Start the graceful shutdown (the third button). */
-  onClosingTime?: () => void;
+  /** Quit now without waiting (a hard quit; unsaved work is lost). */
+  onForceQuit: () => void;
+  /** Start closing time again after a refused start. */
+  onRetry: () => void;
 }
 
-export function QuitWarningModal({ ptyCount, closing, onCancel, onConfirm, onClosingTime }: QuitWarningModalProps) {
+/**
+ * Closing time on the office floor (owner, 2026-09-30: the quit dialog
+ * defeated the lights going out). Quitting starts closing time straight away;
+ * this bar takes the bottom bar's place and says how many people are still
+ * working while their pods go dark one by one. Who is still working, with
+ * Remind and Close without them, opens under it. Cancel goes back to work;
+ * Force quit asks once, because unsaved work is lost.
+ */
+export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: ClosingTimeBarProps) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [confirmForce, setConfirmForce] = useState(false);
   const [busy, setBusy] = useState(false);
+  const c = closing;
+  const error = c?.phase === 'error';
+  const done = c?.phase === 'complete';
+  const waiting = c?.waiting?.length ?? 0;
+  const pct = c && c.total > 0 ? Math.min(100, Math.round((c.acked / c.total) * 100)) : done ? 100 : 0;
+  const force = async () => { setBusy(true); onForceQuit(); };
 
-  const confirm = async () => {
-    setBusy(true);
-    await onConfirm();
-    // No need to clear busy — the app is quitting.
-  };
+  const status = error
+    ? (c?.error ?? t('quit.startFailed'))
+    : done
+      ? (c?.relaunch ? t('quit.savedReopen') : t('quit.saved'))
+      : !c || c.total === 0 && c.phase === 'started'
+        ? t('closingBar.starting')
+        : headerLine(c, t);
 
-  const inClosingTime = !!closing && closing.phase !== 'error';
-  const many = ptyCount !== 1;
-
-  // Above EVERY modal, not just most of them (zIndex 1000). Modals in this app
-  // sit at 500 (add agent, edit agent, the release drop) and overlays below
-  // that. At 300 this dialog opened BEHIND the release drop, so clicking quit
-  // with a drop on screen looked like quit did nothing, while a hidden dialog
-  // held the app open. This is the last thing the user is asked before the
-  // process dies; it outranks whatever it interrupts.
-  if (inClosingTime) {
-    const c = closing!;
-    return (
-      <Dialog
-        title={t('quit.closingTitle')}
-        onClose={onCancel}
-        closable={false}
-        width={520}
-        zIndex={1000}
-        footer={c.phase !== 'complete' ? (
-          <>
-            <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>{t('quit.cancelBack')}</PixelButton>
-            <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>{busy ? t('quit.killing') : t('quit.forceQuit')}</PixelButton>
-          </>
-        ) : undefined}
-      >
-        <Lead
-          tone={c.phase === 'complete' ? 'green' : 'amber'}
-          title={c.phase === 'complete'
-            ? (c.relaunch ? t('quit.savedReopen') : t('quit.saved'))
-            : c.phase === 'timeout' ? t('quit.stillWrapping') : t('quit.wrapping')}
-          body={c.phase === 'complete'
-            ? (c.relaunch ? t('quit.savedBodyRelaunch') : t('quit.savedBody'))
-            : (c.relaunch ? t('quit.wrappingBodyRelaunch') : t('quit.wrappingBody'))}
-        />
-        <div style={strip}>
-          <span style={{ fontFamily: 'var(--cth-font-mono)', fontWeight: 500 }}>{headerLine(closing!, t)}</span>
-          {/* "Keep waiting" is wrong once Michael's terminal has ended. */}
-          {closing!.phase === 'timeout' && closing!.godLive !== false && (
-            <div style={{ marginTop: 6 }}>{t('quit.slow')}</div>
+  return (
+    <div role="region" aria-label={t('closingBar.title')} style={{
+      position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 80,
+      width: 'min(720px, calc(100% - 48px))', display: 'flex', flexDirection: 'column',
+      background: 'var(--cth-card)', borderRadius: 'var(--cth-r-xl)', fontFamily: 'var(--cth-font-ui)',
+      boxShadow: `inset 0 0 0 1px ${error ? 'color-mix(in srgb, var(--cth-coral) 45%, transparent)' : 'var(--cth-line)'}, var(--cth-shadow-lg)`
+    }}>
+      {/* Who is still working, above the bar so it opens upward from it. */}
+      {open && c && !error && (
+        <div style={{ padding: '6px 16px 2px', maxHeight: 300, overflowY: 'auto', borderBottom: '1px solid var(--cth-line)' }}>
+          {c.phase === 'timeout' && c.godLive !== false && (
+            <div style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)', padding: '6px 0' }}>{t('quit.slow')}</div>
+          )}
+          <ClosingTimeRows closing={c} />
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 14px', minHeight: 56, boxSizing: 'border-box' }}>
+        <span aria-hidden="true" style={{
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+          background: error ? 'var(--cth-coral-soft)' : 'var(--cth-indigo-soft)', color: error ? 'var(--cth-coral-text)' : 'var(--cth-indigo-text)'
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+          </svg>
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+            <b style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--cth-ink)', flexShrink: 0 }}>{t('closingBar.title')}</b>
+            <span role="status" aria-live="polite" style={{ fontSize: 12.5, color: error ? 'var(--cth-coral-text)' : 'var(--cth-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{status}</span>
+          </div>
+          {!error && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <span style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--cth-line)', overflow: 'hidden' }}>
+                <span style={{ display: 'block', height: '100%', width: `${pct}%`, borderRadius: 2, background: done ? 'var(--cth-green)' : 'var(--cth-indigo)', transition: 'width 600ms var(--cth-ease)' }} />
+              </span>
+              {c && !done && waiting > 0 && (
+                <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} style={linkBtn}>
+                  {open ? t('closingBar.hideWho') : (waiting === 1 ? t('closingBar.left', { count: waiting }) : t('closingBar.leftPlural', { count: waiting }))}
+                </button>
+              )}
+            </div>
           )}
         </div>
-        <ClosingTimeRows closing={c} />
-      </Dialog>
-    );
-  }
-
-  return (
-    <Dialog
-      title={t('quit.title')}
-      onClose={onCancel}
-      busy={busy}
-      width={520}
-      zIndex={1000}
-      footer={(
-        <>
-          <PixelButton variant="secondary" size="md" onClick={onCancel} disabled={busy}>{t('quit.keepRunning')}</PixelButton>
-          {onClosingTime && (
-            <PixelButton variant="primary" size="md" onClick={onClosingTime} disabled={busy}>{t('quit.closingTime')}</PixelButton>
-          )}
-          <PixelButton variant="destructive" size="md" onClick={confirm} disabled={busy}>
-            {busy ? t('quit.killing') : many ? t('quit.killQuitPlural') : t('quit.killQuit')}
-          </PixelButton>
-        </>
-      )}
-    >
-      <Lead
-        tone="coral"
-        title={many ? t('quit.runningPlural', { count: ptyCount }) : t('quit.running', { count: ptyCount })}
-        body={many ? t('quit.bodyPlural', { count: ptyCount }) : t('quit.body')}
-      />
-      <div style={strip}>{t('quit.tip')}</div>
-      {closing?.phase === 'error' && (
-        <div role="alert" style={errorStyle}>{closing.error ?? t('quit.startFailed')}</div>
-      )}
-    </Dialog>
-  );
-}
-
-/** The icon, headline and sentence at the top of the dialog. */
-function Lead({ tone, title, body }: { tone: 'coral' | 'amber' | 'green'; title: string; body: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-      <span aria-hidden="true" style={{
-        width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
-        background: `var(--cth-${tone}-soft)`, color: `var(--cth-${tone}-text)`
-      }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          {tone === 'green' ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>}
-        </svg>
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink)', marginBottom: 3 }}>{title}</div>
-        <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>{body}</div>
+        {!done && (
+          confirmForce ? (
+            <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: 'var(--cth-ink-2)', maxWidth: 170 }}>{t('closingBar.confirmForce')}</span>
+              <button type="button" className="cth-toast-btn" autoFocus onClick={() => setConfirmForce(false)}>{t('closingBar.keepClosing')}</button>
+              <button type="button" className="cth-toast-btn" style={{ background: 'var(--cth-coral-strong)', color: '#fff', boxShadow: 'none' }} disabled={busy} onClick={() => { void force(); }}>
+                {busy ? t('quit.killing') : t('quit.forceQuit')}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {error && <button type="button" className="cth-toast-btn primary" onClick={onRetry}>{t('closingBar.tryAgain')}</button>}
+              <button type="button" className="cth-toast-btn" onClick={onCancel}>{t('quit.cancelBack')}</button>
+              <button type="button" className="cth-toast-btn" style={{ color: 'var(--cth-coral-text)' }} onClick={() => setConfirmForce(true)}>{t('quit.forceQuit')}</button>
+            </div>
+          )
+        )}
       </div>
     </div>
   );
 }
 
-const strip: CSSProperties = {
-  padding: '9px 12px', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-card-2)',
-  boxShadow: 'inset 0 0 0 1px var(--cth-line)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)'
+const linkBtn: CSSProperties = {
+  flexShrink: 0, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-indigo-text)'
 };
-
 
 /**
  * Who is still working at closing time (owner, 2026-09-29): one row per team

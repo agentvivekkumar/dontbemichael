@@ -727,7 +727,12 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   text.)
 - Toasts (completion, update, Claude Code update): bottom right above the bottom bar,
   `card`, `line`, `r-xl`, `shadow-lg`, 360 px max, up to 4 stacked. Auto dismiss per today.
-- Dialogs (Settings, hire wizard, closing time, quit warning, office folder missing):
+- Closing time is not a dialog (owner, 2026-09-30): quitting with people at work starts it
+  at once, and a closing bar takes the bottom bar's place: `card`, `r-xl`, `shadow-lg`, the
+  moon mark, "Closing time" and the counter strip ("5 / 8 workers confirmed"), a progress
+  line, "3 still working" opening the rows (Remind, Close without them), "Cancel and go back
+  to work", and "Force quit now", which asks once because unsaved work is lost.
+- Dialogs (Settings, hire wizard, office folder missing):
   `card`, `r-2xl`, `shadow-lg`, backdrop per §6.1, `role=dialog`, focus trapped, Esc closes
   (Settings and onboarding lack this today, §17).
 

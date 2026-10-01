@@ -17,7 +17,7 @@ import { AddAgentModal } from '@/components/AddAgentModal';
 import { MichaelBooting } from '@/components/MichaelBooting';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
 import { OfficeFolderMissing } from '@/components/OfficeFolderMissing';
-import { QuitWarningModal, type ClosingTimeState } from '@/components/QuitWarningModal';
+import { ClosingTimeBar, type ClosingTimeState } from '@/components/ClosingTimeBar';
 import { CompletionToast } from '@/realtime/CompletionToast';
 import { UpdateToast } from '@/components/UpdateToast';
 import { CliUpdateToast } from '@/components/CliUpdateNotice';
@@ -74,7 +74,9 @@ export function App() {
   /** Which tab Settings opens on. Set by a `cth:open-settings` deep link, reset
    *  to undefined (→ General) whenever the modal is opened the normal way. */
   const [settingsSection, setSettingsSection] = useState<SettingsSection | undefined>(undefined);
-  const [quitWarn, setQuitWarn] = useState<{ ptyCount: number } | null>(null);
+  // Closing time on the floor (ClosingTimeBar): shown from the quit request
+  // until the office closes or the owner goes back to work.
+  const [closingOpen, setClosingOpen] = useState(false);
   const [closing, setClosing] = useState<ClosingTimeState | null>(null);
   const [vpWidth, setVpWidth] = useState<number>(window.innerWidth);
 
@@ -135,8 +137,16 @@ export function App() {
   // moment anything saves a setting.
   useEffect(() => window.cth.onConfigChanged(setConfig), []);
 
-  // Quit warning subscription
-  useEffect(() => window.cth.onCloseRequested((info) => setQuitWarn(info)), []);
+  // Quitting with people at work starts closing time straight away (owner,
+  // 2026-09-30: no dialog; the floor shows the lights going out). The bar
+  // offers Cancel and Force quit. A second quit request while closing is a no-op.
+  const closingOpenRef = useRef(false);
+  closingOpenRef.current = closingOpen;
+  useEffect(() => window.cth.onCloseRequested(() => {
+    if (closingOpenRef.current) return;
+    setClosingOpen(true);
+    void startClosingTimeRef.current(reopenAsked.current ? { relaunch: true } : undefined);
+  }), []);
 
   // Shareable hires: a validated manifest arriving via the dontbemichael://
   // deep link (or file import) pre-fills the Add-Agent modal. Never spawns by itself.
@@ -164,15 +174,15 @@ export function App() {
     console.error('[hire] import failed:', info.error);
   }), []);
 
-  // Closing-time progress: drives the quit dialog's "wrapping up" view. The
-  // dialog stays up through the whole protocol; on 'complete' the main process
-  // tears down and quits by itself moments later.
+  // Closing-time progress: drives the closing bar. It stays up through the
+  // whole protocol; on 'complete' the main process tears down and quits by
+  // itself moments later.
   useEffect(() => window.cth.onClosingTime?.((ev) => {
     const { phase, ...rows } = ev;
-    if (phase === 'cancelled') { setClosing(null); return; }
-    // Every field main sends reaches the dialog; none is copied by hand.
+    if (phase === 'cancelled') { setClosing(null); setClosingOpen(false); return; }
+    // Every field main sends reaches the bar; none is copied by hand.
     setClosing({ phase, ...rows });
-    if (phase === 'started' || phase === 'progress') setQuitWarn((w) => w ?? { ptyCount: 0 });
+    if (phase === 'started' || phase === 'progress') setClosingOpen(true);
   }), []);
 
   const startClosingTime = async (opts?: { relaunch?: boolean }): Promise<boolean> => {
@@ -180,14 +190,16 @@ export function App() {
     if (!res.ok) setClosing({ phase: 'error', acked: 0, total: 0, error: res.error });
     return res.ok;
   };
+  const startClosingTimeRef = useRef(startClosingTime);
+  startClosingTimeRef.current = startClosingTime;
   // The owner asked to reopen (CliUpdateNotice). Kept until they cancel, so a
-  // retry from the quit dialog (after a refused start) still reopens.
+  // retry from the closing bar (after a refused start) still reopens.
   const reopenAsked = useRef(false);
   // A Claude Code update is waiting (CliUpdateNotice): the owner's click closes
   // the office the safe way, then the app reopens on the new version.
-  const closeOfficeAndReopen = (liveAgents: number): Promise<boolean> => {
+  const closeOfficeAndReopen = (): Promise<boolean> => {
     reopenAsked.current = true;
-    setQuitWarn((w) => w ?? { ptyCount: liveAgents });
+    setClosingOpen(true);
     return startClosingTime({ relaunch: true });
   };
   const cancelClosingTime = () => {
@@ -342,7 +354,20 @@ export function App() {
               )}
             </div>
           )}
-          <BottomBar config={config} />
+          {closingOpen ? (
+            <ClosingTimeBar
+              closing={closing}
+              onCancel={() => {
+                reopenAsked.current = false;
+                if (closing && closing.phase !== 'error') cancelClosingTime();
+                window.cth.cancelClose();
+                setClosing(null);
+                setClosingOpen(false);
+              }}
+              onForceQuit={() => { void window.cth.confirmClose(); }}
+              onRetry={() => { void startClosingTime(reopenAsked.current ? { relaunch: true } : undefined); }}
+            />
+          ) : <BottomBar config={config} />}
         </div>
 
         <SidebarSplitter
@@ -386,20 +411,6 @@ export function App() {
         />
       )}
 
-      {quitWarn && (
-        <QuitWarningModal
-          ptyCount={quitWarn.ptyCount}
-          closing={closing}
-          onCancel={() => {
-            reopenAsked.current = false;
-            if (closing) cancelClosingTime();
-            window.cth.cancelClose();
-            setQuitWarn(null);
-          }}
-          onConfirm={async () => { await window.cth.confirmClose(); }}
-          onClosingTime={() => { void startClosingTime(reopenAsked.current ? { relaunch: true } : undefined); }}
-        />
-      )}
 
       {fullscreenAgentId && <FullscreenTerminal config={config} />}
       {SHOW_IDE && ideOpen && <IdePanel />}

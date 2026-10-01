@@ -48,7 +48,7 @@ test('the Remind limit is one shared value for main and the dialog', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   assert.equal(CLOSING_TIME_REMIND_MS, 30_000);
   assert.match(read('src/main/closingTime.ts'), /now - at < CLOSING_TIME_REMIND_MS\) return/);
-  assert.match(read('src/renderer/src/components/QuitWarningModal.tsx'), /< CLOSING_TIME_REMIND_MS/);
+  assert.match(read('src/renderer/src/components/ClosingTimeBar.tsx'), /< CLOSING_TIME_REMIND_MS/);
 });
 
 test('the counter strip moves on to the orchestrator, and says when his terminal ended', () => {

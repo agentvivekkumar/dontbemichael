@@ -15,7 +15,7 @@ const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
 test('the dialog keeps its safety invariants: Michael by id, never excused, no terminal stopped', () => {
   // Value: protects=the owner can never close without Michael or stop a terminal from the dialog; fails_when=the dialog hard-codes Michael, excuses him, or calls a PTY kill; why_new=row wording moved to closing-time-rows.test.cjs; seam=none
-  const src = read('src/renderer/src/components/QuitWarningModal.tsx');
+  const src = read('src/renderer/src/components/ClosingTimeBar.tsx');
   assert.match(src, /const godId = closing\.godId;/, "Michael's row comes from the event, never a hard-coded id");
   assert.match(src, /remindButton\(godId\)/, 'Michael can be reminded');
   assert.doesNotMatch(src, /closeWithout[^\n]*godId|closingTimeExcuse\(godId\)/, 'never close without Michael');
@@ -27,7 +27,7 @@ test('the dialog keeps its safety invariants: Michael by id, never excused, no t
   assert.match(src, /const keepWaiting = \(id: string\): void => \{ setConfirming\(null\); setRefocus\(id\); \};/);
   assert.match(src, /\{!done && !godGone && <span/);
   assert.match(src, /const godGone = closing\.godLive === false;/);
-  assert.match(src, /closing!\.phase === 'timeout' && closing!\.godLive !== false && \(/, 'no "keep waiting" advice once Michael is gone');
+  assert.match(src, /c\.phase === 'timeout' && c\.godLive !== false && \(/, 'no "keep waiting" advice once Michael is gone');
   // Focus comes back after Remind and after a refused Close without them (R23).
   assert.match(src, /setRefocus\(kind === 'excuse' \? 'keep' : id\)/);
   assert.match(src, /buttonRef=\{keepButton\}/);
@@ -37,7 +37,7 @@ test('the dialog keeps its safety invariants: Michael by id, never excused, no t
   assert.match(src, /\{confirming !== id && <MiniButton [^\n]*?onClick=\{\(\) => setConfirming\(id\)\}>/);
   // A refusal is shown, never taken as success (review R1, owner 2026-09-29).
   assert.match(src, /const message = actionMessage\(res, t\('closingTime\.sendFailed'\)\);\n(?:\s*\/\/[^\n]*\n)*\s+if \(message\) \{ setFailed/);
-  assert.match(src, /\{headerLine\(closing!, t\)\}/, 'the counter strip comes from the tested headerLine()');
+  assert.match(src, /: headerLine\(c, t\);/, 'the counter strip comes from the tested headerLine()');
 });
 
 test('App passes the new event fields through to the dialog', () => {
@@ -86,7 +86,7 @@ test('Remind and Close without them reach main on the channels main handles', ()
 
 test('every closing-time string the dialog shows exists in English', () => {
   // Value: protects=no row shows a raw "closingTime.x" key; fails_when=a t('closingTime.*') key is renamed or mistyped on one side; why_new=locale parity tests only compare locales, not what the code renders; seam=none
-  const src = read('src/renderer/src/components/QuitWarningModal.tsx') + read('src/renderer/src/components/closingTimeRows.ts');
+  const src = read('src/renderer/src/components/ClosingTimeBar.tsx') + read('src/renderer/src/components/closingTimeRows.ts');
   const used = [...new Set([...src.matchAll(/\bt\('closingTime\.([A-Za-z0-9_]+)'/g)].map((m) => m[1]))];
   assert.ok(used.includes('closeWithout') && used.includes('stillWorking'), 'sanity: both files are scanned');
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).closingTime;
@@ -138,4 +138,21 @@ test('a tool call\'s detail and clock stay in memory: no save, and never in the 
   assert.equal(r.saved.description, 'Sales', 'a durable change is saved');
   assert.ok(!('actionDetail' in r.saved) && !('actionAt' in r.saved), JSON.stringify(r.saved));
   assert.ok(r.added && !('actionDetail' in r.added) && !('actionAt' in r.added), JSON.stringify(r.added));
+});
+
+test('quitting starts closing time on the floor, with no dialog (owner, 2026-09-30)', () => {
+  const app = read('src/renderer/src/App.tsx');
+  assert.doesNotMatch(app, /QuitWarningModal/);
+  assert.match(app, /window\.cth\.onCloseRequested\(\(\) => \{\n\s+if \(closingOpenRef\.current\) return;\n\s+setClosingOpen\(true\);\n\s+void startClosingTimeRef\.current\(/);
+  // The bar takes the bottom bar's place; Cancel calls closing time off and tells main.
+  assert.match(app, /\{closingOpen \? \(\n\s+<ClosingTimeBar/);
+  assert.match(app, /if \(closing && closing\.phase !== 'error'\) cancelClosingTime\(\);\n\s+window\.cth\.cancelClose\(\);/);
+  assert.match(app, /onForceQuit=\{\(\) => \{ void window\.cth\.confirmClose\(\); \}\}/);
+  // Force quit loses unsaved work, so it asks once.
+  const bar = read('src/renderer/src/components/ClosingTimeBar.tsx');
+  assert.match(bar, /onClick=\{\(\) => setConfirmForce\(true\)\}>\{t\('quit\.forceQuit'\)\}/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
+    for (const k of ['title', 'starting', 'left', 'leftPlural', 'hideWho', 'confirmForce', 'keepClosing', 'tryAgain']) assert.ok(d.closingBar[k], `${loc}: closingBar.${k}`);
+  }
 });
