@@ -1053,11 +1053,11 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 | 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Done |
 | 5 | App | Ask me is a tab in Michael's panel | `AskMeTab`, `CommandCenterPanel` | Done |
 | 6 | App | Pixel icon set | `components/Icon.tsx` | Done: outline icons behind the same component |
-| 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Done for Settings (`shell/useDialog.ts`); other dialogs follow in phase 6 |
+| 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Done: `shell/Dialog.tsx` and `useDialog` for Settings, hire, edit, quit and closing time; Esc reaches only the top dialog |
 | 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Done |
 | 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Done: `departmentOf` in `scene/studio/layout.ts` |
 | 10 | App | No counters for delegated and kept | hive | Done: the hub card counts from the hive log and tasks |
-| 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Fix: §13.1 |
+| 11 | App | UI strings not audited for dashes | `src/renderer/src/i18n` | Done: `test/no-dashes.test.cjs`; ALL CAPS strings moved to sentence case (§4) |
 | 12 | App | Reference screens use 9 to 9.5 px text and off-grid spacing | `reference/studio/` | Accepted in mockups; the build uses §4.2 and §5.1 |
 | 13 | App | Reference screens predate the contrast fixes (`ink-3`, pill text, coral fills) | `reference/studio/` | Accepted in mockups; the build uses §3 |
 | 14 | Kit | Retired fonts still in `fonts/` | `branding/fonts/` | Fix: remove once #3 and #15 are done |
