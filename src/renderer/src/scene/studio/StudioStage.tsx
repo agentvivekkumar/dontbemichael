@@ -197,6 +197,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     }
   });
   const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
+  const kickoff = useKickoff(plan.pods, paused);
   const closing = useClosingLights();
   const hour = useHour();
   const night = hour >= 19 || hour < 6;
@@ -256,21 +257,19 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         {plan.pods.map((pod) => (
           <PodGlow key={`glow-${pod.dept}-${pod.members[0].id}`} grid={pod.grid} famKey={pod.dept} desks={pod.members.map((a) => ({ st: deskState(a) }))} />
         ))}
-        {/* Paths: Michael to every pod, each mailbox to the person who watches it. */}
-        {plan.pods.map((pod, i) => {
-          const busy = pod.members.some((a) => a.status !== 'idle');
-          // Work flows down the wire while someone in the pod is at it.
-          const flowing = pod.members.some((a) => ACTIVE.has(a.status));
-          return <Flow key={`f-${i}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={busy ? 2.6 : 1.6} opacity={busy ? 0.55 : 0.32} dash={busy ? undefined : '2 6'} T={T} flowing={flowing} />;
-        })}
+        {/* No standing wires (owner, 2026-09-30: lines everywhere looked busy).
+            A wire shows only while something moves along it: Michael's wire to a
+            pod when someone there starts working, a mailbox's wire while mail
+            moves. Messages draw their own path as they fly (life.tsx). */}
+        {plan.pods.map((pod) => kickoff[pod.members[0].id] ? (
+          <Flow key={`f-${pod.members[0].id}-${kickoff[pod.members[0].id]}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={2.4} opacity={0.45} T={T} flowing fade />
+        ) : null)}
         {mailboxes.map((m, i) => {
           const owner = ownerOf(m.id);
           const seat = owner ? seatOf.get(owner.id) : undefined;
+          if (!seat || !life.postActive[m.id]) return null;
           const from: Pt = [postGx(i, mailboxes.length), POST_GY - 0.3];
-          if (m.status === 'needs-attention') {
-            return <Flow key={`m-${m.id}`} a={from} b={seat?.pod.grid ?? HUB} bend={0} color={T.coral} width={2} opacity={0.9} dash="5 5" T={T} />;
-          }
-          return seat ? <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} flowing={!!life.postActive[m.id]} /> : null;
+          return <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} flowing fade />;
         })}
         {/* Objects, back to front. */}
         {[
@@ -695,6 +694,37 @@ function CompactGrid({ plan, families, snap, selected, onSelect, missions, godId
       ))}
     </div>
   );
+}
+
+/* ── Work starting (DESIGN.md 8.12) ───────────────────────────────────────── */
+
+/** Pods where someone just started working, keyed by the pod's first member,
+ *  for about three seconds: Michael's wire to the pod shows and flows, then
+ *  fades. Nothing on first load: work already under way is not a start. */
+function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, number> {
+  const [kick, setKick] = useState<Record<string, number>>({});
+  const prev = useRef<Map<string, boolean> | null>(null);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+  const sig = pods.map((p) => `${p.members[0].id}:${p.members.map((a) => a.status).join('.')}`).join('|');
+  useEffect(() => {
+    const now = new Map(pods.flatMap((p) => p.members.map((a) => [a.id, ACTIVE.has(a.status)] as [string, boolean])));
+    const before = prev.current;
+    prev.current = now;
+    if (!before || paused) return;
+    for (const pod of pods) {
+      if (!pod.members.some((a) => now.get(a.id) && before.get(a.id) === false)) continue;
+      const key = pod.members[0].id;
+      const stamp = Date.now();
+      setKick((k) => ({ ...k, [key]: stamp }));
+      timers.current.push(window.setTimeout(() => setKick((k) => {
+        if (k[key] !== stamp) return k;
+        const n = { ...k }; delete n[key]; return n;
+      }), 3200));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+  return kick;
 }
 
 /* ── Closing time and daylight (DESIGN.md 8.12) ───────────────────────────── */

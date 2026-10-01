@@ -825,8 +825,11 @@ As §3.5. In addition:
 
 ### 8.6 Paths and tokens
 
-- Paths are thin curves (1.5 px) in `line-2` tones between mailbox posts, Michael's pod and
-  department pods, with a faint drop line to the floor.
+- No standing paths (owner, 2026-09-30: permanent lines made the office look busy). A path
+  is drawn only while something moves along it: a token's own faint trail as it flies,
+  Michael's wire to a pod for 3.2 s when someone there starts working, a mailbox's wire
+  while mail moves, and a conversation arc while two people talk (§8.12). A broken mailbox
+  shows its warning on the post and its tag, not a line.
 - Tokens are small isometric cards or glyph circles in the act color (§3.3), white ring,
   traveling along paths. Speed about 240 px/s with ease in out. At most 16 in flight;
   beyond that, counts on paths (a mono number pill) replace extra tokens.
@@ -883,7 +886,8 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | Any other tool call | A 26 px glyph rises off the desk: web, terminal, file, search, books, or a spark (one per person per 1.4 s) |
 | A task reaches Done | A green check bursts over its owner's pod; a new sticky pops onto Michael's board |
 | Counts change | Michael's numbers tick up into place |
-| Someone working | Their screen scrolls, their mug steams, the wire from Michael flows toward the pod |
+| Someone starts working | Michael's wire to the pod appears, flows toward it and fades (3.2 s) |
+| Someone working | Their screen scrolls, their mug steams |
 | Michael working | His screens scroll, his marker writes on the board, his badge floats; Doing stickies breathe |
 | Thinking | The three dots bounce in turn |
 | Always | Plants sway slightly (5.5 s) |

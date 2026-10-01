@@ -427,15 +427,17 @@ export function MailPost({ gx, gy, broken, c, T, active }: {
 
 /* ── Paths on the floor ───────────────────────────────────────────────────── */
 
-export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T, flowing = false }: {
+export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T, flowing = false, fade = false }: {
   a: Pt; b: Pt; bend: number; color: string; width: number; opacity?: number; dash?: string; T: SceneTokens;
   /** Work is moving along this wire: dashes run from a toward b. */
   flowing?: boolean;
+  /** A wire that is only there for a moment: it fades in, and out at the end. */
+  fade?: boolean;
 }) {
   const sh = dpath(curvePts(a, b, bend, 0));
   const ln = dpath(curvePts(a, b, bend, 5));
   return (
-    <g>
+    <g className={fade ? 'cth-st-wire' : undefined}>
       <path d={sh} fill="none" stroke={T.flowSh} strokeOpacity={T.flowShOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
       <path d={ln} fill="none" stroke={T.under} strokeOpacity={T.underOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
       <path d={ln} fill="none" stroke={color} strokeOpacity={opacity} strokeWidth={width} strokeLinecap="round" strokeDasharray={dash} />

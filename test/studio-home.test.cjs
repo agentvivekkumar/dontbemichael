@@ -117,10 +117,13 @@ test('the studio moves on real events only: scheduled runs, mail, tools, done ta
   assert.match(life, /const dir: 'in' \| 'out' = op === 'read' \? 'in' : 'out';/);
   assert.match(life, /window\.cth\.onHiveHookEvent\(onHook\)/);
   // A done burst only for a task that newly reached Done, never on first load.
-  assert.match(life, /if \(!before \|\| live\.current\.paused\) return;/);
+  assert.match(life, /if \(!before \|\| Date\.now\(\) - openedAt\.current < 6000 \|\| live\.current\.paused\) return;/);
   assert.match(life, /if \(\/\^Bash\$\|\^BashOutput\$\/\.test\(tool\)\) return 'terminal';/);
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
-  assert.match(stage, /flowing=\{!!life\.postActive\[m\.id\]\}/);
+  // No standing wires: a mailbox wire only while mail moves, Michael's wire only as work starts.
+  assert.match(stage, /if \(!seat \|\| !life\.postActive\[m\.id\]\) return null;/);
+  assert.match(stage, /plan\.pods\.map\(\(pod\) => kickoff\[pod\.members\[0\]\.id\] \? \(/);
+  assert.doesNotMatch(stage, /dash="5 5"/, 'no standing red line from a broken mailbox');
   assert.match(stage, /busy=\{godBusy\} ringing=\{life\.clockRinging\}/);
   // Reduced motion: the ambient loops stop.
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-scroll, \.cth-st-steam, \.cth-st-sway, \.cth-st-dot, \.cth-st-write, \.cth-st-bob, \.cth-st-flow, \.cth-st-doing \{ animation: none !important; \}/);

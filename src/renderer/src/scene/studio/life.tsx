@@ -247,7 +247,7 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
         const path = dir === 'in' ? ptsIn : [...ptsIn].reverse();
         const id = ps[i].id;
         setPostActive((prev) => ({ ...prev, [id]: dir }));
-        later(FLIGHT_MS + 400, () => setPostActive((prev) => { const n = { ...prev }; delete n[id]; return n; }));
+        later(3200, () => setPostActive((prev) => { const n = { ...prev }; delete n[id]; return n; }));
         launch([{ key: `e${seqRef.current++}`, d: dpath(path), start: path[0], end: path[path.length - 1], kind: 'mail', color: live.current.accentOf(agentId), ping: true }]);
         return;
       }
@@ -271,7 +271,8 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
   useEffect(() => {
     const before = seen.current;
     seen.current = done;
-    if (!before || live.current.paused) return;
+    // The first polls after the office opens report work that was already done.
+    if (!before || Date.now() - openedAt.current < 6000 || live.current.paused) return;
     for (const [id, owner] of Object.entries(done)) {
       if (id in before || !owner) continue;
       const at = deskTop(owner) ?? (owner === live.current.godId || owner === 'god' ? P(0, -0.2, 110) : null);
