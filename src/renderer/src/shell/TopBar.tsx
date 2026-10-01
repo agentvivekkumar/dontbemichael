@@ -223,6 +223,13 @@ export function NeedsYouButton() {
   const { t } = useTranslation();
   const count = useNeedsYouCount();
   const open = () => useStore.getState().setNeedsYouOpen(true);
+  // Michael's paper plane lands here (scene/studio/life.tsx): the button bumps.
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    const on = () => setBump((n) => n + 1);
+    window.addEventListener('cth:needs-you-ping', on);
+    return () => window.removeEventListener('cth:needs-you-ping', on);
+  }, []);
 
   if (count === 0) {
     return (
@@ -235,7 +242,8 @@ export function NeedsYouButton() {
   }
   return (
     <button
-      className="cth-titlebar-nodrag"
+      key={bump}
+      className={bump ? 'cth-titlebar-nodrag cth-needs-bump' : 'cth-titlebar-nodrag'}
       onClick={open}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 6px 0 14px',

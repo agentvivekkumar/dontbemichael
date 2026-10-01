@@ -188,7 +188,8 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
 
   // Motion from real events: messages, scheduled runs, mail, tools, done tasks.
   const life = useStudioLife({
-    seatOf, godId, paused, T, done: snap.done,
+    seatOf, godId, paused, T, done: snap.done, toYou,
+    team: agents.filter((a) => !a.isGod).map((a) => ({ id: a.id, name: a.name })),
     posts: mailboxes.map((m) => ({ id: m.id, ownerId: ownerOf(m.id)?.id })),
     accentOf: (id) => {
       const a = agents.find((x) => x.id === id);
@@ -196,6 +197,9 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     }
   });
   const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
+  const closing = useClosingLights();
+  const hour = useHour();
+  const night = hour >= 19 || hour < 6;
 
   const selected = needsYouOpen ? null : selectedId;
   const select = (id: string) => useStore.getState().select(id);
@@ -288,13 +292,32 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
                 c={families[pod.dept]} famKey={pod.dept}
                 selected={pod.members.some((a) => a.id === selected)}
                 T={T} dark={dark}
+                arriving={pod.members.some((a) => life.arriving.has(a.id))}
+                lightsOut={!!closing && pod.members.every((a) => closing.out.has(a.id))}
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} /> }
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}
       </svg>
+
+      {/* The light of the day (DESIGN.md 8.12): morning sun from the left, a
+          golden evening, a darker night where working desks keep their lamps on. */}
+      <DayLight hour={hour} dark={dark} />
+      {night && (
+        <svg aria-hidden="true" viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width={STAGE_W * k} height={STAGE_H * k}
+          style={{ position: 'absolute', left: ox, top: oy, overflow: 'visible', pointerEvents: 'none', mixBlendMode: 'screen' }}>
+          <defs>
+            <radialGradient id="st-lamp"><stop offset="0" stopColor="#FFD38A" stopOpacity={0.55} /><stop offset="1" stopColor="#FFD38A" stopOpacity={0} /></radialGradient>
+          </defs>
+          {plan.pods.filter((pod) => pod.members.some((a) => ACTIVE.has(a.status)) && !(closing && pod.members.every((a) => closing.out.has(a.id)))).map((pod) => {
+            const [x, y] = P(pod.grid[0], pod.grid[1], 30);
+            return <ellipse key={pod.members[0].id} cx={x} cy={y} rx={95} ry={60} fill="url(#st-lamp)" className="cth-st-breathe" />;
+          })}
+          {godBusy && !closing?.all && (() => { const [x, y] = P(0, -0.2, 40); return <ellipse cx={x} cy={y} rx={110} ry={70} fill="url(#st-lamp)" />; })()}
+        </svg>
+      )}
 
       {/* Stems from each card to its pod. */}
       <svg aria-hidden="true" width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -380,9 +403,11 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
 
       {/* A scheduled job's name, as it starts. */}
       {life.bubbles.map((b) => (
-        <div key={b.key} className="cth-st-sched" style={{ ...at(b.at[0], b.at[1]), transform: 'translateX(-50%)' }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-          {b.text}
+        <div key={b.key} className={b.tone === 'welcome' ? 'cth-st-sched cth-st-welcome' : 'cth-st-sched'} style={{ ...at(b.at[0], b.at[1]), transform: 'translateX(-50%)' }}>
+          {b.tone === 'welcome'
+            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8 5.8 1.9-5.8 1.9L12 18l-1.9-5.4L4.3 10.7l5.8-1.9z" /></svg>
+            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>}
+          {b.tone === 'welcome' ? t('studio.welcome', { name: b.text }) : b.text}
         </div>
       ))}
 
@@ -670,6 +695,45 @@ function CompactGrid({ plan, families, snap, selected, onSelect, missions, godId
       ))}
     </div>
   );
+}
+
+/* ── Closing time and daylight (DESIGN.md 8.12) ───────────────────────────── */
+
+/** Closing time, as the stage sees it: who has gone home (confirmed or
+ *  excused), and whether the whole office is closed. Null when not closing. */
+function useClosingLights(): { out: Set<string>; all: boolean } | null {
+  const [state, setState] = useState<{ out: Set<string>; all: boolean } | null>(null);
+  useEffect(() => window.cth.onClosingTime((ev) => {
+    const e = ev as { phase: string; confirmed?: string[]; excused?: string[] };
+    if (e.phase === 'cancelled' || e.phase === 'error') { setState(null); return; }
+    setState({ out: new Set([...(e.confirmed ?? []), ...(e.excused ?? [])]), all: e.phase === 'complete' });
+  }), []);
+  return state;
+}
+
+/** The local hour, checked every minute (a demo can set it with an event). */
+function useHour(): number {
+  const [h, setH] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const id = window.setInterval(() => setH(new Date().getHours()), 60_000);
+    const onDemo = (ev: Event) => setH((ev as CustomEvent<number>).detail);
+    window.addEventListener('cth:demo-hour', onDemo);
+    return () => { window.clearInterval(id); window.removeEventListener('cth:demo-hour', onDemo); };
+  }, []);
+  return h;
+}
+
+function DayLight({ hour, dark }: { hour: number; dark: boolean }) {
+  const k = dark ? 0.6 : 1;
+  const bg = hour >= 6 && hour < 10
+    ? `linear-gradient(115deg, rgba(255,196,140,${0.26 * k}) 0%, rgba(255,214,170,${0.1 * k}) 35%, transparent 65%)`
+    : hour >= 16 && hour < 19
+      ? `linear-gradient(295deg, rgba(255,150,70,${0.3 * k}) 0%, rgba(255,120,90,${0.12 * k}) 40%, rgba(110,80,200,${0.08 * k}) 100%)`
+      : hour >= 19 || hour < 6
+        ? `radial-gradient(1100px 700px at 50% 45%, rgba(60,48,130,${0.16 * k}) 0%, rgba(40,32,96,${0.34 * k}) 100%)`
+        : '';
+  if (!bg) return null;
+  return <div aria-hidden="true" className="cth-st-daylight" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: bg, mixBlendMode: 'multiply' }} />;
 }
 
 /* ── Idle quote (DESIGN.md 8.8) ───────────────────────────────────────────── */

@@ -12,6 +12,13 @@
  * - Any other tool call pops a small glyph over the desk (web, terminal, file,
  *   search, books).
  * - A task that reaches Done bursts a check over its owner's pod.
+ * - Michael points: a beam of light toward the pod he hands work to.
+ * - A question for the owner leaves Michael's office as a paper plane and
+ *   lands on the Needs you button, which bumps.
+ * - Two people messaging back and forth get a conversation arc between their
+ *   pods, with a count, until they go quiet for a minute.
+ * - Something the owner sends Michael comes up from the composer below.
+ * - A new hire's pod drops in with confetti and a welcome.
  *
  * Nothing here is invented: every effect starts from a hive message, a hook
  * event or the task ledger. Effects stop while the stage is paused, and with
@@ -30,11 +37,13 @@ const FLIGHT_MS = 2200;
 
 export type SeatMap = Map<string, { pod: PodPlan<Agent>; index: number }>;
 
-type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail';
+type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail' | 'owner';
 interface Flight { key: string; d: string; start: Pt; end: Pt; kind: FlightKind; color?: string; ping: boolean }
 interface Pop { key: string; at: Pt; glyph: Glyph; color: string }
 interface Burst { key: string; at: Pt }
-interface Bubble { key: string; at: Pt; text: string }
+interface Bubble { key: string; at: Pt; text: string; tone: 'sched' | 'welcome' }
+interface Beam { key: string; to: Pt }
+interface Conversation { a: string; b: string; from: Pt; to: Pt; count: number; last: number; ab: boolean; ba: boolean }
 type Glyph = 'web' | 'terminal' | 'file' | 'search' | 'books' | 'spark';
 
 export interface LifeInput {
@@ -48,6 +57,10 @@ export interface LifeInput {
   accentOf: (agentId: string) => string;
   /** Done task ids with their owner, from the task ledger poll. */
   done: Record<string, string | undefined>;
+  /** How many things wait on the owner (Needs you). */
+  toYou: number;
+  /** Every team member's id and name, to notice a new hire. */
+  team: { id: string; name: string }[];
 }
 
 export interface Life {
@@ -58,7 +71,12 @@ export interface Life {
   clockRinging: boolean;
   /** Mailboxes in use right now: an envelope coming in or going out. */
   postActive: Record<string, 'in' | 'out'>;
+  /** New hires whose pod is dropping in right now. */
+  arriving: Set<string>;
 }
+
+/** Where the Brief Michael composer sits, below the stage. */
+const COMPOSER: Pt = [530, 800];
 
 /** Curve every delegation path a little, away from the platform's center line. */
 export function bendFor([gx, gy]: Pt): number {
@@ -89,13 +107,19 @@ export function toolGlyph(tool: string): Glyph | null {
   return 'spark';
 }
 
-export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done }: LifeInput): Life {
+export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done, toYou, team }: LifeInput): Life {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [pops, setPops] = useState<Pop[]>([]);
   const [bursts, setBursts] = useState<Burst[]>([]);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [clockRinging, setClockRinging] = useState(false);
   const [postActive, setPostActive] = useState<Record<string, 'in' | 'out'>>({});
+  const [beams, setBeams] = useState<Beam[]>([]);
+  const [convs, setConvs] = useState<Record<string, Conversation>>({});
+  const [arriving, setArriving] = useState<Set<string>>(new Set());
+  const [confetti, setConfetti] = useState<Burst[]>([]);
+  const lastPlane = useRef(0);
+  const openedAt = useRef(Date.now());
 
   // Read the latest inputs from inside long-lived listeners.
   const live = useRef({ seatOf, godId, paused, posts, accentOf });
@@ -116,6 +140,11 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done 
 
   const launch = (add: Flight[]) => {
     if (!add.length) return;
+    // A paper plane lands on the Needs you button, which bumps to catch it.
+    if (add.some((f) => f.kind === 'you')) {
+      lastPlane.current = Date.now();
+      later(reduced() ? 0 : FLIGHT_MS, () => window.dispatchEvent(new Event('cth:needs-you-ping')));
+    }
     setFlights((prev) => [...prev, ...add].slice(-MAX_TOKENS));
     later(reduced() ? 1000 : FLIGHT_MS + 900, () => setFlights((prev) => prev.filter((f) => !add.includes(f))));
   };
@@ -137,12 +166,38 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done 
         setClockRinging(true);
         later(1700, () => setClockRinging(false));
       }
+      const fromOwner = e.from === 'human';
       const from = scheduled ? 'hub' : node(e.from);
       const targets = e.needsHuman ? ['human'] : (e.targets?.length ? e.targets : [e.to]);
       const add: Flight[] = [];
+      const pointing = !scheduled && from === 'hub' && e.act === 'request';
       for (const to of targets) {
         const dest = node(to);
         if (!from || !dest) continue;
+        // The owner's message rises from the composer under the stage.
+        if (fromOwner && dest !== 'you') {
+          const [ex, ey] = dest === 'hub' ? HUB_TOP : P(dest[0], dest[1], 70);
+          const d = `M${COMPOSER[0]},${COMPOSER[1]} C${COMPOSER[0]},${COMPOSER[1] - 160} ${ex},${ey + 140} ${ex},${ey}`;
+          add.push({ key: `m${seqRef.current++}`, d, start: COMPOSER, end: floorAt(dest), kind: 'owner', ping: true });
+          continue;
+        }
+        if (pointing && dest !== 'hub' && dest !== 'you') {
+          const beam: Beam = { key: `l${seqRef.current++}`, to: dest };
+          setBeams((prev) => [...prev, beam]);
+          later(1300, () => setBeams((prev) => prev.filter((x) => x !== beam)));
+        }
+        // Back and forth between two people (or a person and Michael) is a conversation.
+        if (!scheduled && !fromOwner && dest !== 'you' && e.from !== to) {
+          const [a, b] = [e.from, to].sort();
+          const k = `${a}|${b}`;
+          const fwd = e.from === a;
+          const at = (n: Pt | 'hub'): Pt => (n === 'hub' ? HUB : n);
+          const [pa, pb] = fwd ? [at(from as Pt | 'hub'), at(dest)] : [at(dest), at(from as Pt | 'hub')];
+          setConvs((prev) => {
+            const c = prev[k] ?? { a, b, from: pa, to: pb, count: 0, last: 0, ab: false, ba: false };
+            return { ...prev, [k]: { ...c, count: c.count + 1, last: Date.now(), ab: c.ab || fwd, ba: c.ba || !fwd } };
+          });
+        }
         const kind: FlightKind = scheduled ? 'clock'
           : e.needsHuman || dest === 'you' ? 'you'
           : e.act === 'query' ? 'question' : e.act === 'done' || e.act === 'agree' ? 'done'
@@ -154,13 +209,13 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done 
         if (scheduled && e.subject && dest !== 'you') {
           // On the floor just in front of the pod (or Michael's glass office).
           const at = dest === 'hub' ? P(1.15, 1.15, 0) : P(dest[0] + 0.75, dest[1] + 0.75, 0);
-          const b: Bubble = { key: `b${seqRef.current++}`, at, text: e.subject };
+          const b: Bubble = { key: `b${seqRef.current++}`, at, text: e.subject, tone: 'sched' };
           later(scheduled ? 650 : 0, () => setBubbles((prev) => [...prev, b]));
           later(5200, () => setBubbles((prev) => prev.filter((x) => x !== b)));
         }
       }
-      // The clock rings first, then the job leaves Michael's office.
-      if (scheduled) later(450, () => launch(add)); else launch(add);
+      // The clock rings (or Michael points) first, then the work leaves his office.
+      if (scheduled) later(450, () => launch(add)); else if (pointing) later(380, () => launch(add)); else launch(add);
     };
     const off = window.cth.onHiveMessage(fly);
     // Demo mode has no real hive, so the mock loop sends its own handoffs.
@@ -228,15 +283,72 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
+  // A conversation fades a minute after its last message.
+  useEffect(() => {
+    const id = window.setInterval(() => setConvs((prev) => {
+      const now = Date.now();
+      const next = Object.fromEntries(Object.entries(prev).filter(([, c]) => now - c.last < 60_000));
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    }), 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // A new Needs you item without a message in flight: Michael still sends a plane.
+  const lastToYou = useRef<number | null>(null);
+  useEffect(() => {
+    const before = lastToYou.current;
+    lastToYou.current = toYou;
+    // The first counts after the office opens are what was already waiting.
+    if (before === null || Date.now() - openedAt.current < 6000 || toYou <= before || live.current.paused) return;
+    if (Date.now() - lastPlane.current < 4000) return;
+    const d = flightPath('hub', 'you');
+    if (d) launch([{ key: `y${seqRef.current++}`, d, start: floorAt('hub'), end: EXIT, kind: 'you', ping: false }]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toYou]);
+
+  // A new hire (not someone already on the team when the office opened).
+  const known = useRef<Set<string> | null>(null);
+  const teamKey = team.map((m) => m.id).join(',');
+  useEffect(() => {
+    if (!known.current || Date.now() - openedAt.current < 4000) {
+      known.current = new Set([...(known.current ?? []), ...team.map((m) => m.id)]);
+      return;
+    }
+    for (const m of team) {
+      if (known.current.has(m.id)) continue;
+      known.current.add(m.id);
+      if (live.current.paused) continue;
+      const id = m.id;
+      setArriving((prev) => new Set(prev).add(id));
+      later(2600, () => setArriving((prev) => { const n = new Set(prev); n.delete(id); return n; }));
+      // Wait a frame for the pod to be planned, then celebrate over it.
+      later(450, () => {
+        const seat = live.current.seatOf.get(id);
+        if (!seat) return;
+        const [gx, gy] = seat.pod.grid;
+        const c: Burst = { key: `c${seqRef.current++}`, at: P(gx, gy, 80) };
+        setConfetti((prev) => [...prev, c]);
+        later(1800, () => setConfetti((prev) => prev.filter((x) => x !== c)));
+        const b: Bubble = { key: `w${seqRef.current++}`, at: P(gx + 0.75, gy + 0.75, 0), text: m.name, tone: 'welcome' };
+        setBubbles((prev) => [...prev, b]);
+        later(5200, () => setBubbles((prev) => prev.filter((x) => x !== b)));
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamKey]);
+
   const still = reduced();
   const svg = (
     <>
+      {Object.entries(convs).filter(([, c]) => c.ab && c.ba).map(([k, c]) => <ConversationArc key={k} c={c} T={T} />)}
+      {!still && beams.map((b) => <PointBeam key={b.key} to={b.to} T={T} />)}
       {flights.map((f) => <Token key={f.key} f={f} T={T} still={still} />)}
+      {!still && confetti.map((c) => <Confetti key={c.key} at={c.at} T={T} />)}
       {pops.map((p) => <ToolPop key={p.key} p={p} T={T} />)}
       {bursts.map((b) => <DoneBurst key={b.key} at={b.at} T={T} />)}
     </>
   );
-  return { svg, bubbles, clockRinging, postActive };
+  return { svg, bubbles, clockRinging, postActive, arriving };
 }
 
 /* ── Drawing ──────────────────────────────────────────────────────────────── */
@@ -251,6 +363,7 @@ function colorOf(kind: FlightKind, T: SceneTokens, own?: string): string {
     case 'inform': return '#9C98B8';
     case 'refuse': return '#4A4660';
     case 'mail': return own ?? T.req;
+    case 'owner': return T.indigo;
     default: return T.req;
   }
 }
@@ -289,10 +402,17 @@ function TokenHead({ kind, color, T }: { kind: FlightKind; color: string; T: Sce
   return (
     <g>
       <circle r={14} fill={color} opacity={0.16} />
-      {kind === 'question' || kind === 'you' ? (
+      {kind === 'you' ? (
+        // A paper plane: Michael folded the question and threw it to you.
+        <g transform="rotate(-18)">
+          <path d="M-11,1 L11,-7 L3,9 L0,3 Z" fill="#FFFFFF" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+          <path d="M11,-7 L0,3" fill="none" stroke={color} strokeWidth={1.2} />
+          <path d="M0,3 L-2,8 L3,9" fill={color} opacity={0.35} />
+        </g>
+      ) : kind === 'question' ? (
         <>
           <circle r={9} fill={color} />
-          <text y={4} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={11} fill="#fff">{kind === 'you' ? '!' : '?'}</text>
+          <text y={4} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={11} fill="#fff">?</text>
         </>
       ) : kind === 'done' ? (
         <>
@@ -347,6 +467,54 @@ function DoneBurst({ at, T }: { at: Pt; T: SceneTokens }) {
         <circle r={11} fill={T.green} />
         <path d="M-4.5,0 l3,3 l6,-6" fill="none" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
       </g>
+    </g>
+  );
+}
+
+/** Michael pointing: a soft wedge of light from his office to a pod's floor. */
+function PointBeam({ to, T }: { to: Pt; T: SceneTokens }) {
+  const [sx, sy] = P(0, -0.2, 70);
+  const [tx, ty] = P(to[0], to[1], 2);
+  return (
+    <g className="cth-st-beam" style={{ pointerEvents: 'none' }}>
+      <path d={`M${sx - 4},${sy} L${tx - 46},${ty} A46,23 0 0 0 ${tx + 46},${ty} L${sx + 4},${sy} Z`} fill={T.req} opacity={0.2} />
+      <ellipse cx={tx} cy={ty} rx={50} ry={25} fill={T.req} opacity={0.28} />
+      <ellipse cx={tx} cy={ty} rx={50} ry={25} fill="none" stroke={T.req} strokeOpacity={0.6} strokeWidth={1.5} />
+    </g>
+  );
+}
+
+/** Two people talking it through: an arc over the floor with a count. */
+function ConversationArc({ c, T }: { c: Conversation; T: SceneTokens }) {
+  const arc = hopPts(c.from, c.to, 40, 40, 36);
+  const mid = arc[Math.floor(arc.length / 2)];
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <path d={dpath(arc)} fill="none" stroke={T.violet} strokeOpacity={0.55} strokeWidth={2} strokeDasharray="5 6" strokeLinecap="round" className="cth-st-flow" />
+      <g transform={`translate(${mid[0]},${mid[1]})`}>
+        <g className="cth-st-pop">
+        <path d="M-15,-11 h30 a5,5 0 0 1 5,5 v10 a5,5 0 0 1 -5,5 h-18 l-6,6 v-6 h-6 a5,5 0 0 1 -5,-5 v-10 a5,5 0 0 1 5,-5 z" fill={T.tokBg} stroke={T.violet} strokeWidth={1.5} />
+        <text y={3.8} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontWeight={600} fontSize={10.5} fill={T.violet}>{c.count}</text>
+        </g>
+      </g>
+    </g>
+  );
+}
+
+/** A welcome: bits of the five department colors thrown up over a new pod. */
+function Confetti({ at, T }: { at: Pt; T: SceneTokens }) {
+  const colors = [T.coral, T.amber, T.green, T.blue, T.violet];
+  return (
+    <g transform={`translate(${at[0]},${at[1]})`} style={{ pointerEvents: 'none' }}>
+      {Array.from({ length: 18 }, (_, i) => {
+        const ang = (i / 18) * Math.PI * 2;
+        const dist = 26 + (i % 3) * 12;
+        return (
+          <rect key={i} x={-2.5} y={-1.5} width={5} height={3} rx={1} fill={colors[i % colors.length]}
+            className="cth-st-confetti"
+            style={{ '--cx': `${Math.cos(ang) * dist}px`, '--cy': `${Math.sin(ang) * dist * 0.7 - 18}px`, '--cr': `${(i * 47) % 360}deg`, animationDelay: `${(i % 4) * 40}ms` } as CSSProperties} />
+        );
+      })}
     </g>
   );
 }

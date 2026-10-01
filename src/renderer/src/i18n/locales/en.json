@@ -1920,7 +1920,8 @@
       "it": "IT",
       "operations": "Operations",
       "team": "Team"
-    }
+    },
+    "welcome": "Welcome, {{name}}"
   },
   "panel": {
     "edit": "Edit",

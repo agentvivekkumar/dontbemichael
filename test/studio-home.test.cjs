@@ -151,3 +151,24 @@ test('a quiet pod is a chip; its card shows while someone works, it is selected,
   // No stem to a card that is not showing.
   assert.match(src, /if \(!awake\(pod\) && peek !== podKey\(pod\)\) return null;/);
 });
+
+test('more life: plane to Needs you, pointing, conversations, owner messages, hires, closing lights, daylight (owner, 2026-09-30)', () => {
+  const life = read('src/renderer/src/scene/studio/life.tsx');
+  assert.match(life, /window\.dispatchEvent\(new Event\('cth:needs-you-ping'\)\)/);
+  assert.match(read('src/renderer/src/shell/TopBar.tsx'), /window\.addEventListener\('cth:needs-you-ping', on\)/);
+  assert.match(life, /const pointing = !scheduled && from === 'hub' && e\.act === 'request';/);
+  assert.match(life, /filter\(\(\[, c\]\) => c\.ab && c\.ba\)/, 'an arc only for a real back and forth');
+  assert.match(life, /now - c\.last < 60_000/);
+  assert.match(life, /const fromOwner = e\.from === 'human';/);
+  // Hires and Needs you planes ignore what was already there when the office opened.
+  assert.match(life, /Date\.now\(\) - openedAt\.current < 6000/);
+  assert.match(life, /Date\.now\(\) - openedAt\.current < 4000/);
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(stage, /window\.cth\.onClosingTime\(/);
+  assert.match(stage, /if \(e\.phase === 'cancelled' \|\| e\.phase === 'error'\) \{ setState\(null\); return; \}/);
+  assert.match(stage, /lightsOut=\{!!closing && pod\.members\.every\(\(a\) => closing\.out\.has\(a\.id\)\)\}/);
+  assert.match(stage, /const night = hour >= 19 \|\| hour < 6;/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    assert.match(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).studio.welcome, /\{\{name\}\}/, loc);
+  }
+});

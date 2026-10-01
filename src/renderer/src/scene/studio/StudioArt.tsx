@@ -207,8 +207,12 @@ export function deskSpots(n: number): { dx: number; dy: number; sc: number }[] {
   return [...back, ...front];
 }
 
-export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark }: {
+export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark, arriving = false, lightsOut = false }: {
   grid: Pt; desks: PodDesk[]; c: Family; famKey: string; selected: boolean; T: SceneTokens; dark: boolean;
+  /** A new hire's pod, dropping into place. */
+  arriving?: boolean;
+  /** Everyone here confirmed at closing time: the lights are off. */
+  lightsOut?: boolean;
 }) {
   const n = desks.length;
   const hw = n === 1 ? 0.65 : 1.0;
@@ -217,7 +221,7 @@ export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark }: {
   const allIdle = desks.every((d) => d.st === 'idle');
   const needs = desks.some((d) => d.st === 'needs');
   return (
-    <g className={allIdle ? 'cth-st-idle' : undefined}>
+    <g className={[allIdle ? 'cth-st-idle' : '', arriving ? 'cth-st-arrive' : '', lightsOut ? 'cth-st-lightsout' : ''].filter(Boolean).join(' ') || undefined}>
       <Box gx={gx - hw} gy={gy - hd} w={2 * hw} d={2 * hd} h={6} z0={0} top={c.l} left={c.m} right={c.d} T={T} />
       <polygon points={pts([P(gx - hw + 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy + hd - 0.1, 6), P(gx - hw + 0.1, gy + hd - 0.1, 6)])}
         fill="none" stroke={T.inset} strokeOpacity={T.insetOp} strokeWidth={1} />
@@ -258,12 +262,14 @@ function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── Michael's glass pod ──────────────────────────────────────────────────── */
 
-export function Hub({ T, dark, board, busy = false, ringing = false }: {
+export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut = false }: {
   T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number };
   /** Michael is at work: his screens scroll, the marker writes on the board. */
   busy?: boolean;
   /** A scheduled job just started: the wall clock rings. */
   ringing?: boolean;
+  /** Closing time is done: Michael's office goes dark last. */
+  lightsOut?: boolean;
 }) {
   const a = 1.05;
   const ph = 14;
@@ -278,7 +284,7 @@ export function Hub({ T, dark, board, busy = false, ringing = false }: {
   const [mx, my] = P(0, -0.2, 96);
   const beam = [P(-0.15, -0.2, ph + 50), P(0.15, -0.2, ph + 50)];
   return (
-    <g>
+    <g className={lightsOut ? 'cth-st-lightsout' : undefined}>
       <EllipseAt gx={0} gy={0} z={0} r={2.2} fill="url(#st-glow-hub)" />
       <Box gx={-a - 0.12} gy={-a - 0.12} w={2 * a + 0.24} d={2 * a + 0.24} h={5} z0={0} top={T.hbBase[0]} left={T.hbBase[1]} right={T.hbBase[2]} T={T} />
       <Box gx={-a} gy={-a} w={2 * a} d={2 * a} h={ph - 5} z0={5} top={T.hbFloor[0]} left={T.hbFloor[1]} right={T.hbFloor[2]} T={T} />

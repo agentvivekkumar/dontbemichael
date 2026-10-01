@@ -1920,7 +1920,8 @@
       "it": "IT",
       "operations": "运营",
       "team": "团队"
-    }
+    },
+    "welcome": "欢迎，{{name}}"
   },
   "panel": {
     "edit": "编辑",
