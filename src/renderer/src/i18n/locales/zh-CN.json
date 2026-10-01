@@ -96,7 +96,7 @@
   "askMe": {
     "emptyTitle": "现在没有需要你的事。🌿",
     "emptySub": "当团队把任务卡在你的输入上（要回答的问题，或只有你能完成的待办），就会出现在这里（也会出现在楼层的「问我」看板上）。",
-    "openDetail": "打开完整任务详情",
+    "openDetail": "这个问题的完整背景，以及之前的回答",
     "answerPlaceholder": "你的回答，或者如果你已处理，写“完成”",
     "sending": "正在发送…",
     "respond": "回复",
@@ -118,7 +118,7 @@
     "scheduleWhy": "原因：{{reason}}",
     "scheduleMichael": "{{name}}：{{note}}",
     "draft": "草稿",
-    "openTask": "打开任务",
+    "openTask": "查看完整背景",
     "justNow": "刚刚"
   },
   "agentStrip": {

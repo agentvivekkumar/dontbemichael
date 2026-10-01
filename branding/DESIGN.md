@@ -535,7 +535,8 @@ ring and a soft two layer shadow so it stands on its own.
   `shadow-md`): the same header, then Michael's full question as markdown at 12.5 / 18 in
   `ink`; one row with the answer (one line, growing to three; placeholder "Your answer, or
   done if you handled it") and a primary "Reply"; "Holding up N tasks" folded under it; and
-  a footer with "Open task" and "N earlier answers". Cmd or Ctrl+Enter sends; Enter
+  a footer with "See full context" (the ask's full background and history; owner,
+  2026-10-01: it is context, not a task) and "N earlier answers". Cmd or Ctrl+Enter sends; Enter
   respects IME composition.
 - Optional secondary actions Michael attached
   (for a broken mailbox: "Open Mailboxes").

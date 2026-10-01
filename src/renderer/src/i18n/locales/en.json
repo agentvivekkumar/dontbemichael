@@ -96,7 +96,7 @@
   "askMe": {
     "emptyTitle": "Nothing needs you right now. 🌿",
     "emptySub": "When the team blocks a task on your input (a question to answer, or something only you can do), it shows up here and on the ASK ME board on the floor.",
-    "openDetail": "open the full task detail",
+    "openDetail": "The full background to this ask, with earlier answers",
     "answerPlaceholder": "Your answer, or done if you handled it",
     "sending": "Sending…",
     "respond": "Reply",
@@ -118,7 +118,7 @@
     "scheduleWhy": "Why: {{reason}}",
     "scheduleMichael": "{{name}}: {{note}}",
     "draft": "Draft",
-    "openTask": "Open task",
+    "openTask": "See full context",
     "justNow": "just now"
   },
   "agentStrip": {
