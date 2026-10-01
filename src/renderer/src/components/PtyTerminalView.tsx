@@ -41,39 +41,39 @@ const zoomBtnStyle: CSSProperties = {
   padding: 0
 };
 
-// Light theme — cream paper. The ANSI "white" / "yellow" / bright slots are
+// Light theme: the v2 card (white). The ANSI "white" / "yellow" / bright slots are
 // remapped to readable dark inks: programs that print white or pale-yellow text
-// (expecting a dark terminal) were previously invisible on the cream background.
-// A single ANSI slot has to serve both roles — coloured *foreground* on cream and
+// (expecting a dark terminal) were previously invisible on a white background.
+// A single ANSI slot has to serve both roles — coloured *foreground* on white and
 // a coloured *background* under the dark default ink — which no fixed luminance
 // can satisfy at once. The terminal's `minimumContrastRatio` (see terminalPool.ts)
 // dynamically adjusts the per-cell foreground to keep both roles legible; these
 // values are tuned so the colours stay recognisable and read well natively. The
-// green/yellow are kept deep enough to read as text on cream (the brighter
+// green/yellow are kept deep enough to read as text on white (the brighter
 // variants are the lighter shades, per terminal convention).
 const lightTheme = {
-  background: '#FCFAF0',
-  foreground: '#1A1320',
-  cursor: '#D96A62',
-  cursorAccent: '#FCFAF0',
-  selectionBackground: '#FFEC99',
-  selectionForeground: '#1A1320',
-  black:        '#1A1320',
+  background: '#FFFFFF',       // = --cth-card
+  foreground: '#1E1B2E',       // = --cth-ink
+  cursor: '#6C5CE7',           // = --cth-indigo
+  cursorAccent: '#FFFFFF',
+  selectionBackground: '#EEEBFD',
+  selectionForeground: '#1E1B2E',
+  black:        '#1E1B2E',
   red:          '#D1453B',
-  green:        '#20904B',    // deep green → readable as text on cream
-  yellow:       '#9C6B00',    // deep amber → readable as text on cream
+  green:        '#20904B',    // deep green → readable as text on white
+  yellow:       '#9C6B00',    // deep amber → readable as text on white
   blue:         '#2B6CB0',
   magenta:      '#8A5CF0',
   cyan:         '#1F9C94',
-  white:        '#3A2F44',   // default "white" text → dark, so it's visible
-  brightBlack:  '#6B5878',
+  white:        '#3D3A52',   // default "white" text → dark, so it's visible
+  brightBlack:  '#6C6884',
   brightRed:    '#E0584E',
   brightGreen:  '#2E9E54',
   brightYellow: '#B8860B',
   brightBlue:   '#3B7DC4',
   brightMagenta:'#9B72F2',
   brightCyan:   '#2BA89F',
-  brightWhite:  '#1A1320'
+  brightWhite:  '#1E1B2E'
 };
 
 // Dark theme — mirrors the app's dark surface ramp (tokens.css
@@ -85,21 +85,21 @@ const lightTheme = {
 // apart from the panel holding it. Muted-professional ANSI: recognizable hues, no
 // fluorescing on the dark ground; brights are one legible step up, not pastels.
 const darkTheme = {
-  background: '#1A1A1F',        // = --cth-paper-100
-  foreground: '#DEDBD6',        // = --cth-ink-900
-  cursor: '#E08C82',
-  cursorAccent: '#1A1A1F',
-  selectionBackground: '#37363F',
-  selectionForeground: '#DEDBD6',
-  black:        '#222229',
+  background: '#1F1E2B',        // = --cth-card (dark)
+  foreground: '#ECEAF4',        // = --cth-ink (dark)
+  cursor: '#9D90FF',            // = --cth-indigo (dark)
+  cursorAccent: '#1F1E2B',
+  selectionBackground: '#36334F',
+  selectionForeground: '#ECEAF4',
+  black:        '#24233A',
   red:          '#E08C82',
   green:        '#74C096',
   yellow:       '#CFAA57',
   blue:         '#6FB3C4',
   magenta:      '#A896E3',
   cyan:         '#6FB3C4',
-  white:        '#DEDBD6',
-  brightBlack:  '#96919F',
+  white:        '#ECEAF4',
+  brightBlack:  '#A5A2B8',
   brightRed:    '#EBA39C',
   brightGreen:  '#96CDA9',
   brightYellow: '#E5C87E',

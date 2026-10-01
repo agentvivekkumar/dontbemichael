@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL, SHOW_VOICE } from '@shared/buildFeatures';
 import { useTranslation } from 'react-i18next';
@@ -290,7 +290,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'var(--cth-cream-100)',
+      background: 'var(--cth-bg)',
       zIndex: 250,
       display: 'flex',
       flexDirection: 'column',
@@ -301,35 +301,27 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
         className="cth-titlebar-drag"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 36,
-          background: 'linear-gradient(180deg, var(--cth-cream-100) 0%, var(--cth-cream-200) 100%)',
-          borderBottom: '1px solid var(--cth-ink-300)',
+          background: 'var(--cth-bg)',
+          borderBottom: '1px solid var(--cth-line)',
           display: 'flex', alignItems: 'center',
           paddingLeft: 96, paddingRight: 12, gap: 12,
           userSelect: 'none'
         }}
       >
-        <span style={{
-          fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px',
-          color: 'var(--cth-ink-900)'
-        }}>DON&apos;T BE MICHAEL · FOCUS MODE</span>
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
+          Don&apos;t Be Michael <span style={{ fontWeight: 500, color: 'var(--cth-ink-3)' }}>· {t('shell.focus')}</span>
+        </span>
         {/* Same top-right controls as the main title bar — fullscreen covers
             it, so theme / exit-fullscreen / IDE must live here too. */}
-        <div className="cth-titlebar-nodrag" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="cth-titlebar-nodrag" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             onClick={toggleRoster}
             title={rosterCollapsed ? t('fullscreenTerminal.showAgentList') : t('fullscreenTerminal.hideAgentList')}
             aria-label={rosterCollapsed ? t('fullscreenTerminal.showAgentList') : t('fullscreenTerminal.hideAgentList')}
             aria-pressed={rosterCollapsed}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0,
-              // Pressed-in when collapsed, so the rail's absence reads as a state
-              // this button is holding rather than something that broke.
-              background: rosterCollapsed ? 'var(--cth-lemon)' : 'var(--cth-paper-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              border: 'none', borderRadius: 2, cursor: 'pointer',
-              color: rosterCollapsed ? 'var(--cth-ink-900)' : 'var(--cth-ink-900)'
-            }}
+            // Pressed in when collapsed, so the rail's absence reads as a state
+            // this button is holding rather than something that broke.
+            style={iconBtn(rosterCollapsed)}
           >
             <Icon name="sidebar" size={1} style={{ width: 16, height: 16 }} />
           </button>
@@ -344,16 +336,11 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
             }}
             title={appThemeNow === 'dark' ? t('fullscreenTerminal.lightTheme') : t('fullscreenTerminal.darkTheme')}
             aria-label={t('fullscreenTerminal.toggleTheme')}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0,
-              background: 'var(--cth-paper-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              border: 'none', borderRadius: 2, cursor: 'pointer',
-              color: 'var(--cth-ink-900)', fontSize: 13, lineHeight: 1
-            }}
+            style={iconBtn(false)}
           >
-            {appThemeNow === 'dark' ? '☀' : '☾'}
+            {appThemeNow === 'dark'
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>}
           </button>
           {/* Settings — the main title bar has it, so fullscreen must too:
               anything reachable in one mode and not the other is a trap. Uses
@@ -364,14 +351,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
             onClick={() => window.dispatchEvent(new CustomEvent('cth:open-settings'))}
             title="Settings"
             aria-label="Settings"
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0,
-              background: 'var(--cth-paper-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              border: 'none', borderRadius: 2, cursor: 'pointer',
-              color: 'var(--cth-ink-900)'
-            }}
+            style={iconBtn(false)}
           >
             <svg
               width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -386,14 +366,7 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
             onClick={() => setFullscreen(null)}
             title={t('fullscreenTerminal.exitFullscreen')}
             aria-label={t('fullscreenTerminal.exitFullscreen')}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0,
-              background: 'var(--cth-paper-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              border: 'none', borderRadius: 2, cursor: 'pointer',
-              color: 'var(--cth-ink-900)'
-            }}
+            style={iconBtn(false)}
           >
             <Icon name="minimize" size={1} style={{ width: 16, height: 16 }} />
           </button>
@@ -415,26 +388,26 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
         <aside style={{
           width: SIDEBAR_WIDTH, flexShrink: 0,
           display: 'flex', flexDirection: 'column',
-          background: 'var(--cth-cream-200)',
-          borderRight: '1px solid var(--cth-ink-300)'
+          background: 'var(--cth-card)',
+          borderRight: '1px solid var(--cth-line)'
         }}>
-          <div style={{ padding: 8, borderBottom: '1px solid var(--cth-ink-300)' }}>
+          <div style={{ padding: 10, borderBottom: '1px solid var(--cth-line)' }}>
             <button
               onClick={() => setAddAgentOpen(true)}
               title={t('fullscreenTerminal.addAgent')}
               style={{
-                width: '100%', height: 32,
-                background: 'var(--cth-cream-100)',
+                width: '100%', height: 32, borderRadius: 'var(--cth-r-md)',
+                background: 'var(--cth-card)',
                 border: 'none',
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
+                boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 fontFamily: 'var(--cth-font-ui)',
-                fontSize: 'clamp(14px, 0.7vw, 15px)',
-                color: 'var(--cth-ink-900)',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                fontSize: 13, fontWeight: 600,
+                color: 'var(--cth-ink)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 cursor: 'pointer'
               }}
             >
-              <Icon name="plus" /> {t('agentStrip.addAgent')}
+              <Icon name="plus" size={0.875} /> {t('agentStrip.addAgent')}
             </button>
           </div>
 
@@ -455,27 +428,21 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
             {groups.map(([repoKey, { label, members }]) => (
               // Repos are the roster's real structure, so they get real
               // separation — a hairline plus air above, not just a label.
-              <div key={repoKey} style={{ marginTop: 16, paddingTop: 10, borderTop: '1px solid var(--cth-ink-300)' }}>
+              <div key={repoKey} style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--cth-line)' }}>
                 <div
                   title={repoKey}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '0 10px 6px',
-                    fontFamily: 'var(--cth-font-display)',
-                    fontSize: scale.group, lineHeight: 1.5,
-                    color: 'var(--cth-ink-500)'
+                    padding: '0 12px 6px',
+                    fontSize: Math.max(11, scale.group), fontWeight: 600, lineHeight: 1.5,
+                    color: 'var(--cth-ink-3)'
                   }}
                 >
-                  {/* Native 16px, never a fraction of it: this is pixel art on
-                      a 16-unit grid, so squeezing it to match a 7px label
-                      merged the outline into mush. Dimmed instead of shrunk. */}
-                  <span style={{ flexShrink: 0, display: 'inline-flex', opacity: 0.7 }}>
-                    <Icon name="folder" size={scale.group >= 13 ? 2 : 1} />
-                  </span>
+                  <Icon name="folder" size={0.875} />
                   <span style={{
                     minWidth: 0,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                  }}>{label.toUpperCase()}</span>
+                  }}>{label}</span>
                 </div>
                 {members.map(a => (
                   <SidebarRow
@@ -497,20 +464,19 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
           {(restorableAgents.length > 0 || autoRestoring) && (
             <div style={{
               flexShrink: 0, padding: 8, display: 'flex', flexDirection: 'column', gap: 6,
-              borderTop: '1px solid var(--cth-ink-300)'
+              borderTop: '1px solid var(--cth-line)'
             }}>
               {autoRestoring && (
                 // Same banner as the floor strip: terminals that open by
                 // themselves need to say why.
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '4px 8px',
-                  fontFamily: 'var(--cth-font-ui)', fontSize: 11,
-                  color: 'var(--cth-ink-900)',
-                  background: 'var(--cth-status-working)',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                  padding: '6px 10px', borderRadius: 'var(--cth-r-md)',
+                  fontFamily: 'var(--cth-font-ui)', fontSize: 12,
+                  color: 'var(--cth-blue-text)',
+                  background: 'var(--cth-blue-soft)'
                 }}>
-                  <Icon name="play" /> restoring your team…
+                  <Icon name="play" size={0.875} /> {t('agentStrip.restoringTeam')}
                 </div>
               )}
               {!autoRestoring && restorableAgents.length > 0 && (
@@ -535,10 +501,10 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                       title={`${a.name}: restorable from last session`}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 2,
-                        height: 20, padding: '0 2px 0 6px',
-                        fontFamily: 'var(--cth-font-ui)', fontSize: 11,
-                        color: 'var(--cth-ink-700)', background: 'var(--cth-paper-100)',
-                        boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                        height: 22, padding: '0 4px 0 9px', borderRadius: 999,
+                        fontFamily: 'var(--cth-font-ui)', fontSize: 11.5,
+                        color: 'var(--cth-ink-2)', background: 'var(--cth-card-2)',
+                        boxShadow: 'inset 0 0 0 1px var(--cth-line)'
                       }}
                     >
                       {a.name}
@@ -550,10 +516,10 @@ export function FullscreenTerminal({ config }: FullscreenTerminalProps) {
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                           width: 14, height: 14, padding: 0, lineHeight: 1,
                           fontFamily: 'var(--cth-font-ui)', fontSize: 11,
-                          color: 'var(--cth-ink-500)', background: 'transparent',
+                          color: 'var(--cth-ink-3)', background: 'transparent',
                           border: 'none', cursor: 'pointer'
                         }}
-                      >✕</button>
+                      ><Icon name="x" size={0.75} /></button>
                     </span>
                   ))}
                 </div>
@@ -633,11 +599,11 @@ function shortModel(model?: string): string | null {
 
 /** Context fullness as a 3px rail. Colour tracks pressure rather than identity —
  *  an agent at 85% is about to compact, and that matters more than its accent. */
-function ContextBar({ tokens, limit, accent }: { tokens?: number; limit?: number; accent: string }) {
+function ContextBar({ tokens, limit }: { tokens?: number; limit?: number }) {
   const { t } = useTranslation();
   if (tokens === undefined || !limit) return null;
   const pct = Math.max(0, Math.min(100, Math.round((tokens / limit) * 100)));
-  const color = pct >= 85 ? 'var(--cth-coral)' : pct >= 65 ? 'var(--cth-lemon)' : `var(--cth-${accent})`;
+  const color = pct >= 85 ? 'var(--cth-coral)' : pct >= 65 ? 'var(--cth-amber)' : 'var(--cth-indigo)';
   const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
   return (
     <div
@@ -645,12 +611,12 @@ function ContextBar({ tokens, limit, accent }: { tokens?: number; limit?: number
       style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}
     >
       <span style={{
-        flex: 1, minWidth: 0, height: 3,
-        background: 'var(--cth-ink-100)', overflow: 'hidden'
+        flex: 1, minWidth: 0, height: 3, borderRadius: 2,
+        background: 'var(--cth-line)', overflow: 'hidden'
       }}>
         <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: color }} />
       </span>
-      <span style={{ flexShrink: 0, fontSize: 9, color: 'var(--cth-ink-500)' }}>{pct}%</span>
+      <span style={{ flexShrink: 0, fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-3)' }}>{pct}%</span>
     </div>
   );
 }
@@ -729,14 +695,14 @@ function SidebarRow({
         aria-current={active ? 'true' : undefined}
         style={{
           width: '100%',
-          padding: '6px 8px',
-          background: active ? 'var(--cth-cream-100)' : 'transparent',
+          padding: '8px 12px',
+          background: active ? 'var(--cth-indigo-soft)' : 'transparent',
           border: 'none',
           boxShadow: active
-            ? 'inset 3px 0 0 var(--cth-ink-900), inset 0 0 0 1px var(--cth-ink-100)'
+            ? 'inset 3px 0 0 var(--cth-indigo)'
             // Insertion cue on the hovered drop target.
             : drag.overId === agent.id && drag.dragId && drag.dragId !== agent.id
-            ? 'inset 0 2px 0 var(--cth-ink-900)'
+            ? 'inset 0 2px 0 var(--cth-indigo)'
             : 'none',
           opacity: drag.dragId === agent.id ? 0.4 : 1,
           display: 'flex', alignItems: 'flex-start', gap: 8,
@@ -744,21 +710,11 @@ function SidebarRow({
           position: 'relative',
           textAlign: 'left',
           fontFamily: 'var(--cth-font-ui)', fontSize: 13,
-          color: 'var(--cth-ink-900)',
+          color: 'var(--cth-ink)',
           transition: 'opacity 120ms ease'
         }}
       >
-        <div style={{
-          width: scale.portrait, height: Math.round(scale.portrait * 1.3), flexShrink: 0,
-          background: `var(--cth-${agent.accent}-light)`,
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-          // Anchor the sprite's TOP: the portrait is taller than this tile, and
-          // bottom-anchoring cropped the head — crop feet, not face (v0.3.4).
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-          overflow: 'hidden'
-        }}>
-          {/* The sprite is drawn at exactly the tile's width, so the figure
-              grows with the tile instead of floating in it. */}
+        <div style={{ flexShrink: 0, paddingTop: 1 }}>
           <SpritePortrait character={agent.character} scale={scale.portraitScale} />
         </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -766,9 +722,8 @@ function SidebarRow({
             <span style={{
               flex: 1, minWidth: 0,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              fontFamily: 'var(--cth-font-display)',
-              fontSize: scale.name, lineHeight: 1.5
-            }}>{agent.name.toUpperCase()}</span>
+              fontSize: Math.max(13, scale.name), fontWeight: 600, lineHeight: 1.4
+            }}>{agent.name}</span>
             {/* Your unsent text outranks the agent's own state here: an idle
                 agent with a draft on its prompt is not idle-and-free, it is
                 idle-and-held, and nothing else on screen said so. */}
@@ -785,14 +740,14 @@ function SidebarRow({
               title={agent.note ? t('agentCard.editNote') : t('agentCard.addNote')}
               aria-label={t('agentCard.editNoteAria', { name: agent.name })}
               style={{
-                flexShrink: 0, width: 20, height: 20,
+                flexShrink: 0, width: 22, height: 22, borderRadius: 'var(--cth-r-sm)',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, lineHeight: 1, color: 'var(--cth-ink-500)',
-                background: notePosition ? 'var(--cth-cream-200)' : 'var(--cth-paper-100)',
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                color: 'var(--cth-ink-3)',
+                background: notePosition ? 'var(--cth-amber-soft)' : 'transparent',
+                boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 cursor: 'pointer'
               }}
-            >✎</span>
+            ><Icon name="edit" size={0.75} /></span>
           </div>
           {/* WHAT this agent is, at a glance. The roster used to carry only a
               name, a portrait and a status dot — enough to tell rows apart, not
@@ -801,8 +756,8 @@ function SidebarRow({
               terminal is the whole screen and the sidebar is your only index. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
-            fontSize: Math.max(9, scale.name - 3), lineHeight: 1.4,
-            color: 'var(--cth-ink-500)'
+            fontSize: Math.max(11, scale.name - 2), lineHeight: 1.4,
+            color: 'var(--cth-ink-3)'
           }}>
             <span style={{
               flexShrink: 0, maxWidth: '52%',
@@ -818,7 +773,7 @@ function SidebarRow({
               {basename(agent.worktreePath || agent.cwd) || agent.project}
             </span>
           </div>
-          <ContextBar tokens={agent.contextTokens} limit={agent.contextLimit} accent={agent.accent} />
+          <ContextBar tokens={agent.contextTokens} limit={agent.contextLimit} />
           {/* Every line of every agent, always on screen — the roster's job is
               to answer "who is on what" without a single interaction. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -828,11 +783,11 @@ function SidebarRow({
                 title={line}
                 style={{
                   display: 'flex', gap: 5, alignItems: 'baseline',
-                  fontSize: scale.note, lineHeight: 1.35,
-                  color: 'var(--cth-ink-500)'
+                  fontSize: Math.max(11, scale.note), lineHeight: 1.35,
+                  color: 'var(--cth-ink-2)'
                 }}
               >
-                <span style={{ flexShrink: 0, color: 'var(--cth-ink-300)' }}>•</span>
+                <span style={{ flexShrink: 0, color: 'var(--cth-amber)' }}>•</span>
                 {/* Exactly one line per bullet — a wrapping row would make the
                     roster's height jump around as notes are typed. The full
                     text is on hover (title, and the editor beside it). */}
@@ -843,9 +798,9 @@ function SidebarRow({
             ))}
             {bullets.length === 0 && (
               <span style={{
-                fontSize: scale.note, lineHeight: 1.35,
-                color: 'var(--cth-ink-300)', fontStyle: 'italic'
-              }}>no note</span>
+                fontSize: Math.max(11, scale.note), lineHeight: 1.35,
+                color: 'var(--cth-ink-4)'
+              }}>No note</span>
             )}
           </div>
         </div>
@@ -866,19 +821,18 @@ function SidebarRow({
             top: notePosition.top,
             width: noteWidth,
             zIndex: 450,
-            padding: 8,
-            background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 0 6px 18px rgba(62,52,140,.08)',
-            boxSizing: 'border-box'
+            padding: 10, borderRadius: 'var(--cth-r-lg)',
+            background: 'var(--cth-card)',
+            boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)',
+            boxSizing: 'border-box', fontFamily: 'var(--cth-font-ui)'
           }}
         >
           <div style={{
             marginBottom: 6,
-            fontFamily: 'var(--cth-font-display)',
-            fontSize: noteLabelSize,
-            lineHeight: `${Math.round(noteLabelSize * 1.5)}px`,
-            color: 'var(--cth-ink-700)'
-          }}>PRIVATE NOTE</div>
+            fontSize: Math.max(11, noteLabelSize), fontWeight: 600,
+            lineHeight: `${Math.round(Math.max(11, noteLabelSize) * 1.5)}px`,
+            color: 'var(--cth-ink-2)'
+          }}>{t('panel.note')}</div>
           {/* A textarea, not an input: the note is a bullet list, so Enter has
               to make a new line rather than doing nothing. autoFocus is safe
               now that opening is an explicit click, not a pointer fly-by. */}
@@ -904,17 +858,16 @@ function SidebarRow({
               outline: 'none',
               resize: 'vertical',
               boxSizing: 'border-box',
-              background: 'var(--cth-cream-100)',
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-              fontFamily: 'var(--cth-font-mono)',
+              background: 'var(--cth-card)',
+              fontFamily: 'var(--cth-font-ui)',
               fontSize: noteFontSize,
               lineHeight: `${Math.round(noteFontSize * 1.6)}px`,
-              color: 'var(--cth-ink-900)'
+              color: 'var(--cth-ink)'
             }}
           />
           <div style={{
-            marginTop: 5, fontSize: 10, color: 'var(--cth-ink-500)'
-          }}>one line = one bullet · esc to close</div>
+            marginTop: 6, fontSize: 11, color: 'var(--cth-ink-3)'
+          }}>{t('agentStrip.oneLineOneBullet')}</div>
         </div>
         </>,
         document.body
@@ -961,14 +914,12 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '6px 10px',
-      background: 'var(--cth-cream-50)',
-      boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
+      padding: '8px 12px', borderRadius: 'var(--cth-r-lg)',
+      background: 'var(--cth-card)',
+      boxShadow: 'inset 0 0 0 1px var(--cth-line)'
     }}>
-      <span style={{
-        fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '16px',
-        color: 'var(--cth-ink-900)'
-      }}>{agent.name.toUpperCase()}</span>
+      <SpritePortrait character={agent.character} scale={1} />
+      <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>{agent.name}</span>
       {/* Edit belongs with the NAME, not with the action cluster on the right:
           it changes who this agent is, and the right-hand group is things you do
           with the agent. Icon-only because it sits inside the identity line —
@@ -987,14 +938,14 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
         </PixelButton>
       )}
       <span style={{
-        fontSize: 12, color: 'var(--cth-ink-500)',
+        fontFamily: 'var(--cth-font-mono)', fontSize: 11.5, color: 'var(--cth-ink-3)',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         maxWidth: 300
       }}>{agent.cwd}</span>
       <span style={{
-        fontSize: 12, color: 'var(--cth-ink-700)',
-        fontStyle: 'italic'
-      }}>“{agent.description}”</span>
+        fontSize: 12.5, color: 'var(--cth-ink-2)',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0
+      }}>{agent.description}</span>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
         {/* v0.3.4: the IDE opens from agent level — full Monaco editor + git
             diff over this agent's workspace. The id is passed EXPLICITLY:
@@ -1060,4 +1011,16 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
       </div>
     </div>
   );
+}
+
+/** A 32px icon button in the focus mode bar (DESIGN.md 7.2): card fill, line
+ *  ring; held (pressed) ones fill indigo soft. */
+function iconBtn(held: boolean): CSSProperties {
+  return {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32, padding: 0, border: 'none', cursor: 'pointer', borderRadius: 'var(--cth-r-md)',
+    background: held ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+    boxShadow: held ? 'inset 0 0 0 1px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)',
+    color: held ? 'var(--cth-indigo-text)' : 'var(--cth-ink-2)'
+  };
 }

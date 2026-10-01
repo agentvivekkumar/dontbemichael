@@ -132,7 +132,7 @@
     "restoringTitle": "上次会话的智能体正在以原始 ID 重新生成，以便记忆和收件箱重新挂载。",
     "restoreTitle": "上次会话：{{names}}",
     "restoringTeam": "正在恢复你的团队…",
-    "restoreTeam": "恢复团队（{{count}}）▴",
+    "restoreTeam": "恢复团队（{{count}}）",
     "previousSession": "上次会话",
     "restorable": "{{name}}：可从上次会话恢复",
     "dismiss": "忽略 {{name}}，从恢复列表中永久移除",

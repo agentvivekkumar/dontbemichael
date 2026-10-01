@@ -85,13 +85,13 @@
     "boss": "BOSS",
     "contextTitle": "Context: {{used}} / {{limit}} tokens ({{pct}}%)",
     "contextGaugeTitle": "Context gauge: fills once the agent reports activity",
-    "doingTasks": "actively working {{count}} task. Click to open.",
-    "doingTasksPlural": "actively working {{count}} tasks. Click to open.",
+    "doingTasks": "Actively working {{count}} task. Click to open.",
+    "doingTasksPlural": "Actively working {{count}} tasks. Click to open.",
     "editNote": "Edit private note",
     "addNote": "Add private note",
     "editNoteAria": "Edit note for {{name}}",
     "noteAria": "Note for {{name}}",
-    "nextRun": "next job: {{time}}"
+    "nextRun": "Next job: {{time}}"
   },
   "askMe": {
     "emptyTitle": "Nothing needs you right now. 🌿",
@@ -126,18 +126,18 @@
     "privateNote": "PRIVATE NOTE · {{name}}",
     "done": "Done",
     "closeNoteEditor": "Close note editor",
-    "notePlaceholder": "one line per bullet…",
-    "oneLineOneBullet": "one line = one bullet · esc to close",
-    "addAgent": "add agent",
+    "notePlaceholder": "One line per bullet…",
+    "oneLineOneBullet": "One line, one bullet. Esc to close.",
+    "addAgent": "Add agent",
     "restoringTitle": "Your previous session's agents are being respawned with their original ids, so memory and inboxes reattach.",
     "restoreTitle": "Previous session: {{names}}",
-    "restoringTeam": "restoring your team…",
-    "restoreTeam": "restore team ({{count}}) ▴",
-    "previousSession": "previous session",
+    "restoringTeam": "Restoring your team…",
+    "restoreTeam": "Restore team ({{count}})",
+    "previousSession": "Previous session",
     "restorable": "{{name}}: restorable from last session",
     "dismiss": "Dismiss {{name}} and remove them permanently from the restore list",
     "dismissAria": "Dismiss {{name}}",
-    "restoreAll": "restore all ({{count}})"
+    "restoreAll": "Restore all ({{count}})"
   },
   "sidebar": {
     "terminal": "Work",

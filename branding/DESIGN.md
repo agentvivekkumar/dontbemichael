@@ -915,7 +915,7 @@ Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
   it.
 - Sizes: 14 (inline in meta), 16 (buttons, rows), 18 (top bar), 20 (empty states).
 - Every icon only button has an `aria-label` and a tooltip.
-- The v1 pixel icon set (`components/Icon.tsx`) is retired (§17).
+- `components/Icon.tsx` draws these outline icons; the v1 pixel set is retired (§17, row 6).
 
 ---
 
@@ -1052,7 +1052,7 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 | 3 | App | Pixel primitives and pixel fonts | `PixelPanel`, `PixelButton`, `PixelBadge`, `fonts.css`, `tokens.css` | Done; Press Start 2P removed with the floor |
 | 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Done |
 | 5 | App | Ask me is a tab in Michael's panel | `AskMeTab`, `CommandCenterPanel` | Done |
-| 6 | App | Pixel icon set | `components/Icon.tsx` | Fix: §10 |
+| 6 | App | Pixel icon set | `components/Icon.tsx` | Done: outline icons behind the same component |
 | 7 | App | Settings and onboarding dialogs lack `role=dialog`, focus trap and Esc | `SettingsModal`, `OnboardingWizard` | Done for Settings (`shell/useDialog.ts`); other dialogs follow in phase 6 |
 | 8 | App | Task detail has no Esc handler | `TaskDetailOverlay` | Done |
 | 9 | App | Role to department mapping does not exist | `src/shared/officeRoles.ts` | Done: `departmentOf` in `scene/studio/layout.ts` |
@@ -1064,7 +1064,7 @@ v2 is adopted in the spec, the kit and the app (phases 1 to 5b on `design/studio
 | 15 | Web | Whole site is v1 (arcade palette, pixel type, hard shadows, chunky frames) | site repo `public/` | Fix: §9 |
 | 16 | Web | Hero shows the pixel office video | site repo, `docs/media/hero.mp4` here | Fix: §8.11 still |
 | 17 | Both | README and screenshots show the pixel floor | `README.md`, `docs/media/`, `docs/screenshots/` | Fix after #1 and #2 |
-| 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Fix: tokens |
+| 18 | App | Release notes modal paints its own palette | `ReleaseDrop.tsx`, `shared/releaseDrop.ts` | Chrome done; the frame keeps the website tokens until the site moves to v2 (#15) |
 | 20 | App | Agent strip removed (phase 2); its per-card functions move with later phases: context gauge, sticky task count and typing dot to the pod label card (§7.14), private note to the person panel header (§7.10), drag to reorder to Michael's Advanced roster | `AgentStrip.tsx` | Done: gauge and task count on the pod card, note in the panel header, reorder in the focus mode roster |
 | 21 | Both | Reference screens show "closes 6:00 PM"; the app has no office hours | `reference/studio/` | Accepted: §7.3 is the rule |
 | 19 | App | The title bar imports the kit lockup, so it already shows the v2 Sora wordmark inside the v1 app | `App.tsx` (`@brandkit/logo/lockup`) | Accepted: it is v2 and needs no change; the rest of the top bar follows with #2 |
