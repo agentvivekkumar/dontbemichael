@@ -414,3 +414,50 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 }
 .cth-toast-btn.primary { background: var(--cth-ink); color: var(--cth-bg); box-shadow: none; }
 .cth-toast-btn:disabled { opacity: .6; cursor: default; }
+
+/* Studio life (DESIGN.md 8.12): motion that follows real work. */
+.cth-st-scroll { animation: cth-scroll 2.6s linear infinite; }
+@keyframes cth-scroll { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+.cth-st-steam { opacity: 0; animation: cth-steam 2.4s ease-out infinite; }
+@keyframes cth-steam { 0% { opacity: 0; transform: translateY(2px); } 30% { opacity: .55; } 100% { opacity: 0; transform: translateY(-8px); } }
+.cth-st-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: cth-sway 5.5s ease-in-out infinite; }
+@keyframes cth-sway { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+.cth-st-dot { animation: cth-dot 1.1s ease-in-out infinite; }
+@keyframes cth-dot { 0%, 60%, 100% { transform: translateY(0); opacity: .55; } 30% { transform: translateY(-3px); opacity: 1; } }
+.cth-st-pop { transform-box: fill-box; transform-origin: center; animation: cth-burst 700ms var(--cth-ease) both; }
+.cth-st-doing { animation: cth-burst 700ms var(--cth-ease) both, cth-breathe 2.4s ease-in-out 700ms infinite; }
+.cth-st-write { animation: cth-write 4.5s ease-in-out infinite; }
+@keyframes cth-write { 0% { stroke-dashoffset: 1; opacity: .9; } 55% { stroke-dashoffset: 0; opacity: .9; } 85% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
+.cth-st-bob { animation: cth-bob 3.2s ease-in-out infinite; }
+@keyframes cth-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+.cth-st-shake { transform-box: fill-box; transform-origin: center; animation: cth-shake 1.6s ease-in-out both; }
+@keyframes cth-shake { 0%, 100% { transform: rotate(0); } 10%, 30%, 50% { transform: rotate(-12deg); } 20%, 40%, 60% { transform: rotate(12deg); } 70% { transform: rotate(0); } }
+.cth-st-ringout { transform-box: fill-box; transform-origin: center; animation: cth-ringout 1.1s ease-out both; }
+@keyframes cth-ringout { from { transform: scale(1); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
+.cth-st-hop { animation: cth-posthop 2.4s var(--cth-ease) both; }
+@keyframes cth-posthop { 0%, 100% { transform: translateY(0); } 8% { transform: translateY(-5px); } 16% { transform: translateY(0); } 24% { transform: translateY(-2px); } 32% { transform: translateY(0); } }
+.cth-st-flag { transform-box: fill-box; transform-origin: 0% 100%; animation: cth-flag 2.4s var(--cth-ease) both; }
+@keyframes cth-flag { 0% { transform: rotate(0); } 15%, 80% { transform: rotate(-35deg); } 100% { transform: rotate(0); } }
+.cth-st-flow { animation: cth-flow 1.1s linear infinite; }
+@keyframes cth-flow { to { stroke-dashoffset: -32; } }
+.cth-st-trail { animation-name: cth-trail; animation-timing-function: cubic-bezier(.45,0,.25,1); animation-fill-mode: both; }
+@keyframes cth-trail { from { stroke-dashoffset: 0.16; } to { stroke-dashoffset: -1; } }
+.cth-st-ping { transform-box: fill-box; transform-origin: center; opacity: 0; animation: cth-ping 900ms ease-out both; }
+@keyframes cth-ping { 0% { transform: scale(.3); opacity: .9; } 100% { transform: scale(1.4); opacity: 0; } }
+.cth-st-tokenhead { animation: cth-burst 300ms var(--cth-ease) both; }
+.cth-st-pop-rise { animation: cth-poprise 1.5s var(--cth-ease) both; }
+@keyframes cth-poprise { 0% { transform: translateY(6px) scale(.6); opacity: 0; } 18% { transform: translateY(0) scale(1); opacity: 1; } 70% { opacity: 1; } 100% { transform: translateY(-16px) scale(1); opacity: 0; } }
+.cth-st-done { animation: cth-done 1.4s var(--cth-ease) both; }
+@keyframes cth-done { 0% { transform: scale(.3); opacity: 0; } 25% { transform: scale(1.15); opacity: 1; } 40% { transform: scale(1); } 75% { transform: translateY(-6px); opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
+.cth-st-tick { display: inline-block; animation: cth-tick 420ms var(--cth-ease) both; }
+@keyframes cth-tick { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.cth-st-sched {
+  position: absolute; white-space: nowrap; pointer-events: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 7px; border-radius: 999px;
+  background: var(--cth-card); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cth-amber) 55%, transparent), var(--cth-shadow-md);
+  font-size: 11px; font-weight: 600; color: var(--cth-amber-text);
+  animation: cth-fade 4.5s var(--cth-ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cth-st-scroll, .cth-st-steam, .cth-st-sway, .cth-st-dot, .cth-st-write, .cth-st-bob, .cth-st-flow, .cth-st-doing { animation: none !important; }
+}

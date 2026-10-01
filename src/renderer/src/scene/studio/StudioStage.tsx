@@ -19,22 +19,22 @@ import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
 import { pickSoloLine } from '@/scene/office/cafeteriaLines';
 import { useNeedsYouCount } from '@/shell/useNeedsYou';
-import { P, STAGE_H, STAGE_W, curvePts, dpath, hopPts, type Pt } from './iso';
+import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
-import { EXIT, HUB, HUB_CARD, HUB_TOP, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
+import { HUB, HUB_CARD, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
+import { bendFor, useStudioLife } from './life';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
-const MAX_TOKENS = 16;
 
 type Board = { todo: number; doing: number; blocked: number; done: number };
 
 /* ── Data ─────────────────────────────────────────────────────────────────── */
 
-interface TaskSnapshot { board: Board; doingBy: Record<string, number>; forYouBy: Record<string, number>; kept: number }
+interface TaskSnapshot { board: Board; doingBy: Record<string, number>; forYouBy: Record<string, number>; kept: number; done: Record<string, string | undefined> }
 
 function useTaskSnapshot(godId: string): TaskSnapshot {
-  const [snap, setSnap] = useState<TaskSnapshot>({ board: { todo: 0, doing: 0, blocked: 0, done: 0 }, doingBy: {}, forYouBy: {}, kept: 0 });
+  const [snap, setSnap] = useState<TaskSnapshot>({ board: { todo: 0, doing: 0, blocked: 0, done: 0 }, doingBy: {}, forYouBy: {}, kept: 0, done: {} });
   useEffect(() => {
     let alive = true;
     const poll = () => {
@@ -45,13 +45,15 @@ function useTaskSnapshot(godId: string): TaskSnapshot {
         const doingBy: Record<string, number> = {};
         const forYouBy: Record<string, number> = {};
         let kept = 0;
+        const done: Record<string, string | undefined> = {};
         for (const t of parseTasks(raw)) {
           board[t.status]++;
+          if (t.status === 'done') done[t.id] = t.assignee;
           if (t.status === 'doing' && t.assignee) doingBy[t.assignee] = (doingBy[t.assignee] ?? 0) + 1;
           if (waitsOnHuman(t) && t.assignee) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + 1;
           if (t.status !== 'done' && (t.assignee === godId || t.assignee === 'god')) kept++;
         }
-        setSnap({ board, doingBy, forYouBy, kept });
+        setSnap({ board, doingBy, forYouBy, kept, done });
       }).catch(() => { /* keep the last snapshot */ });
     };
     poll();
@@ -174,7 +176,6 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     return m;
   }, [plan]);
 
-  const tokens = useHiveTokens(seatOf, godId, paused);
   const quote = useIdleQuote(plan.pods, paused);
 
   // Mailbox posts: every connected mailbox, and who watches it.
@@ -184,6 +185,17 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
       .find(([, c]) => c.email?.enabled && c.email.mailboxes[0] === mailboxId);
     return entry ? agents.find((a) => a.id === entry[0]) : undefined;
   };
+
+  // Motion from real events: messages, scheduled runs, mail, tools, done tasks.
+  const life = useStudioLife({
+    seatOf, godId, paused, T, done: snap.done,
+    posts: mailboxes.map((m) => ({ id: m.id, ownerId: ownerOf(m.id)?.id })),
+    accentOf: (id) => {
+      const a = agents.find((x) => x.id === id);
+      return a ? families[departmentOf(a)].acc : T.req;
+    }
+  });
+  const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
 
   const selected = needsYouOpen ? null : selectedId;
   const select = (id: string) => useStore.getState().select(id);
@@ -243,7 +255,9 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         {/* Paths: Michael to every pod, each mailbox to the person who watches it. */}
         {plan.pods.map((pod, i) => {
           const busy = pod.members.some((a) => a.status !== 'idle');
-          return <Flow key={`f-${i}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={busy ? 2.6 : 1.6} opacity={busy ? 0.55 : 0.32} dash={busy ? undefined : '2 6'} T={T} />;
+          // Work flows down the wire while someone in the pod is at it.
+          const flowing = pod.members.some((a) => ACTIVE.has(a.status));
+          return <Flow key={`f-${i}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={busy ? 2.6 : 1.6} opacity={busy ? 0.55 : 0.32} dash={busy ? undefined : '2 6'} T={T} flowing={flowing} />;
         })}
         {mailboxes.map((m, i) => {
           const owner = ownerOf(m.id);
@@ -252,7 +266,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
           if (m.status === 'needs-attention') {
             return <Flow key={`m-${m.id}`} a={from} b={seat?.pod.grid ?? HUB} bend={0} color={T.coral} width={2} opacity={0.9} dash="5 5" T={T} />;
           }
-          return seat ? <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} /> : null;
+          return seat ? <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} flowing={!!life.postActive[m.id]} /> : null;
         })}
         {/* Objects, back to front. */}
         {[
@@ -261,7 +275,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
             const owner = ownerOf(m.id);
             return {
               depth: gx + POST_GY,
-              node: <MailPost key={`p-${m.id}`} gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} />
+              node: <MailPost key={`p-${m.id}`} gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} />
             };
           }),
           ...plan.pods.map((pod) => ({
@@ -277,9 +291,9 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} /> }
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
-        {tokens}
+        {life.svg}
       </svg>
 
       {/* Stems from each card to its pod. */}
@@ -364,14 +378,17 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         return <div key={quote.key} className="cth-st-quote" style={{ ...at(x + 6, y - 16 - lift), transform: 'translateY(-100%)' }}>{quote.text}</div>;
       })()}
 
+      {/* A scheduled job's name, as it starts. */}
+      {life.bubbles.map((b) => (
+        <div key={b.key} className="cth-st-sched" style={{ ...at(b.at[0], b.at[1]), transform: 'translateX(-50%)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          {b.text}
+        </div>
+      ))}
+
       <div className="cth-sr-only" aria-live="polite">{t('studio.summary', { count: agents.length })}</div>
     </div>
   );
-}
-
-function bendFor([gx, gy]: Pt): number {
-  // Curve every delegation path a little, away from the platform's center line.
-  return (gx - gy > 0 ? -0.5 : 0.5);
 }
 
 /* ── Label card (DESIGN.md 7.14) ──────────────────────────────────────────── */
@@ -542,14 +559,14 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
   const ctx = god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null;
   const stat = (n: number, label: string, coral = false) => (
     <div style={{ padding: '6px 0 7px', textAlign: 'center' }}>
-      <b style={{ display: 'block', fontFamily: 'var(--cth-font-mono)', fontSize: 16, fontWeight: 600, lineHeight: '19px', color: coral && n > 0 ? 'var(--cth-coral-text)' : 'var(--cth-ink)' }}>{n}</b>
+      <b style={{ display: 'block', fontFamily: 'var(--cth-font-mono)', fontSize: 16, fontWeight: 600, lineHeight: '19px', color: coral && n > 0 ? 'var(--cth-coral-text)' : 'var(--cth-ink)' }}><span key={n} className="cth-st-tick">{n}</span></b>
       <span style={{ fontSize: 10, color: 'var(--cth-ink-3)' }}>{label}</span>
     </div>
   );
   const col = (n: number, label: string, key: string) => (
     <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, fontSize: 10, color: 'var(--cth-ink-3)' }}>
       <b style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink)', display: 'flex', alignItems: 'center', gap: 4, lineHeight: '15px' }}>
-        <i style={{ width: 6, height: 6, borderRadius: 2, background: key, display: 'block' }} />{n}
+        <i style={{ width: 6, height: 6, borderRadius: 2, background: key, display: 'block' }} /><span key={n} className="cth-st-tick">{n}</span>
       </b>{label}
     </span>
   );
@@ -652,103 +669,6 @@ function CompactGrid({ plan, families, snap, selected, onSelect, missions, godId
         </div>
       ))}
     </div>
-  );
-}
-
-/* ── Live tokens (DESIGN.md 8.6) ──────────────────────────────────────────── */
-
-type SeatMap = Map<string, { pod: PodPlan<Agent>; index: number }>;
-
-interface Flight { key: string; d: string; kind: 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' }
-
-function useHiveTokens(seatOf: SeatMap, godId: string, paused: boolean) {
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const seatRef = useRef(seatOf);
-  seatRef.current = seatOf;
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
-  const T = sceneTokens(useAppTheme() === 'dark');
-
-  useEffect(() => {
-    let n = 0;
-    type Msg = { id: string; from: string; to: string; targets?: string[]; needsHuman?: boolean; act?: string };
-    const fly = (e: Msg) => {
-      if (pausedRef.current) return;
-      const node = (id: string): Pt | 'hub' | 'you' | null => {
-        if (id === godId || id === 'god') return 'hub';
-        if (id === 'human') return 'you';
-        const seat = seatRef.current.get(id);
-        return seat ? seat.pod.grid : null;
-      };
-      const from = node(e.from);
-      const targets = e.needsHuman ? ['human'] : (e.targets?.length ? e.targets : [e.to]);
-      const add: Flight[] = [];
-      for (const to of targets) {
-        const dest = node(to);
-        if (!from || !dest) continue;
-        const kind: Flight['kind'] = e.needsHuman || dest === 'you' ? 'you'
-          : e.act === 'query' ? 'question' : e.act === 'done' || e.act === 'agree' ? 'done'
-          : e.act === 'propose' ? 'propose' : e.act === 'inform' ? 'inform' : e.act === 'refuse' ? 'refuse' : 'request';
-        const d = flightPath(from === 'you' ? 'hub' : from, dest);
-        if (d) add.push({ key: `${e.id}-${to}-${n++}`, d, kind });
-      }
-      if (!add.length) return;
-      setFlights((prev) => [...prev, ...add].slice(-MAX_TOKENS));
-      window.setTimeout(() => setFlights((prev) => prev.filter((f) => !add.includes(f))), 2000);
-    };
-    const off = window.cth.onHiveMessage(fly);
-    // Demo mode has no real hive, so the mock loop sends its own handoffs.
-    const onDemo = (ev: Event) => {
-      const d = (ev as CustomEvent<{ from: string; to: string; act: string }>).detail;
-      fly({ id: 'demo', from: d.from, to: d.to, act: d.act });
-    };
-    window.addEventListener('cth:demo-handoff', onDemo);
-    return () => { off(); window.removeEventListener('cth:demo-handoff', onDemo); };
-  }, [godId]);
-
-  return flights.map((f) => <Token key={f.key} d={f.d} kind={f.kind} T={T} />);
-}
-
-function flightPath(from: Pt | 'hub', to: Pt | 'hub' | 'you'): string | null {
-  if (to === 'you') {
-    const [x0, y0] = HUB_TOP;
-    return `M${x0 + 16},${y0 + 2} C700,400 960,400 ${EXIT[0]},${EXIT[1]}`;
-  }
-  if (from === 'hub' && to !== 'hub') return dpath(curvePts(HUB, to, bendFor(to), 13));
-  if (from !== 'hub' && to === 'hub') return dpath(curvePts(from, HUB, -bendFor(from), 13));
-  if (from !== 'hub' && to !== 'hub') return dpath(hopPts(from, to, 60, 60, 58));
-  return null;
-}
-
-function Token({ d, kind, T }: { d: string; kind: Flight['kind']; T: ReturnType<typeof sceneTokens> }) {
-  const ref = useRef<SVGAnimateMotionElement | null>(null);
-  useEffect(() => { try { ref.current?.beginElement(); } catch { /* no SMIL */ } }, []);
-  const color = kind === 'you' ? T.coral : kind === 'question' ? T.violet : kind === 'done' ? T.green
-    : kind === 'propose' ? T.amber : kind === 'inform' ? '#B4B1C6' : kind === 'refuse' ? '#4A4660' : T.req;
-  return (
-    <g>
-      <path d={d} fill="none" stroke={color} strokeOpacity={0.35} strokeWidth={2} strokeDasharray="1 6" strokeLinecap="round" />
-      <g>
-        <animateMotion ref={ref} dur="1.6s" begin="indefinite" fill="freeze" path={d} />
-        <circle r={11} fill={color} opacity={0.16} />
-        {kind === 'question' || kind === 'you' ? (
-          <>
-            <circle r={8.5} fill={color} />
-            <text y={3.8} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={10.5} fill="#fff">{kind === 'you' ? '!' : '?'}</text>
-          </>
-        ) : kind === 'done' ? (
-          <>
-            <circle r={8.5} fill={color} />
-            <path d="M-4,0 l3,2.8 l5.2,-5" fill="none" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-          </>
-        ) : (
-          <>
-            <rect x={-9} y={-6.5} width={18} height={13} rx={2.5} fill={T.tokBg} stroke={color} strokeWidth={1.4} />
-            <path d="M-9,-6 L0,1 L9,-6" fill="none" stroke={color} strokeWidth={1.1} strokeLinejoin="round" />
-          </>
-        )}
-      </g>
-    </g>
   );
 }
 

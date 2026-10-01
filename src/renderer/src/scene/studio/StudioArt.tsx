@@ -4,7 +4,7 @@
  * on the fixed 1060 x 816 stage; StudioStage scales it and lays the HTML cards
  * over it. Ported from the approved reference generator.
  */
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useState, type ReactNode } from 'react';
 import { P, curvePts, dpath, pts, type Pt } from './iso';
 import { Box, EllipseAt, Poly } from './shapes';
 import type { Family, SceneTokens } from './theme';
@@ -94,6 +94,11 @@ export function Station({ gx, gy, st, sc = 1, plant = false, c, famKey, T, dark 
   const lineColor = st === 'thinking' || st === 'compacting' ? T.violet : st === 'needs' ? T.coral : c.acc;
   const cw = 0.19 * Math.min(sc, 1);
   const lines = st === 'working' || st === 'needs' || st === 'thinking' || st === 'looping' || st === 'success';
+  // While someone works, their screen scrolls: six lines in a repeating
+  // pattern of three, moving up one pattern (15px) per loop, clipped to the screen.
+  const scrolling = st === 'working' || st === 'looping';
+  const clip = `st-clip-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const [mugX, mugY] = P(gx + 0.38 * sc - 0.03, gy - 0.03, 36);
   return (
     <g className={st === 'working' ? 'cth-st-breathe' : undefined}>
       <Box gx={gx - 0.5 * sc} gy={gy - 0.48} w={1.0 * sc} d={0.56} h={22} z0={6} top={T.desk} left={c.m} right={c.d} T={T} />
@@ -102,16 +107,33 @@ export function Station({ gx, gy, st, sc = 1, plant = false, c, famKey, T, dark 
       <Box gx={gx - mw} gy={gy - 0.42} w={2 * mw} d={0.05} h={mh} z0={mz0} top={T.mon[0]} left={T.mon[1]} right={T.mon[2]} rim={false} T={T} />
       {dark && on && <polygon points={pts(scr)} fill={lineColor} opacity={0.75} filter="url(#st-halo)" />}
       <polygon points={pts(scr)} fill={screenFill} />
-      {lines && [[-0.72, 0.33], [-0.72, 0.55], [-0.72, 0.05]].map(([x0, x1], i) => {
+      {lines && !scrolling && [[-0.72, 0.33], [-0.72, 0.55], [-0.72, 0.05]].map(([x0, x1], i) => {
         const zz = mz0 + mh - 7 - i * 5;
         const [a, b] = [P(gx + x0 * iw, gy - 0.37, zz), P(gx + x1 * iw, gy - 0.37, zz)];
         return <line key={i} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={lineColor} strokeWidth={1.6} strokeLinecap="round" opacity={0.9 - i * 0.2} />;
       })}
+      {scrolling && (
+        <g clipPath={`url(#${clip})`}>
+          <clipPath id={clip}><polygon points={pts(scr)} /></clipPath>
+          <g className="cth-st-scroll">
+            {[[-0.72, 0.33], [-0.72, 0.55], [-0.72, 0.05], [-0.72, 0.33], [-0.72, 0.55], [-0.72, 0.05], [-0.72, 0.33]].map(([x0, x1], i) => {
+              const zz = mz0 + mh - 7 - i * 5 + 0;
+              const [a, b] = [P(gx + x0 * iw, gy - 0.37, zz), P(gx + x1 * iw, gy - 0.37, zz)];
+              return <line key={i} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={lineColor} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />;
+            })}
+          </g>
+        </g>
+      )}
       {on && st !== 'waiting' && (
         <polygon points={pts([P(gx - 0.34 * sc, gy - 0.3, 28.2), P(gx + 0.34 * sc, gy - 0.3, 28.2), P(gx + 0.3 * sc, gy + 0.02, 28.2), P(gx - 0.3 * sc, gy + 0.02, 28.2)])} fill={lineColor} opacity={T.spillOp} />
       )}
       <polygon points={pts([P(gx - 0.2 * sc, gy - 0.12, 28.3), P(gx + 0.18 * sc, gy - 0.12, 28.3), P(gx + 0.18 * sc, gy, 28.3), P(gx - 0.2 * sc, gy, 28.3)])} fill={T.kb} stroke={T.kbBd} strokeWidth={0.8} />
       <Box gx={gx + 0.38 * sc - 0.08} gy={gy - 0.08} w={0.1} d={0.1} h={7} z0={28} top={T.mug} left={c.acc} right={c.d} rim={false} T={T} />
+      {scrolling && [0, 1].map((i) => (
+        <path key={i} className="cth-st-steam" style={{ animationDelay: `${i * 1.2}s` }}
+          d={`M${mugX + i * 3 - 1.5},${mugY} c-3,-4 3,-6 0,-10 c-3,-4 3,-6 0,-10`}
+          fill="none" stroke={T.stem} strokeWidth={1.3} strokeLinecap="round" />
+      ))}
       {/* chair */}
       <Box gx={gx - 0.03} gy={gy + 0.3} w={0.06} d={0.06} h={12} z0={6} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />
       <Box gx={gx - cw} gy={gy + 0.2} w={2 * cw} d={0.32} h={4} z0={16} top={T.seat[0]} left={T.seat[1]} right={T.seat[2]} T={T} />
@@ -130,18 +152,20 @@ function Plant({ gx, gy, T }: { gx: number; gy: number; T: SceneTokens }) {
   return (
     <g>
       <Box gx={gx} gy={gy} w={0.12} d={0.12} h={7} z0={28} top={T.pot[0]} left={T.pot[1]} right={T.pot[2]} rim={false} T={T} />
-      <circle cx={x - 3} cy={y + 2} r={5.2} fill="#6BCB94" />
-      <circle cx={x + 3} cy={y} r={5.5} fill="#4DB97E" />
-      <circle cx={x} cy={y - 4} r={4.8} fill="#86D9A8" />
+      <g className="cth-st-sway">
+        <circle cx={x - 3} cy={y + 2} r={5.2} fill="#6BCB94" />
+        <circle cx={x + 3} cy={y} r={5.5} fill="#4DB97E" />
+        <circle cx={x} cy={y - 4} r={4.8} fill="#86D9A8" />
+      </g>
     </g>
   );
 }
 
 function ThinkBubble({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
   return (
-    <g className="cth-st-think">
+    <g>
       <rect x={x - 17} y={y - 9} width={34} height={18} rx={9} fill={T.bub} stroke={T.bubBd} />
-      {[0, 1, 2].map((i) => <circle key={i} cx={x - 8 + i * 8} cy={y} r={2.4} fill={T.violet} opacity={1 - i * 0.25} />)}
+      {[0, 1, 2].map((i) => <circle key={i} className="cth-st-dot" style={{ animationDelay: `${i * 0.18}s` }} cx={x - 8 + i * 8} cy={y} r={2.4} fill={T.violet} />)}
     </g>
   );
 }
@@ -175,7 +199,7 @@ function CheckBurst({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
 export interface PodDesk { st: DeskState }
 
 /** Desk offsets for a pod of 1 to 4 people (DESIGN.md 8.9). */
-function deskSpots(n: number): { dx: number; dy: number; sc: number }[] {
+export function deskSpots(n: number): { dx: number; dy: number; sc: number }[] {
   if (n <= 1) return [{ dx: 0, dy: 0, sc: 1 }];
   if (n === 2) return [{ dx: -0.48, dy: 0, sc: 0.9 }, { dx: 0.48, dy: 0, sc: 0.9 }];
   const back = [{ dx: -0.48, dy: -0.5, sc: 0.9 }, { dx: 0.48, dy: -0.5, sc: 0.9 }];
@@ -234,7 +258,13 @@ function Beacon({ at: [bx, by], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── Michael's glass pod ──────────────────────────────────────────────────── */
 
-export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number } }) {
+export function Hub({ T, dark, board, busy = false, ringing = false }: {
+  T: SceneTokens; dark: boolean; board: { todo: number; doing: number; blocked: number; done: number };
+  /** Michael is at work: his screens scroll, the marker writes on the board. */
+  busy?: boolean;
+  /** A scheduled job just started: the wall clock rings. */
+  ringing?: boolean;
+}) {
   const a = 1.05;
   const ph = 14;
   const wh = 58;
@@ -258,10 +288,20 @@ export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: 
       <polygon points={pts([P(-a, -a, z0), P(a, -a, z0), P(a, -a, z1), P(-a, -a, z1)])} fill="url(#st-glassB)" />
       {/* the task board on the back glass: one sticky per task, up to 4 per column */}
       <polygon points={pts([P(-a + 0.01, -0.95, bz0), P(-a + 0.01, 0.55, bz0), P(-a + 0.01, 0.55, bz1), P(-a + 0.01, -0.95, bz1)])} fill={T.board} stroke={T.boardBd} strokeWidth={1} />
-      {cols.map(([g0, col, n]) => Array.from({ length: Math.min(n, 4) }, (_, j) => {
+      {/* A sticky pops onto its column when it arrives; the Doing column's
+          stickies breathe, since that work is in progress right now. */}
+      {cols.map(([g0, col, n], ci) => Array.from({ length: Math.min(n, 4) }, (_, j) => {
         const zz = bz1 - 5 - j * 5;
-        return <polygon key={`${g0}-${j}`} points={pts([P(-a + 0.02, g0 + 0.04, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz), P(-a + 0.02, g0 + 0.04, zz)])} fill={col} opacity={0.9} />;
+        return <polygon key={`${g0}-${j}`} className={ci === 1 ? 'cth-st-pop cth-st-doing' : 'cth-st-pop'}
+          style={ci === 1 ? { animationDelay: `0s, ${j * 0.3}s` } : undefined}
+          points={pts([P(-a + 0.02, g0 + 0.04, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz - 3.4), P(-a + 0.02, g0 + 0.26, zz), P(-a + 0.02, g0 + 0.04, zz)])} fill={col} opacity={0.9} />;
       }))}
+      {/* Michael's marker writing a line under the columns while he works. */}
+      {busy && (() => {
+        const [p0, p1] = [P(-a + 0.02, -0.9, bz0 + 3.5), P(-a + 0.02, 0.5, bz0 + 3.5)];
+        return <line x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} pathLength={1} className="cth-st-write" stroke={T.req} strokeWidth={1.4} strokeLinecap="round" strokeDasharray="1 1" />;
+      })()}
+      <WallClock at={P(0.6, -a + 0.01, z1 - 17)} ringing={ringing} T={T} />
       {[[P(-a, a, z0), P(-a, a, z1)], [P(-a, -a, z0), P(-a, -a, z1)], [P(a, -a, z0), P(a, -a, z1)]].map(([p0, p1], i) => (
         <line key={i} x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} stroke={T.wall} strokeWidth={1.4} />
       ))}
@@ -275,11 +315,16 @@ export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: 
             <Box gx={ox - 0.07} gy={-0.45} w={0.46} d={0.05} h={22} z0={ph + 27} top={T.mon[0]} left={T.mon[1]} right={T.mon[2]} rim={false} T={T} />
             {dark && <polygon points={pts(scr)} fill="#8C80F0" opacity={0.8} filter="url(#st-halo)" />}
             <polygon points={pts(scr)} fill="url(#st-scr-hub)" />
-            {[0, 1].map((i) => {
-              const zz = ph + 42 - i * 5;
-              const [p1, p2] = [P(ox + 0.01, -0.4, zz), P(ox + 0.24 - i * 0.08, -0.4, zz)];
-              return <line key={i} x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#6C5CE7" strokeWidth={1.5} strokeLinecap="round" opacity={0.8} />;
-            })}
+            <clipPath id={`st-hubclip${ox < 0 ? 'a' : 'b'}`}><polygon points={pts(scr)} /></clipPath>
+            <g clipPath={`url(#st-hubclip${ox < 0 ? 'a' : 'b'})`}>
+              <g className={busy ? 'cth-st-scroll' : undefined}>
+                {(busy ? [0, 1, 2, 3, 4, 5] : [0, 1]).map((i) => {
+                  const zz = ph + 42 - i * 5;
+                  const [p1, p2] = [P(ox + 0.01, -0.4, zz), P(ox + 0.24 - (i % 3) * 0.08, -0.4, zz)];
+                  return <line key={i} x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#6C5CE7" strokeWidth={1.5} strokeLinecap="round" opacity={0.8} />;
+                })}
+              </g>
+            </g>
           </g>
         );
       })}
@@ -290,9 +335,11 @@ export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: 
       <Box gx={-0.2} gy={0.18} w={0.4} d={0.34} h={4} z0={ph + 10} top={T.hseat[0]} left={T.hseat[1]} right={T.hseat[2]} T={T} />
       <Box gx={-0.2} gy={0.46} w={0.4} d={0.07} h={20} z0={ph + 14} top={T.hback[0]} left={T.hback[1]} right={T.hback[2]} T={T} />
       <path d={`M${beam[0][0]},${beam[0][1]} L${mx - 13},${my} L${mx + 13},${my} L${beam[1][0]},${beam[1][1]} Z`} fill="url(#st-beam)" />
-      <circle cx={mx} cy={my} r={17} fill="#7C6CF2" opacity={0.14} />
-      <circle cx={mx} cy={my} r={12.5} fill={T.mbg} />
-      <text x={mx} y={my + 4.3} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={12} fill="#fff">M</text>
+      <g className={busy ? 'cth-st-bob' : undefined}>
+        <circle cx={mx} cy={my} r={17} fill="#7C6CF2" opacity={0.14} />
+        <circle cx={mx} cy={my} r={12.5} fill={T.mbg} />
+        <text x={mx} y={my + 4.3} textAnchor="middle" fontFamily="Sora, sans-serif" fontWeight={700} fontSize={12} fill="#fff">M</text>
+      </g>
       <polygon points={pts([P(-a, a, z0), P(a, a, z0), P(a, a, z1), P(-a, a, z1)])} fill="url(#st-glassF)" />
       <polygon points={pts([P(a, -a, z0), P(a, a, z0), P(a, a, z1), P(a, -a, z1)])} fill="url(#st-glassF)" />
       {[[-0.7, -0.45], [-0.3, -0.2]].map(([g0, g1]) => (
@@ -306,9 +353,40 @@ export function Hub({ T, dark, board }: { T: SceneTokens; dark: boolean; board: 
   );
 }
 
+/** The office clock on Michael's back wall, showing the real time. It rings
+ *  when a scheduled job starts. Drawn in the wall's plane (a 0.5 shear). */
+function WallClock({ at: [x, y], ringing, T }: { at: Pt; ringing: boolean; T: SceneTokens }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const m = now.getMinutes();
+  const h = (now.getHours() % 12) + m / 60;
+  const hand = (deg: number, len: number) => `M0,0 L${(Math.sin((deg * Math.PI) / 180) * len).toFixed(2)},${(-Math.cos((deg * Math.PI) / 180) * len).toFixed(2)}`;
+  return (
+    <g transform={`matrix(1,0.5,0,1,${x},${y})`}>
+      <g className={ringing ? 'cth-st-shake' : undefined}>
+        {ringing && [0, 1].map((i) => (
+          <circle key={i} r={13} fill="none" stroke={T.amber} strokeWidth={1.6} className="cth-st-ringout" style={{ animationDelay: `${i * 0.35}s` }} />
+        ))}
+        <circle r={12} fill={T.tokBg} stroke={ringing ? T.amber : T.req} strokeOpacity={ringing ? 1 : 0.55} strokeWidth={1.8} />
+        {[0, 90, 180, 270].map((d) => <path key={d} d={hand(d, 10).replace('M0,0 L', `M${(Math.sin((d * Math.PI) / 180) * 8).toFixed(2)},${(-Math.cos((d * Math.PI) / 180) * 8).toFixed(2)} L`)} stroke={T.stem} strokeWidth={1.2} />)}
+        <path d={hand(h * 30, 5.5)} stroke={T.req} strokeWidth={1.9} strokeLinecap="round" />
+        <path d={hand(m * 6, 8.5)} stroke={T.req} strokeWidth={1.3} strokeLinecap="round" />
+        <circle r={1.2} fill={T.req} />
+      </g>
+    </g>
+  );
+}
+
 /* ── Mailbox post ─────────────────────────────────────────────────────────── */
 
-export function MailPost({ gx, gy, broken, c, T }: { gx: number; gy: number; broken: boolean; c: Family | null; T: SceneTokens }) {
+export function MailPost({ gx, gy, broken, c, T, active }: {
+  gx: number; gy: number; broken: boolean; c: Family | null; T: SceneTokens;
+  /** Mail moving right now: in (being read) or out (being sent). */
+  active?: 'in' | 'out';
+}) {
   const [top, left, right] = broken || !c ? T.bill : [c.m, T.boxFront, c.d];
   const acc = broken || !c ? T.coral : c.acc;
   const [sa, sb] = [P(gx - 0.16, gy + 0.2, 43), P(gx + 0.16, gy + 0.2, 43)];
@@ -318,13 +396,18 @@ export function MailPost({ gx, gy, broken, c, T }: { gx: number; gy: number; bro
       <EllipseAt gx={gx} gy={gy} z={0} r={0.36} fill={T.papSh} opacity={0.1} />
       <Box gx={gx - 0.24} gy={gy - 0.24} w={0.48} d={0.48} h={4} z0={0} top={T.postB[0]} left={T.postB[1]} right={T.postB[2]} T={T} />
       <Box gx={gx - 0.06} gy={gy - 0.06} w={0.12} d={0.12} h={26} z0={4} top={T.postP[0]} left={T.postP[1]} right={T.postP[2]} rim={false} T={T} />
-      <Box gx={gx - 0.27} gy={gy - 0.2} w={0.54} d={0.4} h={20} z0={30} top={top} left={left} right={right} T={T} />
-      <Poly ps={[P(gx - 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 34), P(gx - 0.27, gy + 0.2, 34)]} fill={acc} opacity={0.85} />
-      <line x1={sa[0]} y1={sa[1]} x2={sb[0]} y2={sb[1]} stroke={T.slot} strokeWidth={2.4} strokeLinecap="round" />
-      {!broken && (
-        <polygon points={pts([P(gx - 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 50), P(gx - 0.1, gy + 0.2, 50)])} fill={T.env} stroke={acc} strokeWidth={1} />
-      )}
-      <polygon points={pts([P(gx + 0.27, gy - 0.05, 40), P(gx + 0.27, gy + 0.08, 40), P(gx + 0.27, gy + 0.08, 58), P(gx + 0.27, gy - 0.05, 58)])} fill={acc} />
+      <g className={active ? 'cth-st-hop' : undefined}>
+        <Box gx={gx - 0.27} gy={gy - 0.2} w={0.54} d={0.4} h={20} z0={30} top={top} left={left} right={right} T={T} />
+        <Poly ps={[P(gx - 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 30), P(gx + 0.27, gy + 0.2, 34), P(gx - 0.27, gy + 0.2, 34)]} fill={acc} opacity={0.85} />
+        <line x1={sa[0]} y1={sa[1]} x2={sb[0]} y2={sb[1]} stroke={active ? acc : T.slot} strokeWidth={2.4} strokeLinecap="round" />
+        {!broken && (
+          <polygon points={pts([P(gx - 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 43), P(gx + 0.1, gy + 0.2, 50), P(gx - 0.1, gy + 0.2, 50)])} fill={T.env} stroke={acc} strokeWidth={1} />
+        )}
+        {/* The flag: raised while mail moves. */}
+        <g className={active ? 'cth-st-flag' : undefined}>
+          <polygon points={pts([P(gx + 0.27, gy - 0.05, 40), P(gx + 0.27, gy + 0.08, 40), P(gx + 0.27, gy + 0.08, 58), P(gx + 0.27, gy - 0.05, 58)])} fill={acc} />
+        </g>
+      </g>
       {broken && (
         <g className="cth-st-blink">
           <line x1={wx} y1={wy + 10} x2={wx} y2={wy + 18} stroke={T.coral} strokeWidth={1.5} />
@@ -338,8 +421,10 @@ export function MailPost({ gx, gy, broken, c, T }: { gx: number; gy: number; bro
 
 /* ── Paths on the floor ───────────────────────────────────────────────────── */
 
-export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T }: {
+export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T, flowing = false }: {
   a: Pt; b: Pt; bend: number; color: string; width: number; opacity?: number; dash?: string; T: SceneTokens;
+  /** Work is moving along this wire: dashes run from a toward b. */
+  flowing?: boolean;
 }) {
   const sh = dpath(curvePts(a, b, bend, 0));
   const ln = dpath(curvePts(a, b, bend, 5));
@@ -348,6 +433,7 @@ export function Flow({ a, b, bend, color, width, opacity = 0.55, dash, T }: {
       <path d={sh} fill="none" stroke={T.flowSh} strokeOpacity={T.flowShOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
       <path d={ln} fill="none" stroke={T.under} strokeOpacity={T.underOp} strokeWidth={width + 3} strokeLinecap="round" strokeDasharray={dash} />
       <path d={ln} fill="none" stroke={color} strokeOpacity={opacity} strokeWidth={width} strokeLinecap="round" strokeDasharray={dash} />
+      {flowing && <path d={ln} fill="none" stroke={color} strokeOpacity={0.9} strokeWidth={width} strokeLinecap="round" strokeDasharray="3 13" className="cth-st-flow" />}
     </g>
   );
 }

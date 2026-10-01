@@ -98,13 +98,32 @@ test('only what is real: mail paths run to the person who watches the mailbox, a
 });
 
 test('live tokens come from hive messages, only Michael escalates to the owner, and at most 16 fly', () => {
-  const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  const src = read('src/renderer/src/scene/studio/life.tsx');
   assert.match(src, /window\.cth\.onHiveMessage\(/);
-  assert.match(src, /const MAX_TOKENS = 16;/);
+  assert.match(src, /export const MAX_TOKENS = 16;/);
   assert.match(src, /\.slice\(-MAX_TOKENS\)/);
   // An escalation always leaves from Michael's pod toward the Needs you board.
-  assert.match(src, /flightPath\(from === 'you' \? 'hub' : from, dest\)/);
+  assert.match(src, /const src = from === 'you' \? 'hub' : from;/);
   assert.match(src, /const \[x0, y0\] = HUB_TOP;/);
+});
+
+test('the studio moves on real events only: scheduled runs, mail, tools, done tasks (owner, 2026-09-30)', () => {
+  const life = read('src/renderer/src/scene/studio/life.tsx');
+  // A scheduled run is a hive message from the scheduler: the clock rings, then it travels.
+  assert.match(life, /const scheduled = e\.from === 'scheduler';/);
+  assert.match(life, /setClockRinging\(true\);/);
+  // Mail tool calls move an envelope on the watcher's mail wire; reads come in, the rest go out.
+  assert.match(life, /\/\^mcp__md-mail__\(\[a-z_\]\+\)\$\/\.exec\(e\.tool\)/);
+  assert.match(life, /const dir: 'in' \| 'out' = op === 'read' \? 'in' : 'out';/);
+  assert.match(life, /window\.cth\.onHiveHookEvent\(onHook\)/);
+  // A done burst only for a task that newly reached Done, never on first load.
+  assert.match(life, /if \(!before \|\| live\.current\.paused\) return;/);
+  assert.match(life, /if \(\/\^Bash\$\|\^BashOutput\$\/\.test\(tool\)\) return 'terminal';/);
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(stage, /flowing=\{!!life\.postActive\[m\.id\]\}/);
+  assert.match(stage, /busy=\{godBusy\} ringing=\{life\.clockRinging\}/);
+  // Reduced motion: the ambient loops stop.
+  assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-scroll, \.cth-st-steam, \.cth-st-sway, \.cth-st-dot, \.cth-st-write, \.cth-st-bob, \.cth-st-flow, \.cth-st-doing \{ animation: none !important; \}/);
 });
 
 test('the stage pauses when nobody can see it, and honours reduced motion', () => {

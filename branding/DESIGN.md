@@ -869,6 +869,28 @@ that is working or needs you.
 - RTL: the art never mirrors (it is a picture of a room). Labels keep their positions.
 - Reduced motion: §11.3.
 
+### 8.12 Life on the stage
+
+The office moves when the work moves (owner, 2026-09-30: the first build felt static).
+Every effect starts from a real event or state; nothing is decorative noise.
+`scene/studio/life.tsx` holds the event layer.
+
+| Trigger (real) | What moves |
+|---|---|
+| Hive message between people | The token travels its wire with a bright trail, a puff where it leaves and a ping where it lands (2.2 s, eased) |
+| Message from the scheduler (a scheduled run) | The clock on Michael's back wall (real time) rings, then an amber clock token travels to the pod; the job's name shows in front of the pod for 4.5 s |
+| Mail tool call (`md-mail` search or read, draft or send) | The watcher's mailbox hops and raises its flag, its wire flows, and an envelope travels in (read) or out (draft, send) |
+| Any other tool call | A 26 px glyph rises off the desk: web, terminal, file, search, books, or a spark (one per person per 1.4 s) |
+| A task reaches Done | A green check bursts over its owner's pod; a new sticky pops onto Michael's board |
+| Counts change | Michael's numbers tick up into place |
+| Someone working | Their screen scrolls, their mug steams, the wire from Michael flows toward the pod |
+| Michael working | His screens scroll, his marker writes on the board, his badge floats; Doing stickies breathe |
+| Thinking | The three dots bounce in turn |
+| Always | Plants sway slightly (5.5 s) |
+
+All of it pauses with the stage (§11.2). With reduced motion the loops stop and a token
+appears at its destination for one second.
+
 ### 8.11 Web use [Web]
 
 - Hero: a curated still of the studio at hero size (the reference home screen's stage,
@@ -950,7 +972,7 @@ Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
 ### 11.2 App [App]
 
 Motion carries information or it doesn't happen: token travel, beacons, screens breathing,
-the check burst, the quote bubble fade. UI chrome does not move on its own. The stage
+the check burst, the quote bubble fade, and the rest of the stage's life (§8.12). UI chrome does not move on its own. The stage
 pauses all animation when the window is hidden, in focus mode, or when another view is
 showing (as today's floor does).
 
