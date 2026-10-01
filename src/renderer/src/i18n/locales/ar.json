@@ -118,7 +118,10 @@
     "approve": "موافقة",
     "decline": "رفض",
     "scheduleWhy": "السبب: {{reason}}",
-    "scheduleMichael": "يقول {{name}}: {{note}}"
+    "scheduleMichael": "يقول {{name}}: {{note}}",
+    "draft": "مسودة",
+    "openTask": "فتح المهمة",
+    "justNow": "الآن"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",

@@ -118,7 +118,10 @@
     "approve": "批准",
     "decline": "拒绝",
     "scheduleWhy": "原因：{{reason}}",
-    "scheduleMichael": "{{name}}：{{note}}"
+    "scheduleMichael": "{{name}}：{{note}}",
+    "draft": "草稿",
+    "openTask": "打开任务",
+    "justNow": "刚刚"
   },
   "agentStrip": {
     "privateNote": "私人笔记 · {{name}}",

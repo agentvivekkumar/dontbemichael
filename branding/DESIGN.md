@@ -516,19 +516,22 @@ Height 28 px in cards, 32 px in bars, 36 px in the composer and dialogs. `t-meta
 The owner's only inbox. Michael raises a card only when he could not re-delegate or
 unblock the work himself.
 
-Owner, 2026-09-30: a plain card. No side rule (every card had it), no "From Michael" (only
-he raises these), no "saved to memory" note, no underlined titles.
+Owner, 2026-09-30: a plain card, and a board you can scan. No side rule, no "From Michael"
+(only he raises these), no "saved to memory" note, no underlined titles. The board sits on a
+`neutral-soft` ground so each white card stands on its own, 10 px apart.
 
-- `card`, `line` border, `r-xl`, padding 12 × 14.
-- Row 1: the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover; opens the task
-  detail, §7.21) and a quiet dismiss `x` (24 × 24, `ink-4`) on the right.
-- Row 2: the person it is for as a 22 px chip in their department colors (16 px avatar plus
-  name), and "N earlier answers" beside it when there are any.
-- Michael's question: rendered markdown at 12.5 / 18, `ink`.
-- One row: the answer (one line that grows to three as you type, placeholder "Your answer,
-  or done if you handled it") and a primary "Reply" beside it. Cmd or Ctrl+Enter sends;
-  Enter respects IME composition.
-- "Holding up N tasks" folded under it, opening the list of what waits on this answer.
+- Folded (every card but one): the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover),
+  the person it is for as a 22 px chip in their department colors, how long ago Michael
+  asked ("just now", "5h ago"), a "Draft" tag if an answer is half written, and the ask
+  itself in at most two lines (`askHeadline`: his bold first sentence, as plain text, in
+  `ink-2`). The whole header is one target; Enter and Space open it. A quiet dismiss `x`
+  (24 × 24, `ink-4`) sits apart on the right.
+- Open (one at a time; the newest until the owner picks another, `line-2` ring and
+  `shadow-md`): the same header, then Michael's full question as markdown at 12.5 / 18 in
+  `ink`; one row with the answer (one line, growing to three; placeholder "Your answer, or
+  done if you handled it") and a primary "Reply"; "Holding up N tasks" folded under it; and
+  a footer with "Open task" and "N earlier answers". Cmd or Ctrl+Enter sends; Enter
+  respects IME composition.
 - Optional secondary actions Michael attached
   (for a broken mailbox: "Open Mailboxes").
 - Hint under the actions: bookmark icon plus "Saved to Kelly's memory" (`t-meta`, `ink-3`).

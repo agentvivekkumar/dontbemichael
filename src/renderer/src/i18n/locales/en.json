@@ -118,7 +118,10 @@
     "approve": "Approve",
     "decline": "Decline",
     "scheduleWhy": "Why: {{reason}}",
-    "scheduleMichael": "{{name}}: {{note}}"
+    "scheduleMichael": "{{name}}: {{note}}",
+    "draft": "Draft",
+    "openTask": "Open task",
+    "justNow": "just now"
   },
   "agentStrip": {
     "privateNote": "Private note · {{name}}",

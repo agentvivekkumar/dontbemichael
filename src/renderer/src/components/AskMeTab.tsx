@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppTheme } from '@/design/theme';
+import { askHeadline, askedAgo } from './askHeadline';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
 import { PixelButton } from './PixelButton';
@@ -50,7 +51,7 @@ function dependentsTree(id: string, all: HiveTask[], seen = new Set<string>()): 
 }
 
 export function AskMeTab() {
-  const { t: translate } = useTranslation();
+  const { t: translate, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
   const agents = useStore((s) => s.agents);
@@ -62,6 +63,8 @@ export function AskMeTab() {
   const setAnswerDraft = useStore((s) => s.setAnswerDraft);
   const openTaskDetail = useStore((s) => s.openTaskDetail);
   const [sending, setSending] = useState<string | null>(null);
+  // The open card: undefined means the newest, null means none.
+  const [openId, setOpenId] = useState<string | null | undefined>(undefined);
   // Which cards have their "holding up" list open.
   const [openStuck, setOpenStuck] = useState<Record<string, boolean>>({});
   const dark = useAppTheme() === 'dark';
@@ -175,7 +178,7 @@ export function AskMeTab() {
     // Design v2 (branding/DESIGN.md 7.8): plain white cards. Michael's question,
     // a one row answer, and what is stuck behind it. Scrolls on its own so the
     // board heading stays put.
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 8 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 8 }}>
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
       {waiting.length === 0 && scheduleRequests.length === 0 && (
         <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--cth-ink-3)', fontSize: 12.5, lineHeight: '19px' }}>
@@ -183,7 +186,7 @@ export function AskMeTab() {
           {translate('shell.boardEmptySub', { godName })}
         </div>
       )}
-      {waiting.map((t) => {
+      {waiting.map((t, idx) => {
         const open = openQuestion(t)!;
         const stuck = dependentsTree(t.id, tasks);
         const owner = t.assignee ? agents.find((a) => a.id === t.assignee) : undefined;
@@ -192,24 +195,47 @@ export function AskMeTab() {
         const answered = t.humanQA?.filter((e) => e.a).length ?? 0;
         const draft = drafts[t.id] ?? '';
         const showStuck = openStuck[t.id] ?? false;
+        // One card open at a time; the newest is open until the owner picks another.
+        const expanded = openId === undefined ? idx === 0 : openId === t.id;
+        const toggle = () => setOpenId(expanded ? null : t.id);
+        const ago = askedAgo(open.askedAt, Date.now(), i18n.language, translate('askMe.justNow'));
         return (
-          // Design v2 (DESIGN.md 7.8; owner, 2026-09-30): no side rule, no "from
-          // Michael" (only he raises these), no memory note. Who it is for, the
-          // title, his question, a one row reply, and what it holds up.
-          <section key={t.id} aria-label={t.title} style={card} className="cth-askme-card">
-            {/* The title (opens the task) and dismiss. */}
+          // Design v2 (DESIGN.md 7.8; owner, 2026-09-30): folded cards read as a
+          // list (title, who, when, the ask in a line or two); one opens to the
+          // full question, a one row reply and what it holds up.
+          <section key={t.id} aria-label={t.title} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
+            {/* The header folds and unfolds the card; dismiss sits apart. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <button
-                onClick={() => openTaskDetail(t.id)}
-                title={translate('askMe.openDetail')}
-                className="cth-askme-title"
-                style={{
-                  flex: 1, minWidth: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start',
-                  fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)'
-                }}
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded}
+                onClick={toggle}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+                className="cth-askme-head"
+                style={{ flex: 1, minWidth: 0, cursor: 'pointer', outline: 'none' }}
               >
-                {t.title}
-              </button>
+                <div className="cth-askme-title" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
+                  {t.title}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6, flexWrap: 'wrap' }}>
+                  {who && (
+                    <span style={{ ...personChip, ...(fam ? { background: fam.l, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {}) }}>
+                      <span aria-hidden="true" style={{ ...chipAvatar, ...(fam ? { background: fam.m, color: fam.acc } : {}) }}>{who.slice(0, 1).toUpperCase()}</span>
+                      {who}
+                    </span>
+                  )}
+                  {ago && <span style={{ fontSize: 11, color: 'var(--cth-ink-3)' }}>{ago}</span>}
+                  {!expanded && draft.trim() && <span style={draftTag}>{translate('askMe.draft')}</span>}
+                </div>
+                {/* Folded: the ask itself, in a line or two. */}
+                {!expanded && (
+                  <div dir={rtl ? 'auto' : undefined} style={{
+                    marginTop: 7, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)',
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                  }}>{askHeadline(open.q)}</div>
+                )}
+              </div>
               {/* Dismiss: clears this ask off the board without answering it. The
                   card's Q&A history is kept (the question stays on the task,
                   marked dismissed). */}
@@ -228,26 +254,9 @@ export function AskMeTab() {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
-            {/* Who it is for, as a chip, and any earlier answers. */}
-            {(who || answered > 0) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7, flexWrap: 'wrap' }}>
-                {who && (
-                  <span style={{ ...personChip, ...(fam ? { background: fam.l, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {}) }}>
-                    <span aria-hidden="true" style={{ ...chipAvatar, ...(fam ? { background: fam.m, color: fam.acc } : {}) }}>{who.slice(0, 1).toUpperCase()}</span>
-                    {who}
-                  </span>
-                )}
-                {answered > 0 && (
-                  <button onClick={() => openTaskDetail(t.id)} title={translate('askMe.viewAnswersHistory')} style={quietLink}>
-                    {answered === 1
-                      ? translate('askMe.viewAnswers', { count: answered })
-                      : translate('askMe.viewAnswersPlural', { count: answered })}
-                  </button>
-                )}
-              </div>
-            )}
+            {expanded && <>
             {/* The question, as markdown: Michael writes lists, emphasis and code. */}
-            <div dir={rtl ? 'auto' : undefined} className="cth-askme-q" style={{ margin: '9px 0 10px', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)' }}>
+            <div dir={rtl ? 'auto' : undefined} className="cth-askme-q" style={{ margin: '10px 0 12px', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)' }}>
               <MarkdownPreview source={open.q} variant="card" />
             </div>
             {/* One row: the answer, and Reply. */}
@@ -306,6 +315,20 @@ export function AskMeTab() {
                 )}
               </div>
             )}
+            {/* The full task, and any earlier answers, are one click away. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--cth-line)' }}>
+              <button onClick={() => openTaskDetail(t.id)} title={translate('askMe.openDetail')} style={{ ...quietLink, color: 'var(--cth-indigo-text)', fontWeight: 600 }}>
+                {translate('askMe.openTask')}
+              </button>
+              {answered > 0 && (
+                <button onClick={() => openTaskDetail(t.id)} title={translate('askMe.viewAnswersHistory')} style={quietLink}>
+                  {answered === 1
+                    ? translate('askMe.viewAnswers', { count: answered })
+                    : translate('askMe.viewAnswersPlural', { count: answered })}
+                </button>
+              )}
+            </div>
+            </>}
           </section>
         );
       })}
@@ -315,8 +338,16 @@ export function AskMeTab() {
 
 const card: CSSProperties = {
   position: 'relative', flexShrink: 0,
-  padding: '12px 14px 12px', borderRadius: 'var(--cth-r-xl)',
+  padding: '13px 14px 13px', borderRadius: 'var(--cth-r-xl)',
   background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+};
+const cardOpen: CSSProperties = {
+  ...card,
+  boxShadow: 'inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-md)'
+};
+const draftTag: CSSProperties = {
+  fontSize: 10.5, fontWeight: 600, padding: '1px 7px', borderRadius: 'var(--cth-r-pill)',
+  background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)'
 };
 const personChip: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px 0 3px', borderRadius: 'var(--cth-r-pill)',
