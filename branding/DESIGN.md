@@ -503,7 +503,7 @@ team control) sits at the top of the board when there is a team to restore.
 
 | Kind | Fill | Text | Border | Use |
 |---|---|---|---|---|
-| Primary | `ink` | white | none | The main action in a card or dialog ("Respond and unblock", "Approve", "Save", "Send") |
+| Primary | `ink` | white | none | The main action in a card or dialog ("Reply", "Approve", "Save", "Send") |
 | Secondary | `card` | `ink` | 1 px `line-2` | Other actions ("Decline", "Open Mailboxes", "Hire", "Edit") |
 | Quiet | none | `ink-2` | none | Tertiary links in a row ("Earlier answers", "change") |
 | Coral | `coral-strong` | white | none | Only the Needs you button. Never a general CTA |
@@ -516,17 +516,20 @@ Height 28 px in cards, 32 px in bars, 36 px in the composer and dialogs. `t-meta
 The owner's only inbox. Michael raises a card only when he could not re-delegate or
 unblock the work himself.
 
-- `card`, `line` border, `r-xl`, padding 10 × 12 × 10 × 13, 3 px `coral` rule on the left
-  inset 12 px top and bottom.
-- Row 1: task title as a link (`t-ui` 600 at 12.5, `indigo` text, underline at 28%
-  opacity), opens the task detail (§7.21). A dismiss `x` (20 × 20) on the right.
-- Row 2: the tagged person chip (17 px avatar plus name, `neutral-soft` fill) and "From
-  Michael" (ink avatar plus name).
-- Michael's question: `t-body`, rendered markdown, `ink`.
-- Answer: textarea, 2 rows default, `card-2` fill, `line-input` border, `r-md`,
-  placeholder "Your answer, or done if you handled it" in `ink-3`. Cmd or Ctrl+Enter
-  sends; Enter respects IME composition.
-- Actions: primary "Respond and unblock"; optional secondary actions Michael attached
+Owner, 2026-09-30: a plain card. No side rule (every card had it), no "From Michael" (only
+he raises these), no "saved to memory" note, no underlined titles.
+
+- `card`, `line` border, `r-xl`, padding 12 × 14.
+- Row 1: the person it is for as a 26 px avatar in their department colors, then the task
+  title (`t-ui` 600 at 13, `ink`, `indigo` on hover; opens the task detail, §7.21) with
+  their name under it in `t-meta` `ink-3`, plus "N earlier answers" when there are any. A
+  quiet dismiss `x` (24 × 24, `ink-4`) on the right.
+- Michael's question: rendered markdown at 12.5 / 18, `ink`.
+- One row: the answer (one line that grows to three as you type, placeholder "Your answer,
+  or done if you handled it") and a primary "Reply" beside it. Cmd or Ctrl+Enter sends;
+  Enter respects IME composition.
+- "Holding up N tasks" folded under it, opening the list of what waits on this answer.
+- Optional secondary actions Michael attached
   (for a broken mailbox: "Open Mailboxes").
 - Hint under the actions: bookmark icon plus "Saved to Kelly's memory" (`t-meta`, `ink-3`).
 - If tasks wait on it: a divider, then "Blocking N task(s)" in `coral` text 600 and the

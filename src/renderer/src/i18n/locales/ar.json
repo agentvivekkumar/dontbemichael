@@ -100,10 +100,10 @@
     "dismissTitle": "تجاهل: أزِله من اللوحة دون إجابة (يبقى السجل)",
     "dismissAria": "تجاهل هذا الطلب",
     "answerPlaceholder": "إجابتك، أو \"تم\" إن كنت أنجزته بنفسك",
-    "sending": "جارٍ الإرسال...",
-    "respond": "أجب وارفع الحظر",
-    "viewAnswers": "عرض {{count}} إجابة سابقة",
-    "viewAnswersPlural": "عرض {{count}} إجابات سابقة",
+    "sending": "جارٍ الإرسال…",
+    "respond": "رد",
+    "viewAnswers": "{{count}} إجابة سابقة",
+    "viewAnswersPlural": "{{count}} إجابات سابقة",
     "viewAnswersHistory": "افتح تفاصيل المهمة مع سجلّ الأسئلة والأجوبة كاملًا",
     "blockingDownstream": "يعطّل {{count}} مهمة",
     "blockingDownstreamPlural": "يعطّل {{count}} مهام",
@@ -118,9 +118,7 @@
     "approve": "موافقة",
     "decline": "رفض",
     "scheduleWhy": "السبب: {{reason}}",
-    "scheduleMichael": "يقول {{name}}: {{note}}",
-    "from": "من",
-    "savedTo": "حُفظ في ذاكرة {{name}}"
+    "scheduleMichael": "يقول {{name}}: {{note}}"
   },
   "agentStrip": {
     "privateNote": "ملاحظة خاصة · {{name}}",

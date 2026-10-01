@@ -84,17 +84,13 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
             key={req.id}
             aria-label={t('askMe.scheduleTitle', { name })}
             style={{
-              position: 'relative', flexShrink: 0, padding: '10px 12px 10px 13px', borderRadius: 'var(--cth-r-xl)',
+              position: 'relative', flexShrink: 0, padding: '12px 14px', borderRadius: 'var(--cth-r-xl)',
               background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)',
               display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)'
             }}
           >
             {/* Design v2 (branding/DESIGN.md 7.9): the only card with Approve and
                 Decline. Same frame as an Ask me card. */}
-            <span aria-hidden="true" style={{
-              position: 'absolute', insetInlineStart: 0, top: 12, bottom: 12, width: 3,
-              borderStartEndRadius: 3, borderEndEndRadius: 3, background: 'var(--cth-coral-base)'
-            }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, lineHeight: '17px', color: 'var(--cth-ink)' }}>
               <span style={{
                 width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', flexShrink: 0,
