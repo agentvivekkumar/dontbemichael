@@ -46,9 +46,14 @@ export interface ClosingTimeBarProps {
  */
 export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: ClosingTimeBarProps) {
   // Focus comes to the bar as it appears, so the keyboard reaches Cancel and
-  // Force quit even with a dialog open behind it.
+  // Force quit even with a dialog open behind it, and goes back where it was
+  // on Cancel.
   const regionRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { regionRef.current?.focus({ preventScroll: true }); }, []);
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    regionRef.current?.focus({ preventScroll: true });
+    return () => { if (before && document.contains(before)) before.focus({ preventScroll: true }); };
+  }, []);
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);

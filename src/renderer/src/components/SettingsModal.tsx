@@ -74,16 +74,16 @@ function newWebhookId(): string {
   return `wh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Pixel-aesthetic text input, mirroring AddAgentModal's inputStyle. */
+/** The v2 field (DESIGN.md 7.9). Its ring and indigo focus ring come from the
+ *  `cth-input` class every caller sets. */
 const slackInputStyle: CSSProperties = {
   width: '100%',
-  padding: '6px 8px 4px',
-  background: 'var(--cth-paper-100)',
+  padding: '7px 10px',
+  background: 'var(--cth-card)',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
   fontFamily: 'var(--cth-font-ui)',
   fontSize: 13,
-  color: 'var(--cth-ink-900)',
+  color: 'var(--cth-ink)',
   outline: 'none'
 };
 
@@ -177,8 +177,8 @@ const sectionHead = {
 const sectionHeadTight = { ...sectionHead, marginBottom: 2 } as const;
 /** Same heading with no bottom margin at all. */
 const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
-/** The 2px rule between Settings sections. */
-const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
+/** The hairline between Settings sections. */
+const sectionRule = { height: 1, background: 'var(--cth-line)' } as const;
 
 export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
 const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
@@ -1195,7 +1195,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <select
                             value={i18n.language}
                             onChange={(e) => setLanguage(e.target.value)}
-                            style={slackInputStyle}
+                            className="cth-input" style={slackInputStyle}
                             aria-label={t('settings.general.language')}
                           >
                             {LANGUAGES.map((l) => (
@@ -1377,7 +1377,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             type="number" min="1" step="10" value={maxTurnsVal}
                             onChange={(e) => setMaxTurnsVal(e.target.value)}
                             placeholder={t('settings.agentsModels.unlimited')}
-                            style={{ ...slackInputStyle, width: 120 }}
+                            className="cth-input" style={{ ...slackInputStyle, width: 120 }}
                           />
                           <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('settings.agentsModels.blankUnlimited')}</span>
                         </div>
@@ -1451,7 +1451,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="100000" value={agentBudget}
                                 onChange={(e) => setAgentBudget(e.target.value)}
                                 placeholder={t('settings.autonomy.budgetPlaceholder')}
-                                style={{ ...slackInputStyle, width: 180 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 180 }}
                               />
                               <span style={{ fontSize: 11, color: 'var(--cth-ink-500)', textTransform: 'none', letterSpacing: 0 }}>
                                 {fmtBudgetTokens(agentBudget) ? t('settings.autonomy.budgetEquals', { value: fmtBudgetTokens(agentBudget) }) : t('settings.autonomy.budgetTotal')}
@@ -1463,7 +1463,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="1000" value={velocityCeiling}
                                 onChange={(e) => setVelocityCeiling(e.target.value)}
                                 placeholder={t('settings.autonomy.velocityPlaceholder')}
-                                style={{ ...slackInputStyle, width: 180 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 180 }}
                               />
                             </label>
                             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, ...slackLabelStyle }}>
@@ -1472,7 +1472,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="5" value={brkRepeated}
                                 onChange={(e) => setBrkRepeated(e.target.value)}
                                 placeholder={t('settings.autonomy.defaultPlaceholder')}
-                                style={{ ...slackInputStyle, width: 140 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 140 }}
                               />
                             </label>
                             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, ...slackLabelStyle }}>
@@ -1481,7 +1481,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="5" value={brkErrStorm}
                                 onChange={(e) => setBrkErrStorm(e.target.value)}
                                 placeholder={t('settings.autonomy.defaultPlaceholder')}
-                                style={{ ...slackInputStyle, width: 140 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 140 }}
                               />
                             </label>
                           </div>
@@ -1733,7 +1733,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackSecret}
                                     onChange={(e) => setSlackSecret(e.target.value)}
                                     placeholder={t('settings.connections.signingSecretPlaceholder')}
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                                 {/* Bot token: stays in main; never leaves the main process. */}
@@ -1744,7 +1744,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackBotToken}
                                     onChange={(e) => setSlackBotToken(e.target.value)}
                                     placeholder="xoxb-..."
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                               </div>
@@ -1756,7 +1756,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackChannel}
                                     onChange={(e) => setSlackChannel(e.target.value)}
                                     placeholder={t('settings.connections.channelPlaceholder')}
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 100 }}>
@@ -1766,7 +1766,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackPort}
                                     onChange={(e) => setSlackPort(e.target.value)}
                                     placeholder="3847"
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                               </div>
@@ -1819,7 +1819,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={tunnelUrl}
                                       onFocus={(e) => e.currentTarget.select()}
-                                      style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
+                                      className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
                                     />
                                     <PixelButton variant="secondary" size="sm" onClick={copyTunnel} disabled={!tunnelUrl}>{t('common.copy')}</PixelButton>
                                   </div>
@@ -1925,7 +1925,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       onChange={(e) => { void patchWebhook(w.id, { name: e.target.value }, false); }}
                                       onBlur={() => { void applyWebhooks(webhookTriggers); }}
                                       placeholder={t('settings.connections.namePlaceholder')}
-                                      style={{ ...slackInputStyle, flex: 1 }}
+                                      className="cth-input" style={{ ...slackInputStyle, flex: 1 }}
                                     />
                                     <PixelButton
                                       variant={w.enabled ? 'primary' : 'secondary'}
@@ -1955,9 +1955,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={endpoint || t('settings.connections.endpointPlaceholder')}
                                       onFocus={(e) => e.currentTarget.select()}
+                                      className="cth-input"
                                       style={{
                                         ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12,
-                                        color: endpoint ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
+                                        color: endpoint ? 'var(--cth-ink)' : 'var(--cth-ink-3)'
                                       }}
                                     />
                                     <PixelButton
@@ -1978,7 +1979,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={w.secret}
                                       onFocus={(e) => e.currentTarget.select()}
-                                      style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                      className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                     />
                                     <PixelButton
                                       variant="secondary"
@@ -2009,7 +2010,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     <select
                                       value={w.mode}
                                       onChange={(e) => { void patchWebhook(w.id, { mode: e.target.value as TriggerMode }); }}
-                                      style={{ ...slackInputStyle, width: 160, flexShrink: 0 }}
+                                      className="cth-input" style={{ ...slackInputStyle, width: 160, flexShrink: 0 }}
                                     >
                                       {TRIGGER_MODES.map((m) => (
                                         <option key={m.value} value={m.value}>{m.label}</option>
@@ -2078,7 +2079,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               onChange={(e) => { void applyOrg({ ...orgTrigger, apiKey: e.target.value }, false); }}
                               onBlur={() => { void applyOrg(orgTrigger); }}
                               placeholder={t('settings.connections.orgKeyPlaceholder')}
-                              style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                              className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                             />
                             <PixelButton
                               variant="secondary"
@@ -2100,7 +2101,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <select
                             value={orgTrigger.mode}
                             onChange={(e) => { void applyOrg({ ...orgTrigger, mode: e.target.value as TriggerMode }); }}
-                            style={slackInputStyle}
+                            className="cth-input" style={slackInputStyle}
                           >
                             {TRIGGER_MODES.map((m) => (
                               <option key={m.value} value={m.value}>{m.label}</option>
@@ -2167,7 +2168,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                   value={groqKey}
                                   onChange={(e) => setGroqKey(e.target.value)}
                                   placeholder={t('settings.voice.groqPlaceholder')}
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                 />
                                 <PixelButton variant="secondary" size="sm" onClick={() => setShowGroqKey((v) => !v)} disabled={!groqKey}>
                                   {showGroqKey ? t('common.hide') : t('common.show')}
@@ -2181,7 +2182,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               <select
                                 value={freeflowModel}
                                 onChange={(e) => setFreeflowModel(e.target.value)}
-                                style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                               >
                                 <option value="whisper-large-v3-turbo">{t('settings.voice.fast')}</option>
                                 <option value="whisper-large-v3">{t('settings.voice.accurate')}</option>
@@ -2250,7 +2251,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               onChange={(e) => setOpenAiVoiceKey(e.target.value)}
                               onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') void saveOpenAiVoiceKey(); }}
                               placeholder={hasOpenAiKey ? t('settings.voice.keyPlaceholderSaved') : 'sk-…'}
-                              style={{ ...slackInputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)' }}
+                              className="cth-input" style={{ ...slackInputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)' }}
                             />
                             <PixelButton
                               variant="secondary"
@@ -2291,7 +2292,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               setIdleDisconnectMs(v);
                               stage({ realtimeIdleDisconnectMs: v } as Partial<HarnessConfig>);
                             }}
-                            style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                            className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                           >
                             <option value="30000">{t('settings.voice.30s')}</option>
                             <option value="60000">{t('settings.voice.1m')}</option>
@@ -2332,7 +2333,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
               {/* Footer */}
               <div style={{
-                borderTop: '2px solid var(--cth-ink-300)',
+                borderTop: '1px solid var(--cth-line)',
                 padding: '10px 16px',
                 display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
                 background: 'var(--cth-cream-50)'

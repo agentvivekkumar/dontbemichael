@@ -19,6 +19,8 @@ test('closing time leaves dialogs open but pauses their keyboard traps; the bar 
   const bar = read('src/renderer/src/components/ClosingTimeBar.tsx');
   assert.match(bar, /zIndex: 650,/);
   assert.match(bar, /regionRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  // On Cancel focus goes back into the dialog it came from (review pass 3).
+  assert.match(bar, /return \(\) => \{ if \(before && document\.contains\(before\)\) before\.focus\(\{ preventScroll: true \}\); \};/);
 });
 
 test('the task detail is a real dialog: Esc from a field stays in the field, focus trapped', () => {
@@ -97,4 +99,14 @@ test('Closing time in the clock menu quits like Cmd-Q, and closes only its own f
   const top = read('src/renderer/src/shell/TopBar.tsx');
   assert.match(top, /void window\.cth\.requestQuit\(\);/);
   assert.doesNotMatch(top, /^\s*window\.close\(\);/m);
+});
+
+test('Settings fields are the v2 input, with its focus ring', () => {
+  // Value: protects=Settings inputs match setup and the hire wizard and show focus; fails_when=a field drops the cth-input class or the old cream fill comes back; why_new=review pass 3; seam=none
+  const modal = read('src/renderer/src/components/SettingsModal.tsx');
+  const uses = (modal.match(/style=\{\{?\s*(\.\.\.)?slackInputStyle/g) ?? []).length;
+  const ringed = (modal.match(/className="cth-input"\s+style=\{\{?\s*(\.\.\.)?slackInputStyle/g) ?? []).length;
+  assert.ok(uses >= 21, 'every Settings field uses the shared style');
+  assert.equal(ringed, uses, 'every Settings field carries the cth-input class');
+  assert.doesNotMatch(modal, /cth-paper-100[^\n]*\n[^\n]*border: 'none',\n\s*boxShadow: 'inset 0 0 0 1px var\(--cth-ink-100\)'/);
 });
