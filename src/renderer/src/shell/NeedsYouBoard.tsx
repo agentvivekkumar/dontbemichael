@@ -21,9 +21,7 @@ export function NeedsYouBoard({ config }: { config: HarnessConfig }) {
   return (
     <div style={{
       height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12,
-      padding: '14px 16px 12px',
-      // A tinted ground so each white card stands on its own (owner, 2026-09-30).
-      background: 'var(--cth-neutral-soft)'
+      padding: '14px 16px 12px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>

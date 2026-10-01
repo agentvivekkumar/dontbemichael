@@ -517,8 +517,9 @@ The owner's only inbox. Michael raises a card only when he could not re-delegate
 unblock the work himself.
 
 Owner, 2026-09-30: a plain card, and a board you can scan. No side rule, no "From Michael"
-(only he raises these), no "saved to memory" note, no underlined titles. The board sits on a
-`neutral-soft` ground so each white card stands on its own, 10 px apart.
+(only he raises these), no "saved to memory" note, no underlined titles. The cards sit on
+the right column's own `rail` (no tinted slab behind them), 12 px apart, each with a `line`
+ring and a soft two layer shadow so it stands on its own.
 
 - Folded (every card but one): the task title (`t-ui` 600 at 13, `ink`, `indigo` on hover),
   the person it is for as a 22 px chip in their department colors, how long ago Michael

@@ -178,7 +178,7 @@ export function AskMeTab() {
     // Design v2 (branding/DESIGN.md 7.8): plain white cards. Michael's question,
     // a one row answer, and what is stuck behind it. Scrolls on its own so the
     // board heading stays put.
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 8 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '2px 2px 10px', margin: '-2px -2px 0' }}>
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
       {waiting.length === 0 && scheduleRequests.length === 0 && (
         <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--cth-ink-3)', fontSize: 12.5, lineHeight: '19px' }}>
@@ -339,7 +339,7 @@ export function AskMeTab() {
 const card: CSSProperties = {
   position: 'relative', flexShrink: 0,
   padding: '13px 14px 13px', borderRadius: 'var(--cth-r-xl)',
-  background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+  background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), 0 1px 2px rgba(30, 27, 46, .04), 0 4px 12px rgba(62, 52, 140, .06)'
 };
 const cardOpen: CSSProperties = {
   ...card,

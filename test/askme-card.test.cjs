@@ -36,5 +36,6 @@ test('one card is open at a time, the newest by default; folded cards show the h
   // Nothing the owner relies on went away: answering, routing and memory are unchanged.
   assert.match(src, /window\.cth\.hiveRememberOwnerAnswer\(/);
   assert.match(src, /\{translate\('askMe\.openTask'\)\}/);
-  assert.match(read('src/renderer/src/shell/NeedsYouBoard.tsx'), /background: 'var\(--cth-neutral-soft\)'/);
+  // The cards sit on the app's own background, no tinted slab behind them.
+  assert.match(read('src/renderer/src/shell/NeedsYouBoard.tsx'), /padding: '14px 16px 12px'\n\s+\}\}>/);
 });
