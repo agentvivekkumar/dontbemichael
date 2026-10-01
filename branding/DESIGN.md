@@ -539,8 +539,9 @@ stands on its own.
   it, including "done" when the owner handled it.
 - Open (one at a time; the newest until the owner picks another, `line-2` ring and
   `shadow-md`): the same header, then Michael's full question as markdown at 12.5 / 18 in
-  `ink`; one row with the answer (one line, growing to three; placeholder "Your answer, or
-  done if you handled it") and a primary "Reply"; "Holding up N tasks" folded under it; and
+  `ink`; one row with the answer (one line that grows with the text up to 160 px, about
+  eight lines, then scrolls; owner, 2026-10-01: a longer answer was hard to write;
+  placeholder "Your answer, or done if you handled it") and a primary "Reply"; "Holding up N tasks" folded under it; and
   a footer with "See full context" (the ask's full background and history; owner,
   2026-10-01: it is context, not a task) and "N earlier answers". Cmd or Ctrl+Enter sends; Enter
   respects IME composition.
@@ -1242,6 +1243,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-01 | The Ask me answer box grows with the text, to about eight lines (§7.8). |
 | 2026-10-01 | Task detail: title under the id row, the card's notes shown, no empty section (§7.21). |
 | 2026-10-01 | Ask me titles read plain: agents are told how to title a card, and the card drops opaque ids and bracketed metadata (§7.8). |
 | 2026-10-01 | Every quiet pod chip sits just over its pod, the right and front pods too; a quiet pod's card rolls down in its chip's place (§7.14a). |

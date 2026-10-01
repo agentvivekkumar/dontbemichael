@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppTheme } from '@/design/theme';
+import { GrowingTextarea } from './GrowingTextarea';
 import { askHeadline, askTitle, askedAgo } from './askHeadline';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
@@ -231,16 +232,15 @@ export function AskMeTab() {
             </div>
             {/* One row: the answer, and Reply. */}
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
-              <textarea
+              <GrowingTextarea
                 className="cth-input"
                 dir={rtl ? 'auto' : undefined}
                 value={draft}
                 onChange={(e) => setAnswerDraft(t.id, e.target.value)}
                 onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(t); }}
-                rows={draft.includes('\n') || draft.length > 60 ? 3 : 1}
                 placeholder={translate('askMe.answerPlaceholder')}
                 style={{
-                  flex: 1, minWidth: 0, display: 'block', boxSizing: 'border-box', padding: '7px 10px', resize: 'none', minHeight: 34,
+                  flex: 1, minWidth: 0, display: 'block', boxSizing: 'border-box', padding: '7px 10px', minHeight: 34,
                   background: 'var(--cth-card)', border: 'none',
                   fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '18px',
                   color: 'var(--cth-ink)', outline: 'none'

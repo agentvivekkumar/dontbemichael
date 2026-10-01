@@ -88,3 +88,14 @@ test('task detail: title under the id row, and the card\'s notes show', () => {
   assert.match(src, /<div style=\{\{ marginTop: 10, fontSize: 16, fontWeight: 600[^}]*\}\}>\{askTitle\(task\.title\)\}<\/div>/);
   assert.match(read('src/main/hive.ts'), /Keep the card\\'s "notes" to what the work is and where it stands/);
 });
+
+/** The answer box grows with the text (owner, 2026-10-01). */
+test('the Ask me answer box grows with what is typed, then scrolls', () => {
+  const tab = read('src/renderer/src/components/AskMeTab.tsx');
+  assert.match(tab, /<GrowingTextarea\n\s*className="cth-input"/);
+  assert.doesNotMatch(tab, /rows=\{draft\.includes/);
+  const grow = read('src/renderer/src/components/GrowingTextarea.tsx');
+  assert.match(grow, /el\.style\.height = `\$\{Math\.min\(full, maxHeight\)\}px`;/);
+  assert.match(grow, /el\.style\.overflowY = full > maxHeight \? 'auto' : 'hidden';/);
+  assert.match(grow, /new ResizeObserver/);
+});
