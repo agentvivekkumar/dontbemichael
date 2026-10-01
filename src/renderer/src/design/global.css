@@ -193,27 +193,27 @@ canvas, img.cth-px { image-rendering: pixelated; image-rendering: crisp-edges; }
 :root[data-cth-theme='dark'] .cth-st-idle { filter: saturate(.45) brightness(1.15); opacity: .95; }
 .cth-studio-paused * { animation-play-state: paused !important; }
 .cth-st-quote {
-  position: absolute; pointer-events: none; max-width: 250px; width: max-content;
-  display: flex; flex-direction: column; gap: 4px; padding: 8px 11px 9px;
-  border-radius: 14px 14px 14px 4px; background: var(--cth-card); color: var(--cth-ink);
+  position: absolute; pointer-events: none; max-width: 250px; width: max-content; z-index: 2;
+  display: flex; flex-direction: column; gap: 3px; padding: 7px 11px 8px;
+  border-radius: 14px 14px 14px 4px; background: var(--cth-card); color: var(--cth-ink); text-align: start;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--q-acc, var(--cth-indigo)) 45%, transparent), var(--cth-shadow-md);
-  transform-origin: 0% 100%; z-index: 75; --q-x: 0%; --q-y: -100%;
+  transform-origin: var(--q-tail, 10px) 100%; --q-x: 0%; --q-y: 0%;
   animation: cth-quote 8s var(--cth-ease) both;
 }
-.cth-st-quote-below { --q-y: 0%; transform-origin: 0% 0%; border-radius: 4px 14px 14px 14px; }
-.cth-st-quote-below::after { bottom: auto; top: -6px; transform: rotate(225deg); }
-.cth-st-quote-left { --q-x: -100%; transform-origin: 100% 100%; border-radius: 14px 14px 4px 14px; }
-.cth-st-quote-left::after { left: auto; right: 10px; }
-.cth-st-quote-left.cth-st-quote-below { transform-origin: 100% 0%; border-radius: 14px 4px 14px 14px; }
-/* The tail, pointing down at the desk. */
+/* The tail, pointing down at the speaker's avatar on the chip. */
 .cth-st-quote::after {
-  content: ''; position: absolute; left: 10px; bottom: -6px; width: 11px; height: 11px;
+  content: ''; position: absolute; left: var(--q-tail, 10px); bottom: -6px; width: 11px; height: 11px;
   background: var(--cth-card); transform: rotate(45deg); border-radius: 0 0 3px 0;
   box-shadow: 1.5px 1.5px 0 0 color-mix(in srgb, var(--q-acc, var(--cth-indigo)) 45%, transparent);
 }
-.cth-st-quote-who { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--cth-ink-2); }
-.cth-st-quote-who i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 9.5px; font-weight: 700; }
+.cth-st-quote-below { transform-origin: var(--q-tail, 10px) 0%; border-radius: 4px 14px 14px 14px; }
+.cth-st-quote-below::after { bottom: auto; top: -6px; transform: rotate(225deg); }
+.cth-st-quote-end { transform-origin: calc(100% - 14px) 100%; border-radius: 14px 14px 4px 14px; }
+.cth-st-quote-end::after { left: auto; right: 12px; }
+.cth-st-quote-who { font-size: 11px; font-weight: 600; color: var(--q-acc, var(--cth-ink-2)); }
 .cth-st-quote-text { font-size: 12.5px; line-height: 17px; color: var(--cth-ink); }
+.cth-st-speak { animation: cth-speak 8s ease-in-out both; }
+@keyframes cth-speak { 0%, 100% { transform: translateY(0); } 3% { transform: translateY(-3px); } 6% { transform: translateY(0); } 9% { transform: translateY(-2px); } 12% { transform: translateY(0); } }
 @keyframes cth-quote {
   0% { opacity: 0; transform: translate(var(--q-x), var(--q-y)) translateY(8px) scale(.7); }
   6% { opacity: 1; transform: translate(var(--q-x), var(--q-y)) scale(1.04); }

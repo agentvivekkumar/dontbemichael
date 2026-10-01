@@ -852,14 +852,17 @@ tinted with a red "x" on its path.
 
 ### 8.8 Idle quote bubble
 
-One at a time, over an idle pod (owner, 2026-09-30: the first version was easy to miss): a
-`card` speech bubble, max 250 px, with a 1.5 px ring and tail in the speaker's department
-color, the speaker's avatar and name on top (`t-meta` 600), and the line in quotes at
-12.5 / 17 `ink`. It pops in from its tail (scale .7 to 1.04 to 1), holds, and fades. Lines come
-from the in-character list (`cafeteriaLines.ts`). The first comes 8 to 15 s after the office
-opens, then every 25 to 50 s, visible 8 s. Never from someone working, needing you, or
-still clocking in. It sits above the pod (over its chip) opening right of its tail; if that would
-cover an open card or Michael's, it opens left, then in front of the pod with the tail up.
+One at a time, from someone in a quiet pod (owner, 2026-09-30: the first version was easy to
+miss, and a bubble floating apart from the person's tag looked wrong). The bubble belongs to
+the pod chip (§7.14a): a `card` speech bubble, max 250 px, ring and tail in the speaker's
+department color, the line in quotes at 12.5 / 17 `ink`, with the speaker's name on top only
+when the chip holds more than one person. Its tail points at the speaker's avatar on the
+chip, which gets a 3 px ring in the same color and a small hop. It opens up from the chip,
+or up and leftward, or down under it, whichever first covers no open card or Michael's.
+It pops in from the tail, holds, and fades. Lines come from the in-character list
+(`cafeteriaLines.ts`). The first comes 8 to 15 s after the office opens, then every 25 to
+50 s, visible 8 s. Never from a pod with someone at work, and never from someone still
+clocking in.
 
 ### 8.9 Scaling rule
 

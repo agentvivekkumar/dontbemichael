@@ -220,6 +220,29 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
   const closePeek = () => { window.clearTimeout(closeTimer.current); closeTimer.current = window.setTimeout(() => setPeek(null), 220); };
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
   const podKey = (pod: PodPlan<Agent>) => `${pod.dept}-${pod.members[0].id}`;
+  /** Where a chip's speech bubble goes (DESIGN.md 8.8): up from the chip's left,
+   *  up from its right, or down under it, whichever first covers no open card. */
+  const quoteSpot = (pod: PodPlan<Agent>, cx: number, chipTop: number): QuoteSpot => {
+    const QW = 250; const QH = 60; const GAP = 10;
+    const names = pod.members.map((a) => a.name).join(', ');
+    const w = 30 + 14 * (pod.members.length - 1) + names.length * 6.6;
+    const left = cx - w / 2;
+    const boxes = plan.pods.filter((p) => p !== pod && (awake(p) || peek === podKey(p))).map((p) => {
+      const r = cardRect(p.slot, p.members.length);
+      const l = ox + r.left * k;
+      const t = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
+      return { l, t, r: l + r.w, b: t + r.h };
+    });
+    if (god) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 190 });
+    const spots: [QuoteSpot, number, number][] = [
+      ['up', left, chipTop - GAP - QH],
+      ['up-end', left + 32 - QW, chipTop - GAP - QH],
+      ['down', left, chipTop + 28 + GAP]
+    ];
+    const free = spots.find(([, l, t]) => !boxes.some((q) => l < q.r && l + QW > q.l && t < q.b && t + QH > q.t));
+    return (free ?? spots[0])[0];
+  };
+
   /** A pod shows its full card while someone in it is at work, or it is selected. */
   const awake = (pod: PodPlan<Agent>) => pod.members.some((a) => ACTIVE.has(a.status) || a.id === selected);
 
@@ -344,16 +367,20 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
         const isAwake = awake(pod);
         const above = pod.slot.mode === 'above';
         const r = cardRect(pod.slot, pod.members.length);
+        const chipX = ox + pod.slot.x * k;
+        const chipY = oy + (above ? r.stem.y2 - 4 : r.stem.y2 + 6) * k;
+        const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
         const chip = !isAwake && (
           <PodChip
             key={`chip-${pod.members[0].id}`}
             style={{
-              position: 'absolute', left: ox + pod.slot.x * k,
-              top: oy + (above ? r.stem.y2 - 4 : r.stem.y2 + 6) * k,
+              position: 'absolute', left: chipX, top: chipY,
               transform: above ? 'translate(-50%, -100%)' : 'translateX(-50%)'
             }}
             dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
             onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
+            quote={speaking}
+            quoteSpot={speaking ? quoteSpot(pod, chipX, above ? chipY - 28 : chipY) : 'up'}
           />
         );
         if (!isAwake && peek !== key) return chip;
@@ -394,51 +421,6 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
             broken={broken} reason={m.statusReason} />
         );
       })}
-
-      {/* One in-character line over an idle pod (DESIGN.md 8.8). */}
-      {quote && (() => {
-        const seat = seatOf.get(quote.agentId);
-        if (!seat) return null;
-        const who = seat.pod.members[seat.index];
-        const c = families[seat.pod.dept];
-        // Where the bubble goes: above the pod (over its chip), opening right or
-        // left of the tail, else in front of the pod with the tail up. The first
-        // spot that covers no open card (or Michael's) wins.
-        const QW = 250; const QH = 64;
-        const boxes = plan.pods.filter((p) => awake(p) || peek === podKey(p)).map((p) => {
-          const r = cardRect(p.slot, p.members.length);
-          const left = ox + r.left * k;
-          const top = p.slot.mode === 'above' ? oy + (r.top + r.h) * k - r.h : oy + r.top * k;
-          return { l: left, t: top, r: left + r.w, b: top + r.h };
-        });
-        if (god) boxes.push({ l: ox + HUB_CARD.left * k, t: oy + HUB_CARD.top * k, r: ox + HUB_CARD.left * k + HUB_CARD.w, b: oy + HUB_CARD.top * k + 190 });
-        const [gx, gy] = seat.pod.grid;
-        const lift = awake(seat.pod) || seat.pod.slot.mode !== 'above' ? 0 : 40;
-        const [ax, ay] = P(gx, gy - 0.42, 57);
-        const [fx, fy] = P(gx + 0.55, gy + 0.55, 0);
-        const spots = [
-          { front: false, flip: false, x: ox + (ax - 10) * k, y: oy + (ay - 18) * k - lift },
-          { front: false, flip: true, x: ox + (ax - 10) * k, y: oy + (ay - 18) * k - lift },
-          { front: true, flip: false, x: ox + (fx - 10) * k, y: oy + (fy + 10) * k },
-          { front: true, flip: true, x: ox + (fx - 10) * k, y: oy + (fy + 10) * k }
-        ];
-        const covers = (sp: typeof spots[number]) => {
-          const l = sp.flip ? sp.x + 20 - QW : sp.x;
-          const t = sp.front ? sp.y : sp.y - QH;
-          return boxes.some((q) => l < q.r && l + QW > q.l && t < q.b && t + QH > q.t);
-        };
-        const spot = spots.find((sp) => !covers(sp)) ?? spots[0];
-        const cls = ['cth-st-quote', spot.front ? 'cth-st-quote-below' : '', spot.flip ? 'cth-st-quote-left' : ''].filter(Boolean).join(' ');
-        return (
-          <div key={quote.key} className={cls} style={{ left: spot.flip ? spot.x + 20 : spot.x, top: spot.y, position: 'absolute', '--q-acc': c.acc } as CSSProperties}>
-            <span className="cth-st-quote-who">
-              <i style={{ background: c.l, color: c.acc, boxShadow: `inset 0 0 0 1px ${c.m}` }}>{who.name.slice(0, 1).toUpperCase()}</i>
-              {who.name}
-            </span>
-            <span className="cth-st-quote-text">“{quote.text}”</span>
-          </div>
-        );
-      })()}
 
       {/* A scheduled job's name, as it starts. */}
       {life.bubbles.map((b) => (
@@ -551,14 +533,37 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
 /** A quiet pod's chip (DESIGN.md 7.14a): who sits there, and anything waiting
  *  on the owner, without the full card. Hover shows the card; a click opens
  *  that person's panel. */
-function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave }: {
+type QuoteSpot = 'up' | 'up-end' | 'down';
+
+function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave, quote, quoteSpot }: {
   style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
   onSelect: (id: string) => void; onEnter: () => void; onLeave: () => void;
+  /** An idle line someone in this pod is saying (DESIGN.md 8.8). */
+  quote: { agentId: string; text: string; key: number } | null;
+  quoteSpot: QuoteSpot;
 }) {
   const { t } = useTranslation();
   const forYou = members.reduce((n, a) => n + (snap.forYouBy[a.id] ?? 0), 0);
   const names = members.map((a) => a.name).join(', ');
+  const speakerAt = quote ? members.findIndex((a) => a.id === quote.agentId) : -1;
+  const speaker = speakerAt >= 0 ? members[speakerAt] : null;
   return (
+    <div style={style}>
+      {/* The speech bubble belongs to the chip: its tail points at the speaker's avatar. */}
+      {quote && speaker && (
+        <div key={quote.key} aria-hidden="true"
+          className={['cth-st-quote', quoteSpot === 'down' ? 'cth-st-quote-below' : '', quoteSpot === 'up-end' ? 'cth-st-quote-end' : ''].filter(Boolean).join(' ')}
+          style={{
+            ...(quoteSpot === 'down' ? { top: 'calc(100% + 10px)' } : { bottom: 'calc(100% + 10px)' }),
+            // Opening leftward, the bubble's right edge sits just past the
+            // speaker's avatar so the tail (12px in from that edge) lands on it.
+            ...(quoteSpot === 'up-end' ? { right: `calc(100% - ${4 + speakerAt * 14 + 10 + 18}px)` } : { left: 0 }),
+            ['--q-acc' as string]: c.acc, ['--q-tail' as string]: `${4 + speakerAt * 14 + 4}px`
+          } as CSSProperties}>
+          {members.length > 1 && <span className="cth-st-quote-who">{speaker.name}</span>}
+          <span className="cth-st-quote-text">“{quote.text}”</span>
+        </div>
+      )}
     <button
       data-studio-card=""
       onClick={() => onSelect(members[0].id)}
@@ -567,7 +572,7 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave }: 
       aria-label={`${t(`studio.dept.${dept}`)}: ${names}`}
       title={t(`studio.dept.${dept}`)}
       style={{
-        ...style, display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px 0 4px',
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px 0 4px',
         border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--cth-font-ui)',
         background: 'color-mix(in srgb, var(--cth-card) 92%, transparent)', backdropFilter: 'blur(6px)',
         boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
@@ -575,9 +580,10 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave }: 
     >
       <span style={{ display: 'inline-flex' }}>
         {members.map((a, i) => (
-          <span key={a.id} style={{
+          <span key={a.id} className={i === speakerAt ? 'cth-st-speak' : undefined} style={{
             width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', marginInlineStart: i ? -6 : 0,
-            background: c.l, color: c.acc, boxShadow: `0 0 0 1.5px var(--cth-card), inset 0 0 0 1px ${c.m}`, fontSize: 10, fontWeight: 700
+            position: 'relative', zIndex: i === speakerAt ? 1 : undefined,
+            background: c.l, color: c.acc, boxShadow: i === speakerAt ? `0 0 0 1.5px var(--cth-card), 0 0 0 3px ${c.acc}` : `0 0 0 1.5px var(--cth-card), inset 0 0 0 1px ${c.m}`, fontSize: 10, fontWeight: 700
           }}>{a.name.slice(0, 1).toUpperCase()}</span>
         ))}
       </span>
@@ -586,6 +592,7 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave }: 
         <span style={forYouBadge}><i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cth-coral-base)', display: 'block' }} />{t('studio.forYou', { count: forYou })}</span>
       )}
     </button>
+    </div>
   );
 }
 
@@ -845,7 +852,8 @@ function useIdleQuote(pods: PodPlan<Agent>[], paused: boolean): { agentId: strin
       // a quiet pod first, so the bubble never sits on an open card.
       const isIn = (a: Agent) => a.status === 'idle' && a.action !== ACTION_CLOCKING_IN;
       const quiet = podsRef.current.filter((p) => !p.members.some((a) => ACTIVE.has(a.status))).flatMap((p) => p.members).filter(isIn);
-      const idle = quiet.length ? quiet : podsRef.current.flatMap((p) => p.members).filter(isIn);
+      // Lines belong to a chip, so only someone in a quiet pod speaks.
+      const idle = quiet;
       if (idle.length) {
         const a = idle[Math.floor(Math.random() * idle.length)];
         const text = pickSoloLine(a.character, 'coffee', Math.floor(Math.random() * 1000));
