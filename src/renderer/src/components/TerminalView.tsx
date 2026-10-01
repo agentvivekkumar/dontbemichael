@@ -115,8 +115,9 @@ export function TerminalView({ initialLines = [], feed = [] }: TerminalViewProps
         marginBottom: 4
       }}>
         <span style={{
+          borderRadius: 'var(--cth-r-md)',
           width: 8, height: 8, background: 'var(--cth-coral)',
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }} />
         live · pipe-pane
       </div>

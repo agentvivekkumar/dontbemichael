@@ -115,7 +115,7 @@ export function UpdateBadge() {
         border: 'none',
         borderRadius: 2,
         // 'latest' is a quiet word after the version, not a chip asking for a click.
-        boxShadow: view.label && view.tone !== 'idle' ? 'inset 0 0 0 1px var(--cth-ink-300)' : 'none',
+        boxShadow: view.label && view.tone !== 'idle' ? 'inset 0 0 0 1px var(--cth-line-2)' : 'none',
         fontFamily: 'var(--cth-font-ui)',
         fontSize: 13,
         lineHeight: '18px',

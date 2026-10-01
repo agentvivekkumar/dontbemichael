@@ -659,14 +659,16 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
             .some((model) => model.id === a.model);
           return (
           <div key={a.id} style={{
+            borderRadius: 'var(--cth-r-md)',
             display: 'flex', flexDirection: 'column', gap: 4,
             padding: 6, marginBottom: 6,
-            background: armed ? 'var(--cth-coral-light)' : 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+            background: armed ? 'var(--cth-coral-light)' : 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 width: 24, height: 24, background: `var(--cth-${a.accent}-light)`,
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
               }}>
                 <SpritePortrait character={a.character} scale={1} />
@@ -698,8 +700,9 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
               )}
               {lastTool[a.id] && (
                 <span style={{
+                  borderRadius: 'var(--cth-r-md)',
                   fontSize: 10, lineHeight: '14px', padding: '0 5px', flexShrink: 0,
-                  background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', color: 'var(--cth-ink-700)'
+                  background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-700)'
                 }}>{lastTool[a.id]}</span>
               )}
               <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-300)', flexShrink: 0 }}>{t('commandCenter.budget')}</span>
@@ -710,7 +713,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                   limit: denom.toLocaleString(),
                   note: hasAgentCap ? t('commandCenter.agentLimit') : t('commandCenter.floorBudget')
                 })}
-                style={{ width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', flexShrink: 0 }}
+                style={{ borderRadius: 'var(--cth-r-md)', width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', flexShrink: 0 }}
               >
                 <div style={{ width: `${pct}%`, height: '100%', background: meterColor }} />
               </div>
@@ -738,7 +741,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                         limit: a.contextLimit!.toLocaleString(),
                         pct: cpct
                       })}
-                      style={{ width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', flexShrink: 0 }}
+                      style={{ borderRadius: 'var(--cth-r-md)', width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', flexShrink: 0 }}
                     >
                       <div style={{ width: `${cpct}%`, height: '100%', background: ccolor }} />
                     </div>
@@ -900,6 +903,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
         })}
         {/* Fleet summary band */}
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', gap: 14, marginTop: 2, padding: '6px 8px',
           background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
           fontFamily: 'var(--cth-font-mono)', fontSize: 11, color: 'var(--cth-ink-900)', flexWrap: 'wrap'
@@ -951,17 +955,19 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
             </div>
             {issuesError && (
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 fontSize: 12, color: 'var(--cth-ink-700)', marginBottom: 6,
-                padding: 6, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                padding: 6, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 wordBreak: 'break-word'
               }}>{issuesError}</div>
             )}
             {!issuesError && !issuesLoading && issues.length === 0 && <Muted>{t('commandCenter.noIssues')}</Muted>}
             {issues.map((issue) => (
               <div key={issue.number} style={{
+                borderRadius: 'var(--cth-r-md)',
                 display: 'flex', flexDirection: 'column', gap: 4,
                 padding: 6, marginBottom: 6,
-                background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <span style={{ fontSize: 12, color: 'var(--cth-ink-900)', flex: 1, wordBreak: 'break-word' }}>
@@ -975,8 +981,9 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {issue.labels.map((label) => (
                       <span key={label} style={{
+                        borderRadius: 'var(--cth-r-md)',
                         fontSize: 10, lineHeight: '14px', padding: '0 5px',
-                        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                         color: 'var(--cth-ink-700)'
                       }}>{label}</span>
                     ))}
@@ -1004,6 +1011,7 @@ function ArchivedSection() {
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: '2px 8px 1px', border: 'none', cursor: 'pointer',
           background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
@@ -1013,13 +1021,15 @@ function ArchivedSection() {
       >{open ? '▾' : '▸'} {open ? t('commandCenter.hideClosed') : t('commandCenter.showClosed')}</button>
       {open && archivedAgents.map((a) => (
         <div key={a.id} style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', alignItems: 'center', gap: 8,
           padding: 6, marginBottom: 6, opacity: 0.7,
-          background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }}>
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             width: 24, height: 24, background: `var(--cth-${a.accent}-light)`,
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
           }}>
             <SpritePortrait character={a.character} scale={1} />
@@ -1152,7 +1162,7 @@ export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }:
 
       {!ownOnly && <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
         <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-ink-700)' }}>{t('memoryNotes.searchTitle')}</h3>
-        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
+        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ borderRadius: 'var(--cth-r-md)', display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', marginBottom: 6 }}>
           {(['text', 'meaning'] as const).map((m) => (
             <button
               key={m}
@@ -1245,6 +1255,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
         onClick={() => { setText(value != null ? String(value) : ''); setEditing(true); }}
         title={t('commandCenter.tokenLimitTitle')}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           flexShrink: 0, padding: '1px 6px', border: 'none', cursor: 'pointer',
           background: value && value > 0 ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
           boxShadow: `inset 0 0 0 1px ${value && value > 0 ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
@@ -1268,6 +1279,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
         onBlur={() => { if (skipBlur.current) { skipBlur.current = false; return; } commit(); }}
         placeholder={t('common.tokens')}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           width: 84, padding: '2px 4px', background: 'var(--cth-paper-100)', border: 'none',
           boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontFamily: 'var(--cth-font-mono)',
           fontSize: 11, color: 'var(--cth-ink-900)', outline: 'none'
@@ -1275,7 +1287,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
       />
       <button
         onMouseDown={(e) => e.preventDefault()} onClick={commit} title={t('commandCenter.saveLimit')}
-        style={{ flexShrink: 0, padding: '1px 5px', border: 'none', cursor: 'pointer', background: 'var(--cth-mint)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', fontSize: 11, color: 'var(--cth-ink-900)' }}
+        style={{ borderRadius: 'var(--cth-r-md)', flexShrink: 0, padding: '1px 5px', border: 'none', cursor: 'pointer', background: 'var(--cth-mint)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', fontSize: 11, color: 'var(--cth-ink-900)' }}
       >✓</button>
     </span>
   );
@@ -1369,9 +1381,10 @@ function Pre({ children, fill = false }: { children: React.ReactNode; fill?: boo
   const rtl = useRtl();
   return (
     <pre style={{
+      borderRadius: 'var(--cth-r-md)',
       margin: '6px 0 0', padding: 8, overflow: 'auto',
       ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 200 }),
-      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
       fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px',
       color: 'var(--cth-ink-900)', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
     }} dir={rtl ? 'auto' : undefined}>{children}</pre>
@@ -1395,6 +1408,7 @@ function Select({ value, onChange, disabled, children }: {
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       style={{
+        borderRadius: 'var(--cth-r-md)',
         padding: '3px 6px', background: 'var(--cth-paper-100)',
         border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
         fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)', cursor: 'pointer',

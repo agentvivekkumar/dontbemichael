@@ -989,9 +989,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{
+                  borderRadius: 'var(--cth-r-md)',
                   width: 32, height: 32,
                   background: 'var(--cth-coral-light)',
-                  boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
+                  boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0
                 }}>
@@ -1320,7 +1321,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.skills.desc', { godName })}
                         </span>
                       </div>
-                      <div style={{ flex: 1, minHeight: 420, display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+                      <div style={{ borderRadius: 'var(--cth-r-md)', flex: 1, minHeight: 420, display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
                         <SkillsTab />
                       </div>
                     </div>
@@ -1342,10 +1343,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 key={m.label}
                                 onClick={() => { if (m.id) void saveDefaultModel(m.id); }}
                                 style={{
+                                  borderRadius: 'var(--cth-r-md)',
                                   padding: '3px 8px 1px', border: 'none', cursor: 'pointer',
                                   fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
                                   background: defaultModelSel === m.id ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-                                  boxShadow: defaultModelSel === m.id ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)'
+                                  boxShadow: defaultModelSel === m.id ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-ink-100)'
                                 }}
                               >{m.label}</button>
                             ))}
@@ -1541,7 +1543,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 : { dot: 'var(--cth-lemon)', label: t('memoryPanel.onGettingReady') };
                           return (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--cth-ink-900)', marginTop: 8 }}>
-                              <span style={{ width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
+                              <span style={{ borderRadius: 'var(--cth-r-md)', width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }} />
                               {st.label}
                             </span>
                           );
@@ -1550,8 +1552,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         {/* Not installed: send them to the setup that installs it. */}
                         {memStatus && !memStatus.available && (
                           <div style={{
+                            borderRadius: 'var(--cth-r-md)',
                             marginTop: 8, fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: 1.6,
-                            background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', padding: 10
+                            background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', padding: 10
                           }}>
                             {t('memoryPanel.notInstalled')}
                             <div style={{ marginTop: 8 }}>
@@ -1579,9 +1582,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     type="button"
                                     onClick={() => pickEmbeddingModel(id)}
                                     style={{
+                                      borderRadius: 'var(--cth-r-md)',
                                       flex: 1, textAlign: 'left', cursor: 'pointer', border: 'none', padding: '8px 8px',
                                       background: sel ? 'var(--cth-lemon-light)' : 'var(--cth-cream-100)',
-                                      boxShadow: sel ? 'inset 0 0 0 2px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-300)'
+                                      boxShadow: sel ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)'
                                     }}
                                     aria-pressed={sel}
                                   >
@@ -1717,9 +1721,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               bot-event subscription requirement (steps 6 & 7). */}
                           {showSlackHelp && (
                             <pre style={{
+                              borderRadius: 'var(--cth-r-md)',
                               margin: 0, padding: 10, whiteSpace: 'pre-wrap',
                               background: 'var(--cth-paper-100)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                               fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
                               color: 'var(--cth-ink-700)'
                             }}>{SLACK_CONNECT_STEPS}</pre>
@@ -1885,9 +1890,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                         {showWebhookHelp && (
                           <pre style={{
+                            borderRadius: 'var(--cth-r-md)',
                             margin: 0, padding: 10, whiteSpace: 'pre-wrap',
                             background: 'var(--cth-paper-100)',
-                            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                             fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
                             color: 'var(--cth-ink-700)'
                           }}>{webhookApiDoc(godName)}</pre>
@@ -1912,6 +1918,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 <div
                                   key={w.id}
                                   style={{
+                                    borderRadius: 'var(--cth-r-md)',
                                     display: 'flex', flexDirection: 'column', gap: 8,
                                     padding: '10px 12px',
                                     background: 'var(--cth-cream-100)',
@@ -2229,10 +2236,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             and saving in either flips the same gate. The value never leaves
                             main; only the presence boolean comes back. */}
                         <div style={{
+                          borderRadius: 'var(--cth-r-md)',
                           display: 'flex', flexDirection: 'column', gap: 8,
                           padding: 10,
                           background: 'var(--cth-paper-100)',
-                          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                          boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                         }}>
                           <span style={sectionHeadFlush}>
                             {t('settings.voice.openaiKey')}
@@ -2267,9 +2275,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             color: hasOpenAiKey ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
                           }}>
                             <span aria-hidden style={{
+                              borderRadius: 'var(--cth-r-md)',
                               width: 8, height: 8, flexShrink: 0,
                               background: hasOpenAiKey ? 'var(--cth-mint)' : 'var(--cth-ink-300)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                             }} />
                             {openAiVoiceNote || (hasOpenAiKey
                               ? t('settings.voice.keySaved', { godName })

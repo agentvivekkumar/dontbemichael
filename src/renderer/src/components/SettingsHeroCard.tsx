@@ -99,6 +99,7 @@ export function SettingsHeroCard() {
               }}>v{version}</span>
             )}
             <span style={{
+              borderRadius: 'var(--cth-r-md)',
               fontFamily: MONO, fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase',
               padding: '2px 7px', background: 'var(--cth-mint-light)',
               boxShadow: 'inset 0 0 0 1px var(--cth-mint)', color: INK

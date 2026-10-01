@@ -135,9 +135,10 @@ export function ProfileTab({ agent }: { agent: Agent }) {
                       type="button"
                       onClick={() => useStore.getState().select(a.id)}
                       style={{
+                        borderRadius: 'var(--cth-r-md)',
                         padding: '2px 8px', border: 'none', cursor: 'pointer', fontFamily: 'var(--cth-font-ui)',
                         fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)', textAlign: 'start',
-                        background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                        background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                       }}
                     >
                       <span style={{ fontWeight: 600 }}>{a.name}</span>
@@ -194,6 +195,7 @@ export function ProfileTab({ agent }: { agent: Agent }) {
             </button>
             {showInstructions && (
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 marginTop: 8, padding: '4px 12px', fontSize: 14, lineHeight: '20px',
                 background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
               }}>

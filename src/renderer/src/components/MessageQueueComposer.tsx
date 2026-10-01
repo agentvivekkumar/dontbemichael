@@ -197,6 +197,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       }}
       onDrop={onDrop}
       style={{
+        borderRadius: 'var(--cth-r-md)',
         flexShrink: 0,
         borderTop: '1px solid var(--cth-ink-700)',
         background: 'var(--cth-cream-100)',
@@ -221,6 +222,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
         }}>{t('queueComposer.queue')}</span>
         {queue.length > 0 && (
           <span style={{
+            borderRadius: 'var(--cth-r-md)',
             fontSize: 11, padding: '1px 6px 0',
             background: 'var(--cth-cream-200)',
             boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
@@ -313,6 +315,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
               key={a.path}
               title={a.path}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 maxWidth: '100%',
                 padding: '2px 4px 2px 6px',
@@ -473,10 +476,11 @@ function QueuedMessageRow(
 
   return (
     <div style={{
+      borderRadius: 'var(--cth-r-md)',
       display: 'flex', alignItems: 'flex-start', gap: 6,
       padding: '4px 6px',
       background: 'var(--cth-paper-100)',
-      boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+      boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
     }}>
       <span style={{
         fontFamily: 'var(--cth-font-mono)', fontSize: 12,
@@ -676,11 +680,12 @@ function FreeFlowButton({ agentId, hasGroqKey }: { agentId: string; hasGroqKey: 
               role="dialog"
               onClick={(e) => e.stopPropagation()}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 position: 'fixed', left: hint.left, top: hint.top, zIndex: 460,
                 width: HINT_W, padding: '10px 12px', boxSizing: 'border-box',
                 display: 'flex', flexDirection: 'column', gap: 7,
                 background: 'var(--cth-paper-100)',
-                boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 0 6px 18px rgba(62,52,140,.08)',
+                boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo), 0 6px 18px rgba(62,52,140,.08)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 11, lineHeight: '15px',
                 color: 'var(--cth-ink-900)', textAlign: 'left', whiteSpace: 'normal'
               }}

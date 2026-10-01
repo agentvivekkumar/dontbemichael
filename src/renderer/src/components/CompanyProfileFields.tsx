@@ -196,15 +196,17 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
 
       {parts.includes('hint') && (
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', flexDirection: 'column', gap: 6, padding: 10,
-          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }}>
           <span style={{ fontSize: 14, lineHeight: '19px', color: 'var(--cth-ink-900)' }}>{t('companyProfile.knowledgeHead')}</span>
           <span style={{ fontSize: 14, lineHeight: '19px', color: 'var(--cth-ink-700)' }}>{t('companyProfile.knowledgeBody')}</span>
           {onOpenKnowledge && (
             <button type="button" onClick={onOpenKnowledge} style={{
+              borderRadius: 'var(--cth-r-md)',
               alignSelf: 'flex-start', padding: '4px 10px 2px', border: 'none', cursor: 'pointer',
-              background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)'
             }}>
               {t('companyProfile.knowledgeOpen')}
@@ -241,7 +243,7 @@ function input(missing: boolean): CSSProperties {
   return {
     padding: '6px 8px 4px', border: 'none',
     background: 'var(--cth-cream-50)',
-    boxShadow: missing ? 'inset 0 0 0 2px var(--cth-coral)' : 'inset 0 0 0 1.5px var(--cth-ink-300)',
+    boxShadow: missing ? 'inset 0 0 0 2px var(--cth-coral)' : 'inset 0 0 0 1px var(--cth-line-2)',
     fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)',
     minWidth: 0
   };

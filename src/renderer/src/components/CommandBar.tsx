@@ -48,12 +48,13 @@ export function CommandBar({ accent, busy, blocked, onSend }: CommandBarProps) {
             key={m}
             onClick={() => setMode(m)}
             style={{
+              borderRadius: 'var(--cth-r-md)',
               padding: '4px 10px 2px',
               border: 'none',
               background: mode === m ? `var(--cth-${accent})` : 'var(--cth-cream-200)',
               color: 'var(--cth-ink-900)',
               boxShadow: mode === m
-                ? 'inset 0 0 0 1px var(--cth-ink-300), 0 -2px 0 var(--cth-ink-900) inset'
+                ? 'inset 0 0 0 1px var(--cth-line-2), 0 -2px 0 var(--cth-ink-900) inset'
                 : 'inset 0 0 0 1px var(--cth-ink-100)',
               fontFamily: 'var(--cth-font-ui)',
               fontSize: 13,
@@ -79,6 +80,7 @@ export function CommandBar({ accent, busy, blocked, onSend }: CommandBarProps) {
             onKeyDown={onKey}
             placeholder={blocked ? t('commandBar.placeholderBlocked') : busy ? t('commandBar.placeholderBusy') : t('commandBar.placeholder')}
             style={{
+              borderRadius: 'var(--cth-r-md)',
               flex: 1,
               padding: '4px 6px 2px',
               background: 'var(--cth-paper-100)',

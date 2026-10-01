@@ -113,6 +113,7 @@ function EntryRow({ agentId, entry }: { agentId: string; entry: MemoryEntry }) {
         <span>{t('memoryNotes.sourceLine', { source, date: shortDate(entry.date, lang) })}</span>
         {expiry !== 'none' && entry.expires && (
           <span style={{
+            borderRadius: 'var(--cth-r-md)',
             padding: '0 6px', color: 'var(--cth-ink-900)',
             background: expiry === 'passed' ? 'var(--cth-coral-light)' : 'var(--cth-lemon-light)',
             boxShadow: `inset 0 0 0 1px ${expiry === 'passed' ? 'var(--cth-coral)' : 'var(--cth-lemon)'}`

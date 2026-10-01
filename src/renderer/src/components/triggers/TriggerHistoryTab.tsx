@@ -266,6 +266,7 @@ function ExchangeCard({
     <div style={pending ? pendingCardStyle : cardStyle}>
       {pending && (
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-lemon)',
           padding: '4px 6px 3px', ...tinyCaps, color: 'var(--cth-ink-900)'
         }}>
@@ -496,6 +497,7 @@ export function TriggerHistoryTab() {
 
         {pendingCount > 0 && (
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-lemon)',
             padding: '6px 8px', ...uiText, fontSize: 11, lineHeight: '16px'
           }}>
@@ -507,6 +509,7 @@ export function TriggerHistoryTab() {
 
         {error && (
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
             padding: '6px 8px', ...uiText, fontSize: 11, lineHeight: '16px'
           }}>{error}</div>

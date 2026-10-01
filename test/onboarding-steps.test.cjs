@@ -21,7 +21,7 @@ const orderMatch = wizard.match(/const order: Step\[\] = \[([^\]]+)\]/);
 const ORDER = orderMatch ? [...orderMatch[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]) : [];
 
 const STEP_RE = {
-  en: /^STEP (\d+) OF (\d+) · /,
+  en: /^Step (\d+) of (\d+) · /,
   'zh-CN': /^第 (\d+) 步，共 (\d+) 步 · /,
   ar: /^الخطوة (\d+) من (\d+) · /
 };

@@ -90,6 +90,7 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
                   <div
                     key={entry.id}
                     style={{
+                      borderRadius: 'var(--cth-r-md)',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       gap: 12, padding: '7px 10px',
                       background: 'var(--cth-paper-100)',
@@ -115,6 +116,7 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
                       type="button"
                       onClick={() => { void toggle(entry.id); }}
                       style={{
+                        borderRadius: 'var(--cth-r-md)',
                         flexShrink: 0,
                         padding: '3px 10px 1px',
                         background: on

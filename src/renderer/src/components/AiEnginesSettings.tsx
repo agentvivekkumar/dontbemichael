@@ -189,8 +189,9 @@ export function AiEnginesSettings({ config }: { config: HarnessConfig }) {
 
       {/* Unsandboxed-in-auto caveat (Pam guardrail #6) */}
       <div style={{
+        borderRadius: 'var(--cth-r-md)',
         fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px',
-        padding: 8, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', background: 'var(--cth-paper-100)'
+        padding: 8, boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', background: 'var(--cth-paper-100)'
       }}>
         {t('aiEngines.autoModeCaveat')}
       </div>

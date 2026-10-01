@@ -80,7 +80,7 @@ export function MailboxesSettings() {
       {failed && <div role="alert" style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>! {t('capabilities.saveFailed')}</div>}
 
       {mailboxes.length === 0 ? (
-        <div style={{ background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', padding: 12, fontSize: 13, lineHeight: '18px' }}>
+        <div style={{ borderRadius: 'var(--cth-r-md)', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', padding: 12, fontSize: 13, lineHeight: '18px' }}>
           {t('mailboxes.empty')}
         </div>
       ) : (

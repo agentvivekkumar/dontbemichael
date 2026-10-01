@@ -53,6 +53,7 @@ function StatusBadge({ w }: { w: WorkerSnapshot }) {
   const releasing = w.status === 'releasing';
   return (
     <span style={{
+      borderRadius: 'var(--cth-r-md)',
       fontFamily: 'var(--cth-font-mono)', fontSize: 10, padding: '1px 6px',
       textTransform: 'uppercase', letterSpacing: 0.5,
       color: releasing ? 'var(--cth-paper-100)' : 'var(--cth-ink-900)',
@@ -121,6 +122,7 @@ export function WorkersTab() {
                     }}>{w.name}</span>
                     {w.hasSlack && (
                       <span title={t('workersTab.repliesToSlack')} style={{
+                        borderRadius: 'var(--cth-r-md)',
                         fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-700)',
                         boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', padding: '0 5px'
                       }}>slack</span>

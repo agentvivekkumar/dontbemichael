@@ -185,6 +185,7 @@ export function CommitGraph({ commits, currentBranch, onCommitClick }: CommitGra
 
             {head && (
               <span style={{
+                borderRadius: 'var(--cth-r-md)',
                 flexShrink: 1, minWidth: 0, maxWidth: '38%',
                 overflow: 'hidden', textOverflow: 'ellipsis',
                 padding: '0 5px', fontSize: 11,

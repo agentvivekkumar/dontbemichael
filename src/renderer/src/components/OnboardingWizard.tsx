@@ -589,9 +589,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{
+                    borderRadius: 'var(--cth-r-md)',
                     width: 56, height: 56, flexShrink: 0,
                     background: 'var(--cth-sky-light)',
-                    boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
+                    boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)',
                     display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden'
                   }}>
                     <SpritePortrait character="michael" scale={2} />
@@ -675,6 +676,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
                 {triedBusiness && businessGaps.length > 0 && (
                   <div role="alert" style={{
+                    borderRadius: 'var(--cth-r-md)',
                     padding: '6px 10px',
                     background: 'var(--cth-coral-light)',
                     boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
@@ -699,9 +701,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <div style={{
+                    borderRadius: 'var(--cth-r-md)',
                     width: 56, height: 56, flexShrink: 0,
                     background: 'var(--cth-sky-light)',
-                    boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
+                    boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)',
                     display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden'
                   }}>
                     <SpritePortrait character="michael" scale={2} />
@@ -720,16 +723,18 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {FEATURES.map((f) => (
                     <div key={f.labelKey} style={{
+                      borderRadius: 'var(--cth-r-md)',
                       display: 'flex', gap: 10, alignItems: 'flex-start',
                       padding: 10,
                       background: f.tint,
                       boxShadow: `inset 0 0 0 2px ${f.edge}`
                     }}>
                       <div style={{
+                        borderRadius: 'var(--cth-r-md)',
                         width: 28, height: 28, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'var(--cth-paper-100)',
-                        boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                        boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                       }}>
                         <Icon name={f.icon} />
                       </div>
@@ -781,14 +786,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     because an owner's instinct is to keep business things in
                     Dropbox or Drive, and the damage shows up much later. */}
                 <div role="note" style={{
+                  borderRadius: 'var(--cth-r-md)',
                   display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
                   background: 'var(--cth-lemon-light)',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                  boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                 }}>
                   <span style={{
+                    borderRadius: 'var(--cth-r-md)',
                     width: 28, height: 28, flexShrink: 0, display: 'flex',
                     alignItems: 'center', justifyContent: 'center',
-                    background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                    background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                   }}>
                     <Icon name="info" />
                   </span>
@@ -811,8 +818,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </p>
 
                 <div style={{
+                  borderRadius: 'var(--cth-r-md)',
                   display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10,
-                  background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                  background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                   fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
                 }}>
                   <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="sparkle" /></span>
@@ -830,6 +838,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     const sel = godProvider === p.id;
                     return (
                       <label key={p.id} style={{
+                        borderRadius: 'var(--cth-r-md)',
                         display: 'flex', alignItems: 'center', gap: 10,
                         padding: '8px 10px',
                         background: sel ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
@@ -872,19 +881,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                           const bad = a.state === 'not-installable';
                           return (
                             <span title={a.path ?? undefined} style={{
+                              borderRadius: 'var(--cth-r-md)',
                               fontSize: 10, padding: '1px 5px', lineHeight: '16px',
                               background: a.state === 'installed' ? 'var(--cth-mint-light)' : bad ? 'var(--cth-paper-100)' : 'var(--cth-cream-200)',
                               color: bad ? 'var(--cth-ink-500)' : 'var(--cth-ink-900)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                               fontFamily: 'var(--cth-font-display)', flexShrink: 0
                             }}>{badge}</span>
                           );
                         })()}
                         {p.id === 'claude' && (
                           <span style={{
+                            borderRadius: 'var(--cth-r-md)',
                             fontSize: 10, padding: '1px 5px', lineHeight: '16px',
                             background: 'var(--cth-lemon)',
-                            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                             fontFamily: 'var(--cth-font-display)', flexShrink: 0
                           }}>{t('onboarding.orchestrator.recommended')}</span>
                         )}
@@ -896,10 +907,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       real constraint — no inbox drain path — not as "unsupported". */}
                   {onboardingEngineChoices().workersOnly.map((p) => (
                     <label key={p.id} aria-disabled title={t('onboarding.orchestrator.workersOnlyHint')} style={{
+                      borderRadius: 'var(--cth-r-md)',
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '8px 10px',
                       background: 'var(--cth-paper-100)',
-                      boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                      boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                       cursor: 'not-allowed', opacity: 0.75
                     }}>
                       <input type="radio" name="godProvider" value={p.id} checked={false} disabled
@@ -919,9 +931,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                         </span>
                       </span>
                       <span style={{
+                        borderRadius: 'var(--cth-r-md)',
                         fontSize: 10, padding: '1px 5px', lineHeight: '16px',
                         background: 'var(--cth-paper-100)', color: 'var(--cth-ink-500)',
-                        boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                        boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                         fontFamily: 'var(--cth-font-display)', flexShrink: 0
                       }}>{t('onboarding.orchestrator.workersOnly')}</span>
                     </label>
@@ -929,6 +942,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
                 {engineBlocked && (
                   <div style={{
+                    borderRadius: 'var(--cth-r-md)',
                     display: 'flex', flexDirection: 'column', gap: 8, padding: 10,
                     background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 2px var(--cth-ink-900)',
                     fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-900)'
@@ -973,6 +987,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     finish, so a smaller plan's usage limit isn't a surprise on
                     the first busy afternoon. */}
                 <div style={{
+                  borderRadius: 'var(--cth-r-md)',
                   display: 'flex', flexDirection: 'column', gap: 8, padding: 10,
                   background: 'var(--cth-peach-light)', boxShadow: 'inset 0 0 0 2px var(--cth-peach)',
                   fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)'
@@ -1005,8 +1020,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     folder; put their documents there; they save their work there. */}
                 {folderSuggestions && (
                   <div style={{
+                    borderRadius: 'var(--cth-r-md)',
                     display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
-                    background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                    background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                     fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)'
                   }}>
                     <span style={{ flexShrink: 0, marginTop: 1 }}><Icon name="folder" /></span>
@@ -1062,6 +1078,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   {t('onboarding.permissions.autonomyHead')}
                 </div>
                 <label style={{
+                  borderRadius: 'var(--cth-r-md)',
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: 12,
                   background: autoMode ? 'var(--cth-mint-light)' : 'var(--cth-cream-200)',
@@ -1143,14 +1160,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     itself, so we deep-link the pane where one exists (macOS/Windows)
                     and fall back to text-only guidance on Linux. */}
                 <div style={{
+                  borderRadius: 'var(--cth-r-md)',
                   display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10,
                   background: 'var(--cth-lemon-light)',
-                  boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                  boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                 }}>
                   <span style={{
+                    borderRadius: 'var(--cth-r-md)',
                     width: 28, height: 28, flexShrink: 0, display: 'flex',
                     alignItems: 'center', justifyContent: 'center',
-                    background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                    background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                   }}>
                     <Icon name="gear" />
                   </span>
@@ -1178,6 +1197,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
             {error && (
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 padding: '6px 10px',
                 background: 'var(--cth-coral-light)',
                 boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
@@ -1333,6 +1353,7 @@ function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
       onClick={onClick}
       aria-pressed={selected}
       style={{
+        borderRadius: 'var(--cth-r-md)',
         textAlign: 'left', cursor: 'pointer', border: 'none',
         padding: 10, display: 'flex', gap: 10, alignItems: 'flex-start',
         background: selected ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
@@ -1342,9 +1363,10 @@ function PackTile({ glyph, title, subtitle, selected, missing, onClick }: {
       }}
     >
       <span style={{
+        borderRadius: 'var(--cth-r-md)',
         width: 28, height: 28, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
         fontSize: 16, lineHeight: '28px'
       }}>{glyph}</span>
       {/* minWidth:0 lets this flex child shrink below its content width;
@@ -1540,9 +1562,10 @@ function Dots({ step }: { step: Step }) {
     <div style={{ display: 'flex', gap: 4 }}>
       {order.map((s) => (
         <span key={s} style={{
+          borderRadius: 'var(--cth-r-md)',
           width: 8, height: 8,
           background: s === step ? 'var(--cth-ink-900)' : 'var(--cth-cream-300)',
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }} />
       ))}
     </div>

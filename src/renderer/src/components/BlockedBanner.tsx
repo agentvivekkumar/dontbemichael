@@ -12,8 +12,9 @@ export function BlockedBanner({ reason, onAction }: BlockedBannerProps) {
   const { t } = useTranslation();
   return (
     <div style={{
+      borderRadius: 'var(--cth-r-md)',
       background: 'var(--cth-coral-light)',
-      boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), inset 0 0 0 4px var(--cth-coral)',
+      boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo), inset 0 0 0 4px var(--cth-coral)',
       padding: 12,
       display: 'flex',
       flexDirection: 'column',
@@ -45,6 +46,7 @@ export function BlockedBanner({ reason, onAction }: BlockedBannerProps) {
       </div>
       {reason.command && (
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           fontFamily: 'var(--cth-font-mono)',
           fontSize: 13,
           lineHeight: '18px',
