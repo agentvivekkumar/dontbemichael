@@ -19,9 +19,11 @@
  *   pods, with a count, until they go quiet for a minute.
  * - Something the owner sends Michael comes up from the composer below.
  * - A new hire's pod drops in with confetti and a welcome.
+ * - Idle banter (DESIGN.md 8.8): two quiet people trade lines as paper planes
+ *   or envelopes (`throwNote`); the stage shows each line where it lands.
  *
- * Nothing here is invented: every effect starts from a hive message, a hook
- * event or the task ledger. Effects stop while the stage is paused, and with
+ * Apart from the banter, nothing here is invented: every effect starts from a
+ * hive message, a hook event or the task ledger. Effects stop while the stage is paused, and with
  * reduced motion a token appears at its destination for a second instead.
  */
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -33,11 +35,11 @@ import { deskSpots } from './StudioArt';
 import type { SceneTokens } from './theme';
 
 export const MAX_TOKENS = 16;
-const FLIGHT_MS = 2200;
+export const FLIGHT_MS = 2200;
 
 export type SeatMap = Map<string, { pod: PodPlan<Agent>; index: number }>;
 
-type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail' | 'owner';
+type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail' | 'owner' | 'note-plane' | 'note-mail';
 interface Flight { key: string; d: string; start: Pt; end: Pt; kind: FlightKind; color?: string; ping: boolean }
 interface Pop { key: string; at: Pt; glyph: Glyph; color: string }
 interface Burst { key: string; at: Pt }
@@ -73,6 +75,10 @@ export interface Life {
   postActive: Record<string, 'in' | 'out'>;
   /** New hires whose pod is dropping in right now. */
   arriving: Set<string>;
+  /** Idle banter: a paper plane or an envelope from one person's pod to
+   *  another's, in the sender's department color. False when it can't fly
+   *  (paused, or either one has no seat). It lands after FLIGHT_MS. */
+  throwNote: (fromId: string, toId: string, look: 'plane' | 'mail') => boolean;
 }
 
 /** Where the Brief Michael composer sits, below the stage. */
@@ -349,7 +355,16 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
       {bursts.map((b) => <DoneBurst key={b.key} at={b.at} T={T} />)}
     </>
   );
-  return { svg, bubbles, clockRinging, postActive, arriving };
+  const throwNote = (fromId: string, toId: string, look: 'plane' | 'mail'): boolean => {
+    const { seatOf: s, paused: p, accentOf: acc } = live.current;
+    const a = s.get(fromId)?.pod.grid;
+    const b = s.get(toId)?.pod.grid;
+    const d = a && b ? flightPath(a, b) : null;
+    if (p || !a || !b || !d) return false;
+    launch([{ key: `n${seqRef.current++}`, d, start: floorAt(a), end: floorAt(b), kind: look === 'plane' ? 'note-plane' : 'note-mail', color: acc(fromId), ping: true }]);
+    return true;
+  };
+  return { svg, bubbles, clockRinging, postActive, arriving, throwNote };
 }
 
 /* ── Drawing ──────────────────────────────────────────────────────────────── */
@@ -363,7 +378,7 @@ function colorOf(kind: FlightKind, T: SceneTokens, own?: string): string {
     case 'clock': return T.amber;
     case 'inform': return '#9C98B8';
     case 'refuse': return '#4A4660';
-    case 'mail': return own ?? T.req;
+    case 'mail': case 'note-plane': case 'note-mail': return own ?? T.req;
     case 'owner': return T.indigo;
     default: return T.req;
   }
@@ -403,8 +418,9 @@ function TokenHead({ kind, color, T }: { kind: FlightKind; color: string; T: Sce
   return (
     <g>
       <circle r={14} fill={color} opacity={0.16} />
-      {kind === 'you' ? (
-        // A paper plane: Michael folded the question and threw it to you.
+      {kind === 'you' || kind === 'note-plane' ? (
+        // A paper plane: Michael folded the question and threw it to you, or
+        // two idle people pass a line across the office.
         <g transform="rotate(-18)">
           <path d="M-11,1 L11,-7 L3,9 L0,3 Z" fill="#FFFFFF" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
           <path d="M11,-7 L0,3" fill="none" stroke={color} strokeWidth={1.2} />

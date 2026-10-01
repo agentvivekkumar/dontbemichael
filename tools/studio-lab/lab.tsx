@@ -101,6 +101,7 @@ const PLAYS: Play[] = [
   { group: 'Everyday work', label: 'Mail sent (out)', loop: true, run: () => { spot('dwight'); tool('dwight', 'mcp__md-mail__send'); } },
   { group: 'Everyday work', label: 'A task reaches Done', loop: true, run: () => { spot('dwight'); w.__extraDone = [...(w.__extraDone ?? []), { id: `D${n++}`, title: 'Done', status: 'done', assignee: 'dwight' }]; } },
   { group: 'Everyday work', label: 'Someone idle says something', loop: true, run: () => window.dispatchEvent(new Event('cth:demo-quote')) },
+  { group: 'Everyday work', label: 'Two idle people chat (planes, mail)', loop: true, run: () => window.dispatchEvent(new Event('cth:demo-banter')) },
   { group: 'Michael and you', label: 'Michael points, then delegates', loop: true, run: () => { msg('god', 'dwight', 'request', 'Follow up with Lakeview Dental'); spot('dwight', 1600); } },
   { group: 'Michael and you', label: 'A scheduled job starts', loop: true, run: () => { msg('scheduler', 'ryan', 'inform', 'Weekly LinkedIn post'); spot('ryan', 1800); } },
   { group: 'Michael and you', label: 'Michael asks you (paper plane)', loop: true, run: () => msg('god', 'human', 'query', 'Refund or explain?', { needsHuman: true }) },

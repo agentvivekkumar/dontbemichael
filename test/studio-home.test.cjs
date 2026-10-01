@@ -198,12 +198,30 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
   assert.match(chip.slice(0, 6000), /className=\{i === speakerAt \? 'cth-st-speak' : undefined\}/);
   assert.doesNotMatch(stage, /One in-character line over an idle pod/, 'no free floating bubble');
   // Only someone in a quiet pod (a chip) speaks; never someone clocking in.
-  assert.match(stage, /const idle = quiet;/);
+  assert.match(stage, /const quietPeople = \(\) => quietPods\(\)\.flatMap\(\(p\) => p\.members\)\.filter\(isIn\);/);
   assert.match(stage, /a\.status === 'idle' && a\.action !== ACTION_CLOCKING_IN/);
   assert.match(stage, /const wait = first \? 8000 \+ Math\.random\(\) \* 7000 : 15_000 \+ Math\.random\(\) \* 15_000;/);
   // Up from the chip, up and leftward, or down under it: the first that covers no card.
   assert.match(stage, /const free = spots\.find\(/);
   assert.match(read('src/renderer/src/design/global.css'), /\.cth-st-quote-text \{ font-size: 12\.5px;/);
+});
+
+/**
+ * Idle people talk to each other (owner, 2026-10-01: "kelly and ryan throwing
+ * paper planes towards each other or mails which on landing shows a chat
+ * bubble with the message"): a beat flies pod to pod, then shows on the
+ * catcher's chip with the sender's name and color.
+ */
+test('idle banter: planes or mail between two quiet pods, the line shown where it lands', () => {
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  const life = read('src/renderer/src/scene/studio/life.tsx');
+  assert.match(stage, /const partners = idle\.filter\(\(b\) => podOf\(b\.id\) !== podOf\(a\.id\)\);/, 'two different pods');
+  assert.match(stage, /live\.current\.throwNote\(from\.id, to\.id, look\)/);
+  assert.match(stage, /later\(FLIGHT_MS, \(\) => \{\n\s*show\(\{ agentId: to\.id, text, from: \{ name: from\.name, acc: live\.current\.accentOf\(from\.id\) \}/, 'the line shows on landing, at the catcher');
+  assert.match(stage, /if \(!still\.includes\(from\.id\) \|\| !still\.includes\(to\.id\)\) \{ busyUntil = 0; return; \}/, 'work ends the chat');
+  assert.match(stage, /\{\(quote\.from \|\| members\.length > 1\) && <span className="cth-st-quote-who">\{quote\.from\?\.name \?\? speaker\.name\}<\/span>\}/);
+  assert.match(life, /kind: look === 'plane' \? 'note-plane' : 'note-mail', color: acc\(fromId\)/);
+  assert.match(life, /kind === 'you' \|\| kind === 'note-plane' \?/);
 });
 
 test('Michael\'s numbers live on his walls; a chip replaces the always-on card (owner, 2026-09-30)', () => {

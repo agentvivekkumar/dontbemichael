@@ -17,12 +17,12 @@ import { useHasTerminalDraft } from '@/components/terminalPool';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
-import { createIdleLines } from '@/scene/office/cafeteriaLines';
+import { createBanter, createIdleLines } from '@/scene/office/cafeteriaLines';
 import { useNeedsYouCount } from '@/shell/useNeedsYou';
 import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
 import { HUB, HUB_CARD, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
-import { bendFor, useStudioLife } from './life';
+import { FLIGHT_MS, bendFor, useStudioLife } from './life';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
@@ -197,8 +197,6 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     return m;
   }, [plan]);
 
-  const quote = useIdleQuote(plan.pods, paused);
-
   // Mailbox posts: every connected mailbox, and who watches it.
   const mailboxes = config.mailboxes ?? [];
   const ownerOf = (mailboxId: string): Agent | undefined => {
@@ -207,16 +205,18 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     return entry ? agents.find((a) => a.id === entry[0]) : undefined;
   };
 
+  const accentOf = (id: string): string => {
+    const a = agents.find((x) => x.id === id);
+    return a ? families[departmentOf(a)].acc : T.req;
+  };
   // Motion from real events: messages, scheduled runs, mail, tools, done tasks.
   const life = useStudioLife({
     seatOf, godId, paused, T, done: snap.done, toYou,
     team: agents.filter((a) => !a.isGod).map((a) => ({ id: a.id, name: a.name })),
     posts: mailboxes.map((m) => ({ id: m.id, ownerId: ownerOf(m.id)?.id })),
-    accentOf: (id) => {
-      const a = agents.find((x) => x.id === id);
-      return a ? families[departmentOf(a)].acc : T.req;
-    }
+    accentOf
   });
+  const quote = useIdleQuote(plan.pods, paused, life.throwNote, accentOf);
   const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
   // Opening (DESIGN.md 8.12): a desk's light comes on as its person clocks in,
   // a pod's when the first of its people is in, Michael's office when he is.
@@ -613,8 +613,8 @@ type QuoteSpot = 'up' | 'up-end' | 'down';
 function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave, quote, quoteSpot }: {
   style: CSSProperties; dept: DepartmentName; members: Agent[]; c: Family; snap: TaskSnapshot;
   onSelect: (id: string) => void; onEnter: () => void; onLeave: () => void;
-  /** An idle line someone in this pod is saying (DESIGN.md 8.8). */
-  quote: { agentId: string; text: string; key: number } | null;
+  /** An idle line someone in this pod is saying, or one thrown to them (DESIGN.md 8.8). */
+  quote: Quote | null;
   quoteSpot: QuoteSpot;
 }) {
   const { t } = useTranslation();
@@ -633,9 +633,11 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave, qu
             // Opening leftward, the bubble's right edge sits just past the
             // speaker's avatar so the tail (12px in from that edge) lands on it.
             ...(quoteSpot === 'up-end' ? { right: `calc(100% - ${4 + speakerAt * 14 + 10 + 18}px)` } : { left: 0 }),
-            ['--q-acc' as string]: c.acc, ['--q-tail' as string]: `${4 + speakerAt * 14 + 4}px`
+            // A thrown line wears the sender's color and name.
+            ['--q-acc' as string]: quote.from?.acc ?? c.acc, ['--q-tail' as string]: `${4 + speakerAt * 14 + 4}px`,
+            animationDuration: `${quote.ms}ms`
           } as CSSProperties}>
-          {members.length > 1 && <span className="cth-st-quote-who">{speaker.name}</span>}
+          {(quote.from || members.length > 1) && <span className="cth-st-quote-who">{quote.from?.name ?? speaker.name}</span>}
           <span className="cth-st-quote-text">“{quote.text}”</span>
         </div>
       )}
@@ -909,49 +911,114 @@ function DayLight({ hour, dark }: { hour: number; dark: boolean }) {
   return <div aria-hidden="true" className="cth-st-daylight" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: bg, mixBlendMode: 'multiply' }} />;
 }
 
-/* ── Idle quote (DESIGN.md 8.8) ───────────────────────────────────────────── */
+/* ── Idle quote and banter (DESIGN.md 8.8) ─────────────────────────────── */
 
-function useIdleQuote(pods: PodPlan<Agent>[], paused: boolean): { agentId: string; text: string; key: number } | null {
-  const [quote, setQuote] = useState<{ agentId: string; text: string; key: number } | null>(null);
-  const podsRef = useRef(pods);
-  podsRef.current = pods;
-  // One deck of lines for the studio's life, so nothing repeats until it must.
+/** A line on a chip: said by `agentId`, or (with `from`) thrown to them by
+ *  someone else and shown where it landed. Visible for `ms`. */
+type Quote = { agentId: string; text: string; key: number; from?: { name: string; acc: string }; ms: number };
+
+function useIdleQuote(
+  pods: PodPlan<Agent>[], paused: boolean,
+  throwNote: (fromId: string, toId: string, look: 'plane' | 'mail') => boolean,
+  accentOf: (id: string) => string
+): Quote | null {
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const live = useRef({ pods, throwNote, accentOf });
+  live.current = { pods, throwNote, accentOf };
+  // One deck of lines and one of exchanges, so nothing repeats until it must.
   const [lines] = useState(() => createIdleLines());
+  const [banter] = useState(() => createBanter());
   const lastSpeaker = useRef('');
   useEffect(() => {
     if (paused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setQuote(null); return; }
+    const timers: number[] = [];
+    const later = (ms: number, fn: () => void) => { timers.push(window.setTimeout(fn, ms)); };
     let timer: number | undefined;
     let hide: number | undefined;
     let n = 0;
-    // The first line comes soon after the office opens, then every 15 to 30 s.
-    let first = true;
+    let busyUntil = 0;
+    const show = (q: Omit<Quote, 'key'>) => {
+      setQuote({ ...q, key: n++ });
+      window.clearTimeout(hide);
+      hide = window.setTimeout(() => setQuote(null), q.ms);
+    };
+    // Someone idle and in (not still clocking in), in a pod where nobody is at
+    // work, so a bubble never sits on an open card.
+    const isIn = (a: Agent) => a.status === 'idle' && a.action !== ACTION_CLOCKING_IN;
+    const quietPods = () => live.current.pods.filter((p) => !p.members.some((a) => ACTIVE.has(a.status)));
+    const quietPeople = () => quietPods().flatMap((p) => p.members).filter(isIn);
+    const pickOne = (people: Agent[]) => {
+      const others = people.length > 1 ? people.filter((x) => x.id !== lastSpeaker.current) : people;
+      const a = others[Math.floor(Math.random() * others.length)];
+      lastSpeaker.current = a.id;
+      return a;
+    };
+
+    // One person says a line of their own.
     const say = () => {
-      // Someone idle and in (not still clocking in) says something; people in
-      // a quiet pod first, so the bubble never sits on an open card.
-      const isIn = (a: Agent) => a.status === 'idle' && a.action !== ACTION_CLOCKING_IN;
-      const quiet = podsRef.current.filter((p) => !p.members.some((a) => ACTIVE.has(a.status))).flatMap((p) => p.members).filter(isIn);
-      // Lines belong to a chip, so only someone in a quiet pod speaks.
-      const idle = quiet;
-      if (idle.length) {
-        // Someone other than the last speaker, when there is a choice.
-        const others = idle.length > 1 ? idle.filter((x) => x.id !== lastSpeaker.current) : idle;
-        const a = others[Math.floor(Math.random() * others.length)];
-        lastSpeaker.current = a.id;
-        const text = lines(a.character);
-        setQuote({ agentId: a.id, text, key: n++ });
-        window.clearTimeout(hide);
-        hide = window.setTimeout(() => setQuote(null), 8000);
-      }
+      const idle = quietPeople();
+      if (!idle.length) return;
+      const a = pickOne(idle);
+      show({ agentId: a.id, text: lines(a.character), ms: 8000 });
+    };
+
+    // Two people in different pods trade an exchange: each beat flies across
+    // as a paper plane or an envelope and shows where it lands, held long
+    // enough to read while the reply is on its way back.
+    const chat = (): boolean => {
+      const idle = quietPeople();
+      if (idle.length < 2) return false;
+      const podOf = (id: string) => quietPods().find((p) => p.members.some((m) => m.id === id));
+      const a = pickOne(idle);
+      const partners = idle.filter((b) => podOf(b.id) !== podOf(a.id));
+      if (!partners.length) return false;
+      const b = partners[Math.floor(Math.random() * partners.length)];
+      const beats = banter(a.character);
+      const look = Math.random() < 0.5 ? 'plane' : 'mail';
+      const holdFor = (text: string) => Math.min(3600, Math.max(2000, 1200 + text.length * 50));
+      busyUntil = Date.now() + beats.reduce((t, x) => t + FLIGHT_MS + holdFor(x), 0) + 2000;
+      const play = (i: number) => {
+        const [from, to] = i % 2 ? [b, a] : [a, b];
+        // Someone got work mid conversation: it ends there.
+        const still = quietPeople().map((x) => x.id);
+        if (!still.includes(from.id) || !still.includes(to.id)) { busyUntil = 0; return; }
+        if (!live.current.throwNote(from.id, to.id, look)) { busyUntil = 0; return; }
+        const text = beats[i];
+        const last = i === beats.length - 1;
+        const hold = holdFor(text);
+        later(FLIGHT_MS, () => {
+          show({ agentId: to.id, text, from: { name: from.name, acc: live.current.accentOf(from.id) }, ms: last ? hold + 1600 : hold + FLIGHT_MS + 300 });
+          if (!last) later(hold, () => play(i + 1));
+        });
+      };
+      play(0);
+      return true;
+    };
+
+    // The first comes soon after the office opens, then every 15 to 30 s:
+    // a conversation a little over half the time, when two people are free.
+    let first = true;
+    const tick = () => {
+      if (Date.now() < busyUntil) return;
+      if (Math.random() < 0.55 && chat()) return;
+      say();
     };
     const schedule = () => {
       const wait = first ? 8000 + Math.random() * 7000 : 15_000 + Math.random() * 15_000;
       first = false;
-      timer = window.setTimeout(() => { say(); schedule(); }, wait);
+      timer = window.setTimeout(() => { tick(); schedule(); }, wait);
     };
     schedule();
-    // Demo mode (and the design lab) can ask for a line now.
+    // Demo mode (and the design lab) can ask for a line, or a conversation, now.
+    const banterNow = () => { if (!chat()) say(); };
     window.addEventListener('cth:demo-quote', say);
-    return () => { window.clearTimeout(timer); window.clearTimeout(hide); window.removeEventListener('cth:demo-quote', say); };
+    window.addEventListener('cth:demo-banter', banterNow);
+    return () => {
+      window.clearTimeout(timer); window.clearTimeout(hide); timers.forEach((t) => window.clearTimeout(t));
+      window.removeEventListener('cth:demo-quote', say);
+      window.removeEventListener('cth:demo-banter', banterNow);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused]);
   return quote;
 }

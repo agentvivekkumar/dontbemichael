@@ -54,39 +54,6 @@ const TABLE: readonly string[] = [
   'do NOT tell Michael I’m in here',
 ];
 
-// At a quiet desk, waiting for the next job: the studio's idle bubbles
-// (DESIGN.md 8.8) use these as well as the break-room pools.
-const AT_DESK: readonly string[] = [
-  'all caught up. this feels illegal.',
-  'inbox zero. framing this moment.',
-  'waiting for Michael to notice me',
-  'my to-do list is empty. suspicious.',
-  'refreshing my inbox for cardio',
-  'is it a meeting if no one comes?',
-  'pretending to type, just in case',
-  'reorganized my desk. again.',
-  'my chair spins 3.5 times. tested.',
-  'staring at the plant. it stares back.',
-  'I could take on one more thing',
-  'ready when you are, boss',
-  'standing by. heroically.',
-  'pondering the meaning of “reply all”',
-  'drafting an email I will never send',
-  'quietly judging the printer',
-  'counting ceiling tiles. 48.',
-  'tidied my files. so clean.',
-  'wondering what Michael is plotting',
-  'idle is just loading, really',
-  'on break. a very professional break.',
-  'my coffee is cold. my spirit is warm.',
-  'leaning back. strategically.',
-  'practicing my handshake',
-  'waiting for the next big thing',
-  'I alphabetized my sticky notes',
-  'my desk plant needs a raise',
-  'checked the calendar. still today.',
-];
-
 const SPOT_POOL: Record<BreakSpot, readonly string[]> = {
   coffee: COFFEE, vending: VENDING, snack: SNACK, table: TABLE,
 };
@@ -97,25 +64,25 @@ const SPOT_POOL: Record<BreakSpot, readonly string[]> = {
 // everyone"), written in each one's voice from what the show established.
 // Darryl, Erin, Nick and Sadiq were added to this app later.
 const BY_CHARACTER: Record<OfficeCharacterName, readonly string[]> = {
-  michael:  ['I DECLARE… BANKRUPTCY!', "that's what she said", 'I knocked on wood. the desk is wood.', 'no meetings before coffee. that’s the rule.', 'it says World’s Best Boss. on the mug. so.', 'who wants to hear an improv bit?', 'delegating is just caring, but faster', 'my door is always open. it is glass.', 'I am not micromanaging. I am curious.', 'should I give a speech? I feel a speech.', 'who wants a motivational nickname?', 'nobody laughs at my jokes over email', 'I would be a great talk show host', 'team meeting? team meeting.'],
-  dwight:   ['FALSE.', 'identity theft is not a joke', 'that mug is regulation', 'this fridge needs a beet drawer', 'Schrute Farms has better coffee', 'I am fully trained in break room safety', 'assistant TO the regional coffee', 'my pipeline is a fortress', 'I have ranked every lead. by threat.', 'idle? I am watching leads. legally.', 'I alphabetized the CRM. twice.', 'a salesman never sits. I am perching.', 'beet sales are up. not that you asked.', 'I keep a spare tie for emergencies', 'question: who touched my desk?', 'I can close a deal in my sleep. I have.'],
-  jim:      ["...that's what she said", 'bears. beets. Battlestar Galactica.', 'I moved Dwight’s stapler again', 'just here for the gossip', 'stapler. jello. you know the drill.', 'looks at camera', 'staring at the screen like it owes me', 'productivity level: looking busy', 'one day I will read the whole handbook', 'refreshing my inbox for sport', 'I built a pyramid of sticky notes', 'waiting for Michael to need me', 'quietly winning at chair spins', 'Dwight’s stapler is in the cloud now'],
-  pam:      ['Dunder Mifflin, this is Pam', 'sketching the vending machine', 'the watercolor of the break room', 'I’d rather be painting right now', 'did Jim hide Dwight’s stuff again?', 'the inbox is clear. I don’t trust it.', 'I drew the office plant. it looks sad.', 'I labeled the label maker', 'no calls in four minutes. a record.', 'sorting my pens by mood', 'ready when the phones are', 'doodling a very serious flowchart', 'I could answer email in my sleep', 'ready to forward something. anything.'],
-  kevin:    ['the chili is NOT ready', 'why waste time say lot word', 'me want snack', 'cookie? cookie.', 'M&Ms count as a food group', 'I only eat the red ones today', 'is lunch a task? I would take it', 'I counted the snacks. we are short.', 'numbers are like candy. I like candy.', 'my spreadsheet has a snack column', 'waiting. hungrily.', 'I can do math. small math.', 'nap mode on. kidding. mostly.', 'is the vending machine a client?'],
-  angela:   ['this break room is filthy', 'party planning committee, 3pm', 'I’m judging the fridge', 'my cats have better manners', 'who microwaved fish. who.', 'this spreadsheet is not festive enough', 'I reviewed everyone’s expenses. judging.', 'my desk is cleaner than yours', 'receipts in order. alphabetical.', 'someone used the wrong font again', 'idle is a choice. a poor one.', 'saving my energy for disapproval', 'I filed my disapproval. in triplicate.', 'my cat would have finished by now'],
-  oscar:    ['actually, it’s “espresso”', 'well, actually…', 'the budget for snacks is concerning', 'I read the ingredients. all of them.', 'that is not how interest works', 'the books balance. I checked twice.', 'reconciled. waiting for a challenge.', 'technically, idle time is a cost', 'I read the tax code for fun. relax.', 'someone rounded. I felt it.', 'every cent accounted for. you’re welcome.', 'I have notes on everyone’s invoices', 'cash flow is a love language', 'I color coded the ledger. tastefully.'],
-  stanley:  ['is it Pretzel Day?', 'did I stutter?', 'crossword and coffee. leave me be.', "I'll retire before this brews", 'I do crosswords in meetings. and here.', 'nothing to do. perfect.', 'I will be here. not moving.', 'wake me if it’s important', 'this is my favorite kind of day', 'done enough for today. it is 10 am.', 'if this is a meeting, I am not here', 'counting the minutes to five', 'I have peaked. today. at 9.', 'do not assign me anything shiny'],
-  phyllis:  ['Bob is picking me up at five', 'knitting and a nice cup of tea', 'Bob Vance, Vance Refrigeration', 'Christmas party planning starts now', 'knitting a scarf for the server', 'a cardigan for every quarter', 'quiet days are good for gossip', 'Bob says hi. he always says hi.', 'I baked muffins. for the files.', 'cozy, and available', 'I ordered more tissues. just in case.', 'gossip is a form of networking', 'I have a recipe for slow days', 'sweater weather, every day'],
-  andy:     ['Cornell, ever heard of it?', 'rit-dit-dit, coffee break!', 'Big Tuna, grab a chair', 'I sang a cappella, you know', 'Nard Dog needs caffeine', 'I wrote a jingle for our invoices', 'humming a cappella at my desk', 'ready to sell. born ready.', 'I nicknamed every client. all great.', 'waiting for my big break. any break.', 'my tie matches my mood: optimistic', 'ready to give a toast. to anyone.', 'I could serenade the sales team', 'ask me about my glee club days'],
-  kelly:    ['did you HEAR what happened??', 'so. much. to tell you.', 'I am the GOSSIP queen', 'Ryan texted me back!!', 'okay who is dating who', 'no tickets? who broke up with who?', 'inbox zero. best day ever', 'I have SO much to tell you', 'customers love me. obviously.', 'checked support@ again. nothing.', 'refreshing like it’s a group chat', 'did someone say drama? no? okay.', 'if nobody writes, I will write first', 'I already know the plot twist'],
-  ryan:     ['I’m kind of a big deal', 'the temp needs caffeine', 'starting a coffee startup, actually', 'this could be an app', 'I pitched this idea in business school', 'thinking about a rebrand', 'what if our invoices went viral', 'drafting a post nobody asked for', 'my LinkedIn is very strong right now', 'this calls for a growth hack', 'brainstorming. alone. intensely.', 'synergy. that’s it. that’s the post.', 'I mean, I’m basically a founder', 'pivoting. to a nap.'],
-  toby:     ['I should write that up…', 'HR-wise this break is fine', 'no one ever sits with me', 'please don’t tell Michael I’m in here', 'I miss Costa Rica', 'updated a policy nobody will read', 'quiet is good. quiet is compliant.', 'timesheets are in. mostly. sort of.', 'I brought a plant for morale', 'please file complaints in writing', 'I am available. always available.', 'nobody signed my birthday card', 'I am the calm in the office', 'I left a note in the suggestion box'],
-  creed:    ['which one of you is the new guy?', 'I’ve eaten worse out of that fridge', 'mung beans. under my desk.', 'nobody steals from Creed', 'I sprout my beans on a damp towel', 'I’ve been idle since the eighties', 'nobody knows what I do. perfect.', 'I have three desks. this is one.', 'my real job is a mystery', 'is this the cloud? it’s not fluffy', 'I invested in quills. long play.', 'I don’t work here. I just stay.', 'nobody checks my timesheet', 'that wasn’t me. whatever it was.'],
-  meredith: ['is it 5 o’clock yet?', 'someone spike the coffee?', 'I brought my own mug. don’t ask.', 'my kid says hi', 'quiet day. I approve.', 'my mug says coffee. it is not.', 'a supplier called. we’re friends now.', 'waiting it out like a pro', 'five o’clock somewhere. here soon.', 'nobody needs me? great. noted.', 'casual Friday energy, every day', 'I’m on a break from my break', 'happy hour is a state of mind', 'I’ll answer when it’s interesting'],
-  darryl:   ['forklift parked. break is sacred.', 'the warehouse fridge is cleaner', 'working on a new song at home', 'dream job: a cereal shack', 'Michael asked me for slang again', 'upstairs coffee. fancy.', 'shipping’s caught up. I’m vibing.', 'writing a song about invoices', 'the warehouse is quiet. too quiet.', 'I keep it smooth. ask anyone.', 'ready to lift something. anything.', 'inventory counted. twice. all good.', 'keeping it cool down here', 'I could run this place, honestly'],
-  erin:     ['is there cake? I love when there’s cake', 'I made a new friend at the coffee machine', 'everyone here is basically family', 'Kelly was taken, so I’m Erin', 'today feels like a party day', 'is a vending snack a meal?', 'is there a task? I love tasks!', 'I made a welcome card for the inbox', 'everyone works so hard. aww.', 'I alphabetized the stickers', 'waiting is just being ready, right?', 'I learned a new spreadsheet word', 'I color coded my smiley stickers', 'can I help? I want to help!'],
-  nick:     ['it’s Nick. the IT guy. hi.', 'tried turning it off and on?', 'I can see your browser history', 'nobody remembers my name', 'stop clicking the free cruise emails', 'servers up. nobody says thanks.', 'uptime 100%. silence means praise.', 'updated everything. you’re welcome.', 'someone clicked a link. I can feel it.', 'the Wi-Fi is fine. it’s you.', 'patched. backed up. bored.', 'did you try restarting your attitude?', 'the printer and I have an agreement', 'my ticket queue is a ghost town'],
-  sadiq:    ['your password isn’t “password”, right?', 'removed another virus. kids game site.', 'I set up security, not spying. mostly.', 'the phishing test results… wow', 'every day is patch day', 'firewall up. so is my guard.', 'nothing suspicious. that’s suspicious.', 'two factor everything. even lunch.', 'I changed my password. again.', 'the logs are quiet. I am watching.', 'trust no attachment', 'I saw that weak password. I saw it.', 'locking my screen. out of habit.', 'phishing season never closes'],
+  michael:  ['I DECLARE… BANKRUPTCY!', "that's what she said", "I'm not superstitious. just a little stitious.", 'no meetings before coffee. that’s the rule.', 'it says World’s Best Boss. on the mug. so.', 'who wants to hear an improv bit?'],
+  dwight:   ['FALSE.', 'identity theft is not a joke', 'that mug is regulation', 'this fridge needs a beet drawer', 'Schrute Farms has better coffee', 'I am fully trained in break room safety', 'assistant TO the regional coffee'],
+  jim:      ["...that's what she said", 'bears. beets. Battlestar Galactica.', 'I moved Dwight’s stapler again', 'just here for the gossip', 'stapler. jello. you know the drill.', 'looks at camera'],
+  pam:      ['Dunder Mifflin, this is Pam', 'sketching the vending machine', 'the watercolor of the break room', 'I’d rather be painting right now', 'did Jim hide Dwight’s stuff again?'],
+  kevin:    ['the chili is NOT ready', 'why waste time say lot word', 'me want snack', 'cookie? cookie.', 'M&Ms count as a food group', 'I only eat the red ones today'],
+  angela:   ['this break room is filthy', 'party planning committee, 3pm', 'I’m judging the fridge', 'my cats have better manners', 'who microwaved fish. who.'],
+  oscar:    ['actually, it’s “espresso”', 'well, actually…', 'the budget for snacks is concerning', 'I read the ingredients. all of them.', 'that is not how interest works'],
+  stanley:  ['is it Pretzel Day?', 'did I stutter?', 'crossword and coffee. leave me be.', "I'll retire before this brews", 'I do crosswords in meetings. and here.'],
+  phyllis:  ['Bob is picking me up at five', 'knitting and a nice cup of tea', 'Bob Vance, Vance Refrigeration', 'Christmas party planning starts now'],
+  andy:     ['Cornell, ever heard of it?', 'rit-dit-dit, coffee break!', 'Big Tuna, grab a chair', 'I sang a cappella, you know', 'Nard Dog needs caffeine'],
+  kelly:    ['did you HEAR what happened??', 'so. much. to tell you.', 'I am the GOSSIP queen', 'Ryan texted me back!!', 'okay who is dating who'],
+  ryan:     ['I’m kind of a big deal', 'the temp needs caffeine', 'starting a coffee startup, actually', 'this could be an app', 'I pitched this idea in business school'],
+  toby:     ['I should write that up…', 'HR-wise this break is fine', 'no one ever sits with me', 'please don’t tell Michael I’m in here', 'I miss Costa Rica'],
+  creed:    ['which one of you is the new guy?', 'I’ve eaten worse out of that fridge', 'mung beans. under my desk.', 'nobody steals from Creed', 'I sprout my beans on a damp towel'],
+  meredith: ['is it 5 o’clock yet?', 'someone spike the coffee?', 'I brought my own mug. don’t ask.', 'my kid says hi'],
+  darryl:   ['forklift parked. break is sacred.', 'the warehouse fridge is cleaner', 'working on a new song at home', 'dream job: a cereal shack', 'Michael asked me for slang again', 'upstairs coffee. fancy.'],
+  erin:     ['is there cake? I love when there’s cake', 'I made a new friend at the coffee machine', 'everyone here is basically family', 'Kelly was taken, so I’m Erin', 'today feels like a party day', 'is a vending snack a meal?'],
+  nick:     ['it’s Nick. the IT guy. hi.', 'tried turning it off and on?', 'I can see your browser history', 'nobody remembers my name', 'stop clicking the free cruise emails'],
+  sadiq:    ['your password isn’t “password”, right?', 'removed another virus. kids game site.', 'I set up security, not spying. mostly.', 'the phishing test results… wow', 'every day is patch day'],
 };
 
 /** A solo break-room line. Character flavour ~60% of the time, else the line
@@ -127,37 +94,42 @@ export function pickSoloLine(character: OfficeCharacterName, spot: BreakSpot, se
   return pick(SPOT_POOL[spot], seed);
 }
 
-/** Every line anyone can say, besides their own. */
-const SHARED_IDLE: readonly string[] = [...AT_DESK, ...COFFEE, ...VENDING, ...SNACK, ...TABLE];
-
-/**
- * The studio's idle lines (DESIGN.md 8.8). About 60% in the speaker's own
- * voice, the rest from the shared pool, and no line comes back until its pool
- * has run out, so a long quiet day doesn't repeat itself (owner, 2026-10-01:
- * "there are not enough funny one liners"). One per studio; `random` is there
- * for tests.
- */
-export function createIdleLines(random: () => number = Math.random): (character: OfficeCharacterName) => string {
-  const bags = new Map<string, string[]>();
-  let last = '';
-  const draw = (key: string, pool: readonly string[]): string => {
-    let bag = bags.get(key);
-    if (!bag?.length) {
+/** A shuffled deck over `pool`: every item once, then a fresh shuffle that
+ *  never opens with the one just drawn. */
+function deck<T>(pool: readonly T[], random: () => number): () => T {
+  let bag: T[] = [];
+  let last: T | undefined;
+  return () => {
+    if (!bag.length) {
       bag = [...pool];
       for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1));
         [bag[i], bag[j]] = [bag[j], bag[i]];
       }
-      // A fresh bag never opens with the line just said.
       if (bag.length > 1 && bag[bag.length - 1] === last) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
-      bags.set(key, bag);
     }
-    last = bag.pop()!;
+    last = bag.pop() as T;
     return last;
   };
+}
+
+/** Every break-room line, whoever says it. */
+const SHARED_SOLO: readonly string[] = [...COFFEE, ...VENDING, ...SNACK, ...TABLE];
+
+/**
+ * The studio's idle lines (DESIGN.md 8.8), from this file's Office lines only
+ * (owner, 2026-10-01: "dont show made up lines"): the speaker's own about 60%
+ * of the time, else a break-room line, and nothing comes back until its pool
+ * has run out. One per studio; `random` is there for tests.
+ */
+export function createIdleLines(random: () => number = Math.random): (character: OfficeCharacterName) => string {
+  const own = new Map<string, () => string>();
+  const shared = deck(SHARED_SOLO, random);
   return (character) => {
-    const own = BY_CHARACTER[character];
-    return own?.length && random() < 0.6 ? draw(character, own) : draw('shared', SHARED_IDLE);
+    const lines = BY_CHARACTER[character];
+    if (!lines?.length || random() >= 0.6) return shared();
+    if (!own.has(character)) own.set(character, deck(lines, random));
+    return own.get(character)!();
   };
 }
 
@@ -306,6 +278,24 @@ const KEYED_EXCHANGES: Partial<Record<OfficeCharacterName, Exchange>> = {
   sadiq:    ['did you click the cruise link?', 'it said I won!', '…running a scan.'],
   pam:      ['want to see a sketch?', 'is that the vending machine?', 'it’s you, actually.'],
 };
+
+/**
+ * Conversations for the studio (DESIGN.md 8.8): two idle people trade the
+ * beats of an exchange as paper planes or envelopes. From EXCHANGES and the
+ * signature openers; the "that's what she said" set stays out of the studio,
+ * which sits on a business owner's screen. No exchange comes back until all
+ * have played; `random` is there for tests.
+ */
+export function createBanter(random: () => number = Math.random): (opener: OfficeCharacterName) => Exchange {
+  const next = deck(EXCHANGES, random);
+  const keyedUsed = new Set<string>();
+  return (opener) => {
+    const keyed = KEYED_EXCHANGES[opener];
+    // A signature bit once per person per day, when they happen to open.
+    if (keyed && !keyedUsed.has(opener) && random() < 0.35) { keyedUsed.add(opener); return keyed; }
+    return next();
+  };
+}
 
 /** A multi-beat exchange for two agents sharing a table. Beats alternate:
  *  index 0 = `speaker`, 1 = the table-mate, 2 = speaker, … */

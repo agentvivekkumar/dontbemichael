@@ -906,13 +906,25 @@ department color, the line in quotes at 12.5 / 17 `ink`, with the speaker's name
 when the chip holds more than one person. Its tail points at the speaker's avatar on the
 chip, which gets a 3 px ring in the same color and a small hop. It opens up from the chip,
 or up and leftward, or down under it, whichever first covers no open card or Michael's.
-It pops in from the tail, holds, and fades. Lines come from `cafeteriaLines.ts`
-(`createIdleLines`): about 60% in the speaker's own voice (at least 14 lines each), the rest
-from a shared pool of desk and break-room lines, over 200 in all, original, never show
-quotes. No line comes back until its pool has run out, and the same person never speaks
-twice running when someone else could. The first comes 8 to 15 s after the office opens,
-then every 15 to 30 s, visible 8 s (owner, 2026-10-01: more lines, more often). Never from a
-pod with someone at work, and never from someone still clocking in.
+It pops in from the tail, holds, and fades. Lines are the Office lines in
+`cafeteriaLines.ts` and nothing else (owner, 2026-10-01: "dont show made up lines"): the
+speaker's own about 60% of the time, else a break-room line, dealt like a deck so none comes
+back until its pool has run out, and never the same speaker twice running when someone else
+could speak.
+
+**Banter.** A little over half the time, when two quiet people sit in different pods, they
+trade an exchange instead (owner, 2026-10-01: Kelly and Ryan throwing paper planes or mail
+at each other). Each beat flies pod to pod as a paper plane or an envelope (one look per
+conversation) in the sender's department color, and on landing shows in the catcher's
+bubble with the sender's name on top and the sender's color on the ring. Each line holds 2
+to 3.6 s by its length while the reply flies back, so the conversation reads in order; the
+last one holds a little longer. Exchanges are the file's `EXCHANGES` and each character's
+signature opener (once a day); the "that's what she said" set stays out, since the studio
+sits on a business owner's screen. A conversation ends early if either person gets work.
+
+The first line or conversation comes 8 to 15 s after the office opens, then every 15 to
+30 s. A single line is visible 8 s. Never from a pod with someone at work, and never from
+someone still clocking in.
 
 ### 8.9 Scaling rule
 
@@ -967,6 +979,7 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | Michael hands work out (`request` from Michael) | He points first: a soft beam from his office lights the pod's floor, then the envelope leaves |
 | A question for the owner (a message to the owner, or a new Needs you item) | A paper plane flies from Michael's office toward Needs you, and the Needs you button bumps as it lands |
 | Two people message back and forth | A dashed violet arc joins their pods with a count bubble; it fades a minute after their last message |
+| Two quiet people banter (§8.8) | A paper plane or an envelope in the sender's color flies pod to pod; the line pops up on the catcher's chip as it lands, and the reply flies back |
 | The owner messages Michael (from `human`) | The envelope rises from the composer under the stage |
 | A new team member appears on the roster after launch | Their pod drops in, confetti in the department colors, and "Welcome, Jim" in front of the pod |
 | The office opens (each person's action is the clocking in marker) | Every light starts off. Michael's office comes on when he is in, a pod's when the first of its people is in, each desk when its person is; a light that comes on flickers like a strip light. A desk stays dark at most one minute, so a quiet engine never leaves it off |
@@ -1212,7 +1225,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
-| 2026-10-01 | Idle lines: over 200, each person's own voice most of the time, no repeats until a pool runs out, every 15 to 30 s (§8.8). |
+| 2026-10-01 | Idle lines: only the Office lines in `cafeteriaLines.ts`, dealt with no repeats until a pool runs out; banter, two quiet people trading an exchange as paper planes or envelopes, each line shown where it lands; every 15 to 30 s (§8.8). |
 | 2026-10-01 | The Tasks tab drops its blocked count; Needs you is the one coral number (§7.2). |
 | 2026-10-01 | Reference screens re-shot from the app's components (`npm run shoot`, §20); brand guide, PDF and social card rebuilt. Found while shooting: pod cards above their pod no longer run under the top bar on a short window (§7.14); graph nodes stay clear of the toolbar and legend (§7.22); the setup footer sticks to the window and its buttons read Back and Next (§7.25); the not picked tag moves to its outline's back corner. |
 | 2026-10-01 | Needs you: no dismiss (an ask is cleared only by answering), "See full context" replaces "Open task", a chevron shows each card opens. Focus mode hidden (`SHOW_FOCUS_MODE`). The studio lab (§8.13) for demos and videos. |

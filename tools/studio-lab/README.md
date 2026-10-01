@@ -3,7 +3,8 @@
 The real office studio, on a fictional team (Harbor & Pine), with a button for
 every animation the app plays: messages, conversations, tool use, mail in and
 out, scheduled jobs, Michael pointing and asking you, your messages, a task
-reaching Done, idle chatter, a new hire, the office opening and closing, and
+reaching Done, idle chatter and banter (paper planes and mail between two
+quiet people), a new hire, the office opening and closing, and
 the time of day. Each button fires the same event the app listens to, so what
 you see is what the app does (branding/DESIGN.md 8.12).
 

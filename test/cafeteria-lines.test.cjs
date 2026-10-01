@@ -14,16 +14,16 @@ const loadTs = require('./load-ts.cjs');
 const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/scene/office/cafeteriaLines.ts'), 'utf8');
 const castSrc = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/scene/office/cast.ts'), 'utf8');
 const cast = [...new Set([...castSrc.matchAll(/name: '([a-z]+)'/g)].map((m) => m[1]))];
-const { pickSoloLine, pickExchange, createIdleLines } = loadTs('src/renderer/src/scene/office/cafeteriaLines.ts');
+const { pickSoloLine, pickExchange, createIdleLines, createBanter } = loadTs('src/renderer/src/scene/office/cafeteriaLines.ts');
 
-test('every character has at least fourteen lines of their own', () => {
+test('every character has at least four lines of their own', () => {
   assert.match(src, /const BY_CHARACTER: Record<OfficeCharacterName, readonly string\[\]> = \{/, 'a full record: a new character fails to compile without lines');
   const block = src.slice(src.indexOf('const BY_CHARACTER'), src.indexOf('};', src.indexOf('const BY_CHARACTER')));
   for (const c of cast) {
     const m = new RegExp(`\\n  ${c}:\\s*\\[(.*)\\],`).exec(block);
     assert.ok(m, `${c} has lines`);
     const lines = [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g)];
-    assert.ok(lines.length >= 14, `${c} has ${lines.length} lines`);
+    assert.ok(lines.length >= 4, `${c} has ${lines.length} lines`);
   }
 });
 
@@ -40,27 +40,39 @@ test('the new characters speak in their own voice, briefly and without dashes', 
 });
 
 /**
- * The studio's idle bubbles (owner, 2026-10-01: "there are not enough funny
- * one liners"): a big pool, each person's own voice most of the time, and no
- * line twice until its pool runs out.
+ * The studio uses only these Office lines (owner, 2026-10-01: "dont show made
+ * up lines. use everything from the office"), dealt like a deck so nothing
+ * repeats until its pool runs out, and conversations from the exchanges.
  */
-test('idle lines do not repeat until the pool runs out, and every one fits', () => {
-  // A seeded generator, so the test is the same every run.
-  let seed = 7;
+test('studio idle lines come from this file and never repeat before their pool runs out', () => {
+  // Always the shared pool (random never under 0.6): every break-room line once, then again.
+  const shared = createIdleLines(() => 0.99);
+  const first = [];
+  for (let i = 0; i < 23; i++) first.push(shared('pam'));
+  assert.equal(new Set(first).size, 23, 'all 23 break-room lines before any repeat');
+  // Always their own (random 0): each of Dwight's lines once before any repeat.
+  const own = createIdleLines(() => 0);
+  const d = [];
+  for (let i = 0; i < 7; i++) d.push(own('dwight'));
+  assert.equal(new Set(d).size, 7);
+  for (const line of [...first, ...d]) assert.ok(src.includes(line.replace(/'/g, "\\'")) || src.includes(line), `"${line}" is one of the file's lines`);
+});
+
+test('studio conversations are the Office exchanges, without the innuendo set', () => {
+  let seed = 11;
   const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  for (const c of cast) {
-    const next = createIdleLines(random);
-    const said = [];
-    for (let i = 0; i < 30; i++) said.push(next(c));
-    for (let i = 1; i < said.length; i++) assert.notEqual(said[i], said[i - 1], `${c} says the same line twice running`);
-    assert.ok(new Set(said).size >= 20, `${c}: ${new Set(said).size} different lines in 30`);
+  const twss = src.slice(src.indexOf('const TWSS_EXCHANGES'), src.indexOf('const PAIR_POOL'));
+  const next = createBanter(random);
+  const seen = new Set();
+  for (let i = 0; i < 120; i++) {
+    const ex = next('ryan');
+    assert.ok(ex.length >= 2, 'at least a line and a reply');
+    seen.add(ex.join(' / '));
+    assert.ok(!twss.includes(`['${ex[0]}', '${ex[1]}'`), `not from the innuendo set: ${ex.join(' / ')}`);
   }
-  const next = createIdleLines(random);
-  const all = new Set();
-  for (let i = 0; i < 4000; i++) all.add(next(cast[i % cast.length]));
-  assert.ok(all.size >= 200, `${all.size} lines in all`);
-  for (const line of all) {
-    assert.ok(line.length <= 44, `"${line}" fits the bubble`);
-    assert.doesNotMatch(line, /[–—]| - /, `"${line}"`);
-  }
+  assert.ok(seen.size >= 40, `${seen.size} different exchanges`);
+  // A signature opener plays once at most for the same person.
+  const keyed = createBanter(() => 0);
+  assert.deepEqual([...keyed('stanley')], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
+  assert.notDeepEqual([...keyed('stanley')], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
 });
