@@ -4,7 +4,7 @@
  * on the fixed 1060 x 816 stage; StudioStage scales it and lays the HTML cards
  * over it. Ported from the approved reference generator.
  */
-import { Fragment, useEffect, useId, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { P, curvePts, dpath, pts, type Pt } from './iso';
 import { Box, EllipseAt, Poly } from './shapes';
 import type { Family, SceneTokens } from './theme';
@@ -196,7 +196,29 @@ function CheckBurst({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
 
 /* ── A department pod ─────────────────────────────────────────────────────── */
 
-export interface PodDesk { st: DeskState }
+export interface PodDesk {
+  st: DeskState;
+  /** This person has not clocked in yet: their desk light is off. */
+  away?: boolean;
+}
+
+/** A light that has just come on flickers like a strip light (DESIGN.md 8.12).
+ *  Returns the class while it flickers, after `off` goes from true to false. */
+function useLightsOn(off: boolean): string | undefined {
+  const [on, setOn] = useState(false);
+  const was = useRef(off);
+  useEffect(() => {
+    if (was.current && !off) {
+      setOn(true);
+      const id = window.setTimeout(() => setOn(false), 1000);
+      was.current = off;
+      return () => window.clearTimeout(id);
+    }
+    was.current = off;
+    return undefined;
+  }, [off]);
+  return on ? 'cth-st-lightson' : undefined;
+}
 
 /** Desk offsets for a pod of 1 to 4 people (DESIGN.md 8.9). */
 export function deskSpots(n: number): { dx: number; dy: number; sc: number }[] {
@@ -220,15 +242,16 @@ export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark, arriv
   const spots = deskSpots(n);
   const allIdle = desks.every((d) => d.st === 'idle');
   const needs = desks.some((d) => d.st === 'needs');
+  const podFlicker = useLightsOn(lightsOut);
   return (
-    <g className={[allIdle ? 'cth-st-idle' : '', arriving ? 'cth-st-arrive' : '', lightsOut ? 'cth-st-lightsout' : ''].filter(Boolean).join(' ') || undefined}>
+    <g className={[allIdle ? 'cth-st-idle' : '', arriving ? 'cth-st-arrive' : '', lightsOut ? 'cth-st-lightsout' : '', podFlicker ?? ''].filter(Boolean).join(' ') || undefined}>
       <Box gx={gx - hw} gy={gy - hd} w={2 * hw} d={2 * hd} h={6} z0={0} top={c.l} left={c.m} right={c.d} T={T} />
       <polygon points={pts([P(gx - hw + 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy - hd + 0.1, 6), P(gx + hw - 0.1, gy + hd - 0.1, 6), P(gx - hw + 0.1, gy + hd - 0.1, 6)])}
         fill="none" stroke={T.inset} strokeOpacity={T.insetOp} strokeWidth={1} />
       {spots.map((sp, i) => {
         const d = desks[i];
         const inner = <Station gx={gx + sp.dx} gy={gy + sp.dy} st={d.st} sc={sp.sc} plant={i === 0 && n <= 2} c={c} famKey={famKey} T={T} dark={dark} />;
-        return <g key={i} className={d.st === 'idle' && !allIdle ? 'cth-st-idle' : undefined}>{inner}</g>;
+        return <DeskLight key={i} away={!lightsOut && !!d.away} idle={d.st === 'idle' && !allIdle}>{inner}</DeskLight>;
       })}
       {needs && <Beacon at={[gx + 0.42, gy - hd + 0.2]} T={T} />}
       {selected && (
@@ -236,6 +259,13 @@ export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark, arriv
       )}
     </g>
   );
+}
+
+/** One desk's light: off until its person clocks in, then it flickers on. */
+function DeskLight({ away, idle, children }: { away: boolean; idle: boolean; children: ReactNode }) {
+  const flicker = useLightsOn(away);
+  const cls = [idle ? 'cth-st-idle' : '', away ? 'cth-st-lightsout' : '', flicker ?? ''].filter(Boolean).join(' ');
+  return <g className={cls || undefined}>{children}</g>;
 }
 
 /** Floor glow under a pod, drawn beneath everything (DESIGN.md 8.3). */
@@ -281,10 +311,11 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
   const cols: [number, string, number][] = [
     [-0.9, '#B7B2DD', board.todo], [-0.52, T.blue, board.doing], [-0.14, T.coral, board.blocked], [0.24, T.green, board.done]
   ];
+  const hubFlicker = useLightsOn(lightsOut);
   const [mx, my] = P(0, -0.2, 96);
   const beam = [P(-0.15, -0.2, ph + 50), P(0.15, -0.2, ph + 50)];
   return (
-    <g className={lightsOut ? 'cth-st-lightsout' : undefined}>
+    <g className={lightsOut ? 'cth-st-lightsout' : hubFlicker}>
       <EllipseAt gx={0} gy={0} z={0} r={2.2} fill="url(#st-glow-hub)" />
       <Box gx={-a - 0.12} gy={-a - 0.12} w={2 * a + 0.24} d={2 * a + 0.24} h={5} z0={0} top={T.hbBase[0]} left={T.hbBase[1]} right={T.hbBase[2]} T={T} />
       <Box gx={-a} gy={-a} w={2 * a} d={2 * a} h={ph - 5} z0={5} top={T.hbFloor[0]} left={T.hbFloor[1]} right={T.hbFloor[2]} T={T} />

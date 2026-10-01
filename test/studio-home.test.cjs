@@ -169,9 +169,20 @@ test('more life: plane to Needs you, pointing, conversations, owner messages, hi
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(stage, /window\.cth\.onClosingTime\(/);
   assert.match(stage, /if \(e\.phase === 'cancelled' \|\| e\.phase === 'error'\) \{ setState\(null\); return; \}/);
-  assert.match(stage, /lightsOut=\{!!closing && pod\.members\.every\(\(a\) => closing\.out\.has\(a\.id\)\)\}/);
+  assert.match(stage, /lightsOut=\{\(!!closing && pod\.members\.every\(\(a\) => closing\.out\.has\(a\.id\)\)\) \|\|/);
   assert.match(stage, /const night = hour >= 19 \|\| hour < 6;/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     assert.match(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).studio.welcome, /\{\{name\}\}/, loc);
   }
+});
+
+test('lights come up as people clock in, the way closing time turns them off (owner, 2026-09-30)', () => {
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(stage, /if \(a\.action !== ACTION_CLOCKING_IN\) \{ since\.current\.delete\(a\.id\); continue; \}/);
+  assert.match(stage, /now - \(since\.current\.get\(a\.id\) \?\? now\) < 60_000/, 'never dark for more than a minute');
+  assert.match(stage, /\|\| pod\.members\.every\(\(a\) => away\.has\(a\.id\)\)\}/);
+  assert.match(stage, /const hubAway = godStatus === 'booting' \|\| \(!!god && away\.has\(god\.id\)\);/);
+  const art = read('src/renderer/src/scene/studio/StudioArt.tsx');
+  assert.match(art, /if \(was\.current && !off\) \{/, 'a light flickers only as it comes on');
+  assert.match(read('src/renderer/src/store/store.ts'), /status: 'idle',\n\s+action: ACTION_CLOCKING_IN,/, 'a saved team loads clocking in');
 });

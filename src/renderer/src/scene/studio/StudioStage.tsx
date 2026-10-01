@@ -8,7 +8,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore, actionText, liveActivity, type Agent } from '@/store/store';
+import { useStore, actionText, liveActivity, ACTION_CLOCKING_IN, type Agent } from '@/store/store';
 import type { HarnessConfig } from '@/store/config';
 import type { DepartmentName } from '@/design/tokens';
 import { useAppTheme } from '@/design/theme';
@@ -197,6 +197,11 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
     }
   });
   const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
+  // Opening (DESIGN.md 8.12): a desk's light comes on as its person clocks in,
+  // a pod's when the first of its people is in, Michael's office when he is.
+  const away = useClockingIn(agents);
+  const godStatus = useStore((s) => s.godStatus);
+  const hubAway = godStatus === 'booting' || (!!god && away.has(god.id));
   const kickoff = useKickoff(plan.pods, paused);
   const closing = useClosingLights();
   const hour = useHour();
@@ -287,16 +292,16 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
               <Pod
                 key={`pod-${pod.dept}-${pod.members[0].id}`}
                 grid={pod.grid}
-                desks={pod.members.map((a) => ({ st: deskState(a) }))}
+                desks={pod.members.map((a) => ({ st: deskState(a), away: away.has(a.id) }))}
                 c={families[pod.dept]} famKey={pod.dept}
                 selected={pod.members.some((a) => a.id === selected)}
                 T={T} dark={dark}
                 arriving={pod.members.some((a) => life.arriving.has(a.id))}
-                lightsOut={!!closing && pod.members.every((a) => closing.out.has(a.id))}
+                lightsOut={(!!closing && pod.members.every((a) => closing.out.has(a.id))) || pod.members.every((a) => away.has(a.id))}
               />
             )
           })),
-          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all} /> }
+          { depth: 0, node: <Hub key="hub" T={T} dark={dark} board={snap.board} busy={godBusy} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway} /> }
         ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
         {life.svg}
       </svg>
@@ -310,7 +315,7 @@ export function StudioStage({ config: initialConfig }: { config: HarnessConfig }
           <defs>
             <radialGradient id="st-lamp"><stop offset="0" stopColor="#FFD38A" stopOpacity={0.55} /><stop offset="1" stopColor="#FFD38A" stopOpacity={0} /></radialGradient>
           </defs>
-          {plan.pods.filter((pod) => pod.members.some((a) => ACTIVE.has(a.status)) && !(closing && pod.members.every((a) => closing.out.has(a.id)))).map((pod) => {
+          {plan.pods.filter((pod) => pod.members.some((a) => ACTIVE.has(a.status) && !away.has(a.id)) && !(closing && pod.members.every((a) => closing.out.has(a.id)))).map((pod) => {
             const [x, y] = P(pod.grid[0], pod.grid[1], 30);
             return <ellipse key={pod.members[0].id} cx={x} cy={y} rx={95} ry={60} fill="url(#st-lamp)" className="cth-st-breathe" />;
           })}
@@ -725,6 +730,27 @@ function useKickoff(pods: PodPlan<Agent>[], paused: boolean): Record<string, num
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
   return kick;
+}
+
+/** Who is still clocking in: their action is the clocking in marker, for at
+ *  most a minute each, so a quiet engine never leaves a desk dark. */
+function useClockingIn(agents: Agent[]): Set<string> {
+  const since = useRef(new Map<string, number>());
+  const [, tick] = useState(0);
+  const now = Date.now();
+  const out = new Set<string>();
+  for (const a of agents) {
+    if (a.action !== ACTION_CLOCKING_IN) { since.current.delete(a.id); continue; }
+    if (!since.current.has(a.id)) since.current.set(a.id, now);
+    if (now - (since.current.get(a.id) ?? now) < 60_000) out.add(a.id);
+  }
+  const waiting = out.size > 0;
+  useEffect(() => {
+    if (!waiting) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 5000);
+    return () => window.clearInterval(id);
+  }, [waiting]);
+  return out;
 }
 
 /* ── Closing time and daylight (DESIGN.md 8.12) ───────────────────────────── */

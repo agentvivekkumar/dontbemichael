@@ -896,6 +896,7 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | Two people message back and forth | A dashed violet arc joins their pods with a count bubble; it fades a minute after their last message |
 | The owner messages Michael (from `human`) | The envelope rises from the composer under the stage |
 | A new team member appears on the roster after launch | Their pod drops in, confetti in the department colors, and "Welcome, Jim" in front of the pod |
+| The office opens (each person's action is the clocking in marker) | Every light starts off. Michael's office comes on when he is in, a pod's when the first of its people is in, each desk when its person is; a light that comes on flickers like a strip light. A desk stays dark at most one minute, so a quiet engine never leaves it off |
 | Closing time (`onClosingTime`) | Each pod's lights go out as everyone in it confirms or is excused; Michael's office goes dark when it completes; cancelling turns them back on |
 | Local time | Morning sun from the left (6 to 10), plain daylight, a golden evening (16 to 19), and a darker night (19 to 6) where working desks and Michael keep warm lamps on |
 
