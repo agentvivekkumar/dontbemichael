@@ -137,7 +137,8 @@ export function planStudio<A extends Seatable>(agents: A[]): StudioPlan<A> {
 export const CARD_W = 186;
 export const CARD_W_WIDE = 200;
 export const CARD_H = 66;
-export const CARD_ROW_H = 42;
+/** Each extra person adds a row: name, role, what they are doing, a bar. */
+export const CARD_ROW_H = 78;
 
 export function cardSize(members: number): { w: number; h: number } {
   return { w: members > 1 ? CARD_W_WIDE : CARD_W, h: CARD_H + CARD_ROW_H * (members - 1) };

@@ -82,12 +82,14 @@ export function OnboardingStudio({ picked, unpicked, businessName }: {
       {/* Name tags */}
       {plan.pods.map((pod) => {
         const inPod = pod.members.filter((m) => pickedIds.has(m.id));
-        const [x, y] = P(pod.grid[0], pod.grid[1], inPod.length ? 96 : 2);
         const ghost = !inPod.length;
+        // A picked pod's tag floats over its desks; an empty place's tag sits
+        // on the back corner of its outline, clear of the pods in front of it.
+        const [x, y] = ghost ? P(pod.grid[0] - 0.7, pod.grid[1] - 0.7, 2) : P(pod.grid[0], pod.grid[1], 96);
         const names = (ghost ? pod.members : inPod).map((m) => nameOf(m)).join(', ');
         return (
           <div key={`tag-${pod.dept}`} style={{
-            position: 'absolute', left: ox + x * k, top: oy + y * k, transform: ghost ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)',
+            position: 'absolute', left: ox + x * k, top: oy + y * k, transform: ghost ? 'translate(-50%, calc(-100% - 4px))' : 'translate(-50%, -100%)',
             whiteSpace: 'nowrap', padding: '4px 9px', borderRadius: 999, fontSize: 11, fontWeight: 600,
             background: ghost ? 'color-mix(in srgb, var(--cth-bg) 85%, transparent)' : 'var(--cth-card)', color: ghost ? 'var(--cth-ink-3)' : 'var(--cth-ink)',
             boxShadow: ghost ? 'none' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)',

@@ -110,7 +110,12 @@ export function MemoryGraphPanel({
       target: e.target,
       strength: e.kind === 'topic' ? 0.35 : 0.7 + Math.min(e.weight, 5) * 0.06
     }));
-    return forceLayout(lnodes, ledges, { width: dims.w, height: dims.h, pinned });
+    return forceLayout(lnodes, ledges, {
+      width: dims.w, height: dims.h, pinned,
+      // Clear of the header card on top and the legend below, with room for
+      // a node's ring and its name (DESIGN.md 7.22).
+      padding: 44, insetTop: GRAPH_HEADER_H, insetBottom: GRAPH_LEGEND_H
+    });
     // structKey/pinnedKey capture the relevant graph identity; intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structKey, pinnedKey, dims.w, dims.h, godId]);
@@ -457,6 +462,11 @@ function Tooltip({ x, y, wrap, children }: { x: number; y: number; wrap: { w: nu
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+/** Room the floating header card (top) and legend (bottom) take from the
+ *  canvas, beyond the layout's own padding. */
+const GRAPH_HEADER_H = 52;
+const GRAPH_LEGEND_H = 56;
 
 const MARKER_ACTS: MessageAct[] = ['request', 'inform', 'propose', 'query', 'agree', 'refuse', 'done'];
 

@@ -32,6 +32,9 @@ import { COLLECT_USAGE_STATS } from '@shared/buildFeatures';
 
 export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
+  /** Open on a later step with the first answers filled in. Only for the
+   *  reference screens (tools/studio-lab/reference.tsx); the app never sets it. */
+  preview?: { step: 'team'; businessType: string; businessName: string };
 }
 
 type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
@@ -115,11 +118,11 @@ const PROVIDER_BLURB_KEYS: Partial<Record<AgentProvider, string>> = {
   cursor: 'onboarding.providerBlurb.cursor'
 };
 
-export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps) {
   const { t } = useTranslation();
   // Onboarding runs before god exists in the store, so read the persisted name.
   const godName = useResolvedGodName();
-  const [step, setStep] = useState<Step>('business');
+  const [step, setStep] = useState<Step>(preview?.step ?? 'business');
 
   // WHAT BUSINESS THIS IS — the first and most consequential question, because it
   // decides the suggested cast, the office hours, and every agent's starting tool
@@ -127,8 +130,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // the owner to classify themselves before the app had earned anything, and it
   // forked every subsequent string into two registers. There is one register now,
   // and it is the plain one.
-  const [businessType, setBusinessType] = useState<string | undefined>();
-  const [businessName, setBusinessName] = useState('');
+  const [businessType, setBusinessType] = useState<string | undefined>(preview?.businessType);
+  const [businessName, setBusinessName] = useState(preview?.businessName ?? '');
   // The company profile (src/shared/companyProfile.ts): the essentials on step
   // 1, everything else optional on step 2. Time zone and currency start from
   // the Mac's own settings.
@@ -541,7 +544,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <div style={{ width: 560, maxWidth: '100%', flexShrink: 0, margin: step === 'team' ? '0' : 'auto 0' }}>
           <div role="region" aria-label={stepTitle} style={{
             background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
-            boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)', overflow: 'hidden'
+            // clip, not hidden: hidden would make the card a scroll box and
+            // stop the footer sticking to the window.
+            boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)', overflow: 'clip'
           }}>
           <div style={{ padding: '22px 22px 4px' }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--cth-ink)' }}>{stepTitle}</h1>
@@ -1207,8 +1212,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               }}>{error}</div>
             )}
 
-            {/* Footer / nav */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            {/* Footer / nav. It sticks to the window's bottom edge, so Back and
+                Next stay in reach on a long step (the Team list runs past a
+                900 px window). */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              position: 'sticky', bottom: 0, zIndex: 2, margin: '4px -22px -22px', padding: '12px 22px 16px',
+              background: 'var(--cth-card)', borderTop: '1px solid var(--cth-line)'
+            }}>
               {step === 'resume' ? <span /> : <Dots step={step} />}
               <div style={{ display: 'flex', gap: 8 }}>
                 {step !== 'business' && step !== 'resume' && (

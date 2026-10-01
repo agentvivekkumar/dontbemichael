@@ -26,6 +26,8 @@ import { bendFor, useStudioLife } from './life';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
 const POLL_MS = 5000;
+/** Space kept over the highest card above a pod (its department tab sits on top). */
+const CARD_ROOM = 18;
 
 type Board = { todo: number; doing: number; blocked: number; done: number };
 
@@ -162,9 +164,15 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   }, []);
   // Leave room for the floating bottom bar under the platform.
   const fitW = Math.max(200, box.w - bleed);
-  const k = Math.min(fitW / STAGE_W, (box.h - 40) / STAGE_H, 1.25);
+  // A card above its pod keeps its size while the stage scales, so on a short
+  // window it can rise past the top edge (Kelly's card under the top bar at
+  // 1440 x 900). Each one needs its top at least CARD_ROOM down: that pushes
+  // the stage down, and shrinks it when there is no room to push.
+  const lifted = plan.pods.filter((p) => p.slot.mode === 'above').map((p) => cardRect(p.slot, p.members.length));
+  const k = Math.min(fitW / STAGE_W, (box.h - 40) / STAGE_H, 1.25,
+    ...lifted.map((r) => (box.h - 40 - CARD_ROOM - r.h) / (STAGE_H - r.top - r.h)));
   const ox = (fitW - STAGE_W * k) / 2;
-  const oy = Math.max(0, (box.h - 70 - STAGE_H * k) / 2);
+  const oy = Math.max(0, (box.h - 70 - STAGE_H * k) / 2, ...lifted.map((r) => CARD_ROOM + r.h - (r.top + r.h) * k));
   const at = (x: number, y: number): CSSProperties => ({ position: 'absolute', left: ox + x * k, top: oy + y * k });
 
   // Pause every animation while nobody can see the stage (DESIGN.md 11.2).
