@@ -383,15 +383,13 @@ export function App() {
           viewportWidth={vpWidth}
         />
 
-        {/* The right column floats over the office as frosted glass (owner,
-            2026-09-30): the room's light and tint show through, no slab beside it. */}
+        {/* The right column has no ground of its own (owner, 2026-09-30): its
+            cards, and the person and Michael panels (cards themselves), sit
+            straight on the office, which runs on underneath. */}
         <div style={{
           width: sidebarWidth, flexShrink: 0, minHeight: 0, position: 'relative', zIndex: 60,
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          margin: '10px 10px 10px 0', borderRadius: 'var(--cth-r-2xl)',
-          background: 'color-mix(in srgb, var(--cth-rail) 48%, transparent)',
-          backdropFilter: 'blur(18px) saturate(1.15)', WebkitBackdropFilter: 'blur(18px) saturate(1.15)',
-          boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-line-2) 70%, transparent), var(--cth-shadow-lg)'
+          margin: '4px 6px 0 0'
         }}>
           {needsYouOpen || !agent ? (
             <NeedsYouBoard config={config} />
