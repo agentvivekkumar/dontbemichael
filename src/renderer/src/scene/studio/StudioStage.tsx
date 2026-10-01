@@ -119,7 +119,13 @@ function deskState(a: Agent): DeskState {
  * light and tint reach under the panel; the scene still fits the space left
  * of it.
  */
-export function StudioStage({ config: initialConfig, bleed = 0 }: { config: HarnessConfig; bleed?: number }) {
+export function StudioStage({ config: initialConfig, bleed = 0, quietCards = false }: {
+  config: HarnessConfig; bleed?: number;
+  /** Demo mode (tools/studio-lab; owner, 2026-10-01): every pod shows its chip,
+   *  even while people work; a card pops up only on hover, or for a few
+   *  seconds when a demo spotlights someone (`cth:demo-spotlight`). */
+  quietCards?: boolean;
+}) {
   const { t } = useTranslation();
   const dark = useAppTheme() === 'dark';
   const T = sceneTokens(dark);
@@ -263,7 +269,24 @@ export function StudioStage({ config: initialConfig, bleed = 0 }: { config: Harn
   };
 
   /** A pod shows its full card while someone in it is at work, or it is selected. */
-  const awake = (pod: PodPlan<Agent>) => pod.members.some((a) => ACTIVE.has(a.status) || a.id === selected);
+  const awake = (pod: PodPlan<Agent>) => pod.members.some((a) => (!quietCards && ACTIVE.has(a.status)) || a.id === selected);
+
+  // A demo can pop one person's card for a moment, the way a hover does.
+  const planRef = useRef(plan);
+  planRef.current = plan;
+  useEffect(() => {
+    const onSpot = (ev: Event) => {
+      const id = (ev as CustomEvent<string>).detail;
+      const pod = planRef.current.pods.find((p) => p.members.some((a) => a.id === id));
+      if (!pod) return;
+      window.clearTimeout(closeTimer.current);
+      setPeek(podKey(pod));
+      closeTimer.current = window.setTimeout(() => setPeek(null), 3400);
+    };
+    window.addEventListener('cth:demo-spotlight', onSpot);
+    return () => window.removeEventListener('cth:demo-spotlight', onSpot);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Arrow keys move between cards in reading order (DESIGN.md 12).
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

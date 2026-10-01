@@ -5,6 +5,9 @@
  * time, a new hire), so what you see is what the app does. For demos and
  * recordings; built into one self-contained HTML file by `npm run lab`.
  *
+ * Every pod shows only its chip; a card pops up on hover, or for a moment
+ * when a button involves someone in it, one at a time.
+ *
  * URL options, for scripted shots:
  *   #dark            dark theme
  *   ?hour=22         time of day (8 morning, 12 day, 17 evening, 22 night)
@@ -73,6 +76,8 @@ const msg = (from: string, to: string, act: string, subject = '', extra: Record<
   fire('onHiveMessage', { id: String(Math.random()), from, to, act, subject, targets: [to], ...extra });
 const tool = (agentId: string, name: string) => fire('onHiveHookEvent', { agentId, event: 'PreToolUse', tool: name });
 const at = (ms: number, fn: () => void) => window.setTimeout(fn, ms);
+/** Pop one person's card for a moment (cards stay folded otherwise in the lab). */
+const spot = (agentId: string, ms = 0) => at(ms, () => window.dispatchEvent(new CustomEvent('cth:demo-spotlight', { detail: agentId })));
 const team = () => useStore.getState().agents.filter((a) => !a.isGod).map((a) => a.id);
 let n = 0;
 
@@ -83,18 +88,21 @@ const PLAYS: Play[] = [
     const r = s.agents.find((a) => a.id === 'ryan');
     const on = r?.status !== 'working';
     s.updateAgent('ryan', { status: on ? 'working' : 'idle', action: on ? 'Drafting the LinkedIn post' : 'idle' } as never);
+    spot('ryan', 150);
   } },
-  { group: 'Everyday work', label: 'Message between two people', loop: true, run: () => msg('kelly', 'oscar', 'query', 'Was the late fee waived?') },
+  { group: 'Everyday work', label: 'Message between two people', loop: true, run: () => { spot('kelly'); msg('kelly', 'oscar', 'query', 'Was the late fee waived?'); spot('oscar', 2000); } },
   { group: 'Everyday work', label: 'Back and forth (conversation)', run: () => {
-    msg('kelly', 'oscar', 'query'); at(1200, () => msg('oscar', 'kelly', 'inform')); at(2600, () => msg('kelly', 'oscar', 'query')); at(4000, () => msg('oscar', 'kelly', 'done'));
+    spot('kelly'); msg('kelly', 'oscar', 'query');
+    at(1200, () => msg('oscar', 'kelly', 'inform')); at(2600, () => msg('kelly', 'oscar', 'query')); at(4000, () => msg('oscar', 'kelly', 'done'));
+    spot('oscar', 3500);
   } },
-  { group: 'Everyday work', label: 'Tool use', loop: true, run: () => { tool('nick', 'WebFetch'); tool('oscar', 'Bash'); tool('pam', 'Read'); tool('dwight', 'Grep'); } },
-  { group: 'Everyday work', label: 'Mail read (in)', loop: true, run: () => tool('kelly', 'mcp__md-mail__search') },
-  { group: 'Everyday work', label: 'Mail sent (out)', loop: true, run: () => tool('dwight', 'mcp__md-mail__send') },
-  { group: 'Everyday work', label: 'A task reaches Done', loop: true, run: () => { w.__extraDone = [...(w.__extraDone ?? []), { id: `D${n++}`, title: 'Done', status: 'done', assignee: 'dwight' }]; } },
+  { group: 'Everyday work', label: 'Tool use', loop: true, run: () => { spot('nick'); tool('nick', 'WebFetch'); tool('oscar', 'Bash'); tool('pam', 'Read'); tool('dwight', 'Grep'); } },
+  { group: 'Everyday work', label: 'Mail read (in)', loop: true, run: () => { spot('kelly'); tool('kelly', 'mcp__md-mail__search'); } },
+  { group: 'Everyday work', label: 'Mail sent (out)', loop: true, run: () => { spot('dwight'); tool('dwight', 'mcp__md-mail__send'); } },
+  { group: 'Everyday work', label: 'A task reaches Done', loop: true, run: () => { spot('dwight'); w.__extraDone = [...(w.__extraDone ?? []), { id: `D${n++}`, title: 'Done', status: 'done', assignee: 'dwight' }]; } },
   { group: 'Everyday work', label: 'Someone idle says something', loop: true, run: () => window.dispatchEvent(new Event('cth:demo-quote')) },
-  { group: 'Michael and you', label: 'Michael points, then delegates', loop: true, run: () => msg('god', 'dwight', 'request', 'Follow up with Lakeview Dental') },
-  { group: 'Michael and you', label: 'A scheduled job starts', loop: true, run: () => msg('scheduler', 'ryan', 'inform', 'Weekly LinkedIn post') },
+  { group: 'Michael and you', label: 'Michael points, then delegates', loop: true, run: () => { msg('god', 'dwight', 'request', 'Follow up with Lakeview Dental'); spot('dwight', 1600); } },
+  { group: 'Michael and you', label: 'A scheduled job starts', loop: true, run: () => { msg('scheduler', 'ryan', 'inform', 'Weekly LinkedIn post'); spot('ryan', 1800); } },
   { group: 'Michael and you', label: 'Michael asks you (paper plane)', loop: true, run: () => msg('god', 'human', 'query', 'Refund or explain?', { needsHuman: true }) },
   { group: 'Michael and you', label: 'You talk to Michael', loop: true, run: () => msg('human', 'god', 'request', 'Can someone call Lakeview?') },
   { group: 'The office day', label: 'Office opens, lights come up', run: () => {
@@ -107,7 +115,9 @@ const PLAYS: Play[] = [
     }));
   } },
   { group: 'The office day', label: 'A new hire arrives', run: () => {
-    useStore.setState({ agents: [...useStore.getState().agents, agent({ id: `jim${n++}`, name: 'Jim', character: 'jim', status: 'idle', extra: { description: 'Sales rep' } })] } as never);
+    const id = `jim${n++}`;
+    useStore.setState({ agents: [...useStore.getState().agents, agent({ id, name: 'Jim', character: 'jim', status: 'idle', extra: { description: 'Sales rep' } })] } as never);
+    spot(id, 900);
   } },
   { group: 'The office day', label: 'Closing time, lights out', run: () => {
     const ids = team(); const done: string[] = []; const godId = 'god';
@@ -180,7 +190,7 @@ function Lab() {
       )}
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
         <div style={{ position: 'absolute', top: 14, right: 18, zIndex: 5 }}><NeedsYouButton /></div>
-        <StudioStage config={config} />
+        <StudioStage config={config} quietCards />
         {closing && <ClosingTimeBar closing={closing} onCancel={() => fire('onClosingTime', { phase: 'cancelled' })} onForceQuit={() => {}} onRetry={() => {}} />}
       </div>
     </div>

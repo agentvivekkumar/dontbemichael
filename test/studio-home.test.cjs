@@ -146,7 +146,9 @@ test('every label card is a button, and arrow keys move between them', () => {
 test('a quiet pod is a chip; its card shows while someone works, it is selected, or hovered (owner, 2026-09-30)', () => {
   const src = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(src, /const ACTIVE = new Set<string>\(\['thinking', 'working', 'blocked', 'compacting', 'looping'\]\);/);
-  assert.match(src, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => ACTIVE\.has\(a\.status\) \|\| a\.id === selected\);/);
+  assert.match(src, /const awake = \(pod: PodPlan<Agent>\) => pod\.members\.some\(\(a\) => \(!quietCards && ACTIVE\.has\(a\.status\)\) \|\| a\.id === selected\);/);
+  // In the app quietCards is off, so a pod at work shows its card.
+  assert.doesNotMatch(read('src/renderer/src/App.tsx'), /quietCards/);
   assert.match(src, /if \(!isAwake && peek !== key\) return chip;/);
   // The chip still carries anything waiting on the owner.
   const chip = src.slice(src.indexOf('function PodChip('));

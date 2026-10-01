@@ -7,6 +7,10 @@ reaching Done, idle chatter, a new hire, the office opening and closing, and
 the time of day. Each button fires the same event the app listens to, so what
 you see is what the app does (branding/DESIGN.md 8.12).
 
+Every pod shows only its chip, so the office reads clean on camera. A card
+pops up when you hover a pod, or for a moment when a button involves someone
+in it (Kelly as she sends, then Oscar as it lands), one card at a time.
+
 Use it for demos, screenshots and demo videos.
 
 ## Build
