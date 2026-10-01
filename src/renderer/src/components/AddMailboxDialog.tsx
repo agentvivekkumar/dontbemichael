@@ -89,7 +89,7 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'color-mix(in srgb, var(--cth-ink-900) 60%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'var(--cth-backdrop)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
     >
       <div
@@ -98,9 +98,9 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
         aria-modal="true"
         aria-labelledby="add-mailbox-title"
         onKeyDown={onKeyDown}
-        style={{ width: 460, maxHeight: '90vh', overflowY: 'auto', background: 'var(--cth-cream-50)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-500), 3px 3px 0 var(--cth-ink-900)', padding: 16 }}
+        style={{ width: 460, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)', padding: '18px 22px', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink)' }}
       >
-        <div id="add-mailbox-title" style={{ fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px' }}>
+        <div id="add-mailbox-title" style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: '22px', marginBottom: 8 }}>
           {fix ? t('mailboxes.dialogFixTitle', { address: fix.address }) : t('mailboxes.dialogTitle')}
         </div>
 
@@ -119,10 +119,10 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
                   tabIndex={provider === p ? 0 : -1}
                   onClick={() => setProvider(p)}
                   style={{
-                    border: 'none', cursor: 'pointer', padding: '8px 6px', fontSize: 13, lineHeight: '18px',
-                    fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink-900)',
-                    background: provider === p ? 'var(--cth-mint-light)' : 'var(--cth-paper-100)',
-                    boxShadow: `inset 0 0 0 ${provider === p ? 2 : 1}px ${provider === p ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`
+                    border: 'none', cursor: 'pointer', padding: '9px 6px', fontSize: 12.5, lineHeight: '18px', borderRadius: 'var(--cth-r-lg)',
+                    fontFamily: 'var(--cth-font-ui)', fontWeight: provider === p ? 600 : 500, color: 'var(--cth-ink)',
+                    background: provider === p ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+                    boxShadow: `inset 0 0 0 ${provider === p ? 1.5 : 1}px ${provider === p ? 'var(--cth-indigo)' : 'var(--cth-line-2)'}`
                   }}
                 >{label(p)}</button>
               ))}
@@ -131,14 +131,14 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
         )}
 
         <Field label={t('mailboxes.address')}>
-          <input type="email" value={address} disabled={!!fix || busy} onChange={(e) => setAddress(e.target.value)} style={input} autoComplete="off" spellCheck={false} />
+          <input type="email" value={address} disabled={!!fix || busy} onChange={(e) => setAddress(e.target.value)} className="cth-input" style={input} autoComplete="off" spellCheck={false} />
         </Field>
         <Field label={t('mailboxes.password')}>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               ref={passRef}
               type={showPass ? 'text' : 'password'} value={password} disabled={busy}
-              onChange={(e) => setPassword(e.target.value)} style={{ ...input, flex: 1 }} autoComplete="off" spellCheck={false}
+              onChange={(e) => setPassword(e.target.value)} className="cth-input" style={{ ...input, flex: 1 }} autoComplete="off" spellCheck={false}
             />
             <PixelButton variant="secondary" size="md" onClick={() => setShowPass((v) => !v)}>{showPass ? t('mailboxes.hide') : t('mailboxes.show')}</PixelButton>
           </div>
@@ -147,16 +147,16 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
         {provider === 'other' && (
           <>
             <Field label={t('mailboxes.incoming')}>
-              <input value={imapHost} placeholder={guessed.imap.host} disabled={busy} onChange={(e) => setImapHost(e.target.value)} style={input} spellCheck={false} />
+              <input value={imapHost} placeholder={guessed.imap.host} disabled={busy} onChange={(e) => setImapHost(e.target.value)} className="cth-input" style={input} spellCheck={false} />
             </Field>
             <Field label={t('mailboxes.outgoing')}>
-              <input value={smtpHost} placeholder={guessed.smtp.host} disabled={busy} onChange={(e) => setSmtpHost(e.target.value)} style={input} spellCheck={false} />
+              <input value={smtpHost} placeholder={guessed.smtp.host} disabled={busy} onChange={(e) => setSmtpHost(e.target.value)} className="cth-input" style={input} spellCheck={false} />
             </Field>
             <button type="button" aria-expanded={more} onClick={() => setMore((v) => !v)} style={{ ...linkButton, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Disclosure open={more} />{t('mailboxes.moreSettings')}</button>
             {more && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Field label={t('mailboxes.incomingPort')}><input inputMode="numeric" value={imapPort} onChange={(e) => setImapPort(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 100 }} /></Field>
-                <Field label={t('mailboxes.outgoingPort')}><input inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 100 }} /></Field>
+                <Field label={t('mailboxes.incomingPort')}><input inputMode="numeric" value={imapPort} onChange={(e) => setImapPort(e.target.value.replace(/\D/g, ''))} className="cth-input" style={{ ...input, width: 100 }} /></Field>
+                <Field label={t('mailboxes.outgoingPort')}><input inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value.replace(/\D/g, ''))} className="cth-input" style={{ ...input, width: 100 }} /></Field>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-end', paddingBottom: 6, fontSize: 13 }}>
                   <span>{t('mailboxes.tls')}</span>
                   <Toggle on={tls} label={t('mailboxes.tls')} onClick={() => setTls((v) => !v)} />
@@ -166,14 +166,14 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
           </>
         )}
 
-        <div style={{ background: 'var(--cth-sky-light)', padding: '8px 10px', fontSize: 13, lineHeight: '18px', marginTop: 12, color: 'var(--cth-ink-900)' }}>
+        <div style={{ background: 'var(--cth-blue-soft)', borderRadius: 'var(--cth-r-md)', padding: '9px 12px', fontSize: 12.5, lineHeight: '18px', marginTop: 14, color: 'var(--cth-ink)' }}>
           {t(`mailboxes.help.${provider}`)}
         </div>
 
         <div aria-live="polite" style={{ minHeight: 0 }}>
           {busy && <div style={{ ...hint, marginTop: 10 }}>{t('mailboxes.testing', { address: address.trim() })}</div>}
           {error && !busy && (
-            <div role="alert" style={{ background: 'var(--cth-coral-light)', color: 'var(--cth-ink-900)', padding: '8px 10px', fontSize: 13, lineHeight: '18px', marginTop: 10 }}>! {error}</div>
+            <div role="alert" style={{ background: 'var(--cth-coral-soft)', color: 'var(--cth-coral-text)', borderRadius: 'var(--cth-r-md)', padding: '8px 12px', fontSize: 12.5, lineHeight: '18px', marginTop: 10 }}>{error}</div>
           )}
         </div>
 
@@ -188,20 +188,20 @@ export function AddMailboxDialog({ fix, onClose, onSaved }: {
   );
 }
 
-const hint: CSSProperties = { fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' };
+const hint: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-3)' };
 const input: CSSProperties = {
-  height: 32, border: 'none', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-  padding: '0 8px', fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)', minWidth: 0
+  height: 34, border: 'none', background: 'var(--cth-card)', outline: 'none',
+  padding: '0 10px', fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink)', minWidth: 0
 };
 const linkButton: CSSProperties = {
   border: 'none', background: 'transparent', padding: 0, marginTop: 10, cursor: 'pointer', textDecoration: 'underline',
-  fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink-700)'
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, color: 'var(--cth-indigo-text)'
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 12 }}>
-      <span style={{ fontSize: 13, color: 'var(--cth-ink-700)' }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}</span>
       {children}
     </label>
   );

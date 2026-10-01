@@ -1555,14 +1555,14 @@
     "decodeFailed": "could not decode this image; the file may be corrupt or misnamed"
   },
   "officeMissing": {
-    "title": "WE CAN'T FIND YOUR OFFICE",
+    "title": "We can't find your office",
     "body": "Your office was kept in this folder, and it is no longer there. It may have been moved, renamed or deleted.",
     "whyItMatters": "Your team's memory, tasks and history live in that folder, so finding it brings everyone back just as they were.",
     "find": "Find the folder…",
     "findHint": "Pick the folder where you moved it.",
     "notAnOffice": "That folder doesn't have an office in it. Pick the folder you moved, or start over.",
     "couldNotOpen": "Couldn't open that office. Try again, or pick another folder.",
-    "recent": "OR OPEN ONE YOU USED BEFORE",
+    "recent": "Or open one you used before",
     "startOver": "Start over here",
     "startOverHint": "Makes a new, empty office in the same place.",
     "startOverConfirm": "Start over with an empty office? Your team won't have its past memory or history.",
