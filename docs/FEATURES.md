@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.14). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.15). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -76,7 +76,7 @@ moving, and brings you only the decisions that need you.
 
 ## Part 2: Every change, release by release
 
-### 0.0.15 (unreleased)
+### 0.0.15 (2026-10-02)
 - Claude connectors. Settings > Connections lists every connector on your Claude account, read
   from Claude when the app starts, when you open Connections and when you press Refresh. Each one
   is off until you turn it on, and a team member uses it only once its Access tab gives it.
