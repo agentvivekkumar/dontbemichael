@@ -27,6 +27,16 @@ export type ToolKind =
 export type StationKind =
   | 'shelf' | 'terminal' | 'web' | 'board' | 'mailbox' | 'mcp' | 'desk';
 
+/** Why an agent waits for a restart (store.pendingRestart). */
+export interface PendingRestart {
+  at: number;
+  reason: 'email' | 'connectors';
+  /** The owner pressed Restart now: do not wait for idle. */
+  now?: boolean;
+  /** The last restart attempt failed; it is tried again on the next tick. */
+  failed?: boolean;
+}
+
 export interface BlockReason {
   summary: string;                 // short headline shown on banner
   detail: string;                  // longer explanation
@@ -304,10 +314,12 @@ interface State {
    *  mic button reactively (set by App on config load and by Settings on save). */
   freeflowEnabled: boolean;
   setFreeflowEnabled: (on: boolean) => void;
-  /** Agents waiting for a restart so email turns on (docs/designs/multi-mailbox.md,
-   *  E2/E5): agent id -> when it was queued. Cleared once restarted. */
-  pendingEmailRestart: Record<string, number>;
-  setPendingEmailRestart: (agentId: string, at: number | undefined) => void;
+  /** Agents waiting for a restart so a change reaches them: email turned on
+   *  (docs/designs/multi-mailbox.md, E2/E5) or their Claude connectors changed
+   *  (docs/designs/claude-connectors.md, D2). Agent id -> when it was queued,
+   *  why, and whether the owner pressed Restart now. Cleared once restarted. */
+  pendingRestart: Record<string, PendingRestart>;
+  setPendingRestart: (agentId: string, entry: PendingRestart | undefined) => void;
   /** Mirror of `!!config.groqApiKey` — boolean presence ONLY; the key value never
    *  enters the store. Lets the composer show the voice button disabled (with a
    *  "add a Groq key" tooltip) instead of hiding it. Set by App on config load and
@@ -1080,11 +1092,18 @@ export const useStore = create<State>((set, get) => ({
   setDraft: (agentId, text) =>
     set((s) => ({ drafts: { ...s.drafts, [agentId]: text } })),
   freeflowEnabled: false,
-  pendingEmailRestart: {},
-  setPendingEmailRestart: (agentId, at) => set((s) => {
-    const next = { ...s.pendingEmailRestart };
-    if (at === undefined) delete next[agentId]; else next[agentId] = at;
-    return { pendingEmailRestart: next };
+  pendingRestart: {},
+  setPendingRestart: (agentId, entry) => set((s) => {
+    const next = { ...s.pendingRestart };
+    // A second reason while one waits keeps the first time, so the 10 minute
+    // ceiling never resets, and keeps 'connectors': turning email off clears
+    // only an email restart, never one main asked for its connectors.
+    if (entry === undefined) delete next[agentId];
+    else {
+      const prev = next[agentId];
+      next[agentId] = prev ? { ...entry, at: prev.at, reason: prev.reason === 'connectors' ? 'connectors' : entry.reason } : entry;
+    }
+    return { pendingRestart: next };
   }),
   // Voice is off in this build (SHOW_VOICE): dictation stays off whatever is saved,
   // which hides the mic button and disarms hold Option.

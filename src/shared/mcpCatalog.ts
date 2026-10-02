@@ -152,27 +152,14 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   }
 ];
 
-/** Whether the owner allows the email and calendar connected to their Claude
- *  account: the "Your Claude account" switch in Settings > Connections >
- *  Mailboxes (stored as mcpDefaults['email-calendar']).
+/** Whether the owner allowed the email and calendar connected to their Claude
+ *  account with the old "Your Claude account" switch (mcpDefaults['email-calendar']).
+ *  Read once, for the carry-over to per-agent Gmail and Calendar grants
+ *  (docs/designs/claude-connectors.md, D9); agents are gated by the connector rules.
  *  A secret tier server, so only an explicit yes counts (the catalog ships it
  *  off and a missing entry means off). */
 export function emailCalendarAllowed(mcpDefaults: { [id: string]: { enabled: boolean } } | undefined): boolean {
   return mcpDefaults?.['email-calendar']?.enabled === true;
-}
-
-/** An MCP tool that reads or acts on the owner's mail or calendar, from any
- *  server: the Claude account connectors agents inherit
- *  (mcp__claude_ai_Gmail__*, mcp__claude_ai_Google_Calendar__*), an Outlook
- *  connector, or this app's own munder-email-calendar. Matched on whole words
- *  of the server name, so Mailchimp and the like are not caught. */
-export function isEmailCalendarTool(toolName: string): boolean {
-  const m = /^mcp__(.+?)__/.exec(toolName);
-  if (!m) return false;
-  // This app's own mailboxes (md-mail) are governed by Capabilities alone, not
-  // by the Claude account switch (owner, 2026-09-26).
-  if (m[1] === 'md-mail') return false;
-  return /(^|[_-])(gmail|google[_-]?calendar|calendar|outlook|e?mail|email[_-]calendar)([_-]|$)/i.test(m[1]);
 }
 
 /** Look up a catalog entry by id. */

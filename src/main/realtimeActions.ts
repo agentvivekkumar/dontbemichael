@@ -144,7 +144,7 @@ const SETTING_POLICY: Record<string, {
   terminalTheme: { tier: 'soft', type: 'string', values: ['light', 'dark'] },
   freeflowEnabled: { tier: 'soft', type: 'boolean' },
   strongKeepalive: { tier: 'soft', type: 'boolean' },
-  autoUpdate: { tier: 'soft', type: 'boolean' },
+  // autoUpdate left with its effect (owner, 2026-10-02): installs always check.
   realtimeIdleDisconnectMs: { tier: 'soft', type: 'number', min: 30_000, max: 3_600_000 },
   // confirm: behavior-changing — echo old→new + distinct token
   autoMode: { tier: 'confirm', type: 'boolean' },

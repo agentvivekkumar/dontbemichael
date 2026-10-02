@@ -48,6 +48,7 @@ own memory, working on your Mac.
 ## Contents
 
 - [What it is](#what-it-is)
+- [How it differs from Munder Difflin](#how-it-differs-from-munder-difflin)
 - [Your team](#your-team)
 - [A mailbox for every job](#a-mailbox-for-every-job)
 - [What the office does](#what-the-office-does)
@@ -69,6 +70,31 @@ decision.
 Everything runs on your Mac, on the Claude plan you already have. Each team member has a desk in
 an office you can watch, a pod for each department around Michael's glass office, so you can see
 who is working on what.
+
+## How it differs from Munder Difflin
+
+Don't Be Michael started as a fork of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
+and it keeps that project's core: every team member is a real Claude Code process in its own
+terminal, and the team coordinates through the hive, a folder of plain files. What was built on
+top is a different product for a different person.
+
+Munder Difflin is an agent harness for developers: it turns the coding CLIs you already run into
+clones of you. Don't Be Michael is an office for a small business owner who never opens a
+terminal. That changes almost every decision:
+
+| | Munder Difflin | Don't Be Michael |
+|---|---|---|
+| **Made for** | Developers running coding agents | Small business owners in any line of work, with no technical background needed |
+| **Michael** | Your clone, routing work between your agents | Your office manager: the only one who assigns work, decides the team's day to day requests, and brings you only the calls that need you |
+| **Setting up** | Start agents in terminals and give them work | Pick your kind of business, get a suggested team, and hire in four steps with a real job and a work style for each; no two teammates do the same work |
+| **Email** | The one Gmail account on your Claude account, shared by every agent | As many mailboxes as the business runs on, one per team member, each set to Can send or Draft only; passwords stay in your Mac's keychain |
+| **Access control** | None: every agent can reach every app connected to your Claude account and every tool you set up in Claude Code | You decide exactly which apps the office can use and which team member uses each one; the app enforces it on every call |
+| **Files and data** | Hard to give an agent a workspace of its own: agents work in code project folders, with no way to give each one its own set of files and data | Your business folder becomes the office's filing cabinet, with access that follows its hierarchy. Each team member works in its own folder with the files its job needs, such as product documentation and client lists for Sales, or survey results and user interviews for Marketing, and opens only that folder. Michael, above them, reads every folder and changes none. You organize your own work in the same folders the team uses |
+| **User experience** | Lots of low level details and out of place screens, which make the system hard to use and hard to focus on the right things | A modern office workspace, redesigned from the ground up for business users. Unneeded details and repetition are gone, and there is one clear way to talk to the office, instead of every option piled into an orchestrator panel |
+| **Cost and data** | Free, with a paid Pro plan; anonymous usage stats | Free, no paid plan, no usage data sent |
+
+If you write code and want a team of coding agents, Munder Difflin is the better fit. If you run a
+business and want the work done without watching terminals, this is.
 
 ## Your team
 
@@ -113,7 +139,8 @@ business runs on, and each team member works from the one that matches its job.
   "needs you" and Michael asks you to fix it once, on the Needs you board.
 
 Outlook and Microsoft 365 are not supported yet. The Gmail and Calendar connected to your Claude
-account are separate: one switch in Mailboxes allows or blocks them for the whole team.
+account are separate: they are listed under Claude connectors in Settings, off until you turn them
+on and give them to a team member.
 
 ## What the office does
 
@@ -178,7 +205,7 @@ quotes.
 
 </td>
 <td width="50%">
-  <img src="./branding/reference/studio/settings-autonomy.png" alt="Settings, Autonomy and Budgets: approvals and the circuit breaker" width="100%">
+  <img src="./branding/reference/studio/settings-autonomy.png" alt="Settings, Agents: the default model, approvals and the circuit breaker" width="100%">
 </td>
 </tr>
 <tr>
@@ -224,8 +251,8 @@ works. Setup checks what your Mac already has and offers to install anything mis
 - **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
 - **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
-- **QuickBooks through your Claude account.** The app does not connect to Intuit itself. Turn QuickBooks on in Settings, Connections, QuickBooks (it is off by default); the app then shows whether your Claude account has QuickBooks connected, or the steps to connect it. On each team member's Access tab, choose Can use QuickBooks, then Read only or Can make changes. Oscar starts on and Read only; everyone else starts off.
-- **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, QuickBooks when you turn it on, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
+- **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.
+- **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, Claude connectors, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
 - **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.
@@ -241,7 +268,6 @@ works. Setup checks what your Mac already has and offers to install anything mis
 **Also**
 - **Updates.** The app tells you when a new version is out and links to the download.
 - **Claude Code updates.** When Claude Code updates itself, team members already running stay on the old version until they restart. A "team upgrade ready" chip and note offer to close the office the safe way (everyone saves first) and reopen on the new version. Nothing restarts until you click.
-- **Your language.** English, Simplified Chinese and Arabic, with right to left layout for Arabic.
 
 <div align="right">(<a href="#what-it-is">↑ back to top</a>)</div>
 

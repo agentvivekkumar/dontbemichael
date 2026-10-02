@@ -1,5 +1,6 @@
 // Mirrors src/main/config.ts. Kept as a renderer-side type-only module
 // so we don't have to reach into the preload package to type-check.
+import type { ClaudeConnectorsState } from '@shared/claudeConnectors';
 import type { MailboxRecord, AgentCapabilities } from '@shared/mailboxes';
 import type { CompanyProfile } from '@shared/companyProfile';
 import {
@@ -112,9 +113,15 @@ export interface HarnessConfig {
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
-  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
-   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  /** The QuickBooks row's switch under Settings > Connections > Claude connectors.
+   *  Off or absent refuses everyone. Mirrors src/main/config.ts. */
   quickbooksClaude?: boolean;
+  /** Connectors on the owner's Claude account, as last read (src/main/config.ts). */
+  claudeConnectors?: ClaudeConnectorsState;
+  /** The connectors the owner turned on, by key (QuickBooks: quickbooksClaude). */
+  connectorsOn?: { [key: string]: boolean };
+  /** Connector keys the owner has seen in Settings. */
+  connectorsSeen?: string[];
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
@@ -126,7 +133,7 @@ export interface HarnessConfig {
    *  while away (battery cost; best on AC). Default off = survive + catch up on
    *  resume. Mirrors the main-process field (src/main/config.ts). */
   strongKeepalive?: boolean;
-  /** Auto-update from GitHub releases (default ON; Settings → General). */
+  /** @deprecated Ignored since 2026-10-02: updates are always checked. */
   autoUpdate?: boolean;
   /** Anonymous product analytics (see TELEMETRY.md). Ignored while
    *  COLLECT_USAGE_STATS (buildFeatures.ts) is false, as it is in this build.

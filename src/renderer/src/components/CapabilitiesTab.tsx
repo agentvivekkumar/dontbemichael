@@ -7,9 +7,10 @@ import { useStore, type Agent } from '@/store/store';
 import { type EmailCapability, mailboxHolder } from '@shared/mailboxes';
 import { missionsFor } from '@shared/missions';
 import { quickbooksCapability, type QuickBooksCapability } from '@shared/quickbooks';
+import { connectorGranted, connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
-type SectionKey = 'email' | 'books' | 'schedules';
+type SectionKey = 'email' | 'connectors' | 'schedules';
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
@@ -22,22 +23,24 @@ type SectionKey = 'email' | 'books' | 'schedules';
  *   2026-09-26). With email on, the body is the agent's one mailbox, picked
  *   from a list (or a link to Settings when none is set up), then Sending with Draft only first chosen (6A), then
  *   the pending restart note (E2/E5).
- * - QuickBooks: the Claude account's QuickBooks connector (owner,
- *   2026-09-29), shown only once it is on in Settings. The header switch, then Read only or Can make changes. The
- *   hook reads it on the agent's next call, so nothing restarts. Before the
- *   owner chooses, roles that read the books (Oscar) are on, Read only.
+ * - Claude connectors (docs/designs/claude-connectors.md, design D4): one row
+ *   and switch per connector the owner turned on in Settings, or a link to
+ *   Settings when none is. QuickBooks keeps Read only or Can make changes under
+ *   its row, and before the owner chooses, roles that read the books (Oscar)
+ *   are on, Read only. The hook checks every call at once; the agent restarts
+ *   when idle so a new connector loads (useHive effect 8), or at Restart now.
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had.
  *
  * Every change saves at once through main, which checks it and says whether
  * email just turned on; if it did and the agent is running, it is queued for a
- * restart (useHive effect 8).
+ * restart (useHive effect 8). Main asks for a connector restart itself.
  */
 export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const config = useHarnessConfig();
   const godName = useResolvedGodName();
-  const pending = useStore((s) => s.pendingEmailRestart[agent.id]);
+  const pending = useStore((s) => s.pendingRestart[agent.id]);
   const [failed, setFailed] = useState(false);
   // A mailbox another agent holds, waiting for the owner to confirm the move.
   const [moving, setMoving] = useState<string | null>(null);
@@ -47,7 +50,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { missions } = useMissions();
   const mine = missionsFor(missions, agent.id, godId);
   const schedulesOn = mine.filter((m) => m.enabled).length;
-  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, books: true, schedules: true });
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, connectors: true, schedules: true });
   // Unknown until main answers for this agent (the card stays hidden), so
   // Oscar's switch never shows off while the hook treats him as on, and
   // another agent's answer never shows.
@@ -72,8 +75,8 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
       if (!res.ok && res.heldBy && next.mailboxes[0]) { setMoving(next.mailboxes[0]); return; }
       if (!res.ok) { setFailed(true); return; }
       setMoving(null);
-      if (res.restartNeeded && agent.ptyId) useStore.getState().setPendingEmailRestart(agent.id, Date.now());
-      if (!next.enabled) useStore.getState().setPendingEmailRestart(agent.id, undefined);
+      if (res.restartNeeded && agent.ptyId) useStore.getState().setPendingRestart(agent.id, { at: Date.now(), reason: 'email' });
+      if (!next.enabled && pending?.reason === 'email') useStore.getState().setPendingRestart(agent.id, undefined);
     } catch { setFailed(true); }
   };
 
@@ -129,13 +132,26 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
       if (!res.ok) setFailed(true);
     } catch { setFailed(true); }
   };
-  // Turning QuickBooks on opens the section, so Read only shows; it always
-  // starts Read only.
+  // Turning QuickBooks on always starts Read only.
   const toggleBooks = (): void => {
-    if (books.enabled) { void saveBooks({ enabled: false, changes: false }); return; }
-    setCollapsed({ ...collapsed, books: false });
-    void saveBooks({ enabled: true, changes: false });
+    void saveBooks(books.enabled ? { enabled: false, changes: false } : { enabled: true, changes: false });
   };
+
+  // The connectors the owner turned on, A to Z. QuickBooks waits for its role
+  // default, so Oscar's switch never shows off while the hook treats him as on.
+  const connectors = (config.claudeConnectors?.list ?? [])
+    .filter((c) => connectorOn(config, c.key) && (!isQuickBooksKey(c.key) || booksDefault !== undefined))
+    .sort((a, b) => a.key.localeCompare(b.key));
+  const holds = (key: string): boolean => connectorGranted(config, agent.id, key, booksDefault === true);
+  const granted = connectors.filter((c) => holds(c.key)).length;
+  const setGrant = async (key: string, on: boolean): Promise<void> => {
+    setFailed(false);
+    try {
+      const res = await window.cth.connectorsSetGrant(agent.id, key, on);
+      if (!res.ok) setFailed(true);
+    } catch { setFailed(true); }
+  };
+  const restartNow = (): void => { if (pending) useStore.getState().setPendingRestart(agent.id, { ...pending, now: true, failed: false }); };
 
   const openSettings = (): void => { window.dispatchEvent(new CustomEvent('cth:open-settings', { detail: { section: 'Connections' } })); };
 
@@ -192,28 +208,46 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           )}
         </TriggerCard>
 
-        {config.quickbooksClaude === true && booksDefault !== undefined && <TriggerCard
-          title={t('capabilities.quickbooks')}
-          blurb={t('capabilities.quickbooksBlurb', { name })}
-          action={<Toggle on={books.enabled} label={t('capabilities.canUseBooks', { name })} onClick={toggleBooks} />}
-          open={!collapsed.books}
-          onToggle={(open) => setFold('books', open)}
+        <TriggerCard
+          title={t('capabilities.connectors')}
+          blurb={t('capabilities.connectorsBlurb', { name })}
+          summary={connectors.length ? t('capabilities.connectorsSummary', { granted, total: connectors.length }) : undefined}
+          open={!collapsed.connectors}
+          onToggle={(open) => setFold('connectors', open)}
         >
-          {!books.enabled ? (
-            <div style={hint}>{t('capabilities.quickbooksOff', { name })}</div>
+          {connectors.length === 0 ? (
+            <div style={hint}>
+              {t('capabilities.connectorsNone')}{' '}
+              <button type="button" onClick={openSettings} style={link}>{t('capabilities.connectorsTurnOn')}</button>
+            </div>
           ) : (
-            <>
-              <div style={{ ...h13, marginTop: 0 }}>{t('capabilities.booksChanges')}</div>
-              <RadioRows
-                label={t('capabilities.booksChanges')}
-                value={String(books.changes)}
-                options={[{ value: 'false', label: t('capabilities.booksReadOnly'), desc: t('capabilities.booksReadOnlyDesc') }, { value: 'true', label: t('capabilities.booksCanChange'), desc: t('capabilities.booksCanChangeDesc') }]}
-                onChange={(v) => { if ((v === 'true') !== books.changes) void saveBooks({ enabled: true, changes: v === 'true' }); }}
-              />
-            </>
+            <div role="list">
+              {connectors.map((c, i) => {
+                const qbo = isQuickBooksKey(c.key);
+                const on = holds(c.key);
+                const roleDefault = qbo && booksDefault === true && !config.agentCapabilities?.[agent.id]?.quickbooks;
+                return (
+                  <div key={c.key} role="listitem" style={{ ...row, flexWrap: 'wrap', borderTop: i === 0 ? 'none' : row.borderTop }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>{c.key}</span>
+                    {c.status === 'needs-sign-in' && <span style={hint}>{t('capabilities.needsSignIn')}</span>}
+                    {roleDefault && <span style={hint}>{t('capabilities.booksRoleDefault')}</span>}
+                    <Toggle on={on} label={t('capabilities.canUseConnector', { name, connector: c.key })} onClick={() => { if (qbo) toggleBooks(); else void setGrant(c.key, !on); }} />
+                    {qbo && on && (
+                      <div style={{ flexBasis: '100%', paddingInlineStart: 12 }}>
+                        <RadioRows
+                          label={t('capabilities.booksChanges')}
+                          value={String(books.changes)}
+                          options={[{ value: 'false', label: t('capabilities.booksReadOnly'), desc: t('capabilities.booksReadOnlyDesc') }, { value: 'true', label: t('capabilities.booksCanChange'), desc: t('capabilities.booksCanChangeDesc') }]}
+                          onChange={(v) => { if ((v === 'true') !== books.changes) void saveBooks({ enabled: true, changes: v === 'true' }); }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-          <div style={{ ...hint, marginTop: 10 }}>{t('capabilities.booksHow')}</div>
-        </TriggerCard>}
+        </TriggerCard>
 
         <TriggerCard
           title={t('capabilities.schedules')}
@@ -227,7 +261,16 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
         {/* Outside the sections, so a closed Email section still shows them. */}
         <div aria-live="polite">
-          {pending !== undefined && email.enabled && <div style={{ ...notice, background: 'var(--cth-amber-soft)' }}>{t('capabilities.pending', { name })}</div>}
+          {pending && (pending.reason === 'connectors' || email.enabled) && (
+            <div style={{ ...notice, background: 'var(--cth-amber-soft)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ flex: 1 }}>
+                {pending.failed ? t('capabilities.restartFailed', { name })
+                  : pending.now ? t('capabilities.restarting', { name })
+                  : pending.reason === 'connectors' ? t('capabilities.connectorsPending', { name }) : t('capabilities.pending', { name })}
+              </span>
+              {!pending.now && <MiniButton onClick={restartNow}>{t('capabilities.restartNow')}</MiniButton>}
+            </div>
+          )}
           {failed && <div role="alert" style={{ ...notice, background: 'var(--cth-coral-soft)', color: 'var(--cth-coral-text)' }}>! {t('capabilities.saveFailed')}</div>}
         </div>
       </div>

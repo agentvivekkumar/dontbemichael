@@ -138,7 +138,7 @@ test('nothing is sent while usage stats are hidden, whatever the saved setting',
 
 /**
  * The header's "auto mode on / off" text is hidden (owner, 2026-09-24). The
- * setting itself still works and stays in Settings → Autonomy & Budgets.
+ * setting itself still works and stays in Settings → Agents.
  */
 test('the header hides the auto mode text', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
@@ -240,13 +240,10 @@ test('the pixel office themes are gone with the floor', () => {
   assert.equal(fs.existsSync(path.resolve(__dirname, '../src/renderer/src/scene/office/themeRegistry.ts')), false);
 });
 
-test('this build hides the automatic updates switch; Check for updates stays', () => {
-  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_UPDATE_SWITCH, false);
+test('there is no automatic updates switch: every installed build checks (owner, 2026-10-02)', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_UPDATE_SWITCH, undefined, 'the flag is gone with the switch');
   const settings = read('src/renderer/src/components/SettingsModal.tsx');
-  const open = settings.indexOf('{SHOW_AUTO_UPDATE_SWITCH && (<>');
-  const close = settings.indexOf('</>)}', open);
-  assert.ok(open > 0 && close > open, 'switch wrapped in SHOW_AUTO_UPDATE_SWITCH');
-  assert.ok(settings.slice(open, close).includes("t('settings.general.autoUpdate')"));
+  assert.doesNotMatch(settings, /autoUpdate/);
 });
 
 test('this build hides Slack, and a Slack connection saved earlier does not start', () => {
@@ -266,6 +263,15 @@ test('this build hides the safe and read only server list; the switches that nee
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_READONLY_SERVERS, false);
   const src = read('src/renderer/src/components/McpDefaultsSettings.tsx');
   assert.match(src, /const TIER_ORDER: McpTier\[\] = \(\['safe-readonly', 'write', 'secret'\] as McpTier\[\]\)\s*\.filter\(\(tier\) => tier !== 'safe-readonly' \|\| SHOW_READONLY_SERVERS\);/);
+});
+
+test('this build hides the whole Default MCP servers section: none of its servers load (owner, 2026-10-01)', () => {
+  // Claude Code ignores mcpServers in the --settings file each agent starts
+  // with (probe on 2.1.287), so every switch here did nothing.
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_MCP_DEFAULTS, false);
+  const settings = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(settings, /\{SHOW_MCP_DEFAULTS && activeSection === 'Connections' && \(\s*<>\s*<McpDefaultsSettings config=\{config\} \/>/);
+  assert.equal((settings.match(/<McpDefaultsSettings /g) || []).length, 1, 'shown nowhere else');
 });
 
 test('Add Agent hides import hire and its AI prompt; the button says hire (owner, 2026-09-27)', () => {
@@ -319,4 +325,104 @@ test('focus mode is hidden: no button opens it and a saved preference cannot reo
   assert.match(read('src/renderer/src/shell/TopBar.tsx'), /\{SHOW_FOCUS_MODE && \(\n\s+<IconButton label=\{fullscreenAgentId \? t\('shell\.exitFocus'\)/);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \? /);
   assert.match(read('src/renderer/src/components/CommandCenterPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \|\| fullscreen \? /);
+});
+
+test('Settings, General: one About card carries the version once and the update status (owner, 2026-10-01)', () => {
+  // docs/designs/about-updates-card.md: the hero card and the Updates block
+  // said the version twice and offered release notes three ways.
+  const modal = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(modal, /<SettingsHeroCard \/>/);
+  assert.doesNotMatch(modal, /<UpdatesSection \/>/, 'no separate Updates block');
+  const card = read('src/renderer/src/components/SettingsHeroCard.tsx');
+  assert.equal((card.match(/v\{__APP_VERSION__\}/g) || []).length, 1, 'the version once');
+  assert.match(card, /const u = useUpdates\(\);/);
+  assert.match(card, /<UpdateStatusLine u=\{u\} \/>[\s\S]*<UpdateButtons u=\{u\} \/>[\s\S]*<UpdateDetails u=\{u\} \/>/);
+  assert.doesNotMatch(card, /download v\{pending\}|border: `2px solid/, 'no second download, no v1 ink frame');
+  assert.match(card, /<InfoTip label=\{hero\.plan\.label\} text=\{hero\.plan\.blurb\} \/>/, 'the plan blurb sits behind an info icon');
+  assert.doesNotMatch(card, /⭐/);
+  const upd = read('src/renderer/src/components/UpdatesSection.tsx');
+  assert.match(upd, /const quiet = !status \|\| status\.state === 'idle' \|\| status\.state === 'checking' \|\| status\.state === 'not-available' \|\| status\.state === 'just-updated';/, 'quiet states do not repeat the version');
+  assert.match(upd, /notes: quiet \? \[\] : notes/, 'notes only for a newer version');
+  // In Settings' scrolling flex column a card with overflow hidden shrank to
+  // 1px (owner, 2026-10-01: "I no longer see the entire merged section").
+  assert.match(card, /<div style=\{\{ flexShrink: 0, background: 'var\(--cth-card\)'/);
+  assert.doesNotMatch(card, /overflow: 'hidden'/);
+});
+
+test("What's new opens a popover under its link with the notes of this version (owner, 2026-10-02)", () => {
+  // It opened GitHub behind the app, then a corner toast that was easy to miss
+  // on a mostly white app; the answer to a click sits where you clicked.
+  const card = read('src/renderer/src/components/SettingsHeroCard.tsx');
+  assert.match(card, /<button type="button" ref=\{whatsNewRef\} style=\{footLink\} onClick=\{toggleNotes\} aria-expanded=\{notesOpen\} aria-haspopup="dialog">/);
+  assert.match(card, /\{notesOpen && <WhatsNewPopover notes=\{whatsNew\.notes\} loading=\{whatsNew\.loading\} anchor=\{whatsNewRef\} onClose=\{\(\) => setNotesOpen\(false\)\} \/>\}/);
+  assert.match(card, /<div style=\{\{ position: 'relative', display: 'flex'/, 'the footer anchors the popover');
+  assert.doesNotMatch(card, /fullChangelog|cth:show-release-notes/);
+  const pop = read('src/renderer/src/components/WhatsNewPopover.tsx');
+  assert.match(pop, /if \(cur\.state === 'just-updated' && cur\.notes\) \{ setNotes/);
+  assert.match(pop, /const r = await window\.cth\.updateReleaseNotes\(\);/);
+  assert.match(pop, /onKeyDown=\{\(e\) => \{ if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); close\(\); \} \}\}/, 'Esc closes the popover, not Settings');
+  assert.match(pop, /document\.addEventListener\('mousedown', onDown\)/, 'a click outside closes it');
+  assert.match(pop, /t\('whatsNewPopover\.failed'\)/, 'a failure says so');
+  assert.match(pop, /onClick=\{\(\) => void window\.cth\.openExternal\(changelog\)\}>\{t\('whatsNewPopover\.fullChangelog'\)\}<\/button>/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const w = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).whatsNewPopover;
+    for (const k of ['title', 'titleVersion', 'loading', 'failed', 'fullChangelog', 'releasePage', 'close']) assert.ok(w[k], `${loc} whatsNewPopover.${k}`);
+  }
+  // Ink fill like the info tooltips: white on a white card was hard to read.
+  assert.match(pop, /background: 'var\(--cth-ink\)', color: ON,/);
+  // The corner toast is for updates that arrive on their own again.
+  assert.doesNotMatch(read('src/renderer/src/components/UpdateToast.tsx'), /cth:show-release-notes|WhatsNewCard/);
+  // Main answers for the running version from its GitHub release, in dev too.
+  const upd = read('src/main/updater.ts');
+  const reg = upd.indexOf("ipcMain.handle('update:releaseNotes'");
+  assert.ok(reg > 0 && reg < upd.indexOf('if (!app.isPackaged) return;'), 'registered before the packaged-only block');
+});
+
+test('Settings, General hides Explain things simply and Arabic / RTL text in terminals (owner, 2026-10-02)', () => {
+  const flags = loadTs('src/shared/buildFeatures.ts');
+  assert.equal(flags.SHOW_SIMPLE_MODE_SWITCH, false);
+  assert.equal(flags.SHOW_ARABIC_TERMINAL_SWITCH, false);
+  const modal = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(modal, /\{SHOW_SIMPLE_MODE_SWITCH && \(\s*<div[^>]*>\s*<div[^>]*>\s*<span[^>]*>\{t\('settings\.general\.simpleMode'\)\}/);
+  assert.match(modal, /\{SHOW_ARABIC_TERMINAL_SWITCH && \(\s*<div[^>]*>\s*<div[^>]*>\s*<span[^>]*>\s*\{t\('settings\.general\.arabicTerminal'\)\}/);
+  // The settings still work while hidden: Arabic shaping follows the language.
+  assert.match(read('src/renderer/src/terminal/arabicSetting.ts'), /return override \?\? languageDefault\(\);/);
+});
+
+test('Settings, General hides the Language section (owner, 2026-10-02)', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_LANGUAGE_PICKER, false);
+  const modal = read('src/renderer/src/components/SettingsModal.tsx');
+  assert.match(modal, /\{SHOW_LANGUAGE_PICKER && \(<>\s*<div style=\{\{ height: 1, background: 'var\(--cth-line\)' \}\} \/>\s*\{\/\* Language — app UI language \(i18n\) \*\/\}/);
+  // The saved choice, else English: never the OS locale.
+  assert.match(read('src/renderer/src/i18n/index.ts'), /return 'en';\s*\}/);
+});
+
+test('the Danger zone is a loud red card with a filled reset button (owner, 2026-10-02)', () => {
+  // It was a 10px label, grey prose and a white button: easy to miss for the
+  // one action that wipes the office.
+  const modal = read('src/renderer/src/components/SettingsModal.tsx');
+  const zone = modal.slice(modal.indexOf('{/* Danger zone: loud on purpose'), modal.indexOf('{/* Footer */}'));
+  assert.match(zone, /<div role="group" aria-labelledby="settings-danger-zone" style=\{\{[^}]*background: 'var\(--cth-coral-soft\)'/);
+  assert.match(zone, /<svg width="22"[^>]*aria-hidden="true"/, 'a warning mark');
+  assert.match(zone, /background: 'var\(--cth-coral-strong\)', color: 'var\(--cth-on-coral\)'/, 'a filled red button, readable in dark mode too');
+  assert.match(zone, /onClick=\{\(\) => setConfirming\(true\)\}/, 'reset still asks first');
+  assert.match(read('branding/DESIGN.md'), /Reset & start over inside the Danger zone card/);
+});
+
+test('the update line only promises automatic checks when they run (owner, 2026-10-02)', () => {
+  // updater.ts checks every 6h in every installed build (the old autoUpdate
+  // flag is ignored); a dev build never checks.
+  const upd = read('src/main/updater.ts');
+  assert.match(upd, /const CHECK_INTERVAL_MS = 6 \* 60 \* 60 \* 1000;/, 'the 6 hours the line names');
+  assert.match(upd, /const tick = \(\): void => \{ void runCheck\(\); \};/, 'always check (owner, 2026-10-02)');
+  assert.doesNotMatch(upd, /autoUpdateEnabled|readConfig\(\)\.autoUpdate/);
+  assert.doesNotMatch(read('src/main/realtimeActions.ts'), /^\s*autoUpdate: \{/m, 'voice cannot set a setting that does nothing');
+  assert.match(read('src/main/index.ts'), /return \{ version: app\.getVersion\(\), changelog: top, packaged: app\.isPackaged \};/);
+  const ui = read('src/renderer/src/components/UpdatesSection.tsx');
+  assert.match(ui, /if \(packaged === false\) return \{ headline: t\('updatesSection\.onVersion', \{ v \}\), detail: t\('updatesSection\.devDetail'\), button: null \};/);
+  assert.match(ui, /detail: t\('updatesSection\.idleDetail'\),/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const u = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).updatesSection;
+    assert.ok(u.devDetail, loc);
+  }
 });

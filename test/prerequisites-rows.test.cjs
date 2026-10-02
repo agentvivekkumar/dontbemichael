@@ -43,3 +43,22 @@ test('Agents & Models hides the API keys panel while no offered engine reads it'
   assert.match(modal, /\{showByokSettings\(\) && \(\s*<>\s*<AiEnginesSettings config=\{config\} \/>/);
   assert.match(modal, /settings\.agentsModels\.maxTurns/, 'Max turns stays (owner, 2026-09-25)');
 });
+
+test('Agents & Models and Autonomy & Budgets are one Agents tab (owner, 2026-10-01)', () => {
+  const modal = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/SettingsModal.tsx'), 'utf8');
+  assert.match(modal, /const NAV_SECTIONS: Section\[\] = \['General', 'Company profile', 'Prerequisites', 'Agents', 'Skills', 'Connections', 'Voice', 'Memory & Knowledge'\];/);
+  assert.doesNotMatch(modal, /'Autonomy & Budgets'|'Agents & Models'/);
+  // One tab, in this order: the model, autonomy, the circuit breaker, then max turns.
+  const tab = modal.slice(modal.indexOf("{activeSection === 'Agents' && ("), modal.indexOf("{/* MEMORY & KNOWLEDGE */}"));
+  const at = (k) => { const i = tab.indexOf(k); assert.ok(i > 0, k); return i; };
+  assert.ok(at("t('settings.agentsModels.defaultModel')") < at("t('settings.autonomy.autonomy')"));
+  assert.ok(at("t('settings.autonomy.autonomy')") < at("t('settings.autonomy.breaker')"));
+  assert.ok(at("t('settings.autonomy.breaker')") < at("t('settings.agentsModels.maxTurns')"));
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const nav = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8')).settings.nav;
+    assert.ok(nav.agents, `${loc}: Agents label`);
+    assert.equal(nav.autonomyBudgets, undefined, `${loc}: no second tab label`);
+  }
+  // Agents are told where the owner turns hiring on (hive.ts).
+  assert.match(fs.readFileSync(path.resolve(__dirname, '..', 'src/main/hive.ts'), 'utf8'), /under Settings → Agents, and it is/);
+});

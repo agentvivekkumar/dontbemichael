@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.13). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.15). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -53,6 +53,9 @@ moving, and brings you only the decisions that need you.
   whole team, searchable by meaning.
 
 ### 6. You stay in charge
+- Every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest)
+  shows up in Settings by itself, off. Turn one on, then give it to the team members who need it.
+  Nobody else can reach it, and your own Claude Code servers stay yours.
 - Spending money, deleting things and anything public come to you first, on the Needs you board.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
   change it. Enforced by Claude Code's sandbox and checked again by the app.
@@ -70,9 +73,26 @@ moving, and brings you only the decisions that need you.
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
-- English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.15 (2026-10-02)
+- Claude connectors. Settings > Connections lists every connector on your Claude account, read
+  from Claude when the app starts, when you open Connections and when you press Refresh. Each one
+  is off until you turn it on, and a team member uses it only once its Access tab gives it.
+  Connectors that need sign in link to claude.ai; ones that left your account show Removed.
+- Until now every team member could reach every connector except QuickBooks and Gmail. After the
+  update the others are off, and one Ask me card names them. QuickBooks keeps your switch and each
+  team member's choice; Gmail and Google Calendar, if you had them on, stay on for everyone.
+- Team members no longer load your own Claude Code servers or plugin servers. A team member whose
+  connectors change restarts when it is idle, in the same conversation, or right away with
+  Restart now on its Access tab.
+- Settings is simpler: Agents and Autonomy are one Agents tab, About and Updates are one card
+  whose What's new opens the notes for the version you are on, and Mailboxes fold into one line
+  that opens by itself when one needs you. Default MCP servers, Explain things simply, Arabic
+  text in terminals and Language are hidden, and updates are always checked.
+- Schedule rows read in three quiet lines: the job and its next run, when it runs, and how the
+  last run went.
 
 ### 0.0.14 (2026-10-01)
 - A new look, Studio. The pixel floor is gone: the office is a calm isometric studio with a pod

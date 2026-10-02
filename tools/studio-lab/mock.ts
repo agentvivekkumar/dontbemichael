@@ -83,8 +83,22 @@ export const officeConfig = {
   ],
   agentCapabilities: {
     pam: { email: { enabled: true, mailboxes: ['ceo'], send: false } },
-    kelly: { email: { enabled: true, mailboxes: ['support'], send: true } },
+    kelly: { email: { enabled: true, mailboxes: ['support'], send: true }, connectors: ['HubSpot'] },
     dwight: { email: { enabled: true, mailboxes: ['sales'], send: true } },
     oscar: { email: { enabled: true, mailboxes: ['billing'], send: false } }
-  }
+  },
+  // Connectors on the owner's Claude account (docs/designs/claude-connectors.md),
+  // so the Access tab shows the Claude connectors card.
+  claudeConnectors: {
+    list: [
+      { key: 'Gmail', url: 'https://gmailmcp.googleapis.com/mcp/v1', status: 'connected' },
+      { key: 'Google Drive', url: 'https://drivemcp.googleapis.com/mcp/v1', status: 'connected' },
+      { key: 'HubSpot', url: 'https://mcp.hubspot.com/anthropic', status: 'connected' },
+      { key: 'Intuit QuickBooks', url: 'https://ai-inc.quickbooks.intuit.com/v1/mcp', status: 'connected' }
+    ],
+    servers: [],
+    readAt: 1
+  },
+  connectorsOn: { HubSpot: true, 'Google Drive': true },
+  connectorsSeen: ['Gmail', 'Google Drive', 'HubSpot', 'Intuit QuickBooks']
 };

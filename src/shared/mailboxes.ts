@@ -52,6 +52,9 @@ export interface AgentCapabilities {
   /** QuickBooks through the owner's Claude account (shared/quickbooks.ts).
    *  Absent until the owner chooses: the role default applies. */
   quickbooks?: QuickBooksCapability;
+  /** Connectors on the owner's Claude account this agent may use, by key
+   *  (shared/claudeConnectors.ts). QuickBooks is under `quickbooks`. */
+  connectors?: string[];
 }
 
 export type MailOp = 'list' | 'read' | 'draft' | 'send';

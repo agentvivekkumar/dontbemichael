@@ -108,22 +108,3 @@ export function quickbooksAccess(officeOn: boolean, cap: QuickBooksCapability, t
   }
   return { ok: true };
 }
-
-/** Whether the owner's Claude account has QuickBooks: added and signed in,
- *  added but needing sign-in, or not added. `unknown` when the check could
- *  not run (no Claude, a timeout). */
-export type ClaudeQuickBooksStatus = 'connected' | 'needs-sign-in' | 'not-added' | 'unknown';
-
-/** Reads `claude mcp list`: the account's connectors are the lines starting
- *  "claude.ai ", e.g.
- *  "claude.ai Intuit QuickBooks: https://ai-inc.quickbooks.intuit.com/v1/mcp - ✔ Connected". */
-export function parseClaudeQuickBooksStatus(stdout: string): ClaudeQuickBooksStatus {
-  let found: ClaudeQuickBooksStatus = 'not-added';
-  for (const line of stdout.split(/\r?\n/)) {
-    const m = /^claude\.ai (.+?): (\S+) - (.*)$/.exec(line.trim());
-    if (!m || !(/quickbooks/i.test(m[1]) || /quickbooks\.intuit\.com/i.test(m[2]))) continue;
-    if (/\bconnected\b/i.test(m[3]) && !/\bnot\b|needs|fail|error/i.test(m[3])) return 'connected';
-    found = 'needs-sign-in';
-  }
-  return found;
-}

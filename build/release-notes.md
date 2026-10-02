@@ -1,4 +1,4 @@
-- **A new look, Studio:** a calm office in place of the pixel floor.
-- **Idle teammates trade lines** from The Office by paper plane.
-- **Plain Ask me cards;** reply boxes grow as you type.
-- **Closing time runs on the floor,** with Cancel and Force quit.
+- **Claude connectors:** each one is off until you give it to a team member.
+- **Agents reach only what you allow,** checked on every call.
+- **Simpler Settings,** with What's new right in the app.
+- **Mailboxes fold** into one line.

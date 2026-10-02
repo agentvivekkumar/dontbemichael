@@ -1224,34 +1224,51 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, [config?.onboardingComplete]);
 
-  // 8) Restart on enable (docs/designs/multi-mailbox.md, E2 + E5). Claude Code
-  //    picks up the md-mail tools only at start, so turning email on for a
-  //    running agent queues a restart. It waits until the agent is not mid-step,
-  //    then restarts with Restart & Continue (same conversation). After 10
-  //    minutes still busy it restarts anyway and says so on the floor.
+  // 8) Restart to apply (docs/designs/multi-mailbox.md E2 + E5, and
+  //    docs/designs/claude-connectors.md D2). Claude Code picks up the md-mail
+  //    tools and its connectors only at start, so turning email on, or changing
+  //    an agent's connectors, queues a restart. It waits until the agent is not
+  //    mid-step, then restarts with Restart & Continue (same conversation).
+  //    After 10 minutes still busy, or when the owner presses Restart now, it
+  //    restarts anyway and says so on the floor. Main asks for a connector
+  //    restart whenever the agent would now start differently.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const queue = (agentId: string): void => {
+      const a = useStore.getState().agents.find((x) => x.id === agentId);
+      if (a?.ptyId) useStore.getState().setPendingRestart(agentId, { at: Date.now(), reason: 'connectors' });
+    };
+    // A push sent before this window listened (app start, a reload) is asked for again.
+    void window.cth.connectorsPendingRestarts?.().then((ids) => ids.forEach(queue)).catch(() => {});
+    return window.cth.onConnectorsRestartNeeded?.(({ agentId }) => queue(agentId));
+  }, [config?.onboardingComplete]);
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const CEILING_MS = 10 * 60_000;
     const POLL_MS = 5_000;
     const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
+    const WHY = { email: 'turn on email', connectors: 'apply its connectors' } as const;
     const inFlight = new Set<string>();
     const tick = (): void => {
-      const { pendingEmailRestart, agents, setPendingEmailRestart, updateAgent } = useStore.getState();
-      for (const [agentId, queuedAt] of Object.entries(pendingEmailRestart)) {
+      const { pendingRestart, agents, setPendingRestart, updateAgent } = useStore.getState();
+      for (const [agentId, entry] of Object.entries(pendingRestart)) {
         if (inFlight.has(agentId)) continue;
         const a = agents.find((x) => x.id === agentId);
-        if (!a || !a.ptyId) { setPendingEmailRestart(agentId, undefined); continue; } // not running: the next start attaches mail
-        const overdue = Date.now() - queuedAt >= CEILING_MS;
-        if (BUSY.has(a.status) && !overdue) continue;
+        if (!a || !a.ptyId) { setPendingRestart(agentId, undefined); continue; } // not running: its next start applies it
+        const overdue = Date.now() - entry.at >= CEILING_MS;
+        if (BUSY.has(a.status) && !overdue && !entry.now) continue;
         inFlight.add(agentId);
         void respawnResumed(a, a.ptyId).then((res) => {
           if (res.ok) {
-            setPendingEmailRestart(agentId, undefined);
-            updateAgent(agentId, { status: 'idle', action: overdue ? `restarted after ${Math.round(CEILING_MS / 60_000)} minutes to turn on email` : 'restarted to turn on email' });
+            setPendingRestart(agentId, undefined);
+            updateAgent(agentId, { status: 'idle', action: overdue ? `restarted after ${Math.round(CEILING_MS / 60_000)} minutes to ${WHY[entry.reason]}` : `restarted to ${WHY[entry.reason]}` });
           } else {
-            console.error('[email] restart failed for', agentId, res.error);
+            console.error('[restart] restart failed for', agentId, entry.reason, res.error);
+            // Say so on the Access tab and give Restart now back.
+            const cur = useStore.getState().pendingRestart[agentId];
+            if (cur) setPendingRestart(agentId, { ...cur, now: false, failed: true });
           }
-        }).catch((e) => console.error('[email] restart threw for', agentId, e))
+        }).catch((e) => console.error('[restart] restart threw for', agentId, e))
           .finally(() => inFlight.delete(agentId));
       }
     };

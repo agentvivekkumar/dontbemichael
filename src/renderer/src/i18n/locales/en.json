@@ -159,11 +159,9 @@
   "settingsHero": {
     "sponsoredBy": "Sponsored by",
     "visit": "visit",
-    "whatsNew": "what's new",
-    "whatsNewTitle": "Show the release notes for the update you were last told about",
-    "starOnGitHub": "star on GitHub",
-    "reportProblem": "report a problem",
-    "fullChangelog": "full changelog →"
+    "whatsNew": "What's new",
+    "starOnGitHub": "Star on GitHub",
+    "reportProblem": "Report a problem"
   },
   "settings": {
     "title": "Settings",
@@ -179,9 +177,8 @@
     "nav": {
       "general": "General",
       "prerequisites": "Prerequisites",
-      "agentsModels": "Agents & Models",
+      "agents": "Agents",
       "skills": "Skills",
-      "autonomyBudgets": "Autonomy & Budgets",
       "connections": "Connections",
       "voice": "Voice",
       "memoryKnowledge": "Memory & Knowledge",
@@ -216,8 +213,6 @@
       "maintenance": "Maintenance",
       "autoCompact": "Compact on a schedule",
       "autoCompactDesc": "Queue /compact for every agent on a schedule (hourly by default; set the interval in the Triggers tab). Off by default. Agents that run for a long time may overflow their context without it.",
-      "autoUpdate": "Automatic updates",
-      "autoUpdateDesc": "Check GitHub releases and download updates in the background; you choose when to restart. Never restarts on its own.",
       "telemetry": "Anonymous usage stats",
       "telemetryDesc": "A handful of anonymous events (app opened, agent spawned, feature used). Never prompts, code, paths, or agent output. Full list in TELEMETRY.md.",
       "language": "Language",
@@ -339,7 +334,7 @@
       "voiceChatDesc": "Talk to the orchestrator in real time. Toggle it on from {{godName}}'s tab; choose which microphone and speaker the voice loop uses here.",
       "openaiKey": "OpenAI API key · voice",
       "openaiKeyDesc1": "Talking to {{godName}} runs on OpenAI's Realtime API (speech in, speech out, over a live connection to {{model}}). That is a different service from the Claude subscription your agents run on, so it needs its own OpenAI API key.",
-      "openaiKeyDesc2": "Paste it once below. It is encrypted on this machine and never shown again. Each voice session makes its own temporary token from it, and the key itself never leaves your computer. It is the same OpenAI key listed under Agents & Models; setting it in either place is enough.",
+      "openaiKeyDesc2": "Paste it once below. It is encrypted on this machine and never shown again. Each voice session makes its own temporary token from it, and the key itself never leaves your computer. It is the same OpenAI key listed under Agents; setting it in either place is enough.",
       "keyPlaceholderSaved": "key saved; paste a new one to replace it",
       "save": "Save",
       "keySaved": "Key saved. Talk is ready. Start it from {{godName}}'s card.",
@@ -979,8 +974,9 @@
     "latestDetail": "You're already up to date. Nothing to install.",
     "checkAgainBtn": "Check again",
     "idleDetail": "Updates are checked automatically every 6 hours. Check now if you want to be sure.",
+    "devDetail": "Development build: updates are not checked here.",
     "checkBtn": "Check for updates",
-    "downloadManually": "download manually",
+    "downloadManually": "Download manually",
     "downloadManuallyTitle": "Download the v{{version}} installer and replace the app yourself",
     "manualDownloadingTitle": "<b>v{{version}} is downloading in your browser.</b>",
     "manualDownloadingBody": "When it lands, quit this app, install the new version over the current one, open it and pick the same project. On {{os}}:"
@@ -1033,13 +1029,13 @@
     "sure": "Sure?",
     "deleteIt": "delete it",
     "keep": "keep",
-    "addedByYou": "added by you",
     "addedBy": "added by {{name}}",
     "runAria": "Run {{job}}",
     "closedGroup": "{{name}} (closed)",
     "closedNote": "{{name}} is closed, so these are paused.",
     "relayHint": "{{godName}} hands this job to the team.",
-    "approvedBy": "approved by {{name}}"
+    "approvedBy": "approved by {{name}}",
+    "everyInterval": "every {{interval}}"
   },
   "webhooksSection": {
     "summaryNone": "none",
@@ -1696,6 +1692,9 @@
     "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Access tab.",
     "add": "Add a mailbox",
     "empty": "No mailboxes yet. Add sales@, support@ or your own inbox, then choose which team member works in it.",
+    "summaryOne": "1 mailbox",
+    "summaryCount": "{{count}} mailboxes",
+    "summaryNone": "none yet",
     "needsCount": "{{count}} needs you",
     "usedBy": "used by {{names}}",
     "usedByNobody": "used by nobody yet",
@@ -1708,8 +1707,6 @@
     "removeIt": "remove it",
     "keep": "keep",
     "removeAffects": "{{names}} will stop working in it.",
-    "claudeAccount": "Your Claude account",
-    "claudeAccountSub": "Gmail and Google Calendar, connected in Claude",
     "dialogTitle": "Add a mailbox",
     "dialogFixTitle": "Fix {{address}}",
     "which": "Which email service is it?",
@@ -1736,10 +1733,7 @@
       "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
       "other": "Your email host lists these servers in its help pages. If your normal password is refused, ask them for an app password."
     },
-    "claudeAccessLabel": "Team members can use the email and calendar in your Claude account",
-    "claudeAccessOn": "allowed",
-    "claudeAccessOff": "blocked",
-    "claudeAccessDesc": "Allowed lets every team member use the Gmail and Google Calendar connected to your Claude account. Blocked stops everyone. The mailboxes above are separate: give them to team members on their Access tab."
+    "gmailIsConnector": "Gmail on your Claude account is under Claude connectors."
   },
   "capabilities": {
     "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
@@ -1768,33 +1762,23 @@
     "moveMailboxFree": "Use {{address}}?",
     "moveIt": "Move it",
     "keepIt": "Keep it",
-    "quickbooks": "QuickBooks",
-    "quickbooksBlurb": "Whether {{name}} may use the QuickBooks connected to your Claude account, and change anything there.",
-    "quickbooksOff": "{{name}} doesn't use QuickBooks.",
-    "canUseBooks": "{{name}} can use QuickBooks",
     "booksChanges": "Changes",
     "booksReadOnly": "Read only",
     "booksReadOnlyDesc": "Reports, invoices and customers to look at. Nothing is created, changed or sent.",
     "booksCanChange": "Can make changes",
     "booksCanChangeDesc": "May create, change, send and delete invoices, customers and more.",
-    "booksHow": "QuickBooks comes from your Claude account: connect it in Claude under Settings > Connectors."
-  },
-  "quickbooksSettings": {
-    "title": "QuickBooks",
-    "introOff": "Off: no team member can use QuickBooks, and it doesn't show on their Access tabs.",
-    "introOn": "On: team members use the QuickBooks connected to your Claude account. Choose who, and who may make changes, on each Access tab.",
-    "label": "Team members can use the QuickBooks in your Claude account",
-    "checking": "Checking your Claude account for QuickBooks…",
-    "connected": "QuickBooks is connected in your Claude account.",
-    "notAdded": "QuickBooks isn't connected in your Claude account yet. Connect it there first:",
-    "needsSignIn": "QuickBooks is in your Claude account but needs you to sign in again:",
-    "unknown": "Couldn't check your Claude account. If QuickBooks isn't connected there yet:",
-    "step1": "Open Claude's Connectors settings (the button below).",
-    "step2": "Find Intuit QuickBooks, using Browse connectors if it isn't listed, and select Connect.",
-    "step3": "Sign in to Intuit and choose your company.",
-    "step4": "Come back here and select Check again.",
-    "openClaude": "Open Claude connectors",
-    "checkAgain": "Check again"
+    "connectors": "Claude connectors",
+    "connectorsBlurb": "Which connectors on your Claude account {{name}} may use. Only the ones turned on in Settings show here.",
+    "connectorsSummary": "{{granted}} of {{total}}",
+    "connectorsNone": "No connector is turned on yet.",
+    "connectorsTurnOn": "Turn connectors on in Settings",
+    "canUseConnector": "{{name}} can use {{connector}}",
+    "needsSignIn": "sign in at claude.ai first",
+    "booksRoleDefault": "on for bookkeeping roles",
+    "connectorsPending": "Restarts when {{name}} is idle to apply.",
+    "restartNow": "Restart now",
+    "restarting": "Restarting {{name}} to apply…",
+    "restartFailed": "Couldn't restart {{name}}. It tries again shortly, or press Restart now."
   },
   "closingTime": {
     "listLabel": "Who is still working",
@@ -1920,5 +1904,35 @@
     "frameTitle": "What's new in {{version}}",
     "close": "Close release notes",
     "closeTip": "Close (Esc)"
+  },
+  "connectors": {
+    "title": "Claude connectors",
+    "intro": "Connectors on your Claude account. Turn one on here, then give it to team members on their Access tab. One that is off is blocked for everyone.",
+    "reading": "Reading your Claude connectors…",
+    "summaryNone": "none yet",
+    "summaryOne": "1 connector, {{on}} on",
+    "summaryCount": "{{count}} connectors, {{on}} on",
+    "removedCount": "{{count}} removed",
+    "refresh": "Refresh",
+    "refreshing": "Reading…",
+    "readFailed": "Couldn't read your Claude connectors.",
+    "readFailedSince": "Couldn't read your Claude connectors. Last read {{when}}.",
+    "tryAgain": "Try again",
+    "empty": "No connectors on your Claude account.",
+    "addAtClaude": "Add one at claude.ai",
+    "removed": "Removed from your Claude account",
+    "clear": "Clear",
+    "signIn": "Sign in at claude.ai",
+    "connected": "connected",
+    "allow": "Allow {{name}} to be granted"
+  },
+  "whatsNewPopover": {
+    "title": "What's new",
+    "titleVersion": "What's new in v{{version}}",
+    "loading": "Loading the notes…",
+    "failed": "Couldn't load the notes for this version. The full changelog has every release.",
+    "fullChangelog": "Full changelog",
+    "releasePage": "Release page",
+    "close": "Close"
   }
 }

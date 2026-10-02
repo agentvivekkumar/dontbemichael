@@ -50,7 +50,7 @@ re-shoots the brand kit's reference screens (`branding/reference/studio/*.png`,
 1440 x 900) from the app's real shell and panels on the same office:
 the Office view in light and dark, Kelly's Access, Memory and Work tabs,
 Michael's office schedule, a task open, who talks to whom, the Business, Meet
-and Team steps of setup, the hire wizard, and Settings at Autonomy and Budgets.
+and Team steps of setup, the hire wizard, and Settings at Agents.
 `npm run shoot -- home-dark` re-shoots just the ones named. The clock reads
 10:42 and the dice are seeded, so a re-shoot changes only what the app changed.
 Then rebuild what uses them:

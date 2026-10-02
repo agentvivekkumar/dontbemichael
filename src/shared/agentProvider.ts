@@ -173,7 +173,7 @@ export interface AgentProviderPreset {
 export const BUILD_ENGINES: readonly AgentProvider[] = ['claude'];
 
 /** Engines that read the owner's own API keys and local endpoints (Settings →
- *  Agents & Models, AI engine providers). Claude Code and Codex use their own
+ *  Agents, AI engine providers). Claude Code and Codex use their own
  *  login, so the panel only means something when a build offers one of these. */
 export const BYOK_ENGINES: readonly AgentProvider[] = ['opencode', 'crush', 'pi', 'qwen'];
 

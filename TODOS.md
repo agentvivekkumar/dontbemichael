@@ -109,13 +109,6 @@
 **Effort:** S
 **Priority:** P2
 
-### Back the Claude account switch with more than the hook
-
-**What:** The Your Claude account switch is enforced only by the PreToolUse hook, which lets calls through when the hook cannot reach the app, and matches connectors by server name. Also keep the connectors out at spawn when the switch is off, and match on tool names.
-
-**Effort:** M
-**Priority:** P2
-
 ### Close a stale "needs you" card after an edit race
 
 **What:** In `mail:save` (`src/main/index.ts`), close the mailbox's Ask me card whenever a fix succeeds, not only when the mailbox was needs-attention before the login test. A failure during the test can open the card and leave it open.
@@ -178,28 +171,12 @@
 
 **What:** Keep agents from starting their own `claude` (for example `claude -p`) outside the app's hooks, or turn off the Claude account's connectors for such runs.
 
+**Update 2026-10-02 (docs/designs/claude-connectors.md):** once that plan ships, an agent with no connector grants starts with `ENABLE_CLAUDEAI_MCP_SERVERS=false`, which a nested `claude` inherits, so this is closed for them. It stays open for agents with at least one grant (explicit or the QuickBooks role default): a nested `claude` loads every connector with no deny rules. Options: a separate Claude config folder per agent, or blocking `claude` in agent shells.
+
 **Why:** The QuickBooks switch and Capabilities are enforced by the app's PreToolUse hook, which reaches an agent only through `--settings` (`src/main/hive.ts`). A nested Claude started from Bash has no hook but inherits the account's QuickBooks (and email), so the switch off is not a hard guarantee. Stated in CHANGELOG 0.0.11.
 
 **Effort:** M
 **Priority:** P1
-
-### Recognise the connector behind an opaque server name
-
-**What:** When the connector's server has a UUID-like name, 16 of its tools (including `money_onboarding_application_submit`) are not recognised as QuickBooks and are not gated.
-
-**Why:** Claude Code names claude.ai connectors `claude_ai_Intuit_QuickBooks`, which matches; a differently named server would not. Match on the connector URL from `claude mcp list` or on the full tool catalog.
-
-**Effort:** S
-**Priority:** P2
-
-### Subagents keep their parent's QuickBooks access
-
-**What:** Tag hook payloads with the harness agent id so a subagent's own `agent_id` does not replace it.
-
-**Why:** If Claude Code sends a subagent id, the hook finds no capability and refuses Oscar's delegated QuickBooks reads (fails closed).
-
-**Effort:** S
-**Priority:** P3
 
 ### Base the QuickBooks default on the role, not the agent id
 
@@ -758,6 +735,32 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ## Completed
 
+### Recognise the connector behind an opaque server name
+
+**What:** When the connector's server has a UUID-like name, 16 of its tools (including `money_onboarding_application_submit`) are not recognised as QuickBooks and are not gated.
+
+**Why:** Claude Code names claude.ai connectors `claude_ai_Intuit_QuickBooks`, which matches; a differently named server would not. Match on the connector URL from `claude mcp list` or on the full tool catalog.
+
+**Effort:** S
+**Priority:** P2
+**Completed:** 0.0.15 (2026-10-02). Any MCP server that is not a discovered, granted connector is now refused by default (docs/designs/claude-connectors.md), so an opaque name can no longer slip past.
+
+### Subagents keep their parent's QuickBooks access
+
+**What:** Tag hook payloads with the harness agent id so a subagent's own `agent_id` does not replace it.
+
+**Why:** If Claude Code sends a subagent id, the hook finds no capability and refuses Oscar's delegated QuickBooks reads (fails closed).
+
+**Effort:** S
+**Priority:** P3
+**Completed:** 0.0.15 (2026-10-02). The hook shim always sends the agent's own id and keeps Claude Code's subagent id as `subagent_id`, so delegated calls follow the agent's QuickBooks, connector and folder rules.
+
+### Back the Claude account switch with more than the hook
+
+**What:** The Your Claude account switch was enforced only by the PreToolUse hook, which let calls through when the hook could not reach the app, and matched connectors by server name.
+
+**Completed:** 0.0.15 (2026-10-02). Replaced by per-connector grants (docs/designs/claude-connectors.md): connectors are kept out at spawn, the hook shim fails closed for MCP calls, and connectors are matched by tool name. Left open: local-scope and project `.mcp.json` servers are not in the start-up deny list (the hook still refuses them).
+
 ### Point the contributors workflow at this fork's credit, or turn it off
 
 **What:** `.github/workflows/contributors.yml` regenerates CONTRIBUTORS.md from this repo's merged pull requests and opens a bot pull request.
@@ -770,3 +773,37 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Priority:** P3
 **Depends on:** None
 **Completed:** 2026-09-24 (the workflow stays on; CONTRIBUTORS.md now lists this repo's contributors only, and the README no longer credits the upstream list there)
+
+## Claude account connectors (deferred from /plan-ceo-review, 2026-10-02)
+
+### Per-connector activity log
+
+**What:** Record each connector call (agent, connector, tool, allowed or refused) and show recent use on each row of Settings > Connections > Claude connectors.
+
+**Why:** Once connectors are granted per agent, the owner will ask what an agent did in HubSpot or Drive; refusals are otherwise visible only in the agent's own terminal.
+
+**Pros:** A clear record of who touched which system; builds on the hook's refusal log lines from the connectors plan.
+
+**Cons:** A new screen, log rotation and privacy wording.
+
+**Context:** Deferred as E5 (D7) in docs/designs/claude-connectors.md. The hook already sees every MCP call (`src/main/hooks.ts`).
+
+**Effort:** M (human) / S (CC)
+**Priority:** P2
+**Depends on:** the Claude connectors plan.
+
+### Disable the owner's Claude Code plugins in agent sessions
+
+**What:** Start agents with the owner's Claude Code plugins (skills, hooks, agent definitions) disabled, not only their MCP servers.
+
+**Why:** E1 in docs/designs/claude-connectors.md blocks personal and plugin MCP servers, but plugin skills, hooks and agents still load in every agent session; a plugin hook runs code on agent events.
+
+**Pros:** Closes the rest of the leak E1 targets; agents run only what the app provides.
+
+**Cons:** Needs a probe of which flag or setting disables plugins for one session without touching the owner's own Claude Code.
+
+**Context:** Seen 2026-10-02: plugins enterprise-search and finance load in agent sessions (stream-json `init`).
+
+**Effort:** S (human) / S (CC)
+**Priority:** P2
+**Depends on:** nothing.

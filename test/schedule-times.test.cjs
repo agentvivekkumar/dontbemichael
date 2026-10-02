@@ -211,3 +211,19 @@ test('merges keep a rename and a correction as asked; a joined request goes back
   assert.match(main, /const overdue = pending\.filter\(\(r\) => !r\.escalated && r\.sentToMichael && now - \(r\.sentToMichaelAt \?\? r\.createdAt\) > MICHAEL_DECIDES_WITHIN_MS\);/);
   assert.match(main, /scheduleSweepTimer = setInterval\(/);
 });
+
+test('a schedule row is three quiet lines: name and next run, when, then who and when it fired (owner, 2026-10-01)', () => {
+  const list = read('src/renderer/src/components/triggers/ScheduleList.tsx');
+  // A bold when chip beside the name cut it to "Check ...", and under the name
+  // it broke the status mid phrase.
+  assert.doesNotMatch(list, /WhenChip/);
+  assert.match(list, /\}\}>\{mission\.label\}<\/span>\s*\{next && <span style=\{\{ flexShrink: 0[^}]*\}\}>\{next\}<\/span>\}/, 'the next run sits beside the name');
+  assert.match(list, /<span style=\{\{ display: 'block'[^}]*fontSize: 14[^}]*\}\}>\{whenText\(mission, t\)\}<\/span>\s*\{sub && <span style=\{\{ display: 'block'[^}]*\}\}>\{sub\}<\/span>\}/, 'when on its own line, then the status');
+  assert.doesNotMatch(/const sub = \[[^]*?\]\.filter/.exec(list)[0], /schedulesSection\.next/, 'the next run is not repeated in the status');
+  // "added by you" was on every row and said nothing; only a team member's
+  // request names who asked.
+  assert.match(list, /const creator = !mission\.createdBy \|\| mission\.createdBy === OWNER \? ''/);
+  assert.doesNotMatch(list, /addedByYou/);
+  assert.match(list, /padding: readOnly \? '8px 0' : '8px 4px'/, 'read only rows line up with the name above');
+  assert.match(list, /return \/\^\\d\/\.test\(every\) \? t\('schedulesSection\.everyInterval', \{ interval: every \}\) : every;/, 'an interval reads "every 4h", not a bare "4h", in every language');
+});

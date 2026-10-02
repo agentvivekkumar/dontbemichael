@@ -109,25 +109,9 @@ export function UpdateToast() {
     return () => { alive = false; };
   }, []);
 
-  // Settings' hero card asks to re-open the release notes. This surface owns the
-  // last status and the drop renderer, so it answers rather than duplicating
-  // either. `updateCurrent()` is used instead of the remembered state because
-  // "later" clears the local copy while main still holds it — dismissing a
-  // release must not make it unreadable afterwards. With genuinely nothing to
-  // show (a dev build, or an install already on the newest release) the honest
-  // answer is the releases page, not an empty modal.
-  useEffect(() => {
-    const onShow = async () => {
-      try {
-        const cur = await window.cth.updateCurrent();
-        const t = toastable(cur);
-        if (t) { setStatus(t); return; }
-      } catch { /* fall through to the page */ }
-      void window.cth.updateOpenRelease();
-    };
-    window.addEventListener('cth:show-release-notes', onShow);
-    return () => window.removeEventListener('cth:show-release-notes', onShow);
-  }, []);
+  // What's new in Settings opens its own popover under the link
+  // (WhatsNewPopover, owner 2026-10-02); this corner is for updates that
+  // arrive on their own.
 
   const notes = useMemo(() => summarizeReleaseNotes(status?.notes), [status?.notes]);
   /** An authored <!-- drop --> block in the release body upgrades this whole
@@ -290,3 +274,4 @@ export function Spark() {
     </svg>
   );
 }
+

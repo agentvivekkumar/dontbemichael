@@ -51,8 +51,9 @@ export function McpDefaultsSettings({ config }: McpDefaultsSettingsProps) {
     }
   };
 
-  // Email & Calendar is the "Your Claude account" switch at the end of
-  // Mailboxes now (docs/designs/multi-mailbox.md), not a row in this list.
+  // Email & Calendar is the old "Your Claude account" switch, read once to carry
+  // Gmail and Calendar over as per-agent grants (claude-connectors.md, D9); they
+  // are rows under Settings > Connections > Claude connectors now, not here.
   const byTier = (tier: McpTier) => MCP_CATALOG.filter((e) => e.tier === tier && e.id !== 'email-calendar');
 
   return (

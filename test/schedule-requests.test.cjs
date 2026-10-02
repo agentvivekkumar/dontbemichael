@@ -119,7 +119,7 @@ test('approving a request goes through the stale check and the one-schedule writ
 test('new schedule strings exist in every language', () => {
   const keys = {
     schedulesSection: ['officeEmpty', 'emptyAgent', 'addFor', 'agentSummary', 'agentSummaryPlural', 'loading',
-      'loadError', 'saveFailed', 'sure', 'deleteIt', 'keep', 'addedByYou', 'addedBy', 'runAria', 'closedGroup', 'closedNote', 'relayHint'],
+      'loadError', 'saveFailed', 'sure', 'deleteIt', 'keep', 'addedBy', 'runAria', 'closedGroup', 'closedNote', 'relayHint'],
     askMe: ['scheduleTitle', 'scheduleAdd', 'scheduleUpdate', 'schedulePause', 'scheduleResume', 'scheduleDelete', 'scheduleStale', 'approve', 'decline'],
     agentDetail: ['killConfirmSchedules', 'killConfirmSchedulesPlural'],
     capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'emailOff', 'canCheck', 'mailbox', 'pickMailbox', 'addMailbox']

@@ -75,7 +75,9 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, type AddMailboxInput } from './mail';
 import { PROVIDER_PRESETS, secretRefForMailbox } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
-import { claudeBinFor, claudeQuickBooksStatus } from './claudeQuickBooks';
+import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
+import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
+import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { buildWorkerLaunch } from './workerLaunch';
@@ -589,6 +591,7 @@ function teardownPty(id: string): void {
   try { integrationBroker.revoke(id); } catch { /* best-effort */ }
   // 1) Archive the agent — retained + flagged; only live-PTY agents are active.
   if (ptyCli.delete(id)) void refreshCliUpdate();
+  connectorPlans.delete(id);
   const agentId = ptyToAgent.get(id);
   if (agentId) {
     ptyToAgent.delete(id);
@@ -3211,6 +3214,12 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // seedDelivery:'type-into-tui') rather than passed on argv. Surfaced in the spawn
   // result so the renderer types it through the per-pty write-chain. (ondev-b)
   let seedPrompt: string | undefined;
+  // Claude connectors (docs/designs/claude-connectors.md): the plan is worked
+  // out once, passed to the spawn and recorded as what this agent started with,
+  // so a change in between still asks for a restart. Until the hive injection
+  // has applied it, the agent counts as unprotected and is stripped below.
+  const connectorPlan = opts.hive && claudeProvider ? connectorStart(readConfig(), opts.hive.id) : undefined;
+  let connectorsApplied = false;
   if (opts.hive && hive.enabled()) {
     try {
       const inj = await hive.ensureAgent(
@@ -3251,10 +3260,12 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
               process.platform !== 'linux'
             )
             : undefined,
-          docTextCliPath: docTextCliPath()
+          docTextCliPath: docTextCliPath(),
+          connectors: connectorPlan?.plan
         }
       );
       opts.args = [...(opts.args ?? []), ...inj.args];
+      connectorsApplied = true;
       seedPrompt = inj.seedPrompt;
       // A degraded spawn (proxy bridge never bound) is told to the user the same
       // way breaker escalations are: a native toast, gated on the notifications
@@ -3267,6 +3278,14 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
       // Hive provisioning is best-effort; never block a spawn on it.
       console.error('[hive] ensureAgent failed:', e);
     }
+  }
+  // No hive injection (it failed, or the hive is off) means no hook and no deny
+  // rules: a Claude agent then starts with no connector and none of the owner's
+  // own servers, whatever its grants (D8). md-mail still comes via --mcp-config.
+  if (connectorPlan && !connectorsApplied) {
+    console.warn(`[connectors] ${opts.hive?.id}: no hive settings, starting without connectors`);
+    if (!(opts.args ?? []).includes('--strict-mcp-config')) opts.args = [...(opts.args ?? []), '--strict-mcp-config'];
+    opts.env = { ...(opts.env ?? {}), ENABLE_CLAUDEAI_MCP_SERVERS: 'false' };
   }
   // Long-run guardrails + tiering (Lane A #6.4/#6.6). All additive to the args
   // already assembled (incl. the hive injection); an explicit choice always wins.
@@ -3519,6 +3538,12 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     }
   }
   const res = ptyManager.spawn(opts, owner);
+  // What its connectors were at start, so a later change can restart it (D2).
+  if (res.ok && opts.hive?.id && connectorPlan) {
+    const failures = connectorsApplied ? 0 : (connectorsUnapplied.get(opts.hive.id) ?? 0) + 1;
+    if (failures) connectorsUnapplied.set(opts.hive.id, failures); else connectorsUnapplied.delete(opts.hive.id);
+    connectorPlans.set(opts.id, { agentId: opts.hive.id, sig: failures === 1 ? 'unapplied' : connectorPlan.sig });
+  }
   // Record the Claude Code version this agent starts on, only once its terminal
   // is really running: a failed spawn must not count as an agent to upgrade.
   if (res.ok && opts.hive?.id && claudeProvider) {
@@ -4072,10 +4097,6 @@ ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) =
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
   return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean });
 });
-/** Whether the owner's Claude account has QuickBooks (Settings > Connections). */
-ipcMain.handle('quickbooks:claudeStatus', () => {
-  return claudeQuickBooksStatus(ptyManager.commandPath(claudeBinFor(readConfig().defaultCommand)));
-});
 /** Roles that may use QuickBooks, Read only, before the owner chooses. */
 ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);
 /** Save one agent's QuickBooks capability. The hook reads it on the agent's
@@ -4087,6 +4108,201 @@ ipcMain.handle('quickbooks:setAccess', (_evt, agentId: unknown, cap: unknown) =>
   const cfg = readConfig();
   const caps = cfg.agentCapabilities ?? {};
   writeConfig({ agentCapabilities: { ...caps, [agentId]: { ...(caps[agentId] ?? {}), quickbooks } } });
+  return { ok: true };
+});
+// ─── Claude connectors (docs/designs/claude-connectors.md, owner 2026-10-02) ───
+// The connectors on the owner's Claude account, read with `claude mcp list` at
+// app start, when Settings > Connections opens, and on Refresh. A failed read
+// keeps the last good list; until one read succeeds every agent starts with
+// none. The first good read also carries the old choices over (D9) and tells
+// the owner, once, which connectors the update turned off (E2).
+let connectorsRead: Promise<void> | null = null;
+/** Successful reads in a row that listed no connector; a second one is
+ *  believed. Any failed read starts the count again. */
+let connectorsEmptyReads = 0;
+function connectorsPush(): void {
+  try { liveWebContents()?.send('connectors:reading', connectorsRead !== null); } catch { /* window gone */ }
+}
+/** Saves a failed read: the last good list stays, with the time it failed. */
+function connectorsReadFailed(why: string, started: number): void {
+  const prev = readConfig().claudeConnectors;
+  console.warn(`[connectors] read failed: ${why} after ${Date.now() - started} ms; keeping the last good list`);
+  writeConfig({ claudeConnectors: { list: prev?.list ?? null, servers: prev?.servers, readAt: prev?.readAt, failedAt: Date.now() } });
+}
+function refreshClaudeConnectors(why: string): Promise<void> {
+  if (connectorsRead) return connectorsRead;
+  const started = Date.now();
+  connectorsRead = readClaudeMcpList(ptyManager.commandPath(claudeBinFor(readConfig().defaultCommand)))
+    .then((r) => {
+      const cfg = readConfig();
+      const prev = cfg.claudeConnectors;
+      if (!r.ok) { connectorsEmptyReads = 0; connectorsReadFailed(`${why}, ${r.why}`, started); return; }
+      let { connectors, servers } = r.list;
+      // A run that exited non-zero may have stopped part way: it may add, never
+      // remove, so whatever the last good read had stays in, except an entry
+      // whose address this run lists under a new name (a rename, moved below).
+      if (!r.complete) {
+        const seen = new Set(connectors.map((c) => c.key));
+        const urls = new Set(connectors.map((c) => c.url).filter(Boolean));
+        connectors = [...connectors, ...(prev?.list ?? []).filter((c) => !seen.has(c.key) && !(c.url && urls.has(c.url)))];
+        servers = [...new Set([...servers, ...(prev?.servers ?? [])])];
+      }
+      // Enough of a list for the one-time carry-over: a complete run, or one
+      // that lists connectors (older Claude Code exits non-zero whenever a
+      // server fails). With the old Gmail switch on it must list a connector
+      // at all, and a partial run must list Gmail or Calendar: an empty or cut
+      // off list would use up the carry-over and lose that yes for good.
+      const emailOn = emailCalendarAllowed(cfg.mcpDefaults);
+      const listed = r.list.connectors.length > 0;
+      const carryable = emailOn
+        ? listed && (r.complete || r.list.connectors.some((c) => isEmailCalendarKey(c.key)))
+        : r.complete || listed;
+      // A read that lists the owner's own servers but no connector at all,
+      // after one that had some, is the account not answering (offline, signed
+      // out), not every connector removed. The same before the carry-over of
+      // the old Gmail switch, which needs the connectors to grant.
+      // Two such reads in a row are believed: the account really has none.
+      connectorsEmptyReads = connectors.length === 0 ? connectorsEmptyReads + 1 : 0;
+      if (connectors.length === 0 && connectorsEmptyReads < 2 && ((prev?.list?.length ?? 0) > 0 || (!cfg.connectorsMigrated && emailCalendarAllowed(cfg.mcpDefaults)))) {
+        connectorsReadFailed(`${why}, no connectors listed`, started);
+        return;
+      }
+      console.log(`[connectors] read (${why}): ${connectors.length} connectors, ${servers.length} other servers in ${Date.now() - started} ms`);
+      // A renamed connector (same address) keeps its switch, grants and seen mark.
+      let connectorsOn = { ...(cfg.connectorsOn ?? {}) };
+      let agentCapabilities = { ...(cfg.agentCapabilities ?? {}) };
+      let connectorsSeen = cfg.connectorsSeen;
+      for (const { from, to } of renamedKeys(prev?.list, connectors)) {
+        if (from in connectorsOn) { connectorsOn[to] = connectorsOn[from]; delete connectorsOn[from]; }
+        for (const [id, caps] of Object.entries(agentCapabilities)) {
+          if (caps?.connectors?.includes(from)) agentCapabilities[id] = { ...caps, connectors: caps.connectors.map((k) => (k === from ? to : k)) };
+        }
+        if (connectorsSeen?.includes(from)) connectorsSeen = connectorsSeen.map((k) => (k === from ? to : k));
+        console.log(`[connectors] ${from} is now ${to}; its switch and grants moved`);
+      }
+      const patch: Partial<HarnessConfig> = { claudeConnectors: { list: connectors, servers, readAt: Date.now() }, connectorsSeen };
+      // The one-time carry-over needs the office's team and a whole list, so it
+      // waits for an open office and a complete read (D9).
+      if (!cfg.connectorsMigrated && hive.enabled() && carryable) {
+        const reg = hive.registry();
+        const agentIds = [...new Set([...Object.keys(reg.agents ?? {}), ...(reg.godId ? [reg.godId] : [])])];
+        const carried = connectorCarryOver({ ...cfg, connectorsOn, agentCapabilities }, connectors, agentIds);
+        connectorsOn = carried.connectorsOn;
+        agentCapabilities = carried.agentCapabilities;
+        patch.connectorsMigrated = true;
+        if (carried.switchedOff.length) connectorsUpgradeCard(carried.switchedOff);
+        console.log(`[connectors] carried over: ${agentIds.length} agents, switched off: ${carried.switchedOff.join(', ') || 'none'}`);
+      }
+      writeConfig({ ...patch, connectorsOn, agentCapabilities });
+    })
+    .catch((e) => {
+      connectorsEmptyReads = 0;
+      console.error('[connectors] read:', e);
+      try { connectorsReadFailed(`${why}, ${e instanceof Error ? e.message : String(e)}`, started); } catch { /* config unwritable */ }
+    })
+    .finally(() => { connectorsRead = null; connectorsPush(); });
+  connectorsPush();
+  return connectorsRead;
+}
+
+/** E2: one Ask me card after the update naming the connectors agents could
+ *  use before and now cannot, until the owner turns them on. */
+function connectorsUpgradeCard(keys: string[]): void {
+  try {
+    const now = new Date().toISOString();
+    hive.addTask({
+      id: 'claude-connectors-update',
+      title: 'Claude connectors are now off',
+      status: 'blocked',
+      dependsOn: [],
+      priority: 2,
+      createdAt: now,
+      humanQA: [{
+        q: `**${keys.join(', ')} ${keys.length === 1 ? 'is' : 'are'} now off for the team.**\n\nAgents used to reach every connector on your Claude account. Now each one is off until you turn it on in Settings, Connections, Claude connectors, and give it to the team members who need it on their Access tab.`,
+        askedAt: now,
+        raisedBy: 'god'
+      }]
+    });
+  } catch (e) { console.error('[connectors] ask me card:', e); }
+}
+
+/** What each running agent started with, by terminal: its connector plan. A
+ *  config change that would start it differently asks the renderer to restart
+ *  it when idle (D2), resuming its thread; the hook enforces the change until then. */
+// An agent stripped because its hive injection failed is asked to restart
+// once (the failure may have passed); after a second failure in a row it is
+// recorded with its plan, so only a real change asks again, never every config
+// save while the failure lasts.
+const connectorPlans = new Map<string, { agentId: string; sig: string; told?: string }>();
+const connectorsUnapplied = new Map<string, number>();
+/** What an agent would start with: its plan, plus whether each connector it
+ *  uses is signed in (Claude loads no tools for one that needs sign in, so
+ *  signing in later needs a restart too). */
+function connectorStart(cfg: HarnessConfig, agentId: string): { plan: SpawnConnectorPlan; sig: string } {
+  const books = booksReadRoleIds().has(agentId);
+  const plan = spawnConnectorPlan(cfg, agentId, books);
+  const signedIn = usableConnectors(cfg, agentId, books).map((c) => `${c.key}:${c.status}`).sort().join(',');
+  return { plan, sig: `${plan.strip ? 'strip' : [...plan.deny].sort().join('|')}#${signedIn}` };
+}
+onConfigWritten((cfg) => {
+  for (const rec of connectorPlans.values()) {
+    const { sig } = connectorStart(cfg, rec.agentId);
+    if (sig === rec.sig) { rec.told = undefined; continue; }
+    if (rec.told === sig) continue;
+    rec.told = sig;
+    console.log(`[connectors] ${rec.agentId} needs a restart to apply its connectors`);
+    try { liveWebContents()?.send('connectors:restartNeeded', { agentId: rec.agentId }); } catch { /* window gone */ }
+  }
+});
+
+ipcMain.handle('connectors:refresh', (_evt, why: unknown) => {
+  const reason = typeof why === 'string' ? why : 'refresh';
+  // Opening Connections reads again only when the last read is a minute old;
+  // each read starts every MCP server the owner has. Refresh always reads.
+  const last = readConfig().claudeConnectors;
+  if (reason === 'settings' && Math.max(last?.readAt ?? 0, last?.failedAt ?? 0) > Date.now() - 60_000) return Promise.resolve();
+  return refreshClaudeConnectors(reason);
+});
+ipcMain.handle('connectors:reading', () => connectorsRead !== null);
+/** Agents whose connectors changed since they started, for a window that
+ *  missed the restartNeeded push (it opened late or reloaded). */
+ipcMain.handle('connectors:pendingRestarts', () => {
+  const cfg = readConfig();
+  return [...new Set([...connectorPlans.values()].filter((rec) => connectorStart(cfg, rec.agentId).sig !== rec.sig).map((rec) => rec.agentId))];
+});
+/** The owner's switch for one connector (QuickBooks keeps quickbooksClaude). */
+ipcMain.handle('connectors:setOn', (_evt, key: unknown, on: unknown) => {
+  if (typeof key !== 'string' || !key) return { ok: false };
+  if (isQuickBooksKey(key)) { writeConfig({ quickbooksClaude: on === true }); return { ok: true }; }
+  writeConfig({ connectorsOn: { ...(readConfig().connectorsOn ?? {}), [key]: on === true } });
+  return { ok: true };
+});
+/** Give or take one connector from one agent. */
+ipcMain.handle('connectors:setGrant', (_evt, agentId: unknown, key: unknown, granted: unknown) => {
+  if (typeof agentId !== 'string' || !agentId || typeof key !== 'string' || !key || isQuickBooksKey(key)) return { ok: false };
+  const caps = readConfig().agentCapabilities ?? {};
+  const cur = caps[agentId]?.connectors ?? [];
+  const connectors = granted === true ? [...new Set([...cur, key])] : cur.filter((k) => k !== key);
+  writeConfig({ agentCapabilities: { ...caps, [agentId]: { ...(caps[agentId] ?? {}), connectors } } });
+  return { ok: true };
+});
+/** Forget a connector that left the Claude account: its switch and grants. */
+ipcMain.handle('connectors:clear', (_evt, key: unknown) => {
+  if (typeof key !== 'string' || !key) return { ok: false };
+  const cfg = readConfig();
+  const connectorsOn = { ...(cfg.connectorsOn ?? {}) };
+  delete connectorsOn[key];
+  const agentCapabilities = Object.fromEntries(Object.entries(cfg.agentCapabilities ?? {}).map(([id, caps]) =>
+    [id, caps?.connectors?.includes(key) ? { ...caps, connectors: caps.connectors.filter((k) => k !== key) } : caps]));
+  writeConfig({ connectorsOn, agentCapabilities });
+  return { ok: true };
+});
+/** The owner opened the list: what they saw is no longer new. */
+ipcMain.handle('connectors:seen', () => {
+  const cfg = readConfig();
+  const keys = cfg.claudeConnectors?.list?.map((c) => c.key);
+  // Only a change is saved: every save tells the renderer, which must not loop.
+  if (keys && keys.join('\n') !== (cfg.connectorsSeen ?? []).join('\n')) writeConfig({ connectorsSeen: keys });
   return { ok: true };
 });
 /** An agent's handoff history, received and sent, for its Messages tab. */
@@ -5365,7 +5581,9 @@ ipcMain.handle('app:info', () => {
   const top = changelog
     ? changelog.split(/\n## /).slice(1, 3).map((s) => `## ${s}`).join('\n').slice(0, 8000)
     : '';
-  return { version: app.getVersion(), changelog: top };
+  // `packaged`: only installed builds check for updates (updater.ts), so
+  // Settings can say so instead of promising checks a dev build never runs.
+  return { version: app.getVersion(), changelog: top, packaged: app.isPackaged };
 });
 ipcMain.handle('realtime:drainCompletions', () => completionWatcher.drainQueuedCompletions());
 ipcMain.handle('realtime:waitFor', (_e, taskId: unknown, timeoutMs: unknown) =>
@@ -5875,6 +6093,8 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
+  // Read the Claude account's connectors in the background (D11).
+  void refreshClaudeConnectors('start');
   // Waiting schedule requests reach Michael, and ones he leaves undecided
   // reach the owner (sweepScheduleRequests).
   try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
@@ -6207,8 +6427,8 @@ app.whenReady().then(() => {
   // Guarded: a DB failure (e.g. a bad native build) must degrade to defaults,
   // never block app startup.
   try { persist.open(); } catch (e) { console.error('[db] open failed:', e); }
-  // Auto-update from GitHub releases (packaged builds only; gated on the
-  // `autoUpdate` config flag). Download-in-background + restart-to-apply toast;
+  // Auto-update from GitHub releases (installed builds only; always on since
+  // 2026-10-02). Download-in-background + restart-to-apply toast;
   // never restarts on its own. Falls back to a notify-only releases/latest
   // check where native updating isn't possible (win-portable, dev-ish builds).
   initAutoUpdater(() => liveWebContents());

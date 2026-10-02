@@ -54,7 +54,7 @@ export const COLLECT_USAGE_STATS = false;
 
 /** The "auto mode on / off" text in the header bar. It named a developer
  *  setting in words owners don't use, and it wasn't clickable. The setting
- *  itself is unchanged and stays in Settings → Autonomy & Budgets
+ *  itself is unchanged and stays in Settings → Agents
  *  (owner, 2026-09-24). */
 export const SHOW_AUTO_MODE_LABEL = false;
 
@@ -99,11 +99,20 @@ export const SHOW_VOICE = false;
  *  stay on with no way to turn it off. */
 export const SHOW_OFFICE_THEME = false;
 
-/** The Automatic updates switch in Settings → General. Hidden (owner,
- *  2026-09-26): Check for updates at the top of Settings covers it. The
- *  setting itself is unchanged: background checks still follow the saved
- *  value, which is on unless the owner turned it off before this build. */
-export const SHOW_AUTO_UPDATE_SWITCH = false;
+/** "Explain things simply" in Settings → General. Hidden (owner, 2026-10-02).
+ *  The saved audience still applies: agents keep briefing in plain language
+ *  when it was on, and nothing changes for an office that never set it. */
+export const SHOW_SIMPLE_MODE_SWITCH = false;
+
+/** "Arabic / RTL text in terminals" in Settings → General. Hidden (owner,
+ *  2026-10-02). The terminal shaping still follows the app language, and a
+ *  choice saved earlier still applies. */
+export const SHOW_ARABIC_TERMINAL_SWITCH = false;
+
+/** The Language section in Settings → General. Hidden (owner, 2026-10-02).
+ *  The app keeps a language saved earlier, else English (i18n/index.ts never
+ *  reads the OS locale); with this off there is no other picker in the app. */
+export const SHOW_LANGUAGE_PICKER = false;
 
 /** Slack: the Slack block in Settings → Connections (switch, signing secret,
  *  bot token, channel, port, posting, Start and Stop, setup steps). Hidden
@@ -120,6 +129,14 @@ export const SHOW_SLACK = false;
  *  built in file and web tools instead). The servers that need an explicit yes
  *  are listed below it and stay. */
 export const SHOW_READONLY_SERVERS = false;
+
+/** The whole Default MCP servers section in Settings → Connections. Hidden
+ *  (owner, 2026-10-01): its servers go into each agent's settings file, and
+ *  Claude Code ignores `mcpServers` there (probe on 2.1.287: 0 loaded from
+ *  `--settings`, loaded from `--mcp-config`), so the GitHub, database and
+ *  search switches did nothing either. Bring it back once the servers are
+ *  passed with `--mcp-config`, like the md-mail server. */
+export const SHOW_MCP_DEFAULTS = false;
 
 /** Import hire in Add Agent: the "import hire…" button, its explainer and the
  *  "generate one with AI…" prompt. Hidden (owner, 2026-09-27); adding a team

@@ -241,6 +241,18 @@ test('idle banter: planes or mail between two quiet pods, the line shown where i
   assert.match(life, /kind === 'you' \|\| kind === 'note-plane' \?/);
 });
 
+test('a paper plane turns with its path instead of flying as a fixed picture (owner, 2026-10-01)', () => {
+  const life = read('src/renderer/src/scene/studio/life.tsx');
+  assert.match(life, /const plane = f\.kind === 'you' \|\| f\.kind === 'note-plane';/);
+  assert.match(life, /<animateMotion [^>]*\n?\s*rotate=\{plane \? 'auto' : undefined\} \/>/, 'only planes rotate; badges and envelopes stay upright');
+  assert.match(life, /\{plane && f\.end\[0\] < f\.start\[0\] \? <g transform="scale\(1,-1\)">\{head\}<\/g> : head\}/, 'flying left it stays right side up');
+  // rotate="auto" points the shape's +x axis down the path, so the glyph's
+  // nose (11,-7) must sit on +x once its own rotation is applied.
+  const turn = Number(/Nose along \+x[^]*?<g transform="rotate\((-?[\d.]+)\)">\s*<path d="M-11,1 L11,-7/.exec(life)[1]);
+  const nose = (Math.atan2(-7, 11) * 180) / Math.PI + turn;
+  assert.ok(Math.abs(nose) < 2, `nose points ${nose.toFixed(1)} degrees off the path`);
+});
+
 test('Michael\'s numbers live on his walls; a chip replaces the always-on card (owner, 2026-09-30)', () => {
   const art = read('src/renderer/src/scene/studio/StudioArt.tsx');
   assert.match(art, /function StatsSign\(/);
@@ -297,4 +309,13 @@ test('a second pod never takes a slot another department prefers; job titles com
   // Mailbox posts spread along the front edge, the first always at the corner.
   assert.deepEqual([L.postGx(0, 1), L.postGx(0, 3), L.postGx(2, 3)], [-4, -4, -1.6]);
   assert.ok(L.postGx(5, 6) <= -4 + 3.4 + 1e-9, 'never past the platform edge');
+});
+
+test('the selected Michael card keeps its outline down the filled stats row (owner, 2026-10-01)', () => {
+  const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  const hub = /function HubCard[^]*?\n\}\) \{[^]*?\n\}\n/.exec(stage)[0];
+  // An inset shadow on the card paints under its children, so the filled
+  // stats row covered the outline at the sides.
+  assert.doesNotMatch(/<div style=\{\{\n\s*position: 'relative', \.\.\.style[^]*?\}\}>/.exec(hub)[0], /inset/, 'the card itself draws no inset outline');
+  assert.match(hub, /<span aria-hidden style=\{\{\n\s*position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',\n\s*boxShadow: `inset 0 0 0 1px \$\{selected \? 'var\(--cth-ink\)' : 'var\(--cth-line\)'\}`\n\s*\}\} \/>\n\s*<\/div>\n\s*\);\n\}\n$/, 'the outline is the last layer, over the rows');
 });
