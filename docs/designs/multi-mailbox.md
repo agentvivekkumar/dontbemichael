@@ -1031,6 +1031,8 @@ DESIGN.md 7.10 divided list, delete "Sure?" pattern and failed-save copy; 7.12 P
 
 ### Implementation Tasks (design review)
 - [ ] **D-T1 (P1, human: ~1d / CC: ~1h)**: Mailboxes section with Team email switch first (1A), 2A line layout, 3A states, 8A remove confirmation, "N needs you" title count
+  - 2026-10-01: the list now folds and the Claude account switch sits under the header; see `docs/designs/mailboxes-fold.md`.
+  - 2026-10-02: the Claude account switch is gone from Mailboxes. Gmail and Google Calendar on the Claude account are rows under Settings > Connections > Claude connectors, given per agent on the Access tab like any connector; the old switch, when on, carried over once as a grant to every agent (`docs/designs/claude-connectors.md`, E4, D9).
   - Surfaced by: Pass 1, 2, 7
   - Files: src/renderer/src/components (new MailboxesSettings), src/renderer/src/components/SettingsModal.tsx, src/renderer/src/components/McpDefaultsSettings.tsx (switch removed from the list)
   - Verify: each 3A state renders its copy; removing a used mailbox names who loses it
@@ -1085,11 +1087,15 @@ None.
 ### Change after the design review (owner, 2026-09-26): the Claude account is not a capability
 The Gmail and Calendar connected to the owner's Claude account are removed from Capabilities everywhere. The Settings switch on the "Your Claude account" line alone decides: allowed lets every agent use them (the behavior before this feature), blocked stops everyone. Capabilities cover only mailboxes added in Settings. This supersedes eng E3's Claude-account part (Michael and team members now follow the switch alike) and the Draft only rule for the Claude account Gmail.
 
+Superseded 2026-10-02 (`docs/designs/claude-connectors.md`): the switch is gone. Gmail and Google Calendar on the Claude account are rows under Settings > Connections > Claude connectors, granted per agent on the Access tab like any connector.
+
 ### Change after the design review (owner, 2026-09-26): no upgrade card
 Design decision 4A is withdrawn. Email being per team member is not a problem to raise, so Michael puts no card on Ask me about it. Startup clears the card if an earlier build of this branch added it.
 
 ### Change after the design review (owner, 2026-09-26)
 The on/off switch governs only email and calendar through the owner's Claude account. It moved from the top of Mailboxes onto the "Your Claude account" row, labelled "Team members can use the email and calendar in your Claude account" (allowed / blocked), with the line "Mailboxes you add here are not affected." Mailboxes added in Settings depend on each agent's Capabilities alone. This replaces design decision 1A's placement; the Capabilities tab shows "blocked in Settings for the whole team" on the Claude account row only, instead of a banner.
+
+Superseded 2026-10-02: the "Your Claude account" row and its switch are gone from Mailboxes (see the note under D-T1 above).
 
 ## GSTACK REVIEW REPORT
 

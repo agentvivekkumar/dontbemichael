@@ -84,7 +84,8 @@ src/
     agentDefinition.ts       each agent's levels and outward capabilities
     mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule)
     quickbooks.ts            QuickBooks through the owner's Claude account: which connector tools count, read vs change,
-                             and quickbooksAccess (the hook's rule: the Settings switch, off by default, then per agent;
+                             and quickbooksAccess (the hook's rule: the QuickBooks row's switch in Claude connectors,
+                             off by default, then per agent;
                              books roles like Oscar default to Read only)
     officeOpen.ts            the Office open message each agent gets after closing time
     cliUpdate.ts             whether live Claude agents run an older Claude Code than the one installed
@@ -110,12 +111,16 @@ src/
                              read-only list of every enabled job
     AskMeTab,                the Ask me cards on the Needs you board, agents' schedule requests included
     CapabilitiesTab,         every agent's Access tab (Michael included): the Email section (on/off switch,
-                             one mailbox, Can send / Draft only), the QuickBooks section (on/off switch,
-                             Read only / Can make changes) and the On a schedule section
-    MailboxesSettings,       Settings > Connections > Mailboxes, AddMailboxDialog, and the Claude account email switch
-    QuickBooksSettings,      Settings > Connections > QuickBooks: the central switch for the Claude account's QuickBooks
-                             (off hides it on every Access tab); on, it shows whether Claude has QuickBooks
-                             connected (claudeQuickBooks.ts runs `claude mcp list`) or the steps to connect it
+                             one mailbox, Can send / Draft only), the Claude connectors card (a switch per
+                             connector the owner turned on; QuickBooks keeps Read only / Can make changes)
+                             and the On a schedule section
+    MailboxesSettings,       Settings > Connections > Mailboxes and AddMailboxDialog
+    ClaudeConnectorsSettings, Settings > Connections > Claude connectors: every connector on the owner's Claude
+                             account (main/claudeMcpList.ts runs `claude mcp list`), the owner's switch for each;
+                             the rules (shared/claudeConnectors.ts: connectorAccess for the PreToolUse hook,
+                             spawnConnectorPlan for start-up) are in docs/designs/claude-connectors.md
+    SettingsHeroCard,        Settings > General's one About and Updates card; its What's new link opens
+                             WhatsNewPopover (docs/designs/about-updates-card.md)
     triggers/ScheduleList,   per-agent schedules: the On a schedule section of Access (agent mode) and
                              Michael's Office schedule tab (office mode); rules live in shared/missions.ts
     triggers/WhenLines,      the several "when" lines one schedule can have

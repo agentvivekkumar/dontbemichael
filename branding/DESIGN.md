@@ -438,8 +438,10 @@ The v1 "no radius" rule is retired.
 
 ### 6.3 Borders
 
-Hairlines only: 1 px. The one exception is the 2.5 px top rule on mailbox tags (§7.18)
-and the 3 px coral left rule on Ask me cards (§7.8).
+Hairlines only: 1 px. The exceptions are the 2.5 px top rule on mailbox tags (§7.18), the
+3 px coral left rule on Ask me cards (§7.8), and the 1.5 px coral ring and 700 title and
+button of the Danger zone card in Settings, General, which is loud on purpose because
+Reset deletes the office (owner, 2026-10-02).
 
 ---
 
@@ -509,7 +511,7 @@ team control) sits at the top of the board when there is a team to restore.
 | Primary | `ink` | white | none | The main action in a card or dialog ("Reply", "Approve", "Save", "Send") |
 | Secondary | `card` | `ink` | 1 px `line-2` | Other actions ("Decline", "Open Mailboxes", "Hire", "Edit") |
 | Quiet | none | `ink-2` | none | Tertiary links in a row ("Earlier answers", "change") |
-| Coral | `coral-strong` | white | none | Only the Needs you button. Never a general CTA |
+| Coral | `coral-strong` | white | none | Only the Needs you button, and Reset & start over inside the Danger zone card (owner, 2026-10-02). Never a general CTA |
 
 Height 28 px in cards, 32 px in bars, 36 px in the composer and dialogs. `t-meta` 600 at
 28, `t-ui` 600 above. Radius `r-md`. Focus per §12. Disabled: 45% opacity, no shadow.
@@ -587,9 +589,9 @@ enforced today:
 | Group | Controls |
 |---|---|
 | Email | Switch. When on: Mailbox select (mono value), Sending segmented control [Draft only, Can send] |
-| QuickBooks | Shown only when QuickBooks is on in Settings. Switch; when on, segmented [Read only, Can make changes]. When off, one `ink-3` line |
+| Claude connectors | One row and switch per connector the owner turned on in Settings, A to Z; "2 of 4" in the header. QuickBooks keeps radio rows [Read only, Can make changes] under its row, and an `ink-3` "on for bookkeeping roles" while the role default holds. None on: one `ink-3` line with a link to Settings. A pending restart shows under the groups with Restart now (`docs/designs/claude-connectors.md`) |
 | Files | Read only row: lock icon, "Own folder only", the folder name, "Open folder" link |
-| On a schedule | "+ Add" link. Rows: switch, job name (`t-ui` 600), when line (mono 11, `ink-2`), provenance ("added by Michael, approved by you") in `t-meta` `ink-3` |
+| On a schedule | "+ Add" link. Rows (owner, 2026-10-01, three quiet lines): switch; the job name (14 px) with the next run on the right; the when line (14 px, `ink-2`); then the status line (last run, and who added it only when it was not the owner) in `t-meta` `ink-3` |
 
 The group list is data driven: a new enforced capability adds a group. Nothing appears
 before it is enforced (§2.4).
@@ -772,6 +774,9 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 ### 7.23 Menus, tooltips, info tips, toasts, dialogs
 
 - Menus and popovers: `card`, `line`, `r-lg`, `shadow-lg`, 6 px padding, rows 32 px.
+- What's new (Settings, General, About card) is the one popover in the tooltip style: `ink`
+  fill, `bg` text, a caret to its link, `r-lg`, `shadow-lg`, title 13/600, body 13, links 12.
+  White on the white card was hard to read (owner, 2026-10-02).
 - Info tip: a 15 px circle, 1 px `ink-4` ring, "i" in `ink-3`. Hover or focus shows a
   tooltip: `ink` fill, white `t-meta`, `r-md`, max 260 px. (Dark: `#ECEAF4` fill, `#14131C`
   text.)
@@ -833,6 +838,20 @@ Keep every section, control and save rule from v1 (see the functional map in
 dialogs. The hire wizard's steps are numbered circles (done `green` with a check, current
 `ink`), its character tiles and job rows use the `indigo` soft selection, and its strings
 are sentence case. Closing time is the closing bar (§7.23), not a dialog.
+
+**Mailboxes** (Settings, Connections; `docs/designs/mailboxes-fold.md`, owner 2026-10-01) folds so
+many mailboxes never mean a long scroll. One header line: the `Disclosure` caret, the title, the
+count ("14 mailboxes", "none yet"), the coral "N needs you" when one is broken, an info icon with
+the intro, and Add a mailbox. It starts closed and opens by itself when a mailbox needs you;
+broken mailboxes sort first, then A to Z. Gmail on the owner's Claude account is not a row here;
+the info icon says it is under Claude connectors.
+
+**Claude connectors** (Settings, Connections, first; `docs/designs/claude-connectors.md`, owner
+2026-10-02) folds the same way: caret, title, "8 connectors, 3 on", an info icon, Refresh. It
+starts closed and opens by itself for a connector the owner has not seen or a failed read. Rows:
+name (14px, 600), status in words (connected, an underlined "Sign in at claude.ai" link, or a coral
+"Removed from your Claude account" chip with Clear, sorted first), then the owner's switch. A
+failed read is one line with the time of the last good read and Try again.
 
 ---
 
@@ -1295,7 +1314,7 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 |---|---|
 | `home-light.png` | Office view, Needs you board, light |
 | `home-dark.png` | The same, dark |
-| `kelly-access.png` | A person selected, Access tab |
+| `kelly-access.png` | A person selected, Access tab (Email, Claude connectors, On a schedule) |
 | `kelly-work.png` | A person selected, Work tab (her session, Talk 1:1) |
 | `michael-office-schedule.png` | Michael selected, Office schedule tab |
 | `tasks-detail.png` | Tasks view with a task detail open |
@@ -1305,7 +1324,7 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 | `onboarding-meet.png` | Onboarding step 3, Meet your office |
 | `kelly-memory.png` | A person selected, Memory tab |
 | `hire.png` | The hire wizard, step 1 (Who) |
-| `settings-autonomy.png` | Settings, Autonomy & Budgets |
+| `settings-autonomy.png` | Settings, Agents (the default model, autonomy and the circuit breaker) |
 
 The original mockups (HTML and generators) live with the design session in
 `~/.gstack/projects/agentvivekkumar-dontbemichael/designs/business-first-redesign-20260930/`.
