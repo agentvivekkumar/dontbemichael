@@ -13,8 +13,8 @@
  *
  * Click behaviour: status==='off' → connect(); anything else → disconnect().
  *
- * Rendered in two places (AgentCard for the god card, FullscreenTerminal header when
- * Michael is fullscreen). It is intentionally state-only / hook-only so both can mount it.
+ * Rendered in the FullscreenTerminal header when Michael is fullscreen. It is
+ * state-only / hook-only so any other surface can mount it too.
  */
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -121,7 +121,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
 
   // Jump straight to the tab that holds the key. App owns the Settings modal's
   // open state, so this goes through the `cth:` window-event convention rather
-  // than threading a callback down through AgentCard/FullscreenTerminal.
+  // than threading a callback down through FullscreenTerminal.
   // Target is VOICE, not Agents & Models: the key is settable in both, but only
   // one of them explains what it is for.
   const openKeySettings = (e: MouseEvent): void => {
@@ -209,11 +209,12 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
           <span
             aria-hidden
             style={{
+              borderRadius: 'var(--cth-r-md)',
               width: 6,
               height: 6,
               flexShrink: 0,
               background: noKey ? 'var(--cth-ink-300)' : view.dot,
-              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               animation: noKey ? 'none' : view.anim
             }}
           />
@@ -257,6 +258,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
               role="dialog"
               onClick={(e) => e.stopPropagation()}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 position: 'fixed',
                 left: hint.left,
                 top: hint.top,
@@ -271,7 +273,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
                 // Matches the note editor's portalled popover: hairline + a hard
                 // drop shadow, so it reads as floating above the dock rather than
                 // as part of whichever card it happens to cover.
-                boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 4px 4px 0 rgba(26,19,32,0.25)',
+                boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo), 0 6px 18px rgba(62,52,140,.08)',
                 fontFamily: 'var(--cth-font-ui)',
                 fontSize: 11,
                 lineHeight: '15px',

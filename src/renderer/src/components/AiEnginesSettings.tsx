@@ -48,13 +48,13 @@ const inputStyle: CSSProperties = {
 };
 const labelStyle: CSSProperties = {
   fontFamily: 'var(--cth-font-display)',
-  fontSize: 8,
+  fontSize: 10, fontWeight: 600,
   lineHeight: '12px',
   color: 'var(--cth-ink-700)',
   textTransform: 'uppercase'
 };
 const headStyle: CSSProperties = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+  fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
   color: 'var(--cth-ink-500)', textTransform: 'uppercase', marginBottom: 2
 };
 
@@ -189,8 +189,9 @@ export function AiEnginesSettings({ config }: { config: HarnessConfig }) {
 
       {/* Unsandboxed-in-auto caveat (Pam guardrail #6) */}
       <div style={{
+        borderRadius: 'var(--cth-r-md)',
         fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px',
-        padding: 8, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', background: 'var(--cth-paper-100)'
+        padding: 8, boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', background: 'var(--cth-paper-100)'
       }}>
         {t('aiEngines.autoModeCaveat')}
       </div>

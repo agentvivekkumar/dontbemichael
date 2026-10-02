@@ -19,7 +19,7 @@ const cthEditorTheme = EditorView.theme({
     background: '#FCFAF0',
     color: '#1A1320',
     height: '100%',
-    fontFamily: 'VT323, "JetBrains Mono", monospace',
+    fontFamily: 'var(--cth-font-terminal)',
     fontSize: '16px'
   },
   '.cm-content': { caretColor: '#FF6B6B', padding: '8px 0' },
@@ -158,7 +158,7 @@ export function CodeEditor({
           <Icon name="code" size={2} />
         </div>
         <div style={{
-          fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '14px',
+          fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '14px',
           textTransform: 'uppercase', letterSpacing: 1,
           color: 'var(--cth-ink-700)'
         }}>

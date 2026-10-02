@@ -84,7 +84,7 @@ export function WhenLines({ lines, onChange }: { lines: LineDraft[]; onChange: (
   const tab = (active: boolean): CSSProperties => ({
     padding: '3px 10px 2px', border: 'none', cursor: 'pointer',
     background: active ? 'var(--cth-cream-100)' : 'transparent',
-    boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+    boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-ink-100)',
     fontFamily: 'var(--cth-font-ui)', fontSize: 11,
     color: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
   });
@@ -184,9 +184,10 @@ function EveryLine({ line, longRange, taken, onChange }: {
               title={blocked ? t('triggersUi.dayTaken', { day: WEEKDAY_LABELS[d] }) : WEEKDAY_LABELS[d]}
               aria-pressed={on}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 width: 26, height: 24, border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.4 : 1,
                 background: on ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
-                boxShadow: on ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
+                boxShadow: on ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-ink-100)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 11,
                 color: on ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
               }}

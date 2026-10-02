@@ -288,7 +288,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
       {open && !readOnly && (
         <div
-          style={{ padding: '4px 8px 12px', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}
+          style={{ borderRadius: 'var(--cth-r-md)', padding: '4px 8px 12px', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}
           onKeyDown={(e) => {
             if (e.key !== 'Escape' || isComposingKey(e.nativeEvent)) return;
             e.stopPropagation();
@@ -320,6 +320,7 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
           {legacy && (
             <Field label={t('schedulesSection.olderInstructions')}>
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 padding: '4px 6px', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
                 fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-700)', whiteSpace: 'pre-wrap'
               }}>{legacy}</div>
@@ -399,7 +400,7 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
     );
   }
   return (
-    <div style={{ marginTop: 12, padding: '4px 8px 12px', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+    <div style={{ borderRadius: 'var(--cth-r-md)', marginTop: 12, padding: '4px 8px 12px', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
       <Field label={t('schedulesSection.label')}>
         <input
           autoFocus

@@ -19,12 +19,14 @@ import {
 
 /* ───────────────────────────── shared styles ─────────────────────────────── */
 
+// Design v2 controls (branding/DESIGN.md 6, 7.12): white fields on a line-input
+// boundary (3:1), 9px radius, Sora.
 export const inputStyle: CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '6px 8px',
-  background: 'var(--cth-paper-100)', border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px',
-  color: 'var(--cth-ink-900)', outline: 'none'
+  width: '100%', boxSizing: 'border-box', padding: '7px 10px',
+  background: 'var(--cth-card)', border: 'none', borderRadius: 'var(--cth-r-md)',
+  boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, lineHeight: '17px',
+  color: 'var(--cth-ink)'
 };
 
 export const monoInputStyle: CSSProperties = {
@@ -38,33 +40,33 @@ export const textareaStyle: CSSProperties = {
 };
 
 export const selectStyle: CSSProperties = {
-  padding: '3px 6px', background: 'var(--cth-paper-100)', border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-  fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
+  height: 32, padding: '0 10px', background: 'var(--cth-card)', border: 'none', borderRadius: 'var(--cth-r-md)',
+  boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, color: 'var(--cth-ink)',
   cursor: 'pointer', minWidth: 0, maxWidth: '100%'
 };
 
 /* ───────────────────────────── text helpers ──────────────────────────────── */
 
 export function Muted({ children }: { children: ReactNode }) {
-  return <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>{children}</div>;
+  return <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-3)' }}>{children}</div>;
 }
 
 /** One line of explanation under a control. Smaller than Muted, never a tooltip —
  *  a sidebar hides tooltips behind the window edge half the time. */
 export function Hint({ children }: { children: ReactNode }) {
   // 13px: the floor for text an owner reads (DESIGN.md §4.2).
-  return <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)', marginTop: 3 }}>{children}</div>;
+  return <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-3)', marginTop: 3 }}>{children}</div>;
 }
 
 export function Chip({ children, tone = 'plain' }: { children: ReactNode; tone?: 'plain' | 'on' | 'off' }) {
-  const bg = tone === 'on' ? 'var(--cth-lemon)' : tone === 'off' ? 'var(--cth-cream-200)' : 'var(--cth-cream-100)';
-  const line = tone === 'on' ? 'var(--cth-ink-900)' : 'var(--cth-ink-100)';
+  const bg = tone === 'on' ? 'var(--cth-green-soft)' : 'var(--cth-neutral-soft)';
+  const fg = tone === 'on' ? 'var(--cth-green-text)' : 'var(--cth-ink-3)';
   return (
     <span style={{
-      flexShrink: 0, padding: '2px 5px 1px',
-      fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
-      background: bg, boxShadow: `inset 0 0 0 1px ${line}`, color: 'var(--cth-ink-900)'
+      flexShrink: 0, padding: '2px 8px', borderRadius: 'var(--cth-r-pill)',
+      fontFamily: 'var(--cth-font-ui)', fontSize: 10.5, fontWeight: 600, lineHeight: '15px',
+      background: bg, color: fg
     }}>{children}</span>
   );
 }
@@ -73,10 +75,9 @@ export function Callout({ children, tone = 'warn' }: { children: ReactNode; tone
   const warn = tone === 'warn';
   return (
     <div style={{
-      marginTop: 6, padding: '6px 8px',
-      fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)',
-      background: warn ? 'var(--cth-coral-light)' : 'var(--cth-cream-200)',
-      boxShadow: `inset 0 0 0 1px ${warn ? 'var(--cth-coral)' : 'var(--cth-ink-100)'}`
+      marginTop: 6, padding: '8px 10px', borderRadius: 'var(--cth-r-md)',
+      fontSize: 12.5, lineHeight: '18px', color: warn ? 'var(--cth-coral-text)' : 'var(--cth-ink-2)',
+      background: warn ? 'var(--cth-coral-soft)' : 'var(--cth-neutral-soft)'
     }}>{children}</div>
   );
 }
@@ -100,14 +101,25 @@ export function Toggle({ on, onClick, onLabel, offLabel, label, disabled }: {
       disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '2px 8px 1px', border: 'none', cursor: disabled ? 'progress' : 'pointer', flexShrink: 0,
-        opacity: disabled ? 0.6 : 1,
-        background: on ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
-        boxShadow: `inset 0 0 0 1px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
-        // Text on the lemon fill uses on-accent, readable in both themes (DESIGN.md 3.3).
-        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', color: on ? 'var(--cth-on-accent)' : 'var(--cth-ink-900)'
+        // v2 switch (branding/DESIGN.md 7.12): the word, then a pill track.
+        display: 'inline-flex', alignItems: 'center', gap: 8, padding: 0, border: 'none', background: 'transparent',
+        cursor: disabled ? 'progress' : 'pointer', flexShrink: 0, opacity: disabled ? 0.6 : 1,
+        fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, lineHeight: '18px',
+        color: on ? 'var(--cth-green-text)' : 'var(--cth-ink-3)'
       }}
-    >{on ? (onLabel ?? t('common.on')) : (offLabel ?? t('common.off'))}</button>
+    >
+      {on ? (onLabel ?? t('common.on')) : (offLabel ?? t('common.off'))}
+      <span aria-hidden="true" style={{
+        position: 'relative', width: 32, height: 18, borderRadius: 999, flexShrink: 0,
+        background: on ? 'var(--cth-green)' : 'var(--cth-neutral-soft)',
+        boxShadow: on ? 'none' : 'inset 0 0 0 1px var(--cth-line-input)', transition: 'background var(--cth-dur-fast) var(--cth-ease)'
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, insetInlineStart: on ? 16 : 2, width: 14, height: 14, borderRadius: '50%',
+          background: '#FFFFFF', boxShadow: '0 1px 2px rgba(30,27,46,.25)', transition: 'inset-inline-start var(--cth-dur-fast) var(--cth-ease)'
+        }} />
+      </span>
+    </button>
   );
 }
 
@@ -126,12 +138,12 @@ export function MiniButton({ children, onClick, tone = 'plain', disabled, autoFo
       onClick={onClick}
       disabled={disabled}
       style={{
-        flexShrink: 0, padding: '2px 7px 1px', border: 'none',
+        flexShrink: 0, height: 26, padding: '0 10px', border: 'none', borderRadius: 'var(--cth-r-md)',
         cursor: disabled ? 'default' : 'pointer',
-        background: tone === 'good' ? 'var(--cth-mint)' : destructive ? 'var(--cth-coral)' : 'var(--cth-cream-200)',
-        boxShadow: `inset 0 0 0 1px ${destructive ? 'var(--cth-ink-500)' : 'var(--cth-ink-100)'}`,
-        fontFamily: 'var(--cth-font-ui)', fontSize: 14,
-        color: disabled ? 'var(--cth-ink-300)' : destructive ? 'var(--cth-on-accent)' : tone === 'danger' ? 'var(--cth-coral)' : 'var(--cth-ink-900)'
+        background: tone === 'good' ? 'var(--cth-green-soft)' : destructive ? 'var(--cth-coral-strong)' : 'var(--cth-card)',
+        boxShadow: destructive || tone === 'good' ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)',
+        fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600,
+        color: disabled ? 'var(--cth-ink-4)' : destructive ? 'var(--cth-on-coral)' : tone === 'danger' ? 'var(--cth-coral-text)' : tone === 'good' ? 'var(--cth-green-text)' : 'var(--cth-ink)'
       }}
     >{children}</button>
   );
@@ -156,8 +168,8 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{
-        fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
-        color: 'var(--cth-ink-500)', marginBottom: 4
+        fontFamily: 'var(--cth-font-ui)', fontSize: 10, fontWeight: 600, lineHeight: '13px', textTransform: 'uppercase',
+        letterSpacing: '0.05em', color: 'var(--cth-ink-3)', marginBottom: 5
       }}>{label}</div>
       {children}
     </div>
@@ -170,7 +182,7 @@ export function Scroll({ children }: { children: ReactNode }) {
   return (
     <div style={{
       flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
-      padding: 10, background: 'var(--cth-paper-200)'
+      padding: 14
     }}>{children}</div>
   );
 }
@@ -190,8 +202,11 @@ export function Scroll({ children }: { children: ReactNode }) {
 export function Disclosure({ open }: { open: boolean }) {
   const rtl = useRtl();
   return (
-    <span aria-hidden="true" style={{ flexShrink: 0, width: 14, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)', textAlign: 'center' }}>
-      {open ? '▾' : rtl ? '◂' : '▸'}
+    <span aria-hidden="true" style={{ flexShrink: 0, width: 16, height: 20, display: 'inline-grid', placeItems: 'center', color: 'var(--cth-ink-3)' }}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
+        style={{ transform: `rotate(${open ? 0 : rtl ? 90 : -90}deg)`, transition: 'transform var(--cth-dur-fast) var(--cth-ease)' }}>
+        <path d="M6 9l6 6 6-6" />
+      </svg>
     </span>
   );
 }
@@ -208,8 +223,10 @@ export function TriggerCard({ title, blurb, summary, action, defaultOpen = false
   const open = openProp ?? openState;
   const bodyId = useId();
   return (
-    <div style={{ marginBottom: 8, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)' }}>
+    // v2 row group (branding/DESIGN.md 7.12): a white card, the title and one
+    // quiet line of what it is, the section's own switch on the right.
+    <div style={{ marginBottom: 10, background: 'var(--cth-card)', borderRadius: 'var(--cth-r-xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <button
         type="button"
         aria-expanded={open}
@@ -217,24 +234,24 @@ export function TriggerCard({ title, blurb, summary, action, defaultOpen = false
         onClick={() => { const next = !open; if (openProp === undefined) setOpenState(next); onToggle?.(next); }}
         style={{
           flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 6, textAlign: 'start',
-          padding: '8px 10px', border: 'none', cursor: 'pointer', background: 'transparent'
+          padding: '11px 12px', border: 'none', cursor: 'pointer', background: 'transparent'
         }}
       >
         <Disclosure open={open} />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
-            display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '18px',
-            color: 'var(--cth-ink-900)'
+            display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px',
+            color: 'var(--cth-ink)'
           }}>{title}</span>
-          <span style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-500)', marginTop: 2 }}>
+          <span style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-3)', marginTop: 2 }}>
             {blurb}
           </span>
         </span>
         {summary !== undefined && action === undefined && <Chip>{summary}</Chip>}
       </button>
-      {action !== undefined && <div style={{ flexShrink: 0, paddingBlockStart: 8, paddingInlineEnd: 10 }}>{action}</div>}
+      {action !== undefined && <div style={{ flexShrink: 0, paddingBlockStart: 11, paddingInlineEnd: 12 }}>{action}</div>}
       </div>
-      <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '8px 10px 10px' }}>{children}</div>
+      <div id={bodyId} style={{ display: open ? 'block' : 'none', padding: '10px 12px 12px', borderTop: '1px solid var(--cth-line)' }}>{children}</div>
     </div>
   );
 }
@@ -243,8 +260,8 @@ export function TriggerCard({ title, blurb, summary, action, defaultOpen = false
 export function SubCard({ children }: { children: ReactNode }) {
   return (
     <div style={{
-      marginBottom: 6, padding: '8px 10px 10px',
-      background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
+      marginBottom: 8, padding: '10px 12px', borderRadius: 'var(--cth-r-lg)',
+      background: 'var(--cth-card-2)', boxShadow: 'inset 0 0 0 1px var(--cth-line)'
     }}>{children}</div>
   );
 }
@@ -262,7 +279,7 @@ export function SubHeader({ open, onToggle, title, sub, right }: {
           padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'
         }}
       >
-        <span style={{ flexShrink: 0, width: 8, fontSize: 11, color: 'var(--cth-ink-500)' }}>{open ? '▾' : '▸'}</span>
+        <Disclosure open={open} />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '16px',
@@ -399,10 +416,10 @@ export function PctField({ value, onChange }: { value: number; onChange: (pct: n
       />
       <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>%</span>
       <div style={{
-        flex: 1, minWidth: 40, height: 8,
-        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)'
+        flex: 1, minWidth: 40, height: 6, borderRadius: 3, overflow: 'hidden',
+        background: 'var(--cth-neutral-soft)'
       }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: pct === 0 ? 'var(--cth-ink-300)' : 'var(--cth-lemon)' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: pct === 0 ? 'var(--cth-ink-4)' : 'var(--cth-indigo)' }} />
       </div>
     </div>
   );
@@ -495,13 +512,11 @@ export function WeeklyPicker({ value, onChange, taken = [] }: {
               title={blocked ? t('triggersUi.dayTaken', { day: WEEKDAY_LABELS[d] }) : WEEKDAY_LABELS[d]}
               aria-pressed={on}
               style={{
-                width: 26, height: 24, border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.4 : 1,
-                background: on ? 'var(--cth-mint)' : 'var(--cth-cream-200)',
-                boxShadow: on
-                  ? 'inset 0 0 0 1.5px var(--cth-ink-500)'
-                  : 'inset 0 0 0 1px var(--cth-ink-100)',
-                fontFamily: 'var(--cth-font-ui)', fontSize: 11,
-                color: on ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
+                width: 30, height: 28, border: 'none', borderRadius: 'var(--cth-r-md)', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.4 : 1,
+                background: on ? 'var(--cth-ink)' : 'var(--cth-card)',
+                boxShadow: on ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)',
+                fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, fontWeight: 600,
+                color: on ? 'var(--cth-bg)' : 'var(--cth-ink-2)'
               }}
             >{initial}</button>
           );
@@ -546,11 +561,11 @@ export function SchedulePicker({ intervalMs, weekly, onInterval, onWeekly }: {
 }) {
   const { t } = useTranslation();
   const tab = (active: boolean): CSSProperties => ({
-    padding: '3px 10px 2px', border: 'none', cursor: 'pointer',
-    background: active ? 'var(--cth-cream-100)' : 'transparent',
-    boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-    fontFamily: 'var(--cth-font-ui)', fontSize: 11,
-    color: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
+    height: 28, padding: '0 12px', border: 'none', borderRadius: 'var(--cth-r-md)', cursor: 'pointer',
+    background: active ? 'var(--cth-ink)' : 'var(--cth-card)',
+    boxShadow: active ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)',
+    fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600,
+    color: active ? 'var(--cth-bg)' : 'var(--cth-ink-2)'
   });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

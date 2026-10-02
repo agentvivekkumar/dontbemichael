@@ -5,9 +5,9 @@ import { roleForHiveSpawn } from '@shared/agentRole';
 
 /** "Restore team" — respawn every worker from the previous session.
  *
- *  Lives here rather than inside AgentStrip because the floor strip is hidden in
- *  fullscreen, which used to mean the restore button (and the list of restorable
- *  agents) simply vanished when you went fullscreen. Both mount points share the
+ *  Lives in a hook so the restore banner and focus mode can both mount it
+ *  without the button (and the list of restorable agents) vanishing in one of
+ *  them. Both mount points share the
  *  progress state below, so a restore kicked off from one view shows as running
  *  in the other and can't be double-started. */
 

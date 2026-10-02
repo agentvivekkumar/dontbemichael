@@ -18,6 +18,21 @@ export interface PixelBadgeProps {
   style?: CSSProperties;
 }
 
+// v2 status pills (branding/DESIGN.md 3.5 and 7.13): text color on a soft fill,
+// with a dot in the same color. Needs you is the one filled coral pill.
+const pillByStatus: Record<StatusKind, { text: string; fill: string }> = {
+  idle:       { text: 'var(--cth-ink-3)', fill: 'var(--cth-neutral-soft)' },
+  thinking:   { text: 'var(--cth-violet-text)', fill: 'var(--cth-violet-soft)' },
+  working:    { text: 'var(--cth-blue-text)', fill: 'var(--cth-blue-soft)' },
+  waiting:    { text: 'var(--cth-ink-3)', fill: 'var(--cth-neutral-soft)' },
+  blocked:    { text: 'var(--cth-on-coral)', fill: 'var(--cth-coral-strong)' },
+  success:    { text: 'var(--cth-green-text)', fill: 'var(--cth-green-soft)' },
+  ghost:      { text: 'var(--cth-ink-3)', fill: 'var(--cth-neutral-soft)' },
+  compacting: { text: 'var(--cth-violet-text)', fill: 'var(--cth-violet-soft)' },
+  looping:    { text: 'var(--cth-amber-text)', fill: 'var(--cth-amber-soft)' },
+  typing:     { text: 'var(--cth-indigo-text)', fill: 'var(--cth-indigo-soft)' }
+};
+
 const colorByStatus: Record<StatusKind, string> = {
   idle:     'var(--cth-status-idle)',
   thinking: 'var(--cth-status-thinking)',
@@ -61,24 +76,26 @@ export function PixelBadge({ status, label, style }: PixelBadgeProps) {
         // Same reason as PixelButton: a status chip that shrinks spills its text
         // under the controls beside it instead of holding its own width.
         flexShrink: 0,
-        gap: 6,
-        padding: '2px 8px 0',
-        background: 'var(--cth-cream-100)',
-        boxShadow: `inset 0 0 0 1px ${colorByStatus[status]}`,
+        gap: 5,
+        padding: '2px 8px',
+        background: pillByStatus[status].fill,
+        borderRadius: 'var(--cth-r-pill)',
         fontFamily: 'var(--cth-font-ui)',
-        fontSize: 'var(--cth-text-body-sm)',
-        lineHeight: '18px',
-        color: 'var(--cth-ink-900)',
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: '16px',
+        letterSpacing: 0,
+        color: pillByStatus[status].text,
         userSelect: 'none',
         ...style
       }}
     >
       <span
         style={{
-          width: 8,
-          height: 8,
-          background: colorByStatus[status],
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: status === 'blocked' ? 'currentColor' : colorByStatus[status]
         }}
       />
       {text}

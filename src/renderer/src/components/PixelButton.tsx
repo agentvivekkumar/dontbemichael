@@ -14,8 +14,9 @@ export interface PixelButtonProps {
   title?: string;
 }
 
-const heightBySize: Record<Size, number> = { sm: 24, md: 32, lg: 40 };
-const padBySize: Record<Size, string> = { sm: '0 8px', md: '0 12px', lg: '0 16px' };
+// Design system v2 (branding/DESIGN.md 7.7): 28 in cards, 32 in bars, 36 in dialogs.
+const heightBySize: Record<Size, number> = { sm: 28, md: 32, lg: 36 };
+const padBySize: Record<Size, string> = { sm: '0 10px', md: '0 12px', lg: '0 16px' };
 
 export function PixelButton({
   variant = 'primary',
@@ -30,51 +31,22 @@ export function PixelButton({
   const [pressed, setPressed] = useState(false);
   const [hover, setHover] = useState(false);
 
-  // DISABLED TEXT IS ITS OWN COLOR, not the variant's.
-  //
-  // Every variant swaps its FILL to `--cth-cream-300` when disabled, but the
-  // variants used to keep their enabled text token — and `primary`'s is
-  // `--cth-cream-50`, the INVERSE foreground picked to sit on an ink-900 button.
-  // On the cream-300 disabled fill that pairing collapses: in dark mode it is
-  // #1A191E text on #37363E (~1.4:1, effectively invisible), and in light mode a
-  // near-white #FFFDF5 on tan, which is barely better. That is why a disabled
-  // Send or Dispatch reads as an empty box.
-  //
-  // `--cth-ink-500` is the one foreground that works against cream-300 in BOTH
-  // themes, because both tokens flip together — and a muted label is what a
-  // disabled control should look like anyway.
-  const disabledText = 'var(--cth-ink-500)';
-
+  // v2 (DESIGN.md 7.7): primary is ink, secondary is a white card on a
+  // hairline, ghost is text only. Destructive is a secondary button with coral
+  // text: coral fills are reserved for the Needs you signal.
   const palette = (() => {
+    if (disabled) {
+      return { fill: variant === 'ghost' ? 'transparent' : 'var(--cth-neutral-soft)', text: 'var(--cth-ink-3)', border: 'transparent' };
+    }
     switch (variant) {
       case 'primary':
-        return {
-          fill:    disabled ? 'var(--cth-cream-300)' : (hover ? 'var(--cth-ink-700)' : 'var(--cth-ink-900)'),
-          text:    disabled ? disabledText : 'var(--cth-cream-50)',
-          border:  'var(--cth-ink-900)',
-          shadow:  'var(--cth-ink-900)'
-        };
+        return { fill: hover ? 'var(--cth-ink-2)' : 'var(--cth-ink)', text: 'var(--cth-bg)', border: 'transparent' };
       case 'secondary':
-        return {
-          fill:    disabled ? 'var(--cth-cream-300)' : (hover ? 'var(--cth-cream-200)' : 'var(--cth-cream-100)'),
-          text:    disabled ? disabledText : 'var(--cth-ink-900)',
-          border:  'var(--cth-ink-300)',
-          shadow:  'var(--cth-ink-100)'
-        };
+        return { fill: hover ? 'var(--cth-card-2)' : 'var(--cth-card)', text: 'var(--cth-ink)', border: 'var(--cth-line-2)' };
       case 'ghost':
-        return {
-          fill:    hover ? 'var(--cth-cream-200)' : 'transparent',
-          text:    disabled ? disabledText : 'var(--cth-ink-700)',
-          border:  'var(--cth-ink-300)',
-          shadow:  'var(--cth-ink-100)'
-        };
+        return { fill: hover ? 'var(--cth-neutral-soft)' : 'transparent', text: 'var(--cth-ink-2)', border: 'transparent' };
       case 'destructive':
-        return {
-          fill:    disabled ? 'var(--cth-cream-300)' : (hover ? 'var(--cth-coral-light)' : 'var(--cth-coral)'),
-          text:    disabled ? disabledText : 'var(--cth-ink-900)',
-          border:  'var(--cth-ink-500)',
-          shadow:  'var(--cth-ink-300)'
-        };
+        return { fill: hover ? 'var(--cth-coral-soft)' : 'var(--cth-card)', text: 'var(--cth-coral-text)', border: 'var(--cth-line-2)' };
     }
   })();
 
@@ -117,13 +89,13 @@ export function PixelButton({
         background: palette.fill,
         color: palette.text,
         border: 'none',
-        // v0.3.4: 1px hairline + 1px lift — the 2px chrome read as heavy boxes
-        boxShadow: pressed && !disabled
-          ? `inset 0 0 0 1px ${palette.border}`
-          : `inset 0 0 0 1px ${palette.border}, 0 1px 0 ${palette.shadow}`,
+        boxShadow: palette.border === 'transparent' ? 'none' : `inset 0 0 0 1px ${palette.border}`,
+        borderRadius: 'var(--cth-r-md)',
         transform: pressed && !disabled ? 'translateY(1px)' : 'none',
+        transition: 'background var(--cth-dur-fast) var(--cth-ease)',
         fontFamily: 'var(--cth-font-ui)',
-        fontSize: size === 'lg' ? 'var(--cth-text-body-md)' : 'var(--cth-text-body-sm)',
+        fontWeight: 600,
+        fontSize: size === 'sm' ? 12 : 13,
         cursor: disabled ? 'not-allowed' : 'pointer',
         width: fullWidth ? '100%' : 'auto',
         userSelect: 'none',

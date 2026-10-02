@@ -1,18 +1,17 @@
 import { CapabilitiesTab } from './CapabilitiesTab';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PixelPanel } from './PixelPanel';
+import { PanelCard, PanelHeader, PanelTabs } from '@/shell/PanelChrome';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
 import { MessageQueueComposer } from './MessageQueueComposer';
-import { AskMeTab } from './AskMeTab';
 import { ProfileTab } from './ProfileTab';
 import { MemoryNotes, memorySummary } from './MemoryNotes';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { memoryView } from '@shared/memoryIndex';
-import { SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_IDE, ALLOW_TEMP_WORKERS, SHOW_OPEN_TERMINAL, SHOW_DELIVERY_SWITCH } from '@shared/buildFeatures';
 import { TriggersTab } from './triggers/TriggersTab';
 import { TriggerHistoryTab } from './triggers/TriggerHistoryTab';
 import { TriggerCard } from './triggers/ui';
@@ -55,7 +54,7 @@ import { useRtl } from '@/i18n/useDirection';
 // with that card expanded (see the ccTabRequest effect).
 // TASKS and GRAPH are not tabs: they are the floor's TASKS and GRAPH views
 // (App.tsx), and a request for either switches the floor to it.
-type CCTab = 'profile' | 'capabilities' | 'terminal' | 'human' | 'triggers' | 'trigger-history'
+type CCTab = 'profile' | 'capabilities' | 'terminal' | 'triggers' | 'trigger-history'
   | 'memory' | 'workers' | 'advanced';
 
 /** Fallback denominator for the per-agent token meter when no floor token budget
@@ -79,7 +78,6 @@ interface GHIssue {
  *  owner, and a business owner opening Michael should land there. */
 const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'profile', labelKey: 'sidebar.profile', icon: 'info' },
-  { key: 'human', labelKey: 'commandCenter.tabs.human', icon: 'bell' },
   // Michael follows Capabilities like everyone (docs/designs/multi-mailbox.md, E3);
   // after ASK ME, which stays second on his panel (owner, 2026-09-25).
   { key: 'capabilities', labelKey: 'sidebar.capabilities', icon: 'gear' },
@@ -100,10 +98,11 @@ const TABS: { key: CCTab; labelKey: string; icon: Parameters<typeof Icon>[0]['na
  *  cols/rows and corrupt the display. */
 export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent; fullscreen?: boolean }) {
   const { t } = useTranslation();
-  // The docked panel opens on ASK ME: a terminal is the least friendly thing a
-  // business owner can meet first. Focus mode is the one place that opens on
-  // the terminal, because reaching it means asking for the terminal full screen.
-  const defaultTab: CCTab = fullscreen ? 'terminal' : 'human';
+  // Design v2: Ask me is no longer a tab here; it is the Needs you board in the
+  // right column (branding/DESIGN.md 7.6). The docked panel opens on Profile: a
+  // terminal is the least friendly thing a business owner can meet first. Focus
+  // mode opens on the terminal, because reaching it means asking for it.
+  const defaultTab: CCTab = fullscreen ? 'terminal' : 'profile';
   const [tab, setTab] = useState<CCTab>(defaultTab);
   // The trigger-history ledger has nothing to say until an outside party can
   // reach us, so its tab appears only once an org key or a webhook exists. This
@@ -185,149 +184,39 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
   };
 
   return (
-    <PixelPanel
-      variant="default"
-      noPadding
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0, overflow: 'hidden' }}
-    >
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '6px 8px', background: 'var(--cth-cream-100)',
-        borderBottom: '1px solid var(--cth-ink-700)', flexShrink: 0
-      }}>
-        <div style={{
-          width: 32, height: 32, background: `var(--cth-${agent.accent}-light)`,
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
-        }}>
-          <SpritePortrait character={agent.character} scale={1} />
-        </div>
-        {/* Title + subtitle truncate; the control cluster never shrinks. At
-            sidebar width the old header wrapped its 24-char display-font title
-            onto three lines and "runs the floor" word-per-line under the two
-            wide buttons — everything here is single-line by construction. */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px', color: 'var(--cth-ink-900)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-          }}>{t('commandCenter.title')}</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 1, minWidth: 0 }}>
-            <PixelBadge status={agent.status} />
-            <span style={{
-              fontSize: 12, color: 'var(--cth-ink-500)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-            }}>{t('commandCenter.runsTheFloor', { name: agent.name })}</span>
-          </div>
-        </div>
-        {/* v0.3.4: floor-wide auto-delivery lives HERE (one switch for every
-            agent's queue), and the IDE opens from agent level, not the toolbar.
-            Short labels — the tooltips carry the full explanation. */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+    <PanelCard>
+      {/* Design v2 header (branding/DESIGN.md 7.10). Floor-wide delivery and
+          the IDE stay behind their build flags, beside close. */}
+      <PanelHeader
+        agent={agent}
+        role={t('studio.officeManager')}
+        withNote={false}
+        extra={<>
           {SHOW_DELIVERY_SWITCH && (
-            <PixelButton
-              variant={floorDeliveryPaused ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => { void toggleFloorDelivery(); }}
-            >
-              <span
-                className="cth-tip cth-tip-wrap"
-                data-tip={floorDeliveryPaused
-                  ? t('commandCenter.deliveryPausedTitle')
-                  : t('commandCenter.deliveryOnTitle')}
-                aria-label={floorDeliveryPaused
-                  ? t('commandCenter.deliveryResumeAria')
-                  : t('commandCenter.deliveryHoldAria')}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
+            <PixelButton variant={floorDeliveryPaused ? 'primary' : 'secondary'} size="md" onClick={() => { void toggleFloorDelivery(); }}>
+              <span className="cth-tip cth-tip-wrap"
+                data-tip={floorDeliveryPaused ? t('commandCenter.deliveryPausedTitle') : t('commandCenter.deliveryOnTitle')}
+                aria-label={floorDeliveryPaused ? t('commandCenter.deliveryResumeAria') : t('commandCenter.deliveryHoldAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Icon name={floorDeliveryPaused ? 'pause' : 'play'} />
                 {floorDeliveryPaused ? t('commandCenter.deliveryPaused') : t('commandCenter.deliveryAuto')}
               </span>
             </PixelButton>
           )}
-          {/* Floor-level surface with no agent of its own: the honest target is
-              whoever is selected, stated explicitly rather than left to the
-              IDE's fallback so the intent is visible at the call site. */}
           {SHOW_IDE && (
-          <PixelButton variant="secondary" size="sm" onClick={() => {
-            const s = useStore.getState();
-            s.setIdeOpen(true, s.selectedId);
-          }}>
-            <span
-              className="cth-tip cth-tip-wrap"
-              data-tip={t('commandCenter.ideTitle')}
-              aria-label={t('commandCenter.openIdeAria')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-            >
-              <Icon name="code" /> {t('commandCenter.ide')}
-            </span>
-          </PixelButton>
+            <PixelButton variant="secondary" size="md" onClick={() => { const st = useStore.getState(); st.setIdeOpen(true, st.selectedId); }}>
+              <span className="cth-tip cth-tip-wrap" data-tip={t('commandCenter.ideTitle')} aria-label={t('commandCenter.openIdeAria')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="code" /> {t('commandCenter.ide')}
+              </span>
+            </PixelButton>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
-      {/* Tab bar — ONE row, tabs at their natural width, scrolling only if the
-          panel is genuinely too narrow for all of them.
-
-          This was an auto-fit grid of equal-width cells, which had a failure mode
-          the equal widths caused: every column is sized to the WIDEST tab, so the
-          track count is set by the longest label rather than by the total width
-          the labels actually need. Adding a 12th tab tipped it over at fullscreen
-          width and dropped `setup` onto a second row with most of the first row's
-          space still unused — the tabs need ~1320px of content and had ~1610px.
-
-          Content-sized tabs fit all twelve on one line with room to spare, and the
-          `.cth-tabbar` rules in global.css (scrollbar-width: none, ::-webkit-
-          scrollbar { height: 0 }) already exist for exactly this: a single row that
-          scrolls with the scrollbar hidden. The grid never scrolled, so those rules
-          have been dead code since it landed.
-
-          Trade-off, deliberate: in the NARROW docked panel the far-right tabs now
-          scroll out of view instead of wrapping to a visible second row. One row
-          that sometimes needs a scroll beats two rows where one is nearly empty —
-          and the grid's own reason for existing (keeping wrapped rows aligned)
-          stops applying the moment there is only ever one row. */}
-      <div className="cth-tabbar" style={{
-        display: 'flex', gap: 4,
-        // Docked in the sidebar the panel is narrow, so tabs WRAP: a second row
-        // costs a few pixels of a tall column, while a horizontal scroll there
-        // would hide half the tabs behind a gesture with no affordance.
-        // In focus mode the panel is wide and vertical space is the scarce
-        // resource, so it stays ONE row and scrolls instead. `.cth-tabbar` in
-        // global.css already hides that scrollbar.
-        flexWrap: fullscreen ? 'nowrap' : 'wrap',
-        overflowX: fullscreen ? 'auto' : 'visible',
-        padding: '6px 8px', background: 'var(--cth-cream-100)',
-        borderBottom: '1px solid var(--cth-ink-700)', flexShrink: 0
-      }}>
-        {visibleTabs.map((tabDef) => (
-          <button
-            key={tabDef.key}
-            onClick={() => setTab(tabDef.key)}
-            style={{
-              whiteSpace: 'nowrap',
-              // grow to share any spare width (so the strip still spans the panel
-              // exactly as the old grid did), never shrink below the label (a
-              // squashed tab is unreadable — overflow into the scroll instead).
-              flex: '1 0 auto',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              padding: '4px 8px 3px', border: 'none', cursor: 'pointer',
-              background: tab === tabDef.key ? `var(--cth-${agent.accent})` : 'var(--cth-cream-200)',
-              // The selected tab is filled with the agent's accent, which is a
-              // LIGHT colour in both themes. ink-900 flips to near-white in dark
-              // mode, so the active tab's label was pale-on-pale — the one tab
-              // you most need to read. On-accent text is dark in both themes.
-              color: tab === tabDef.key ? 'var(--cth-on-accent)' : 'var(--cth-ink-900)',
-              boxShadow: tab === tabDef.key
-                ? 'inset 0 0 0 1px var(--cth-ink-300)'
-                : 'inset 0 0 0 1px var(--cth-ink-100)',
-              fontFamily: 'var(--cth-font-ui)', fontSize: 13
-            }}
-          >
-            <Icon name={tabDef.icon} /> {t(tabDef.labelKey)}
-          </button>
-        ))}
-      </div>
+      {/* Tabs (DESIGN.md 7.11): Profile, Access, Work, Office schedule, History
+          (only once a webhook exists), Memory, Advanced. */}
+      <PanelTabs tabs={visibleTabs.map((tabDef) => ({ key: tabDef.key, label: t(tabDef.labelKey) }))} current={tab} onChange={setTab} />
 
       {/* Body */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -348,7 +237,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
                     }
                     void window.cth.historyAdd({ agentId: agent.id, cwd: agent.cwd, text: t });
                   }}
-                  onToggleFullscreen={() => setFullscreen(fullscreen ? null : agent.id)}
+                  onToggleFullscreen={SHOW_FOCUS_MODE || fullscreen ? () => setFullscreen(fullscreen ? null : agent.id) : undefined}
                   fullscreen={fullscreen}
                   embedded={!fullscreen}
                 />
@@ -361,7 +250,6 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
         )}
         {tab === 'profile' && <ProfileTab agent={agent} />}
         {tab === 'capabilities' && <CapabilitiesTab agent={agent} />}
-        {tab === 'human' && <AskMeTab />}
         {tab === 'triggers' && <TriggersTab />}
         {tab === 'trigger-history' && <TriggerHistoryTab />}
         {tab === 'memory' && (
@@ -370,7 +258,7 @@ export function CommandCenterPanel({ agent, fullscreen = false }: { agent: Agent
         {tab === 'advanced' && <AdvancedTab key={advancedFocus.seq} focus={advancedFocus.card} seed={dispatchSeed} />}
         {ALLOW_TEMP_WORKERS && tab === 'workers' && <WorkersTab />}
       </div>
-    </PixelPanel>
+    </PanelCard>
   );
 }
 
@@ -713,7 +601,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
     <Wrap>
       <Section title={t('commandCenter.dispatchViaMichael', { godName: godName.toUpperCase() })}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, color: 'var(--cth-ink-500)', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, color: 'var(--cth-ink-500)', flexShrink: 0 }}>
             {t('commandCenter.suggestedOwner')}
           </span>
           <Select value={dispatchTo} onChange={setDispatchTo}>
@@ -770,14 +658,16 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
             .some((model) => model.id === a.model);
           return (
           <div key={a.id} style={{
+            borderRadius: 'var(--cth-r-md)',
             display: 'flex', flexDirection: 'column', gap: 4,
             padding: 6, marginBottom: 6,
-            background: armed ? 'var(--cth-coral-light)' : 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+            background: armed ? 'var(--cth-coral-light)' : 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 width: 24, height: 24, background: `var(--cth-${a.accent}-light)`,
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
               }}>
                 <SpritePortrait character={a.character} scale={1} />
@@ -809,8 +699,9 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
               )}
               {lastTool[a.id] && (
                 <span style={{
+                  borderRadius: 'var(--cth-r-md)',
                   fontSize: 10, lineHeight: '14px', padding: '0 5px', flexShrink: 0,
-                  background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', color: 'var(--cth-ink-700)'
+                  background: 'var(--cth-paper-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-700)'
                 }}>{lastTool[a.id]}</span>
               )}
               <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-300)', flexShrink: 0 }}>{t('commandCenter.budget')}</span>
@@ -821,7 +712,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                   limit: denom.toLocaleString(),
                   note: hasAgentCap ? t('commandCenter.agentLimit') : t('commandCenter.floorBudget')
                 })}
-                style={{ width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', flexShrink: 0 }}
+                style={{ borderRadius: 'var(--cth-r-md)', width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', flexShrink: 0 }}
               >
                 <div style={{ width: `${pct}%`, height: '100%', background: meterColor }} />
               </div>
@@ -849,7 +740,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                         limit: a.contextLimit!.toLocaleString(),
                         pct: cpct
                       })}
-                      style={{ width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', flexShrink: 0 }}
+                      style={{ borderRadius: 'var(--cth-r-md)', width: 96, height: 8, background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', flexShrink: 0 }}
                     >
                       <div style={{ width: `${cpct}%`, height: '100%', background: ccolor }} />
                     </div>
@@ -1011,6 +902,7 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
         })}
         {/* Fleet summary band */}
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', gap: 14, marginTop: 2, padding: '6px 8px',
           background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
           fontFamily: 'var(--cth-font-mono)', fontSize: 11, color: 'var(--cth-ink-900)', flexWrap: 'wrap'
@@ -1062,17 +954,19 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
             </div>
             {issuesError && (
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 fontSize: 12, color: 'var(--cth-ink-700)', marginBottom: 6,
-                padding: 6, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                padding: 6, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                 wordBreak: 'break-word'
               }}>{issuesError}</div>
             )}
             {!issuesError && !issuesLoading && issues.length === 0 && <Muted>{t('commandCenter.noIssues')}</Muted>}
             {issues.map((issue) => (
               <div key={issue.number} style={{
+                borderRadius: 'var(--cth-r-md)',
                 display: 'flex', flexDirection: 'column', gap: 4,
                 padding: 6, marginBottom: 6,
-                background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <span style={{ fontSize: 12, color: 'var(--cth-ink-900)', flex: 1, wordBreak: 'break-word' }}>
@@ -1086,8 +980,9 @@ function FloorTab({ seed, embedded = false }: { seed: { text: string; seq: numbe
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {issue.labels.map((label) => (
                       <span key={label} style={{
+                        borderRadius: 'var(--cth-r-md)',
                         fontSize: 10, lineHeight: '14px', padding: '0 5px',
-                        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                         color: 'var(--cth-ink-700)'
                       }}>{label}</span>
                     ))}
@@ -1115,6 +1010,7 @@ function ArchivedSection() {
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: '2px 8px 1px', border: 'none', cursor: 'pointer',
           background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
@@ -1124,13 +1020,15 @@ function ArchivedSection() {
       >{open ? '▾' : '▸'} {open ? t('commandCenter.hideClosed') : t('commandCenter.showClosed')}</button>
       {open && archivedAgents.map((a) => (
         <div key={a.id} style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', alignItems: 'center', gap: 8,
           padding: 6, marginBottom: 6, opacity: 0.7,
-          background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }}>
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             width: 24, height: 24, background: `var(--cth-${a.accent}-light)`,
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
           }}>
             <SpritePortrait character={a.character} scale={1} />
@@ -1263,7 +1161,7 @@ export function MemoryTab({ godId, who: controlledWho, onWho, ownOnly = false }:
 
       {!ownOnly && <section style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--cth-ink-100)' }}>
         <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-ink-700)' }}>{t('memoryNotes.searchTitle')}</h3>
-        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', marginBottom: 6 }}>
+        <div role="radiogroup" aria-label={t('memoryNotes.searchTitle')} style={{ borderRadius: 'var(--cth-r-md)', display: 'inline-flex', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', marginBottom: 6 }}>
           {(['text', 'meaning'] as const).map((m) => (
             <button
               key={m}
@@ -1356,6 +1254,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
         onClick={() => { setText(value != null ? String(value) : ''); setEditing(true); }}
         title={t('commandCenter.tokenLimitTitle')}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           flexShrink: 0, padding: '1px 6px', border: 'none', cursor: 'pointer',
           background: value && value > 0 ? 'var(--cth-lemon)' : 'var(--cth-cream-200)',
           boxShadow: `inset 0 0 0 1px ${value && value > 0 ? 'var(--cth-ink-900)' : 'var(--cth-ink-700)'}`,
@@ -1379,6 +1278,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
         onBlur={() => { if (skipBlur.current) { skipBlur.current = false; return; } commit(); }}
         placeholder={t('common.tokens')}
         style={{
+          borderRadius: 'var(--cth-r-md)',
           width: 84, padding: '2px 4px', background: 'var(--cth-paper-100)', border: 'none',
           boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontFamily: 'var(--cth-font-mono)',
           fontSize: 11, color: 'var(--cth-ink-900)', outline: 'none'
@@ -1386,7 +1286,7 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
       />
       <button
         onMouseDown={(e) => e.preventDefault()} onClick={commit} title={t('commandCenter.saveLimit')}
-        style={{ flexShrink: 0, padding: '1px 5px', border: 'none', cursor: 'pointer', background: 'var(--cth-mint)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', fontSize: 11, color: 'var(--cth-ink-900)' }}
+        style={{ borderRadius: 'var(--cth-r-md)', flexShrink: 0, padding: '1px 5px', border: 'none', cursor: 'pointer', background: 'var(--cth-mint)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', fontSize: 11, color: 'var(--cth-ink-900)' }}
       >✓</button>
     </span>
   );
@@ -1456,7 +1356,7 @@ function Scroll({ children }: { children: React.ReactNode }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px', color: 'var(--cth-ink-500)', marginBottom: 6 }}>{title}</div>
+      <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', color: 'var(--cth-ink-500)', marginBottom: 6 }}>{title}</div>
       {children}
     </div>
   );
@@ -1480,9 +1380,10 @@ function Pre({ children, fill = false }: { children: React.ReactNode; fill?: boo
   const rtl = useRtl();
   return (
     <pre style={{
+      borderRadius: 'var(--cth-r-md)',
       margin: '6px 0 0', padding: 8, overflow: 'auto',
       ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 200 }),
-      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
       fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px',
       color: 'var(--cth-ink-900)', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
     }} dir={rtl ? 'auto' : undefined}>{children}</pre>
@@ -1506,6 +1407,7 @@ function Select({ value, onChange, disabled, children }: {
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       style={{
+        borderRadius: 'var(--cth-r-md)',
         padding: '3px 6px', background: 'var(--cth-paper-100)',
         border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
         fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)', cursor: 'pointer',

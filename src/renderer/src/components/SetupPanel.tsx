@@ -33,7 +33,8 @@ function StatusChip({ tool }: { tool: ToolStatus }) {
   const ready = tool.found;
   return (
     <span style={{
-      fontFamily: 'var(--cth-font-display)', fontSize: 9, letterSpacing: 0.5,
+      borderRadius: 'var(--cth-r-md)',
+      fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
       padding: '2px 6px', flexShrink: 0, whiteSpace: 'nowrap',
       background: ready ? 'var(--cth-mint-light)' : 'var(--cth-cream-200)',
       boxShadow: `inset 0 0 0 1px ${ready ? 'var(--cth-mint)' : 'var(--cth-ink-300)'}`,
@@ -55,8 +56,9 @@ function ToolRow({ tool }: { tool: ToolStatus }) {
   };
   return (
     <div style={{
+      borderRadius: 'var(--cth-r-md)',
       padding: 10, display: 'flex', flexDirection: 'column', gap: 6,
-      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+      background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 11, flex: 1, minWidth: 0 }}>
@@ -84,16 +86,18 @@ function ToolRow({ tool }: { tool: ToolStatus }) {
       {!tool.found && tool.installCommand && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
           <code style={{
+            borderRadius: 'var(--cth-r-md)',
             flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-mono)', fontSize: 11,
             padding: '4px 6px', background: 'var(--cth-cream-100)',
-            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
             color: 'var(--cth-ink-900)', overflowX: 'auto', whiteSpace: 'pre'
           }}>{tool.installCommand}</code>
           <button
             onClick={copy}
             style={{
+              borderRadius: 'var(--cth-r-md)',
               flexShrink: 0, fontFamily: 'var(--cth-font-ui)', fontSize: 11, padding: '0 8px',
-              background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               border: 'none', cursor: 'pointer', color: 'var(--cth-ink-900)'
             }}
           >{copied ? t('common.copy') + ' ✓' : t('common.copy')}</button>
@@ -168,9 +172,10 @@ export function SetupPanel({ onDone }: { onDone?: () => void } = {}) {
       {/* The headline action. Present but disabled when nothing is missing, so the
           page reads the same either way rather than the button vanishing. */}
       <div style={{
+        borderRadius: 'var(--cth-r-md)',
         padding: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
         background: missingEssential.length ? 'var(--cth-lemon-light)' : 'var(--cth-cream-100)',
-        boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+        boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
       }}>
         <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: 1.5 }}>
           {missingEssential.length

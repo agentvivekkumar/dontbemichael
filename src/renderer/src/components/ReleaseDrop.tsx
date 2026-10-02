@@ -5,11 +5,9 @@
  * the other thing: a page the release author designs, shown once, at the size the
  * work deserves.
  *
- * The chrome follows the landing site (docs/DESIGN.md), not the app's pixel
- * idiom and not a generic rounded sheet: warm paper, square corners, a thick
- * ink border, a hard offset shadow with no blur, and a dark mono title bar with
- * three square dots. It is the `.win` window from the project website, so the moment
- * a user opens the drop it reads as the same product they downloaded from.
+ * The chrome is a v2 dialog (branding/DESIGN.md 7.23): a card with a title row
+ * and a close. What is inside the frame is the release author's page, styled
+ * by its own tokens (shared/releaseDrop.ts), which follow the website.
  *
  * There is NO chrome button here, on purpose. The app frames the drop and gets
  * out of the way; every action the release wants to offer (read the notes, star
@@ -34,7 +32,9 @@
  * out here even though the drop itself holds none.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { buildDropSrcDoc } from '../../../shared/releaseDrop';
+import { useBackdropClose } from '@/hooks/useBackdropClose';
 
 export interface ReleaseDropProps {
   version: string;
@@ -43,31 +43,17 @@ export interface ReleaseDropProps {
   onDismiss: () => void;
 }
 
-// Landing site palette (docs/DESIGN.md §2). Restated here because the modal is
-// app chrome and cannot reach the site's stylesheet; kept in one place so the
-// frame's tokens in shared/releaseDrop.ts and this chrome never drift apart.
-const PAPER = '#FFFDF7';
-const INK = '#1B1B1B';
-const INK_FAINT = '#8A867A';
-const YELLOW = '#FFCA54';
-const SKY = '#72C2DF';
-const MAROON = '#B23A4E';
-const MONO = '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+/** The frame's own ground (shared/releaseDrop.ts --paper, the v2 `card`), so
+ *  the area under the loader never flashes a different color before the page
+ *  paints. */
+const PAPER = '#FFFFFF';
 
-// How long the loader may cover the frame before it is revealed regardless.
-//
-// The reveal signal is the iframe ELEMENT's own `onLoad` (it fires on the
-// parent, needs no script rights in the sandboxed child) — but `load` WAITS for
-// subresources, so a drop with slow remote images would hold the loader for the
-// whole fetch. With the render-blocking font @import gone (shared/releaseDrop.ts),
-// first paint is immediate and onLoad is normally well under this; the cap only
-// governs the pathological case, where revealing a paper page whose images are
-// still arriving beats a spinner that never ends. 2.5s is long enough not to cut
-// off a normal onLoad and short enough not to read as a hang.
 const REVEAL_TIMEOUT_MS = 2500;
 
 export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
   const srcDoc = useMemo(() => buildDropSrcDoc(html), [html]);
+  const backdrop = useBackdropClose(onDismiss);
+  const { t } = useTranslation();
 
   // The loader covers the frame until it is ready to be seen. `revealed` latches
   // true on the FIRST of two signals — the iframe's onLoad or the timeout cap —
@@ -92,85 +78,55 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
 
   return (
     <div
-      // Backdrop. Clicking it dismisses, same meaning as "later". Warm ink over
-      // the app with the site's dotted paper grid, so the window sits on paper
-      // rather than floating in a grey void.
-      onClick={onDismiss}
+      // Backdrop. A press and release on it dismisses, same meaning as "later".
+      {...backdrop}
       style={{
-        position: 'fixed', inset: 0, zIndex: 600,
-        background:
-          'radial-gradient(rgba(255,253,247,0.16) 1px, transparent 1px) 0 0 / 22px 22px, rgba(27,27,27,0.72)',
+        position: 'fixed', inset: 0, zIndex: 600, background: 'var(--cth-backdrop)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 28,
-        // Center with auto margins on the child and let the overlay scroll, so a
-        // tall dialog is never clipped at the top where it cannot be scrolled
-        // back to.
         overflowY: 'auto'
       }}
     >
       <div
         role="dialog"
-        aria-label={`What's new in Don't Be Michael ${version}`}
-        onClick={(e) => e.stopPropagation()}
+        aria-modal="true"
+        aria-label={t('releaseDrop.dialogLabel', { version })}
         style={{
           margin: 'auto',
-          // A landscape window, like the site's hero frame, not a square card.
-          // Width is derived from height so the shape holds as the window
-          // resizes; `min(…, 92vw)` is the escape hatch for a narrow window.
           height: 'min(82vh, 720px)',
           width: 'min(calc(82vh * 1.28), 92vw, 920px)',
           minHeight: 420,
           display: 'flex', flexDirection: 'column',
-          background: PAPER,
-          // The neo-brutalist window: square, 3px ink border, hard 10px offset
-          // shadow with no blur. Depth comes from the offset, not elevation.
-          border: `3px solid ${INK}`,
-          borderRadius: 0,
-          boxShadow: `12px 12px 0 ${INK}`,
+          background: 'var(--cth-card)',
+          borderRadius: 'var(--cth-r-2xl)',
+          boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)',
           overflow: 'hidden',
-          fontFamily: MONO
+          fontFamily: 'var(--cth-font-ui)'
         }}
       >
-        {/* Title bar: the site's `.win` header. Dark band, three square dots,
-            white mono title, and the only control the chrome owns: close. */}
+        {/* Title row, and the only control the chrome owns: close. */}
         <div style={{
-          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 14px', background: INK, color: PAPER,
-          borderBottom: `3px solid ${INK}`
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px 12px 22px', borderBottom: '1px solid var(--cth-line)'
         }}>
-          <span aria-hidden style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <i style={{ width: 10, height: 10, background: YELLOW, display: 'block' }} />
-            <i style={{ width: 10, height: 10, background: '#72C2DF', display: 'block' }} />
-            <i style={{ width: 10, height: 10, background: '#B23A4E', display: 'block' }} />
-          </span>
-          <span style={{
-            flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
-            textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            Don&apos;t Be Michael <span style={{ color: YELLOW }}>v{version.replace(/^v/, '')}</span>
-            <span style={{ color: INK_FAINT, fontWeight: 500, marginLeft: 10, letterSpacing: '.12em' }}>
-              / release notes
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {t('releaseDrop.title')}
+            <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 12, fontWeight: 500, color: 'var(--cth-ink-3)', letterSpacing: 0 }}>
+              v{version.replace(/^v/, '')}
             </span>
-          </span>
-          <span aria-hidden style={{
-            flexShrink: 0, fontSize: 11, fontWeight: 500, letterSpacing: '.12em',
-            color: INK_FAINT, textTransform: 'uppercase'
-          }}>
-            esc
           </span>
           <button
             onClick={onDismiss}
-            aria-label="Close release notes"
-            title="Close (Esc)"
+            aria-label={t('releaseDrop.close')}
+            title={t('releaseDrop.closeTip')}
             style={{
-              flexShrink: 0, width: 26, height: 26, padding: 0,
-              background: PAPER, color: INK, border: `2px solid ${PAPER}`,
-              borderRadius: 0, cursor: 'pointer',
-              fontFamily: MONO, fontSize: 13, fontWeight: 700, lineHeight: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              flexShrink: 0, width: 30, height: 30, padding: 0, border: 'none', cursor: 'pointer',
+              borderRadius: 'var(--cth-r-md)', background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
+              color: 'var(--cth-ink-2)', display: 'grid', placeItems: 'center'
             }}
-          >✕</button>
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
 
         {/* The frame area. Relative so the loader can sit exactly over the drop,
@@ -183,7 +139,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
               authored <a target="_blank"> reach the OS browser, and it carries no
               script, same-origin, form or navigation rights with it. */}
           <iframe
-            title={`What's new in ${version}`}
+            title={t('releaseDrop.frameTitle', { version })}
             srcDoc={srcDoc}
             sandbox="allow-popups"
             referrerPolicy="no-referrer"
@@ -208,6 +164,7 @@ export function ReleaseDrop({ version, html, onDismiss }: ReleaseDropProps) {
  *  chrome — it carries no control; dismissal stays Esc / close / backdrop. It is
  *  removed the instant the frame is revealed, so it is only ever seen briefly. */
 function DropLoader() {
+  const { t } = useTranslation();
   return (
     <div
       // aria-hidden: the dialog's own label already announces the drop, and a
@@ -231,23 +188,23 @@ function DropLoader() {
         }
       `}</style>
       <span aria-hidden style={{ display: 'flex', gap: 8 }}>
-        {[YELLOW, SKY, MAROON].map((c, i) => (
+        {/* Coral only ever means "needs you" (DESIGN.md 3.2). */}
+        {['var(--cth-blue)', 'var(--cth-amber)', 'var(--cth-indigo)'].map((c, i) => (
           <i
             key={c}
             className="drop-load-dot"
             style={{
-              width: 12, height: 12, background: c, display: 'block',
+              width: 10, height: 10, borderRadius: '50%', background: c, display: 'block',
               animation: 'drop-load-pulse 1.1s ease-in-out infinite',
               animationDelay: `${i * 0.16}s`
             }}
           />
         ))}
       </span>
-      <span style={{
-        fontFamily: MONO, fontSize: 11, fontWeight: 500, letterSpacing: '.18em',
-        textTransform: 'uppercase', color: INK_FAINT
-      }}>
-        Loading
+      {/* The frame is white in both themes (an authored page), so the text
+          keeps the light theme's ink-3 rather than the token, which flips. */}
+      <span style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: '#6C6884' }}>
+        {t('releaseDrop.loading')}
       </span>
     </div>
   );

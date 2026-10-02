@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
-import { Icon } from './Icon';
+import { useAppTheme } from '@/design/theme';
+import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
+import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import type { HarnessConfig } from '@/store/config';
 
@@ -23,6 +24,7 @@ function folderName(path: string): string {
  */
 export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
   const { t } = useTranslation();
+  const dark = useAppTheme() === 'dark';
   const missing = config.harnessHome ?? '';
   const [recents, setRecents] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -72,96 +74,109 @@ export function OfficeFolderMissing({ config }: { config: HarnessConfig }) {
     if (!res.ok) { restoreLocalState(snap); setError(res.error ?? t('officeMissing.couldNotOpen')); setBusy(false); }
   };
 
-  const sectionLabel = { fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-500)', marginBottom: 4 } as const;
+  const sectionLabel = { fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)', marginBottom: 6 } as const;
+  const hint = { fontSize: 12.5, color: 'var(--cth-ink-3)' } as const;
 
+  // A launch screen, not a dialog over the app: nothing is behind it yet.
   return (
     <div style={{
-      position: 'fixed', inset: 0,
-      background: 'var(--cth-cream-200)',
-      backgroundImage: 'repeating-linear-gradient(45deg, rgba(232, 217, 160, 0.4) 0 1px, transparent 1px 8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 200, padding: 32
+      position: 'fixed', inset: 0, background: 'var(--cth-bg)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20,
+      zIndex: 200, padding: 32, fontFamily: 'var(--cth-font-ui)'
     }}>
-      <div style={{ width: 560, maxWidth: '94vw' }}>
-        <PixelPanel variant="dialog" title={t('officeMissing.title')} noPadding>
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-              {t('officeMissing.body')}
-            </p>
-            <div style={{
-              padding: '8px 12px', fontFamily: 'var(--cth-font-mono)', fontSize: 14, color: 'var(--cth-ink-700)',
-              background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              wordBreak: 'break-all'
-            }}>{missing}</div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
-              {t('officeMissing.whyItMatters')}
-            </p>
+      <img src={dark ? lockupDark : lockupLight} alt="Don't Be Michael" style={{ height: 30, width: 'auto' }} />
+      <div role="dialog" aria-modal="true" aria-label={t('officeMissing.title')} style={{
+        width: 560, maxWidth: '94vw', display: 'flex', flexDirection: 'column', gap: 14, padding: '22px 24px',
+        background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
+      }}>
+        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{t('officeMissing.title')}</h1>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>
+          {t('officeMissing.body')}
+        </p>
+        <div style={{
+          padding: '9px 12px', fontFamily: 'var(--cth-font-mono)', fontSize: 12.5, color: 'var(--cth-ink-2)', borderRadius: 'var(--cth-r-md)',
+          background: 'var(--cth-card-2)', boxShadow: 'inset 0 0 0 1px var(--cth-line)', wordBreak: 'break-all'
+        }}>{missing}</div>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-2)' }}>
+          {t('officeMissing.whyItMatters')}
+        </p>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <PixelButton variant="primary" size="md" onClick={find} disabled={busy}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Icon name="folder" /> {t('officeMissing.find')}
-                </span>
-              </PixelButton>
-              <span style={{ fontSize: 14, color: 'var(--cth-ink-500)' }}>{t('officeMissing.findHint')}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <PixelButton variant="primary" size="md" onClick={find} disabled={busy}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FolderGlyph /> {t('officeMissing.find')}
+            </span>
+          </PixelButton>
+          <span style={hint}>{t('officeMissing.findHint')}</span>
+        </div>
+
+        {recents.length > 0 && (
+          <div>
+            <div style={sectionLabel}>{t('officeMissing.recent')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+              {recents.map((h) => (
+                <button
+                  key={h}
+                  onClick={() => { void openOffice(h); }}
+                  disabled={busy}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 'var(--cth-r-lg)',
+                    background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line)', color: 'var(--cth-ink-2)',
+                    border: 'none', cursor: busy ? 'default' : 'pointer', textAlign: 'start'
+                  }}
+                >
+                  <FolderGlyph />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>
+                      {folderName(h)}
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--cth-font-mono)', fontSize: 11.5, color: 'var(--cth-ink-3)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', direction: 'rtl', textAlign: 'left'
+                    }}>{h}</div>
+                  </div>
+                </button>
+              ))}
             </div>
-
-            {recents.length > 0 && (
-              <div>
-                <div style={sectionLabel}>{t('officeMissing.recent')}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                  {recents.map((h) => (
-                    <button
-                      key={h}
-                      onClick={() => { void openOffice(h); }}
-                      disabled={busy}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                        background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-                        border: 'none', cursor: busy ? 'default' : 'pointer', textAlign: 'left'
-                      }}
-                    >
-                      <Icon name="folder" />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)' }}>
-                          {folderName(h)}
-                        </div>
-                        <div style={{
-                          fontFamily: 'var(--cth-font-mono)', fontSize: 14, color: 'var(--cth-ink-500)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', direction: 'rtl', textAlign: 'left'
-                        }}>{h}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ borderTop: '1px solid var(--cth-ink-300)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {!confirmStartOver ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <PixelButton variant="secondary" size="sm" onClick={() => setConfirmStartOver(true)} disabled={busy}>
-                    {t('officeMissing.startOver')}
-                  </PixelButton>
-                  <span style={{ fontSize: 14, color: 'var(--cth-ink-500)' }}>{t('officeMissing.startOverHint')}</span>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 14, color: 'var(--cth-ink-900)' }}>{t('officeMissing.startOverConfirm')}</span>
-                  <PixelButton variant="primary" size="sm" onClick={() => { void startOver(); }} disabled={busy}>
-                    {t('officeMissing.startOverYes')}
-                  </PixelButton>
-                  <PixelButton variant="ghost" size="sm" onClick={() => setConfirmStartOver(false)} disabled={busy}>
-                    {t('common.cancel')}
-                  </PixelButton>
-                </div>
-              )}
-            </div>
-
-            {error && <div style={{ fontSize: 14, lineHeight: '20px', color: '#6E1423' }}>{error}</div>}
           </div>
-        </PixelPanel>
+        )}
+
+        <div style={{ borderTop: '1px solid var(--cth-line)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!confirmStartOver ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <PixelButton variant="secondary" size="sm" onClick={() => setConfirmStartOver(true)} disabled={busy}>
+                {t('officeMissing.startOver')}
+              </PixelButton>
+              <span style={hint}>{t('officeMissing.startOverHint')}</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, color: 'var(--cth-ink)' }}>{t('officeMissing.startOverConfirm')}</span>
+              <PixelButton variant="destructive" size="sm" onClick={() => { void startOver(); }} disabled={busy}>
+                {t('officeMissing.startOverYes')}
+              </PixelButton>
+              <PixelButton variant="ghost" size="sm" onClick={() => setConfirmStartOver(false)} disabled={busy}>
+                {t('common.cancel')}
+              </PixelButton>
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div role="alert" style={{
+            padding: '8px 12px', borderRadius: 'var(--cth-r-md)', fontSize: 12.5, lineHeight: '18px',
+            color: 'var(--cth-coral-text)', background: 'var(--cth-coral-soft)'
+          }}>{error}</div>
+        )}
       </div>
     </div>
+  );
+}
+
+function FolderGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+    </svg>
   );
 }

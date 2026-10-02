@@ -58,7 +58,7 @@ export function ToolWaterfall({ agentId }: { agentId: string }) {
               <span style={{ width: 88, fontSize: 11, color: 'var(--cth-ink-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.error ?? s.tool}>
                 {s.tool}
               </span>
-              <div style={{ flex: 1, height: 12, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+              <div style={{ borderRadius: 'var(--cth-r-md)', flex: 1, height: 12, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
                 <div
                   title={s.error
                     ? `${s.tool}: ${s.error}`

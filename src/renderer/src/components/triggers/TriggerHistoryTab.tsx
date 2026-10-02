@@ -131,7 +131,7 @@ function clampBody(body: string): { text: string; clipped: boolean } {
 /* ───────────────────────────────── styles ────────────────────────────────── */
 
 const tinyCaps: CSSProperties = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px',
+  fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
   color: 'var(--cth-ink-500)'
 };
 const uiText: CSSProperties = {
@@ -167,7 +167,7 @@ const linkButton: CSSProperties = {
 
 function badgeStyle(fill: string, line: string): CSSProperties {
   return {
-    fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px',
+    fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
     padding: '3px 5px 2px', background: fill, boxShadow: `inset 0 0 0 1px ${line}`,
     color: 'var(--cth-ink-900)', flexShrink: 0
   };
@@ -266,6 +266,7 @@ function ExchangeCard({
     <div style={pending ? pendingCardStyle : cardStyle}>
       {pending && (
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-lemon)',
           padding: '4px 6px 3px', ...tinyCaps, color: 'var(--cth-ink-900)'
         }}>
@@ -470,7 +471,7 @@ export function TriggerHistoryTab() {
                 flex: 1, height: 32, padding: '0 8px', border: 'none', cursor: 'pointer',
                 background: active ? 'var(--cth-paper-200)' : 'transparent',
                 boxShadow: active ? 'inset 0 -2px 0 var(--cth-ink-900)' : 'none',
-                fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px',
+                fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
                 color: active ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 minWidth: 0
@@ -496,6 +497,7 @@ export function TriggerHistoryTab() {
 
         {pendingCount > 0 && (
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-lemon)',
             padding: '6px 8px', ...uiText, fontSize: 11, lineHeight: '16px'
           }}>
@@ -507,6 +509,7 @@ export function TriggerHistoryTab() {
 
         {error && (
           <div style={{
+            borderRadius: 'var(--cth-r-md)',
             background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)',
             padding: '6px 8px', ...uiText, fontSize: 11, lineHeight: '16px'
           }}>{error}</div>

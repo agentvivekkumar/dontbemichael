@@ -5,7 +5,11 @@ you ever touch the code. Share this folder as it is, or as a zip.
 
 **Start here:** open [`brand-guide.pdf`](./brand-guide.pdf), or
 [`brand-guide.html`](./brand-guide.html) in any browser. It is nine short pages: the
-idea, the logo, logo don'ts, color, type, voice, the app icon, and what's in this folder.
+idea, the logo, logo don'ts, color, type, the studio, voice, the app icon, and what's in
+this folder.
+
+This is **design system v2, "Studio"** (2026-09-30). The v1 pixel system is kept for
+reference in [`archive/`](./archive/).
 
 **Building product?** [`DESIGN.md`](./DESIGN.md) is the full design system for the
 desktop app and dontbemichael.com: every token, component and rule. It is the single
@@ -20,22 +24,27 @@ source of truth. The brand guide is the summary.
 | [`app-icon/`](./app-icon/) | App icon: `icon.svg`, PNG 128 to 1024, macOS `icon.icns`, Windows `icon.ico` | App stores, installers, press |
 | [`web/`](./web/) | `favicon.svg`, `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png` | Websites |
 | [`social/`](./social/) | `og-card-1200x630.png` link preview | Link sharing, social posts |
-| [`colors/`](./colors/) | `colors.css`, `colors.json`, `dont-be-michael.ase` (Adobe swatches), `palette.png` | Design tools and code |
-| [`fonts/`](./fonts/) | VT323, Pixelify Sans, Press Start 2P, Inter, JetBrains Mono, each with its `OFL.txt` | Installing the brand type |
+| [`colors/`](./colors/) | `colors.css` (light and dark `--dbm-*` tokens), `colors.json`, `dont-be-michael.ase` (Adobe swatches), `palette.png` | Design tools and code |
+| [`fonts/`](./fonts/) | Sora and IBM Plex Mono (the brand type), JetBrains Mono (the app terminal), each with its `OFL.txt`. The v1 pixel fonts are retired and removed | Installing the brand type |
+| [`reference/studio/`](./reference/studio/) | The approved v2 screens of the app, 1440 × 900 | Building the app and the website |
 | [`source/build.py`](./source/build.py) | Regenerates every asset above | Changing the brand |
 
 ## The rules that matter most
 
-1. **The logo is pixels.** Use the SVG, or a PNG at a multiple of 16 px. Never smooth,
-   blur, rotate, recolor or outline it. Keep 2 grid cells of clear space around it.
-2. **The slash is always coral `#FF6B6B`.** The M is ink `#1A1320` on light grounds and
-   cream `#FFFDF5` on dark ones.
-3. **Two volumes.** Anything outside the app (web pages, slides, social posts, merch) uses
-   the loud palette and pixel headlines. The app uses the calm palette. See brand guide §04.
-4. **Voice:** short, human, a little dry. The joke is on Michael, never on the customer.
+1. **The mark is the only pixel element.** Use the SVG, or a PNG at a multiple of 16 px.
+   Never smooth, blur, rotate, recolor or outline it. Keep 2 grid cells of clear space.
+   The name is set in Sora SemiBold, never in pixel type.
+2. **The slash is always `#FF6B6B`.** The M is `#1A1320` on light grounds and `#ECEAF4`
+   on dark ones.
+3. **One system, two scales.** The app and everything outside it (web pages, slides,
+   social posts) use the same colors, type and studio illustration. The web is bigger,
+   not louder.
+4. **Coral means "needs you".** Nothing else is coral: no coral buttons, no decorative
+   coral.
+5. **Voice:** short, plain, a little dry. The joke is on Michael, never on the customer.
    No em dashes, no emoji in copy.
-5. **No *The Office* material.** No NBC or show logos, title lettering, cast photos or
-   likenesses. Michael is an archetype.
+6. **No *The Office* material beyond the character names.** No NBC or show logos, title
+   lettering, cast photos or likenesses.
 
 ## Using the name and logo
 
@@ -60,6 +69,7 @@ python3 branding/source/build.py logos      # or one step: logos, app-icon, web,
 ```
 
 Chrome renders the PNG lockups, the social card, the palette and the PDF (set `CHROME`
-if it isn't at the default macOS path). `iconutil`, for the `.icns`, is macOS only. The
+if it isn't at the default macOS path). The wordmark is outlined from
+`fonts/sora/Sora-Variable.ttf` at weight 600 with its kerning, so the lockups need no font. `iconutil`, for the `.icns`, is macOS only. The
 mark itself comes from a 16 × 16 grid defined once in `build.py`, so every file stays in
 sync.

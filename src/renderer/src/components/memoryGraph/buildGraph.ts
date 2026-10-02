@@ -7,9 +7,11 @@
 
 import type { AccentColorName } from '@/design/tokens';
 import type { StatusKind } from '@/components/PixelBadge';
-import type { MessageAct } from '@/scene/office/MessageEnvelope';
 import { extractTopics } from './extractTopics';
 import type { OfficeCharacterName } from '@/scene/office/cast';
+
+/** A hive message's speech act. */
+export type MessageAct = 'request' | 'inform' | 'propose' | 'query' | 'agree' | 'refuse' | 'done';
 
 export interface AgentNode {
   kind: 'agent';

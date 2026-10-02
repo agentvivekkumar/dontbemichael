@@ -139,8 +139,8 @@ const SETTING_POLICY: Record<string, {
 }> = {
   // soft: cosmetic / low-blast, instantly reversible
   notifications: { tier: 'soft', type: 'boolean' },
-  tvShowOffices: { tier: 'soft', type: 'boolean' },
-  officeTheme: { tier: 'soft', type: 'string', values: ['office', 'friends', 'brooklyn99', 'siliconvalley', 'got', 'hogwarts'] },
+  // officeTheme and tvShowOffices left with the pixel floor (design v2): voice
+  // must not "apply" a setting that does nothing.
   terminalTheme: { tier: 'soft', type: 'string', values: ['light', 'dark'] },
   freeflowEnabled: { tier: 'soft', type: 'boolean' },
   strongKeepalive: { tier: 'soft', type: 'boolean' },

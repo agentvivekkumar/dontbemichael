@@ -103,9 +103,10 @@ export function CompletionToast(): JSX.Element | null {
           key={t.key}
           role="status"
           style={{
+            borderRadius: 'var(--cth-r-md)',
             pointerEvents: 'auto',
             background: 'var(--cth-paper-100)',
-            boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 4px 4px 0 0 var(--cth-ink-900)',
+            boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo), 4px 4px 0 0 var(--cth-ink-900)',
             padding: 12,
             display: 'flex',
             flexDirection: 'column',
@@ -118,7 +119,7 @@ export function CompletionToast(): JSX.Element | null {
               alignItems: 'center',
               gap: 8,
               fontFamily: 'var(--cth-font-display)',
-              fontSize: 8,
+              fontSize: 10, fontWeight: 600,
               lineHeight: '12px',
               color: 'var(--cth-ink-900)',
               textTransform: 'uppercase'

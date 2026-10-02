@@ -132,7 +132,7 @@ const MOCK_ACTS = ['request', 'inform', 'propose', 'query', 'agree'] as const;
 /** Occasionally fire a synthetic agent-to-agent message so the office floor's
  *  envelope-handoff animation is visible in demo mode (no live hive routing
  *  happens without real `claude` agents). The scene listens for this event and
- *  flies an envelope between the two avatars; see OfficeFloor's demo path. */
+ *  flies a token between the two pods; see useHiveTokens in StudioStage. */
 function maybeFlyMessage(mockIds: string[]): void {
   if (mockIds.length < 2 || Math.random() >= 0.45) return;
   const from = mockIds[Math.floor(Math.random() * mockIds.length)];

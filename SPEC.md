@@ -1,5 +1,9 @@
 # Don't Be Michael: Spec
 
+> **Historical.** This is the original spec. The terminal and event planes still describe the app,
+> but the 2D pixel canvas (Pixi.js) and the command bar were replaced by the Studio redesign; see
+> [`branding/DESIGN.md`](./branding/DESIGN.md) for the current interface.
+
 A desktop control room for the Claude Code agents you already run in terminals. Each agent is a Sims-style avatar in a shared 2D workspace; you can watch them work, send them commands, and configure their goals/skills/MCP from one place.
 
 ---

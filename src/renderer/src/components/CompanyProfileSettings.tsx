@@ -72,6 +72,6 @@ export function CompanyProfileSettings({ config, onOpenKnowledge }: {
 
 const inputStyle: CSSProperties = {
   padding: '6px 8px 4px', border: 'none',
-  background: 'var(--cth-cream-50)', boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-300)',
+  background: 'var(--cth-cream-50)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
   fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)'
 };

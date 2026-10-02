@@ -15,13 +15,17 @@ const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const FONT_DIR = 'src/renderer/src/assets/fonts';
+// Design system v2 (branding/DESIGN.md 4.1): Sora for words, IBM Plex Mono for
+// numbers, JetBrains Mono for the terminal.
 const FILES = [
-  'press-start-2p-latin-400.woff2',
-  'inter-latin-var.woff2',
+  'sora-latin-var.woff2',
+  'ibm-plex-mono-regular.woff2',
+  'ibm-plex-mono-medium.woff2',
+  'ibm-plex-mono-semibold.woff2',
   'jetbrains-mono-latin-var.woff2'
 ];
 
-test('the three faces are real woff2 files inside the repo', () => {
+test('the bundled faces are real woff2 files inside the repo', () => {
   for (const f of FILES) {
     const buf = fs.readFileSync(path.join(root, FONT_DIR, f));
     // 'wOF2' — a truncated or HTML-error-page download would not carry it.
@@ -40,14 +44,14 @@ test('bundling stays small: no CJK face was quietly added', () => {
 test('the OFL license and attribution ship with the fonts', () => {
   const lic = read(`${FONT_DIR}/LICENSE.txt`);
   assert.match(lic, /SIL OPEN FONT LICENSE Version 1\.1/);
-  for (const name of ['Press Start 2P', 'Inter', 'JetBrains Mono']) {
+  for (const name of ['Sora', 'IBM Plex Mono', 'JetBrains Mono']) {
     assert.ok(lic.includes(name), `${name} has no attribution`);
   }
 });
 
 test('@font-face points at the bundled files, not a URL', () => {
   const css = read('src/renderer/src/design/fonts.css');
-  assert.equal((css.match(/@font-face/g) || []).length, 3);
+  assert.equal((css.match(/@font-face/g) || []).length, FILES.length);
   for (const f of FILES) assert.ok(css.includes(f), `fonts.css does not reference ${f}`);
   assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /https?:/);
 });
@@ -73,10 +77,9 @@ test('the app HTML no longer reaches for Google, and its CSP forbids it', () => 
 
 // --- the token stacks -------------------------------------------------------
 
-/** Every font stack the app exposes, from BOTH files that define them. */
+/** Every font stack the app exposes (tokens.css; tokens.ts no longer mirrors them). */
 function stacks() {
   const css = read('src/renderer/src/design/tokens.css');
-  const ts = read('src/renderer/src/design/tokens.ts');
   const pick = (s, re) => {
     const m = s.match(re);
     assert.ok(m, `no match for ${re}`);
@@ -85,10 +88,7 @@ function stacks() {
   return {
     cssDisplay: pick(css, /--cth-font-display:\s*(.+);/),
     cssUi: pick(css, /--cth-font-ui:\s*(.+);/),
-    cssMono: pick(css, /--cth-font-mono:\s*(.+);/),
-    tsDisplay: pick(ts, /display: '(.+)',/),
-    tsUi: pick(ts, /ui: '(.+)',/),
-    tsMono: pick(ts, /mono: '(.+)'/)
+    cssMono: pick(css, /--cth-font-mono:\s*(.+);/)
   };
 }
 
@@ -98,15 +98,6 @@ test('every stack falls through to a system CJK face and an Arabic face', () => 
     assert.match(stack, /PingFang SC|Microsoft YaHei|Noto Sans( Mono)? CJK SC/, `${name} has no CJK fallback`);
     assert.match(stack, /Geeza Pro|Noto Naskh Arabic/, `${name} has no Arabic fallback`);
   }
-});
-
-test('tokens.css and tokens.ts do not drift apart', () => {
-  // tokens.ts says "mirrors tokens.css — update both together". Nothing enforced
-  // that, so a stack could be widened in one file and not the other.
-  const s = stacks();
-  assert.equal(s.tsDisplay, s.cssDisplay);
-  assert.equal(s.tsUi, s.cssUi);
-  assert.equal(s.tsMono, s.cssMono);
 });
 
 test('the release-drop iframe also falls through to a system CJK face', () => {

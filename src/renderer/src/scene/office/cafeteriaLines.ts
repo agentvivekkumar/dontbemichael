@@ -1,21 +1,18 @@
-// Cafeteria small-talk — The Office edition.
+// The studio's idle talk, The Office edition (branding/DESIGN.md 8.8).
 //
-// The cast ARE Dunder Mifflin (see cast.ts), so an agent's coffee break is an
-// excuse for a one-liner in character. Two kinds of line:
-//   • solo  — one quip shown above a single agent at a break spot
-//   • pair  — a two-beat exchange between two agents at the same table
+// The cast ARE Dunder Mifflin (see cast.ts), so a quiet team member says a line
+// in character. Two kinds:
+//   * solo: one line on the speaker's chip. createIdleLines deals the
+//     speaker's own lines about 60% of the time, else a break-room line
+//     (SHARED_SOLO), never repeating until a pool runs out.
+//   * pair: an exchange two quiet people trade as paper planes or envelopes.
+//     createBanter deals EXCHANGES, the "that's what she said" bits and each
+//     character's signature opener.
 //
-// Lines are kept short so they fit the ThoughtBubble (≈MAX_WIDTH). Character
-// keys match OfficeCharacterName; anyone without bespoke lines falls back to the
-// shared GENERIC pool so the floor never feels empty.
+// Lines are kept short for the 250 px quote bubble. Character keys match
+// OfficeCharacterName.
 
 import type { OfficeCharacterName } from './cast';
-
-/** Where an agent is lingering — picks a contextual line pool. */
-export type BreakSpot = 'coffee' | 'vending' | 'snack' | 'table';
-
-const pick = <T,>(arr: readonly T[], seed: number): T =>
-  arr[((seed % arr.length) + arr.length) % arr.length];
 
 // ─── solo lines, by spot ─────────────────────────────────────────────────────
 
@@ -54,10 +51,6 @@ const TABLE: readonly string[] = [
   'do NOT tell Michael I’m in here',
 ];
 
-const SPOT_POOL: Record<BreakSpot, readonly string[]> = {
-  coffee: COFFEE, vending: VENDING, snack: SNACK, table: TABLE,
-};
-
 // ─── character flavour — overrides the generic pool when present ─────────────
 
 // Every character has lines of their own (owner, 2026-09-27: "add some for
@@ -85,21 +78,51 @@ const BY_CHARACTER: Record<OfficeCharacterName, readonly string[]> = {
   sadiq:    ['your password isn’t “password”, right?', 'removed another virus. kids game site.', 'I set up security, not spying. mostly.', 'the phishing test results… wow', 'every day is patch day'],
 };
 
-/** A solo break-room line. Character flavour ~60% of the time, else the line
- *  fits the spot the agent is standing at. `seed` keeps it deterministic per
- *  call site (avoids Math.random, which Pixi/Electron CSP-safe code prefers). */
-export function pickSoloLine(character: OfficeCharacterName, spot: BreakSpot, seed: number): string {
-  const flavour = BY_CHARACTER[character];
-  if (flavour?.length && seed % 5 < 3) return pick(flavour, Math.floor(seed / 5));
-  return pick(SPOT_POOL[spot], seed);
+
+/** A shuffled deck over `pool`: every item once, then a fresh shuffle that
+ *  never opens with the one just drawn. */
+function deck<T>(pool: readonly T[], random: () => number): () => T {
+  let bag: T[] = [];
+  let last: T | undefined;
+  return () => {
+    if (!bag.length) {
+      bag = [...pool];
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+      if (bag.length > 1 && bag[bag.length - 1] === last) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+    }
+    last = bag.pop() as T;
+    return last;
+  };
+}
+
+/** Every break-room line, whoever says it. */
+const SHARED_SOLO: readonly string[] = [...COFFEE, ...VENDING, ...SNACK, ...TABLE];
+
+/**
+ * The studio's idle lines (DESIGN.md 8.8), from this file's Office lines only
+ * (owner, 2026-10-01: "dont show made up lines"): the speaker's own about 60%
+ * of the time, else a break-room line, and nothing comes back until its pool
+ * has run out. One per studio; `random` is there for tests.
+ */
+export function createIdleLines(random: () => number = Math.random): (character: OfficeCharacterName) => string {
+  const own = new Map<string, () => string>();
+  const shared = deck(SHARED_SOLO, random);
+  return (character) => {
+    const lines = BY_CHARACTER[character];
+    if (!lines?.length || random() >= 0.6) return shared();
+    if (!own.has(character)) own.set(character, deck(lines, random));
+    return own.get(character)!();
+  };
 }
 
 // ─── paired exchanges (two agents at one table) ──────────────────────────────
 //
-// Each exchange is a list of beats that ALTERNATE between the two agents:
-// beat[0] = the speaker who sat down, beat[1] = their table-mate, beat[2] =
-// speaker again, and so on. The director plays them out one beat at a time.
-// Lines are trimmed to fit the thought cloud; longer ones auto-truncate.
+// Each exchange is a list of beats that ALTERNATE between the two people:
+// beat[0] = the one who opens, beat[1] = the other, beat[2] = the opener again,
+// and so on. The studio plays them out one beat at a time.
 
 type Exchange = readonly string[];
 
@@ -240,10 +263,20 @@ const KEYED_EXCHANGES: Partial<Record<OfficeCharacterName, Exchange>> = {
   pam:      ['want to see a sketch?', 'is that the vending machine?', 'it’s you, actually.'],
 };
 
-/** A multi-beat exchange for two agents sharing a table. Beats alternate:
- *  index 0 = `speaker`, 1 = the table-mate, 2 = speaker, … */
-export function pickExchange(speaker: OfficeCharacterName, seed: number): Exchange {
-  const keyed = KEYED_EXCHANGES[speaker];
-  if (keyed && seed % 4 === 0) return keyed;
-  return pick(PAIR_POOL, seed);
+/**
+ * Conversations for the studio (DESIGN.md 8.8): two idle people trade the
+ * beats of an exchange as paper planes or envelopes. The full set: EXCHANGES,
+ * the "that's what she said" bits (owner, 2026-10-01: "bring full set back")
+ * and the signature openers. No exchange comes back until all have played;
+ * `random` is there for tests.
+ */
+export function createBanter(random: () => number = Math.random): (opener: OfficeCharacterName) => Exchange {
+  const next = deck(PAIR_POOL, random);
+  const keyedUsed = new Set<string>();
+  return (opener) => {
+    const keyed = KEYED_EXCHANGES[opener];
+    // A signature bit at most once per person while the studio is open, when they happen to open.
+    if (keyed && !keyedUsed.has(opener) && random() < 0.35) { keyedUsed.add(opener); return keyed; }
+    return next();
+  };
 }

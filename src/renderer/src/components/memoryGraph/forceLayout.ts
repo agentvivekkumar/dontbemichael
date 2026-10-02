@@ -25,6 +25,10 @@ export interface LayoutOpts {
   pinned?: Record<string, { x: number; y: number }>;
   iterations?: number;
   padding?: number;
+  /** Extra room kept clear at the top and bottom, for cards that float over
+   *  the canvas (the graph's header and legend). Added to `padding`. */
+  insetTop?: number;
+  insetBottom?: number;
 }
 
 export type Positions = Map<string, { x: number; y: number }>;
@@ -52,11 +56,19 @@ export function forceLayout(
   const padding = opts.padding ?? 28;
   const iterations = opts.iterations ?? 320;
   const pinned = opts.pinned ?? {};
+  // The insets give way on a short canvas: they shrink together so at least
+  // half the height stays free for nodes (else every node sat on one line).
+  const insetTop = opts.insetTop ?? 0;
+  const insetBottom = opts.insetBottom ?? 0;
+  const room = Math.max(0, height / 2 - 2 * padding);
+  const fit = insetTop + insetBottom > room ? room / (insetTop + insetBottom || 1) : 1;
+  const top = padding + insetTop * fit;
+  const bottom = Math.max(top, height - padding - insetBottom * fit);
 
   const ids = nodes.map((n) => n.id);
   const cx = width / 2;
-  const cy = height / 2;
-  const usableR = Math.max(40, Math.min(width, height) / 2 - padding);
+  const cy = (top + bottom) / 2;
+  const usableR = Math.max(40, Math.min(width / 2 - padding, (bottom - top) / 2));
   const pos = seed(ids, cx, cy, usableR);
 
   // honour pins from the start
@@ -134,7 +146,7 @@ export function forceLayout(
       p.x += (d.x / len) * step;
       p.y += (d.y / len) * step;
       p.x = Math.max(padding, Math.min(width - padding, p.x));
-      p.y = Math.max(padding, Math.min(height - padding, p.y));
+      p.y = Math.max(top, Math.min(bottom, p.y));
     }
 
     temp *= cool;

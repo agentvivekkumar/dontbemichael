@@ -1,4 +1,5 @@
 import { ClipboardEvent, DragEvent, KeyboardEvent, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { attachmentsFromPaste } from './pasteAttachments';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
@@ -109,25 +110,8 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
 
   // Paste a screenshot (no path → persist the native clipboard image to a temp
   // file) or paste files copied from the OS file manager (carry a real path).
-  const onPaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = Array.from(e.clipboardData?.items ?? []);
-    const hasImage = items.some((it) => it.kind === 'file' && it.type.startsWith('image/'));
-    if (hasImage) {
-      e.preventDefault();
-      const res = await window.cth.saveClipboardImage();
-      if (res.ok) addAttachments([res.file]);
-      return;
-    }
-    const files = Array.from(e.clipboardData?.files ?? []);
-    if (files.length) {
-      const atts = files
-        .map((f) => ({ path: window.cth.pathForFile(f), name: f.name }))
-        .filter((a) => a.path);
-      if (atts.length) {
-        e.preventDefault();
-        addAttachments(atts);
-      }
-    }
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    void attachmentsFromPaste(e)?.then(addAttachments);
   };
 
   const canSend = !!text.trim() || attachments.length > 0;
@@ -197,6 +181,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       }}
       onDrop={onDrop}
       style={{
+        borderRadius: 'var(--cth-r-md)',
         flexShrink: 0,
         borderTop: '1px solid var(--cth-ink-700)',
         background: 'var(--cth-cream-100)',
@@ -208,7 +193,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       }}>
       {dragOver && (
         <span style={{
-          fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '12px',
+          fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)', textAlign: 'center'
         }}>{t('queueComposer.dropToAttach')}</span>
       )}
@@ -216,11 +201,12 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{
           fontFamily: 'var(--cth-font-display)',
-          fontSize: 9, lineHeight: '12px',
+          fontSize: 10, fontWeight: 600, lineHeight: '12px',
           color: 'var(--cth-ink-700)'
         }}>{t('queueComposer.queue')}</span>
         {queue.length > 0 && (
           <span style={{
+            borderRadius: 'var(--cth-r-md)',
             fontSize: 11, padding: '1px 6px 0',
             background: 'var(--cth-cream-200)',
             boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
@@ -313,6 +299,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
               key={a.path}
               title={a.path}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 maxWidth: '100%',
                 padding: '2px 4px 2px 6px',
@@ -473,10 +460,11 @@ function QueuedMessageRow(
 
   return (
     <div style={{
+      borderRadius: 'var(--cth-r-md)',
       display: 'flex', alignItems: 'flex-start', gap: 6,
       padding: '4px 6px',
       background: 'var(--cth-paper-100)',
-      boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+      boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
     }}>
       <span style={{
         fontFamily: 'var(--cth-font-mono)', fontSize: 12,
@@ -676,17 +664,18 @@ function FreeFlowButton({ agentId, hasGroqKey }: { agentId: string; hasGroqKey: 
               role="dialog"
               onClick={(e) => e.stopPropagation()}
               style={{
+                borderRadius: 'var(--cth-r-md)',
                 position: 'fixed', left: hint.left, top: hint.top, zIndex: 460,
                 width: HINT_W, padding: '10px 12px', boxSizing: 'border-box',
                 display: 'flex', flexDirection: 'column', gap: 7,
                 background: 'var(--cth-paper-100)',
-                boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500), 4px 4px 0 rgba(26,19,32,0.25)',
+                boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo), 0 6px 18px rgba(62,52,140,.08)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 11, lineHeight: '15px',
                 color: 'var(--cth-ink-900)', textAlign: 'left', whiteSpace: 'normal'
               }}
             >
               <span style={{
-                fontFamily: 'var(--cth-font-display)', fontSize: 9, letterSpacing: 0.5,
+                fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
                 textTransform: 'uppercase', color: 'var(--cth-ink-500)'
               }}>{t('queueComposer.ffSetupTitle')}</span>
 

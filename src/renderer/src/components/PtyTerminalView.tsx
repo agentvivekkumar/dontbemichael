@@ -26,54 +26,54 @@ const MAX_FONT_SIZE = MAX_TERMINAL_FONT_SIZE;
 type PtyTheme = 'light' | 'dark';
 
 const zoomBtnStyle: CSSProperties = {
-  width: 18,
-  height: 18,
+  width: 28,
+  height: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontFamily: 'var(--cth-font-ui)',
   fontSize: 12,
   lineHeight: 1,
-  color: 'var(--cth-ink-700)',
-  background: 'var(--cth-paper-100)',
-  border: '1px solid var(--cth-ink-300)',
+  color: 'var(--cth-ink-2)',
+  background: 'var(--cth-card)',
+  border: 'none',
   cursor: 'pointer',
   padding: 0
 };
 
-// Light theme — cream paper. The ANSI "white" / "yellow" / bright slots are
+// Light theme: the v2 card (white). The ANSI "white" / "yellow" / bright slots are
 // remapped to readable dark inks: programs that print white or pale-yellow text
-// (expecting a dark terminal) were previously invisible on the cream background.
-// A single ANSI slot has to serve both roles — coloured *foreground* on cream and
+// (expecting a dark terminal) were previously invisible on a white background.
+// A single ANSI slot has to serve both roles — coloured *foreground* on white and
 // a coloured *background* under the dark default ink — which no fixed luminance
 // can satisfy at once. The terminal's `minimumContrastRatio` (see terminalPool.ts)
 // dynamically adjusts the per-cell foreground to keep both roles legible; these
 // values are tuned so the colours stay recognisable and read well natively. The
-// green/yellow are kept deep enough to read as text on cream (the brighter
+// green/yellow are kept deep enough to read as text on white (the brighter
 // variants are the lighter shades, per terminal convention).
 const lightTheme = {
-  background: '#FCFAF0',
-  foreground: '#1A1320',
-  cursor: '#D96A62',
-  cursorAccent: '#FCFAF0',
-  selectionBackground: '#FFEC99',
-  selectionForeground: '#1A1320',
-  black:        '#1A1320',
+  background: '#FFFFFF',       // = --cth-card
+  foreground: '#1E1B2E',       // = --cth-ink
+  cursor: '#6C5CE7',           // = --cth-indigo
+  cursorAccent: '#FFFFFF',
+  selectionBackground: '#EEEBFD',
+  selectionForeground: '#1E1B2E',
+  black:        '#1E1B2E',
   red:          '#D1453B',
-  green:        '#20904B',    // deep green → readable as text on cream
-  yellow:       '#9C6B00',    // deep amber → readable as text on cream
+  green:        '#20904B',    // deep green → readable as text on white
+  yellow:       '#9C6B00',    // deep amber → readable as text on white
   blue:         '#2B6CB0',
   magenta:      '#8A5CF0',
   cyan:         '#1F9C94',
-  white:        '#3A2F44',   // default "white" text → dark, so it's visible
-  brightBlack:  '#6B5878',
+  white:        '#3D3A52',   // default "white" text → dark, so it's visible
+  brightBlack:  '#6C6884',
   brightRed:    '#E0584E',
   brightGreen:  '#2E9E54',
   brightYellow: '#B8860B',
   brightBlue:   '#3B7DC4',
   brightMagenta:'#9B72F2',
   brightCyan:   '#2BA89F',
-  brightWhite:  '#1A1320'
+  brightWhite:  '#1E1B2E'
 };
 
 // Dark theme — mirrors the app's dark surface ramp (tokens.css
@@ -85,21 +85,21 @@ const lightTheme = {
 // apart from the panel holding it. Muted-professional ANSI: recognizable hues, no
 // fluorescing on the dark ground; brights are one legible step up, not pastels.
 const darkTheme = {
-  background: '#1A1A1F',        // = --cth-paper-100
-  foreground: '#DEDBD6',        // = --cth-ink-900
-  cursor: '#E08C82',
-  cursorAccent: '#1A1A1F',
-  selectionBackground: '#37363F',
-  selectionForeground: '#DEDBD6',
-  black:        '#222229',
+  background: '#1F1E2B',        // = --cth-card (dark)
+  foreground: '#ECEAF4',        // = --cth-ink (dark)
+  cursor: '#9D90FF',            // = --cth-indigo (dark)
+  cursorAccent: '#1F1E2B',
+  selectionBackground: '#36334F',
+  selectionForeground: '#ECEAF4',
+  black:        '#24233A',
   red:          '#E08C82',
   green:        '#74C096',
   yellow:       '#CFAA57',
   blue:         '#6FB3C4',
   magenta:      '#A896E3',
   cyan:         '#6FB3C4',
-  white:        '#DEDBD6',
-  brightBlack:  '#96919F',
+  white:        '#ECEAF4',
+  brightBlack:  '#A5A2B8',
   brightRed:    '#EBA39C',
   brightGreen:  '#96CDA9',
   brightYellow: '#E5C87E',
@@ -360,7 +360,7 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
 
   return (
     <div style={{
-      background: 'var(--cth-paper-100)',
+      background: 'var(--cth-card)',
       boxShadow: embedded ? 'none' : 'var(--cth-panel-border-terminal)',
       padding: embedded ? 0 : 8,
       height: '100%',
@@ -369,63 +369,42 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
       display: 'flex',
       flexDirection: 'column'
     }}>
+      {/* Design v2 Work row (branding/DESIGN.md 7.12): live, watching or
+          typing, the zoom group, and Focus. No developer words. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        fontFamily: 'var(--cth-font-ui)',
-        fontSize: 12,
-        color: 'var(--cth-ink-500)',
-        borderBottom: '1px dashed var(--cth-ink-300)',
-        paddingBottom: 4,
-        marginBottom: 4,
-        paddingLeft: embedded ? 8 : 0,
-        paddingRight: embedded ? 8 : 0,
-        paddingTop: embedded ? 6 : 0
+        display: 'flex', alignItems: 'center', gap: 8,
+        fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 500, color: 'var(--cth-ink-2)',
+        padding: embedded ? '10px 14px 8px' : '0 0 8px'
       }}>
-        <span style={{
-          width: 8, height: 8, background: 'var(--cth-mint)',
-          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-          animation: 'cth-pulse 1200ms steps(2, end) infinite'
-        }} />
-        live · pty {ptyId}
-        {inputLocked && (
-          <span style={{ marginInlineStart: 'auto', fontSize: 13, color: 'var(--cth-ink-500)' }}>{t('ownerVia.watching')}</span>
-        )}
-        {/* The watching tag takes the auto margin when shown, so it sits beside these. */}
-        <div style={{ marginInlineStart: inputLocked ? 8 : 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* v0.3.4: the theme + enter-fullscreen buttons moved to the TITLE BAR
-              (top right) — more accessible, and the theme now darkens the whole
-              app. Only the EXIT affordance stays here, in fullscreen. */}
-          <button
-            onClick={() => zoom(-1)}
-            disabled={fontSize <= MIN_FONT_SIZE}
-            title="Zoom out (Cmd -)"
-            style={zoomBtnStyle}
-          >−</button>
-          <button
-            onClick={resetZoom}
-            title="Reset zoom (Cmd 0)"
-            style={{ ...zoomBtnStyle, width: 'auto', padding: '0 4px', minWidth: 28 }}
-          >{fontSize}px</button>
-          <button
-            onClick={() => zoom(1)}
-            disabled={fontSize >= MAX_FONT_SIZE}
-            title="Zoom in (Cmd +)"
-            style={zoomBtnStyle}
-          >+</button>
-          {fullscreen && onToggleFullscreen && (
-            <button
-              onClick={onToggleFullscreen}
-              title="Exit focus mode (Esc)"
-              style={{ ...zoomBtnStyle, width: 22, height: 22, marginLeft: 4 }}
-            >
-              <Icon name="minimize" />
+        {inputLocked ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />
+          </svg>
+        ) : null}
+        <span>{inputLocked ? t('ownerVia.watching') : t('workTab.live')}</span>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--cth-green)', boxShadow: '0 0 0 3px var(--cth-green-soft)', animation: 'cth-pulse 1.6s ease-in-out infinite' }} />
+        <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--cth-r-md)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', overflow: 'hidden' }}>
+            <button onClick={() => zoom(-1)} disabled={fontSize <= MIN_FONT_SIZE} title="Zoom out (Cmd -)" aria-label="Zoom out" style={zoomBtnStyle}>−</button>
+            <button onClick={resetZoom} title="Reset zoom (Cmd 0)" style={{ ...zoomBtnStyle, width: 'auto', padding: '0 8px', fontFamily: 'var(--cth-font-mono)', fontSize: 11, borderInline: '1px solid var(--cth-line)' }}>{fontSize}px</button>
+            <button onClick={() => zoom(1)} disabled={fontSize >= MAX_FONT_SIZE} title="Zoom in (Cmd +)" aria-label="Zoom in" style={zoomBtnStyle}>+</button>
+          </div>
+          {onToggleFullscreen && (
+            <button onClick={onToggleFullscreen} title={fullscreen ? 'Exit focus mode (Esc)' : t('workTab.focus')} style={{ ...zoomBtnStyle, width: 'auto', padding: '0 10px', gap: 6, borderRadius: 'var(--cth-r-md)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', fontWeight: 600 }}>
+              {fullscreen ? <Icon name="minimize" /> : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
+              )}
+              {!fullscreen && t('workTab.focus')}
             </button>
           )}
         </div>
       </div>
       <div ref={hostRef} onDragOver={onDragOver} onDrop={onDrop} style={{
         flex: 1, minHeight: 0,
-        padding: embedded ? '0 8px 8px' : 0
+        margin: embedded ? '0 14px 10px' : 0,
+        padding: embedded ? 10 : 0,
+        borderRadius: embedded ? 'var(--cth-r-lg)' : 0,
+        boxShadow: embedded ? 'inset 0 0 0 1px var(--cth-line)' : 'none'
       }} />
     </div>
   );

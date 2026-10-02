@@ -4,32 +4,32 @@
     <meta charset="UTF-8" />
     <title>Don't Be Michael</title>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.openai.com https://*.openai.com wss://api.openai.com wss://*.openai.com; media-src 'self' blob: mediastream:;" />
-    <!-- v0.3.4 type revamp: Press Start 2P stays as the BRAND display face
-         (small caps labels only); body/UI moves to Inter and code/terminal to
-         JetBrains Mono. The pixel body fonts (Pixelify/VT323) read as toy-like
-         and strained at data-dense sizes.
-         v0.4.6: these three faces are BUNDLED (src/renderer/src/design/fonts.css)
-         rather than fetched from fonts.googleapis.com, which is blocked in
-         mainland China. The CSP above no longer allows either Google font host. -->
+    <!-- Fonts are bundled (src/renderer/src/design/fonts.css), never fetched:
+         Google's font hosts are blocked in mainland China. The splash uses
+         the v2 tokens (branding/DESIGN.md 3) before the stylesheet loads. -->
     <style>
       #cth-splash {
         position: fixed; inset: 0; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; gap: 14px;
-        background: #FFF8E7; color: #1A1320;
-        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        align-items: center; justify-content: center; gap: 12px;
+        background: #F7F7FB; color: #1E1B2E;
+        font-family: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        #cth-splash { background: #14131C; color: #ECEAF4; }
+        #cth-splash .hint { color: #A5A2B8; }
       }
       /* Holds the mark's place until main.tsx swaps in the brand kit's Struck M. */
       #cth-splash .mk { width: 56px; height: 56px; }
-      #cth-splash .title { font-family: "Press Start 2P", monospace; font-size: 13px; }
-      #cth-splash .hint { font-size: 15px; color: #6B5878; }
+      #cth-splash .title { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+      #cth-splash .hint { font-size: 13px; color: #6C6884; }
     </style>
   </head>
   <body>
     <div id="root">
       <div id="cth-splash">
         <div class="mk"></div>
-        <div class="title">DON'T BE MICHAEL</div>
-        <div class="hint">opening the office…</div>
+        <div class="title">Don't Be Michael</div>
+        <div class="hint">Opening the office…</div>
       </div>
     </div>
     <script type="module" src="./src/main.tsx"></script>

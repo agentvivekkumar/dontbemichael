@@ -1,6 +1,7 @@
 import { MailboxesSettings } from './MailboxesSettings';
 import { QuickBooksSettings } from './QuickBooksSettings';
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useDialog } from '@/shell/useDialog';
 import { useTranslation } from 'react-i18next';
 import { agentModels, type HarnessConfig } from '@/store/config';
 import { useStore } from '@/store/store';
@@ -13,19 +14,18 @@ import {
   type TriggerMode,
   type WebhookTrigger
 } from '@shared/triggers';
-import { PixelPanel } from './PixelPanel';
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_OFFICE_THEME, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
+import { InfoTip } from './InfoTip';
 import { PixelButton } from './PixelButton';
 import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
 import { CompanyProfileSettings } from './CompanyProfileSettings';
 import { SetupPanel } from './SetupPanel';
 import { Icon } from './Icon';
-import { OfficeThemePicker } from './OfficeThemePicker';
 import { McpDefaultsSettings } from './McpDefaultsSettings';
 import { IntegrationsRegistry } from './IntegrationsRegistry';
 import { AiEnginesSettings } from './AiEnginesSettings';
@@ -74,22 +74,22 @@ function newWebhookId(): string {
   return `wh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Pixel-aesthetic text input, mirroring AddAgentModal's inputStyle. */
+/** The v2 field (DESIGN.md 7.9). Its ring and indigo focus ring come from the
+ *  `cth-input` class every caller sets. */
 const slackInputStyle: CSSProperties = {
   width: '100%',
-  padding: '6px 8px 4px',
-  background: 'var(--cth-paper-100)',
+  padding: '7px 10px',
+  background: 'var(--cth-card)',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
   fontFamily: 'var(--cth-font-ui)',
   fontSize: 13,
-  color: 'var(--cth-ink-900)',
+  color: 'var(--cth-ink)',
   outline: 'none'
 };
 
 const slackLabelStyle: CSSProperties = {
   fontFamily: 'var(--cth-font-display)',
-  fontSize: 8,
+  fontSize: 10, fontWeight: 600,
   lineHeight: '12px',
   color: 'var(--cth-ink-700)',
   textTransform: 'uppercase'
@@ -170,15 +170,15 @@ import { showByokSettings } from '@shared/agentProvider';
    seventeen times, in three slightly different forms, which is how a tab ends
    up looking subtly unlike its neighbours. */
 const sectionHead = {
-  fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+  fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px',
   color: 'var(--cth-ink-500)', textTransform: 'uppercase', marginBottom: 10
 } as const;
 /** Same heading, tight under a section that supplies its own spacing. */
 const sectionHeadTight = { ...sectionHead, marginBottom: 2 } as const;
 /** Same heading with no bottom margin at all. */
 const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
-/** The 2px rule between Settings sections. */
-const sectionRule = { height: 2, background: 'var(--cth-ink-300)' } as const;
+/** The hairline between Settings sections. */
+const sectionRule = { height: 1, background: 'var(--cth-line)' } as const;
 
 export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
 const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
@@ -200,6 +200,11 @@ const NAV_SECTION_KEYS: Record<Section, string> = {
 
 export function SettingsModal({ config, onClose, initialSection }: SettingsModalProps) {
   const { t, i18n } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // Esc and the focus trap (DESIGN.md 7.23). The close it runs is set below,
+  // once requestClose exists, so unsaved changes still ask first.
+  const closeFnRef = useRef<() => void>(() => onClose());
+  useDialog(dialogRef, () => closeFnRef.current());
   const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'the orchestrator';
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -414,6 +419,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     if (dirty && !window.confirm(t('settings.unsavedWarning'))) return;
     onClose();
   };
+  closeFnRef.current = busy ? () => {} : requestClose;
 
   const fmtBudgetTokens = (raw: string): string => {
     const n = Number(raw);
@@ -885,25 +891,37 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
       onClick={busy ? undefined : onClose}
       style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(26, 19, 32, 0.7)',
+        background: 'color-mix(in srgb, var(--cth-bg) 60%, transparent)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 300
       }}
     >
+      {/* Design v2 dialog (branding/DESIGN.md 7.23): a card with its title and
+          close, Esc and a focus trap (useDialog). */}
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={modalTitle}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 840, maxWidth: '92vw', maxHeight: '88vh',
-          display: 'flex', flexDirection: 'column',
-          filter: 'drop-shadow(4px 4px 0 rgba(26, 19, 32, 0.25))'
+          width: 880, maxWidth: '92vw', maxHeight: '88vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', outline: 'none',
+          background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
+          boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)'
         }}
       >
-        <PixelPanel
-          variant="dialog"
-          title={modalTitle}
-          noPadding
-          style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: '88vh' }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 14px 22px', borderBottom: '1px solid var(--cth-line)', flexShrink: 0 }}>
+          <h2 style={{ margin: 0, flex: 1, fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{modalTitle}</h2>
+          <button type="button" onClick={busy ? undefined : requestClose} aria-label={t('common.close')} style={{
+            width: 30, height: 30, display: 'grid', placeItems: 'center', border: 'none', cursor: 'pointer', borderRadius: 'var(--cth-r-md)',
+            background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', color: 'var(--cth-ink-2)'
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, flex: 1 }}>
           {/* === Change home sub-modal === */}
           {changeHome ? (
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
@@ -935,8 +953,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       disabled={changeBusy}
                       style={{
                         textAlign: 'left', cursor: changeBusy ? 'default' : 'pointer',
-                        padding: '10px 12px', background: 'var(--cth-paper-100)', border: 'none',
-                        boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-ink-900)' : 'var(--cth-ink-300)'}`,
+                        padding: '10px 12px', background: 'var(--cth-card)', border: 'none', borderRadius: 'var(--cth-r-lg)',
+                        boxShadow: `inset 0 0 0 ${selected ? 2 : 1}px ${selected ? 'var(--cth-ink)' : 'var(--cth-line-2)'}`,
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
@@ -953,7 +971,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
               </div>
 
               {changeErr && (
-                <div style={{ fontSize: 12, lineHeight: '18px', color: '#6E1423' }}>{changeErr}</div>
+                <div style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{changeErr}</div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -971,9 +989,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{
+                  borderRadius: 'var(--cth-r-md)',
                   width: 32, height: 32,
                   background: 'var(--cth-coral-light)',
-                  boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)',
+                  boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0
                 }}>
@@ -1001,11 +1020,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                 {/* Left nav */}
                 <div style={{
-                  width: 160, flexShrink: 0,
-                  display: 'flex', flexDirection: 'column',
-                  borderRight: '2px solid var(--cth-ink-300)',
-                  paddingTop: 8, paddingBottom: 8,
-                  background: 'var(--cth-cream-200)'
+                  width: 190, flexShrink: 0,
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                  borderInlineEnd: '1px solid var(--cth-line)',
+                  padding: 10,
+                  background: 'var(--cth-card-2)'
                 }}>
                   {VISIBLE_SECTIONS.map((section) => {
                     const active = activeSection === section;
@@ -1014,18 +1033,16 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         key={section}
                         type="button"
                         onClick={() => setActiveSection(section)}
+                        aria-current={active ? 'page' : undefined}
                         style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          padding: '10px 16px 8px',
-                          border: 'none',
-                          borderLeft: active ? '3px solid var(--cth-lemon)' : '3px solid transparent',
-                          background: active ? 'var(--cth-ink-900)' : 'transparent',
-                          color: active ? 'var(--cth-cream-50)' : 'var(--cth-ink-700)',
-                          fontFamily: 'var(--cth-font-display)',
-                          fontSize: 8,
-                          lineHeight: '12px',
-                          cursor: 'pointer',
-                          letterSpacing: 0
+                          display: 'block', width: '100%', textAlign: 'start',
+                          height: 34, padding: '0 12px',
+                          border: 'none', borderRadius: 'var(--cth-r-md)',
+                          background: active ? 'var(--cth-ink)' : 'transparent',
+                          color: active ? 'var(--cth-bg)' : 'var(--cth-ink-2)',
+                          fontFamily: 'var(--cth-font-ui)',
+                          fontSize: 13, fontWeight: active ? 600 : 500,
+                          cursor: 'pointer'
                         }}
                       >
                         {t(NAV_SECTION_KEYS[section])}
@@ -1052,7 +1069,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           and a sponsor live here; both render nothing until set. */}
                       <SettingsHeroCard />
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Updates — first among the settings proper, because "am I
                           on the latest?" is the question people open Settings to
@@ -1060,7 +1077,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           the answer is yes. */}
                       <UpdatesSection />
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Home folder */}
                       <div>
@@ -1098,7 +1115,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         )}
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Environment — settings that used to be trapped in onboarding */}
                       <div>
@@ -1161,7 +1178,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Language — app UI language (i18n) */}
                       <div>
@@ -1178,7 +1195,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <select
                             value={i18n.language}
                             onChange={(e) => setLanguage(e.target.value)}
-                            style={slackInputStyle}
+                            className="cth-input" style={slackInputStyle}
                             aria-label={t('settings.general.language')}
                           >
                             {LANGUAGES.map((l) => (
@@ -1188,7 +1205,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Desktop notifications toggle */}
                       <div>
@@ -1214,7 +1231,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Scheduled auto-compact (compact-maintenance mission) */}
                       <div>
@@ -1280,9 +1297,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </>)}
                       </div>
 
-                      {/* Office Theme: TV show office maps (flag tvShowOffices, default off).
-                          Hidden in this build (SHOW_OFFICE_THEME). */}
-                      {SHOW_OFFICE_THEME && <OfficeThemePicker config={config} />}
                     </>
                   )}
 
@@ -1307,7 +1321,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.skills.desc', { godName })}
                         </span>
                       </div>
-                      <div style={{ flex: 1, minHeight: 420, display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+                      <div style={{ borderRadius: 'var(--cth-r-md)', flex: 1, minHeight: 420, display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
                         <SkillsTab />
                       </div>
                     </div>
@@ -1329,10 +1343,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 key={m.label}
                                 onClick={() => { if (m.id) void saveDefaultModel(m.id); }}
                                 style={{
+                                  borderRadius: 'var(--cth-r-md)',
                                   padding: '3px 8px 1px', border: 'none', cursor: 'pointer',
                                   fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
                                   background: defaultModelSel === m.id ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-                                  boxShadow: defaultModelSel === m.id ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)'
+                                  boxShadow: defaultModelSel === m.id ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-ink-100)'
                                 }}
                               >{m.label}</button>
                             ))}
@@ -1340,14 +1355,14 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         </div>
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* API keys and local endpoints feed only OpenCode, Crush, pi and
                           Qwen; this build offers none of them (BUILD_ENGINES). */}
                       {showByokSettings() && (
                         <>
                           <AiEnginesSettings config={config} />
-                          <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                          <div style={{ height: 1, background: 'var(--cth-line)' }} />
                         </>
                       )}
 
@@ -1362,7 +1377,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             type="number" min="1" step="10" value={maxTurnsVal}
                             onChange={(e) => setMaxTurnsVal(e.target.value)}
                             placeholder={t('settings.agentsModels.unlimited')}
-                            style={{ ...slackInputStyle, width: 120 }}
+                            className="cth-input" style={{ ...slackInputStyle, width: 120 }}
                           />
                           <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('settings.agentsModels.blankUnlimited')}</span>
                         </div>
@@ -1379,14 +1394,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.autonomy.autonomy')}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                              {autoModeOn ? t('settings.autonomy.autoOn') : t('settings.autonomy.autoOff')}
-                            </span>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.autonomy.autoDesc')}
-                            </span>
-                          </div>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                            {autoModeOn ? t('settings.autonomy.autoOn') : t('settings.autonomy.autoOff')}
+                            <InfoTip text={t('settings.autonomy.autoDesc')} />
+                          </span>
                           <PixelButton variant={autoModeOn ? 'primary' : 'secondary'} size="sm" onClick={toggleAutoMode}>
                             {autoModeOn ? t('settings.autonomy.autonomous') : t('settings.autonomy.askFirst')}
                           </PixelButton>
@@ -1418,17 +1429,15 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       </div>
                       </>)}
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Circuit breaker — the FULL unit (v0.3.4: all fields have UI) */}
                       <div>
-                        <div style={sectionHead}>
-                          {t('settings.autonomy.breaker')}
-                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                            <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                              {t('settings.autonomy.breakerDesc')}
+                            <span style={{ ...sectionHead, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
+                              {t('settings.autonomy.breaker')}
+                              <InfoTip text={t('settings.autonomy.breakerDesc')} />
                             </span>
                             <PixelButton variant={brkEnabled ? 'primary' : 'secondary'} size="sm"
                               onClick={() => { setBrkEnabled(!brkEnabled); }}>
@@ -1442,9 +1451,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="100000" value={agentBudget}
                                 onChange={(e) => setAgentBudget(e.target.value)}
                                 placeholder={t('settings.autonomy.budgetPlaceholder')}
-                                style={{ ...slackInputStyle, width: 180 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 180 }}
                               />
-                              <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>
+                              <span style={{ fontSize: 11, color: 'var(--cth-ink-500)', textTransform: 'none', letterSpacing: 0 }}>
                                 {fmtBudgetTokens(agentBudget) ? t('settings.autonomy.budgetEquals', { value: fmtBudgetTokens(agentBudget) }) : t('settings.autonomy.budgetTotal')}
                               </span>
                             </label>
@@ -1454,7 +1463,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="1000" value={velocityCeiling}
                                 onChange={(e) => setVelocityCeiling(e.target.value)}
                                 placeholder={t('settings.autonomy.velocityPlaceholder')}
-                                style={{ ...slackInputStyle, width: 180 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 180 }}
                               />
                             </label>
                             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, ...slackLabelStyle }}>
@@ -1463,7 +1472,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="5" value={brkRepeated}
                                 onChange={(e) => setBrkRepeated(e.target.value)}
                                 placeholder={t('settings.autonomy.defaultPlaceholder')}
-                                style={{ ...slackInputStyle, width: 140 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 140 }}
                               />
                             </label>
                             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, ...slackLabelStyle }}>
@@ -1472,17 +1481,15 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 type="number" min="0" step="5" value={brkErrStorm}
                                 onChange={(e) => setBrkErrStorm(e.target.value)}
                                 placeholder={t('settings.autonomy.defaultPlaceholder')}
-                                style={{ ...slackInputStyle, width: 140 }}
+                                className="cth-input" style={{ ...slackInputStyle, width: 140 }}
                               />
                             </label>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('settings.autonomy.hardStop')}</span>
-                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                                {t('settings.autonomy.hardStopDesc')}
-                              </span>
-                            </div>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+                              {t('settings.autonomy.hardStop')}
+                              <InfoTip text={t('settings.autonomy.hardStopDesc')} />
+                            </span>
                             <PixelButton variant={brkHardStop ? 'destructive' : 'secondary'} size="sm"
                               onClick={() => { setBrkHardStop(!brkHardStop); }}>
                               {brkHardStop ? t('settings.autonomy.killOnTrip') : t('settings.autonomy.steerFirst')}
@@ -1528,7 +1535,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 : { dot: 'var(--cth-lemon)', label: t('memoryPanel.onGettingReady') };
                           return (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--cth-ink-900)', marginTop: 8 }}>
-                              <span style={{ width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }} />
+                              <span style={{ borderRadius: 'var(--cth-r-md)', width: 8, height: 8, background: st.dot, boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }} />
                               {st.label}
                             </span>
                           );
@@ -1537,8 +1544,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         {/* Not installed: send them to the setup that installs it. */}
                         {memStatus && !memStatus.available && (
                           <div style={{
+                            borderRadius: 'var(--cth-r-md)',
                             marginTop: 8, fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: 1.6,
-                            background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', padding: 10
+                            background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', padding: 10
                           }}>
                             {t('memoryPanel.notInstalled')}
                             <div style={{ marginTop: 8 }}>
@@ -1566,9 +1574,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     type="button"
                                     onClick={() => pickEmbeddingModel(id)}
                                     style={{
+                                      borderRadius: 'var(--cth-r-md)',
                                       flex: 1, textAlign: 'left', cursor: 'pointer', border: 'none', padding: '8px 8px',
                                       background: sel ? 'var(--cth-lemon-light)' : 'var(--cth-cream-100)',
-                                      boxShadow: sel ? 'inset 0 0 0 2px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-300)'
+                                      boxShadow: sel ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)'
                                     }}
                                     aria-pressed={sel}
                                   >
@@ -1582,7 +1591,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                         )}
                       </div>
 
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Knowledge Graph — enterprise multimodal context for agents */}
                       <div>
@@ -1627,7 +1636,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   {activeSection === 'Connections' && (
                     <>
                       <McpDefaultsSettings config={config} />
-                      <div style={{ height: 1, background: 'var(--cth-ink-300)' }} />
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
                     </>
                   )}
 
@@ -1704,9 +1713,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               bot-event subscription requirement (steps 6 & 7). */}
                           {showSlackHelp && (
                             <pre style={{
+                              borderRadius: 'var(--cth-r-md)',
                               margin: 0, padding: 10, whiteSpace: 'pre-wrap',
                               background: 'var(--cth-paper-100)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                               fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
                               color: 'var(--cth-ink-700)'
                             }}>{SLACK_CONNECT_STEPS}</pre>
@@ -1723,7 +1733,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackSecret}
                                     onChange={(e) => setSlackSecret(e.target.value)}
                                     placeholder={t('settings.connections.signingSecretPlaceholder')}
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                                 {/* Bot token: stays in main; never leaves the main process. */}
@@ -1734,7 +1744,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackBotToken}
                                     onChange={(e) => setSlackBotToken(e.target.value)}
                                     placeholder="xoxb-..."
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                               </div>
@@ -1746,7 +1756,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackChannel}
                                     onChange={(e) => setSlackChannel(e.target.value)}
                                     placeholder={t('settings.connections.channelPlaceholder')}
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 100 }}>
@@ -1756,7 +1766,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     value={slackPort}
                                     onChange={(e) => setSlackPort(e.target.value)}
                                     placeholder="3847"
-                                    style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                    className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                   />
                                 </label>
                               </div>
@@ -1809,7 +1819,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={tunnelUrl}
                                       onFocus={(e) => e.currentTarget.select()}
-                                      style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
+                                      className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}
                                     />
                                     <PixelButton variant="secondary" size="sm" onClick={copyTunnel} disabled={!tunnelUrl}>{t('common.copy')}</PixelButton>
                                   </div>
@@ -1872,9 +1882,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                         {showWebhookHelp && (
                           <pre style={{
+                            borderRadius: 'var(--cth-r-md)',
                             margin: 0, padding: 10, whiteSpace: 'pre-wrap',
                             background: 'var(--cth-paper-100)',
-                            boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                            boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                             fontFamily: 'var(--cth-font-mono)', fontSize: 11, lineHeight: '16px',
                             color: 'var(--cth-ink-700)'
                           }}>{webhookApiDoc(godName)}</pre>
@@ -1899,6 +1910,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                 <div
                                   key={w.id}
                                   style={{
+                                    borderRadius: 'var(--cth-r-md)',
                                     display: 'flex', flexDirection: 'column', gap: 8,
                                     padding: '10px 12px',
                                     background: 'var(--cth-cream-100)',
@@ -1913,7 +1925,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       onChange={(e) => { void patchWebhook(w.id, { name: e.target.value }, false); }}
                                       onBlur={() => { void applyWebhooks(webhookTriggers); }}
                                       placeholder={t('settings.connections.namePlaceholder')}
-                                      style={{ ...slackInputStyle, flex: 1 }}
+                                      className="cth-input" style={{ ...slackInputStyle, flex: 1 }}
                                     />
                                     <PixelButton
                                       variant={w.enabled ? 'primary' : 'secondary'}
@@ -1943,9 +1955,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={endpoint || t('settings.connections.endpointPlaceholder')}
                                       onFocus={(e) => e.currentTarget.select()}
+                                      className="cth-input"
                                       style={{
                                         ...slackInputStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 12,
-                                        color: endpoint ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
+                                        color: endpoint ? 'var(--cth-ink)' : 'var(--cth-ink-3)'
                                       }}
                                     />
                                     <PixelButton
@@ -1966,7 +1979,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                       readOnly
                                       value={w.secret}
                                       onFocus={(e) => e.currentTarget.select()}
-                                      style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                      className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                     />
                                     <PixelButton
                                       variant="secondary"
@@ -1997,7 +2010,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                     <select
                                       value={w.mode}
                                       onChange={(e) => { void patchWebhook(w.id, { mode: e.target.value as TriggerMode }); }}
-                                      style={{ ...slackInputStyle, width: 160, flexShrink: 0 }}
+                                      className="cth-input" style={{ ...slackInputStyle, width: 160, flexShrink: 0 }}
                                     >
                                       {TRIGGER_MODES.map((m) => (
                                         <option key={m.value} value={m.value}>{m.label}</option>
@@ -2066,7 +2079,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               onChange={(e) => { void applyOrg({ ...orgTrigger, apiKey: e.target.value }, false); }}
                               onBlur={() => { void applyOrg(orgTrigger); }}
                               placeholder={t('settings.connections.orgKeyPlaceholder')}
-                              style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                              className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                             />
                             <PixelButton
                               variant="secondary"
@@ -2088,7 +2101,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           <select
                             value={orgTrigger.mode}
                             onChange={(e) => { void applyOrg({ ...orgTrigger, mode: e.target.value as TriggerMode }); }}
-                            style={slackInputStyle}
+                            className="cth-input" style={slackInputStyle}
                           >
                             {TRIGGER_MODES.map((m) => (
                               <option key={m.value} value={m.value}>{m.label}</option>
@@ -2155,7 +2168,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                                   value={groqKey}
                                   onChange={(e) => setGroqKey(e.target.value)}
                                   placeholder={t('settings.voice.groqPlaceholder')}
-                                  style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                  className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                                 />
                                 <PixelButton variant="secondary" size="sm" onClick={() => setShowGroqKey((v) => !v)} disabled={!groqKey}>
                                   {showGroqKey ? t('common.hide') : t('common.show')}
@@ -2169,7 +2182,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               <select
                                 value={freeflowModel}
                                 onChange={(e) => setFreeflowModel(e.target.value)}
-                                style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                                className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                               >
                                 <option value="whisper-large-v3-turbo">{t('settings.voice.fast')}</option>
                                 <option value="whisper-large-v3">{t('settings.voice.accurate')}</option>
@@ -2216,10 +2229,11 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             and saving in either flips the same gate. The value never leaves
                             main; only the presence boolean comes back. */}
                         <div style={{
+                          borderRadius: 'var(--cth-r-md)',
                           display: 'flex', flexDirection: 'column', gap: 8,
                           padding: 10,
                           background: 'var(--cth-paper-100)',
-                          boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                          boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                         }}>
                           <span style={sectionHeadFlush}>
                             {t('settings.voice.openaiKey')}
@@ -2237,7 +2251,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               onChange={(e) => setOpenAiVoiceKey(e.target.value)}
                               onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter') void saveOpenAiVoiceKey(); }}
                               placeholder={hasOpenAiKey ? t('settings.voice.keyPlaceholderSaved') : 'sk-…'}
-                              style={{ ...slackInputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)' }}
+                              className="cth-input" style={{ ...slackInputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)' }}
                             />
                             <PixelButton
                               variant="secondary"
@@ -2254,9 +2268,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             color: hasOpenAiKey ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
                           }}>
                             <span aria-hidden style={{
+                              borderRadius: 'var(--cth-r-md)',
                               width: 8, height: 8, flexShrink: 0,
                               background: hasOpenAiKey ? 'var(--cth-mint)' : 'var(--cth-ink-300)',
-                              boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
                             }} />
                             {openAiVoiceNote || (hasOpenAiKey
                               ? t('settings.voice.keySaved', { godName })
@@ -2277,7 +2292,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               setIdleDisconnectMs(v);
                               stage({ realtimeIdleDisconnectMs: v } as Partial<HarnessConfig>);
                             }}
-                            style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
+                            className="cth-input" style={{ ...slackInputStyle, fontFamily: 'var(--cth-font-mono)' }}
                           >
                             <option value="30000">{t('settings.voice.30s')}</option>
                             <option value="60000">{t('settings.voice.1m')}</option>
@@ -2318,7 +2333,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
               {/* Footer */}
               <div style={{
-                borderTop: '2px solid var(--cth-ink-300)',
+                borderTop: '1px solid var(--cth-line)',
                 padding: '10px 16px',
                 display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
                 background: 'var(--cth-cream-50)'
@@ -2336,7 +2351,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
               </div>
             </>
           )}
-        </PixelPanel>
+        </div>
       </div>
     </div>
   );

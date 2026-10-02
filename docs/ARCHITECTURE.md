@@ -11,8 +11,8 @@ Two data planes feed one renderer:
 ┌───────────────────────────────────────────────────────────────┐
 │                     Electron Renderer (React)                  │
 │   ┌──────────────────┐    ┌──────────────────────────────┐    │
-│   │ Office Floor      │    │ Terminal + Command Bar       │    │
-│   │ (Pixi.js)        │    │ Files + Git tabs (xterm.js)  │    │
+│   │ Office studio    │    │ Terminal + Talk to Michael   │    │
+│   │ (SVG, React)     │    │ person panels (xterm.js)     │    │
 │   └─────────▲────────┘    └────────────▲─────────────────┘    │
 │             │ avatar state             │ pty bytes / fs / git  │
 └─────────────┼──────────────────────────┼───────────────────────┘
@@ -63,7 +63,7 @@ src/
                              (integration-secrets.json in userData, 0600); refuses to save over a file it can't read
     atomicFile.ts            crash-safe file write (temp file, fsync, rename); the secret store's writer
     closingTime.ts           Closing Time shutdown protocol (the office reopens on next launch, shared/officeOpen.ts)
-                             The quit dialog lists who is still working (hook `detail` from hooks.ts toolDetail),
+                             The closing time bar (ClosingTimeBar) lists who is still working (hook `detail` from hooks.ts toolDetail),
                              with Remind and Close without them (never pty:kill: that archives the agent).
                              start({relaunch}) reopens the app once closed (a Claude Code update, shared/cliUpdate.ts)
     fs.ts / git.ts           sandboxed filesystem + git bridges
@@ -104,18 +104,19 @@ src/
   renderer/src/
     App.tsx                  top-level layout + wiring
     design/                  tokens.css / tokens.ts / global.css (design source of truth)
-    components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, OnboardingWizard, …
-    CommandCenterPanel,      Michael's control surface (Profile/Ask me/Capabilities/Terminal/Office schedule/History/
-                             Memory/Advanced tabs; Advanced holds Monitor and Activity). Office schedule is a read-only
-                             list of every enabled job; Ask me also shows agents' schedule requests
-    CapabilitiesTab,         every agent's Capabilities tab (Michael included): the Email section (on/off switch,
+    components/              AgentDetailPanel, OnboardingWizard, SettingsModal, TaskDetailOverlay, …
+    CommandCenterPanel,      Michael's control surface (Profile/Access/Work/Office schedule/Memory/Advanced tabs, plus
+                             History once a webhook exists; Advanced holds Monitor and Activity). Office schedule is a
+                             read-only list of every enabled job
+    AskMeTab,                the Ask me cards on the Needs you board, agents' schedule requests included
+    CapabilitiesTab,         every agent's Access tab (Michael included): the Email section (on/off switch,
                              one mailbox, Can send / Draft only), the QuickBooks section (on/off switch,
                              Read only / Can make changes) and the On a schedule section
     MailboxesSettings,       Settings > Connections > Mailboxes, AddMailboxDialog, and the Claude account email switch
     QuickBooksSettings,      Settings > Connections > QuickBooks: the central switch for the Claude account's QuickBooks
-                             (off hides it on every Capabilities tab); on, it shows whether Claude has QuickBooks
+                             (off hides it on every Access tab); on, it shows whether Claude has QuickBooks
                              connected (claudeQuickBooks.ts runs `claude mcp list`) or the steps to connect it
-    triggers/ScheduleList,   per-agent schedules: the On a schedule section of Capabilities (agent mode) and
+    triggers/ScheduleList,   per-agent schedules: the On a schedule section of Access (agent mode) and
                              Michael's Office schedule tab (office mode); rules live in shared/missions.ts
     triggers/WhenLines,      the several "when" lines one schedule can have
     ScheduleRequestCards,    Ask me cards for schedule requests Michael passed to the owner (Approve / Decline)
@@ -123,23 +124,27 @@ src/
     ProfileTab,              the first tab on every agent: job, folder (Open folder), full instructions
     MemoryNotes,             an agent's Memory tab as grouped notes; "Show the file" keeps the raw text
     OwnerViaMichaelBar,      replaces a team member's message box outside 1:1 (Message Michael / Talk 1:1)
-    FloorViewToggle,         the floor's OFFICE / TASKS / GRAPH switch
     OfficeFolderMissing,     launch screen shown only when the office folder is missing
     CliUpdateNotice,         "team upgrade ready" title-bar chip and corner note; its click runs closing time
                              with relaunch, "later" waits for a newer version (localStorage cth.cliUpdateLaterFor)
     ToolWaterfall,           per-agent tool-span waterfall for the observability view
-    TasksKanban,             dependency-aware kanban board (the floor's TASKS view)
+    TasksKanban,             dependency-aware kanban board (the Tasks view)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
     MessageQueueComposer,    park messages for a busy agent
-    scene/office/            Pixi office floor: OfficeFloor, Character, Camera, cast, pathfinding, …
+    scene/studio/            the office studio: isometric SVG stage, pods, Michael's office, life layer (branding/DESIGN.md 8)
+    scene/office/            the cast and the idle lines (data only)
+    shell/                   top bar (view tabs: Office, Tasks, Who talks to whom), bottom bar, Needs you board,
+                             panel chrome, dialogs
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
-    assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
+    assets/                  fonts (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)
 resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarded to the broker
 docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime)
+docs/demo/studio-lab.html    the studio lab, built by `npm run lab`
+tools/studio-lab/            the studio lab and the reference screens (`npm run lab`, `npm run shoot`)
 docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
                              (the old project's website files still here are tracked for removal in TODOS.md)
-docs/media/                  media the README embeds (see docs/media/README.md)
+branding/reference/studio/   the app's reference screens, also the README's images (npm run shoot)
 landing-remotion/            Remotion project that renders the landing page's "how it works" clips
 HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 docs/message-queue.md        who may type into an agent's terminal, and when
@@ -149,8 +154,8 @@ docs/message-queue.md        who may type into an agent's terminal, and when
 
 ## Design system
 
-The aesthetic is **Animal Crossing × Earthbound × SNES menu UI** — pixel-snapped, chunky, friendly.
-[`DESIGN.md`](../DESIGN.md) is canonical; every component derives from its tokens. The Don't Be Michael
-brand layers a **Dunder-Mifflin maroon** (`#6E1423`) and **gold** (`#F4D35E`) on top for logo and
-chrome. The 20 avatars are the cast of *The Office*, differentiated by hair/skin/shirt recipes.
+The look is **Studio** (design system v2): a calm isometric office drawn in SVG, with Sora for
+the interface and JetBrains Mono for data, in light and dark. [`branding/DESIGN.md`](../branding/DESIGN.md)
+is canonical; every component derives from its tokens (`src/renderer/src/design/`). Team members
+are the cast of *The Office*, each shown as a pod in their department's color.
 

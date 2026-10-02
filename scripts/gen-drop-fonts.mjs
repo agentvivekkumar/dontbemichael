@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const FILES = {
-  inter: 'src/renderer/src/assets/fonts/inter-latin-var.woff2',
+  sora: 'src/renderer/src/assets/fonts/sora-latin-var.woff2',
   jetbrainsMono: 'src/renderer/src/assets/fonts/jetbrains-mono-latin-var.woff2'
 };
 
@@ -31,17 +31,17 @@ const out = `/**
  * Google Fonts fetch, nothing to hang on a blocked fonts.googleapis.com.
  *
  * Generated from the SAME woff2 the app ships:
- *   - Inter    → src/renderer/src/assets/fonts/inter-latin-var.woff2 (drop --font-sans; substitutes Geist)
+ *   - Sora     → src/renderer/src/assets/fonts/sora-latin-var.woff2 (drop --font-sans, the brand type)
  *   - JetBrains Mono → …/jetbrains-mono-latin-var.woff2 (drop --font-mono, exact)
  * Both are variable (one file spans weight 400–700). Regenerate with
  * scripts/gen-drop-fonts.mjs if the woff2 change. Do not hand-edit the base64.
  */
 
 export const DROP_FONT_WOFF2_BASE64 = {
-  inter: '${b64.inter}',
+  sora: '${b64.sora}',
   jetbrainsMono: '${b64.jetbrainsMono}'
 } as const;
 `;
 
 writeFileSync('src/shared/dropFonts.ts', out);
-console.log('wrote src/shared/dropFonts.ts (inter %d + jbm %d base64 chars)', b64.inter.length, b64.jetbrainsMono.length);
+console.log('wrote src/shared/dropFonts.ts (sora %d + jbm %d base64 chars)', b64.sora.length, b64.jetbrainsMono.length);

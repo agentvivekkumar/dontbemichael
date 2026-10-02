@@ -80,38 +80,38 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
           <div style={grid2}>
             <Field label={t('companyProfile.ceo')} required>
               <input value={text(value.ceo)} onChange={(e) => set({ ceo: orUndefined(e.target.value) })}
-                placeholder={t('companyProfile.ceoPlaceholder')} aria-required aria-invalid={miss('ceo')} style={input(miss('ceo'))} />
+                placeholder={t('companyProfile.ceoPlaceholder')} aria-required aria-invalid={miss('ceo')} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.website')}>
               <input value={text(value.website)} onChange={(e) => set({ website: orUndefined(e.target.value) })}
-                placeholder="www.example.com" style={input(false)} />
+                placeholder="www.example.com" className="cth-input" style={fieldStyle} />
             </Field>
           </div>
           {needsIndustry && (
             <Field label={t('companyProfile.industry')} required>
               <input value={text(value.industry)} onChange={(e) => set({ industry: orUndefined(e.target.value) })}
-                placeholder={t('companyProfile.industryPlaceholder')} aria-required aria-invalid={miss('industry')} style={input(miss('industry'))} />
+                placeholder={t('companyProfile.industryPlaceholder')} aria-required aria-invalid={miss('industry')} className="cth-input" style={fieldStyle} />
             </Field>
           )}
           <Head>{t('companyProfile.addressHead')}</Head>
           <Field label={t('companyProfile.street')} required>
             <input value={text(value.address?.street)} onChange={(e) => setAddress({ street: orUndefined(e.target.value) })}
-              aria-required aria-invalid={miss('street')} style={input(miss('street'))} />
+              aria-required aria-invalid={miss('street')} className="cth-input" style={fieldStyle} />
           </Field>
           <div style={grid2}>
             <Field label={t('companyProfile.city')} required>
               <input value={text(value.address?.city)} onChange={(e) => setAddress({ city: orUndefined(e.target.value) })}
-                aria-required aria-invalid={miss('city')} style={input(miss('city'))} />
+                aria-required aria-invalid={miss('city')} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.region')}>
-              <input value={text(value.address?.region)} onChange={(e) => setAddress({ region: orUndefined(e.target.value) })} style={input(false)} />
+              <input value={text(value.address?.region)} onChange={(e) => setAddress({ region: orUndefined(e.target.value) })} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.postalCode')}>
-              <input value={text(value.address?.postalCode)} onChange={(e) => setAddress({ postalCode: orUndefined(e.target.value) })} style={input(false)} />
+              <input value={text(value.address?.postalCode)} onChange={(e) => setAddress({ postalCode: orUndefined(e.target.value) })} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.country')} required>
               <input value={text(value.address?.country)} onChange={(e) => setAddress({ country: orUndefined(e.target.value) })}
-                aria-required aria-invalid={miss('country')} style={input(miss('country'))} />
+                aria-required aria-invalid={miss('country')} className="cth-input" style={fieldStyle} />
             </Field>
           </div>
         </>
@@ -123,19 +123,19 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
           <div style={grid2}>
             <Field label={t('companyProfile.legalName')}>
               <input value={text(value.legalName)} onChange={(e) => set({ legalName: orUndefined(e.target.value) })}
-                placeholder={t('companyProfile.legalNamePlaceholder')} style={input(false)} />
+                placeholder={t('companyProfile.legalNamePlaceholder')} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.entityType')}>
-              <select value={value.entityType ?? ''} onChange={(e) => set({ entityType: (e.target.value || undefined) as CompanyProfile['entityType'] })} style={input(false)}>
+              <select value={value.entityType ?? ''} onChange={(e) => set({ entityType: (e.target.value || undefined) as CompanyProfile['entityType'] })} className="cth-input" style={fieldStyle}>
                 <option value="">{t('companyProfile.notSet')}</option>
                 {ENTITY_TYPES.map((k) => <option key={k} value={k}>{t(`companyProfile.entity.${k}`)}</option>)}
               </select>
             </Field>
             <Field label={t('companyProfile.phone')}>
-              <input value={text(value.phone)} onChange={(e) => set({ phone: orUndefined(e.target.value) })} style={input(false)} />
+              <input value={text(value.phone)} onChange={(e) => set({ phone: orUndefined(e.target.value) })} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.email')}>
-              <input value={text(value.email)} onChange={(e) => set({ email: orUndefined(e.target.value) })} style={input(false)} />
+              <input value={text(value.email)} onChange={(e) => set({ email: orUndefined(e.target.value) })} className="cth-input" style={fieldStyle} />
             </Field>
           </div>
           <Field label={t('companyProfile.social')} hint={t('companyProfile.socialHint')}>
@@ -146,7 +146,8 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
                 set({ social: links.some((l) => l.trim()) ? links : undefined });
               }}
               rows={3}
-              style={{ ...input(false), resize: 'vertical', fontFamily: 'var(--cth-font-ui)' }}
+              className="cth-input"
+              style={{ ...fieldStyle, resize: 'vertical' }}
             />
           </Field>
 
@@ -154,38 +155,38 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
           <div style={grid2}>
             <Field label={t('companyProfile.hours')}>
               <input value={text(value.hours)} onChange={(e) => set({ hours: orUndefined(e.target.value) })}
-                placeholder={t('companyProfile.hoursPlaceholder')} style={input(false)} />
+                placeholder={t('companyProfile.hoursPlaceholder')} className="cth-input" style={fieldStyle} />
             </Field>
             <Field label={t('companyProfile.timeZone')}>
-              <select value={value.timeZone ?? ''} onChange={(e) => set({ timeZone: e.target.value || undefined })} style={input(false)}>
+              <select value={value.timeZone ?? ''} onChange={(e) => set({ timeZone: e.target.value || undefined })} className="cth-input" style={fieldStyle}>
                 <option value="">{t('companyProfile.notSet')}</option>
                 {value.timeZone && !timeZones.includes(value.timeZone) && <option value={value.timeZone}>{value.timeZone}</option>}
                 {timeZones.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
               </select>
             </Field>
             <Field label={t('companyProfile.serviceArea')}>
-              <select value={value.serviceArea ?? ''} onChange={(e) => set({ serviceArea: (e.target.value || undefined) as CompanyProfile['serviceArea'] })} style={input(false)}>
+              <select value={value.serviceArea ?? ''} onChange={(e) => set({ serviceArea: (e.target.value || undefined) as CompanyProfile['serviceArea'] })} className="cth-input" style={fieldStyle}>
                 <option value="">{t('companyProfile.notSet')}</option>
                 {SERVICE_AREAS.map((k) => <option key={k} value={k}>{t(`companyProfile.area.${k}`)}</option>)}
               </select>
             </Field>
             <Field label={t('companyProfile.languages')}>
               <input value={text(value.languages)} onChange={(e) => set({ languages: orUndefined(e.target.value) })}
-                placeholder={t('companyProfile.languagesPlaceholder')} style={input(false)} />
+                placeholder={t('companyProfile.languagesPlaceholder')} className="cth-input" style={fieldStyle} />
             </Field>
           </div>
 
           <Head>{t('companyProfile.moneyHead')}</Head>
           <div style={grid2}>
             <Field label={t('companyProfile.currency')}>
-              <select value={value.currency ?? ''} onChange={(e) => set({ currency: e.target.value || undefined })} style={input(false)}>
+              <select value={value.currency ?? ''} onChange={(e) => set({ currency: e.target.value || undefined })} className="cth-input" style={fieldStyle}>
                 <option value="">{t('companyProfile.notSet')}</option>
                 {value.currency && !currencies.includes(value.currency) && <option value={value.currency}>{value.currency}</option>}
                 {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label={t('companyProfile.fiscalMonth')}>
-              <select value={value.fiscalYearStartMonth ?? ''} onChange={(e) => set({ fiscalYearStartMonth: e.target.value ? Number(e.target.value) : undefined })} style={input(false)}>
+              <select value={value.fiscalYearStartMonth ?? ''} onChange={(e) => set({ fiscalYearStartMonth: e.target.value ? Number(e.target.value) : undefined })} className="cth-input" style={fieldStyle}>
                 <option value="">{t('companyProfile.notSet')}</option>
                 {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
@@ -196,15 +197,17 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
 
       {parts.includes('hint') && (
         <div style={{
+          borderRadius: 'var(--cth-r-md)',
           display: 'flex', flexDirection: 'column', gap: 6, padding: 10,
-          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+          background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
         }}>
           <span style={{ fontSize: 14, lineHeight: '19px', color: 'var(--cth-ink-900)' }}>{t('companyProfile.knowledgeHead')}</span>
           <span style={{ fontSize: 14, lineHeight: '19px', color: 'var(--cth-ink-700)' }}>{t('companyProfile.knowledgeBody')}</span>
           {onOpenKnowledge && (
             <button type="button" onClick={onOpenKnowledge} style={{
+              borderRadius: 'var(--cth-r-md)',
               alignSelf: 'flex-start', padding: '4px 10px 2px', border: 'none', cursor: 'pointer',
-              background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)'
             }}>
               {t('companyProfile.knowledgeOpen')}
@@ -219,16 +222,16 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
 function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <span style={{ fontSize: 14, color: 'var(--cth-ink-700)' }}>{label}{required ? ' *' : ''}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}{required ? ' *' : ''}</span>
       {children}
-      {hint && <span style={{ fontSize: 14, color: 'var(--cth-ink-500)' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 11.5, color: 'var(--cth-ink-3)' }}>{hint}</span>}
     </label>
   );
 }
 
 function Head({ children }: { children: ReactNode }) {
   return (
-    <div style={{ fontFamily: 'var(--cth-font-display)', fontSize: 10, color: 'var(--cth-ink-700)', marginTop: 4 }}>
+    <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--cth-ink)', marginTop: 4 }}>
       {children}
     </div>
   );
@@ -236,13 +239,10 @@ function Head({ children }: { children: ReactNode }) {
 
 const grid2: CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 };
 
-/** An input, ringed coral when a required answer is missing. */
-function input(missing: boolean): CSSProperties {
-  return {
-    padding: '6px 8px 4px', border: 'none',
-    background: 'var(--cth-cream-50)',
-    boxShadow: missing ? 'inset 0 0 0 2px var(--cth-coral)' : 'inset 0 0 0 1.5px var(--cth-ink-300)',
-    fontFamily: 'var(--cth-font-ui)', fontSize: 14, color: 'var(--cth-ink-900)',
-    minWidth: 0
-  };
-}
+/** The v2 field (DESIGN.md 7.9). Its ring, focus ring and the coral ring for a
+ *  missing required answer (aria-invalid) come from the `cth-input` class. */
+const fieldStyle: CSSProperties = {
+  padding: '7px 10px', border: 'none', background: 'var(--cth-card)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 13, color: 'var(--cth-ink)',
+  minWidth: 0
+};

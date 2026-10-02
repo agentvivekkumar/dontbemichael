@@ -68,6 +68,7 @@ export function ClearedBanner({ agentId, name }: { agentId: string; name: string
 
   return (
     <div role="status" style={{
+      borderRadius: 'var(--cth-r-md)',
       margin: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
       background: 'var(--cth-sky-light)', boxShadow: 'inset 0 0 0 1px var(--cth-sky)'
     }}>

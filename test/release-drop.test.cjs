@@ -124,7 +124,7 @@ test('ReleaseDrop renders no action buttons, only a close', () => {
   const src = readDrop();
   const buttons = src.match(/<button\b[\s\S]*?>/g) ?? [];
   assert.equal(buttons.length, 1, 'the release drop must carry exactly one chrome button');
-  assert.ok(/aria-label="Close/.test(buttons[0]), 'the only chrome button must be the close');
+  assert.ok(/aria-label=\{t\('releaseDrop\.close'\)\}/.test(buttons[0]), 'the only chrome button must be the close');
   assert.ok(!/Star|Restart|Later|Download|Open release/i.test(src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')),
     'no release action may be a chrome button');
 });
@@ -160,7 +160,7 @@ test('the CSP can no longer permit a remote stylesheet or font — it fails such
 test('the design fonts are self-hosted as data: URIs, so the frame needs no network', () => {
   const doc = buildDropSrcDoc('<h1>hi</h1>');
   // Both families the drop tokens name are present as @font-face data: URIs.
-  assert.match(doc, /@font-face[\s\S]*?font-family:\s*'Inter'[\s\S]*?src:\s*url\(data:font\/woff2;base64,/i);
+  assert.match(doc, /@font-face[\s\S]*?font-family:\s*'Sora'[\s\S]*?src:\s*url\(data:font\/woff2;base64,/i);
   assert.match(doc, /@font-face[\s\S]*?font-family:\s*'JetBrains Mono'[\s\S]*?src:\s*url\(data:font\/woff2;base64,/i);
   // …and they are real payloads, not empty placeholders.
   const b64 = [...doc.matchAll(/base64,([A-Za-z0-9+/=]+)\)/g)].map((m) => m[1]);

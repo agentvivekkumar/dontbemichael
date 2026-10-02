@@ -1080,6 +1080,8 @@ const api = {
     ipcRenderer.on('app:closeRequested', listener);
     return () => ipcRenderer.removeListener('app:closeRequested', listener);
   },
+  /** Quit the way Cmd-Q does: closing time when terminals are running. */
+  requestQuit: (): Promise<void> => ipcRenderer.invoke('app:requestQuit'),
   confirmClose: (): Promise<void> => ipcRenderer.invoke('app:confirmClose'),
   cancelClose: (): Promise<void> => ipcRenderer.invoke('app:cancelClose'),
 

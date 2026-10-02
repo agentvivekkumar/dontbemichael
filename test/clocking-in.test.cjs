@@ -21,8 +21,8 @@ test('startup captions are office words, and shown translated', () => {
   for (const f of ['src/renderer/src/store/store.ts', 'src/renderer/src/hooks/useHive.ts', 'src/renderer/src/hooks/useRestoreTeam.ts', 'src/renderer/src/components/AddAgentModal.tsx']) {
     assert.doesNotMatch(read(f), /action: '(?:reconnecting…|starting up)'/, f);
   }
-  assert.match(read('src/renderer/src/components/AgentCard.tsx'), /actionText\(action, t\)/);
-  assert.match(read('src/renderer/src/scene/office/OfficeFloor.tsx'), /c\.showThought\(actionText\(liveActivity\(agent\), t\)/);
+  assert.match(read('src/renderer/src/shell/PanelChrome.tsx'), /const raw = agent\.action\?\.trim\(\) \? actionText\(agent\.action\.trim\(\), t\) : '';/);
+  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /const caption = sentence\(\(live \? \(a\.action\?\.trim\(\) \? actionText\(live, t\) : live\) : ''\)/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).office.activity.clockingIn, loc);
   }
@@ -32,7 +32,7 @@ test('startup captions are office words, and shown translated', () => {
 
 test('an idle agent says "nothing to do" in the office (owner, 2026-09-27)', () => {
   const store = read('src/renderer/src/store/store.ts');
-  assert.match(store, /if \(action\.trim\(\)\.toLowerCase\(\) === 'idle'\) return t\('office\.activity\.idle'\);/);
+  assert.match(store, /const plain = action\.trim\(\)\.toLowerCase\(\);\n\s+if \(plain === 'idle'\) return t\('office\.activity\.idle'\);/);
   const en = JSON.parse(read('src/renderer/src/i18n/locales/en.json'));
   assert.equal(en.office.activity.idle, 'nothing to do');
   for (const loc of ['zh-CN', 'ar']) {

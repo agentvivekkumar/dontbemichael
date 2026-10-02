@@ -495,7 +495,7 @@ export function IdePanel() {
                   onClick={() => { setRailTab(k); if (gitCollapsed) toggleGitRail(); }}
                   style={{
                     padding: '1px 8px', border: 'none', cursor: 'pointer',
-                    fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '14px',
+                    fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '14px',
                     textTransform: 'uppercase', color: 'var(--cth-ink-700)',
                     background: railTab === k && !gitCollapsed ? 'var(--cth-sky-light)' : 'transparent',
                     boxShadow: railTab === k && !gitCollapsed ? 'inset 0 0 0 1px var(--cth-ink-300)' : 'none'
@@ -627,7 +627,7 @@ export function IdePanel() {
                 }}>
                   <Icon name="code" size={2} />
                   <div style={{
-                    fontFamily: 'var(--cth-font-display)', fontSize: 8, textTransform: 'uppercase',
+                    fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                     letterSpacing: 1, color: 'var(--cth-ink-700)'
                   }}>nothing open</div>
                   <div style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13 }}>
@@ -764,7 +764,7 @@ function SectionHeader({ title, right }: { title: string; right?: React.ReactNod
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px 4px',
-      fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px', textTransform: 'uppercase',
+      fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', textTransform: 'uppercase',
       color: 'var(--cth-ink-700)', background: 'var(--cth-cream-50)', borderBottom: '1px solid var(--cth-ink-100)'
     }}>
       <span style={{ flex: 1 }}>{title}</span>

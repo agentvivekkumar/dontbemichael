@@ -21,7 +21,7 @@ const orderMatch = wizard.match(/const order: Step\[\] = \[([^\]]+)\]/);
 const ORDER = orderMatch ? [...orderMatch[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]) : [];
 
 const STEP_RE = {
-  en: /^STEP (\d+) OF (\d+) · /,
+  en: /^Step (\d+) of (\d+) · /,
   'zh-CN': /^第 (\d+) 步，共 (\d+) 步 · /,
   ar: /^الخطوة (\d+) من (\d+) · /
 };
@@ -30,17 +30,14 @@ test('the wizard step order can be read from the component', () => {
   assert.ok(ORDER.length >= 2, 'could not find `const order: Step[]` in OnboardingWizard.tsx');
 });
 
-for (const [locale, re] of Object.entries(STEP_RE)) {
-  test(`${locale}: every step title shows its real position out of the real total`, () => {
+// The step indicator shows "Step N of M" (onboarding.stepOf) beside a title
+// per step (onboarding.stepTitle); the old "Step N of M · Title" strings are gone.
+for (const locale of Object.keys(STEP_RE)) {
+  test(`${locale}: every step has a title, and the counter takes its position and the total`, () => {
     const file = path.join(root, 'src/renderer/src/i18n/locales', `${locale}.json`);
-    const titles = JSON.parse(fs.readFileSync(file, 'utf8')).onboarding.titles;
-    ORDER.forEach((step, i) => {
-      const title = titles[step];
-      assert.equal(typeof title, 'string', `${locale}: no title for step "${step}"`);
-      const m = title.match(re);
-      assert.ok(m, `${locale}: "${step}" title has no step number: ${title}`);
-      assert.equal(Number(m[1]), i + 1, `${locale}: "${step}" says step ${m[1]}, is step ${i + 1}`);
-      assert.equal(Number(m[2]), ORDER.length, `${locale}: "${step}" says of ${m[2]}, there are ${ORDER.length}`);
-    });
+    const onboarding = JSON.parse(fs.readFileSync(file, 'utf8')).onboarding;
+    for (const step of ORDER) assert.equal(typeof onboarding.stepTitle[step], 'string', `${locale}: no title for step "${step}"`);
+    assert.match(onboarding.stepOf, /\{\{n\}\}/, `${locale}: stepOf has its position`);
+    assert.match(onboarding.stepOf, /\{\{total\}\}/, `${locale}: stepOf has the total`);
   });
 }

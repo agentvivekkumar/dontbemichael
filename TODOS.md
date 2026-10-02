@@ -26,6 +26,20 @@
 **Priority:** P2
 **Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
 
+## Attachments (from the Codex adversarial review of design/studio-v2, 2026-10-01)
+
+### Keep pasted screenshots somewhere durable
+
+**What:** A pasted screenshot is saved to the OS temp folder (`clipboard:saveImage` in `src/main/index.ts`), and only that path goes into the message. Save it in an app folder tied to the message instead, and delete it once the message is delivered or removed, and on startup.
+
+**Why:** A screenshot pasted into a busy team member's queue is persisted as a temp path. If the app quits or the Mac restarts before delivery, the restored queue can send a path that no longer exists, and every pasted image stays in temp until the OS clears it.
+
+**Context:** This predates the Studio redesign (the queue composer used it already); the redesign also lets Talk to Michael paste screenshots through `src/renderer/src/components/pasteAttachments.ts`, though those are sent at once.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
 ## Mailboxes (deferred from ship of feat/multi-mailbox, 2026-09-26)
 
 ### Keep each agent's mail pass out of other agents' reach
@@ -543,9 +557,9 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 **What:** A close dialog with a safe default and keyboard contract, and a tray so the office keeps running.
 
-**Why:** Closing the window stops every agent without warning today.
+**Why:** Closing the window ends the day for the whole office; there is no way to keep it running in the background.
 
-**Context:** `src/renderer/src/components/QuitWarningModal.tsx` exists for quit; the close path does not use it.
+**Context:** Since the Studio redesign, closing the main window with terminals running starts closing time on the floor (`ClosingTimeBar`, via `app:closeRequested` in `src/main/index.ts`), the same as quitting. What is left is the tray, and a choice between closing the window and quitting.
 
 **Effort:** M
 **Priority:** P1
@@ -720,7 +734,7 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ### Remove or rewrite the old project's website files in docs/
 
-**What:** What is left of the old project's website: `docs/blog/` with its source in `blog/`, `docs/sitemap.xml`, `.github/workflows/blog.yml`, and the upstream promo media in `docs/media/`. (The site pages, `docs/CNAME`, `robots.txt`, the Google verification file, the research, drops, hires gallery, evidence and deck were removed on 2026-09-28. `docs/llms.txt` and `docs/llms-full.txt` went in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
+**What:** What is left of the old project's website: `docs/blog/` with its source in `blog/`, `docs/sitemap.xml`, `.github/workflows/blog.yml`, and the upstream promo media that was in `docs/media/` (removed on 2026-10-01 with the v2 redesign). (The site pages, `docs/CNAME`, `robots.txt`, the Google verification file, the research, drops, hires gallery, evidence and deck were removed on 2026-09-28. `docs/llms.txt` and `docs/llms-full.txt` went in the 0.0.1 land: GitHub Pages is off for this repo, so nothing served them.)
 
 **Why:** They describe the other product.
 
@@ -732,11 +746,11 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ### Record demo videos of Don't Be Michael
 
-**What:** New demo videos of this app: a short hero clip for the top of the README, and an agents-at-work clip with a poster image to replace the one in the README's demo section.
+**What:** New demo videos of this app: a short hero clip for the top of the README, and an agents-at-work clip with a poster image for the README's "Watch the office work" section, which now shows a still.
 
-**Why:** `README.md` still embeds the old project's recordings, `docs/media/hero.mp4` (lines 28 and 29) and `docs/media/demo/agents.mp4` with `agents-poster.jpg` (line 197). They show the Munder Difflin UI from May to July, not business mode, Michael running the office or the hire wizard. The old landing demos (`hero-demo.mp4`, `hero-demo-9x16.mp4`, `floor.png`, `home-screen.png`) were deleted on 2026-09-28 for the same reason.
+**Why:** The README shows stills only. The old project's recordings (`docs/media/hero.mp4`, `docs/media/demo/agents.mp4`) were removed on 2026-10-01 with the v2 redesign, since they showed the Munder Difflin pixel UI.
 
-**Context:** Record the real app on a neutral example office (not MoblizeIT). Keep files small enough for the repo (the old ones were 1.5 to 4.7 MB), commit an mp4 plus a jpg poster, and point the README at them. Once replaced, delete the old files and whatever of `docs/media/demo/` and `landing-remotion/` is no longer used. The website repo may want the same clips.
+**Context:** The studio lab (`npm run lab`, `docs/demo/studio-lab.html?clean&autoplay`) plays the office on a neutral example office and is made for recording. Keep files small (under 5 MB), commit an mp4 plus a jpg poster under `docs/media/`, and point the README at them. Delete whatever of `landing-remotion/` is no longer used. The website repo may want the same clips.
 
 **Effort:** S
 **Priority:** P2

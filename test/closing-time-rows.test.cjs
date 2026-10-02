@@ -7,6 +7,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
 const { describeRow, actionMessage, headerLine } = loadTs('src/renderer/src/components/closingTimeRows.ts');
@@ -43,20 +45,22 @@ test('a refused or failed action shows a message; one that went through shows no
 
 test('the Remind limit is one shared value for main and the dialog', () => {
   // Value: protects="reminded" shows exactly as long as main refuses a second reminder; fails_when=one side hard-codes its own number; why_new=they were linked only by a comment; seam=none
-  const fs = require('node:fs');
-  const path = require('node:path');
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   assert.equal(CLOSING_TIME_REMIND_MS, 30_000);
   assert.match(read('src/main/closingTime.ts'), /now - at < CLOSING_TIME_REMIND_MS\) return/);
-  assert.match(read('src/renderer/src/components/QuitWarningModal.tsx'), /< CLOSING_TIME_REMIND_MS/);
+  assert.match(read('src/renderer/src/components/ClosingTimeBar.tsx'), /< CLOSING_TIME_REMIND_MS/);
 });
 
 test('the counter strip moves on to the orchestrator, and says when his terminal ended', () => {
   // Value: protects=the header agrees with the rows below it; fails_when=headerLine ignores waiting or godLive; why_new=replaces source regexes (review run 2); seam=none
-  assert.equal(headerLine({ acked: 1, total: 3, waiting: ['a', 'b'] }), '1 / 3 WORKERS CONFIRMED');
-  assert.equal(headerLine({ acked: 2, total: 3, waiting: [] }), '2 / 3 WORKERS CONFIRMED. WAITING FOR THE ORCHESTRATOR', 'one closed without');
-  assert.equal(headerLine({ acked: 3, total: 3 }), '3 / 3 WORKERS CONFIRMED. WAITING FOR THE ORCHESTRATOR');
-  assert.equal(headerLine({ acked: 1, total: 3, waiting: ['a'], godLive: false }), "1 / 3 WORKERS CONFIRMED. THE ORCHESTRATOR'S TERMINAL ENDED");
-  assert.equal(headerLine({ acked: 0, total: 0 }), 'NO WORKERS ON THE FLOOR. WAITING FOR THE ORCHESTRATOR');
-  assert.equal(headerLine({ acked: 0, total: 0, godLive: false }), "NO WORKERS ON THE FLOOR. THE ORCHESTRATOR'S TERMINAL ENDED");
+  // The real English strings, interpolated the way i18next does.
+  const en = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/renderer/src/i18n/locales/en.json'), 'utf8'));
+  const tt = (key, opts = {}) => key.split('.').reduce((o, k) => o[k], en).replace(/\{\{(\w+)\}\}/g, (_, k) => String(opts[k]));
+  const h = (c) => headerLine(c, tt);
+  assert.equal(h({ acked: 1, total: 3, waiting: ['a', 'b'] }), '1 / 3 workers confirmed');
+  assert.equal(h({ acked: 2, total: 3, waiting: [] }), '2 / 3 workers confirmed. Waiting for the orchestrator', 'one closed without');
+  assert.equal(h({ acked: 3, total: 3 }), '3 / 3 workers confirmed. Waiting for the orchestrator');
+  assert.equal(h({ acked: 1, total: 3, waiting: ['a'], godLive: false }), "1 / 3 workers confirmed. The orchestrator's terminal ended");
+  assert.equal(h({ acked: 0, total: 0 }), 'No workers on the floor. Waiting for the orchestrator');
+  assert.equal(h({ acked: 0, total: 0, godLive: false }), "No workers on the floor. The orchestrator's terminal ended");
 });

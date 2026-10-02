@@ -58,10 +58,10 @@ export function OneOnOneLine({ agent }: { agent: Agent }) {
   const { busy, err, setHold } = useSetHold(agent.id);
   return (
     <div role="region" aria-label={t('ownerVia.inOneOnOne', { name: agent.name })} style={{
-      margin: '8px 8px 0', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 8,
-      background: 'var(--cth-lemon-light)', boxShadow: 'inset 0 0 0 1px var(--cth-lemon)'
+      margin: '10px 14px 0', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 'var(--cth-r-lg)',
+      background: 'var(--cth-indigo-soft)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-indigo) 30%, transparent)'
     }}>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-indigo-text)', fontWeight: 600 }}>
         {err ? `! ${t('ownerVia.holdFailed')}` : t('ownerVia.inOneOnOneNote', { name: agent.name, godName })}
       </span>
       <PixelButton variant="secondary" size="sm" onClick={() => setHold(false)} disabled={busy}>{t('ownerVia.endOneOnOne')}</PixelButton>
@@ -97,26 +97,28 @@ export function OwnerViaMichaelBar({ agent }: { agent: Agent }) {
 
   return (
     <div role="region" aria-label={t('ownerVia.regionAria', { name: agent.name })} style={{
-      margin: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
-      background: stuck ? 'var(--cth-coral-light)' : 'var(--cth-sky-light)',
-      boxShadow: `inset 0 0 0 1px ${stuck ? 'var(--cth-coral)' : 'var(--cth-sky)'}`
+      // Design v2 Work tab (branding/DESIGN.md 7.12): two actions under the
+      // terminal, and one line of why. Coral only when the owner is needed.
+      padding: '10px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8,
+      background: stuck ? 'var(--cth-coral-soft)' : 'transparent',
+      borderTop: '1px solid var(--cth-line)'
     }}>
-      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+      <div style={{ fontSize: 11.5, lineHeight: '16px', color: stuck ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)', fontWeight: stuck ? 600 : 400 }}>
         {stuck
           ? t('ownerVia.stuck', { name: agent.name })
           : t('ownerVia.explain', { name: agent.name, godName })}
       </div>
-      {err && <div role="alert" style={{ fontSize: 14, color: 'var(--cth-coral)' }}>! {t('ownerVia.holdFailed')}</div>}
+      {err && <div role="alert" style={{ fontSize: 12, color: 'var(--cth-coral-text)' }}>{t('ownerVia.holdFailed')}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {stuck ? (
           <>
-            <PixelButton variant="primary" size="sm" onClick={talkOneOnOne} disabled={busy}>{t('ownerVia.talk')}</PixelButton>
-            <PixelButton variant="secondary" size="sm" onClick={messageMichael} disabled={!godId}>{t('ownerVia.message', { godName, name: agent.name })}</PixelButton>
+            <PixelButton variant="primary" size="md" onClick={talkOneOnOne} disabled={busy}>{t('ownerVia.talk')}</PixelButton>
+            <PixelButton variant="secondary" size="md" onClick={messageMichael} disabled={!godId}>{t('ownerVia.message', { godName, name: agent.name })}</PixelButton>
           </>
         ) : (
           <>
-            <PixelButton variant="primary" size="sm" onClick={messageMichael} disabled={!godId}>{t('ownerVia.message', { godName, name: agent.name })}</PixelButton>
-            <PixelButton variant="secondary" size="sm" onClick={talkOneOnOne} disabled={busy}>{t('ownerVia.talk')}</PixelButton>
+            <PixelButton variant="secondary" size="md" onClick={messageMichael} disabled={!godId}>{t('ownerVia.message', { godName, name: agent.name })}</PixelButton>
+            <PixelButton variant="primary" size="md" onClick={talkOneOnOne} disabled={busy}>{t('ownerVia.talk')}</PixelButton>
           </>
         )}
       </div>

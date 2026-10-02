@@ -15,7 +15,7 @@
  * click on it brings the toast back.
  */
 import { useEffect, useState } from 'react';
-import { Icon } from '@/components/Icon';
+import { Spark } from '@/components/UpdateToast';
 import { cliUpdateToastVisible, type CliUpdateStatus } from '@shared/cliUpdate';
 
 /** The installed version the owner said "later" to. `cth.`-prefixed renderer
@@ -62,43 +62,27 @@ export function CliUpdateToast({ onCloseAndReopen }: { onCloseAndReopen: (liveAg
   // terminal ended) keeps the toast, so the offer is still there after.
   const go = () => { void onCloseAndReopen(status.live).then((ok) => { if (ok) later(); }); };
 
-  const buttonStyle: React.CSSProperties = {
-    padding: '3px 10px 1px',
-    background: 'var(--cth-mint-light, #d0f0e0)',
-    boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-    fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-    color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-  };
-
   return (
-    <div style={{
-      // Top-right, under the title bar: the bottom-right corner belongs to the
-      // app-update and completion toasts, and these can all be up at once.
-      position: 'fixed', right: 16, top: 48, zIndex: 400,
-      maxWidth: 340,
-      background: 'var(--cth-cream-50)',
-      boxShadow: '0 0 0 2px var(--cth-ink-900), 4px 5px 0 0 rgba(26,19,32,0.25)',
-      padding: '10px 12px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-      fontFamily: 'var(--cth-font-ui)'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name="sparkle" />
-        <span style={{ fontSize: 13, color: 'var(--cth-ink-900)', fontWeight: 600 }}>
+    // Top right, under the top bar: the bottom right corner belongs to the
+    // app update and completion toasts, and these can all be up at once.
+    <div className="cth-toast" style={{ right: 16, top: 64 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Spark />
+        <span className="cth-toast-title">
           Your team has an upgrade waiting
         </span>
       </div>
-      <span role="status" style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
+      <span role="status" className="cth-toast-body">
         Claude Code {status.installed} is installed, but {status.behind === 1 ? '1 agent is' : `${status.behind} agents are`} still
         on the older version. Close the office and reopen to switch everyone over. Each agent
         saves its work first, so nothing is lost. Nothing restarts until you say so.
       </span>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button onClick={later} style={{ ...buttonStyle, background: 'var(--cth-cream-100)' }}>
-          later
+        <button className="cth-toast-btn" onClick={later}>
+          Later
         </button>
-        <button onClick={go} style={buttonStyle}>
-          close office &amp; reopen
+        <button className="cth-toast-btn primary" onClick={go}>
+          Close office &amp; reopen
         </button>
       </div>
     </div>
@@ -116,15 +100,13 @@ export function CliUpdateBadge() {
       title={`Claude Code ${status.installed} is installed. Close the office and reopen to use it.`}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '2px 8px', margin: 0,
-        background: 'var(--cth-mint-light, #d0f0e0)',
-        border: 'none', borderRadius: 2,
-        boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-        fontFamily: 'var(--cth-font-ui)', fontSize: 13, lineHeight: '18px',
-        color: 'var(--cth-ink-900)', fontWeight: 600, cursor: 'pointer'
+        height: 26, padding: '0 10px', margin: 0,
+        background: 'var(--cth-green-soft)', color: 'var(--cth-green-text)',
+        border: 'none', borderRadius: 999,
+        fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600, cursor: 'pointer'
       }}
     >
-      team upgrade ready
+      Team upgrade ready
     </button>
   );
 }

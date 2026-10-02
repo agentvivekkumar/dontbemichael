@@ -6,15 +6,15 @@ by release.
 
 ## Part 1: Feature highlights
 
-**One line:** An AI office for your small business. Brief Michael, your office manager, and a team
-of AI employees does the work on your Mac.
+**One line:** An AI office for your small business. Talk to Michael, your office manager, and a
+team of AI employees does the work on your Mac.
 
 **Short pitch:** Pick your kind of business and your team. Every team member is an AI agent with a
 job, its own folder, its own mailbox and its own memory. Michael hands out the work, keeps the team
 moving, and brings you only the decisions that need you.
 
 ### 1. Michael runs the office
-- You brief one person. Michael sends each job to whoever's job it is, runs an hourly standup,
+- You talk to one person. Michael sends each job to whoever's job it is, runs an hourly standup,
   keeps the task board right and brings you only what needs you.
 - Only Michael assigns work. When one team member needs another to do something, it goes through
   Michael, so work never bounces between two agents. Teammates can still ask each other questions.
@@ -39,7 +39,7 @@ moving, and brings you only the decisions that need you.
 - Choose Can send or Draft only for each one. A team member can't reach a mailbox you didn't give it.
 
 ### 4. Jobs on a clock
-- Each team member's schedules sit on its Capabilities tab. Name the job ("Check the support
+- Each team member's schedules sit on its Access tab. Name the job ("Check the support
   inbox") and when, and it does the job the way its work style says.
 - One job can run at several times: every 2 hours on weekdays between 8 and 6, plus 2 pm at weekends.
 - Closing time pauses the office; opening it runs a missed job once, never a backlog.
@@ -53,16 +53,17 @@ moving, and brings you only the decisions that need you.
   whole team, searchable by meaning.
 
 ### 6. You stay in charge
-- Spending money, deleting things and anything public come to you first, on the Ask me board.
+- Spending money, deleting things and anything public come to you first, on the Needs you board.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
   change it. Enforced by Claude Code's sandbox and checked again by the app.
 - House rules for every agent: say where a fact came from, say when it doesn't know, never make up
   people, customers or quotes. A looping agent is steered, then held, then stopped.
 
 ### 7. An office you can watch
-- A pixel office floor with the cast of The Office: team members walk to their stations, envelopes
-  fly between desks, and idle agents chat by the coffee machine in character.
-- Every team member has a Profile, Capabilities, Messages and Memory tab written for owners, not
+- A pod for each department around Michael's glass office. Desks light up as team members clock
+  in and go dark at closing time, envelopes fly between pods as work moves, and idle teammates
+  trade lines across the office.
+- Every team member has a Profile, Access, Messages, Memory and Work tab written for owners, not
   developers. Views for the task board and for who talks to whom.
 
 ### 8. Built for small business owners
@@ -72,6 +73,20 @@ moving, and brings you only the decisions that need you.
 - English, Simplified Chinese and Arabic (right to left).
 
 ## Part 2: Every change, release by release
+
+### 0.0.14 (2026-10-01)
+- A new look, Studio. The pixel floor is gone: the office is a calm isometric studio with a pod
+  and a chip for each team, lights that come up as the office opens, and handoffs, mail and
+  Michael's numbers drawn from real events. Every screen, dialog, setup step and Settings field
+  uses the same fonts, colors and inputs, in light and dark.
+- Idle team members say lines from The Office, and two of them trade a line by paper plane or
+  envelope. A quiet pod's card rolls down from under its chip, and selecting someone dims the rest.
+- Needs you is the one count. Ask me cards have plain titles, the answer box and Talk to Michael
+  grow as you type, and Talk to Michael takes pasted screenshots and files. Task detail shows the
+  card's notes.
+- Closing time runs on the floor with Cancel and Force quit, starts from the clock menu too, and
+  leaves open dialogs as they were. A team member's tabs are Profile, Access, Messages, Memory
+  and Work.
 
 ### 0.0.13 (2026-09-30)
 - Claude Code updates itself, but team members already running keep the old version until they

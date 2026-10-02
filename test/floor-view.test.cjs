@@ -24,29 +24,35 @@ test('the office shows by default, and the choice is remembered', () => {
   assert.deepEqual(r, { first: 'office', now: 'tasks', saved: 'tasks' });
 });
 
-test('the toggle sits in the floor\'s bottom left corner, over the board, which leaves it room', () => {
+// Design v2 (branding/DESIGN.md 7.2): the view switch is the tab group in the
+// top bar; the board covers the office and leaves room for the bottom bar.
+test('the view tabs sit in the top bar, and the board covers the office above the bottom bar', () => {
   const app = read('src/renderer/src/App.tsx');
-  const office = app.indexOf('<OfficeFloor />');
+  const office = app.indexOf('<StudioStage config={config} bleed={sidebarWidth + 10} />');
   const board = app.indexOf("{floorView !== 'office' && (");
-  const toggle = app.indexOf('<FloorViewToggle />');
-  assert.ok(office > 0 && board > office && toggle > board, 'office, then the board over it, then the toggle over both');
-  assert.match(app.slice(board, board + 700), /position: 'absolute', inset: 0, zIndex: 50,[\s\S]*paddingBottom: 52,[\s\S]*\{floorView === 'tasks' && <TasksKanban \/>\}/);
-  assert.match(app.slice(toggle - 200, toggle), /position: 'absolute', left: 12, bottom: 12, zIndex: 60/);
-  // No header strip above the floor any more.
-  assert.doesNotMatch(app, /flexDirection: 'column', gap: 8 \}\}>\s*\{\/\* OFFICE \| TASKS/);
+  const bottom = app.indexOf('<BottomBar config={config} />');
+  assert.ok(office > 0 && board > office && bottom > board, 'office, then the board over it, then the bottom bar over both');
+  assert.match(app.slice(board, board + 700), /position: 'absolute', inset: 0, zIndex: 50,[\s\S]*paddingBottom: 96,[\s\S]*\{floorView === 'tasks' && <TasksKanban \/>\}/);
+  assert.match(read('src/renderer/src/shell/TopBar.tsx'), /<ViewTabs \/>/);
+  assert.doesNotMatch(app, /<FloorViewToggle \/>/);
 });
 
 test('the office pauses while the board covers it, and its whiteboard opens the board', () => {
-  const floor = read('src/renderer/src/scene/office/OfficeFloor.tsx');
-  assert.match(floor, /const paused = !!fullscreenAgentId \|\| ideOpen \|\| docHidden \|\| floorView !== 'office';/);
-  const board = floor.indexOf("boardG.on('pointertap'");
-  assert.match(floor.slice(board, board + 300), /setFloorView\('tasks'\)/);
+  const floor = read('src/renderer/src/scene/studio/StudioStage.tsx');
+  assert.match(floor, /const paused = docHidden \|\| floorView !== 'office' \|\| !!fullscreenAgentId;/);
+  assert.match(floor, /onClick=\{\(\) => useStore\.getState\(\)\.setFloorView\('tasks'\)\}/);
 });
 
-test('the toggle counts blocked cards so trouble shows on the office view too', () => {
-  const src = read('src/renderer/src/components/FloorViewToggle.tsx');
-  assert.match(src, /parseTasks\(raw\)\.filter\(\(x\) => x\.status === 'blocked'\)\.length/);
-  assert.match(src, /option\('tasks', 'check', t\('floorView\.tasks'\), blocked\)/);
+/**
+ * Only Needs you carries a coral count (owner, 2026-10-01): a blocked count on
+ * the Tasks tab beside it read as the same thing with a different number
+ * (7 blocked, 6 waiting on you). Blocked work shows on the board itself.
+ */
+test('the Tasks tab carries no count; Needs you is the one number for the owner', () => {
+  const src = read('src/renderer/src/shell/TopBar.tsx');
+  assert.match(src, /tab\('tasks', t\('floorView\.tasks'\)\)/);
+  assert.doesNotMatch(src, /useTaskCounts/);
+  assert.doesNotMatch(src, /blockedTitle/);
 });
 
 /**
@@ -77,7 +83,7 @@ test('the floor has a GRAPH view, remembered like the others', () => {
   assert.deepEqual(r, { first: 'graph', saved: 'office' });
   const app = read('src/renderer/src/App.tsx');
   assert.match(app, /\{floorView === 'graph' && \(\s*<MemoryGraphPanel godId=\{godId\} onJumpToMemory=\{\(id\) => useStore\.getState\(\)\.openAgentMemory\(id\)\} \/>/);
-  assert.match(read('src/renderer/src/components/FloorViewToggle.tsx'), /option\('graph', 'web', t\('floorView\.graph'\)\)/);
+  assert.match(read('src/renderer/src/shell/TopBar.tsx'), /tab\('graph', t\('floorView\.graph'\)\)/);
 });
 
 test('clicking an agent in the graph opens its memory on Michael\'s panel', () => {
@@ -92,15 +98,13 @@ test('clicking an agent in the graph opens its memory on Michael\'s panel', () =
   assert.doesNotMatch(cc, /MemoryGraphPanel|key: 'graph'/);
 });
 
-test('TASKS and GRAPH open with a plain line on what they are', () => {
-  const app = read('src/renderer/src/App.tsx');
-  const board = app.indexOf("{floorView !== 'office' && (");
-  assert.match(app.slice(board, board + 900), /<FloorViewIntro view=\{floorView\} \/>\s*\{floorView === 'tasks' && <TasksKanban \/>\}/);
+// Design v2: the explanation sits behind an info icon in each view's header
+// (fields first, DESIGN.md 2.6), not in a line above it.
+test('TASKS and GRAPH explain themselves behind an info icon', () => {
+  assert.match(read('src/renderer/src/components/TasksKanban.tsx'), /<InfoTip text=\{t\('floorView\.tasksIntro'\)\} \/>/);
+  assert.match(read('src/renderer/src/components/MemoryGraphPanel.tsx'), /<InfoTip text=\{t\('floorView\.graphIntroShort'\)\} \/>/);
   for (const l of ['en', 'zh-CN', 'ar']) {
     const j = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`));
-    for (const k of ['tasksIntroTitle', 'tasksIntro', 'graphIntroTitle', 'graphIntro']) assert.ok(j.floorView[k], `${l} ${k}`);
-    // The intro names the board's own columns, so they must match.
-    const cols = [j.kanban.colBlocked, j.kanban.colDone].map((c) => c.toLowerCase());
-    for (const c of cols) assert.ok(j.floorView.tasksIntro.toLowerCase().includes(c), `${l} intro names "${c}"`);
+    for (const k of ['tasksIntro', 'graphIntroShort']) assert.ok(j.floorView[k], `${l} ${k}`);
   }
 });

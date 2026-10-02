@@ -1,3 +1,4 @@
-- **Know when Claude Code updated under your team:** a chip and note appear.
-- **One click closes the office safely and reopens** on the new version.
-- **Nothing restarts on its own;** "later" waits for a newer version.
+- **A new look, Studio:** a calm office in place of the pixel floor.
+- **Idle teammates trade lines** from The Office by paper plane.
+- **Plain Ask me cards;** reply boxes grow as you type.
+- **Closing time runs on the floor,** with Cancel and Force quit.

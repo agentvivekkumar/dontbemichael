@@ -1,5 +1,5 @@
 /**
- * What each closing-time row says (QuitWarningModal's ClosingTimeRows), kept
+ * What each closing-time row says (ClosingTimeBar's list of who is still working), kept
  * out of the component so it can be tested without rendering React.
  */
 import type { Agent } from '@/store/store';
@@ -42,13 +42,17 @@ export function actionMessage(res: { ok: boolean; error?: string } | undefined, 
 
 /**
  * The counter strip above the rows. Its words are the dialog's original
- * English (owner, 2026-09-29: the existing dialog words stay); it moves on to
- * the orchestrator once nobody is left to wait for, and says so when
- * Michael's own terminal has ended.
+ * English (owner, 2026-09-29: the existing dialog words stay), translated and
+ * in sentence case for design v2. It moves on to the orchestrator once nobody
+ * is left to wait for, and says so when Michael's own terminal has ended.
  */
-export function headerLine(c: { acked: number; total: number; waiting?: string[]; godLive?: boolean }): string {
-  const tail = c.godLive === false ? "THE ORCHESTRATOR'S TERMINAL ENDED" : 'WAITING FOR THE ORCHESTRATOR';
-  if (c.total <= 0) return `NO WORKERS ON THE FLOOR. ${tail}`;
+export function headerLine(
+  c: { acked: number; total: number; waiting?: string[]; godLive?: boolean },
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  const tail = c.godLive === false ? t('closingTime.orchestratorEnded') : t('closingTime.waitingOrchestrator');
+  if (c.total <= 0) return `${t('closingTime.noWorkers')}. ${tail}`;
   const nobodyLeft = c.acked >= c.total || (c.waiting !== undefined && c.waiting.length === 0);
-  return `${c.acked} / ${c.total} WORKERS CONFIRMED${c.godLive === false || nobodyLeft ? `. ${tail}` : ''}`;
+  const head = t('closingTime.confirmedCount', { acked: c.acked, total: c.total });
+  return c.godLive === false || nobodyLeft ? `${head}. ${tail}` : head;
 }

@@ -25,6 +25,7 @@ const PROVIDER_LABEL: Record<LocalSkill['provider'], string> = {
 function Chip({ text, tone = 'quiet' }: { text: string; tone?: 'quiet' | 'accent' }) {
   return (
     <span style={{
+      borderRadius: 'var(--cth-r-md)',
       fontSize: 10, fontFamily: 'var(--cth-font-display)', letterSpacing: 0.4,
       padding: '2px 6px', flexShrink: 0, textTransform: 'uppercase',
       color: 'var(--cth-ink-900)',
@@ -181,9 +182,10 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder={mode === 'installed' ? t('skillsTab.searchInstalled') : t('skillsTab.searchCatalog')}
           style={{
+            borderRadius: 'var(--cth-r-md)',
             flex: 1, minWidth: 140, padding: '4px 8px',
             background: 'var(--cth-paper-100)', color: 'var(--cth-ink-900)',
-            border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+            border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
             fontFamily: 'var(--cth-font-ui)', fontSize: 12
           }}
         />
@@ -193,9 +195,10 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
             onChange={(e) => setCategory(e.target.value)}
             title={t('skillsTab.categoryTitle')}
             style={{
+              borderRadius: 'var(--cth-r-md)',
               padding: '4px 6px', maxWidth: 210,
               background: 'var(--cth-paper-100)', color: 'var(--cth-ink-900)',
-              border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               fontFamily: 'var(--cth-font-ui)', fontSize: 12
             }}
           >
@@ -208,9 +211,10 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
             style={{
+              borderRadius: 'var(--cth-r-md)',
               padding: '4px 6px', maxWidth: 190,
               background: 'var(--cth-paper-100)', color: 'var(--cth-ink-900)',
-              border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+              border: 'none', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
               fontFamily: 'var(--cth-font-ui)', fontSize: 12
             }}
           >
@@ -294,6 +298,7 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
           <>
             {catalogMeta?.error && (
               <div style={{
+                borderRadius: 'var(--cth-r-md)',
                 marginBottom: 8, padding: 8, fontSize: 12, color: 'var(--cth-ink-900)',
                 background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)'
               }}>
@@ -349,7 +354,7 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
 
 const rowStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 5, padding: 10,
-  background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+  background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
   color: 'var(--cth-ink-900)'
 };
 

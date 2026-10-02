@@ -122,7 +122,6 @@ test('new schedule strings exist in every language', () => {
       'loadError', 'saveFailed', 'sure', 'deleteIt', 'keep', 'addedByYou', 'addedBy', 'runAria', 'closedGroup', 'closedNote', 'relayHint'],
     askMe: ['scheduleTitle', 'scheduleAdd', 'scheduleUpdate', 'schedulePause', 'scheduleResume', 'scheduleDelete', 'scheduleStale', 'approve', 'decline'],
     agentDetail: ['killConfirmSchedules', 'killConfirmSchedulesPlural'],
-    agentCard: ['nextRun'],
     capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'emailOff', 'canCheck', 'mailbox', 'pickMailbox', 'addMailbox']
   };
   for (const loc of ['en', 'zh-CN', 'ar']) {

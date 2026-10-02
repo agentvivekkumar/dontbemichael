@@ -60,7 +60,7 @@ function glyphFor(kind: string, label: string): { mono: string; bg: string } {
   return GLYPH[kind] ?? { mono: (label.replace(/[^A-Za-z0-9]/g, '').slice(0, 2) || '··'), bg: '#6B5878' };
 }
 
-const dispLabel: CSSProperties = { fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' };
+const dispLabel: CSSProperties = { fontFamily: 'var(--cth-font-display)', fontSize: 10, fontWeight: 600, lineHeight: '12px', color: 'var(--cth-ink-500)', textTransform: 'uppercase' };
 const fieldLabel: CSSProperties = { ...dispLabel, color: 'var(--cth-ink-700)' };
 const subText: CSSProperties = { fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' };
 const hint: CSSProperties = { fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-500)' };
@@ -70,7 +70,7 @@ const linkBtn: CSSProperties = { background: 'none', border: 'none', cursor: 'po
 function Glyph({ mono, bg, lg }: { mono: string; bg: string; lg?: boolean }) {
   const size = lg ? 48 : 40;
   return (
-    <div style={{ width: size, height: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, color: '#fff', boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-500)', fontFamily: 'var(--cth-font-display)', fontSize: lg ? 13 : 11 }}>{mono}</div>
+    <div style={{ borderRadius: 'var(--cth-r-md)', width: size, height: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, color: '#fff', boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)', fontFamily: 'var(--cth-font-display)', fontSize: lg ? 13 : 11 }}>{mono}</div>
   );
 }
 
@@ -220,6 +220,7 @@ export function IntegrationsRegistry() {
             const g = glyphFor(t.kind, t.label);
             return (
               <button key={t.idSuggestion} type="button" onClick={() => setPicked(t.idSuggestion)} style={{
+                borderRadius: 'var(--cth-r-md)',
                 display: 'flex', alignItems: 'center', gap: 10, padding: 10, textAlign: 'left', cursor: 'pointer', border: 'none',
                 background: on ? 'var(--cth-lemon-light, #FFEC99)' : 'var(--cth-paper-100)',
                 boxShadow: `inset 0 0 0 ${on ? 2 : 1}px ${on ? 'var(--cth-ink-900)' : 'var(--cth-ink-300)'}`
@@ -252,7 +253,7 @@ export function IntegrationsRegistry() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <button type="button" onClick={draft.isNew ? startAdd : goList} style={linkBtn}>{draft.isNew ? tr('integrations.backToTemplates') : tr('integrations.backToList')}</button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+        <div style={{ borderRadius: 'var(--cth-r-md)', display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
           <Glyph mono={g.mono} bg={g.bg} lg />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-ink-900)' }}>{tpl?.label ?? draft.kind}</span>
@@ -304,7 +305,7 @@ export function IntegrationsRegistry() {
             <span style={fieldLabel}>{secretLabel}</span>
             {showSavedPill ? (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 12, color: 'var(--cth-ink-500)', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)', padding: '6px 10px', letterSpacing: 2 }}>•••••••• {tr('integrations.saved')}</span>
+                <span style={{ borderRadius: 'var(--cth-r-md)', fontFamily: 'var(--cth-font-mono)', fontSize: 12, color: 'var(--cth-ink-500)', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', padding: '6px 10px', letterSpacing: 2 }}>•••••••• {tr('integrations.saved')}</span>
                 <PixelButton variant="secondary" size="sm" onClick={() => { setReplacing(true); setShowSecret(false); patch({ secret: '' }); }}>{tr('integrations.replaceKey')}</PixelButton>
               </div>
             ) : (
@@ -313,7 +314,7 @@ export function IntegrationsRegistry() {
                   <input type={showSecret ? 'text' : 'password'} value={draft.secret} onChange={(e) => patch({ secret: e.target.value })} placeholder={`${tr('integrations.pasteYour')} ${secretLabel.toLowerCase()}`} autoComplete="off" style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)' }} />
                   <PixelButton variant="secondary" size="sm" onClick={() => setShowSecret((s) => !s)} disabled={!draft.secret}>{showSecret ? tr('common.hide') : tr('common.show')}</PixelButton>
                 </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '7px 9px', background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100, var(--cth-ink-300))', ...hint }}>
+                <div style={{ borderRadius: 'var(--cth-r-md)', display: 'flex', gap: 6, alignItems: 'flex-start', padding: '7px 9px', background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100, var(--cth-ink-300))', ...hint }}>
                   🔒&nbsp;<span><b style={{ color: 'var(--cth-ink-700)' }}>{tr('integrations.writeOnly')}.</b> {tr('integrations.secretDesc')}{!draft.isNew && draft.hasSecret ? ` ${tr('integrations.blankKeepsKey')}` : ''}</span>
                 </div>
                 {tpl?.secretHelp && <span style={hint}>{tpl.secretHelp}</span>}
@@ -364,7 +365,7 @@ export function IntegrationsRegistry() {
       </div>
 
       {records.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+        <div style={{ borderRadius: 'var(--cth-r-md)', padding: 24, textAlign: 'center', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
           <p style={{ margin: '0 0 12px', fontSize: 12, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{tr('integrations.empty')}</p>
           <PixelButton variant="primary" size="sm" onClick={startAdd} disabled={templates.length === 0}>+ {tr('integrations.addFirst')}</PixelButton>
         </div>
@@ -382,7 +383,7 @@ export function IntegrationsRegistry() {
                   : { dot: '●', color: 'var(--cth-mint-700, #1f7a4d)', text: tr('integrations.enabled') };
               const rt = rowTest[r.id];
               return (
-                <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)' }}>
+                <div key={r.id} style={{ borderRadius: 'var(--cth-r-md)', display: 'flex', flexDirection: 'column', gap: 6, padding: 10, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Glyph mono={g.mono} bg={g.bg} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>

@@ -20,8 +20,11 @@ test('this build hides git', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_GIT, false);
 });
 
-test('the agent sidebar drops the GIT tab, and a saved GIT tab opens the terminal', () => {
-  assert.match(read('src/renderer/src/components/SidebarTabs.tsx'), /ALL_TABS\.filter\(\(tab\) => tab\.key !== 'git' \|\| SHOW_GIT\)/);
+test('the agent sidebar drops the GIT and TRACES tabs; saved ones open elsewhere', () => {
+  assert.match(read('src/renderer/src/components/SidebarTabs.tsx'), /ALL_TABS\.filter\(\(tab\) => \(tab\.key !== 'git' \|\| SHOW_GIT\) && \(tab\.key !== 'traces' \|\| SHOW_TRACES\)\)/);
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_TRACES, false);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /SHOW_TRACES && sidebarTab === 'traces'/);
+  assert.match(read('src/renderer/src/store/store.ts'), /if \(v === 'traces'\) return SHOW_TRACES \? v : 'profile';/);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /SHOW_GIT && sidebarTab === 'git'/);
   assert.match(read('src/renderer/src/store/store.ts'), /if \(v === 'git'\) return SHOW_GIT \? v : 'terminal';/);
 });
@@ -139,9 +142,10 @@ test('nothing is sent while usage stats are hidden, whatever the saved setting',
  */
 test('the header hides the auto mode text', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_AUTO_MODE_LABEL, false);
-  const app = read('src/renderer/src/App.tsx');
-  const label = app.indexOf("'auto mode on' : 'auto mode off'");
-  assert.ok(label > 0 && app.slice(label - 300, label).includes('{SHOW_AUTO_MODE_LABEL && ('), 'header text is behind the switch');
+  // Design v2's top bar (shell/TopBar.tsx) has no auto mode text at all.
+  for (const f of ['src/renderer/src/App.tsx', 'src/renderer/src/shell/TopBar.tsx']) {
+    assert.doesNotMatch(read(f), /auto mode on/, f);
+  }
 });
 
 /**
@@ -152,7 +156,7 @@ test('the header hides the auto mode text', () => {
 test('the close agent button is hidden everywhere', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_CLOSE_AGENT, false);
   assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'),
-    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
+    /\{isReal && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="md" onClick=\{onKill\}>/);
   assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'),
     /\{!agent\.isGod && SHOW_CLOSE_AGENT && \(\s*<PixelButton variant="destructive" size="sm" onClick=\{onKill\}>/);
 });
@@ -215,7 +219,7 @@ test('voice Michael cannot hire', () => {
  */
 test('voice is off everywhere', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_VOICE, false);
-  for (const f of ['AgentCard.tsx', 'FullscreenTerminal.tsx']) {
+  for (const f of ['FullscreenTerminal.tsx']) {
     const src = read(`src/renderer/src/components/${f}`);
     assert.match(src, /\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/, `${f}: Talk toggle behind SHOW_VOICE`);
     assert.doesNotMatch(src.replace(/\{SHOW_VOICE && <RealtimeMichaelToggle \/>\}/g, ''), /<RealtimeMichaelToggle \/>/, `${f}: no ungated toggle`);
@@ -229,10 +233,11 @@ test('voice is off everywhere', () => {
   assert.match(read('src/main/index.ts'), /ipcMain\.handle\('freeflow:transcribe'[\s\S]{0,200}if \(!SHOW_VOICE\) return \{ ok: false/);
 });
 
-test('this build hides the office theme, and a theme picked earlier falls back to the office', () => {
+test('the pixel office themes are gone with the floor', () => {
   assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_OFFICE_THEME, false);
-  assert.match(read('src/renderer/src/components/SettingsModal.tsx'), /\{SHOW_OFFICE_THEME && <OfficeThemePicker config=\{config\} \/>\}/);
-  assert.match(read('src/renderer/src/App.tsx'), /setOfficeTheme\(SHOW_OFFICE_THEME && c\.tvShowOffices \?/);
+  assert.doesNotMatch(read('src/renderer/src/components/SettingsModal.tsx'), /OfficeThemePicker/);
+  assert.doesNotMatch(read('src/renderer/src/App.tsx'), /setOfficeTheme/);
+  assert.equal(fs.existsSync(path.resolve(__dirname, '../src/renderer/src/scene/office/themeRegistry.ts')), false);
 });
 
 test('this build hides the automatic updates switch; Check for updates stays', () => {
@@ -272,7 +277,7 @@ test('Add Agent hides import hire and its AI prompt; the button says hire (owner
     const d = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', `src/renderer/src/i18n/locales/${loc}.json`), 'utf8'));
     assert.doesNotMatch(d.addAgent.spawn, /spawn|生成|إنشاء/i, `${loc}: the button hires`);
   }
-  assert.equal(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.spawn, 'hire');
+  assert.equal(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/i18n/locales/en.json'), 'utf8')).addAgent.spawn, 'Hire');
 });
 
 test('Add Agent groups the characters by their job in the show (owner, 2026-09-27)', () => {
@@ -303,4 +308,15 @@ test('the hire wizard has no worktree, resume, projects or engine choices (owner
   assert.match(flags, /export const SHOW_ENGINE_PICKER = false;/);
   assert.match(src, /\{SHOW_ENGINE_PICKER && <>[\s\S]*?addAgent\.provider[\s\S]*?addAgent\.command[\s\S]*?<\/>\}/, 'engine and command are gated');
   assert.match(src, /const model = customModel \?\? defaultModel;/, 'the model starts on the Settings default');
+});
+
+test('focus mode is hidden: no button opens it and a saved preference cannot reopen it (owner, 2026-10-01)', () => {
+  assert.equal(loadTs('src/shared/buildFeatures.ts').SHOW_FOCUS_MODE, false);
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /if \(id && !SHOW_FOCUS_MODE\) return;/, 'setFullscreen opens nothing');
+  assert.match(store, /fullscreenAgentId: SHOW_FOCUS_MODE \? focusOnLoad\(initialPrefersFocusMode, initialSelectedId\) : null,/, 'never at launch');
+  assert.match(store, /if \(!SHOW_FOCUS_MODE\) return s;/, 'restoreFocusMode does nothing');
+  assert.match(read('src/renderer/src/shell/TopBar.tsx'), /\{SHOW_FOCUS_MODE && \(\n\s+<IconButton label=\{fullscreenAgentId \? t\('shell\.exitFocus'\)/);
+  assert.match(read('src/renderer/src/components/AgentDetailPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \? /);
+  assert.match(read('src/renderer/src/components/CommandCenterPanel.tsx'), /onToggleFullscreen=\{SHOW_FOCUS_MODE \|\| fullscreen \? /);
 });

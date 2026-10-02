@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { AccentColorName } from '@/design/tokens';
 import type { OfficeCharacterName } from '@/scene/office/cast';
-import type { ThemeId } from '@/scene/office/themeRegistry';
 import type { StatusKind } from '@/components/PixelBadge';
 import type { AgentProvider } from '@shared/agentProvider';
 import type { HireManifest } from '@shared/hire';
@@ -16,7 +15,7 @@ import { DEFAULT_ORG_TRIGGER, type OrgTriggerConfig, type WebhookTrigger } from 
 import { isCompactionCommand } from '@shared/providerAutomation';
 import { preferredAgentRole } from '@shared/agentRole';
 import { isInboxNudge } from '@shared/hiveNudge';
-import { SHOW_GIT, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
+import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_TRACES, SHOW_IDE, SHOW_ORG_TRIGGER, SHOW_VOICE } from '@shared/buildFeatures';
 import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
@@ -238,6 +237,11 @@ interface State {
   bumpToolCount: (id: string) => void;
   setGodStatus: (status: GodStatus) => void;
   select: (id: string) => void;
+  /** Design v2 (branding/DESIGN.md 7.6): the right column shows the Needs you
+   *  board instead of the selected person's panel. Selecting someone closes it;
+   *  the Needs you button and strip open it. Opens by default on launch. */
+  needsYouOpen: boolean;
+  setNeedsYouOpen: (open: boolean) => void;
   updateAgent: (id: string, patch: Partial<Agent>) => void;
   /** Copy durable hive roles onto roster descriptions (and the reverse is a
    *  no-op when the roster already has a real job string). */
@@ -264,7 +268,7 @@ interface State {
   removeArchivedAgent: (id: string) => void;
   /** Drop one agent from the restorable list (it was respawned or dismissed). */
   removeRestorableAgent: (id: string) => void;
-  reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (AgentStrip drag-reorder) and persist the new order
+  reorderAgents: (fromId: string, toId: string) => void; // move agent fromId into toId's slot (drag-reorder) and persist the new order
   /** One-shot request to open a Command-Center tab (e.g. the boss-room calendar
    *  → 'triggers'; 'tasks' and 'graph' switch the floor view instead). `seq`
    *  makes repeated identical requests distinct. */
@@ -316,10 +320,6 @@ interface State {
    *  window.cth.realtimeHasOpenAiKey(). */
   hasOpenAiKey: boolean;
   setHasOpenAiKey: (has: boolean) => void;
-  /** Mirror of the active office theme (set by App on config load + by Settings
-   *  on switch). OfficeFloor depends on this and rebuilds the scene on change. */
-  officeTheme: ThemeId;
-  setOfficeTheme: (theme: ThemeId) => void;
   /** Mirror of config.webhookTriggers — the inbound HTTP endpoints. Webhooks are
    *  editable from BOTH Settings → Connections and the Triggers tab, so neither
    *  surface keeps its own copy: both render off this list and both call the
@@ -417,12 +417,90 @@ export const ACTION_AT_PROMPT = 'waiting at a prompt';
 export const ACTION_CLOCKING_IN = 'clocking in…';
 /** An agent's action for display: the app's own captions in the owner's
  *  language, anything else as it is. */
-export function actionText(action: string, t: (key: string) => string): string {
+export function actionText(action: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (action === ACTION_CLOCKING_IN) return t('office.activity.clockingIn');
   // The hook marks a finished agent "idle"; the office says it more kindly
   // (owner, 2026-09-27: "nothing to do").
-  if (action.trim().toLowerCase() === 'idle') return t('office.activity.idle');
+  const plain = action.trim().toLowerCase();
+  if (plain === 'idle') return t('office.activity.idle');
+  // Engine words become office words (owner, 2026-09-30: "using Bash" confuses
+  // a business owner). Only the words shown change; the stored action does not.
+  const said = OFFICE_WORDS[plain];
+  if (said) return t(`office.activity.${said}`);
+  const tool = toolOfAction(action);
+  if (tool) return toolText(tool, t);
   return action;
+}
+
+/** Fixed captions the app sets, in office words (keys under office.activity). */
+const OFFICE_WORDS: Record<string, string> = {
+  'reading inbox': 'readingInbox',
+  awaiting: 'waiting',
+  'waiting at a prompt': 'waitingInput',
+  'compacting context': 'compacting',
+  'recreating terminal…': 'restarting',
+  resumed: 'backAtIt',
+  'revived after sleep': 'backAtIt',
+  'worktree gone, using base repo': 'mainFolder',
+  thinking: 'thinking',
+  'running the floor': 'runningFloor'
+};
+
+/** Tools an engine reports, as named in hook events and terminal output. */
+const KNOWN_TOOLS = /^(bash|bashoutput|killshell|read|write|edit|multiedit|notebookedit|grep|glob|ls|webfetch|websearch|task|agent|todowrite|skill|exitplanmode)$/i;
+
+/** The tool behind an action: "using Bash" from a hook, or "bash npm test" /
+ *  "read src/app.ts" from the terminal parser. */
+export function toolOfAction(action: string): string | null {
+  const using = /^using (\S+)/i.exec(action.trim());
+  if (using) return using[1];
+  const first = action.trim().split(/\s+/)[0] ?? '';
+  if (KNOWN_TOOLS.test(first) || /^mcp__/.test(first)) return first;
+  return null;
+}
+
+/** A tool call in words a business owner reads at a glance. */
+export function toolText(tool: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const k = (key: string, opts?: Record<string, unknown>) => t(`office.activity.tool.${key}`, opts);
+  const mail = /^mcp__md-mail__([a-z_]+)$/i.exec(tool);
+  if (mail) return mail[1] === 'send' ? k('sendingEmail') : mail[1] === 'draft' ? k('draftingEmail') : k('checkingEmail');
+  const mcp = /^mcp__(.+?)__(.+)$/i.exec(tool);
+  if (mcp) {
+    const server = mcp[1].replace(/^claude_ai_/i, '').replace(/[_-]+/g, ' ').trim();
+    if (/quickbooks|qbo|intuit/i.test(server)) return k('inApp', { app: 'QuickBooks' });
+    if (/calendar/i.test(server)) return k('calendar');
+    if (/gmail|outlook|e?mail/i.test(server)) return k('checkingEmail');
+    if (/^hive$/i.test(server)) return k('team');
+    if (/browser|playwright|chrome|puppeteer/i.test(server)) return k('web');
+    const app = server.split(' ').map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+    return k('inApp', { app });
+  }
+  switch (tool.toLowerCase()) {
+    case 'bash': case 'bashoutput': case 'killshell': return k('computer');
+    case 'read': return k('reading');
+    case 'write': return k('writing');
+    case 'edit': case 'multiedit': case 'notebookedit': return k('editing');
+    case 'grep': case 'glob': case 'ls': return k('looking');
+    case 'webfetch': return k('webPage');
+    case 'websearch': return k('search');
+    case 'task': case 'agent': return k('helper');
+    case 'todowrite': return k('todo');
+    case 'skill': return k('playbook');
+    case 'exitplanmode': return k('plan');
+    default: return k('working');
+  }
+}
+
+/** What an agent is doing right now, for a card or a caption: its action, else
+ *  the first words of the last prompt it was given (the studio label cards and
+ *  panel headers, DESIGN.md 7.14). */
+export function liveActivity(agent: Pick<Agent, 'action' | 'lastPrompt'>, fallback = ''): string {
+  const action = (agent.action || '').trim();
+  if (action) return action;
+  const prompt = (agent.lastPrompt || '').trim();
+  if (!prompt) return fallback;
+  const out = prompt.split(/\s+/).slice(0, 6).join(' ');
+  return out.length > 42 ? `${out.slice(0, 41)}…` : out;
 }
 
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason' | 'contextTokens' | 'contextLimit' | 'seedPrompt' | 'actionDetail' | 'actionAt'>;
@@ -699,7 +777,9 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory' || v === 'traces') return v;
+    if (v === 'profile' || v === 'capabilities' || v === 'terminal' || v === 'messages' || v === 'memory') return v;
+    // A saved TRACES tab opens on Profile while this build hides traces.
+    if (v === 'traces') return SHOW_TRACES ? v : 'profile';
     // Schedules is a section of Capabilities now (owner, 2026-09-26).
     if (v === 'schedules') return 'capabilities';
     // A saved GIT tab opens on the terminal while this build hides git.
@@ -770,15 +850,19 @@ export const useStore = create<State>((set, get) => ({
     return {
       selectedId,
       ccTabRequest: { tab: 'memory', seq },
-      memoryFocusRequest: { agentId, seq }
+      memoryFocusRequest: { agentId, seq },
+      needsYouOpen: false
     };
   }),
+  // 'human' was Michael's Ask me tab; in v2 Ask me is the Needs you board.
   requestCommandCenterTab: (tab) =>
-    set((s) => ({ ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 } })),
+    set((s) => tab === 'human'
+      ? { needsYouOpen: true }
+      : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, needsYouOpen: false }),
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
-  fullscreenAgentId: focusOnLoad(initialPrefersFocusMode, initialSelectedId),
+  fullscreenAgentId: SHOW_FOCUS_MODE ? focusOnLoad(initialPrefersFocusMode, initialSelectedId) : null,
   prefersFocusMode: initialPrefersFocusMode,
   floorView: initialFloorView,
   ideInitialFile: null,
@@ -792,9 +876,16 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
-  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null }; }),
+  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, needsYouOpen: false }; }),
+  needsYouOpen: true,
+  setNeedsYouOpen: (open) => set({ needsYouOpen: open }),
   updateAgent: (id, patch) =>
     set((s) => {
+      // The pty parser calls this on every chunk of output, mostly with what
+      // is already there: no change means no new state, so the studio and
+      // everything else subscribed to `agents` skip the render.
+      const current = s.agents.find((a) => a.id === id) as Record<string, unknown> | undefined;
+      if (!current || Object.entries(patch).every(([k, v]) => Object.is(current[k], v))) return s;
       const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);
       // Persist only when something DURABLE changed. `updateAgent` is also the
       // pty parser's per-chunk write (status/action/progress), so persisting
@@ -890,7 +981,7 @@ export const useStore = create<State>((set, get) => ({
       // BOSS card fourth — and persistAgents() then wrote that order to disk, so
       // it stuck across restarts instead of flickering once.
       //
-      // Fixed at insertion rather than by sorting in AgentStrip: the strip has
+      // Fixed at insertion rather than by sorting at render time: the order has
       // drag-reorder (reorderAgents) whose whole point is a persisted manual
       // order, and a god-first sort at render time would silently override the
       // user's own arrangement every frame. This just makes the head the honest
@@ -1002,8 +1093,6 @@ export const useStore = create<State>((set, get) => ({
   setHasGroqKey: (has) => set({ hasGroqKey: has }),
   hasOpenAiKey: false,
   setHasOpenAiKey: (has) => set({ hasOpenAiKey: has }),
-  officeTheme: 'office',
-  setOfficeTheme: (theme) => set({ officeTheme: theme }),
   webhookTriggers: [],
   setWebhookTriggers: (list) => set({ webhookTriggers: list }),
   // A copy, not the shared DEFAULT_ORG_TRIGGER instance — main takes the same
@@ -1124,6 +1213,8 @@ export const useStore = create<State>((set, get) => ({
     set({ floorView: view });
   },
   setFullscreen: (id) => {
+    // Focus mode is hidden in this build: nothing opens it (buildFeatures.ts).
+    if (id && !SHOW_FOCUS_MODE) return;
     // Entering focus mode makes it the default view; leaving it clears that.
     // Only an explicit toggle writes the preference, so an agent closing under
     // you never silently changes how the app opens next time. Every non-explicit
@@ -1134,6 +1225,7 @@ export const useStore = create<State>((set, get) => ({
   refocusFullscreen: (id) => set({ fullscreenAgentId: id }),
   restoreFocusMode: () =>
     set((s) => {
+      if (!SHOW_FOCUS_MODE) return s;
       const id = restoreFocus(s.prefersFocusMode, s.fullscreenAgentId, s.agents, s.selectedId);
       return id === s.fullscreenAgentId ? s : { fullscreenAgentId: id };
     }),

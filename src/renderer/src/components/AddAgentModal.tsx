@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PixelPanel } from './PixelPanel';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { InfoTip } from './InfoTip';
-import { useBackdropClose, escapeBelongsToField } from '@/hooks/useBackdropClose';
+import { Dialog } from '@/shell/Dialog';
 import { useStore, type Agent, ACTION_CLOCKING_IN } from '@/store/store';
 import { OFFICE_CAST, CAST_BY_NAME, CAST_GROUPS, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
@@ -399,18 +398,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   // closing then would still hire the person (pre-landing review, 2026-09-27).
   const submitting = useRef(false);
   const close = (): void => { if (!submitting.current) onClose(); };
-  const backdrop = useBackdropClose(close);
-  // Close only the modal on Esc.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || escapeBelongsToField(e.target)) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (!submitting.current) onClose();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
+  // Esc, the backdrop and the close button all go through close(), via the
+  // dialog frame (shell/Dialog.tsx); Esc in a field stays in the field.
 
   const importHire = async () => {
     setError(undefined);
@@ -620,400 +609,400 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   }, [cards, listAll, character, config.businessType]);
 
   return (
-    <div
-      {...backdrop}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(26, 19, 32, 0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        // Must sit above fullscreen terminal/file overlays (250/280).
-        zIndex: 500
-      }}
+    // Must sit above focus mode and its file overlays (250/280).
+    <Dialog
+      title={tr('addAgent.title')}
+      onClose={close}
+      width={940}
+      zIndex={500}
+      footer={(
+        <>
+          {SHOW_IMPORT_HIRE && (
+            <PixelButton
+              variant="secondary"
+              size="md"
+              onClick={importHire}
+              disabled={busy}
+              title={tr('addAgent.importHireBtnTitle')}
+            >
+              {tr('addAgent.importHireBtn')}
+            </PixelButton>
+          )}
+          <div style={{ flex: 1 }} />
+          {pendingHire && (
+            <PixelButton variant="secondary" size="md" onClick={skipHire} disabled={busy}>{tr('addAgent.skipHire')}</PixelButton>
+          )}
+          <PixelButton variant="ghost" size="md" onClick={close} disabled={busy || checking || writingInstructions}>{tr('common.cancel')}</PixelButton>
+          {stepIndex > 0 && (
+            <PixelButton variant="secondary" size="md" onClick={() => { void goTo(STEPS[stepIndex - 1]); }} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
+          )}
+          {step !== 'setup' ? (
+            <PixelButton
+              variant="primary"
+              size="md"
+              onClick={() => { void goTo(STEPS[stepIndex + 1]); }}
+              disabled={(step === 'who' && !!whoError) || (step === 'role' && (checking || (overlapNames.length > 0 && !binding)))}
+            >
+              {step === 'role' && checking ? tr('addAgent.wizard.checking') : tr('addAgent.wizard.next')}
+            </PixelButton>
+          ) : (
+            <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || !workStyle.trim()}>
+              {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
+            </PixelButton>
+          )}
+        </>
+      )}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 940, maxWidth: '95vw' }}>
-        <PixelPanel variant="dialog" title={tr('addAgent.title')} style={{ padding: 16 }} noPadding>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxHeight: '86vh', overflowY: 'auto' }}>
-            {hireMeta && (
-              <div style={{
-                padding: '6px 10px', background: 'var(--cth-lemon-light, #fdf3cf)',
-                boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontSize: 12, color: 'var(--cth-ink-900)',
-                display: 'flex', flexDirection: 'column', gap: 2
-              }}>
-                <span>
-                  📋 {tr('addAgent.hireImported')} <strong>{hireMeta.name}</strong>
-                  {hireMeta.author ? <> · {tr('addAgent.byAuthor', { author: hireMeta.author })}</> : null}
-                  {reviewProgress ? <> · {tr('addAgent.hireProgress', { current: reviewProgress.current, total: reviewProgress.total })}</> : null}
-                </span>
-                <span>{tr('addAgent.reviewFields')}</span>
-                {hireMeta.commandFlags && hireMeta.commandFlags.length > 0 && (
-                  <span style={chipRow}>
-                    <span style={{ fontSize: 12 }}>{tr('addAgent.hireFlags')}</span>
-                    {hireMeta.commandFlags.map((f, i) => <code key={`${f}-${i}`} style={codeChip('paprika')}>{f}</code>)}
-                  </span>
-                )}
-                {hireMeta.skills && hireMeta.skills.length > 0 && (
-                  <span style={chipRow}>
-                    <span style={{ fontSize: 12 }}>{tr('addAgent.hireSkills')}</span>
-                    {hireMeta.skills.map((s) => <code key={s} style={codeChip('mint')}>{s}</code>)}
-                  </span>
-                )}
-                {hireMeta.mcpServers && hireMeta.mcpServers.length > 0 && (() => {
-                  const safe = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier === 'safe-readonly');
-                  const consent = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier !== 'safe-readonly');
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
-                      {safe.length > 0 && <span style={chipRow}><span style={{ fontSize: 12 }}>{tr('addAgent.mcpSafe')}:</span>{safe.map((mid) => <code key={mid} style={codeChip('sky')}>{mid}</code>)}</span>}
-                      {consent.length > 0 && (
-                        <span style={chipRow}>
-                          <span style={{ fontSize: 12 }}>{tr('addAgent.mcpConsent')}:</span>
-                          {consent.map((mid) => <code key={mid} style={codeChip('paprika')}>{mid}</code>)}
-                          <span style={{ fontSize: 11, color: 'var(--cth-ink-700)' }}>{tr('addAgent.mcpEnableInSettings')}</span>
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
+        {hireMeta && (
+          <div style={{
+            padding: '8px 12px', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-amber-soft)',
+            boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-amber) 35%, transparent)', fontSize: 12.5, color: 'var(--cth-ink)',
+            display: 'flex', flexDirection: 'column', gap: 2
+          }}>
+            <span>
+              {tr('addAgent.hireImported')} <strong>{hireMeta.name}</strong>
+              {hireMeta.author ? <> · {tr('addAgent.byAuthor', { author: hireMeta.author })}</> : null}
+              {reviewProgress ? <> · {tr('addAgent.hireProgress', { current: reviewProgress.current, total: reviewProgress.total })}</> : null}
+            </span>
+            <span>{tr('addAgent.reviewFields')}</span>
+            {hireMeta.commandFlags && hireMeta.commandFlags.length > 0 && (
+              <span style={chipRow}>
+                <span style={{ fontSize: 12 }}>{tr('addAgent.hireFlags')}</span>
+                {hireMeta.commandFlags.map((f, i) => <code key={`${f}-${i}`} style={codeChip('paprika')}>{f}</code>)}
+              </span>
             )}
-
-            {/* Step bar: go back to any step; forward through Next. */}
-            <nav aria-label={tr('addAgent.wizard.steps')} style={{ display: 'flex', gap: 6 }}>
-              {STEPS.map((s, i) => {
-                const active = s === step;
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    aria-current={active ? 'step' : undefined}
-                    disabled={i > stepIndex}
-                    onClick={() => { void goTo(s); }}
-                    style={{
-                      flex: 1, textAlign: 'start', padding: '6px 9px 5px', border: 'none',
-                      cursor: i > stepIndex ? 'default' : 'pointer',
-                      background: active ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-                      boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-                      opacity: i > stepIndex ? 0.6 : 1
-                    }}
-                  >
-                    <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 9, lineHeight: '13px', textTransform: 'uppercase', color: 'var(--cth-ink-900)' }}>
-                      {i + 1} {tr(`addAgent.wizard.step.${s}`)}
+            {hireMeta.skills && hireMeta.skills.length > 0 && (
+              <span style={chipRow}>
+                <span style={{ fontSize: 12 }}>{tr('addAgent.hireSkills')}</span>
+                {hireMeta.skills.map((s) => <code key={s} style={codeChip('mint')}>{s}</code>)}
+              </span>
+            )}
+            {hireMeta.mcpServers && hireMeta.mcpServers.length > 0 && (() => {
+              const safe = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier === 'safe-readonly');
+              const consent = hireMeta.mcpServers!.filter((mid) => MCP_CATALOG.find((e) => e.id === mid)?.tier !== 'safe-readonly');
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
+                  {safe.length > 0 && <span style={chipRow}><span style={{ fontSize: 12 }}>{tr('addAgent.mcpSafe')}:</span>{safe.map((mid) => <code key={mid} style={codeChip('sky')}>{mid}</code>)}</span>}
+                  {consent.length > 0 && (
+                    <span style={chipRow}>
+                      <span style={{ fontSize: 12 }}>{tr('addAgent.mcpConsent')}:</span>
+                      {consent.map((mid) => <code key={mid} style={codeChip('paprika')}>{mid}</code>)}
+                      <span style={{ fontSize: 11.5, color: 'var(--cth-ink-2)' }}>{tr('addAgent.mcpEnableInSettings')}</span>
                     </span>
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--cth-ink-500)' }}>{tr(`addAgent.wizard.stepHint.${s}`)}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div style={{ minHeight: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {step === 'who' && (
-                <>
-                  <Row label={tr('addAgent.character')}>
-                    {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
-                      {CAST_GROUPS.map((g) => (
-                        <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)', marginBottom: 4 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {g.members.map((m) => CAST_BY_NAME[m]).map((c) => (
-                              <button
-                                key={c.name}
-                                type="button"
-                                onClick={() => { setCharacter(c.name); setName(c.displayName); setJobKey(null); }}
-                                title={c.blurb}
-                                aria-pressed={character === c.name}
-                                style={{
-                                  padding: 4,
-                                  background: character === c.name ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-                                  boxShadow: character === c.name ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-                                  cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                                  border: 'none', width: 72
-                                }}
-                              >
-                                <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>
-                                  <SpritePortrait character={c.name} scale={2} />
-                                </div>
-                                <span style={{ fontSize: 11, color: 'var(--cth-ink-900)' }}>{c.displayName}</span>
-                                {/* Groups club related jobs, so each tile names its own (owner, 2026-09-27). */}
-                                <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-500)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Row>
-                  <Row label={tr('addAgent.name')}>
-                    <input
-                      value={name}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setName(next);
-                        const match = characterForName(next);
-                        if (match) { setCharacter(match); setJobKey(null); }
-                      }}
-                      placeholder={tr('addAgent.namePlaceholder')}
-                      style={inputStyle}
-                    />
-                    {name.trim() && nameTaken(name) && <span role="alert" style={helperStyle}>{tr('addAgent.wizard.nameTaken', { name: name.trim() })}</span>}
-                  </Row>
-                </>
-              )}
-
-              {step === 'job' && (
-                <div role="radiogroup" aria-label={tr('addAgent.wizard.step.job')} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '58vh', overflowY: 'auto', paddingInlineEnd: 4 }}>
-                  {theirJob && (
-                    <JobGroup label={tr('addAgent.wizard.theirJob', { name: name.trim() || CAST_BY_NAME[character].displayName })}>
-                      <JobRow job={theirJob} tag={theirJob.source === 'team' ? tr('addAgent.wizard.likeTeammate', { name: theirJob.fromName }) : theirJob.business} selected={chosenKey === theirJob.key} onPick={() => setJobKey(theirJob.key)} />
-                    </JobGroup>
-                  )}
-                  {familyJobs.length > 0 && (
-                    <JobGroup label={tr('addAgent.wizard.yourOffice')}>
-                      {familyJobs.map((j) => (
-                        <JobRow key={j.key} job={j} tag={j.fromName} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
-                      ))}
-                    </JobGroup>
-                  )}
-                  <JobGroup label={tr('addAgent.wizard.newJob')}>
-                    <JobRow job={{ key: NEW_JOB_KEY, source: 'new', title: tr('addAgent.wizard.newJobTitle'), routing: '', workStyle: '', summary: tr('addAgent.wizard.newJobSummary') }} selected={chosenKey === NEW_JOB_KEY} onPick={() => setJobKey(NEW_JOB_KEY)} />
-                  </JobGroup>
-                  <JobGroup label={listAll ? tr('addAgent.wizard.allJobs') : tr('addAgent.wizard.familyJobs', { role: tr(`addAgent.castRole.${character}`) })}>
-                    {jobGroups.map(([jobTitle, list]) => (
-                      <div key={jobTitle} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {list.filter((j) => j.key !== theirJob?.key).map((j) => (
-                          <JobRow key={j.key} job={j} tag={j.business} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
-                        ))}
-                      </div>
-                    ))}
-                  </JobGroup>
-                  {family && hiddenCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Closing the list again drops a pick it no longer shows.
-                        if (showAll && chosenJob && !inFamily(chosenJob) && chosenJob.key !== theirJob?.key) setJobKey(null);
-                        setShowAll(!showAll);
-                      }}
-                      style={{ ...linkStyle, alignSelf: 'flex-start' }}
-                    >
-                      {showAll
-                        ? tr('addAgent.wizard.showFamily', { role: tr(`addAgent.castRole.${character}`) })
-                        : tr('addAgent.wizard.showAll', { count: hiddenCount })}
-                    </button>
                   )}
                 </div>
-              )}
-
-              {step === 'role' && (
-                <>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-                    <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                      <SpritePortrait character={character} scale={2} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <Row label={tr('addAgent.name')}>
-                        <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-                      </Row>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <Row label={tr('addAgent.role')}>
-                        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tr('addAgent.rolePlaceholder')} style={inputStyle} />
-                      </Row>
-                    </div>
-                  </div>
-
-                  <Row label={tr('addAgent.wizard.whatToSend', { name: name.trim() })} info={tr('addAgent.roleHelp', { godName, name: name.trim() })}>
-                    <textarea
-                      dir={rtl ? 'auto' : undefined}
-                      value={routing}
-                      onChange={(e) => setRouting(e.target.value)}
-                      placeholder={tr('addAgent.roleDescriptionPlaceholder')}
-                      rows={3}
-                      style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
-                    />
-                  </Row>
-
-                  <DistinctBox
-                    checking={checking}
-                    verdict={verdict ?? (binding ? shownVerdict : null)}
-                    overlapNames={binding ? [...new Set([...overlapNames, ...binding.others])] : overlapNames}
-                    binding={binding}
-                    name={name.trim()}
-                    team={team}
-                    onRecheck={() => { void runCheck(); }}
-                    bindMode={bindMode}
-                    setBindMode={setBindMode}
-                    freeMailboxes={freeMailboxes.map((m) => ({ id: m.id, address: m.address }))}
-                    bindMailbox={bindMailbox}
-                    setBindMailbox={setBindMailbox}
-                    topic={topic}
-                    setTopic={setTopic}
-                    onBindMailbox={() => { const a = mailboxAddress(bindMailbox); if (a) applyBinding(tr('addAgent.wizard.mailboxScope', { address: a }), bindMailbox); }}
-                    onBindTopic={() => applyBinding(topic)}
-                    onClearBinding={clearBinding}
-                  />
-                </>
-              )}
-
-              {step === 'setup' && (
-                <>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{ width: 44, height: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                      <SpritePortrait character={character} scale={2} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--cth-ink-900)' }}>{name.trim()}</div>
-                      <div style={{ fontSize: 13, color: 'var(--cth-ink-700)' }}>{title.trim()}</div>
-                    </div>
-                  </div>
-
-                  <Row label={tr('addAgent.workStyle')} info={tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}>
-                    <textarea
-                      dir={rtl ? 'auto' : undefined}
-                      value={workStyle}
-                      onChange={(e) => { describeSeq.current++; setDescribing(false); setWorkStyle(e.target.value); }}
-                      placeholder={tr('addAgent.wizard.workStylePlaceholder', { name: name.trim() })}
-                      rows={7}
-                      style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', fontSize: 14, resize: 'vertical' }}
-                    />
-                    {describing && <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.describing')}</span>}
-                  </Row>
-
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    <div style={{ flex: '1 1 380px', minWidth: 0 }}>
-                      <Row label={tr('addAgent.wizard.folder')} info={tr('addAgent.wizard.folderPurpose', { name: name.trim(), godName })}>
-                        {michaelFolder && !customCwd ? (
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <input value={folderName} onChange={(e) => setFolderName(e.target.value)} style={{ ...inputStyle, flex: 1 }} aria-label={tr('addAgent.wizard.folder')} />
-                            <PixelButton variant="secondary" size="md" onClick={pickFolder}>
-                              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
-                            </PixelButton>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <input value={customCwd ?? ''} onChange={(e) => setCustomCwd(e.target.value)} style={{ ...inputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)', fontSize: 13 }} aria-label={tr('addAgent.wizard.folder')} />
-                            <PixelButton variant="secondary" size="md" onClick={pickFolder}>
-                              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
-                            </PixelButton>
-                            {michaelFolder && <button type="button" onClick={() => setCustomCwd(undefined)} style={linkStyle}>{tr('addAgent.wizard.folderDefault')}</button>}
-                          </div>
-                        )}
-                        {michaelFolder && !customCwd && cwd && (
-                          <span style={{ ...helperStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 11, wordBreak: 'break-all' }}>{cwd}</span>
-                        )}
-                      </Row>
-                    </div>
-                    <div style={{ flex: '0 0 auto' }}>
-                      <Row label={tr('addAgent.model')} info={tr('addAgent.wizard.modelPurpose', { name: name.trim() })}>
-                        <Select
-                          label={tr('addAgent.model')}
-                          value={model ?? ''}
-                          onChange={(v) => { setCommandEdit(undefined); setCustomModel(v && v !== defaultModel ? v : undefined); }}
-                          style={{ fontSize: 14, lineHeight: '20px' }}
-                        >
-                          {!defaultModel && <option value="">{tr('addAgent.wizard.modelDefault', { model: tr('addAgent.wizard.cliDefault') })}</option>}
-                          {modelOptions.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.id === defaultModel ? tr('addAgent.wizard.modelDefault', { model: m.label }) : m.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </Row>
-                    </div>
-                  </div>
-
-                  {/* Engine, model list and the raw command: developer options,
-                      hidden with SHOW_ENGINE_PICKER (owner, 2026-09-27). */}
-                  {SHOW_ENGINE_PICKER && <>
-                    <Row label={tr('addAgent.provider')}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {AGENT_PROVIDER_PRESETS
-                          .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
-                          .map((p) => (
-                            <button key={p.id} type="button" onClick={() => { setProvider(p.id); setCustomModel(undefined); setCommandEdit(undefined); }} style={{ ...chip(provider === p.id), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                              <ProviderLogo provider={p.id} size={14} />
-                              {p.label}
-                            </button>
-                          ))}
-                      </div>
-                    </Row>
-                    <Row label={tr('addAgent.command')}>
-                      <input value={command} onChange={(e) => setCommandEdit(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)' }} />
-                    </Row>
-                  </>}
-                </>
-              )}
-            </div>
-
-            {error && (
-              <div role="alert" style={{ padding: '6px 10px', background: 'var(--cth-coral-light)', boxShadow: 'inset 0 0 0 1px var(--cth-coral)', fontSize: 13, color: 'var(--cth-ink-900)' }}>
-                {error}
-              </div>
-            )}
-
-            {/* Import-hire explainer + AI prompt generator; hidden with
-                SHOW_IMPORT_HIRE (owner, 2026-09-27). */}
-            {SHOW_IMPORT_HIRE && <div style={{
-              padding: '8px 10px', background: 'var(--cth-cream-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-              display: 'flex', flexDirection: 'column', gap: 6
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: 'var(--cth-ink-700)', lineHeight: '17px' }}>{tr('addAgent.importHireDesc')}</span>
-                <button type="button" onClick={() => setShowHirePrompt((v) => !v)} style={{ ...chip(showHirePrompt), flexShrink: 0 }}>
-                  {showHirePrompt ? tr('addAgent.hideAIPrompt') : tr('addAgent.generateWithAI')}
-                </button>
-              </div>
-              {showHirePrompt && (
-                <textarea readOnly value={HIRE_PROMPT} onFocus={(e) => e.currentTarget.select()} rows={10}
-                  style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px', resize: 'vertical' }} />
-              )}
-            </div>}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-              {SHOW_IMPORT_HIRE && (
-                <PixelButton
-                  variant="secondary"
-                  size="md"
-                  onClick={importHire}
-                  disabled={busy}
-                  title={tr('addAgent.importHireBtnTitle')}
-                >
-                  {tr('addAgent.importHireBtn')}
-                </PixelButton>
-              )}
-              <div style={{ flex: 1 }} />
-              {pendingHire && (
-                <PixelButton variant="secondary" size="md" onClick={skipHire} disabled={busy}>{tr('addAgent.skipHire')}</PixelButton>
-              )}
-              <PixelButton variant="ghost" size="md" onClick={close} disabled={busy || checking || writingInstructions}>{tr('common.cancel')}</PixelButton>
-              {stepIndex > 0 && (
-                <PixelButton variant="secondary" size="md" onClick={() => { void goTo(STEPS[stepIndex - 1]); }} disabled={busy}>{tr('addAgent.wizard.back')}</PixelButton>
-              )}
-              {step !== 'setup' ? (
-                <PixelButton
-                  variant="primary"
-                  size="md"
-                  onClick={() => { void goTo(STEPS[stepIndex + 1]); }}
-                  disabled={(step === 'who' && !!whoError) || (step === 'role' && (checking || (overlapNames.length > 0 && !binding)))}
-                >
-                  {step === 'role' && checking ? tr('addAgent.wizard.checking') : tr('addAgent.wizard.next')}
-                </PixelButton>
-              ) : (
-                <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || !workStyle.trim()}>
-                  {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
-                </PixelButton>
-              )}
-            </div>
+              );
+            })()}
           </div>
-        </PixelPanel>
-      </div>
-    </div>
+        )}
+
+        {/* Step bar: go back to any step; forward through Next. */}
+        <nav aria-label={tr('addAgent.wizard.steps')} style={{ display: 'flex', gap: 8 }}>
+          {STEPS.map((s, i) => {
+            const active = s === step;
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-current={active ? 'step' : undefined}
+                disabled={i > stepIndex}
+                onClick={() => { void goTo(s); }}
+                style={{
+                  flex: 1, textAlign: 'start', padding: '8px 10px', border: 'none', borderRadius: 'var(--cth-r-lg)',
+                  cursor: i > stepIndex ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 9, minWidth: 0,
+                  background: active ? 'var(--cth-card)' : 'var(--cth-card-2)',
+                  boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink)' : 'inset 0 0 0 1px var(--cth-line)',
+                  opacity: i > stepIndex ? 0.6 : 1, fontFamily: 'var(--cth-font-ui)'
+                }}
+              >
+                <span aria-hidden="true" style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600,
+                  background: i < stepIndex ? 'var(--cth-green)' : active ? 'var(--cth-ink)' : 'transparent',
+                  color: i < stepIndex || active ? 'var(--cth-bg)' : 'var(--cth-ink-3)',
+                  boxShadow: i < stepIndex || active ? 'none' : 'inset 0 0 0 1px var(--cth-line-2)'
+                }}>{i < stepIndex ? '✓' : i + 1}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, lineHeight: '16px', color: 'var(--cth-ink)' }}>
+                    {tr(`addAgent.wizard.step.${s}`)}
+                  </span>
+                  <span style={{ display: 'block', fontSize: 11.5, lineHeight: '15px', color: 'var(--cth-ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tr(`addAgent.wizard.stepHint.${s}`)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div style={{ minHeight: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {step === 'who' && (
+            <>
+              <Row label={tr('addAgent.character')}>
+                {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
+                  {CAST_GROUPS.map((g) => (
+                    <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)', marginBottom: 6 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {g.members.map((m) => CAST_BY_NAME[m]).map((c) => (
+                          <button
+                            key={c.name}
+                            type="button"
+                            onClick={() => { setCharacter(c.name); setName(c.displayName); setJobKey(null); }}
+                            title={c.blurb}
+                            aria-pressed={character === c.name}
+                            style={{
+                              padding: '8px 4px 7px', borderRadius: 'var(--cth-r-lg)',
+                              background: character === c.name ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+                              boxShadow: character === c.name ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line)',
+                              cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                              border: 'none', width: 78, fontFamily: 'var(--cth-font-ui)'
+                            }}
+                          >
+                            <SpritePortrait character={c.name} scale={1.5} />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink)' }}>{c.displayName}</span>
+                            {/* Groups club related jobs, so each tile names its own (owner, 2026-09-27). */}
+                            <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-3)', textAlign: 'center' }}>{tr(`addAgent.castRole.${c.name}`)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Row>
+              <Row label={tr('addAgent.name')}>
+                <input
+                  value={name}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setName(next);
+                    const match = characterForName(next);
+                    if (match) { setCharacter(match); setJobKey(null); }
+                  }}
+                  placeholder={tr('addAgent.namePlaceholder')}
+                  className="cth-input" style={inputStyle}
+                />
+                {name.trim() && nameTaken(name) && <span role="alert" style={helperStyle}>{tr('addAgent.wizard.nameTaken', { name: name.trim() })}</span>}
+              </Row>
+            </>
+          )}
+
+          {step === 'job' && (
+            <div role="radiogroup" aria-label={tr('addAgent.wizard.step.job')} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '58vh', overflowY: 'auto', paddingInlineEnd: 4 }}>
+              {theirJob && (
+                <JobGroup label={tr('addAgent.wizard.theirJob', { name: name.trim() || CAST_BY_NAME[character].displayName })}>
+                  <JobRow job={theirJob} tag={theirJob.source === 'team' ? tr('addAgent.wizard.likeTeammate', { name: theirJob.fromName }) : theirJob.business} selected={chosenKey === theirJob.key} onPick={() => setJobKey(theirJob.key)} />
+                </JobGroup>
+              )}
+              {familyJobs.length > 0 && (
+                <JobGroup label={tr('addAgent.wizard.yourOffice')}>
+                  {familyJobs.map((j) => (
+                    <JobRow key={j.key} job={j} tag={j.fromName} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
+                  ))}
+                </JobGroup>
+              )}
+              <JobGroup label={tr('addAgent.wizard.newJob')}>
+                <JobRow job={{ key: NEW_JOB_KEY, source: 'new', title: tr('addAgent.wizard.newJobTitle'), routing: '', workStyle: '', summary: tr('addAgent.wizard.newJobSummary') }} selected={chosenKey === NEW_JOB_KEY} onPick={() => setJobKey(NEW_JOB_KEY)} />
+              </JobGroup>
+              <JobGroup label={listAll ? tr('addAgent.wizard.allJobs') : tr('addAgent.wizard.familyJobs', { role: tr(`addAgent.castRole.${character}`) })}>
+                {jobGroups.map(([jobTitle, list]) => (
+                  <div key={jobTitle} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {list.filter((j) => j.key !== theirJob?.key).map((j) => (
+                      <JobRow key={j.key} job={j} tag={j.business} selected={chosenKey === j.key} onPick={() => setJobKey(j.key)} />
+                    ))}
+                  </div>
+                ))}
+              </JobGroup>
+              {family && hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Closing the list again drops a pick it no longer shows.
+                    if (showAll && chosenJob && !inFamily(chosenJob) && chosenJob.key !== theirJob?.key) setJobKey(null);
+                    setShowAll(!showAll);
+                  }}
+                  style={{ ...linkStyle, alignSelf: 'flex-start' }}
+                >
+                  {showAll
+                    ? tr('addAgent.wizard.showFamily', { role: tr(`addAgent.castRole.${character}`) })
+                    : tr('addAgent.wizard.showAll', { count: hiddenCount })}
+                </button>
+              )}
+            </div>
+          )}
+
+          {step === 'role' && (
+            <>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                <div style={{ flexShrink: 0 }}>
+                  <SpritePortrait character={character} scale={2} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Row label={tr('addAgent.name')}>
+                    <input value={name} onChange={(e) => setName(e.target.value)} className="cth-input" style={inputStyle} />
+                  </Row>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Row label={tr('addAgent.role')}>
+                    <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tr('addAgent.rolePlaceholder')} className="cth-input" style={inputStyle} />
+                  </Row>
+                </div>
+              </div>
+
+              <Row label={tr('addAgent.wizard.whatToSend', { name: name.trim() })} info={tr('addAgent.roleHelp', { godName, name: name.trim() })}>
+                <textarea
+                  dir={rtl ? 'auto' : undefined}
+                  value={routing}
+                  onChange={(e) => setRouting(e.target.value)}
+                  placeholder={tr('addAgent.roleDescriptionPlaceholder')}
+                  rows={3}
+                  className="cth-input" style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
+                />
+              </Row>
+
+              <DistinctBox
+                checking={checking}
+                verdict={verdict ?? (binding ? shownVerdict : null)}
+                overlapNames={binding ? [...new Set([...overlapNames, ...binding.others])] : overlapNames}
+                binding={binding}
+                name={name.trim()}
+                team={team}
+                onRecheck={() => { void runCheck(); }}
+                bindMode={bindMode}
+                setBindMode={setBindMode}
+                freeMailboxes={freeMailboxes.map((m) => ({ id: m.id, address: m.address }))}
+                bindMailbox={bindMailbox}
+                setBindMailbox={setBindMailbox}
+                topic={topic}
+                setTopic={setTopic}
+                onBindMailbox={() => { const a = mailboxAddress(bindMailbox); if (a) applyBinding(tr('addAgent.wizard.mailboxScope', { address: a }), bindMailbox); }}
+                onBindTopic={() => applyBinding(topic)}
+                onClearBinding={clearBinding}
+              />
+            </>
+          )}
+
+          {step === 'setup' && (
+            <>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{ flexShrink: 0 }}>
+                  <SpritePortrait character={character} scale={2} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{name.trim()}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--cth-ink-3)' }}>{title.trim()}</div>
+                </div>
+              </div>
+
+              <Row label={tr('addAgent.workStyle')} info={tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}>
+                <textarea
+                  dir={rtl ? 'auto' : undefined}
+                  value={workStyle}
+                  onChange={(e) => { describeSeq.current++; setDescribing(false); setWorkStyle(e.target.value); }}
+                  placeholder={tr('addAgent.wizard.workStylePlaceholder', { name: name.trim() })}
+                  rows={7}
+                  className="cth-input" style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
+                />
+                {describing && <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.describing')}</span>}
+              </Row>
+
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ flex: '1 1 380px', minWidth: 0 }}>
+                  <Row label={tr('addAgent.wizard.folder')} info={tr('addAgent.wizard.folderPurpose', { name: name.trim(), godName })}>
+                    {michaelFolder && !customCwd ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input value={folderName} onChange={(e) => setFolderName(e.target.value)} className="cth-input" style={{ ...inputStyle, flex: 1 }} aria-label={tr('addAgent.wizard.folder')} />
+                        <PixelButton variant="secondary" size="md" onClick={pickFolder}>
+                          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
+                        </PixelButton>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input value={customCwd ?? ''} onChange={(e) => setCustomCwd(e.target.value)} className="cth-input" style={{ ...inputStyle, flex: 1, fontFamily: 'var(--cth-font-mono)', fontSize: 13 }} aria-label={tr('addAgent.wizard.folder')} />
+                        <PixelButton variant="secondary" size="md" onClick={pickFolder}>
+                          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Icon name="folder" /> {tr('addAgent.pick')}</span>
+                        </PixelButton>
+                        {michaelFolder && <button type="button" onClick={() => setCustomCwd(undefined)} style={linkStyle}>{tr('addAgent.wizard.folderDefault')}</button>}
+                      </div>
+                    )}
+                    {michaelFolder && !customCwd && cwd && (
+                      <span style={{ ...helperStyle, fontFamily: 'var(--cth-font-mono)', fontSize: 11, wordBreak: 'break-all' }}>{cwd}</span>
+                    )}
+                  </Row>
+                </div>
+                <div style={{ flex: '0 0 auto' }}>
+                  <Row label={tr('addAgent.model')} info={tr('addAgent.wizard.modelPurpose', { name: name.trim() })}>
+                    <Select
+                      label={tr('addAgent.model')}
+                      value={model ?? ''}
+                      onChange={(v) => { setCommandEdit(undefined); setCustomModel(v && v !== defaultModel ? v : undefined); }}
+                      style={{ fontSize: 14, lineHeight: '20px' }}
+                    >
+                      {!defaultModel && <option value="">{tr('addAgent.wizard.modelDefault', { model: tr('addAgent.wizard.cliDefault') })}</option>}
+                      {modelOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.id === defaultModel ? tr('addAgent.wizard.modelDefault', { model: m.label }) : m.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Row>
+                </div>
+              </div>
+
+              {/* Engine, model list and the raw command: developer options,
+                  hidden with SHOW_ENGINE_PICKER (owner, 2026-09-27). */}
+              {SHOW_ENGINE_PICKER && <>
+                <Row label={tr('addAgent.provider')}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {AGENT_PROVIDER_PRESETS
+                      .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
+                      .map((p) => (
+                        <button key={p.id} type="button" onClick={() => { setProvider(p.id); setCustomModel(undefined); setCommandEdit(undefined); }} style={{ ...chip(provider === p.id), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <ProviderLogo provider={p.id} size={14} />
+                          {p.label}
+                        </button>
+                      ))}
+                  </div>
+                </Row>
+                <Row label={tr('addAgent.command')}>
+                  <input value={command} onChange={(e) => setCommandEdit(e.target.value)} className="cth-input" style={{ ...inputStyle, fontFamily: 'var(--cth-font-mono)' }} />
+                </Row>
+              </>}
+            </>
+          )}
+        </div>
+
+        {error && (
+          <div role="alert" style={{ padding: '8px 12px', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-coral-soft)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-coral) 35%, transparent)', fontSize: 12.5, color: 'var(--cth-coral-text)' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Import-hire explainer + AI prompt generator; hidden with
+            SHOW_IMPORT_HIRE (owner, 2026-09-27). */}
+        {SHOW_IMPORT_HIRE && <div style={{
+          padding: '10px 12px', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-card-2)', boxShadow: 'inset 0 0 0 1px var(--cth-line)',
+          display: 'flex', flexDirection: 'column', gap: 6
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--cth-ink-2)', lineHeight: '17px' }}>{tr('addAgent.importHireDesc')}</span>
+            <button type="button" onClick={() => setShowHirePrompt((v) => !v)} style={{ ...chip(showHirePrompt), flexShrink: 0 }}>
+              {showHirePrompt ? tr('addAgent.hideAIPrompt') : tr('addAgent.generateWithAI')}
+            </button>
+          </div>
+          {showHirePrompt && (
+            <textarea readOnly value={HIRE_PROMPT} onFocus={(e) => e.currentTarget.select()} rows={10}
+              className="cth-input" style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '16px', resize: 'vertical' }} />
+          )}
+        </div>}
+
+    </Dialog>
   );
 }
 
 function JobGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div role="group" aria-label={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-700)' }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)', marginTop: 2 }}>{label}</div>
       {children}
     </div>
   );
@@ -1027,18 +1016,18 @@ function JobRow({ job, tag, selected, onPick }: { job: HireJob; tag?: string; se
       aria-checked={selected}
       onClick={onPick}
       style={{
-        textAlign: 'start', border: 'none', cursor: 'pointer', padding: '6px 10px',
-        background: selected ? 'var(--cth-sky-light)' : 'var(--cth-paper-100)',
-        boxShadow: selected ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-        display: 'flex', flexDirection: 'column', gap: 2
+        textAlign: 'start', border: 'none', cursor: 'pointer', padding: '9px 12px', borderRadius: 'var(--cth-r-lg)',
+        background: selected ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+        boxShadow: selected ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line)',
+        display: 'flex', flexDirection: 'column', gap: 2, fontFamily: 'var(--cth-font-ui)'
       }}
     >
       <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink-900)' }}>{job.title}</span>
-        {tag && <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{tag}</span>}
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{job.title}</span>
+        {tag && <span style={{ fontSize: 11.5, color: 'var(--cth-ink-3)' }}>{tag}</span>}
       </span>
       {job.summary && (
-        <span style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-700)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <span style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {job.summary}
         </span>
       )}
@@ -1065,7 +1054,7 @@ function CheckingTeam({ team }: { team: Agent[] }) {
   const current = shown.length ? shown[turn % shown.length] : undefined;
   const dots = '.'.repeat((turn % 3) + 1);
   return (
-    <div aria-live="polite" aria-busy="true" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div aria-live="polite" aria-busy="true" style={{ ...box, background: 'var(--cth-card-2)', display: 'flex', flexDirection: 'column', gap: 8 }}>
       {shown.length > 0 && (
         <div aria-hidden="true" style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {shown.map((m, i) => {
@@ -1074,11 +1063,10 @@ function CheckingTeam({ team }: { team: Agent[] }) {
               <span
                 key={m.id}
                 style={{
-                  width: 28, height: 34, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden',
-                  background: on ? 'var(--cth-sky-light)' : 'transparent',
-                  boxShadow: on ? 'inset 0 0 0 1px var(--cth-ink-300)' : 'none',
+                  display: 'inline-flex', borderRadius: '50%',
+                  boxShadow: on ? '0 0 0 2px var(--cth-indigo)' : 'none',
                   opacity: on || still ? 1 : 0.45,
-                  animation: on ? 'cth-hop 0.45s steps(1) infinite' : undefined
+                  animation: on ? 'cth-hop 0.9s ease-in-out infinite' : undefined
                 }}
               >
                 <SpritePortrait character={m.character} scale={1} />
@@ -1124,7 +1112,7 @@ function DistinctBox(p: DistinctBoxProps) {
   if (p.checking) return <CheckingTeam team={p.team} />;
   if (!p.verdict && p.overlapNames.length === 0) {
     return (
-      <div aria-live="polite" style={{ ...box, background: 'var(--cth-paper-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div aria-live="polite" style={{ ...box, background: 'var(--cth-card-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span>{t('addAgent.wizard.notChecked')}</span>
         <button type="button" onClick={p.onRecheck} style={linkStyle}>{t('addAgent.wizard.checkNow')}</button>
       </div>
@@ -1133,7 +1121,7 @@ function DistinctBox(p: DistinctBoxProps) {
   const fallback = p.verdict?.source === 'rules' ? <div style={helperStyle}>{t('addAgent.wizard.fullCheckFailed')}</div> : null;
   if (p.overlapNames.length === 0) {
     return (
-      <div aria-live="polite" style={{ ...box, background: 'var(--cth-mint-light)' }}>
+      <div aria-live="polite" style={{ ...box, background: 'var(--cth-green-soft)' }}>
         {t('addAgent.wizard.distinct')}
         {fallback}
       </div>
@@ -1141,7 +1129,7 @@ function DistinctBox(p: DistinctBoxProps) {
   }
   const others = p.binding ? bindingLines(p.binding.scope, p.name).others : '';
   return (
-    <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-mint-light)' : 'var(--cth-lemon-light)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div aria-live="polite" style={{ ...box, background: p.binding ? 'var(--cth-green-soft)' : 'var(--cth-amber-soft)', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {/* A binding resolves the overlap, so the heading says so instead of
           repeating the problem (owner, 2026-09-27). */}
       <strong style={{ fontSize: 13 }}>
@@ -1169,7 +1157,7 @@ function DistinctBox(p: DistinctBoxProps) {
           </div>
           {p.bindMode === 'mailbox' && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select value={p.bindMailbox} onChange={(e) => p.setBindMailbox(e.target.value)} aria-label={t('addAgent.wizard.bindMailbox')} style={{ ...inputStyle, width: 'auto', fontSize: 14 }}>
+              <select value={p.bindMailbox} onChange={(e) => p.setBindMailbox(e.target.value)} aria-label={t('addAgent.wizard.bindMailbox')} className="cth-input" style={{ ...inputStyle, width: 'auto' }}>
                 <option value="">{t('capabilities.pickMailbox')}</option>
                 {p.freeMailboxes.map((m) => <option key={m.id} value={m.id}>{m.address}</option>)}
               </select>
@@ -1178,7 +1166,7 @@ function DistinctBox(p: DistinctBoxProps) {
           )}
           {p.bindMode === 'topic' && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input value={p.topic} maxLength={TOPIC_MAX} onChange={(e) => p.setTopic(e.target.value)} placeholder={t('addAgent.wizard.topicPlaceholder')} aria-label={t('addAgent.wizard.bindTopic')} style={{ ...inputStyle, flex: 1, fontSize: 14 }} />
+              <input value={p.topic} maxLength={TOPIC_MAX} onChange={(e) => p.setTopic(e.target.value)} placeholder={t('addAgent.wizard.topicPlaceholder')} aria-label={t('addAgent.wizard.bindTopic')} className="cth-input" style={{ ...inputStyle, flex: 1 }} />
               <PixelButton variant="secondary" size="sm" onClick={p.onBindTopic} disabled={!p.topic.trim()}>{t('addAgent.wizard.bind')}</PixelButton>
             </div>
           )}
@@ -1191,36 +1179,38 @@ function DistinctBox(p: DistinctBoxProps) {
 }
 
 const chip = (active: boolean): CSSProperties => ({
-  padding: '3px 8px 1px',
-  background: active ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-  boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-ink-500)' : 'inset 0 0 0 1px var(--cth-ink-100)',
-  fontFamily: 'var(--cth-font-ui)', fontSize: 13,
-  color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
+  height: 28, padding: '0 11px', borderRadius: 999,
+  background: active ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
+  boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: active ? 600 : 500,
+  color: 'var(--cth-ink)', cursor: 'pointer', border: 'none'
 });
 const chipRow: CSSProperties = { display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap', marginTop: 2 };
+const TONE = { paprika: 'coral', mint: 'green', sky: 'blue' } as const;
 const codeChip = (tone: 'paprika' | 'mint' | 'sky'): CSSProperties => ({
-  fontFamily: 'var(--cth-font-mono)', fontSize: 12, padding: '0 4px',
-  background: `var(--cth-${tone}-light)`, boxShadow: `inset 0 0 0 1px var(--cth-${tone}-700, var(--cth-ink-500))`,
-  color: 'var(--cth-ink-900)'
+  fontFamily: 'var(--cth-font-mono)', fontSize: 11.5, padding: '1px 6px', borderRadius: 'var(--cth-r-sm)',
+  background: `var(--cth-${TONE[tone]}-soft)`, color: `var(--cth-${TONE[tone]}-text)`
 });
-const box: CSSProperties = { padding: '8px 10px', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)' };
-const linkStyle: CSSProperties = { background: 'none', border: 'none', padding: 0, color: 'var(--cth-sky-700, var(--cth-ink-900))', textDecoration: 'underline', cursor: 'pointer', fontSize: 13 };
+const box: CSSProperties = { padding: '10px 12px', borderRadius: 'var(--cth-r-md)', boxShadow: 'inset 0 0 0 1px var(--cth-line)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)' };
+const linkStyle: CSSProperties = { background: 'none', border: 'none', padding: 0, color: 'var(--cth-indigo-text)', textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer', fontSize: 12.5, fontFamily: 'var(--cth-font-ui)' };
 
 /** A plain note under a field: what it is for, in the owner's words. */
 const helperStyle: CSSProperties = {
-  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-500)'
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-3)'
 };
 
+/** A v2 input (DESIGN.md 7.19); the ring and radius come from .cth-input. */
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '6px 8px 4px',
-  background: 'var(--cth-paper-100)',
+  minHeight: 34,
+  padding: '7px 10px',
+  background: 'var(--cth-card)',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
   fontFamily: 'var(--cth-font-ui)',
-  fontSize: 16,
-  color: 'var(--cth-ink-900)',
-  outline: 'none'
+  fontSize: 13,
+  color: 'var(--cth-ink)',
+  outline: 'none',
+  boxSizing: 'border-box'
 };
 
 /** A field with its label; `info` puts the explanation behind an info icon
@@ -1229,12 +1219,7 @@ function Row({ label, info, children }: { label: string; info?: string; children
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <span style={{
-          fontFamily: 'var(--cth-font-display)',
-          fontSize: 8, lineHeight: '12px',
-          color: 'var(--cth-ink-700)',
-          textTransform: 'uppercase'
-        }}>{label}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}</span>
         {info && <InfoTip text={info} label={label} />}
       </span>
       {children}

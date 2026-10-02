@@ -24,7 +24,7 @@ const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 test('no name starts editing on a click', () => {
   assert.equal(fs.existsSync(path.resolve(__dirname, '../src/renderer/src/components/AgentNameEditor.tsx')), false);
-  for (const f of ['AgentCard.tsx', 'AgentDetailPanel.tsx', 'AgentStrip.tsx', 'CommandCenterPanel.tsx']) {
+  for (const f of ['AgentDetailPanel.tsx', 'CommandCenterPanel.tsx', '../shell/PanelChrome.tsx']) {
     const src = read(`src/renderer/src/components/${f}`);
     assert.doesNotMatch(src, /AgentNameEditor|onRename|onDoubleClick=/, f);
   }

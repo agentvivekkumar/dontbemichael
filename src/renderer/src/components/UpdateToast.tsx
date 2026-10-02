@@ -35,7 +35,6 @@
  * goes through the existing `openExternal` opener.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Icon } from '@/components/Icon';
 import { summarizeReleaseNotes } from '@shared/releaseNotes';
 import { extractDropHtml } from '@shared/releaseDrop';
 import { ReleaseDrop } from '@/components/ReleaseDrop';
@@ -204,38 +203,23 @@ export function UpdateToast() {
   // Freshly updated with nothing authored for this release: nothing to say.
   if (status.state === 'just-updated') return null;
 
-  const buttonStyle: React.CSSProperties = {
-    padding: '3px 10px 1px',
-    background: 'var(--cth-mint-light, #d0f0e0)',
-    boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
-    fontFamily: 'var(--cth-font-ui)', fontSize: 12,
-    color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
-  };
-
   const linkStyle: React.CSSProperties = {
-    fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-900)',
-    textDecoration: 'underline', cursor: 'pointer'
+    fontSize: 12.5, lineHeight: '17px', color: 'var(--cth-indigo-text)',
+    textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer'
   };
 
   return (
-    <div style={{
-      position: 'fixed', right: 16, bottom: 16, zIndex: 400,
-      maxWidth: 340,
-      background: 'var(--cth-cream-50)',
-      boxShadow: '0 0 0 2px var(--cth-ink-900), 4px 5px 0 0 rgba(26,19,32,0.25)',
-      padding: '10px 12px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-      fontFamily: 'var(--cth-font-ui)'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name="sparkle" />
-        <span style={{ fontSize: 13, color: 'var(--cth-ink-900)', fontWeight: 600 }}>
+    // Bottom right, above the bottom bar.
+    <div className="cth-toast" role="status" style={{ right: 16, bottom: 92 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Spark />
+        <span className="cth-toast-title">
           {status.state === 'downloaded'
             ? `Update v${status.version} downloaded`
             : `v${status.version} is available`}
         </span>
       </div>
-      <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)' }}>
+      <span className="cth-toast-body">
         {status.state === 'downloaded'
           ? 'Restart Don\'t Be Michael whenever you like to apply it. Nothing restarts on its own.'
           : 'This install can’t update itself. Grab the new build from the releases page.'}
@@ -243,10 +227,7 @@ export function UpdateToast() {
 
       {notes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{
-            fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
-            color: 'var(--cth-ink-500)', textTransform: 'uppercase'
-          }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
             What’s new
           </div>
           {/* The digest is already capped at ~280 chars; the clamp is the second
@@ -259,9 +240,9 @@ export function UpdateToast() {
             {notes.map((line, i) => (
               <li key={i} style={{
                 display: 'flex', gap: 6,
-                fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-700)'
+                fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)'
               }}>
-                <span aria-hidden style={{ color: 'var(--cth-ink-300)' }}>•</span>
+                <span aria-hidden style={{ color: 'var(--cth-ink-4)' }}>•</span>
                 <span>{line}</span>
               </li>
             ))}
@@ -284,25 +265,28 @@ export function UpdateToast() {
       )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button
-          onClick={() => setStatus(null)}
-          style={{ ...buttonStyle, background: 'var(--cth-cream-100)' }}
-        >
-          later
+        <button className="cth-toast-btn" onClick={() => setStatus(null)}>
+          Later
         </button>
         {status.state === 'downloaded' ? (
-          <button onClick={restart} disabled={busy} style={buttonStyle}>
-            {busy ? 'restarting…' : 'restart to update'}
+          <button className="cth-toast-btn primary" onClick={restart} disabled={busy}>
+            {busy ? 'Restarting…' : 'Restart to update'}
           </button>
         ) : (
-          <button
-            onClick={openRelease}
-            style={buttonStyle}
-          >
-            {hasDownload ? `download ${status.version}` : 'open releases'}
+          <button className="cth-toast-btn primary" onClick={openRelease}>
+            {hasDownload ? `Download ${status.version}` : 'Open releases'}
           </button>
         )}
       </div>
     </div>
+  );
+}
+
+/** The toast's mark: a small four point spark in indigo. */
+export function Spark() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0, color: 'var(--cth-indigo)' }}>
+      <path fill="currentColor" d="M12 2.5l2.1 6.4 6.4 2.1-6.4 2.1L12 19.5l-2.1-6.4L3.5 11l6.4-2.1z" />
+    </svg>
   );
 }
