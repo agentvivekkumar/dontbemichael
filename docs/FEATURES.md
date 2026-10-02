@@ -74,6 +74,20 @@ moving, and brings you only the decisions that need you.
 
 ## Part 2: Every change, release by release
 
+### 0.0.14 (2026-10-01)
+- A new look, Studio. The pixel floor is gone: the office is a calm isometric studio with a pod
+  and a chip for each team, lights that come up as the office opens, and handoffs, mail and
+  Michael's numbers drawn from real events. Every screen, dialog, setup step and Settings field
+  uses the same fonts, colors and inputs, in light and dark.
+- Idle team members say lines from The Office, and two of them trade a line by paper plane or
+  envelope. A quiet pod's card rolls down from under its chip, and selecting someone dims the rest.
+- Needs you is the one count. Ask me cards have plain titles, the answer box and Talk to Michael
+  grow as you type, and Talk to Michael takes pasted screenshots and files. Task detail shows the
+  card's notes.
+- Closing time runs on the floor with Cancel and Force quit, starts from the clock menu too, and
+  leaves open dialogs as they were. A team member's tabs are Profile, Access, Messages, Memory
+  and Work.
+
 ### 0.0.13 (2026-09-30)
 - Claude Code updates itself, but team members already running keep the old version until they
   restart. The app notices within ten minutes and shows a "team upgrade ready" chip in the title
