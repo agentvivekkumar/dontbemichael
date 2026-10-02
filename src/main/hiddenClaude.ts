@@ -82,7 +82,9 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       '--session-id', sessionId,
       '--model', opts.model,
       '--permission-mode', 'bypassPermissions',
-      ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--disallowedTools', ...disallowed]),
+      // No connector or MCP server of the owner's (docs/designs/claude-connectors.md):
+      // these runs have no hook to check a call, so none is loaded at all.
+      ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--strict-mcp-config', '--disallowedTools', ...disallowed]),
     ];
     for (const d of addDirs) { args.push('--add-dir', d); }
 
@@ -107,6 +109,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
           ...process.env,
           PATH: userShellPath(),
           ...(opts.env ?? {}),
+          ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
         } as Record<string, string>,
       });
     } catch (e) {

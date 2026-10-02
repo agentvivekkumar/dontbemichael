@@ -47,6 +47,8 @@ import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
 import { expandTilde } from './fs';
+import { CONNECTOR_UNDECIDED, MCP_RESOURCE_TOOLS, type SpawnConnectorPlan } from '../shared/claudeConnectors';
+import { MAX_HOOK_FRAME_BYTES } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { OFFICE_ROLES } from '../shared/officeRoles';
@@ -929,6 +931,9 @@ export class HiveManager {
       docTextCliPath?: string;
       /** Which folders this agent may open and change (src/shared/folderAccess.ts). */
       folderPolicy?: AgentFolderPolicy;
+      /** Its Claude connectors (shared/claudeConnectors.ts): start with none, or
+       *  deny everything not given. Absent means none. */
+      connectors?: SpawnConnectorPlan;
     } = {}
   ): Promise<SpawnInjection> {
     const root = this.root();
@@ -1196,11 +1201,22 @@ export class HiveManager {
     // user's repo) so the agent reports activity and drains its inbox on Stop.
     const sock = this.sockPath();
     const shim = this.shimPath();
+    // Claude connectors (docs/designs/claude-connectors.md): an agent that holds
+    // none, or has no settings file to carry deny rules and the hook, starts
+    // with no Claude account connector and none of the owner's own servers or
+    // plugins; only the app's own --mcp-config servers (md-mail) remain. The
+    // env reaches its child processes too.
+    const settingsWritten = !!(sock && shim);
+    const stripConnectors = !opts.connectors || opts.connectors.strip || !settingsWritten;
     if (sock && shim) {
       env.HIVE_SOCK = sock;
       const settingsPath = join(dir, 'settings.json');
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? []));
       args.push('--settings', settingsPath);
+    }
+    if (stripConnectors) {
+      env.ENABLE_CLAUDEAI_MCP_SERVERS = 'false';
+      args.push('--strict-mcp-config');
     }
     return { args, env };
   }
@@ -1399,7 +1415,7 @@ export class HiveManager {
     return Array.from(new Set(out));
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = []): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through `sh -c` with a stripped PATH, where `node` is often absent.
     const cmd = this.nodeRun(shim);
@@ -1461,10 +1477,10 @@ export class HiveManager {
             },
             permissions: {
               additionalDirectories: writableDirs,
-              ...(folders?.deny.length ? { deny: folders.deny } : {})
+              ...(folders?.deny.length || connectorDeny.length ? { deny: [...(folders?.deny ?? []), ...connectorDeny] } : {})
             }
           }
-        : {}),
+        : connectorDeny.length ? { permissions: { deny: connectorDeny } } : {}),
       hooks: {
         Stop: [entry()],
         SubagentStop: [entry()],
@@ -3492,7 +3508,7 @@ thread. This is the ONLY spawn route you can complete on your own: a hire manife
 Naming a worker after a cast member already gets you that avatar, so you only need \`character\` when
 the name and the face should differ. An unrecognised value falls back rather than failing the spawn.
 
-**It can be switched off.** The operator controls this under Settings → Autonomy & Budgets, and it is
+**It can be switched off.** The operator controls this under Settings → Agents, and it is
 OFF by default, because every worker you start spends tokens nobody approved. While it is off your
 request is NOT failed or deleted, it waits in \`spawn-requests/\` and runs if the operator turns it on.
 If a request of yours has sat there without moving, that is why, and it is a decision to raise with the
@@ -3654,9 +3670,13 @@ Only Michael asks the owner, on the Ask me board. He sets the card to blocked an
 `;
 
 // ─── cth-hook shim (written to <hive>/bin/cth-hook.cjs) ──────────────────────
-// A minimal pipe: read the hook payload on stdin, tag it with this agent's id,
-// forward it to the hive's UDS, and relay the response back to `claude`. All the
-// real logic lives in the main process (HookServer). Never blocks a stop on error.
+// A pipe: read the hook payload on stdin, forward it to the hive's UDS, and
+// relay the response back to `claude`. The decisions live in the main process
+// (HookServer); the shim makes only three of its own (owner, 2026-10-02):
+// AGENT_ID is always the agent (a Task subagent's id rides as subagent_id); an
+// MCP call too big for one frame is sent with its short input fields; and an
+// MCP call is refused when the app cannot answer (no socket, error, 5 s
+// timeout). Everything else never blocks on error.
 const HOOK_SHIM = `#!/usr/bin/env node
 'use strict';
 const net = require('net');
@@ -3667,7 +3687,12 @@ process.stdin.on('data', (d) => { data += d; });
 process.stdin.on('end', () => {
   let payload = {};
   try { payload = JSON.parse(data || '{}'); } catch (_) {}
-  if (!payload.agent_id) payload.agent_id = process.env.AGENT_ID || null;
+  // Inside a Task subagent, Claude Code puts the SUBAGENT's id in agent_id.
+  // The team member is always AGENT_ID, so every gate checks the call as that
+  // agent; the subagent's id rides along as subagent_id (owner, 2026-10-02).
+  const me = process.env.AGENT_ID || null;
+  if (me && payload.agent_id && payload.agent_id !== me) payload.subagent_id = payload.agent_id;
+  payload.agent_id = me || payload.agent_id || null;
   const sock = process.env.HIVE_SOCK;
   if (isStatus) {
     // Status-line mode: Claude Code pipes the session status JSON (incl.
@@ -3694,15 +3719,38 @@ process.stdin.on('end', () => {
     setTimeout(() => process.exit(0), 1500).unref();
     return;
   }
-  if (!sock) { process.exit(0); }
+  // Claude connectors fail closed (docs/designs/claude-connectors.md, D8): when
+  // the app cannot answer, an MCP call is refused; every other tool goes on.
+  const tool = String(payload.tool_name || '');
+  const mcp = payload.hook_event_name === 'PreToolUse' && (tool.indexOf('mcp__') === 0 || ${JSON.stringify([...MCP_RESOURCE_TOOLS])}.indexOf(tool) >= 0);
+  // An MCP call too big for one hook frame (a long document to write) is sent
+  // with only its short input fields: the connector, mail and QuickBooks gates
+  // decide on the tool name, server and mailbox, never the body (owner, 2026-10-02).
+  let line = JSON.stringify(payload);
+  if (mcp && Buffer.byteLength(line) > ${MAX_HOOK_FRAME_BYTES}) {
+    const small = {};
+    const input = payload.tool_input && typeof payload.tool_input === 'object' ? payload.tool_input : {};
+    for (const k of Object.keys(input)) {
+      const v = input[k];
+      if ((typeof v === 'string' && v.length <= 1024) || typeof v === 'number' || typeof v === 'boolean') small[k] = v;
+    }
+    payload.tool_input = small;
+    payload.tool_input_trimmed = true;
+    line = JSON.stringify(payload);
+  }
+  const fail = () => {
+    if (mcp) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: ${JSON.stringify(CONNECTOR_UNDECIDED)} } }));
+    process.exit(0);
+  };
+  if (!sock) { fail(); return; }
   let resp = '';
-  const done = (code) => { if (resp) process.stdout.write(resp); process.exit(code); };
-  const c = net.createConnection(sock, () => c.write(JSON.stringify(payload) + '\\n'));
+  const done = () => { if (!resp && mcp) { fail(); return; } if (resp) process.stdout.write(resp); process.exit(0); };
+  const c = net.createConnection(sock, () => c.write(line + '\\n'));
   c.setEncoding('utf8');
   c.on('data', (d) => { resp += d; });
-  c.on('end', () => done(0));
-  c.on('error', () => process.exit(0));
-  setTimeout(() => process.exit(0), 5000).unref();
+  c.on('end', done);
+  c.on('error', fail);
+  setTimeout(fail, 5000).unref();
 });
 `;
 

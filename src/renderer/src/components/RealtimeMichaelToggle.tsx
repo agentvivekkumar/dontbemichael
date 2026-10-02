@@ -104,7 +104,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
 
   // Without a BYOK OpenAI key: stay visible but disabled (matches FreeFlowButton).
   // Talk mints an ephemeral token from the OpenAI key (apikey:openai) — the SAME
-  // OpenAI provider key set under Agents & Models, used for the Realtime voice API.
+  // OpenAI provider key set under Agents, used for the Realtime voice API.
   // The tooltip carries the full WHY; the quiet info affordance below gives a
   // discoverable cue so the user never just hits a silently-dead button.
   const title = noKey
@@ -122,7 +122,7 @@ export function RealtimeMichaelToggle({ compact = false }: RealtimeMichaelToggle
   // Jump straight to the tab that holds the key. App owns the Settings modal's
   // open state, so this goes through the `cth:` window-event convention rather
   // than threading a callback down through FullscreenTerminal.
-  // Target is VOICE, not Agents & Models: the key is settable in both, but only
+  // Target is VOICE, not Agents: the key is settable in both, but only
   // one of them explains what it is for.
   const openKeySettings = (e: MouseEvent): void => {
     e.stopPropagation();

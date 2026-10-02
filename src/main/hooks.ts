@@ -19,7 +19,7 @@ import type { HarnessConfig } from './config';
 import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
-import { validateHookEvent } from '../shared/hookEvents';
+import { MAX_HOOK_FRAME_BYTES, validateHookEvent } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
 
@@ -47,23 +47,26 @@ export function isTerminalPrompt(p: { notification_type?: string; message?: stri
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
-import { emailCalendarAllowed, isEmailCalendarTool } from '../shared/mcpCatalog';
+import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
 
-/** Why a mail or calendar tool was refused. Read by the agent (and shown on the
- *  floor), so it says what to do instead. */
-const EMAIL_CALENDAR_OFF =
-  'The owner has turned off email and calendar through their Claude account in Settings, so you cannot use those tools. ' +
-  'Do not try another way. If the task needs email or the calendar, say so: a team member tells Michael, and Michael puts it on ASK ME for the owner.';
+/** An MCP tool, or Claude Code's tools for MCP resources. */
+function isMcpCall(tool: string | undefined): boolean {
+  return /^mcp__/.test(tool ?? '') || MCP_RESOURCE_TOOLS.has(tool ?? '');
+}
 
-/** Maximum JSON payload bytes in one newline-delimited hook frame. */
-const MAX_HOOK_FRAME_BYTES = 256 * 1024;
+function mcpDeny(reason: string): unknown {
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } };
+}
+
 
 interface HookPayload {
   hook_event_name?: string;
   agent_id?: string | null;
+  /** Set by the shim when the call came from a Task subagent of agent_id. */
+  subagent_id?: string;
   session_id?: string;
   transcript_path?: string;
   /** Status-line payloads only: the session's live context accounting. */
@@ -174,7 +177,9 @@ export class HookServer {
         let payload: HookPayload = {};
         try { payload = JSON.parse(frame); } catch { /* ignore */ }
         let res: unknown = {};
-        try { res = this.handle(payload); } catch { res = {}; }
+        // A gate that throws allows a built-in tool as before, but never an MCP
+        // call: connectors fail closed (D8).
+        try { res = this.handle(payload); } catch { res = payload.hook_event_name === 'PreToolUse' && isMcpCall(payload.tool_name) ? mcpDeny(CONNECTOR_UNDECIDED) : {}; }
         conn.end(JSON.stringify(res ?? {}));
       });
       conn.on('error', () => { /* shim hung up — ignore */ });
@@ -204,8 +209,13 @@ export class HookServer {
   private handle(p: HookPayload): unknown {
     const agentId = p.agent_id ?? undefined;
     const event = p.hook_event_name ?? 'Unknown';
+    // A Task subagent's calls are checked as its team member (every gate below),
+    // but its own finish, transcript and session are not the agent's: a
+    // subagent stopping must not mark the agent idle or replace its transcript.
+    const subagent = typeof p.subagent_id === 'string' && p.subagent_id.length > 0;
+    if (subagent && event === 'SubagentStop') return {};
     this.onEvent?.(agentId, event, p.message);
-    if (agentId && typeof p.transcript_path === 'string' && p.transcript_path) {
+    if (agentId && !subagent && typeof p.transcript_path === 'string' && p.transcript_path) {
       this.transcriptPaths.set(agentId, p.transcript_path);
     }
 
@@ -249,7 +259,7 @@ export class HookServer {
 
     // Capture the Claude Code session id for idempotent --resume + cost dedup
     // (Lane A #6.6a). Cheap: recordSession writes only when it changes.
-    if (agentId && p.session_id) this.hive.recordSession(agentId, p.session_id);
+    if (agentId && !subagent && p.session_id) this.hive.recordSession(agentId, p.session_id);
 
     // CostSample — synthesized by the proxy-bridge sidecar (qwen) on every
     // response with usage. Persist it to the SAME cost ledger as Claude's OTel
@@ -285,7 +295,8 @@ export class HookServer {
 
     // Feed the breaker its hook-derived loop signal: a tool that actually ran.
     // A repeated identical (name+input) PostToolUse is the runaway-loop tell.
-    if (event === 'PostToolUse' && agentId) {
+    // A subagent's tool calls are its own run, not the agent's loop signal.
+    if (event === 'PostToolUse' && agentId && !subagent) {
       this.breaker?.recordToolUse(agentId, p.tool_name, p.tool_input);
     }
 
@@ -344,13 +355,34 @@ export class HookServer {
       }
     }
 
-    // Settings → QuickBooks, then Capabilities → QuickBooks (owner, 2026-09-29):
-    // the Claude account's QuickBooks connector. The Settings switch off
-    // refuses everyone; then, per agent, off refuses every call; Read only
-    // refuses any call that could change the books. The name check comes first
-    // so other tools never read config.
+    // Claude connectors (docs/designs/claude-connectors.md, owner 2026-10-02):
+    // every MCP tool and MCP resource call is refused unless it reaches a
+    // connector the owner turned on and gave this agent, or the app's own
+    // md-mail (decided below by Capabilities > Email). QuickBooks keeps its own
+    // rules, next. A call with no agent id, the owner's own servers and plugins,
+    // and a connector the app cannot name are refused. Read per call, so a
+    // revoke takes effect on the next one.
+    // One config read for an MCP call's gates (connector, QuickBooks, md-mail).
+    let mcpCfg: HarnessConfig | undefined;
+    const mcpConfig = (): HarnessConfig => (mcpCfg ??= this.getConfig());
+    if (event === 'PreToolUse' && isMcpCall(p.tool_name)) {
+      const cfg = mcpConfig();
+      const d = connectorAccess(cfg, agentId, p.tool_name ?? '', p.tool_input, agentId ? (this.roleReadsBooks?.(agentId) ?? false) : false);
+      if (!d.ok) {
+        console.log(`[connectors] refused ${p.tool_name} for ${agentId ?? 'no agent'}: ${d.reason}`);
+        if (agentId) this.emitControl(agentId, p.tool_name, d.reason);
+        this.emit(agentId, event, p);
+        return mcpDeny(d.reason);
+      }
+    }
+
+    // QuickBooks (owner, 2026-09-29): its row's switch in Settings > Connections >
+    // Claude connectors refuses everyone when off; then, per agent, off refuses
+    // every call and Read only refuses any call that could change the books. The
+    // connector gate above lets QuickBooks calls through to this one. The name
+    // check comes first so other tools never read config.
     if (event === 'PreToolUse' && agentId && (isQuickBooksConnectorTool(p.tool_name ?? '') || isQuickBooksResourceCall(p.tool_name ?? '', p.tool_input))) {
-      const cfg = this.getConfig();
+      const cfg = mcpConfig();
       const cap = quickbooksCapability(cfg.agentCapabilities?.[agentId]?.quickbooks, this.roleReadsBooks?.(agentId) ?? false);
       const d = quickbooksAccess(cfg.quickbooksClaude === true, cap, p.tool_name ?? '');
       if (!d.ok) {
@@ -366,39 +398,19 @@ export class HookServer {
       }
     }
 
-    // Settings → Mailboxes → "Your Claude account" switch (stored as the old
-    // Email & Calendar switch). Off means no agent, Michael included, uses the
-    // mail or calendar connected to the owner's Claude account. It does not
-    // touch mailboxes added in Settings (md-mail), which Capabilities govern
-    // alone (owner, 2026-09-26). The name check comes first so other tools
-    // never read config.
-    if (event === 'PreToolUse' && agentId && (isEmailCalendarTool(p.tool_name ?? '') || /^mcp__md-mail__/.test(p.tool_name ?? ''))) {
-      const cfg = this.getConfig();
-      let reason: string | undefined;
-      const tool = p.tool_name ?? '';
-      const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(tool);
-      if (!mdMail) {
-        // The Claude account's Gmail and Calendar: the Settings switch alone,
-        // for every agent alike (owner, 2026-09-26).
-        if (!emailCalendarAllowed(cfg.mcpDefaults)) reason = EMAIL_CALENDAR_OFF;
-      } else {
-        // Mailboxes added in Settings: the agent's Capabilities for the mailbox
-        // named in the call (the broker checks it again).
-        const op = MAIL_TOOL_OPS[mdMail[1]];
-        const input = (p.tool_input ?? {}) as { mailbox?: unknown };
-        const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
-        if (!d.ok) reason = d.reason;
-      }
-      if (reason) {
-        this.emitControl(agentId, p.tool_name, reason);
+    // Mailboxes added in Settings (md-mail): the agent's Capabilities for the
+    // mailbox named in the call (the broker checks it again). The Claude
+    // account's Gmail and Calendar are connectors like any other, above.
+    if (event === 'PreToolUse' && agentId && /^mcp__md-mail__/.test(p.tool_name ?? '')) {
+      const cfg = mcpConfig();
+      const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(p.tool_name ?? '');
+      const op = mdMail ? MAIL_TOOL_OPS[mdMail[1]] : undefined;
+      const input = (p.tool_input ?? {}) as { mailbox?: unknown };
+      const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
+      if (!d.ok) {
+        this.emitControl(agentId, p.tool_name, d.reason);
         this.emit(agentId, event, p);
-        return {
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: reason
-          }
-        };
+        return mcpDeny(d.reason);
       }
     }
 
@@ -485,7 +497,9 @@ export class HookServer {
     // Merged with the roster line below so the two injections never displace each
     // other (only ONE additionalContext can be returned per hook).
     let steer: string | null = null;
-    if ((event === 'UserPromptSubmit' || event === 'PostToolUse') && agentId && this.control) {
+    // Never on a subagent's hook: the steer is for the agent, and a subagent
+    // would take it and end with it.
+    if ((event === 'UserPromptSubmit' || event === 'PostToolUse') && agentId && !subagent && this.control) {
       steer = this.control.takeSteer(agentId) ?? null;
     }
 

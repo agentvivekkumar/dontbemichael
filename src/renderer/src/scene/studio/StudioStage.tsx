@@ -783,8 +783,8 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
   );
   return (
     <div style={{
-      ...style, borderRadius: 'var(--cth-r-2xl)', overflow: 'hidden', background: 'var(--cth-card)',
-      boxShadow: selected ? 'inset 0 0 0 1px var(--cth-ink), var(--cth-ring-select), var(--cth-shadow-hub)' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-hub)'
+      position: 'relative', ...style, borderRadius: 'var(--cth-r-2xl)', overflow: 'hidden', background: 'var(--cth-card)',
+      boxShadow: selected ? 'var(--cth-ring-select), var(--cth-shadow-hub)' : 'var(--cth-shadow-hub)'
     }}>
       <button data-studio-card="" onClick={onSelect} aria-label={god.name} style={{
         position: 'relative', display: 'block', width: '100%', padding: '9px 11px 8px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)'
@@ -826,6 +826,13 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
           <span style={{ fontFamily: 'var(--cth-font-mono)', fontWeight: 600, color: 'var(--cth-ink-2)' }}>{ctx}%</span>
         </div>
       )}
+      {/* The outline sits over the rows: an inset shadow on the card paints
+          under its children, so the filled stats and context rows hid it at
+          the sides when the card was selected. */}
+      <span aria-hidden style={{
+        position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
+        boxShadow: `inset 0 0 0 1px ${selected ? 'var(--cth-ink)' : 'var(--cth-line)'}`
+      }} />
     </div>
   );
 }

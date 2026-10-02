@@ -10,8 +10,10 @@
  * LIMITS, stated plainly:
  *  - Only Claude's file tools (Write/Edit/MultiEdit/NotebookEdit) are checked.
  *    A shell command that writes a file can't be judged from its text.
- *  - The PreToolUse hook fails OPEN when the agent's shim can't reach the app's
- *    socket, so this is a strong guard, not an airtight one.
+ *  - The PreToolUse hook fails OPEN for these file tools when the agent's shim
+ *    can't reach the app's socket, so this is a strong guard, not an airtight
+ *    one. (MCP and MCP resource calls fail closed instead: see HOOK_SHIM and
+ *    docs/designs/claude-connectors.md, D8.)
  *
  * Pure: no fs, no electron. The hook server supplies the paths.
  */

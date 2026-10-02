@@ -122,25 +122,16 @@ function relTime(ms: number, lang: string): string {
   }
 }
 
-/** What the when chip says: the calendar, the interval, or the heartbeat. */
+/** When a job runs, in words: the calendar, the interval ("every 4h", like an
+ *  every line in formatTimes), or the heartbeat. */
 export function whenText(m: Pick<ScheduledMission, 'kind' | 'weekly' | 'intervalMs' | 'times'>, t: TFunction): string {
   if (m.kind === 'heartbeat') return t('schedulesSection.beat');
   const times = normalizeTimes(m.times);
   if (times) return formatTimes(times);
   const w = weeklyDraft(m.weekly);
-  return w ? formatWeekly(w) : fmtInterval(m.intervalMs);
-}
-
-/** The 14px when chip (owner-read text never goes below 14px). */
-function WhenChip({ on, children }: { on: boolean; children: ReactNode }) {
-  return (
-    <span style={{
-      flexShrink: 0, padding: '2px 6px',
-      fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px', fontWeight: 600,
-      background: on ? 'var(--cth-lemon-light)' : 'var(--cth-cream-300)',
-      color: on ? 'var(--cth-ink-900)' : 'var(--cth-ink-500)'
-    }}>{children}</span>
-  );
+  if (w) return formatWeekly(w);
+  const every = fmtInterval(m.intervalMs);
+  return /^\d/.test(every) ? t('schedulesSection.everyInterval', { interval: every }) : every;
 }
 
 function Line({ children, tone = 'plain' }: { children: ReactNode; tone?: 'plain' | 'error' }) {
@@ -210,15 +201,18 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
   const now = Date.now();
   const nextAt = nextRunAt(mission, now);
-  const creator = (!mission.createdBy || mission.createdBy === OWNER
-    ? t('schedulesSection.addedByYou')
-    : t('schedulesSection.addedBy', { name: nameOf(mission.createdBy) }))
-    // Michael approves team members' requests (owner, 2026-09-27); say so.
-    + (mission.approvedBy === 'michael' && mission.createdBy && mission.createdBy !== OWNER && nameOf(mission.createdBy) !== godName
-      ? `, ${t('schedulesSection.approvedBy', { name: godName })}` : '');
+  // Nearly every job is the owner's own, so "added by you" said nothing on
+  // every row (owner, 2026-10-01). Only a job a team member asked for names
+  // them, and Michael when he approved it (owner, 2026-09-27).
+  const creator = !mission.createdBy || mission.createdBy === OWNER ? ''
+    : t('schedulesSection.addedBy', { name: nameOf(mission.createdBy) })
+      + (mission.approvedBy === 'michael' && nameOf(mission.createdBy) !== godName
+        ? `, ${t('schedulesSection.approvedBy', { name: godName })}` : '');
+  // Beside the name: when it runs next, or that it is paused.
+  const next = !mission.enabled ? t('schedulesSection.paused')
+    : nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, i18n.language) }) : '';
   const sub = [
-    mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) }) : t('schedulesSection.notFired'),
-    nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, i18n.language) }) : null,
+    mission.enabled ? (mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) }) : t('schedulesSection.notFired')) : null,
     creator
   ].filter(Boolean).join(', ');
 
@@ -239,21 +233,27 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
   const headerStyle = {
     flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, textAlign: rtl ? 'right' : 'left',
-    padding: '8px 4px', border: 'none', background: 'transparent'
+    // Read only rows line up with the name above them; editable rows keep
+    // room for the disclosure sign.
+    padding: readOnly ? '8px 0' : '8px 4px', border: 'none', background: 'transparent'
   } as const;
   const headerBody = (
     <>
       {!readOnly && <Disclosure open={open} />}
-      <WhenChip on={mission.enabled}>{whenText(mission, t)}</WhenChip>
+      {/* Three quiet lines (owner, 2026-10-01): the name with its next run,
+          when it runs, then who added it and when it last fired. A bold when
+          chip beside or under the name crowded it and broke the status
+          mid phrase. */}
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px',
-          color: 'var(--cth-ink-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-        }}>{mission.label}</span>
-        <span style={{
-          display: 'block', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-        }}>{mission.enabled ? sub : `${t('schedulesSection.paused')}, ${creator}`}</span>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{
+            flex: 1, minWidth: 0, fontFamily: 'var(--cth-font-ui)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+            color: 'var(--cth-ink-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>{mission.label}</span>
+          {next && <span style={{ flexShrink: 0, fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-700)' }}>{next}</span>}
+        </span>
+        <span style={{ display: 'block', marginTop: 2, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>{whenText(mission, t)}</span>
+        {sub && <span style={{ display: 'block', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{sub}</span>}
       </span>
     </>
   );

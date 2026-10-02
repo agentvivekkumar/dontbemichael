@@ -397,7 +397,10 @@ function Token({ f, T, still }: { f: Flight; T: SceneTokens; still: boolean }) {
   const color = colorOf(f.kind, T, f.color);
   const dur = `${FLIGHT_MS / 1000}s`;
   const head = <TokenHead kind={f.kind} color={color} T={T} />;
-  if (still) return <g transform={`translate(${f.end[0]},${f.end[1] - 12})`}>{head}</g>;
+  // A paper plane turns with its path (rotate="auto" below); flying left it
+  // is mirrored so it stays right side up instead of rolling over.
+  const plane = f.kind === 'you' || f.kind === 'note-plane';
+  if (still) return <g transform={`translate(${f.end[0]},${f.end[1] - 12})${plane ? ' rotate(-50)' : ''}`}>{head}</g>;
   const ping = (at: Pt, delay: number, r: number): ReactNode => (
     <ellipse cx={at[0]} cy={at[1]} rx={r} ry={r / 2} fill="none" stroke={color} strokeWidth={2}
       className="cth-st-ping" style={{ animationDelay: `${delay}ms` } as CSSProperties} />
@@ -412,8 +415,9 @@ function Token({ f, T, still }: { f: Flight; T: SceneTokens; still: boolean }) {
       {f.ping && ping(f.end, FLIGHT_MS - 120, 30)}
       {f.ping && ping(f.end, FLIGHT_MS + 120, 30)}
       <g>
-        <animateMotion ref={ref} dur={dur} begin="indefinite" fill="freeze" path={f.d} calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.25 1" />
-        <g className="cth-st-tokenhead">{head}</g>
+        <animateMotion ref={ref} dur={dur} begin="indefinite" fill="freeze" path={f.d} calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.25 1"
+          rotate={plane ? 'auto' : undefined} />
+        <g className="cth-st-tokenhead">{plane && f.end[0] < f.start[0] ? <g transform="scale(1,-1)">{head}</g> : head}</g>
       </g>
     </g>
   );
@@ -425,8 +429,9 @@ function TokenHead({ kind, color, T }: { kind: FlightKind; color: string; T: Sce
       <circle r={14} fill={color} opacity={0.16} />
       {kind === 'you' || kind === 'note-plane' ? (
         // A paper plane: Michael folded the question and threw it to you, or
-        // two idle people pass a line across the office.
-        <g transform="rotate(-18)">
+        // two idle people pass a line across the office. Nose along +x, the
+        // way animateMotion rotate="auto" points a shape down its path.
+        <g transform="rotate(32)">
           <path d="M-11,1 L11,-7 L3,9 L0,3 Z" fill="#FFFFFF" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
           <path d="M11,-7 L0,3" fill="none" stroke={color} strokeWidth={1.2} />
           <path d="M0,3 L-2,8 L3,9" fill={color} opacity={0.35} />

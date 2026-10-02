@@ -10,7 +10,7 @@ import { SHOW_ORG_TRIGGER } from '@shared/buildFeatures';
  * TRIGGERS — every way the floor gets woken up without a human typing. Four
  * types exist (src/shared/triggers.ts is the contract); only schedules shows
  * here. Webhooks live in Settings → Connections and context upkeep in Settings
- * → Agents & Models (both apply to the whole office, not to Michael), and
+ * → Agents (both apply to the whole office, not to Michael), and
  * organisation is hidden in this build (SHOW_ORG_TRIGGER).
  * Schedules is the oldest and used to BE this tab.
  *

@@ -3,7 +3,6 @@ import type { WebContents } from 'electron';
 import { request as httpsRequest } from 'node:https';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readConfig } from './config';
 import { DEFAULT_DROP_HTML } from '../shared/releaseDrop';
 import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDrop, REPO, type UpdateStatus } from '../shared/updateState';
 
@@ -21,8 +20,10 @@ import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDro
  * `releases/latest` poll — semver-compare against the running version and show a
  * notify-only state linking the release page.
  *
- * Everything is gated on the `autoUpdate` HarnessConfig flag (default ON,
- * Settings → General) and on `app.isPackaged` — dev runs never poll.
+ * Every installed build checks; dev runs never poll (`app.isPackaged`). The old
+ * `autoUpdate` config flag is ignored (owner, 2026-10-02: "always check for
+ * updates"): its switch is hidden, so an office saved with it off could never
+ * turn checks back on.
  *
  * ─── v0.3.7: why native updating never actually ran ──────────────────────────
  * electron-updater is CommonJS and exposes `autoUpdater` through a lazy
@@ -119,14 +120,6 @@ function logLine(msg: string): void {
 function emit(status: UpdateStatus): void {
   lastStatus = reduceStatus(lastStatus, status);
   try { sendTo?.()?.send('update:status', lastStatus); } catch { /* window tore down */ }
-}
-
-function autoUpdateEnabled(): boolean {
-  try {
-    return readConfig().autoUpdate !== false; // default ON
-  } catch {
-    return true;
-  }
 }
 
 type AutoUpdater = import('electron-updater').AppUpdater;
@@ -401,6 +394,13 @@ export function initAutoUpdater(getWebContents: () => WebContents | null): void 
   });
   /** Re-serve the last known status to a freshly loaded window. */
   ipcMain.handle('update:current', () => lastStatus ?? { state: 'idle' });
+  /** What's new in Settings: the notes of the version you are on, on request,
+   *  so the click always shows something in the app (owner, 2026-10-02). Same
+   *  public endpoint the post-update check reads; dev builds answer too. */
+  ipcMain.handle('update:releaseNotes', () => new Promise<{ version: string; notes?: string; url: string }>((resolve) => {
+    const version = app.getVersion();
+    fetchReleaseBody(version, (notes) => resolve({ version, notes, url: `https://github.com/${REPO}/releases/tag/v${version}` }));
+  }));
   /**
    * DEV ONLY — push a synthetic status so the update toast can be seen without a
    * real release. The toast renders for exactly two states ('downloaded' and
@@ -545,7 +545,7 @@ export function initAutoUpdater(getWebContents: () => WebContents | null): void 
       emit({ state: 'error', message });
     }
 
-    const tick = (): void => { if (autoUpdateEnabled()) void runCheck(); };
+    const tick = (): void => { void runCheck(); };
     // First check shortly after boot (don't compete with spawn/startup I/O),
     // then every CHECK_INTERVAL_MS.
     setTimeout(tick, 30_000);

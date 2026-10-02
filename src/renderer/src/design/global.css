@@ -61,6 +61,9 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
   outline: 2px solid var(--cth-indigo);
   outline-offset: 2px;
 }
+/* On an ink fill (the What's new popover) indigo is too faint in dark mode:
+   the ring takes the page colour, which is the fill's opposite. */
+.cth-onink :focus-visible { outline-color: var(--cth-bg); }
 
 /* Text inputs — resting border faint, focused border dark and thicker.
    The resting 1px ink-100 is deliberately quiet so a panel full of boxes stays

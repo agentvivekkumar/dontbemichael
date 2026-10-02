@@ -14,7 +14,7 @@
  *   ?shot=onboarding-meet         Setup, the Meet step (Michael shows you around)
  *   ?shot=kelly-memory            Kelly's panel, Memory tab
  *   ?shot=hire                    The hire wizard over the office
- *   ?shot=settings-autonomy       Settings, Autonomy & Budgets
+ *   ?shot=settings-autonomy       Settings, Agents
  *   #dark                         dark theme
  *   ?at=10:42                     the time of day the clock shows
  */
@@ -179,7 +179,7 @@ function Shell() {
       </div>
       <TaskDetailOverlay />
       {shot === 'hire' && <AddAgentModal onClose={() => {}} config={config} onConfigChange={() => {}} />}
-      {shot === 'settings-autonomy' && <SettingsModal config={config} initialSection="Autonomy & Budgets" onClose={() => {}} />}
+      {shot === 'settings-autonomy' && <SettingsModal config={config} initialSection="Agents" onClose={() => {}} />}
     </div>
   );
 }

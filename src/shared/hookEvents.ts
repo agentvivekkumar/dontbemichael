@@ -1,3 +1,8 @@
+/** Maximum JSON payload bytes in one newline-delimited hook frame. The hook
+ *  server drops a bigger frame; the hook shim trims an MCP call to fit
+ *  (src/main/hive.ts HOOK_SHIM). */
+export const MAX_HOOK_FRAME_BYTES = 256 * 1024;
+
 /** Renderer-facing hook event shared across the Electron IPC boundary. */
 export interface HookEvent {
   agentId?: string;

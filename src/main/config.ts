@@ -1,6 +1,7 @@
 import type { MailboxRecord, AgentCapabilities } from '../shared/mailboxes';
 import type { CompanyProfile } from '../shared/companyProfile';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
+import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import { app } from 'electron';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -230,9 +231,22 @@ export interface HarnessConfig {
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
-  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
-   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  /** The QuickBooks row's switch in Settings > Connections > Claude connectors:
+   *  agents may use the QuickBooks on the owner's Claude account (owner,
+   *  2026-09-29; one row in the connector list since 2026-10-02). Off or absent
+   *  refuses everyone. */
   quickbooksClaude?: boolean;
+  /** The last read of the connectors on the owner's Claude account
+   *  (shared/claudeConnectors.ts). Absent until the first read. */
+  claudeConnectors?: ClaudeConnectorsState;
+  /** Settings > Connections > Claude connectors: the ones the owner turned on,
+   *  by key. Off or absent refuses every agent. QuickBooks uses quickbooksClaude. */
+  connectorsOn?: { [key: string]: boolean };
+  /** The connector keys the owner has seen in Settings, so a new one opens the list. */
+  connectorsSeen?: string[];
+  /** One-time guard: the old QuickBooks and "Your Claude account" choices were
+   *  carried over to the connector list (owner, 2026-10-02, D9). */
+  connectorsMigrated?: boolean;
   /** Enable semantic memory (MemPalace CLI). No-op if mempalace isn't installed. */
   semanticMemory: boolean;
   /** Embedding model for the palace: lightweight 'minilm' or multilingual 'embeddinggemma'. */
@@ -315,10 +329,9 @@ export interface HarnessConfig {
    *  AC). Default OFF: the honest default is "survive sleep + catch up once on
    *  resume" (see the powerMonitor 'resume' handler), not "stay awake". */
   strongKeepalive?: boolean;
-  /** Auto-update from GitHub releases (v0.3.4). Default ON. Packaged builds
-   *  check on boot + every ~6h, download in the background, and show a
-   *  "restart to update" toast — installation is always user-initiated. OFF
-   *  disables checking entirely. (Mirrored in preload + renderer config.) */
+  /** @deprecated Ignored since 2026-10-02: every installed build checks for
+   *  updates (updater.ts), and the switch is gone. Kept so older config files
+   *  still read. (Mirrored in preload + renderer config.) */
   autoUpdate?: boolean;
   /** Multi-window "floors": expose a New Floor action that opens additional
    *  windows, each an independent office with isolated renderer state (its own
@@ -336,7 +349,7 @@ export interface HarnessConfig {
   /** Anonymous product analytics (PostHog) — the exact events/properties are
    *  documented in TELEMETRY.md. Ignored while COLLECT_USAGE_STATS
    *  (buildFeatures.ts) is false, as it is in this build. Otherwise default ON
-   *  (opt-out, like autoUpdate); builds without an injected key and environments
+   *  (opt-out); builds without an injected key and environments
    *  with DO_NOT_TRACK set never send regardless of this flag. (Mirrored in
    *  preload + renderer config.) */
   telemetryEnabled?: boolean;
@@ -459,7 +472,6 @@ const DEFAULTS: HarnessConfig = {
   missions: [OPS_STANDUP_MISSION],
   notifications: false,
   strongKeepalive: false,
-  autoUpdate: true,
   telemetryEnabled: true,
   multiWindow: true,
   tvShowOffices: false,

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
+import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
@@ -293,9 +294,15 @@ export interface HarnessConfig {
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
-  /** Settings > Connections > QuickBooks: agents may use the QuickBooks on the
-   *  owner's Claude account (owner, 2026-09-29). Off or absent refuses everyone. */
+  /** The QuickBooks row's switch under Settings > Connections > Claude connectors.
+   *  Off or absent refuses everyone. Mirrors src/main/config.ts. */
   quickbooksClaude?: boolean;
+  /** Connectors on the owner's Claude account, as last read. Mirrors src/main/config.ts. */
+  claudeConnectors?: ClaudeConnectorsState;
+  /** The connectors the owner turned on, by key (QuickBooks: quickbooksClaude). */
+  connectorsOn?: { [key: string]: boolean };
+  /** Connector keys the owner has seen in Settings. */
+  connectorsSeen?: string[];
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
@@ -305,7 +312,7 @@ export interface HarnessConfig {
   /** Opt-in strong keep-alive (prevent-display-sleep). Mirrors main + renderer
    *  HarnessConfig so updateConfig({ strongKeepalive }) is typed across the bridge. */
   strongKeepalive?: boolean;
-  /** Auto-update from GitHub releases (default ON; Settings → General). */
+  /** @deprecated Ignored since 2026-10-02: updates are always checked. */
   autoUpdate?: boolean;
   /** Anonymous product analytics (see TELEMETRY.md). Ignored while
    *  COLLECT_USAGE_STATS (buildFeatures.ts) is false, as it is in this build.
@@ -873,8 +880,32 @@ const api = {
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
-  /** Whether the owner's Claude account has QuickBooks: 'connected' | 'needs-sign-in' | 'not-added' | 'unknown'. Takes a few seconds. */
-  quickbooksClaudeStatus: (): Promise<'connected' | 'needs-sign-in' | 'not-added' | 'unknown'> => ipcRenderer.invoke('quickbooks:claudeStatus'),
+  /** Read the connectors on the owner's Claude account again (a few seconds). */
+  connectorsRefresh: (why?: string): Promise<void> => ipcRenderer.invoke('connectors:refresh', why),
+  /** Whether a read is running now. */
+  connectorsReading: (): Promise<boolean> => ipcRenderer.invoke('connectors:reading'),
+  onConnectorsReading: (cb: (reading: boolean) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, reading: boolean) => cb(reading);
+    ipcRenderer.on('connectors:reading', listener);
+    return () => ipcRenderer.removeListener('connectors:reading', listener);
+  },
+  /** The owner's switch for one connector. */
+  connectorsSetOn: (key: string, on: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('connectors:setOn', key, on),
+  /** Give or take one connector from one agent. */
+  connectorsSetGrant: (agentId: string, key: string, granted: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('connectors:setGrant', agentId, key, granted),
+  /** Forget a connector that left the Claude account. */
+  connectorsClear: (key: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('connectors:clear', key),
+  /** The owner saw the list: nothing in it is new any more. */
+  connectorsSeen: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('connectors:seen'),
+  /** Agents whose connectors changed since they started (missed pushes). */
+  connectorsPendingRestarts: (): Promise<string[]> => ipcRenderer.invoke('connectors:pendingRestarts'),
+  /** An agent's connectors changed since it started: restart it when idle. */
+  onConnectorsRestartNeeded: (cb: (p: { agentId: string }) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, p: { agentId: string }) => cb(p);
+    ipcRenderer.on('connectors:restartNeeded', listener);
+    return () => ipcRenderer.removeListener('connectors:restartNeeded', listener);
+  },
   /** Agents that may use QuickBooks, Read only, before the owner chooses (Oscar). */
   quickbooksRoleDefaults: (): Promise<string[]> => ipcRenderer.invoke('quickbooks:roleDefaults'),
   /** Save one agent's QuickBooks capability (through the owner's Claude account). */
@@ -1496,7 +1527,7 @@ const api = {
     return () => ipcRenderer.removeListener('realtime:enqueue', listener);
   },
   /** v0.3.4: app self-knowledge — version + newest changelog sections. */
-  appInfo: (): Promise<{ version: string; changelog: string }> =>
+  appInfo: (): Promise<{ version: string; changelog: string; packaged?: boolean }> =>
     ipcRenderer.invoke('app:info'),
   // ─── Roster mirror (agents + notes + queues, shared dev ↔ packaged) ─────────
   /** Read the roster file beside the hive. SYNCHRONOUS on purpose: the zustand
@@ -1533,6 +1564,11 @@ const api = {
   /** The last known status — a reloaded window subscribes AFTER main may have
    *  already emitted, so it pulls the current state instead of waiting 6h. */
   updateCurrent: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:current'),
+  /** The release notes of the version this install runs, fetched from its
+   *  GitHub release when you click What's new in Settings. `notes` is
+   *  undefined when the release could not be read (offline, no release). */
+  updateReleaseNotes: (): Promise<{ version: string; notes?: string; url: string }> =>
+    ipcRenderer.invoke('update:releaseNotes'),
 
   // ─── Claude Code updated underneath the team (src/shared/cliUpdate.ts) ──────
   /** Pushed when live agents fall behind the installed Claude Code, or catch up

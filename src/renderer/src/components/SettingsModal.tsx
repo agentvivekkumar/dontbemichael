@@ -1,5 +1,5 @@
 import { MailboxesSettings } from './MailboxesSettings';
-import { QuickBooksSettings } from './QuickBooksSettings';
+import { ClaudeConnectorsSettings } from './ClaudeConnectorsSettings';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useDialog } from '@/shell/useDialog';
 import { useTranslation } from 'react-i18next';
@@ -17,11 +17,10 @@ import {
 import { SkillsTab } from './SkillsTab';
 import { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
 import { plainReasonKey } from '@/store/plainReason';
-import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_AUTO_UPDATE_SWITCH, SHOW_SLACK } from '@shared/buildFeatures';
+import { ALLOW_TEMP_WORKERS, SHOW_ORG_TRIGGER, COLLECT_USAGE_STATS, SHOW_VOICE, SHOW_SLACK, SHOW_MCP_DEFAULTS, SHOW_SIMPLE_MODE_SWITCH, SHOW_ARABIC_TERMINAL_SWITCH, SHOW_LANGUAGE_PICKER } from '@shared/buildFeatures';
 import { WebhookSchemaEditor } from './triggers/WebhookSchemaEditor';
 import { InfoTip } from './InfoTip';
 import { PixelButton } from './PixelButton';
-import { UpdatesSection } from './UpdatesSection';
 import { SettingsHeroCard } from './SettingsHeroCard';
 import { CompanyProfileSettings } from './CompanyProfileSettings';
 import { SetupPanel } from './SetupPanel';
@@ -164,7 +163,7 @@ export { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/
 import { showByokSettings } from '@shared/agentProvider';
 
 // v0.3.4 redesign: six tabs, one topic each. 'AI Engines' folded into
-// Agents & Models; MCP + Slack + webhook + REST live together in Connections;
+// Agents (once Agents & Models, now also autonomy and budgets); MCP + Slack + webhook + REST live together in Connections;
 // voice gets its own tab; Danger Zone became a red row at the bottom of General.
 /* The small-caps section heading, defined once. It was written out inline
    seventeen times, in three slightly different forms, which is how a tab ends
@@ -180,8 +179,10 @@ const sectionHeadFlush = { ...sectionHead, marginBottom: 0 } as const;
 /** The hairline between Settings sections. */
 const sectionRule = { height: 1, background: 'var(--cth-line)' } as const;
 
-export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents & Models' | 'Skills' | 'Autonomy & Budgets' | 'Connections' | 'Voice' | 'Memory & Knowledge';
-const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents & Models', 'Skills', 'Autonomy & Budgets', 'Connections', 'Voice', 'Memory & Knowledge'];
+// Agents & Models and Autonomy & Budgets are one Agents tab (owner, 2026-10-01):
+// the model agents run on, how much they do alone and the limits that stop them.
+export type Section = 'General' | 'Company profile' | 'Prerequisites' | 'Agents' | 'Skills' | 'Connections' | 'Voice' | 'Memory & Knowledge';
+const NAV_SECTIONS: Section[] = ['General', 'Company profile', 'Prerequisites', 'Agents', 'Skills', 'Connections', 'Voice', 'Memory & Knowledge'];
 /** The tabs shown: the Voice tab is hidden while voice is off (SHOW_VOICE). */
 const VISIBLE_SECTIONS: Section[] = NAV_SECTIONS.filter((s) => s !== 'Voice' || SHOW_VOICE);
 /** i18n key for each nav section's label — the Section values themselves stay
@@ -190,9 +191,8 @@ const NAV_SECTION_KEYS: Record<Section, string> = {
   'General': 'settings.nav.general',
   'Company profile': 'settings.nav.companyProfile',
   'Prerequisites': 'settings.nav.prerequisites',
-  'Agents & Models': 'settings.nav.agentsModels',
+  'Agents': 'settings.nav.agents',
   'Skills': 'settings.nav.skills',
-  'Autonomy & Budgets': 'settings.nav.autonomyBudgets',
   'Connections': 'settings.nav.connections',
   'Voice': 'settings.nav.voice',
   'Memory & Knowledge': 'settings.nav.memoryKnowledge'
@@ -533,15 +533,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
     setAutoCompactPending(next);
   };
 
-  // ─── Auto-update (default ON; gates main's updater checks entirely) ────────
-  const [autoUpdateOn, setAutoUpdateOn] = useState<boolean>(config.autoUpdate !== false);
-  const toggleAutoUpdate = async () => {
-    const next = !autoUpdateOn;
-    setAutoUpdateOn(next);
-    try { stage({ autoUpdate: next }); }
-    catch { setAutoUpdateOn(!next); }
-  };
-
   // ─── Anonymous usage stats (TELEMETRY.md). Rendered only while
   // COLLECT_USAGE_STATS (buildFeatures.ts) is on; off in this build. ─
   const [telemetryOn, setTelemetryOn] = useState<boolean>(config.telemetryEnabled !== false);
@@ -558,7 +549,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   // Talk (Realtime Michael) is gated on the OpenAI key — read the live presence
   // boolean so the Realtime Michael section can show its enabled/disabled status.
   const hasOpenAiKey = useStore((s) => s.hasOpenAiKey);
-  // Voice-tab entry for the SAME broker slot Agents & Models writes (apikey:openai).
+  // Voice-tab entry for the SAME broker slot the Agents tab writes (apikey:openai).
   // Mirroring presence into the store on save is what makes the Talk button light up
   // immediately instead of on next launch.
   const setHasOpenAiKey = useStore((s) => s.setHasOpenAiKey);
@@ -1063,19 +1054,12 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   {/* GENERAL */}
                   {activeSection === 'General' && (
                     <>
-                      {/* Who you are and what this install is — version, plan,
-                          sponsor, and the app-level actions that belong to none
-                          of the settings below. Slots for a future subscription
-                          and a sponsor live here; both render nothing until set. */}
+                      {/* What this install is and whether it is current, in one
+                          card: version once, the update status and its button, the
+                          app level links (docs/designs/about-updates-card.md). "Am
+                          I on the latest?" is the question people open Settings
+                          with, and the toolbar chip says nothing when it is yes. */}
                       <SettingsHeroCard />
-
-                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
-
-                      {/* Updates — first among the settings proper, because "am I
-                          on the latest?" is the question people open Settings to
-                          answer, and the toolbar chip says nothing at all when
-                          the answer is yes. */}
-                      <UpdatesSection />
 
                       <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
@@ -1134,6 +1118,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               {keepAwake ? t('common.on') : t('common.off')}
                             </PixelButton>
                           </div>
+                          {/* Hidden in this build (SHOW_SIMPLE_MODE_SWITCH); the saved audience still applies. */}
+                          {SHOW_SIMPLE_MODE_SWITCH && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>{t('settings.general.simpleMode')}</span>
@@ -1145,6 +1131,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               {simpleMode ? t('common.on') : t('common.off')}
                             </PixelButton>
                           </div>
+                          )}
+                          {/* Hidden in this build (SHOW_ARABIC_TERMINAL_SWITCH); the shaping still follows the language. */}
+                          {SHOW_ARABIC_TERMINAL_SWITCH && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
@@ -1175,9 +1164,13 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                               {arabicTerminal ? t('common.on') : t('common.off')}
                             </PixelButton>
                           </div>
+                          )}
                         </div>
                       </div>
 
+                      {/* Language: hidden in this build (SHOW_LANGUAGE_PICKER); the
+                          saved language, or English, stays. */}
+                      {SHOW_LANGUAGE_PICKER && (<>
                       <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
                       {/* Language — app UI language (i18n) */}
@@ -1204,6 +1197,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           </select>
                         </div>
                       </div>
+                      </>)}
 
                       <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
@@ -1255,26 +1249,6 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             {autoCompactOn ? t('common.on') : t('common.off')}
                           </PixelButton>
                         </div>
-                        {SHOW_AUTO_UPDATE_SWITCH && (<>
-                          <div style={{ height: 10 }} />
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
-                                {t('settings.general.autoUpdate')}
-                              </span>
-                              <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                                {t('settings.general.autoUpdateDesc')}
-                              </span>
-                            </div>
-                            <PixelButton
-                              variant={autoUpdateOn ? 'primary' : 'secondary'}
-                              size="sm"
-                              onClick={toggleAutoUpdate}
-                            >
-                              {autoUpdateOn ? t('common.on') : t('common.off')}
-                            </PixelButton>
-                          </div>
-                        </>)}
                         {COLLECT_USAGE_STATS && (<>
                           <div style={{ height: 10 }} />
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -1327,7 +1301,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                     </div>
                   )}
 
-                  {activeSection === 'Agents & Models' && (
+                  {/* AGENTS: the model, autonomy, and the limits that stop them. */}
+                  {activeSection === 'Agents' && (
                     <>
                       <div>
                         <div style={sectionHead}>
@@ -1357,38 +1332,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                       <div style={{ height: 1, background: 'var(--cth-line)' }} />
 
-                      {/* API keys and local endpoints feed only OpenCode, Crush, pi and
-                          Qwen; this build offers none of them (BUILD_ENGINES). */}
-                      {showByokSettings() && (
-                        <>
-                          <AiEnginesSettings config={config} />
-                          <div style={{ height: 1, background: 'var(--cth-line)' }} />
-                        </>
-                      )}
-
-                      {/* Advanced */}
-                      <div>
-                        <div style={sectionHead}>
-                          {t('settings.agentsModels.advanced')}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>{t('settings.agentsModels.maxTurns')}</span>
-                          <input
-                            type="number" min="1" step="10" value={maxTurnsVal}
-                            onChange={(e) => setMaxTurnsVal(e.target.value)}
-                            placeholder={t('settings.agentsModels.unlimited')}
-                            className="cth-input" style={{ ...slackInputStyle, width: 120 }}
-                          />
-                          <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('settings.agentsModels.blankUnlimited')}</span>
-                        </div>
-                      </div>
-
-                    </>
-                  )}
-
-                  {/* AUTONOMY & BUDGETS — the safety tab */}
-                  {activeSection === 'Autonomy & Budgets' && (
-                    <>
+                      {/* Autonomy and budgets (was its own tab until 2026-10-01). */}
                       <div>
                         <div style={sectionHead}>
                           {t('settings.autonomy.autonomy')}
@@ -1497,6 +1441,35 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           </div>
                         </div>
                       </div>
+
+                      <div style={{ height: 1, background: 'var(--cth-line)' }} />
+
+                      {/* API keys and local endpoints feed only OpenCode, Crush, pi and
+                          Qwen; this build offers none of them (BUILD_ENGINES). */}
+                      {showByokSettings() && (
+                        <>
+                          <AiEnginesSettings config={config} />
+                          <div style={{ height: 1, background: 'var(--cth-line)' }} />
+                        </>
+                      )}
+
+                      {/* Advanced */}
+                      <div>
+                        <div style={sectionHead}>
+                          {t('settings.agentsModels.advanced')}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>{t('settings.agentsModels.maxTurns')}</span>
+                          <input
+                            type="number" min="1" step="10" value={maxTurnsVal}
+                            onChange={(e) => setMaxTurnsVal(e.target.value)}
+                            placeholder={t('settings.agentsModels.unlimited')}
+                            className="cth-input" style={{ ...slackInputStyle, width: 120 }}
+                          />
+                          <span style={{ fontSize: 12, color: 'var(--cth-ink-500)' }}>{t('settings.agentsModels.blankUnlimited')}</span>
+                        </div>
+                      </div>
+
                     </>
                   )}
 
@@ -1633,7 +1606,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   )}
 
                   {/* CONNECTIONS — everything external (MCP + Slack + webhook + REST) */}
-                  {activeSection === 'Connections' && (
+                  {/* Default MCP servers: hidden in this build (SHOW_MCP_DEFAULTS);
+                      Claude Code never loaded them from the settings file. */}
+                  {SHOW_MCP_DEFAULTS && activeSection === 'Connections' && (
                     <>
                       <McpDefaultsSettings config={config} />
                       <div style={{ height: 1, background: 'var(--cth-line)' }} />
@@ -1642,15 +1617,16 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                   {activeSection === 'Connections' && (
                     <>
-                      {/* Mailboxes first: every connected mailbox, then the
-                          Your Claude account switch (docs/designs/multi-mailbox.md). */}
-                      <MailboxesSettings />
+                      {/* Claude connectors first (docs/designs/claude-connectors.md,
+                          design D2): every connector on the owner's Claude account,
+                          off until turned on here; who may use one is on each
+                          agent's Access tab. QuickBooks and Gmail are rows in it. */}
+                      <ClaudeConnectorsSettings />
 
                       <div style={sectionRule} />
 
-                      {/* QuickBooks through the Claude account: the one switch;
-                          who may use it is on each Capabilities tab. */}
-                      <QuickBooksSettings />
+                      {/* The mailboxes added here (docs/designs/multi-mailbox.md). */}
+                      <MailboxesSettings />
 
                       <div style={sectionRule} />
 
@@ -2225,7 +2201,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                             This is where someone looking for voice actually lands (the Talk
                             button deep-links to it), so sending them to another tab to type
                             the key was a dead end dressed up as documentation. Same broker
-                            slot as Agents & Models (apikey:openai) — one key, two doorways,
+                            slot as the Agents tab (apikey:openai) — one key, two doorways,
                             and saving in either flips the same gate. The value never leaves
                             main; only the presence boolean comes back. */}
                         <div style={{
@@ -2310,20 +2286,35 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                     </>
                   )}
 
-                  {/* Danger — a red row at the bottom of General (was its own tab) */}
+                  {/* Danger zone: loud on purpose (owner, 2026-10-02). A tinted red card
+                      with a warning mark and a filled red button, the one solid
+                      coral button besides Needs you (DESIGN.md 7.7). Reset still
+                      asks once before it wipes anything. */}
                   {activeSection === 'General' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                      <div style={{
-                        fontFamily: 'var(--cth-font-display)', fontSize: 10, lineHeight: '14px',
-                        color: '#6E1423'
-                      }}>{t('settings.general.dangerZone')}</div>
-                      <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>
-                        {t('settings.general.dangerDesc', { godName })}
-                      </p>
-                      <div>
-                        <PixelButton variant="destructive" size="md" onClick={() => setConfirming(true)}>
-                          {t('settings.general.resetStartOver')}
-                        </PixelButton>
+                    <div role="group" aria-labelledby="settings-danger-zone" style={{
+                      flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px',
+                      background: 'var(--cth-coral-soft)', borderRadius: 'var(--cth-r-xl)',
+                      boxShadow: 'inset 0 0 0 1.5px color-mix(in srgb, var(--cth-coral-base) 55%, transparent)'
+                    }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: 'var(--cth-coral-strong)' }}>
+                        <path fill="currentColor" d="M12 2.8 1.6 20.6a1 1 0 0 0 .9 1.5h19a1 1 0 0 0 .9-1.5L12 2.8Zm-1 6.7h2v6h-2v-6Zm0 8h2v2h-2v-2Z" />
+                      </svg>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div id="settings-danger-zone" style={{ fontSize: 15, lineHeight: '20px', fontWeight: 700, color: 'var(--cth-coral-text)' }}>
+                          {t('settings.general.dangerZone')}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--cth-ink)' }}>
+                          {t('settings.general.dangerDesc', { godName })}
+                        </p>
+                        <div style={{ marginTop: 6 }}>
+                          <button type="button" onClick={() => setConfirming(true)} style={{
+                            padding: '8px 16px', border: 'none', borderRadius: 'var(--cth-r-md)', cursor: 'pointer',
+                            background: 'var(--cth-coral-strong)', color: 'var(--cth-on-coral)',
+                            fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 700
+                          }}>
+                            {t('settings.general.resetStartOver')}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}

@@ -22,7 +22,7 @@ require.cache[electron] = {
   exports: { Notification: class { show() {} static isSupported() { return false; } } }
 };
 
-const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability, parseClaudeQuickBooksStatus } = loadTs('src/shared/quickbooks.ts');
+const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability } = loadTs('src/shared/quickbooks.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 const { HookServer } = loadTs('src/main/hooks.ts');
 
@@ -133,26 +133,34 @@ test('with the Settings switch off (the default), everyone is refused, whatever 
   }
 });
 
-test('the QuickBooks section shows on Capabilities only while the Settings switch is on', () => {
+test('QuickBooks shows on Capabilities only while its Settings switch is on, as a Claude connector row (E4, design D4)', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
-  assert.match(read('src/renderer/src/components/CapabilitiesTab.tsx'), /\{config\.quickbooksClaude === true && booksDefault !== undefined && <TriggerCard\n\s+title=\{t\('capabilities\.quickbooks'\)\}/, 'only with the switch on, and not before the role default is known');
-  const settings = read('src/renderer/src/components/QuickBooksSettings.tsx');
-  assert.match(settings, /const on = config\?\.quickbooksClaude === true;/, 'off unless turned on');
-  assert.match(settings, /updateConfig\(\{ quickbooksClaude: next \}\)/);
-  assert.match(settings, /t\(on \? 'quickbooksSettings\.introOn' : 'quickbooksSettings\.introOff'\)/, 'the intro says where things stand');
-  assert.match(settings, /\{on && \(/, 'the Claude account check shows only while on');
-  assert.match(read('src/renderer/src/components/SettingsModal.tsx'), /<MailboxesSettings \/>[\s\S]{0,300}<QuickBooksSettings \/>/, 'under Mailboxes in Connections');
+  const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
+  assert.match(cap, /\.filter\(\(c\) => connectorOn\(config, c\.key\) && \(!isQuickBooksKey\(c\.key\) \|\| booksDefault !== undefined\)\)/, 'only with the switch on, and not before the role default is known');
+  assert.match(cap, /\{qbo && on && \(/, 'Read only or Can make changes under its row');
+  const { connectorOn } = loadTs('src/shared/claudeConnectors.ts');
+  assert.equal(connectorOn({}, 'Intuit QuickBooks'), false, 'off unless turned on');
+  assert.equal(connectorOn({ quickbooksClaude: true }, 'Intuit QuickBooks'), true, 'its switch is still quickbooksClaude');
+  assert.equal(connectorOn({ connectorsOn: { 'Intuit QuickBooks': true } }, 'Intuit QuickBooks'), false);
+  assert.match(read('src/main/index.ts'), /if \(isQuickBooksKey\(key\)\) \{ writeConfig\(\{ quickbooksClaude: on === true \}\); return \{ ok: true \}; \}/);
+  assert.match(read('src/renderer/src/components/SettingsModal.tsx'), /<ClaudeConnectorsSettings \/>[\s\S]{0,300}<MailboxesSettings \/>/, 'in the connector list, first in Connections');
 });
 
-test('the QuickBooks gate leaves every other tool alone', async (t) => {
+test('the QuickBooks gate leaves every other tool to its own rule', async (t) => {
+  // Other connectors were open to every agent until the connector list (owner,
+  // 2026-10-02): now the connector rule refuses them, never as QuickBooks.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-qbo-other-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
   await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
   const s = new HookServer(hive, () => null, () => ({ harnessHome: home }), undefined, undefined, undefined, undefined, undefined, undefined, () => false);
-  for (const tool_name of ['mcp__claude_ai_Xero__get_invoices', 'mcp__claude_ai_Slack__post', 'Read']) {
-    assert.ok(!denied(await s.handle({ agent_id: 'pam', session_id: 's1', hook_event_name: 'PreToolUse', tool_name, tool_input: {}, cwd: home })), tool_name);
+  const call = (tool_name) => s.handle({ agent_id: 'pam', session_id: 's1', hook_event_name: 'PreToolUse', tool_name, tool_input: {}, cwd: home });
+  for (const tool_name of ['mcp__claude_ai_Xero__get_invoices', 'mcp__claude_ai_Slack__post']) {
+    const r = await call(tool_name);
+    assert.ok(denied(r), tool_name);
+    assert.doesNotMatch(r.hookSpecificOutput.permissionDecisionReason, /QuickBooks/, tool_name);
   }
+  assert.ok(!denied(await call('Read')), 'built-in tools are untouched');
 });
 
 test('every bundled pack gives Oscar, and only roles with books.read, the QuickBooks default', () => {
@@ -165,55 +173,11 @@ test('every bundled pack gives Oscar, and only roles with books.read, the QuickB
   }
 });
 
-test('the Claude account check reads `claude mcp list`', () => {
-  const list = (qbo) => [
-    'Checking MCP server health…',
-    '',
-    'claude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - ✔ Connected',
-    qbo,
-    'serena: uvx serena start-mcp-server - ✗ Failed to connect'
-  ].join('\n');
-  assert.equal(parseClaudeQuickBooksStatus(list('claude.ai Intuit QuickBooks: https://ai-inc.quickbooks.intuit.com/v1/mcp - ✔ Connected')), 'connected');
-  assert.equal(parseClaudeQuickBooksStatus(list('claude.ai Intuit QuickBooks: https://ai-inc.quickbooks.intuit.com/v1/mcp - ! Needs authentication')), 'needs-sign-in');
-  assert.equal(parseClaudeQuickBooksStatus(list('claude.ai Intuit TurboTax: https://ai-inc.turbotax.intuit.com/x/v1/mcp - ✔ Connected')), 'not-added', 'TurboTax is not QuickBooks');
-  assert.equal(parseClaudeQuickBooksStatus(list('qbo-test: https://ai-inc.quickbooks.intuit.com/v1/mcp (HTTP) - ✔ Connected')), 'not-added', 'only the Claude account counts');
-  assert.equal(parseClaudeQuickBooksStatus(''), 'not-added');
-});
-
 test('Intuit TurboTax and other non-QuickBooks Intuit connectors are left alone', () => {
   // Value: protects=the owner's other Intuit connectors keep working with the QuickBooks switch off; fails_when=the server match includes "intuit"; why_new=ship review found every TurboTax call refused; seam=none
   assert.equal(isQuickBooksConnectorTool('mcp__claude_ai_Intuit_TurboTax__get_tax_estimate'), false);
   assert.equal(isQuickBooksConnectorTool('mcp__claude_ai_Intuit_TurboTax__submit_return'), false);
   assert.equal(isQuickBooksConnectorTool(Q + 'qbo_sales_get_invoices'), true);
-});
-
-test('only a real "Connected" counts; not connected, failed and a cut-off run do not', () => {
-  // Value: protects=Settings never says connected when it is not, and a timeout is "couldn't check", not "not connected"; fails_when=the parser matches "Not connected" or the runner maps a failed run to not-added; why_new=ship review; seam=fake claude binary
-  const line = (st) => `claude.ai Intuit QuickBooks: https://ai-inc.quickbooks.intuit.com/v1/mcp - ${st}`;
-  assert.equal(parseClaudeQuickBooksStatus(line('Not connected')), 'needs-sign-in');
-  assert.equal(parseClaudeQuickBooksStatus(line('✘ Failed to connect')), 'needs-sign-in');
-  assert.equal(parseClaudeQuickBooksStatus(line('✔ Connected')), 'connected');
-  assert.equal(parseClaudeQuickBooksStatus('Checking MCP server health…\n\n'), 'not-added');
-});
-
-test('a check that fails before listing QuickBooks is unknown, and a finished one is read', { skip: process.platform === 'win32' ? 'shell-script fixtures' : false }, async (t) => {
-  // Value: protects=a timed-out or crashed `claude mcp list` never tells the owner QuickBooks is missing; fails_when=err with header-only output maps to not-added; why_new=ship review; seam=fake claude binary
-  const os = require('node:os');
-  const { claudeQuickBooksStatus, claudeBinFor } = loadTs('src/main/claudeQuickBooks.ts');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qbo-cli-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const bin = (name, body) => { const f = path.join(dir, name); fs.writeFileSync(f, `#!/bin/sh\n${body}\n`); fs.chmodSync(f, 0o755); return f; };
-  assert.equal(await claudeQuickBooksStatus(bin('dies', "echo 'Checking MCP server health…'; exit 1")), 'unknown');
-  assert.equal(await claudeQuickBooksStatus(bin('lists', "echo 'Checking MCP server health…'; echo 'claude.ai Intuit QuickBooks: https://x - ✔ Connected'; echo 'serena: uvx - ✗ Failed to connect'; exit 1")), 'connected');
-  assert.equal(await claudeQuickBooksStatus(bin('none', "echo 'Checking MCP server health…'")), 'not-added');
-  assert.equal(await claudeQuickBooksStatus(null), 'unknown');
-  // Whatever engine the team runs, the Claude CLI is the one asked.
-  assert.equal(claudeBinFor('claude --model opus'), 'claude');
-  assert.equal(claudeBinFor('/opt/bin/claude'), '/opt/bin/claude');
-  assert.equal(claudeBinFor('codex'), 'claude');
-  assert.equal(claudeBinFor('npx something'), 'claude');
-  assert.equal(claudeBinFor('FOO=1 claude'), 'claude');
-  assert.equal(claudeBinFor(undefined), 'claude');
 });
 
 test('reading a QuickBooks MCP resource follows the same switch and Capabilities', async (t) => {
@@ -222,8 +186,11 @@ test('reading a QuickBooks MCP resource follows the same switch and Capabilities
   const off = await floor(t, {});
   assert.ok(denied(await off.raw('ReadMcpResourceTool', { server, uri: 'qbo://company' }, 'oscar')), 'Settings off refuses a resource read');
   assert.ok(denied(await off.raw('ListMcpResourcesTool', { server }, 'oscar')), 'and a resource list');
-  assert.ok(!denied(await off.raw('ListMcpResourcesTool', {}, 'oscar')), 'a list of every server is left alone');
-  assert.ok(!denied(await off.raw('ReadMcpResourceTool', { server: 'claude.ai Intuit TurboTax', uri: 'x' }, 'oscar')), 'TurboTax is not QuickBooks');
+  // A list with no server would show every connected server's resources, so it
+  // is refused; naming the server sends it through the rules (owner, 2026-10-02).
+  assert.match((await off.raw('ListMcpResourcesTool', {}, 'oscar')).hookSpecificOutput.permissionDecisionReason, /Name the connector's server/);
+  const tax = await off.raw('ReadMcpResourceTool', { server: 'claude.ai Intuit TurboTax', uri: 'x' }, 'oscar');
+  assert.doesNotMatch(tax.hookSpecificOutput.permissionDecisionReason, /QuickBooks/, 'TurboTax is not QuickBooks; the connector rule decides it');
   const on = await floor(t, { quickbooksClaude: true });
   assert.ok(!denied(await on.raw('ReadMcpResourceTool', { server, uri: 'qbo://company' }, 'oscar')), 'Oscar, Read only, may read');
   assert.ok(denied(await on.raw('ReadMcpResourceTool', { server, uri: 'qbo://company' }, 'pam')), 'Pam has no QuickBooks');
