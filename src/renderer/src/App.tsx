@@ -371,12 +371,20 @@ export function App() {
               )}
             </div>
           )}
-          {closingOpen ? (
+          {/* The bottom bar stays mounted behind the closing bar, so a Cancel
+              finds Talk to Michael with its attached files still there. */}
+          <div style={{ display: closingOpen ? 'none' : 'contents' }}>
+            <BottomBar config={config} />
+          </div>
+          {closingOpen && (
             <ClosingTimeBar
               closing={closing}
               onCancel={() => {
                 reopenAsked.current = false;
-                if (closing && closing.phase !== 'error') cancelClosingTime();
+                // Closing time starts the moment the quit is asked, so Cancel
+                // always stops it, even before its first progress event; main
+                // ignores a cancel when nothing is running.
+                if (closing?.phase !== 'error') cancelClosingTime();
                 window.cth.cancelClose();
                 setClosing(null);
                 setClosingOpen(false);
@@ -384,7 +392,7 @@ export function App() {
               onForceQuit={() => { void window.cth.confirmClose(); }}
               onRetry={() => { void startClosingTime(reopenAsked.current ? { relaunch: true } : undefined); }}
             />
-          ) : <BottomBar config={config} />}
+          )}
         </div>
 
         <SidebarSplitter

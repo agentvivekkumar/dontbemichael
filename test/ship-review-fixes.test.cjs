@@ -94,7 +94,7 @@ test('a paste attaches a screenshot or Finder files, and leaves text (even with 
 test('Closing time in the clock menu quits like Cmd-Q, and closes only its own floor', () => {
   // Value: protects=the menu item never leaves the app windowless in the Dock; fails_when=the IPC is renamed or the menu goes back to window.close(); why_new=review pass 2; seam=none
   const main = read('src/main/index.ts');
-  assert.match(main, /ipcMain\.handle\('app:requestQuit', \(evt\) => \{\n\s*const win = BrowserWindow\.fromWebContents\(evt\.sender\);\n\s*if \(win && win !== mainWindow\) \{ win\.close\(\); return; \}\n\s*app\.quit\(\);/);
+  assert.match(main, /ipcMain\.handle\('app:requestQuit', \(evt\) => \{\n\s*const win = BrowserWindow\.fromWebContents\(evt\.sender\);\n\s*if \(win && floorWindows\.has\(win\)\) \{ win\.close\(\); return; \}\n\s*app\.quit\(\);/);
   assert.match(read('src/preload/index.ts'), /requestQuit: \(\): Promise<void> => ipcRenderer\.invoke\('app:requestQuit'\),/);
   const top = read('src/renderer/src/shell/TopBar.tsx');
   assert.match(top, /void window\.cth\.requestQuit\(\);/);
@@ -116,4 +116,14 @@ test('a saved capability with email on but no mailbox list does not crash the of
   for (const f of ['src/renderer/src/scene/studio/StudioStage.tsx', 'src/renderer/src/components/MailboxesSettings.tsx']) {
     assert.match(read(f), /c\.email\?\.enabled && c\.email\.mailboxes\?\.\[0\] === mailboxId/);
   }
+});
+
+test('closing time: floors are known by identity, Cancel always stops it, and the bottom bar keeps its files', () => {
+  // Value: protects=Closing time from a floor closes only that floor; a quick Cancel stops main; Talk to Michael keeps attachments across a cancelled quit; fails_when=requestQuit compares against the focus-following mainWindow, Cancel waits for a progress event, or BottomBar unmounts while closing; why_new=Codex adversarial review (gpt-5.4); seam=none
+  const main = read('src/main/index.ts');
+  assert.match(main, /const floorWindows = new WeakSet<BrowserWindow>\(\);/);
+  assert.match(main, /if \(isFloor\) floorWindows\.add\(win\);/);
+  const app = read('src/renderer/src/App.tsx');
+  assert.match(app, /if \(closing\?\.phase !== 'error'\) cancelClosingTime\(\);/);
+  assert.match(app, /<div style=\{\{ display: closingOpen \? 'none' : 'contents' \}\}>\n\s+<BottomBar config=\{config\} \/>/);
 });

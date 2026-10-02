@@ -145,8 +145,8 @@ test('quitting starts closing time on the floor, with no dialog (owner, 2026-09-
   assert.doesNotMatch(app, /QuitWarningModal/);
   assert.match(app, /window\.cth\.onCloseRequested\(\(\) => \{\n\s+if \(closingOpenRef\.current\) return;\n\s+closingOpenRef\.current = true;[^\n]*\n\s+setClosingOpen\(true\);\n\s+void startClosingTimeRef\.current\(/);
   // The bar takes the bottom bar's place; Cancel calls closing time off and tells main.
-  assert.match(app, /\{closingOpen \? \(\n\s+<ClosingTimeBar/);
-  assert.match(app, /if \(closing && closing\.phase !== 'error'\) cancelClosingTime\(\);\n\s+window\.cth\.cancelClose\(\);/);
+  assert.match(app, /\{closingOpen && \(\n\s+<ClosingTimeBar/);
+  assert.match(app, /if \(closing\?\.phase !== 'error'\) cancelClosingTime\(\);\n\s+window\.cth\.cancelClose\(\);/);
   assert.match(app, /onForceQuit=\{\(\) => \{ void window\.cth\.confirmClose\(\); \}\}/);
   // Force quit loses unsaved work, so it asks once.
   const bar = read('src/renderer/src/components/ClosingTimeBar.tsx');

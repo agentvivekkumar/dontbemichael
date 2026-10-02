@@ -427,6 +427,9 @@ const persist = new PersistStore();
  *  the most-recently-focused live window, so global events follow the user.
  *  Additional "floor" windows are tracked in `allWindows` below. */
 let mainWindow: BrowserWindow | null = null;
+/** Floor windows, by identity: `mainWindow` follows focus, so it can't tell a
+ *  floor from the primary window. */
+const floorWindows = new WeakSet<BrowserWindow>();
 /** Every open window (primary + floors). A registry, not a single handle, so
  *  multi-window lifecycle (focus tracking, quit fan-out) is correct. */
 const allWindows = new Set<BrowserWindow>();
@@ -2746,6 +2749,7 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
   // primary. The primary is also seeded synchronously so boot events route now.
   win.on('focus', () => { mainWindow = win; });
   if (!isFloor) mainWindow = win;
+  if (isFloor) floorWindows.add(win);
 
   // Permission gate for the renderer (our own trusted, local content). The only
   // permission we constrain is microphone capture: it's allowed ONLY while a mic
@@ -4519,7 +4523,7 @@ function teardownAndQuit(): void {
 // floor window it closes just that floor, through the floor's own confirm.
 ipcMain.handle('app:requestQuit', (evt) => {
   const win = BrowserWindow.fromWebContents(evt.sender);
-  if (win && win !== mainWindow) { win.close(); return; }
+  if (win && floorWindows.has(win)) { win.close(); return; }
   app.quit();
 });
 ipcMain.handle('app:confirmClose', () => {

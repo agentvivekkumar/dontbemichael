@@ -26,6 +26,20 @@
 **Priority:** P2
 **Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
 
+## Attachments (from the Codex adversarial review of design/studio-v2, 2026-10-01)
+
+### Keep pasted screenshots somewhere durable
+
+**What:** A pasted screenshot is saved to the OS temp folder (`clipboard:saveImage` in `src/main/index.ts`), and only that path goes into the message. Save it in an app folder tied to the message instead, and delete it once the message is delivered or removed, and on startup.
+
+**Why:** A screenshot pasted into a busy team member's queue is persisted as a temp path. If the app quits or the Mac restarts before delivery, the restored queue can send a path that no longer exists, and every pasted image stays in temp until the OS clears it.
+
+**Context:** This predates the Studio redesign (the queue composer used it already); the redesign also lets Talk to Michael paste screenshots through `src/renderer/src/components/pasteAttachments.ts`, though those are sent at once.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
 ## Mailboxes (deferred from ship of feat/multi-mailbox, 2026-09-26)
 
 ### Keep each agent's mail pass out of other agents' reach
