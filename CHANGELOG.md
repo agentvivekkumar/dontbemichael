@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **Claude connectors, under your control.** Settings > Connections now lists every connector
+  on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from
+  Claude when the app starts, when you open Connections, and when you press Refresh. Each one
+  is off until you turn it on, and a team member uses it only once its Access tab gives it to
+  them. Connectors that need sign in link to claude.ai; ones that left your account show
+  Removed until you clear them.
+- **Restart to apply.** A team member whose connectors change restarts by itself when it is
+  idle, in the same conversation, or right away with Restart now on its Access tab, which says
+  when it is restarting and when a restart failed.
+- **What's new** opens the notes for the version you are on, right under its link in
+  Settings > General, in every language.
+- The README explains how Don't Be Michael differs from Munder Difflin.
+
+### Changed
+
+- **Agents can no longer reach what you did not give them.** Until now every team member
+  could use every connector on your Claude account except QuickBooks and Gmail, and loaded
+  your own Claude Code servers and plugin servers. Now each connector is blocked at start up
+  and on every call, and calls are refused if the app cannot confirm access. After the update,
+  one Ask me card names the connectors that are now off. QuickBooks keeps your switch and each
+  team member's choice; Gmail and Google Calendar, if you had them on, stay on for everyone.
+- Work a team member hands to a Claude subagent follows the same rules as the team member:
+  its connectors, its mailbox and its private folder.
+- Settings is simpler: Agents and Autonomy are one tab, About and Updates are one card, the
+  Danger zone stands out, and Default MCP servers, Explain things simply, Arabic text in
+  terminals and Language are hidden.
+- Mailboxes fold into one line with a count and open by themselves when one needs you.
+- Schedule rows read in three quiet lines: the job and its next run, when it runs, and how
+  the last run went.
+- Updates are always checked in installed builds.
+
+### Fixed
+
+- The paper plane two idle teammates throw now points the way it flies.
+- Selecting Michael's card draws its outline all the way around.
+- A connector call with a large input (a long document) is checked and goes through instead
+  of being refused.
+
+### Removed
+
+- The separate QuickBooks section and the "Your Claude account" switch in Mailboxes: both are
+  rows in Claude connectors now.
+- The automatic updates switch, which no longer did anything.
+
 ## [0.0.14] (2026-10-01)
 
 ### Changed
