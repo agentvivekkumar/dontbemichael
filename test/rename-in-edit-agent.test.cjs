@@ -36,7 +36,7 @@ test('Edit Agent renames through the registry first, and stays open on a refusal
   const rename = save.indexOf('await renameAgent(agent.id, trimmedName)');
   const update = save.indexOf('updateAgent(agent.id, {');
   assert.ok(rename > 0 && update > rename, 'rename before the rest is saved');
-  assert.match(save, /if \(!renamed\.ok\) \{ setNameError\(renamed\.error \?\? 'Could not rename agent'\); return; \}/);
+  assert.match(save, /if \(!renamed\.ok\) \{ setNameError\(renamed\.error \?\? t\('editAgent\.errRename'\)\); return; \}/);
   assert.doesNotMatch(save.slice(update, save.indexOf('});', update)), /name: trimmedName/, 'the name is not saved on screen only');
 });
 

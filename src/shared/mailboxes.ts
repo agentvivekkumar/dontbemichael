@@ -57,11 +57,18 @@ export interface AgentCapabilities {
   connectors?: string[];
 }
 
-export type MailOp = 'list' | 'read' | 'draft' | 'send';
+export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'send';
 
 /** Each md-mail tool and the access it needs. The broker and the PreToolUse
- *  hook both check tools against this one map. */
-export const MAIL_TOOL_OPS: Record<string, MailOp> = { list_mailboxes: 'list', search: 'read', read: 'read', draft: 'draft', send: 'send' };
+ *  hook both check tools against this one map. `organize` (archive, mark read,
+ *  mark junk) moves mail out of the inbox and never deletes it, so it can be
+ *  undone in the mailbox: it needs the mailbox, like reading (inbox zero,
+ *  owner 2026-10-03). */
+export const MAIL_TOOL_OPS: Record<string, MailOp> = {
+  list_mailboxes: 'list', search: 'read', read: 'read',
+  archive: 'organize', mark_read: 'organize', mark_junk: 'organize',
+  draft: 'draft', send: 'send'
+};
 
 /** Standard mail ports: IMAP over TLS, SMTP over TLS, and SMTP submission
  *  (STARTTLS). */

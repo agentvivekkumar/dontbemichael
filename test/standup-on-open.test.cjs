@@ -15,13 +15,13 @@ const path = require('node:path');
 const main = fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8');
 
 test('Michael coming up sends the standup, once per launch', () => {
-  assert.match(main, /if \(res\.ok && opts\.hive\?\.isGod\) standupOnOfficeOpen\(\);/);
+  assert.match(main, /if \(res\.ok && opts\.hive\?\.isGod\) \{ standupOnOfficeOpen\(\); catchUpOwnerAnswers\(\); \}/);
   const at = main.indexOf('function standupOnOfficeOpen(): void {');
   assert.ok(at > 0);
   const fn = main.slice(at, main.indexOf('\n}\n', at));
   assert.match(fn, /if \(standupFiredThisLaunch \|\| !hive\.enabled\(\)\) return;/, 'once, and only with an office');
   assert.match(fn, /if \(!m \|\| !m\.enabled \|\| normalizeWeekly\(m\.weekly\) \|\| !\(m\.intervalMs > 0\)\) return;/, 'only an enabled hourly standup');
-  assert.match(fn, /hive\.send\(\{ to: m\.to, act: 'inform', subject: m\.label, body: scheduledRunBody\(m\.label, m\.body\) \}, 'scheduler'\);/);
+  assert.match(fn, /hive\.send\(\{ to: m\.to, act: 'inform', subject: m\.label, body: scheduledRunBody\(m\.label, m\.body, m\.focus\) \}, 'scheduler'\);/);
   assert.match(fn, /syncMissions\(\);/, 'the next one comes an interval after this one');
 });
 

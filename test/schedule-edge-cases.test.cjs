@@ -54,10 +54,10 @@ test('parseWhen refuses a non-text day, an empty day list, a bad time and a half
 /* ───────────────────────── schedule requests ───────────────────────── */
 
 test('an add trims its label and accepts exactly the maximum length', () => {
-  const r = build({ op: 'add', label: '  Check invoices  ', when: { every: '1h' } });
+  const r = build({ op: 'add', label: '  Check invoices  ', when: { every: '1h' }, focus: 'f' });
   assert.equal(r.request.draft.label, 'Check invoices');
   assert.equal('weekly' in r.request.draft, false, 'an interval add carries no weekly');
-  assert.equal(build({ op: 'add', label: 'x'.repeat(80), when: { every: '1h' } }).ok, true);
+  assert.equal(build({ op: 'add', label: 'x'.repeat(80), when: { every: '1h' }, focus: 'f' }).ok, true);
 });
 
 test('a non text id is refused like an unknown one', () => {
@@ -91,7 +91,7 @@ test('an update with an unusable when is refused, even with a good label', () =>
 });
 
 test('an add never goes stale; an update missing its draft is refused as invalid', () => {
-  const add = build({ op: 'add', label: 'New', when: { every: '1h' } }).request;
+  const add = build({ op: 'add', label: 'New', when: { every: '1h' }, focus: 'f' }).request;
   assert.equal(M.requestIsStale(add, []), false);
   const list = [mk()];
   const upd = build({ op: 'update', id: 'm1', label: 'X' }, list).request;
@@ -195,7 +195,7 @@ test('ASK ME shows schedule requests; a stale one cannot be approved, and a fail
   assert.match(src, /if \(!res\.ok\) setFailed\(req\.id\);/);
   assert.match(src, /\} catch \{\s*setFailed\(req\.id\);/);
   assert.match(src, /finally \{\s*setBusy\(null\);\s*refresh\(\);/, 'the list refreshes whatever happened');
-  assert.match(src, /return window\.cth\.onScheduleRequestsUpdated\(refresh\);/, 'new requests arrive without a reload');
+  assert.match(read('src/renderer/src/shell/useNeedsYou.ts'), /offRequests = window\.cth\.onScheduleRequestsUpdated\(readRequests\);/, 'new requests arrive without a reload');
   for (const op of ['Add', 'Update', 'Pause', 'Resume', 'Delete']) assert.ok(src.includes(`t('askMe.schedule${op}'`), op);
 });
 

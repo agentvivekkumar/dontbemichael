@@ -8,6 +8,10 @@ import { parseRoleLine, workStyleBody } from '@shared/agentProfile';
 import { fillBusiness } from '@shared/teamPlan';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import { useStore, type Agent } from '@/store/store';
+import { useHarnessConfig } from '@/hooks/useHarnessConfig';
+import { agentAccessSummary, type AccessItem } from '@shared/agentAccess';
+import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
+import { ScheduledJobsList, useScheduledJobs } from './ScheduledJobs';
 
 /**
  * PROFILE: who this agent is, the first tab on every agent (owner, 2026-09-25;
@@ -17,6 +21,9 @@ import { useStore, type Agent } from '@/store/store';
  *
  * Everything comes from what the app already stores: the agent's role line and
  * work style, and its card in the office's business pack (read once per launch).
+ * "Uses" is what the Access tab grants, not the card's suggested connections.
+ * No "First job": the card's first action line is template text, never a real job
+ * or its status (owner, 2026-10-02).
  */
 
 /** What the office's pack and settings say: each agent's card by id, and for
@@ -81,7 +88,8 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   }, [agent.id, agent.sourceCard]);
 
   const role = useMemo(() => parseRoleLine(agent.description), [agent.description]);
-  const instructions = workStyleBody(agent.goal);
+  // Michael runs with his default Work style until the owner writes one (F6).
+  const instructions = workStyleBody(effectiveWorkStyle(agent));
   const name = agent.isGod ? godName : agent.name;
   const title = role.title || card?.role || (agent.isGod ? t('profile.officeManager') : '');
   const god = !!agent.isGod;
@@ -94,7 +102,24 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const businessLine = office?.business.name
     ? [office.business.name, office.business.city].filter(Boolean).join(t('profile.listJoiner'))
     : '';
-  const connections = card?.connections ?? [];
+  // What this agent can really reach, by the Access tab's own rules; never
+  // the pack card's wish list (owner, 2026-10-02).
+  const config = useHarnessConfig();
+  const [booksAnswer, setBooksAnswer] = useState<{ id: string; on: boolean } | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void window.cth.quickbooksRoleDefaults().then((ids) => { if (alive) setBooksAnswer({ id: agent.id, on: ids.includes(agent.id) }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [agent.id]);
+  const booksDefault = booksAnswer?.id === agent.id ? booksAnswer.on : undefined;
+  // QuickBooks waits for its role default, as on the Access tab.
+  const uses = config
+    ? agentAccessSummary(config, agent.id, booksDefault === true).filter((i) => i.kind !== 'quickbooks' || booksDefault !== undefined)
+    : [];
+  const useLabel = (i: AccessItem): string =>
+    i.kind === 'mailbox' ? `${i.address} (${t(i.send ? 'capabilities.canSend' : 'capabilities.draftOnly')})`
+      : i.kind === 'quickbooks' ? `QuickBooks (${t(i.changes ? 'capabilities.booksCanChange' : 'capabilities.booksReadOnly')})`
+        : i.key;
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', background: 'var(--cth-paper-200)' }}>
@@ -169,12 +194,11 @@ export function ProfileTab({ agent }: { agent: Agent }) {
                 </span>
               </Fact>
             )}
-            {connections.length > 0 && (
+            {uses.length > 0 && (
               <Fact label={t('profile.connections')}>
-                {connections.map((c) => t(`onboarding.team.conn.${c.id}`, { defaultValue: c.id })).join(t('profile.listJoiner'))}
+                {uses.map(useLabel).join(t('profile.listJoiner'))}
               </Fact>
             )}
-            {card?.firstAction && <Fact label={t('profile.firstJob')}>{card.firstAction}</Fact>}
             {agent.model && <Fact label={t('profile.model')}>{agent.model}</Fact>}
           </dl>
         </Section>
@@ -204,9 +228,17 @@ export function ProfileTab({ agent }: { agent: Agent }) {
             )}
           </Section>
         )}
+
+        {/* Each scheduled job with its focus area, read only (FA1). */}
+        <ScheduledJobsSection agentId={agent.id} title={t('scheduledJobs.title')} />
       </div>
     </div>
   );
+}
+
+function ScheduledJobsSection({ agentId, title }: { agentId: string; title: string }) {
+  const jobs = useScheduledJobs(agentId);
+  return jobs.length ? <Section title={title}><ScheduledJobsList agentId={agentId} /></Section> : null;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

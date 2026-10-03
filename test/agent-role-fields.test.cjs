@@ -44,15 +44,23 @@ test('joining uses whichever field is filled, and nothing when both are empty', 
 
 test('Edit Agent shows Role, Role description and Work style, with plain notes', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/EditAgentModal.tsx'), 'utf8');
-  const briefing = src.slice(src.indexOf('<Section label="Briefing"'), src.indexOf('</Section>', src.indexOf('<Section label="Briefing"')));
-  for (const label of ['<Row label="Role">', 'label={`What ${name.trim() || agent.name} handles`}', 'label="Work style"']) {
+  const briefing = src.slice(src.indexOf('<Fields id="briefing"'), src.indexOf('</Fields>', src.indexOf('<Fields id="briefing"')));
+  for (const label of ["<Row label={t('editAgent.role')}>", "label={t('editAgent.handles', { name: who })}", "label={t('editAgent.workStyle')}"]) {
     assert.ok(briefing.includes(label), label);
   }
   assert.doesNotMatch(briefing, /label="Description"|label="Goal/, 'the old labels are gone');
-  assert.match(briefing, /info=\{`Michael reads this to decide what goes to/);
+  assert.match(briefing, /info=\{t\('editAgent\.handlesInfo', \{ manager: godName, name: who \}\)\}/, 'the office manager by the name the office uses');
   assert.doesNotMatch(briefing, /Role description/, 'the plain label replaced it (owner, 2026-09-27)');
-  assert.match(briefing, /info=\{`How \$\{name\.trim\(\) \|\| agent\.name\} does the job:[^`]*scheduled jobs included/);
-  assert.match(briefing, /Michael doesn't use it\./);
+  assert.match(briefing, /info=\{t\('editAgent\.workStyleInfo', \{ name: who \}\)\}/);
+  const en = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/i18n/locales/en.json'), 'utf8')).editAgent;
+  assert.match(en.handlesInfo, /^\{\{manager\}\} reads this to decide what goes to \{\{name\}\}\./);
+  assert.match(en.workStyleInfo, /^How \{\{name\}\} does the job:.*Each scheduled job adds its focus area, set on the job\.$/);
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const keys = Object.keys(JSON.parse(fs.readFileSync(path.resolve(__dirname, `../src/renderer/src/i18n/locales/${loc}.json`), 'utf8')).editAgent);
+    assert.deepEqual(keys, Object.keys(en), `${loc} has every Edit agent string`);
+  }
+  assert.doesNotMatch(briefing, /Michael doesn't use it\./, 'Michael has a Work style now (schedule-focus-areas.md F6)');
+  assert.match(briefing, /<ScheduledJobsList agentId=\{agent\.id\} compact \/>/, 'each job and its focus, read only (FA1)');
 });
 
 test('saving joins the fields, keeps the old role when both are empty, and tells the registry', () => {

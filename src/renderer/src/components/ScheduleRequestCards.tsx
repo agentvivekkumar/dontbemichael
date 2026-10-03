@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { PixelButton } from './PixelButton';
@@ -6,30 +6,6 @@ import { useStore } from '@/store/store';
 import { useMissions, whenText } from './triggers/ScheduleList';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { requestIsStale, type ScheduleRequest, type ScheduledMission } from '@shared/missions';
-
-/**
- * ASK ME: schedule changes an agent asked for (docs/designs/per-agent-schedules.md, R6).
- *
- * An agent never changes a schedule itself (owner, 2026-09-25). It sends a
- * request; each one shows here with exactly what would change, and the owner's
- * Approve applies that one change and nothing else. No answer text is ever read
- * by an agent to decide it. A request whose schedule changed since it was asked
- * can't be approved, because the owner would be approving something they
- * haven't seen.
- */
-export function useScheduleRequests(): { requests: ScheduleRequest[]; refresh: () => void } {
-  const [requests, setRequests] = useState<ScheduleRequest[]>([]);
-  const refresh = useCallback(() => {
-    // Michael decides schedule requests; only the ones he passes on reach the
-    // owner (owner, 2026-09-27).
-    window.cth.listScheduleRequests().then((all) => setRequests(all.filter((r) => r.escalated))).catch(() => { /* keep last good */ });
-  }, []);
-  useEffect(() => {
-    refresh();
-    return window.cth.onScheduleRequestsUpdated(refresh);
-  }, [refresh]);
-  return { requests, refresh };
-}
 
 /** One line saying what the request would do. */
 function describe(req: ScheduleRequest, target: ScheduledMission | undefined, t: TFunction): string {
@@ -99,6 +75,12 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
               {t('askMe.scheduleTitle', { name })}
             </div>
             <div style={{ fontSize: 12, lineHeight: '16.5px', color: 'var(--cth-ink)' }}>{describe(req, target, t)}</div>
+            {/* The job's proposed focus area, approved with it (schedule-focus-areas.md). */}
+            {req.draft?.focus && req.draft.focus !== target?.focus && (
+              <div style={{ fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-2)' }}>
+                {t('scheduledJobs.focus', { focus: req.draft.focus })}
+              </div>
+            )}
             {/* Why the team member asks, then what Michael could not settle (owner, 2026-09-27). */}
             {req.reason && (
               <div style={{ fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-2)' }}>

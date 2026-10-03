@@ -155,6 +155,60 @@ test('only Michael notifies: a team member or an unknown id never does', async (
 test('the message is in our words, never the engine\'s', async (t) => {
   const server = await office(t, 'Michael');
   await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Notification', notification_type: 'idle', message: 'Claude is waiting for your input' });
-  assert.equal(notifications[0].body, 'Waiting for you.');
   assert.doesNotMatch(notifications[0].body, /Claude/);
+});
+
+// 2026-10-02: Michael's idle toast read "Waiting for you.", as if the owner
+// owed an action. Idle means he's free; a real ask goes on ASK ME.
+test('idle never reads as the owner owing an action', async (t) => {
+  const { NOTIFY_IDLE_LINES, IDLE_NOTIFY_GAP_MS } = loadTs('src/main/hooks.ts');
+  const server = await office(t, 'Michael');
+  let clock = 1_000_000;
+  server.now = () => clock;
+  for (let i = 0; i < 12; i++) {
+    await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Notification', notification_type: 'idle', message: 'Claude is waiting for your input' });
+    clock += IDLE_NOTIFY_GAP_MS;
+  }
+  assert.equal(notifications.length, 12);
+  for (const n of notifications) {
+    assert.ok(NOTIFY_IDLE_LINES.includes(n.body), `an idle line: ${n.body}`);
+    assert.doesNotMatch(n.body, /waiting for you/i);
+  }
+  for (let i = 1; i < notifications.length; i++) {
+    assert.notEqual(notifications[i].body, notifications[i - 1].body, 'never the same line twice running');
+  }
+});
+
+test('the idle line shows at most once every few hours', async (t) => {
+  const { IDLE_NOTIFY_GAP_MS } = loadTs('src/main/hooks.ts');
+  const server = await office(t, 'Michael');
+  let clock = 1_000_000;
+  server.now = () => clock;
+  const idle = (id = 'god') => server.handle({ agent_id: id, session_id: 's1', hook_event_name: 'Notification', notification_type: 'idle', message: 'Claude is waiting for your input' });
+  await idle('oscar'); // a team member's idle shows nothing and starts no gap
+  await idle();
+  assert.equal(notifications.length, 1, 'the first idle shows');
+  clock += 60_000; await idle();
+  clock += IDLE_NOTIFY_GAP_MS - 60_001; await idle();
+  assert.equal(notifications.length, 1, 'quiet inside the gap');
+  await server.handle({ agent_id: 'god', session_id: 's1', hook_event_name: 'Stop' });
+  assert.equal(notifications.length, 2, 'the finished toast is not throttled');
+  clock += 1; await idle();
+  assert.equal(notifications.length, 3, 'shows again once the gap has passed');
+});
+
+test('idle lines: owner-readable copy, no dashes', () => {
+  const { NOTIFY_IDLE_LINES, pickIdleLine } = loadTs('src/main/hooks.ts');
+  assert.ok(NOTIFY_IDLE_LINES.length >= 5);
+  for (const l of NOTIFY_IDLE_LINES) {
+    assert.doesNotMatch(l, /[–—]| - /, `no dash: ${l}`);
+    assert.doesNotMatch(l, /waiting for you|needs you|action/i, `not a request: ${l}`);
+  }
+  // Every line is reachable, and the previous one is skipped.
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) seen.add(pickIdleLine(null, () => i / 200));
+  assert.equal(seen.size, NOTIFY_IDLE_LINES.length);
+  for (const prev of NOTIFY_IDLE_LINES) {
+    for (const r of [0, 0.5, 0.999]) assert.notEqual(pickIdleLine(prev, () => r), prev);
+  }
 });

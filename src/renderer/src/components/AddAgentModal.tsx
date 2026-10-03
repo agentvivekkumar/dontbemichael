@@ -49,6 +49,7 @@ import { plainFallback } from '@shared/workStyleText';
 import { useRtl } from '@/i18n/useDirection';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { SHOW_IMPORT_HIRE, SHOW_ENGINE_PICKER } from '@shared/buildFeatures';
+import { seedStarterJobs } from '@/shell/seedStarterJobs';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -560,6 +561,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       recentTextTs: Date.now()
     };
     addAgent(agent);
+    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03).
+    void seedStarterJobs(sourceCard, id);
     // A binding hands the bound work back from every overlapping teammate:
     // their line gains "Not for ...; that goes to <Name>." (D6).
     if (binding) {

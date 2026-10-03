@@ -6,7 +6,9 @@ import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import { notifyThemeChangeAll } from '@/components/terminalPool';
 import { UpdateBadge } from '@/components/UpdateBadge';
 import { CliUpdateBadge } from '@/components/CliUpdateNotice';
-import { useNeedsYouCount } from './useNeedsYou';
+import { pillState, useNeedsYou, useNeedsYouCount } from './useNeedsYou';
+import { NEEDS_YOU_PILL_ID } from './rightColumn';
+import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
 import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 
@@ -223,8 +225,13 @@ function MenuItem({ children, onClick }: { children: ReactNode; onClick: () => v
 
 export function NeedsYouButton() {
   const { t } = useTranslation();
-  const count = useNeedsYouCount();
-  const open = () => useStore.getState().setNeedsYouOpen(true);
+  const godName = useResolvedGodName();
+  const { status, count } = useNeedsYou();
+  const state = pillState(status, count);
+  // The coral pill shows the board and puts focus in the first reply field
+  // (D10). While anything waits the board cannot be closed, so it never
+  // closes it (owner, 2026-10-02).
+  const openBoard = () => useStore.getState().openNeedsYou();
   // Michael's paper plane lands here (scene/studio/life.tsx): the button bumps.
   const [bump, setBump] = useState(0);
   useEffect(() => {
@@ -232,21 +239,32 @@ export function NeedsYouButton() {
     window.addEventListener('cth:needs-you-ping', on);
     return () => window.removeEventListener('cth:needs-you-ping', on);
   }, []);
+  // A screen reader hears it once each time the count rises (D10): with the
+  // column closed, the pill's color is the only other sign.
+  const [announce, setAnnounce] = useState('');
+  const lastCount = useRef(0);
+  useEffect(() => {
+    if (status !== 'ready') return;
+    if (count > lastCount.current) setAnnounce(t('shell.needsYouAnnounce', { godName, count }));
+    lastCount.current = count;
+  }, [status, count, godName, t]);
+  const live = <span aria-live="polite" style={visuallyHidden}>{announce}</span>;
 
-  if (count === 0) {
-    return (
-      <button className="cth-titlebar-nodrag" onClick={open} style={{
-        height: 32, padding: '0 14px', border: 'none', borderRadius: 'var(--cth-r-pill)', cursor: 'pointer',
-        background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line)',
-        fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 500, color: 'var(--cth-ink-3)'
-      }}>{t('shell.nothingNeedsYou')}</button>
-    );
+  // Unknown (launch, before the first read): an empty quiet pill, never a
+  // false "Nothing needs you" (D3).
+  if (state === 'blank') {
+    return <>{live}<span aria-hidden="true" className="cth-titlebar-nodrag" style={{ ...quietPill, width: 132 }} /></>;
   }
-  return (
+  // Nothing waits: a plain label, not a button (D2).
+  if (state === 'quiet') {
+    return <>{live}<span className="cth-titlebar-nodrag" style={quietPill}>{t('shell.nothingNeedsYou')}</span></>;
+  }
+  return (<>{live}
     <button
       key={bump}
+      id={NEEDS_YOU_PILL_ID}
       className={bump ? 'cth-titlebar-nodrag cth-needs-bump' : 'cth-titlebar-nodrag'}
-      onClick={open}
+      onClick={openBoard}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 6px 0 14px',
         border: 'none', borderRadius: 'var(--cth-r-pill)', cursor: 'pointer',
@@ -262,8 +280,17 @@ export function NeedsYouButton() {
         fontFamily: 'var(--cth-font-mono)', fontSize: 12, fontWeight: 600
       }}>{count}</span>
     </button>
-  );
+  </>);
 }
+
+const quietPill: CSSProperties = {
+  height: 32, padding: '0 14px', borderRadius: 'var(--cth-r-pill)', display: 'inline-flex', alignItems: 'center',
+  background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line)',
+  fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 500, color: 'var(--cth-ink-3)', cursor: 'default'
+};
+const visuallyHidden: CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0
+};
 
 /** The coral strip at the top of a person's panel (DESIGN.md 7.6). */
 export function NeedsYouStrip() {
@@ -272,7 +299,7 @@ export function NeedsYouStrip() {
   if (count === 0) return null;
   return (
     <button
-      onClick={() => useStore.getState().setNeedsYouOpen(true)}
+      onClick={() => useStore.getState().openNeedsYou()}
       aria-label={t('shell.backToBoard')}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 36, padding: '0 12px',

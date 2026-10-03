@@ -151,7 +151,7 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
   assert.match(main, /ownerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
   assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\}'s schedule change needs you in ASK ME\.`\);/, 'only when Michael passes it on');
-  assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return;/);
+  assert.match(read('src/main/hooks.ts'), /if \(!agentId \|\| !this\.isGod\(agentId\)\) return(?: false)?;/);
 });
 
 test('a save that landed is reported as saved even if re-arming the timers fails', () => {

@@ -111,7 +111,17 @@
     "scheduleMichael": "{{name}}: {{note}}",
     "draft": "Draft",
     "openTask": "See full context",
-    "justNow": "just now"
+    "justNow": "just now",
+    "yourAnswer": "Your answer",
+    "workStyleTitle": "New job description for {{name}}",
+    "workStyleReplaces": "Using it replaces {{name}}'s Work style and role line, and adds its scheduled jobs.",
+    "workStyleSee": "See the new text",
+    "workStyleHide": "Hide the new text",
+    "workStyleUse": "Use the new one",
+    "workStyleKeep": "Keep mine",
+    "workStyleWhy": {
+      "pamInboxZero": "Inbox zero: every email gets an outcome and leaves the inbox, and nothing is deleted."
+    }
   },
   "agentStrip": {
     "notePlaceholder": "One line per bullet…",
@@ -589,6 +599,31 @@
       "comparingWith": "Comparing with {{name}}'s job"
     }
   },
+  "editAgent": {
+    "title": "Edit agent",
+    "cancel": "Cancel",
+    "save": "Save changes",
+    "writing": "Writing instructions…",
+    "name": "Name",
+    "namePlaceholder": "Stanley",
+    "role": "Role",
+    "rolePlaceholder": "For example: Finance",
+    "handles": "What {{name}} handles",
+    "handlesInfo": "{{manager}} reads this to decide what goes to {{name}}. Name the requests, inbox or customers, so no teammate covers the same thing.",
+    "handlesPlaceholder": "For example: Answers customers who write to the support inbox, and passes refund requests to the bookkeeper.",
+    "workStyle": "Work style",
+    "workStyleInfo": "How {{name}} does the job: what it is for, how you like it done, and what needs your approval first. Write it in your own words; the app turns it into instructions when you save a change. Each scheduled job adds its focus area, set on the job.",
+    "workStylePlaceholder": "The job: what {{name}} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.",
+    "errWorkStyle": "Work style is required: write how {{name}} does the job.",
+    "describing": "Putting the job into plain words…",
+    "errWrite": "The instructions could not be written. Try saving again.",
+    "errRename": "Could not rename this team member.",
+    "engine": "Engine",
+    "provider": "Provider",
+    "model": "Model",
+    "modelCurrent": "{{model}} (current)",
+    "engineNote": "A new engine or model takes effect the next time this team member starts."
+  },
   "onboarding": {
     "resume": {
       "headline": "We found your office",
@@ -1009,11 +1044,7 @@
     "saved": "saved",
     "when": "When",
     "beatCeiling": "The beat adapts to how quiet the floor is, so this is the ceiling, not the exact gap.",
-    "labelHint": "The agent is told this job name and does it the way its Work style says. Put how the job is done in that team member's Work style.",
-    "olderInstructions": "Older instructions",
-    "olderInstructionsHint": "This schedule was set up with its own instructions. They are still sent on every run. How a job is done belongs in {{name}}'s Work style, so move them there or remove them.",
-    "moveToWorkStyle": "Move to {{name}}'s Work style",
-    "removeOlder": "Remove",
+    "labelHint": "Names the job. How it is done comes from the Work style; the focus area says what each run looks at.",
     "officeEmpty": "No one on the team has a job on a clock turned on.",
     "emptyAgent": "{{name}} has no jobs on a clock yet.",
     "addFor": "add a schedule for {{name}}",
@@ -1035,7 +1066,14 @@
     "closedNote": "{{name}} is closed, so these are paused.",
     "relayHint": "{{godName}} hands this job to the team.",
     "approvedBy": "approved by {{name}}",
-    "everyInterval": "every {{interval}}"
+    "everyInterval": "every {{interval}}",
+    "focus": "Focus area",
+    "focusPlaceholder": "What each run concentrates on, for example: invoices more than 30 days unpaid",
+    "focusConflict": "This may clash: {{conflict}} Change it, or save anyway.",
+    "focusFromOlder": "Started from this job's older instructions.",
+    "addFocus": "Add a focus area",
+    "checking": "Checking…",
+    "saveAnyway": "Save anyway"
   },
   "webhooksSection": {
     "summaryNone": "none",
@@ -1378,8 +1416,8 @@
     "colDone": "Done",
     "openTaskDetails": "open task details",
     "needsYouTitle": "waiting on your answer; see Needs you",
-    "dismissTitle": "dismiss this task (removes it from the board)",
-    "dismissAria": "dismiss task",
+    "dismissTitle": "Close as done, your call. {{godName}} is told.",
+    "dismissAria": "close task",
     "taskTitle": "Task",
     "unassigned": "unassigned",
     "humanQA": "Questions",
@@ -1399,7 +1437,16 @@
     "notes": "Notes",
     "question": "Question",
     "answer": "Answer",
-    "assignHint": "Sends it to {{godName}} to hand out"
+    "assignHint": "Sends it to {{godName}} to hand out",
+    "withGod": "With {{godName}} · {{age}}",
+    "godStalled": "{{godName}} hasn't moved this",
+    "withGodTitle": "{{godName}} has your answer and decides the next step",
+    "ageUnderHour": "under 1 h",
+    "ageHours": "{{count}} h",
+    "ageDays": "{{count}} d",
+    "closedByOwner": "Closed by owner",
+    "nothingAsked": "Nothing asked",
+    "nothingAskedTitle": "Blocked, but nothing on it waits on you. {{godName}} is told to ask you or move it."
   },
   "queueComposer": {
     "recording": "● recording. Click stop to transcribe",
@@ -1660,7 +1707,6 @@
     "facts": "Key facts",
     "folder": "Folder",
     "connections": "Uses",
-    "firstJob": "First job",
     "model": "Model",
     "listJoiner": ", ",
     "instructions": "{{name}}'s instructions",
@@ -1806,8 +1852,13 @@
     "needsYou": "Needs you",
     "nothingNeedsYou": "Nothing needs you",
     "needsYouInfo": "{{godName}} asks you only when he can't settle something himself. Answer here and the work carries on.",
-    "boardEmptyTitle": "Nothing needs you right now.",
-    "boardEmptySub": "{{godName}} is handling it. Questions for you land here.",
+    "needsYouAnnounce": "{{godName}} needs you: {{count}}",
+    "allClear": "All clear.",
+    "allClearLine1": "{{godName}} says the team has room for more.",
+    "allClearLine2": "{{godName}} has reorganized the paper clips. Twice.",
+    "allClearLine3": "Quiet in here. Too quiet. Got a project you keep putting off?",
+    "allClearLine4": "Inbox zero. The team is ready when you are.",
+    "allClearLine5": "Free for the next thing. Big or small, the office can handle it.",
     "backToBoard": "Back to Needs you",
     "officeOpen": "Office open",
     "officeSchedule": "Office schedule",
@@ -1934,5 +1985,10 @@
     "fullChangelog": "Full changelog",
     "releasePage": "Release page",
     "close": "Close"
+  },
+  "scheduledJobs": {
+    "title": "Scheduled jobs",
+    "focus": "Focus: {{focus}}",
+    "noFocus": "No focus area"
   }
 }

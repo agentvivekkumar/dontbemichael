@@ -84,8 +84,9 @@ test('an Ask me card title drops opaque ids and bracketed metadata', () => {
  */
 test('task detail: title under the id row, and the card\'s notes show', () => {
   const src = read('src/renderer/src/components/TasksKanban.tsx');
-  // Both fields: the app's "description" and the agents' "notes".
-  assert.match(src, /description: typeof t\.description === 'string' \? t\.description : undefined,\n\s*notes: typeof t\.notes === 'string' \? t\.notes : undefined,/);
+  // Both fields: the app's "description" and the agents' "notes" (the parser
+  // lives in hiveTasks.ts, shared with the Needs you feed).
+  assert.match(read('src/renderer/src/components/hiveTasks.ts'), /description: typeof t\.description === 'string' \? t\.description : undefined,\n\s*notes: typeof t\.notes === 'string' \? t\.notes : undefined,/);
   assert.match(src, /\[\['description', task\.description\], \['notes', task\.notes\]\]/);
   assert.doesNotMatch(src, /noDescription/);
   assert.match(src, /<div style=\{\{ marginTop: 10, fontSize: 16, fontWeight: 600[^}]*\}\}>\{askTitle\(task\.title\)\}<\/div>/);

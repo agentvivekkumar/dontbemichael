@@ -87,6 +87,8 @@ export interface HarnessConfig {
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
+  /** Owner decisions on offered job description updates (shared/workStyleUpdates.ts). */
+  workStyleUpdatesDecided?: Record<string, 'use' | 'keep'>;
   harnessHome: string | null;
   /** Recently-opened office folders (most-recent first), for the missing office
    *  screen and Settings → General.

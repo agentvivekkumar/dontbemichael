@@ -173,9 +173,9 @@ test('parseWhen reads intervals and day lists', () => {
 
 test('an add request proposes, and writes nothing', () => {
   const list = [mk()];
-  const r = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { days: ['fri'], at: '09:00' } }, list, 'god', 5, 'r1', 'why');
+  const r = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { days: ['fri'], at: '09:00' }, focus: '  Unpaid  past 30 days. ' }, list, 'god', 5, 'r1', 'why');
   assert.equal(r.ok, true);
-  assert.deepEqual(r.request, { id: 'r1', agentId: 'pam', op: 'add', draft: { label: 'Check invoices', intervalMs: 86_400_000, weekly: { days: [5], minute: 540 } }, createdAt: 5, reason: 'why' });
+  assert.deepEqual(r.request, { id: 'r1', agentId: 'pam', op: 'add', draft: { label: 'Check invoices', intervalMs: 86_400_000, weekly: { days: [5], minute: 540 }, focus: 'Unpaid past 30 days.' }, createdAt: 5, reason: 'why' });
   assert.equal(list.length, 1, 'building a request never touches the list');
 });
 
@@ -193,14 +193,16 @@ test('malformed and unknown requests are refused with a reason', () => {
   assert.equal(bad({ op: 'add', label: 'x', when: { every: 'never' } }).ok, false, 'bad when');
   assert.equal(bad({ op: 'delete', id: 'nope' }).ok, false, 'unknown id');
   assert.equal(bad({ op: 'update', id: 'm1' }).ok, false, 'update with nothing new');
-  assert.equal(bad({ op: 'add', label: 'x'.repeat(81), when: { every: '1h' } }).ok, false, 'label too long');
+  assert.equal(bad({ op: 'add', label: 'x'.repeat(81), when: { every: '1h' }, focus: 'f' }).ok, false, 'label too long');
+  assert.match(bad({ op: 'add', label: 'x', when: { every: '1h' } }).reason, /An add needs a "focus"/, 'a new job needs its focus area (FA1)');
+  assert.match(bad({ op: 'add', label: 'x', when: { every: '1h' }, focus: 'f'.repeat(601) }).reason, /under 600/);
 });
 
 test('approve applies an add exactly once, as the agent\'s', () => {
-  const req = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { every: '1d' } }, [], 'god', 0, 'r', 'why').request;
+  const req = M.buildScheduleRequest('pam', { op: 'add', label: 'Check invoices', when: { every: '1d' }, focus: 'Unpaid ones' }, [], 'god', 0, 'r', 'why').request;
   const r = M.applyScheduleRequest(req, [], 'new1');
   assert.equal(r.ok, true);
-  assert.deepEqual(r.missions, [{ id: 'new1', label: 'Check invoices', intervalMs: 86_400_000, to: 'pam', body: '', enabled: true, createdBy: 'pam' }]);
+  assert.deepEqual(r.missions, [{ id: 'new1', label: 'Check invoices', intervalMs: 86_400_000, focus: 'Unpaid ones', to: 'pam', body: '', enabled: true, createdBy: 'pam' }]);
 });
 
 test('approve applies update, pause, resume and delete', () => {

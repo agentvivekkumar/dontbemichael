@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useStore, selectedAgent, ROSTER_BOOT_HOME, ACTION_CLOCKING_IN } from '@/store/store';
 import { rosterNeedsReload } from '@/store/rosterSource';
 import { startMockLoop, stopMockLoop } from '@/store/mockEvents';
@@ -33,7 +33,11 @@ import { useTranslation } from 'react-i18next';
 import { TopBar, NeedsYouStrip } from '@/shell/TopBar';
 import { setDialogsSuspended } from '@/shell/useDialog';
 import { useRestoreTeam } from '@/hooks/useRestoreTeam';
-import { NeedsYouBoard } from '@/shell/NeedsYouBoard';
+import { NeedsYouBoard, RestoreTeamBanner } from '@/shell/NeedsYouBoard';
+import { setWorkStyleOffersSource, useNeedsYou } from '@/shell/useNeedsYou';
+import { readWorkStyleOffers } from '@/shell/workStyleOffers';
+import { columnAfterGoneHome } from '@/shell/closingFloor';
+import { NEEDS_YOU_PILL_ID, columnEscAction, columnLocked, focusNeedsYouPill } from '@/shell/rightColumn';
 import { BottomBar } from '@/shell/BottomBar';
 
 // Injected at build time from package.json (see electron.vite.config.ts).
@@ -55,7 +59,7 @@ export function App() {
   const godStatus = useStore(s => s.godStatus);
   const fullscreenAgentId = useStore(s => s.fullscreenAgentId);
   const { t } = useTranslation();
-  const needsYouOpen = useStore(s => s.needsYouOpen);
+  const rightColumn = useStore(s => s.rightColumn);
   const sidebarWidth = useStore(s => s.sidebarWidth);
   const setSidebarWidth = useStore(s => s.setSidebarWidth);
   const ideOpen = useStore(s => s.ideOpen);
@@ -195,6 +199,13 @@ export function App() {
     if (phase === 'started' || phase === 'progress') setClosingOpen(true);
   }), []);
 
+  // Who has gone home: they leave the floor and open from nowhere until
+  // closing is cancelled (docs/designs/closing-floor.md).
+  useEffect(() => window.cth.onClosingTime?.((ev) => {
+    const r = ev as { phase: string; confirmed?: string[]; excused?: string[] };
+    useStore.getState().setGoneHome(r.phase === 'cancelled' ? [] : [...(r.confirmed ?? []), ...(r.excused ?? [])]);
+  }), []);
+
   const startClosingTime = async (opts?: { relaunch?: boolean }): Promise<boolean> => {
     const res = await window.cth.startClosingTime(opts);
     if (!res.ok) setClosing({ phase: 'error', acked: 0, total: 0, error: res.error });
@@ -290,6 +301,60 @@ export function App() {
     useStore.getState().restoreFocusMode();
   }, [config?.onboardingComplete, agents]);
 
+  // The right column (docs/designs/needs-you-empty-state.md): while anything
+  // waits on the owner it is open and cannot be closed; only when nothing at
+  // all waits may the office take the window (owner, 2026-10-02).
+  const feed = useNeedsYou();
+  // New default job descriptions are offered on Needs you (workStyleUpdates.ts).
+  useEffect(() => { setWorkStyleOffersSource(readWorkStyleOffers); }, []);
+  const locked = columnLocked(feed.status, feed.count);
+  // The open person goes home: their panel closes and the closing bar takes
+  // the focus (4A).
+  const goneHome = useStore((s) => s.goneHome);
+  useEffect(() => {
+    const st = useStore.getState();
+    const next = columnAfterGoneHome(st.rightColumn, st.selectedId, goneHome, locked);
+    if (!next) return;
+    st.setRightColumn(next);
+    document.querySelector<HTMLElement>('[data-closing-bar]')?.focus({ preventScroll: true });
+  }, [goneHome, locked]);
+  const columnOpen = rightColumn !== 'closed';
+  const columnRef = useRef<HTMLDivElement>(null);
+  const lastColumnMode = useRef<'board' | 'person'>('board');
+  // An ask arriving, or waiting at launch, opens the board. Focus stays put.
+  useEffect(() => {
+    if (locked && useStore.getState().rightColumn === 'closed') useStore.getState().setRightColumn('board');
+  }, [locked, rightColumn]);
+  // D4: after the last answer the board shows All clear and closes on the next
+  // click outside it (not the pill, which toggles it, nor the splitter).
+  const allClear = rightColumn === 'board' && feed.status === 'ready' && feed.count === 0;
+  useEffect(() => {
+    if (!allClear) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target || columnRef.current?.contains(target)) return;
+      if (target.closest(`#${NEEDS_YOU_PILL_ID}, .cth-splitter`)) return;
+      useStore.getState().setRightColumn('closed');
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, [allClear]);
+  // D9: the column slides out over the office for 240 ms after it closes; it
+  // has already left the layout, so the office takes its new size at once.
+  // Decided during render, so the column is never unmounted for a frame
+  // between closing and sliding out (a person's terminal would remount).
+  const [prevColumnOpen, setPrevColumnOpen] = useState(columnOpen);
+  const [exiting, setExiting] = useState(false);
+  if (prevColumnOpen !== columnOpen) {
+    setPrevColumnOpen(columnOpen);
+    setExiting(!columnOpen && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  }
+  useEffect(() => {
+    if (!exiting) return;
+    const timer = setTimeout(() => setExiting(false), 240);
+    return () => clearTimeout(timer);
+  }, [exiting]);
+
   // Track viewport width for splitter clamping
   useEffect(() => {
     const onResize = () => setVpWidth(window.innerWidth);
@@ -319,6 +384,34 @@ export function App() {
     return <OfficeFolderMissing config={config} />;
   }
 
+  // Esc closes the column only when focus is inside it and nothing else took
+  // the key; a reply with text in it is left first (eng R2). The terminal
+  // keeps its Esc.
+  const onColumnKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const field = target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement ? target : null;
+    const action = columnEscAction({
+      key: e.key,
+      defaultPrevented: e.defaultPrevented || !!target.closest('.xterm'),
+      inColumn: e.currentTarget.contains(target),
+      fieldHasText: !!field?.value.trim(),
+      locked
+    });
+    if (action === 'none') return;
+    e.preventDefault();
+    if (action === 'blur') {
+      field?.blur();
+      e.currentTarget.querySelector<HTMLElement>('[data-needs-you-heading]')?.focus();
+      return;
+    }
+    useStore.getState().setRightColumn('closed');
+    focusNeedsYouPill();
+  };
+  // While it slides out, the column keeps showing what it showed.
+  const columnMode: 'board' | 'person' = !columnOpen ? lastColumnMode.current
+    : rightColumn === 'board' || !agent ? 'board' : 'person';
+  lastColumnMode.current = columnMode;
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -336,9 +429,11 @@ export function App() {
           no permanent Command Center: people live on the stage. */}
       <TopBar onOpenSettings={() => { setSettingsSection(undefined); setSettingsOpen(true); }} />
 
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', background: 'var(--cth-bg)' }}>
-          <StudioStage config={config} bleed={sidebarWidth + 10} />
+          <StudioStage config={config} bleed={columnOpen ? sidebarWidth + 10 : 0} />
+          {/* Over the office only, never over Tasks or the graph (DESIGN.md 7.6). */}
+          {floorView === 'office' && <RestoreTeamBanner config={config} />}
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
           {agentCount === 0 && godStatus !== 'booting' && (
             <div style={{
@@ -395,31 +490,45 @@ export function App() {
           )}
         </div>
 
-        <SidebarSplitter
-          width={sidebarWidth}
-          onChange={setSidebarWidth}
-          viewportWidth={vpWidth}
-        />
+        {columnOpen && (
+          <SidebarSplitter
+            width={sidebarWidth}
+            onChange={setSidebarWidth}
+            viewportWidth={vpWidth}
+          />
+        )}
 
         {/* The right column has no ground of its own (owner, 2026-09-30): its
             cards, and the person and Michael panels (cards themselves), sit
-            straight on the office, which runs on underneath. */}
-        <div style={{
-          width: sidebarWidth, flexShrink: 0, minHeight: 0, position: 'relative', zIndex: 60,
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          margin: '4px 6px 0 0'
-        }}>
-          {needsYouOpen || !agent ? (
-            <NeedsYouBoard config={config} />
-          ) : (
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 12px 0' }}>
-              <NeedsYouStrip />
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <AgentDetailPanel agent={agent} />
+            straight on the office, which runs on underneath. It is not there
+            at all while nothing waits and nobody is open (D1). */}
+        {(columnOpen || exiting) && (
+          <div
+            ref={columnRef}
+            data-right-column
+            onKeyDown={onColumnKey}
+            aria-hidden={columnOpen ? undefined : true}
+            className={columnOpen ? 'cth-col-in' : 'cth-col-out'}
+            style={{
+              width: sidebarWidth, flexShrink: 0, minHeight: 0, zIndex: 60,
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              ...(columnOpen
+                ? { position: 'relative', margin: '4px 6px 0 0' }
+                : { position: 'absolute', top: 4, bottom: 0, insetInlineEnd: 6 })
+            }}
+          >
+            {columnMode === 'board' || !agent ? (
+              <NeedsYouBoard />
+            ) : (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 12px 0' }}>
+                <NeedsYouStrip />
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <AgentDetailPanel agent={agent} />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {addAgentOpen && (

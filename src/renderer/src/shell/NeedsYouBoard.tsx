@@ -7,24 +7,27 @@ import { PixelButton } from '@/components/PixelButton';
 import { useRestoreTeam } from '@/hooks/useRestoreTeam';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useNeedsYouCount } from './useNeedsYou';
+import { focusNeedsYouPill } from './rightColumn';
 
 /**
- * The Needs you board (branding/DESIGN.md 7.6 and 7.8): the right column's
- * default state. It is the Ask me board that used to be a tab in Michael's
- * panel: the questions Michael could not settle, and the schedule requests he
- * passed on. Last session's team, when it is not back yet, sits on top.
+ * The Needs you board (branding/DESIGN.md 7.6 and 7.8): the questions Michael
+ * could not settle, and the schedule requests he passed on. It opens whenever
+ * something waits
+ * (docs/designs/needs-you-empty-state.md). While anything waits it stays open
+ * and has no close; the x appears only when nothing waits (owner, 2026-10-02).
  */
-export function NeedsYouBoard({ config }: { config: HarnessConfig }) {
+export function NeedsYouBoard() {
   const { t } = useTranslation();
   const godName = useResolvedGodName();
   const count = useNeedsYouCount();
+  const close = () => { useStore.getState().setRightColumn('closed'); focusNeedsYouPill(); };
   return (
     <div style={{
       height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12,
       padding: '14px 16px 12px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>
+        <h2 tabIndex={-1} data-needs-you-heading className="cth-needs-heading" style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>
           {t('shell.needsYou')}
         </h2>
         {count > 0 && (
@@ -35,8 +38,16 @@ export function NeedsYouBoard({ config }: { config: HarnessConfig }) {
           }}>{count}</span>
         )}
         <InfoTip text={t('shell.needsYouInfo', { godName })} />
+        {count === 0 && <button
+          onClick={close}
+          aria-label={t('panel.close')}
+          title={t('panel.close')}
+          style={{
+            marginInlineStart: 'auto', width: 24, height: 24, padding: 0, border: 'none', borderRadius: 'var(--cth-r-sm)',
+            cursor: 'pointer', background: 'transparent', color: 'var(--cth-ink-3)', fontSize: 13, lineHeight: 1
+          }}
+        >✕</button>}
       </div>
-      <RestoreTeamBanner config={config} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <AskMeTab />
       </div>
@@ -45,8 +56,9 @@ export function NeedsYouBoard({ config }: { config: HarnessConfig }) {
 }
 
 /** Last session's team, not started yet: bring them all back, or leave one out.
- *  Was the restore dropdown at the end of the agent strip. */
-function RestoreTeamBanner({ config }: { config: HarnessConfig }) {
+ *  Floats over the office's top left corner (D5): it is about the floor, so it
+ *  never opens the column or counts toward Needs you. */
+export function RestoreTeamBanner({ config }: { config: HarnessConfig }) {
   const { t } = useTranslation();
   const restorable = useStore((s) => s.restorableAgents);
   const { restoring, autoRestoring, restoreTeam } = useRestoreTeam(config);
@@ -54,8 +66,9 @@ function RestoreTeamBanner({ config }: { config: HarnessConfig }) {
   if (!restorable.length && !busy) return null;
   return (
     <div style={{
-      flexShrink: 0, padding: '10px 12px', borderRadius: 'var(--cth-r-xl)',
-      background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)',
+      position: 'absolute', top: 12, insetInlineStart: 16, zIndex: 55, width: 320, maxWidth: 'calc(100% - 32px)',
+      padding: '10px 12px', borderRadius: 'var(--cth-r-xl)',
+      background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)',
       display: 'flex', flexDirection: 'column', gap: 8
     }}>
       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--cth-ink)' }}>

@@ -15,17 +15,20 @@ import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
   readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
-  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
+  modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
+import { answerMessages, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
+import { answerKey, catchUpRequests } from '../shared/ownerRequests';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
   migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor, fileScheduleRequest, foldScheduleRequests,
-  requestSummary, whenWords,
+  requestSummary, whenWords, cleanFocus, scheduledJobsBlock,
   type ScheduleRequest
 } from '../shared/missions';
+import { MICHAEL_WORK_STYLE } from '../shared/michaelWorkStyle';
 import {
   getBranch, getStatus, getLog, getBranches, getAheadBehind, isRepo, getDiff, mainRepoRoot,
   addWorktree, removeWorktree, worktreeHasUnintegratedWork, worktreeIsGcSafe,
@@ -42,7 +45,7 @@ import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
 import { checkDistinct, readJobProfile } from './hireCheck';
-import { convertWorkStyle, readConvertRequest } from './workStyleConvert';
+import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckRequest } from './workStyleConvert';
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
@@ -124,6 +127,7 @@ import {
   withCodexRemoteArgs
 } from '../shared/codexRemote';
 import { restartApp } from './restart';
+import { PromptSubmits, confirmSubmit } from '../shared/submitConfirm';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -353,11 +357,27 @@ function standingGoalFromRoster(agentId: string): string | null {
   }
   return null;
 }
+
+/** The Work style an agent's sessions get (docs/designs/schedule-focus-areas.md):
+ *  its own, or Michael's default (F6), followed by its scheduled jobs by name
+ *  and time. A job's focus is not here: it comes with that job's run (FA2). */
+function standingGoalFor(agentId: string): string | null {
+  let godId = 'god';
+  try { godId = hive.registry().godId || 'god'; } catch { /* no hive yet */ }
+  const own = standingGoalFromRoster(agentId) ?? (agentId === godId ? MICHAEL_WORK_STYLE : null);
+  let jobs: string | null = null;
+  try { jobs = scheduledJobsBlock(readConfig().missions ?? [], agentId, godId); } catch { /* no config yet */ }
+  const parts = [own, jobs].filter((x): x is string => !!x);
+  return parts.length ? parts.join('\n\n') : null;
+}
 // Worker inbox-wake watchdog (#151): finds idle workers with undrained inbox mail
 // and types the same guarded nudge the renderer would have (so a throttled
 // background window can't leave a worker parked on an unread inbox forever).
 // HookServer feeds it the hook stream so a permission/HITL prompt blocks nudges.
 const workerWake = new WorkerWakeWatchdog();
+// When each agent last accepted a prompt, so a typed nudge can confirm it
+// landed (shared/submitConfirm.ts).
+const promptSubmits = new PromptSubmits();
 // HookServer needs BOTH: Oscar's control registry (HITL pause/gate/steer/halt via
 // hook returns) AND Jim's breaker (feed recordToolUse on each PostToolUse).
 const hookServer = new HookServer(
@@ -366,8 +386,13 @@ const hookServer = new HookServer(
   () => readConfig(),
   control,
   breaker,
-  standingGoalFromRoster,
-  (agentId, event, message) => { workerWake.noteHook(agentId, event, message); safeClearer.noteHook(agentId, event, message); },
+  standingGoalFor,
+  (agentId, event, message) => {
+    workerWake.noteHook(agentId, event, message);
+    safeClearer.noteHook(agentId, event, message);
+    if (agentId && event === 'UserPromptSubmit') promptSubmits.note(agentId);
+    if (agentId && (event === 'Notification' || event === 'PermissionRequest')) promptSubmits.noteAttention(agentId);
+  },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
   companyProfileForAgents,
   (agentId) => booksReadRoleIds().has(agentId)
@@ -429,16 +454,9 @@ const persist = new PersistStore();
  *  the most-recently-focused live window, so global events follow the user.
  *  Additional "floor" windows are tracked in `allWindows` below. */
 let mainWindow: BrowserWindow | null = null;
-/** Floor windows, by identity: `mainWindow` follows focus, so it can't tell a
- *  floor from the primary window. */
-const floorWindows = new WeakSet<BrowserWindow>();
 /** Every open window (primary + floors). A registry, not a single handle, so
  *  multi-window lifecycle (focus tracking, quit fan-out) is correct. */
 const allWindows = new Set<BrowserWindow>();
-/** Monotonic floor counter → a stable, unique session partition per floor so
- *  each floor's renderer state (localStorage: agents, queues, selection) is
- *  isolated from every other window's. */
-let floorSeq = 0;
 
 /** When true, skip the quit interceptor (user already confirmed). */
 let allowQuit = false;
@@ -515,7 +533,7 @@ function closeMailboxCard(id: string, result: string): void {
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
   getSecret: integrations.getSecret,
-  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig() }, agentId, op, body)
+  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } } }, agentId, op, body)
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
@@ -1012,13 +1030,35 @@ function tellOfficeOpen(agentId: string): void {
     console.error('[office-open]', e);
   }
 }
+/** Once a launch, when Michael starts (docs/designs/card-lifecycle.md section
+ *  5): an answer the owner gave through Ask me on a still blocked card whose
+ *  request never reached Michael (a send that failed, the app quitting) is sent
+ *  to him now. Only answers the app recorded count, word for word; an answer
+ *  already on a card before the app kept that record is not relayed as the
+ *  owner's, and Michael sees that card on his Blocked with nothing asked list
+ *  (security review, ship 2026-10-03). */
+let ownerCatchUpDone = false;
+function catchUpOwnerAnswers(): void {
+  if (ownerCatchUpDone || !hive.enabled()) return;
+  ownerCatchUpDone = true;
+  try {
+    const recorded = new Set(readConfig().ownerAnswerKeys ?? []);
+    for (const m of catchUpRequests(hive.ownerAnswersWithoutRequest(), recorded, hive.registry().agents, answerDigest)) {
+      hive.send({ to: m.to, act: m.act, subject: m.subject, body: m.body, conversation: m.conversation, requires_reply: true }, 'human');
+    }
+    hive.refreshOwnerRequests();
+  } catch (e) {
+    console.error('[owner answers catch-up]', e);
+  }
+}
+
 function standupOnOfficeOpen(): void {
   if (standupFiredThisLaunch || !hive.enabled()) return;
   const m = (readConfig().missions ?? []).find((x) => x.id === OPS_STANDUP_MISSION.id);
   if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
   standupFiredThisLaunch = true;
   try {
-    hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body) }, 'scheduler');
+    hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body, m.focus) }, 'scheduler');
     const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
     writeConfig({ missions: next });
     try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
@@ -1342,6 +1382,23 @@ function ensureDefaultMissions(): void {
       missions: missions5.map((m) =>
         m.id === OPS_STANDUP_MISSION.id && OPS_STANDUP_BUILT_IN_BODIES.includes(m.body) ? { ...m, body: OPS_STANDUP_MISSION.body } : m)
     });
+  }
+  // The standup's focus area (schedule-focus-areas.md F6), in one pass. Once,
+  // for offices made before focus areas, a standup with no focus and no prompt
+  // of the owner's gets the built-in one; and a standup still carrying an
+  // earlier built-in focus word for word gets the current one. The owner's own
+  // text is never replaced.
+  const cfg6 = readConfig();
+  const seed = !cfg6.standupFocusSeeded;
+  const standupFocus = (m: ScheduledMission): ScheduledMission => {
+    if (m.id !== OPS_STANDUP_MISSION.id) return m;
+    if (seed && !m.focus && !(m.body ?? '').trim()) return { ...m, focus: OPS_STANDUP_FOCUS };
+    return m.focus && OPS_STANDUP_BUILT_IN_FOCUSES.includes(m.focus) ? { ...m, focus: OPS_STANDUP_FOCUS } : m;
+  };
+  const before = cfg6.missions ?? [];
+  const after = before.map(standupFocus);
+  if (seed || after.some((m, i) => m !== before[i])) {
+    writeConfig({ missions: after, ...(seed ? { standupFocusSeeded: true } : {}) });
   }
 }
 
@@ -2583,18 +2640,6 @@ function debounce(fn: () => void, ms: number): () => void {
   return () => { if (t) clearTimeout(t); t = setTimeout(() => { t = null; fn(); }, ms); };
 }
 
-/** Cascade a new floor off the focused window so it doesn't stack exactly on
- *  top, clamped on-screen (clampBounds drops an off-display position). */
-function floorCascade(): WindowBounds | null {
-  const base = (mainWindow && !mainWindow.isDestroyed())
-    ? mainWindow
-    : [...allWindows].find((w) => !w.isDestroyed());
-  if (!base) return null;
-  const b = base.getBounds();
-  const OFFSET = 36;
-  return clampBounds({ x: b.x + OFFSET, y: b.y + OFFSET, width: b.width, height: b.height });
-}
-
 // ─── Shareable hires: dontbemichael:// deep link + file import ──────────────
 // A hire manifest NEVER auto-spawns: it is validated, then handed to the
 // renderer, which pre-fills the Add-Agent modal for human review. See
@@ -2698,21 +2743,13 @@ ipcMain.handle('hire:openFile', async () => {
 });
 
 /**
- * Create a window. The PRIMARY window (no opts) restores saved geometry, uses
- * the default session, runs the hive, and keeps the existing app-quit warning.
- * A FLOOR window (`{ floor: true }`) gets its own persistent session partition
- * — isolating its renderer state (agents/queues/selection) from every other
- * window — cascades its position, and on close stops only its OWN terminals
- * while the app keeps running.
+ * Create the office window: it restores saved geometry, uses the default
+ * session, runs the hive, and keeps the app-quit warning. (A second "floor"
+ * window existed once; it went with the New Floor menu item, 2026-10-03.)
  */
-function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
-  const isFloor = opts.floor === true;
-
-  // Primary restores saved geometry; floors cascade off the focused window.
-  let saved: WindowBounds | null = null;
-  if (!isFloor) { try { saved = clampBounds(persist.getKv('window.bounds')); } catch { saved = null; } }
-  const cascade = isFloor ? floorCascade() : null;
-  const geom = cascade ?? saved;
+function createWindow(): BrowserWindow {
+  let geom: WindowBounds | null = null;
+  try { geom = clampBounds(persist.getKv('window.bounds')); } catch { geom = null; }
 
   const win = new BrowserWindow({
     width: geom?.width ?? DEFAULT_WIN.width,
@@ -2720,7 +2757,7 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
     ...(geom && geom.x !== undefined && geom.y !== undefined ? { x: geom.x, y: geom.y } : {}),
     minWidth: MIN_WIN.width,
     minHeight: MIN_WIN.height,
-    title: isFloor ? `${APP_NAME} · Floor` : APP_NAME,
+    title: APP_NAME,
     backgroundColor: '#FFF8E7',
     titleBarStyle: 'hiddenInset',
     show: false,
@@ -2736,10 +2773,6 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
       // — incl. behind the LOCK SCREEN — which silently stalls the hive while
       // the user is away. Don't.
       backgroundThrottling: false,
-      // Each floor gets its OWN persistent session partition → isolated
-      // localStorage so floors never share or stomp each other's office state.
-      // The primary keeps the DEFAULT session so existing persisted state loads.
-      ...(isFloor ? { partition: `persist:floor-${++floorSeq}` } : {})
     }
   });
 
@@ -2751,8 +2784,7 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
   // Global timer events follow the user — the most-recently-focused window is
   // primary. The primary is also seeded synchronously so boot events route now.
   win.on('focus', () => { mainWindow = win; });
-  if (!isFloor) mainWindow = win;
-  if (isFloor) floorWindows.add(win);
+  mainWindow = win;
 
   // Permission gate for the renderer (our own trusted, local content). The only
   // permission we constrain is microphone capture: it's allowed ONLY while a mic
@@ -2783,10 +2815,9 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
     return true;
   });
 
-  // Only the primary persists geometry (kv `window.bounds`); floors cascade
-  // fresh each launch. Skip while maximized/minimized so a restore doesn't save
-  // the fullscreen rect.
-  if (!isFloor) {
+  // The window persists its geometry (kv `window.bounds`). Skip while
+  // maximized/minimized so a restore doesn't save the fullscreen rect.
+  {
     const saveBounds = debounce(() => {
       if (win.isDestroyed() || win.isMinimized() || win.isMaximized()) return;
       try { persist.setKv('window.bounds', win.getBounds()); } catch { /* DB best-effort */ }
@@ -2817,24 +2848,6 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
   // intercept it the same way before-quit does so PTY users aren't surprised.
   win.on('close', (e) => {
     if (allowQuit) return;
-    if (isFloor) {
-      // A floor's close is NOT an app quit — confirm only its OWN terminals,
-      // via a self-contained native dialog (no renderer modal). Confirming lets
-      // the window close; its PTYs are stopped in the 'closed' handler.
-      const owned = ptyManager.countByOwner(wc);
-      if (owned > 0) {
-        const choice = dialog.showMessageBoxSync(win, {
-          type: 'warning',
-          buttons: ['Close floor', 'Cancel'],
-          defaultId: 1,
-          cancelId: 1,
-          message: `Close this floor? ${owned} running terminal${owned === 1 ? '' : 's'} on it will be stopped.`,
-          detail: 'Other floors keep running.'
-        });
-        if (choice === 1) e.preventDefault();
-      }
-      return;
-    }
     // Primary window: existing app-wide quit warning (renderer modal).
     const count = ptyManager.list().length;
     if (count === 0) return;
@@ -2843,8 +2856,8 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
     wc.send('app:closeRequested', { ptyCount: count });
   });
 
-  // The primary is the default PTY sink; floors route purely by per-PTY owner.
-  if (!isFloor) ptyManager.attachWebContents(wc);
+  // The window is the PTY sink.
+  ptyManager.attachWebContents(wc);
 
   // A main-frame reload unmounts the renderer's hire subscription — queue again
   // until the fresh renderer drains. Guard on isMainFrame: a stray sub-frame
@@ -2862,9 +2875,6 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
 
   win.on('closed', () => {
     allWindows.delete(win);
-    // A closed floor must not leave its terminals running headless. (Natural
-    // onExit teardown — archive + worktree cleanup — still runs per PTY.)
-    if (isFloor) { try { ptyManager.killByOwner(wc); } catch { /* best-effort */ } }
     if (mainWindow === win) {
       mainWindow = null;
       for (const w of allWindows) { if (!w.isDestroyed()) { mainWindow = w; break; } }
@@ -2875,36 +2885,28 @@ function createWindow(opts: { floor?: boolean } = {}): BrowserWindow {
   return win;
 }
 
-/** Open a new floor window — gated by the multiWindow flag. Returns the window,
- *  or null when the feature is off (the entry points are hidden in that case,
- *  but the IPC stays defensive). */
-function openFloor(): BrowserWindow | null {
-  if (!readConfig().multiWindow) return null;
-  return createWindow({ floor: true });
-}
-
-/** Build + install the application menu. Only called when multiWindow is on, so
- *  flag-off keeps Electron's default menu (zero behavior change). Uses standard
- *  role-based items so copy/paste/quit/etc. work per-platform, and adds the
- *  "New Floor" item (Cmd/Ctrl+Shift+N). */
 /** The quit item's label in the app menu (and File on Windows and Linux). */
 const QUIT_LABEL = 'Close Office';
 /** The hide item's label in the Mac app menu, for the same reason as Quit:
  *  "Hide Don't Be Michael" read as a double negative (owner, 2026-09-24). */
 const HIDE_LABEL = 'Hide Office';
 
+/** Build + install the application menu: standard role-based items so
+ *  copy/paste/quit work per platform, trimmed to what an office owner uses. */
 function installAppMenu(): void {
   const isMac = process.platform === 'darwin';
-  const newFloorItem = {
-    label: 'New Floor',
-    accelerator: 'CmdOrCtrl+Shift+N',
-    click: () => { openFloor(); }
-  };
   // Quit reads "Close Office" and Hide reads "Hide Office": "Quit Don't Be
   // Michael" put "Quit" and "Don't" side by side, which read as a double
   // negative (owner, 2026-09-24). Both keep their roles, so Cmd+Q, Cmd+H and
   // the quit guard behave exactly as before.
   const quitItem = { role: 'quit' as const, label: QUIT_LABEL };
+  // Only what an office owner uses (owner, 2026-10-03): no File menu on the
+  // Mac (its multi-window item opened a separate, empty office, and Close Window left the
+  // office running in the Dock while looking like a quit); View keeps zoom and
+  // full screen, with Reload and the developer tools only in development.
+  const devViewItems: Electron.MenuItemConstructorOptions[] = app.isPackaged
+    ? []
+    : [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }, { type: 'separator' }];
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac
       ? [{
@@ -2921,13 +2923,8 @@ function installAppMenu(): void {
           quitItem
         ]
       }]
-      : []),
-    {
-      label: 'File',
-      submenu: isMac
-        ? [newFloorItem, { type: 'separator' as const }, { role: 'close' as const }]
-        : [newFloorItem, { type: 'separator' as const }, quitItem]
-    },
+      // Windows and Linux have no app menu, so Close Office lives in File.
+      : [{ label: 'File', submenu: [quitItem] }]),
     // The Edit menu is spelled out rather than `{ role: 'editMenu' }` for one
     // reason: `registerAccelerator: false` on the clipboard items.
     //
@@ -2956,7 +2953,17 @@ function installAppMenu(): void {
         { role: 'selectAll' as const, registerAccelerator: false }
       ]
     },
-    { role: 'viewMenu' },
+    {
+      label: 'View',
+      submenu: [
+        ...devViewItems,
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
     { role: 'windowMenu' }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -3565,7 +3572,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // `cwd` echoes back the TILDE-EXPANDED absolute path so the renderer's agent
   // record matches what the registry and the PTY actually used.
   if (res.ok && opts.hive?.id) tellOfficeOpen(opts.hive.id);
-  if (res.ok && opts.hive?.isGod) standupOnOfficeOpen();
+  if (res.ok && opts.hive?.isGod) { standupOnOfficeOpen(); catchUpOwnerAnswers(); }
   return { ...res, cwd: opts.cwd, ...(worktreePath ? { worktreePath } : {}), ...(resumeNotFound ? { resumeNotFound: true } : {}), ...(didResume ? { resumed: true } : {}), ...(seedPrompt ? { seedPrompt } : {}) };
 }
 ipcMain.handle('pty:write', (_evt, id: string, data: string) => {
@@ -4345,6 +4352,9 @@ ipcMain.handle('hive:send', (_evt, partial: Partial<HiveMessage>, from: unknown)
   if (sender === 'human') analytics.trackMessageSent('hive');
   return { ok: true, message: msg };
 });
+// Michael's open requests from the owner, by card (card-lifecycle.md): the
+// Tasks view shows these cards as with Michael.
+ipcMain.handle('hive:ownerRequests', () => (hive.enabled() ? hive.ownerRequests() : []));
 ipcMain.handle('hive:addTask', (_evt, task: unknown) => {
   if (!task || typeof task !== 'object' || Array.isArray(task)
     || typeof (task as { id?: unknown }).id !== 'string') {
@@ -4353,17 +4363,67 @@ ipcMain.handle('hive:addTask', (_evt, task: unknown) => {
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   return { ok: hive.addTask(task as HiveTask) };
 });
+/** The digest an answer is recorded by: its question and answer, word for word. */
+function answerDigest(q: string, a: string): string {
+  return createHash('sha256').update(`${q}\u0000${a}`).digest('hex').slice(0, 32);
+}
+
+/** The ledger's keys for these Ask me entries: answered ones only. */
+function answerKeysOf(taskId: string, qa: unknown[]): string[] {
+  return qa
+    .filter((e): e is { q: string; a: string; answeredAt: string } => !!e && typeof e === 'object'
+      && typeof (e as { q?: unknown }).q === 'string' && typeof (e as { a?: unknown }).a === 'string'
+      && typeof (e as { answeredAt?: unknown }).answeredAt === 'string')
+    .map((e) => answerKey(taskId, e.answeredAt, answerDigest(e.q, e.a)));
+}
+
+function recordOwnerAnswerKeys(keys: string[]): void {
+  const prior = readConfig().ownerAnswerKeys ?? [];
+  writeConfig({ ownerAnswerKeys: [...new Set([...prior, ...keys])].slice(-OWNER_ANSWER_KEYS_MAX) });
+}
+
 ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
   if (typeof id !== 'string' || !id || !patch || typeof patch !== 'object' || Array.isArray(patch)) {
     return { ok: false, error: 'invalid task patch' };
   }
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  // The owner's Ask me answers arrive here; recording them is what lets the
+  // launch catch-up tell an owner's answer from text an agent wrote into the
+  // card (security review, 2026-10-03).
+  // Only answers this patch adds count: the renderer sends the card's whole
+  // list, and an entry already on disk may be one an agent wrote.
+  let qa = (patch as { humanQA?: unknown }).humanQA;
+  if (Array.isArray(qa)) {
+    const ledger = hive.tasks() as { tasks?: HiveTask[] };
+    const onDisk = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id)?.humanQA ?? [];
+    // The renderer's list is a few seconds old: an entry added on disk since
+    // (a newer ask) is kept, and a slot whose question changed keeps the disk
+    // entry, so answering never erases a question it did not see.
+    qa = mergeHumanQA(onDisk, qa);
+    patch = { ...(patch as object), humanQA: qa };
+    const had = new Set(onDisk.map((e) => (e && typeof e.answeredAt === 'string' ? e.answeredAt : '')).filter(Boolean));
+    const keys = answerKeysOf(id, (qa as unknown[]).filter((e) => !(e && typeof e === 'object' && had.has((e as { answeredAt?: string }).answeredAt ?? ''))));
+    if (keys.length) recordOwnerAnswerKeys(keys);
+  }
   return { ok: hive.patchTask(id, patch as Partial<Omit<HiveTask, 'id'>>) };
 });
-ipcMain.handle('hive:deleteTask', (_evt, id: unknown) => {
+/** The most recorded owner answers kept: far more than any office has open. */
+const OWNER_ANSWER_KEYS_MAX = 2000;
+// The owner's own card changes (card-lifecycle.md section 4): a move, or a
+// close that ends the card as Done by their decision. Cards are never deleted
+// from the UI; Michael is told of each change.
+ipcMain.handle('hive:moveTask', (_evt, id: unknown, status: unknown) => {
+  // Not Blocked: that is Michael's, for a question waiting on Ask me.
+  if (typeof id !== 'string' || !id || !['todo', 'doing', 'done'].includes(status as string)) {
+    return { ok: false, error: 'invalid task move' };
+  }
+  if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  return { ok: hive.ownerMoveTask(id, status as HiveTask['status']) };
+});
+ipcMain.handle('hive:closeTask', (_evt, id: unknown, reason: unknown) => {
   if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid task id' };
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
-  return { ok: hive.deleteTask(id) };
+  return { ok: hive.ownerCloseTask(id, typeof reason === 'string' ? reason : undefined) };
 });
 ipcMain.handle('hive:setArchived', (_evt, id: unknown, archived: unknown) => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
@@ -4485,6 +4545,20 @@ ipcMain.handle('workStyle:convert', async (_evt, payload: unknown) => {
   if (!req) return { text: '', source: 'rules' };
   const cfg = readConfig();
   return convertWorkStyle(req, {
+    cwd: cfg.harnessHome ?? app.getPath('home'),
+    command: cfg.defaultCommand ?? 'claude',
+    env: memory.env(),
+    log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+  });
+});
+
+/** A job's focus area checked against the agent's Work style and its other
+ *  jobs (schedule-focus-areas.md, FA3). Unchecked when the call can't run. */
+ipcMain.handle('workStyle:checkFocus', async (_evt, payload: unknown) => {
+  const req = readFocusCheckRequest(payload);
+  if (!req) return { checked: false };
+  const cfg = readConfig();
+  return checkFocusArea(req, {
     cwd: cfg.harnessHome ?? app.getPath('home'),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),
@@ -4735,11 +4809,8 @@ function teardownAndQuit(): void {
 }
 // The clock menu's Closing time: the same path as Cmd-Q. before-quit starts
 // closing time when terminals are running and lets the app quit when none are
-// (window.close() only closed the window, leaving the app in the Dock). From a
-// floor window it closes just that floor, through the floor's own confirm.
-ipcMain.handle('app:requestQuit', (evt) => {
-  const win = BrowserWindow.fromWebContents(evt.sender);
-  if (win && floorWindows.has(win)) { win.close(); return; }
+// (window.close() only closed the window, leaving the app in the Dock).
+ipcMain.handle('app:requestQuit', () => {
   app.quit();
 });
 ipcMain.handle('app:confirmClose', () => {
@@ -4752,14 +4823,6 @@ ipcMain.handle('app:cancelClose', () => {
   // been called off, and whoever is waiting on it needs to hear that rather than
   // sit disabled forever waiting for a process that is not going to die.
   abortPendingRestart();
-});
-
-// Open a new floor (independent office window). Gated by the multiWindow flag
-// inside openFloor(); returns whether a window opened so a renderer button can
-// reflect availability. The app-menu "New Floor" item calls openFloor() directly.
-ipcMain.handle('window:newFloor', () => {
-  const win = openFloor();
-  return { ok: win != null };
 });
 
 // ─── IPC: closing time (graceful, data-loss-free shutdown) ──────────────────
@@ -4987,11 +5050,14 @@ ipcMain.handle('missions:upsert', (_evt, mission: unknown): MissionOpResult => {
   if (!isMission(mission)) return { ok: false, error: 'invalid schedule' };
   // Several "when" lines are stored canonical, or the save is refused: a bad
   // line would run on a clock nobody set.
-  let clean: ScheduledMission = mission;
+  // The focus area is stored clean (FA1); an empty one is no focus.
+  let clean: ScheduledMission = { ...mission };
+  const focus = cleanFocus(mission.focus);
+  if (focus) clean.focus = focus; else delete clean.focus;
   if (mission.times !== undefined) {
     const times = normalizeTimes(mission.times);
     if (!times) return { ok: false, error: 'invalid schedule times' };
-    clean = { ...mission, times };
+    clean = { ...clean, times };
   }
   return applyMissions((list) => upsertMission(list, clean));
 });
@@ -5479,7 +5545,8 @@ registerRealtimeActionIpc({
   hiveTasks: () => hive.tasks(),
   hiveAddTask: (task) => hive.addTask(task as HiveTask),
   hivePatchTask: (id, patch) => hive.patchTask(id, patch as Partial<Omit<HiveTask, 'id'>>),
-  hiveDeleteTask: (id) => hive.deleteTask(id),
+  hiveMoveTask: (id, status) => hive.ownerMoveTask(id, status),
+  hiveCloseTask: (id, reason) => hive.ownerCloseTask(id, reason),
   hiveRegistry: () => hive.registry(),
   hiveLog: (event) => hive.appendLog(event),
   controlPause: (id, on) => control.pause(id, on),
@@ -6236,12 +6303,29 @@ function nudgeWorker(ptyId: string, ids: string[] = []): void {
   // produce byte-identical nudges: the queue's one-pending rule recognises either
   // via isInboxNudge, and a watchdog nudge names its ids so the agent can still
   // tell "I filed this last turn" from "woken for nothing".
+  const typedAt = Date.now();
   const wrote = ptyManager.write(ptyId, inboxNudgeText(ids));
   if (!wrote.ok) { console.warn(`[worker-wake] write failed for ${ptyId}: ${wrote.error}`); return; }
   setTimeout(() => {
     try {
       const submitted = ptyManager.write(ptyId, '\r');
-      if (!submitted.ok) console.warn(`[worker-wake] submit failed for ${ptyId}: ${submitted.error}`);
+      if (!submitted.ok) { console.warn(`[worker-wake] submit failed for ${ptyId}: ${submitted.error}`); return; }
+      // A Claude agent says when it accepts a prompt: press Enter again if a
+      // slow terminal took the first one as part of the text.
+      const agentId = ptyToAgent.get(ptyId);
+      const provider = agentId ? hive.registry().agents?.[agentId]?.provider : undefined;
+      if (agentId && isClaudeProvider((provider ?? 'claude') as AgentProvider)) {
+        // An extra Enter only while nothing else happened in that terminal:
+        // nobody typed there and the agent asked for nothing (a permission
+        // prompt or menu would take the Enter as a choice).
+        let ours = ptyManager.writeCount(ptyId);
+        void confirmSubmit({
+          accepted: () => promptSubmits.since(agentId, typedAt),
+          pressEnter: () => { const r = ptyManager.write(ptyId, '\r'); ours = ptyManager.writeCount(ptyId); return r; },
+          stillSafe: () => ptyManager.writeCount(ptyId) === ours && !promptSubmits.attentionSince(agentId, typedAt)
+        })
+          .then((ok) => { if (!ok) console.warn(`[worker-wake] ${agentId} did not accept the nudge after retries`); });
+      }
     } catch (e) { console.error('[worker-wake] submit threw:', e); }
   }, 140);
 }
@@ -6297,8 +6381,14 @@ function runWorkerWakeBeat(): void {
  *  handles that freeze during true system sleep and must be re-armed on wake. */
 function armAlwaysOnBeats(): void {
   if (fleetTimer) clearInterval(fleetTimer);
-  writeFleetSnapshot();
-  fleetTimer = setInterval(writeFleetSnapshot, 8_000);
+  // Michael's open requests from the owner ride the fleet tick
+  // (docs/designs/card-lifecycle.md), so a prompt never scans his mail.
+  const fleetBeat = (): void => {
+    writeFleetSnapshot();
+    try { if (hive.enabled()) hive.refreshOwnerRequests(); } catch (e) { console.error('[owner requests]', e); }
+  };
+  fleetBeat();
+  fleetTimer = setInterval(fleetBeat, 8_000);
   if (breakerBeatTimer) clearInterval(breakerBeatTimer);
   breakerBeatTimer = setInterval(() => { try { runBreakerBeat(300_000); } catch (e) { console.error('[breaker beat]', e); } }, 30_000);
   if (workerWakeTimer) clearInterval(workerWakeTimer);
@@ -6453,9 +6543,9 @@ app.whenReady().then(() => {
   powerMonitor.on('unlock-screen', () => onSystemResume('unlock-screen'));
   powerMonitor.on('suspend', () => { lastSuspendAt = Date.now(); console.log('[power] suspend — system sleeping'); });
   powerMonitor.on('lock-screen', () => { lastSuspendAt = Date.now(); console.log('[power] lock-screen'); });
-  // Multi-window floors (opt-in): install the menu carrying "New Floor". When
-  // off, the app keeps Electron's default menu — zero behavior change.
-  if (readConfig().multiWindow) installAppMenu();
+  // The app's own menu, always: Electron's default carries Reload and the
+  // developer tools, which are not for an office owner (owner, 2026-10-03).
+  installAppMenu();
   createWindow();
   // Auto-start the Slack webhook server when configured. Best-effort: a tunnel
   // failure (offline) is logged, not fatal. The tunnel URL is ephemeral and

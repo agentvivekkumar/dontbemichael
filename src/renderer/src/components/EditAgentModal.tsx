@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
-import { SpritePortrait } from './SpritePortrait';
 import { InfoTip } from './InfoTip';
+import { Disclosure } from './triggers/ui';
 import { Dialog } from '@/shell/Dialog';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useStore, type Agent } from '@/store/store';
-import { OFFICE_CAST, type OfficeCharacterName } from '@/scene/office/cast';
-import { type AccentColorName } from '@/design/tokens';
 import {
   type AgentProvider,
   type HarnessConfig,
@@ -20,8 +19,8 @@ import {
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
 import { plainFallback } from '@shared/workStyleText';
-
-const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
+import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
+import { ScheduledJobsList } from './ScheduledJobs';
 
 export interface EditAgentModalProps {
   agent: Agent;
@@ -29,11 +28,15 @@ export interface EditAgentModalProps {
 }
 
 /**
- * Compact post-hire editor for Identity / Engine / Briefing. Mirrors the Add
- * Agent fields that matter after spawn; save only patches the durable roster
- * via updateAgent (engine changes apply on the next restart).
+ * Edit what can change on someone already hired (docs/designs/edit-agent.md):
+ * name, job, work style and engine, in one column. The character and its
+ * color are chosen once, in the hire wizard: picking another here turned Pam
+ * into a second Michael, and the color drew almost nowhere (owner,
+ * 2026-10-02). Save patches the durable roster via updateAgent; engine changes
+ * apply on the next restart.
  */
 export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
+  const { t } = useTranslation();
   const updateAgent = useStore((s) => s.updateAgent);
   const godName = useResolvedGodName();
   const renameAgent = useStore((s) => s.renameAgent);
@@ -42,12 +45,12 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const [config, setConfig] = useState<HarnessConfig | null>(null);
 
   const [name, setName] = useState(agent.name);
-  const [character, setCharacter] = useState<OfficeCharacterName>(agent.character);
-  const [accent, setAccent] = useState<AccentColorName>(agent.accent);
   const [provider, setProvider] = useState<AgentProvider>(
     inferAgentProvider(agent.command, agent.provider)
   );
   const [model, setModel] = useState<string | undefined>(agent.model);
+  // Folded by default: the engine rarely changes after hiring.
+  const [engineOpen, setEngineOpen] = useState(false);
   // The stored role is one string ("Finance: Keeps track of..."), shown here as
   // two fields and joined back on save (agentRole.ts).
   const [role, setRole] = useState(() => splitAgentRole(agent.description).role);
@@ -55,8 +58,9 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   // Work style in two forms (owner, 2026-09-27): the owner edits a plain
   // description (`goal` here); the agent keeps its instructions (agent.goal),
   // rewritten from the description on save only when it changed.
-  const [goal, setGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
-  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(agent.goal ?? '', agent.name));
+  // Michael starts from his default Work style (schedule-focus-areas.md F6).
+  const [goal, setGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), agent.name));
+  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), agent.name));
   const [describing, setDescribing] = useState(false);
   const [writing, setWriting] = useState(false);
   const [goalError, setGoalError] = useState(false);
@@ -89,13 +93,11 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   // Keep form in sync when the selected agent changes while the modal is open.
   useEffect(() => {
     setName(agent.name);
-    setCharacter(agent.character);
-    setAccent(agent.accent);
     setProvider(inferAgentProvider(agent.command, agent.provider));
     setModel(agent.model);
     setRole(splitAgentRole(agent.description).role);
     setRoleDescription(splitAgentRole(agent.description).roleDescription);
-    describe(agent.goal ?? '');
+    describe(effectiveWorkStyle(agent));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id]);
 
@@ -135,7 +137,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
           business: { name: config?.businessName, city: config?.businessCity },
           manager: godName
         },
-        previous: agent.goal || undefined
+        previous: effectiveWorkStyle(agent) || undefined
       }).catch(() => null);
       setWriting(false);
       if (!res?.text?.trim()) { setWriteError(true); return; }
@@ -148,7 +150,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       setSaving(true);
       const renamed = await renameAgent(agent.id, trimmedName);
       setSaving(false);
-      if (!renamed.ok) { setNameError(renamed.error ?? 'Could not rename agent'); return; }
+      if (!renamed.ok) { setNameError(renamed.error ?? t('editAgent.errRename')); return; }
     }
     setNameError(undefined);
     // Both fields cleared keeps the role it had, rather than saving a blank.
@@ -158,8 +160,6 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       : agent.command;
 
     updateAgent(agent.id, {
-      character,
-      accent,
       provider,
       model,
       command,
@@ -174,202 +174,179 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     onClose();
   };
 
+  const who = name.trim() || agent.name;
+  // What the folded Engine line shows: the provider, and the model when it has one.
+  const providerLabel = AGENT_PROVIDER_PRESETS.find((p) => p.id === provider)?.label ?? provider;
+  const modelLabel = preset.supportsModel && model ? (modelsForProvider(provider).find((m) => m.id === model)?.label ?? model) : '';
   return (
-    // Same box as Add Agent (940 wide). They are the two halves of one job,
-    // describe an agent, and a tall narrow dialog next to a wide one reads as
-    // two unrelated screens.
+    // One column (D3): name, job, work style, then the engine folded away, so
+    // what they handle and the work style get the room (owner, 2026-10-02).
+    // Field labels only; explanations sit behind info icons.
     <Dialog
-      title="Edit agent"
+      title={t('editAgent.title')}
       onClose={onClose}
       busy={saving || writing}
-      width={940}
+      width={640}
+      fill
+      align="end"
+      over={panelBehind}
       zIndex={500}
       footer={(
         <>
-          <PixelButton variant="ghost" size="md" onClick={onClose}>Cancel</PixelButton>
+          <PixelButton variant="ghost" size="md" onClick={onClose}>{t('editAgent.cancel')}</PixelButton>
           <div style={{ flex: 1 }} />
-          <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? 'Writing instructions…' : 'Save changes'}</PixelButton>
+          <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? t('editAgent.writing') : t('editAgent.save')}</PixelButton>
         </>
       )}
     >
-            {/* Two columns so the extra width is used rather than padded.
-                Identity and Engine are short field lists; Briefing is free
-                text and takes the taller side. minHeight keeps the dialog from
-                collapsing into a wide thin strip on a small form. */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              gap: 16, alignItems: 'start', minHeight: 260
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-            <Section label="Identity" hint="Name, character, color">
-              <Row label="Name">
-                <input
-                  value={name}
-                  onChange={(e) => { setName(e.target.value); setNameError(undefined); }}
-                  placeholder="Stanley"
-                  aria-invalid={nameError ? true : undefined}
-                  className="cth-input"
-                  style={nameError ? { ...inputStyle, boxShadow: 'inset 0 0 0 1.5px var(--cth-coral)' } : inputStyle}
-                  autoFocus
-                />
-                {nameError && (
-                  <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>{nameError}</span>
-                )}
-              </Row>
+      {/* The whole window's height (owner, 2026-10-02): the work style box
+          takes whatever the other fields leave, and the body scrolls only on
+          a window too short for its minimum. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minHeight: 0 }}>
+        <Fields id="name">
+          <Row label={t('editAgent.name')}>
+            <input
+              value={name}
+              onChange={(e) => { setName(e.target.value); setNameError(undefined); }}
+              placeholder={t('editAgent.namePlaceholder')}
+              aria-invalid={nameError ? true : undefined}
+              className="cth-input"
+              style={nameError ? { ...inputStyle, boxShadow: 'inset 0 0 0 1.5px var(--cth-coral)' } : inputStyle}
+              autoFocus
+            />
+            {nameError && (
+              <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>{nameError}</span>
+            )}
+          </Row>
+        </Fields>
 
-              <Row label="Character">
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {OFFICE_CAST.map((c) => {
-                    const active = character === c.name;
-                    return (
-                      <button
-                        key={c.name}
-                        type="button"
-                        onClick={() => { setCharacter(c.name); setName(c.displayName); }}
-                        title={c.blurb}
-                        aria-pressed={active}
-                        style={{
-                          height: 30, padding: '0 10px 0 4px', borderRadius: 999,
-                          background: active ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
-                          boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)',
-                          cursor: 'pointer', border: 'none',
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: active ? 600 : 500, color: 'var(--cth-ink)'
-                        }}
-                      >
-                        <SpritePortrait character={c.name} scale={0.5} />
-                        {c.displayName}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Row>
+        <Fields id="briefing" grow>
+          <Row label={t('editAgent.role')}>
+            <input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder={t('editAgent.rolePlaceholder')}
+              className="cth-input"
+              style={inputStyle}
+            />
+          </Row>
 
-              <Row label="Color">
-                <div style={{ display: 'flex', gap: 10, padding: '2px 4px' }}>
-                  {ACCENTS.map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      onClick={() => setAccent(a)}
-                      title={a}
-                      aria-label={a}
-                      aria-pressed={accent === a}
-                      style={{
-                        width: 26, height: 26, borderRadius: '50%',
-                        background: `var(--cth-${a})`,
-                        boxShadow: accent === a
-                          ? '0 0 0 2px var(--cth-card), 0 0 0 4px var(--cth-ink)'
-                          : 'inset 0 0 0 1px color-mix(in srgb, var(--cth-ink) 12%, transparent)',
-                        cursor: 'pointer', border: 'none'
-                      }}
-                    />
-                  ))}
-                </div>
-              </Row>
-            </Section>
+          <Row
+            label={t('editAgent.handles', { name: who })}
+            info={t('editAgent.handlesInfo', { manager: godName, name: who })}
+          >
+            <textarea
+              value={roleDescription}
+              onChange={(e) => setRoleDescription(e.target.value)}
+              placeholder={t('editAgent.handlesPlaceholder')}
+              rows={5}
+              className="cth-input"
+              style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 110 }}
+            />
+          </Row>
 
-            <Section label="Engine" hint="Provider, model">
-              <Row label="Provider">
-                {/* A list, not a grid of buttons. Only the engines this build
-                    offers (BUILD_ENGINES, like setup), plus the agent's own if it
-                    runs on another, so a list never hides what it is on. */}
-                <select
-                  value={provider}
-                  onChange={(e) => pickProvider(e.target.value as AgentProvider)}
-                  className="cth-input"
-                  style={inputStyle}
-                >
-                  {AGENT_PROVIDER_PRESETS
-                    .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
-                    .map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                </select>
-              </Row>
+          <Row
+            grow
+            label={t('editAgent.workStyle')}
+            info={t('editAgent.workStyleInfo', { name: who })}
+          >
+            <textarea
+              value={goal}
+              onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
+              aria-invalid={goalError || undefined}
+              placeholder={t('editAgent.workStylePlaceholder', { name: who })}
+              rows={4}
+              className="cth-input"
+              style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'none', minHeight: 320, flex: 1 }}
+            />
+          </Row>
+          <ScheduledJobsList agentId={agent.id} compact />
+          {goalError && (
+            <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
+              {t('editAgent.errWorkStyle', { name: agent.name })}
+            </span>
+          )}
+          {describing && <span aria-live="polite" style={helperStyle}>{t('editAgent.describing')}</span>}
+          {writeError && (
+            <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
+              {t('editAgent.errWrite')}
+            </span>
+          )}
+        </Fields>
 
-              {preset.supportsModel && (
-                <Row label="Model">
-                  <select
-                    value={model ?? ''}
-                    onChange={(e) => setModel(e.target.value || undefined)}
-                    className="cth-input"
-                    style={inputStyle}
-                  >
-                    {/* Always list the current model: a <select> whose value
-                        matches no option shows its first row while the saved
-                        model stays the other one. */}
-                    {(() => {
-                      const known = modelsForProvider(provider);
-                      return model && !known.some((m) => m.id === model)
-                        ? [...known, { id: model, label: `${model} (current)` }]
-                        : known;
-                    })().map((m) => <option key={m.id ?? m.label} value={m.id ?? ''}>{m.label}</option>)}
-                  </select>
-                </Row>
-              )}
+        {/* The engine rarely changes: one folded line naming it, closed by default. */}
+        <button
+          type="button"
+          aria-expanded={engineOpen}
+          aria-controls={engineOpen ? 'edit-agent-engine' : undefined}
+          onClick={() => setEngineOpen((v) => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', border: 'none', background: 'transparent',
+            cursor: 'pointer', fontFamily: 'var(--cth-font-ui)', textAlign: 'start'
+          }}
+        >
+          <Disclosure open={engineOpen} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{t('editAgent.engine')}</span>
+          {!engineOpen && (
+            <span style={{ fontSize: 12, color: 'var(--cth-ink-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {modelLabel ? `${providerLabel}, ${modelLabel}` : providerLabel}
+            </span>
+          )}
+        </button>
+        {engineOpen && (
+        <Fields id="engine">
+          <Row label={t('editAgent.provider')}>
+            {/* A list, not a grid of buttons. Only the engines this build
+                offers (BUILD_ENGINES, like setup), plus the agent's own if it
+                runs on another, so a list never hides what it is on. */}
+            <select
+              value={provider}
+              onChange={(e) => pickProvider(e.target.value as AgentProvider)}
+              className="cth-input"
+              style={inputStyle}
+            >
+              {AGENT_PROVIDER_PRESETS
+                .filter((p) => BUILD_ENGINES.includes(p.id) || p.id === provider)
+                .map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </Row>
 
-              <span style={helperStyle}>
-                A new engine or model takes effect the next time this team member starts.
-              </span>
-            </Section>
-
-              </div>
-              <div style={{ minWidth: 0 }}>
-            <Section label="Briefing" hint="Role, work style">
-              <Row label="Role">
-                <input
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="For example: Finance"
-                  className="cth-input"
-                  style={inputStyle}
-                />
-              </Row>
-
-              <Row
-                label={`What ${name.trim() || agent.name} handles`}
-                info={`Michael reads this to decide what goes to ${name.trim() || agent.name}. Name the requests, inbox or customers, so no teammate covers the same thing.`}
+          {preset.supportsModel && (
+            <Row label={t('editAgent.model')}>
+              <select
+                value={model ?? ''}
+                onChange={(e) => setModel(e.target.value || undefined)}
+                className="cth-input"
+                style={inputStyle}
               >
-                <textarea
-                  value={roleDescription}
-                  onChange={(e) => setRoleDescription(e.target.value)}
-                  placeholder="For example: Answers customers who write to the support inbox, and passes refund requests to Oscar."
-                  rows={3}
-                  className="cth-input"
-                  style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
-                />
-              </Row>
+                {/* Always list the current model: a <select> whose value
+                    matches no option shows its first row while the saved
+                    model stays the other one. */}
+                {(() => {
+                  const known = modelsForProvider(provider);
+                  return model && !known.some((m) => m.id === model)
+                    ? [...known, { id: model, label: t('editAgent.modelCurrent', { model }) }]
+                    : known;
+                })().map((m) => <option key={m.id ?? m.label} value={m.id ?? ''}>{m.label}</option>)}
+              </select>
+            </Row>
+          )}
 
-              <Row
-                label="Work style"
-                info={`How ${name.trim() || agent.name} does the job: what it is for, how you like it done, and what needs your approval first, scheduled jobs included. Write it in your own words; the app turns it into instructions when you save a change. Michael doesn't use it.`}
-              >
-                <textarea
-                  value={goal}
-                  onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
-                  aria-invalid={goalError || undefined}
-                  placeholder={`The job: what ${name.trim() || agent.name} does and why.\nHow the work is done: how the owner likes it done.\nAsks the owner first: what needs approval.`}
-                  rows={4}
-                  className="cth-input"
-                  style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical', minHeight: 200 }}
-                />
-              </Row>
-              {goalError && (
-                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
-                  Work style is required: write how {agent.name} does the job.
-                </span>
-              )}
-              {describing && <span aria-live="polite" style={helperStyle}>Putting the job into plain words…</span>}
-              {writeError && (
-                <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
-                  The instructions could not be written. Try saving again.
-                </span>
-              )}
-            </Section>
-              </div>
-            </div>
-
+          <span style={helperStyle}>
+            {t('editAgent.engineNote')}
+          </span>
+        </Fields>
+        )}
+      </div>
     </Dialog>
   );
+}
+
+/** The person's panel this dialog edits: Edit agent lays itself exactly over
+ *  it (owner, 2026-10-02). Opened from somewhere with no panel, it falls back to
+ *  the full height on the right. */
+function panelBehind(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-right-column] [data-panel-card]');
 }
 
 /** A plain note under a field: what it is for, in the owner's words. */
@@ -394,32 +371,17 @@ const inputStyle: CSSProperties = {
   boxSizing: 'border-box'
 };
 
-/** A titled group of fields: a section title, then its note in ink-3. */
-function Section({
-  label,
-  hint,
-  children
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, paddingBottom: 6, borderBottom: '1px solid var(--cth-line)' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{label}</span>
-        <span style={{ fontSize: 12, color: 'var(--cth-ink-3)' }}>{hint}</span>
-      </div>
-      {children}
-    </div>
-  );
+/** A group of fields with no heading (D3: field labels only). `id` names the
+ *  group for tests and the reader; nothing shows it. */
+function Fields({ id, grow, children }: { id: 'name' | 'briefing' | 'engine'; grow?: boolean; children: React.ReactNode }) {
+  return <div id={`edit-agent-${id}`} data-fields={id} style={{ display: 'flex', flexDirection: 'column', gap: 12, ...(grow ? { flex: 1, minHeight: 0 } : {}) }}>{children}</div>;
 }
 
 /** A field with its label; `info` puts the explanation behind an info icon
  *  (owner, 2026-09-27: less verbose everywhere). */
-function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
+function Row({ label, info, grow, children }: { label: string; info?: string; grow?: boolean; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5, ...(grow ? { flex: 1, minHeight: 0 } : {}) }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}</span>
         {info && <InfoTip text={info} label={label} />}

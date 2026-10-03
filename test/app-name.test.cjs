@@ -44,7 +44,7 @@ test('the data folder is pinned before the app is renamed, and before anything e
 });
 
 test('window titles use the name', () => {
-  assert.match(main, /title: isFloor \? `\$\{APP_NAME\} · Floor` : APP_NAME,/);
+  assert.match(main, /\n    title: APP_NAME,\n/);
 });
 
 test('the privacy prompts macOS shows say the new name, with no dashes', () => {
@@ -71,4 +71,15 @@ test('the quit item reads Close Office and is still the quit role', () => {
   // Hide gets the same treatment: "Hide Office", still the hide role (Cmd+H).
   assert.match(main, /const HIDE_LABEL = 'Hide Office';/);
   assert.match(menu, /\{ role: 'hide' as const, label: HIDE_LABEL \}/);
+});
+
+test('the menu holds only what an office owner uses (owner, 2026-10-03)', () => {
+  // Value: protects=no New Floor, no Mac File menu, no Reload or developer tools in a shipped app, and the Edit shortcuts stay; fails_when=Electron's default menu or the multi-window menu comes back; why_new=menu trimmed; seam=source pin
+  const menu = main.slice(main.indexOf('function installAppMenu()'), main.indexOf('Menu.setApplicationMenu('));
+  assert.doesNotMatch(menu, /New Floor|newFloorItem|role: 'close'/);
+  assert.doesNotMatch(menu, /role: 'viewMenu'/, 'the default View menu carries Reload and DevTools');
+  assert.match(menu, /const devViewItems: Electron\.MenuItemConstructorOptions\[\] = app\.isPackaged\n\s*\? \[\]\n\s*: \[\{ role: 'reload' \}, \{ role: 'forceReload' \}, \{ role: 'toggleDevTools' \}/);
+  assert.match(menu, /: \[\{ label: 'File', submenu: \[quitItem\] \}\]\)/, 'File only off the Mac, for Close Office');
+  for (const role of ['undo', 'copy', 'paste', 'resetZoom', 'zoomIn', 'zoomOut', 'togglefullscreen', 'windowMenu']) assert.match(menu, new RegExp(`role: '${role}'`), role);
+  assert.match(main, /\n  installAppMenu\(\);\n/, 'installed always, not only with multiWindow');
 });

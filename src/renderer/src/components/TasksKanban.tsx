@@ -7,58 +7,17 @@ import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useRtl } from '@/i18n/useDirection';
-import { isReplacedAsk, openAskIndex } from '@shared/askMeRouting';
+import { isReplacedAsk } from '@shared/askMeRouting';
 import { useDialog } from '@/shell/useDialog';
 import { useBackdropClose } from '@/hooks/useBackdropClose';
 
-/** A card on the task kanban. Mirrors HiveTask in the main/preload process —
- *  re-declared locally so the renderer doesn't reach into the preload package
- *  (same convention as store/config.ts). */
-export interface HumanQA {
-  q: string;
-  a?: string;
-  askedAt?: string;
-  answeredAt?: string;
-  /** Set when the human dismisses the ask from the ASK ME board WITHOUT
-   *  answering — the question stays on the card (history is preserved) but
-   *  openQuestion() stops returning it, so the card leaves ASK ME. */
-  dismissedAt?: string;
-  /** The agent whose work needs the answer, and which learns from it; "god"
-   *  when Michael raised it himself. */
-  raisedBy?: string;
-}
+export { openQuestion, waitsOnHuman, parseTasks, type HiveTask, type HumanQA } from './hiveTasks';
+import { refreshNeedsYou, updateNeedsYouTasks, useNeedsYou } from '@/shell/useNeedsYou';
+import { waitsOnHuman, type HiveTask, type TaskStatus } from './hiveTasks';
+import { blockedWithNothingAsked, michaelCardState, type WorkHours } from '@shared/ownerRequests';
 
-export interface HiveTask {
-  id: string;
-  title: string;
-  description?: string;
-  /** The running notes agents keep on a card (Michael is told the owner reads them). */
-  notes?: string;
-  assignee?: string;
-  status: 'todo' | 'doing' | 'blocked' | 'done';
-  dependsOn: string[];
-  priority: number;
-  createdAt: string;
-  /** First-class human feedback: the god appends {q} when a card needs the
-   *  human; the ASK ME view fills in {a}. Full history stays on the card. */
-  humanQA?: HumanQA[];
-}
+type Status = TaskStatus;
 
-/** The card's currently open question for the human, if any. An entry the human
- *  dismissed (dismissedAt) counts as resolved, same as an answered one. */
-export function openQuestion(t: HiveTask): HumanQA | undefined {
-  // Only the newest ask can be open; an older unanswered one was replaced by it
-  // (askMeRouting.ts openAskIndex, owner 2026-09-25).
-  const i = openAskIndex(t.humanQA);
-  return i >= 0 ? t.humanQA![i] : undefined;
-}
-
-/** Waiting on the human = blocked with an unanswered question on the card. */
-export function waitsOnHuman(t: HiveTask): boolean {
-  return t.status === 'blocked' && !!openQuestion(t);
-}
-
-type Status = HiveTask['status'];
 
 // Design v2 (branding/DESIGN.md 7.20): each column's key dot and chip colors.
 const COLUMNS: { key: Status; labelKey: string; accent: string; soft: string; text: string }[] = [
@@ -70,62 +29,29 @@ const COLUMNS: { key: Status; labelKey: string; accent: string; soft: string; te
 /** How many done cards show before "N more" (DESIGN.md 7.20). */
 const DONE_SHOWN = 5;
 
-const POLL_MS = 5000;
-
-/** Deterministic fallback id derived from a task's content (djb2 → base36).
- *  Used for tasks lacking a valid string id so re-parsing tasks.json on every
- *  5s poll yields the SAME id — no React key churn / card remount. Unlike
- *  shortId() (random, for brand-new tasks), this never changes across polls. */
-function stableId(seed: string): string {
-  let h = 5381;
-  for (let i = 0; i < seed.length; i++) h = (((h << 5) + h) ^ seed.charCodeAt(i)) | 0;
-  return `t-${(h >>> 0).toString(36)}`;
+// The office's working days and hours, from its pack, for "hasn't moved this"
+// (one working day, card-lifecycle.md section 3). Read once; Mon to Fri until then.
+interface OfficeTime { days: string[]; work?: WorkHours }
+let officeTime: Promise<OfficeTime> | null = null;
+function loadOfficeTime(): Promise<OfficeTime> {
+  if (!officeTime) {
+    officeTime = Promise.all([window.cth.packsList(), window.cth.getConfig()])
+      .then(([res, config]) => {
+        const type = (config as { businessType?: string }).businessType;
+        const pack = res.packs.find((p) => p.pack.businessType === type)?.pack ?? res.core;
+        return { days: pack?.officeHours?.days ?? [], work: pack?.officeHours?.work };
+      })
+      .catch(() => { officeTime = null; return { days: [] }; });
+  }
+  return officeTime;
 }
 
-/** Normalize whatever hive:tasks returns into a typed task array. The god
- *  writes this file by hand — every field except the shape itself is optional
- *  in practice, so EVERY consumer must go through this (exported for the
- *  detail overlay; a raw card without dependsOn once crashed it). */
-export function parseTasks(raw: unknown): HiveTask[] {
-  const list = (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown }).tasks))
-    ? (raw as { tasks: unknown[] }).tasks
-    : [];
-  return list
-    .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object')
-    .map((t, i) => ({
-      id: typeof t.id === 'string' && t.id
-        ? t.id
-        : stableId(`${typeof t.title === 'string' ? t.title : ''}|${typeof t.createdAt === 'string' ? t.createdAt : ''}|${i}`),
-      title: typeof t.title === 'string' ? t.title : '(untitled)',
-      // The app writes "description" (a Slack or webhook request); agents keep
-      // their running "notes" (owner, 2026-10-01: the detail showed neither on
-      // most cards). The detail shows both.
-      description: typeof t.description === 'string' ? t.description : undefined,
-      notes: typeof t.notes === 'string' ? t.notes : undefined,
-      assignee: typeof t.assignee === 'string' ? t.assignee : undefined,
-      status: (['todo', 'doing', 'blocked', 'done'] as const).includes(t.status as Status)
-        ? (t.status as Status) : 'todo',
-      dependsOn: Array.isArray(t.dependsOn) ? t.dependsOn.filter((d): d is string => typeof d === 'string') : [],
-      priority: typeof t.priority === 'number' ? t.priority : 3,
-      createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
-      humanQA: Array.isArray(t.humanQA)
-        ? (t.humanQA as unknown[])
-          .filter((e): e is Record<string, unknown> => !!e && typeof e === 'object' && typeof (e as { q?: unknown }).q === 'string')
-          .map((e) => ({
-            q: e.q as string,
-            a: typeof e.a === 'string' ? e.a : undefined,
-            askedAt: typeof e.askedAt === 'string' ? e.askedAt : undefined,
-            answeredAt: typeof e.answeredAt === 'string' ? e.answeredAt : undefined,
-            // Preserve a dismissal across the 5s re-parse, else the card would
-            // resurface on the next poll (openQuestion would see it as open).
-            dismissedAt: typeof e.dismissedAt === 'string' ? e.dismissedAt : undefined
-          }))
-        : undefined
-    }));
-}
+/** A card's open owner request as the Tasks view shows it. */
+interface WithGod { state: 'with' | 'stalled'; hours: number }
+
 
 /**
- * Task kanban over hive/tasks.json — a READ surface. Polls every 5s; cards
+ * Task kanban over hive/tasks.json — a READ surface. Reads the shared 5 s task feed; cards
  * carry just the title and open the app-wide detail overlay on click. The god
  * is the ledger's writer: new work enters via the dispatch box (mailed to the
  * god), never by the human inserting cards the orchestrator never heard about.
@@ -134,34 +60,43 @@ export function TasksKanban() {
   const { t } = useTranslation();
   const godName = useResolvedGodName();
   const agents = useStore((s) => s.agents);
-  const [tasks, setTasks] = useState<HiveTask[]>([]);
+  // The shared task read (shell/useNeedsYou.ts, eng R4): the same snapshot the
+  // Needs you pill and board show, so a blocked card here always matches them.
+  const { tasks, ownerRequests } = useNeedsYou();
+  // A card whose owner answer Michael has not closed is his work, shown like
+  // any team member's (D3): "With Michael", then "hasn't moved this" after one
+  // working day. It never goes back to Ask me; the owner owes nothing.
+  const [office, setOffice] = useState<OfficeTime>({ days: ['mon', 'tue', 'wed', 'thu', 'fri'] });
+  useEffect(() => {
+    let alive = true;
+    void loadOfficeTime().then((o) => { if (alive && o.days.length) setOffice(o); });
+    return () => { alive = false; };
+  }, []);
+  const now = Date.now();
+  const withGod = new Map<string, WithGod>(ownerRequests.map((r) => [r.taskId, {
+    state: michaelCardState(r.createdAt, now, office.days, office.work),
+    hours: Math.max(0, Math.floor((now - Date.parse(r.createdAt)) / 3_600_000))
+  }]));
+  // Blocked with nothing asked (card-lifecycle.md section 7): waiting on nobody.
+  // Michael sees the same list every turn; the owner sees it here.
+  const stuck = new Set(blockedWithNothingAsked(tasks, ownerRequests).map((c) => c.id));
   // Detail view: cards show just the title — clicking one opens the full
   // breakdown as an APP-WIDE overlay over the office floor (see
   // TaskDetailOverlay) — the content grows (contracts, deps, human Q&A), so it
   // gets the big stage instead of the narrow side panel.
   const openTaskDetail = useStore((s) => s.openTaskDetail);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refresh = refreshNeedsYou;
 
-  const refresh = useCallback(async () => {
-    try { setTasks(parseTasks(await window.cth.hiveTasks())); } catch { /* keep last good */ }
-  }, []);
-
-  // Dismiss a card off the board (human-initiated). The kanban is otherwise the
-  // god's to write, but a person can clear a card they no longer want tracked.
-  // Main removes the named id from its latest on-disk ledger, so a webhook or
-  // god card added since this renderer's last poll cannot be lost.
+  // Dismiss: the owner ends a card they no longer want worked. It closes as
+  // Done by the owner's decision, never deleted (card-lifecycle.md D2), and
+  // Michael is told. Main patches the named card on its latest ledger, so a
+  // card added since this renderer's last poll cannot be lost.
   const dismissTask = useCallback(async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id)); // optimistic
+    updateNeedsYouTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'done', closedBy: 'owner' } : t))); // optimistic
     try {
-      const result = await window.cth.hiveDeleteTask(id);
+      const result = await window.cth.hiveCloseTask(id);
       if (!result.ok) void refresh();
     } catch { /* keep last good; the next poll re-syncs from disk */ }
-  }, [refresh]);
-
-  useEffect(() => {
-    refresh();
-    timer.current = setInterval(refresh, POLL_MS);
-    return () => { if (timer.current) clearInterval(timer.current); };
   }, [refresh]);
 
   const restorableAgents = useStore((s) => s.restorableAgents);
@@ -230,6 +165,9 @@ export function TasksKanban() {
                     accent={col.accent}
                     done={col.key === 'done'}
                     assigneeName={nameFor(x.assignee)}
+                    withGod={col.key === 'done' ? undefined : withGod.get(x.id)}
+                    nothingAsked={stuck.has(x.id)}
+                    godName={godName}
                     onOpen={() => openTaskDetail(x.id)}
                     onDismiss={() => dismissTask(x.id)}
                   />
@@ -255,11 +193,14 @@ export function TasksKanban() {
 // lives in the detail view a click away: a kanban card can carry little more
 // than a title.
 
-function TaskCard({ task, done, assigneeName, onOpen, onDismiss }: {
+function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, onOpen, onDismiss }: {
   task: HiveTask;
   accent: string;
   done?: boolean;
   assigneeName?: string;
+  withGod?: WithGod;
+  nothingAsked?: boolean;
+  godName: string;
   onOpen: () => void;
   onDismiss: () => void;
 }) {
@@ -292,6 +233,29 @@ function TaskCard({ task, done, assigneeName, onOpen, onDismiss }: {
             {assigneeName}
           </span>
         )}
+        {done && task.closedBy === 'owner' && (
+          <span data-closed-by="owner" title={task.closedReason || undefined} style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--cth-ink-3)' }}>
+            {t('kanban.closedByOwner')}
+          </span>
+        )}
+        {nothingAsked && (
+          <span data-nothing-asked title={t('kanban.nothingAskedTitle', { godName })} style={{
+            alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 999,
+            fontSize: 10.5, fontWeight: 600, background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)'
+          }}>{t('kanban.nothingAsked')}</span>
+        )}
+        {withGod && (
+          <span data-with-god={withGod.state} title={t('kanban.withGodTitle', { godName })} style={{
+            alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 8px', borderRadius: 999,
+            fontSize: 10.5, fontWeight: 600,
+            background: withGod.state === 'stalled' ? 'var(--cth-amber-soft)' : 'var(--cth-blue-soft)',
+            color: withGod.state === 'stalled' ? 'var(--cth-amber-text)' : 'var(--cth-blue-text)'
+          }}>
+            {withGod.state === 'stalled'
+              ? t('kanban.godStalled', { godName })
+              : t('kanban.withGod', { godName, age: withGod.hours < 1 ? t('kanban.ageUnderHour') : withGod.hours < 48 ? t('kanban.ageHours', { count: withGod.hours }) : t('kanban.ageDays', { count: Math.floor(withGod.hours / 24) }) })}
+          </span>
+        )}
       </button>
       {waitsOnHuman(task) && (
         <span title={t('kanban.needsYouTitle')} style={{
@@ -308,7 +272,7 @@ function TaskCard({ task, done, assigneeName, onOpen, onDismiss }: {
       {hover && !waitsOnHuman(task) && !done && (
         <button
           onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-          title={t('kanban.dismissTitle')}
+          title={t('kanban.dismissTitle', { godName })}
           aria-label={t('kanban.dismissAria')}
           style={{
             position: 'absolute', top: 7, insetInlineEnd: 7, width: 20, height: 20, padding: 0, borderRadius: 6,
@@ -390,8 +354,17 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
                 background: col.soft, color: col.text, boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 600
               }}>
-                {COLUMNS.map((c) => (<option key={c.key} value={c.key}>{t(c.labelKey)}</option>))}
+                {/* Blocked means a question waits on Ask me, so only Michael sets it; a
+                    blocked card shows it as its current state (ship 2026-10-03). */}
+                {COLUMNS.filter((c) => c.key !== 'blocked' || task.status === 'blocked').map((c) => (
+                  <option key={c.key} value={c.key} disabled={c.key === 'blocked'}>{t(c.labelKey)}</option>
+                ))}
               </select>
+              {task.status === 'done' && task.closedBy === 'owner' && (
+                <div data-closed-by="owner" style={{ marginTop: 4, fontSize: 11, color: 'var(--cth-ink-3)' }}>
+                  {t('kanban.closedByOwner')}{task.closedReason ? <InfoTip text={task.closedReason} /> : null}
+                </div>
+              )}
             </div>
             <div>{label(t('kanban.assignee'))}
               {assigneeName

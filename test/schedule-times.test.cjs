@@ -69,7 +69,7 @@ test('agents ask for several times in one request, and the old forms still work'
 
 test('an approved request with times adds or updates one schedule with them', () => {
   const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true, createdBy: 'owner' }];
-  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: [{ every: '2h', days: ['weekdays'], between: ['08:00', '18:00'] }, { days: ['weekends'], at: '14:00' }] }, missions, 'god', 1, 'r1', 'why');
+  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: [{ every: '2h', days: ['weekdays'], between: ['08:00', '18:00'] }, { days: ['weekends'], at: '14:00' }], focus: 'Customer mail' }, missions, 'god', 1, 'r1', 'why');
   assert.equal(add.ok, true);
   const added = M.applyScheduleRequest(add.request, missions, 'm2');
   assert.deepEqual(added.missions[1].times, owners);
@@ -131,10 +131,10 @@ test('a day an every line runs on belongs to it alone (owner, 2026-09-27)', () =
 });
 
 test('a request carries its reason, and one without is not sent (owner, 2026-09-27)', () => {
-  const none = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' } }, [], 'god', 1, 'r');
+  const none = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' }, focus: 'Customer mail' }, [], 'god', 1, 'r');
   assert.equal(none.ok, false);
   assert.match(none.reason, /Say why in the message "body"/);
-  const ok = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' } }, [], 'god', 1, 'r', '  Quiet   mailbox. ');
+  const ok = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { every: '2h' }, focus: 'Customer mail' }, [], 'god', 1, 'r', '  Quiet   mailbox. ');
   assert.equal(ok.request.reason, 'Quiet mailbox.');
   const card = read('src/renderer/src/components/ScheduleRequestCards.tsx');
   assert.match(card, /t\('askMe\.scheduleWhy', \{ reason: req\.reason \}\)/);
@@ -145,7 +145,7 @@ test('two requests from one agent about one job become one card (owner, 2026-09-
   const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true, createdBy: 'owner' }];
   const why = 'Twice daily, agreed with Michael.';
   const upd = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: { days: ['weekdays'], at: '08:00' } }, missions, 'god', 1, 'r1', why).request;
-  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { days: ['weekdays'], at: '14:00' } }, missions, 'god', 2, 'r2', why).request;
+  const add = M.buildScheduleRequest('nick', { op: 'add', label: 'Check Emails', when: { days: ['weekdays'], at: '14:00' }, focus: 'Customer mail' }, missions, 'god', 2, 'r2', why).request;
   const filed = M.fileScheduleRequest([upd], add, missions);
   assert.equal(filed.length, 1);
   assert.equal(filed[0].op, 'update');
@@ -158,7 +158,7 @@ test('two requests from one agent about one job become one card (owner, 2026-09-
   assert.equal(applied.length, 1);
   assert.equal(applied[0].times.length, 2);
   // Another agent, or another job, stays its own card.
-  const other = M.buildScheduleRequest('pam', { op: 'add', label: 'Check Emails', when: { every: '1h' } }, missions, 'god', 3, 'r3', 'x').request;
+  const other = M.buildScheduleRequest('pam', { op: 'add', label: 'Check Emails', when: { every: '1h' }, focus: 'f' }, missions, 'god', 3, 'r3', 'x').request;
   assert.equal(M.fileScheduleRequest(filed, other, missions).length, 2);
   // Folding requests filed before merging existed.
   assert.equal(M.foldScheduleRequests([upd, add], missions).length, 1);
@@ -184,7 +184,8 @@ test('Michael decides team members\' schedule requests; the owner sees only what
   assert.match(decide, /escalated: true, escalation: note/);
   assert.match(main, /try \{ sweepScheduleRequests\(\); \}/, 'waiting requests reach Michael, then the owner');
   const cards = read('src/renderer/src/components/ScheduleRequestCards.tsx');
-  assert.match(cards, /setRequests\(all\.filter\(\(r\) => r\.escalated\)\)/);
+  // The shared Needs you feed is the one reader of schedule requests.
+  assert.match(read('src/renderer/src/shell/useNeedsYou.ts'), /publish\(\{ requests: all\.filter\(\(r\) => r\.escalated\) \}\)/);
   assert.match(cards, /t\('askMe\.scheduleMichael', \{ name: godName, note: req\.escalation \}\)/);
   const missions = [{ id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true }];
   const req = M.buildScheduleRequest('nick', { op: 'update', id: 'm1', when: [{ days: ['weekdays'], at: '08:00' }, { days: ['weekdays'], at: '14:00' }] }, missions, 'god', 1, 'r', 'why').request;

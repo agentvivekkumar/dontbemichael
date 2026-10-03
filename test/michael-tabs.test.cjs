@@ -27,11 +27,12 @@ test('PROFILE leads Michael\'s panel, and Ask me is no longer one of its tabs', 
   assert.ok(keys.includes('terminal'), 'the terminal is still there, just not first');
 });
 
-test('Ask me lives on the Needs you board, which the right column shows by default', () => {
+test('Ask me lives on the Needs you board, which the right column shows when it is open on the board', () => {
+  // The column's states themselves are tested on the real store (needs-you-state).
   const read = (p) => require('node:fs').readFileSync(require('node:path').resolve(__dirname, '..', p), 'utf8');
   assert.match(read('src/renderer/src/shell/NeedsYouBoard.tsx'), /<AskMeTab \/>/);
-  assert.match(read('src/renderer/src/App.tsx'), /\{needsYouOpen \|\| !agent \? \(\s*<NeedsYouBoard config=\{config\} \/>/);
-  assert.match(read('src/renderer/src/store/store.ts'), /needsYouOpen: true,/);
+  assert.match(read('src/renderer/src/App.tsx'), /\{columnMode === 'board' \|\| !agent \? \(\s*<NeedsYouBoard \/>/);
+  assert.match(read('src/renderer/src/store/store.ts'), /rightColumn: 'closed',/);
 });
 
 test('the docked panel opens on Profile; only focus mode opens on the terminal', () => {

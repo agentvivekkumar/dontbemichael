@@ -45,6 +45,8 @@ import {
   validateAgentDefinition,
   type AgentDefinitionV2
 } from './agentDefinition';
+import { parseStarterSchedule } from './starterJobs';
+import { FOCUS_MAX } from './missions';
 
 export const OFFICE_PACK_SPEC_V1 = 'dontbemichael/office-pack@1';
 export const OFFICE_PACK_VERSION = 1;
@@ -76,8 +78,11 @@ export interface OfficeHours {
 export interface StarterMission {
   agentId: string;
   title: string;
-  /** Weekly schedule expression, validated by `weeklySchedule.ts` at arm time. */
+  /** When it runs, in words tied to the pack's office hours (starterJobs.ts):
+   *  "every 2h during office hours", "18:00 on office days", "mon 09:00". */
   schedule: string;
+  /** What each run concentrates on (schedule-focus-areas.md, FA1). */
+  focus: string;
 }
 
 export interface OfficePack {
@@ -275,12 +280,17 @@ export function validateOfficePack(
     const agentId = shapedString(v.agentId, SLUG_RE, `starterMissions[${i}].agentId`, errs);
     const title = cappedString(v.title, 80, `starterMissions[${i}].title`, errs, true);
     const schedule = cappedString(v.schedule, 80, `starterMissions[${i}].schedule`, errs, true);
-    if (!agentId || !title || !schedule) return undefined;
+    const focus = cappedString(v.focus, FOCUS_MAX, `starterMissions[${i}].focus`, errs, true);
+    if (!agentId || !title || !schedule || !focus) return undefined;
     if (!ids.has(agentId)) {
       errs.errors.push(`"starterMissions[${i}].agentId" names "${agentId}", which this pack does not define`);
       return undefined;
     }
-    return { agentId, title, schedule };
+    if (hours && !parseStarterSchedule(schedule, hours)) {
+      errs.errors.push(`"starterMissions[${i}].schedule" is not a schedule this app reads: use "every 2h during office hours", "18:00 on office days" or "mon 09:00"`);
+      return undefined;
+    }
+    return { agentId, title, schedule, focus };
   });
 
   checkUnknownKeys(o, KNOWN_KEYS, strictness, out, 'pack');

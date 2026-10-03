@@ -21,11 +21,13 @@ require.cache[electron] = {
 
 const { OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES } = loadTs('src/main/config.ts');
 
-test('the standup carries no prompt: what Michael does at a standup is in his own instructions', () => {
+test('the standup carries no prompt: what Michael covers at a standup is its focus area, sent with each run', () => {
   assert.equal(OPS_STANDUP_MISSION.body, '');
   assert.equal(OPS_STANDUP_MISSION.label, 'Hourly ops standup');
+  assert.match(OPS_STANDUP_MISSION.focus, /^First close your open requests from the owner/);
   const hive = fs.readFileSync(path.resolve(__dirname, '../src/main/hive.ts'), 'utf8');
-  assert.match(hive, /At the hourly ops standup, review every agent via fleet\.json/);
+  assert.match(hive, /A scheduled run carries its job's focus for that run \(what to cover at the hourly ops standup comes in its message\)/);
+  assert.doesNotMatch(hive, /At the hourly ops standup, review every agent via fleet\.json/, 'one source for the standup: its focus');
 });
 
 test('both texts the app shipped are recognised exactly as offices stored them', () => {

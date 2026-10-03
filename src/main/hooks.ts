@@ -28,7 +28,30 @@ const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
 
 /** Desktop notification bodies. The title is the agent's name (displayName). */
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
-export const NOTIFY_WAITING = 'Waiting for you.';
+
+/** Michael gone idle at his prompt. Nothing is needed from the owner (a real
+ *  ask goes on ASK ME), so never "waiting for you": a line saying he's free and
+ *  the office can take on more (owner, 2026-10-02). Read under his name. */
+export const NOTIFY_IDLE_LINES = [
+  'All caught up. Got anything for the team?',
+  'My desk is clear. Send something my way.',
+  'Nothing to manage right now. The office can take on a lot more.',
+  "I've reorganized the paper clips twice. Please send work.",
+  'Quiet in here. Too quiet. Got a project you keep putting off?',
+  "World's best boss, currently underused.",
+  'Inbox zero. The team is ready when you are.',
+  'Free for the next thing. Big or small, the office can handle it.'
+] as const;
+
+/** The idle line shows at most once in this window, so it stays a light touch
+ *  rather than a toast after every task (owner, 2026-10-02). */
+export const IDLE_NOTIFY_GAP_MS = 3 * 60 * 60_000;
+
+/** A random idle line, never the one shown last. */
+export function pickIdleLine(previous: string | null, rand: () => number = Math.random): string {
+  const pool = NOTIFY_IDLE_LINES.filter((l) => l !== previous);
+  return pool[Math.floor(rand() * pool.length) % pool.length];
+}
 
 /** Claude Code's in-terminal question tool. Refused for team members. */
 export const ASK_TOOL = 'AskUserQuestion';
@@ -51,6 +74,7 @@ import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../sha
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
+import { ownerRequestsContext, stuckCardsContext } from '../shared/ownerRequests';
 
 /** An MCP tool, or Claude Code's tools for MCP resources. */
 function isMcpCall(tool: string | undefined): boolean {
@@ -115,6 +139,31 @@ export class HookServer {
   private deliveredRosterByAgent = new Map<string, { sessionId: string | null; layoutKey: string; statusKey: string }>();
   /** The session each agent was last given its memory index in. */
   private deliveredMemoryByAgent = new Map<string, string | null>();
+  /** Whether Michael's last turn showed open owner requests, per session, so
+   *  the list emptying is said once. */
+  private ownerRequestsShown = new Map<string, { sessionId: string | null; any: boolean }>();
+  private stuckCardsShown = new Map<string, { sessionId: string | null; any: boolean }>();
+  /** The idle toast line shown last, so the next one differs, and when. */
+  private lastIdleLine: string | null = null;
+  private lastIdleAt: number | null = null;
+  /** The clock, swappable so tests can step past the idle gap. */
+  now: () => number = Date.now;
+
+  /** A note shown on every turn while `items` has any, and once, in the same
+   *  session, when it empties. */
+  private everyTurnNote<T>(
+    shownBy: Map<string, { sessionId: string | null; any: boolean }>,
+    agentId: string,
+    sessionId: string | null,
+    items: T[],
+    render: (items: T[]) => string | null,
+    none: string
+  ): string | null {
+    const shown = shownBy.get(agentId);
+    shownBy.set(agentId, { sessionId, any: items.length > 0 });
+    if (items.length) return render(items);
+    return shown?.any && shown.sessionId === sessionId ? none : null;
+  }
 
   constructor(
     private hive: HiveManager,
@@ -597,33 +646,54 @@ export class HookServer {
     const handoffText = event === 'SessionStart' && p.source === 'clear' && agentId ? (this.hive.takeHandoff?.(agentId) ?? null) : null;
     const handoff = handoffText ? handoffContext(handoffText) : null;
 
+    // Michael's open requests from the owner (docs/designs/card-lifecycle.md)
+    // and Blocked cards nothing is moving (section 7): on every turn while any
+    // exist, so neither a compaction nor a busy stretch can lose one; once,
+    // when the last one goes.
+    const michaelTurn = (event === 'SessionStart' || event === 'UserPromptSubmit') && !!agentId && this.isGod(agentId);
+    const ownerRequests = michaelTurn && typeof this.hive.ownerRequests === 'function'
+      ? this.everyTurnNote(this.ownerRequestsShown, agentId!, p.session_id ?? null, this.hive.ownerRequests(),
+        (open) => ownerRequestsContext(open, this.now()), 'OPEN REQUESTS FROM THE OWNER: none open now.')
+      : null;
+    const stuckCards = michaelTurn && typeof this.hive.stuckCards === 'function'
+      ? this.everyTurnNote(this.stuckCardsShown, agentId!, p.session_id ?? null, this.hive.stuckCards(),
+        stuckCardsContext, 'BLOCKED CARDS WITH NOTHING ASKED: none now.')
+      : null;
+
     // Company knowledge turned on or off since this agent was last told.
     const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
       ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
       : null;
 
-    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff) {
+    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff || ownerRequests || stuckCards) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, ownerRequests, stuckCards, steer].filter(Boolean).join('\n\n')
         }
       };
     }
 
-    // A Notification hook that means "the agent is blocked waiting for the user"
-    // (idle prompt) deserves a desktop toast too — distinct from a permission
-    // request, which surfaces natively in the agent's own Claude Code session
-    // (approvable remotely via /remote-control).
+    // A Notification hook that means the agent is idle at its prompt, done and
+    // free. Not a request: a permission request surfaces natively in the
+    // agent's own Claude Code session (approvable remotely via /remote-control).
     if (
       event === 'Notification' &&
       (p.notification_type === 'idle' ||
         (p.message ?? '').toLowerCase().includes('waiting for your input'))
     ) {
-      // Our own words, not Claude Code's ("Claude is waiting for your input"):
-      // the title already names the person, and owners don't know the engine.
-      this.notify(agentId, NOTIFY_WAITING);
+      // Our own words, not Claude Code's ("Claude is waiting for your input"),
+      // which read as the owner owing an action (owner, 2026-10-02). At most
+      // once per IDLE_NOTIFY_GAP_MS; only a shown toast starts the gap.
+      const at = this.now();
+      if (this.lastIdleAt === null || at - this.lastIdleAt >= IDLE_NOTIFY_GAP_MS) {
+        const line = pickIdleLine(this.lastIdleLine);
+        if (this.notify(agentId, line)) {
+          this.lastIdleLine = line;
+          this.lastIdleAt = at;
+        }
+      }
     }
 
     // A team member's session stopped on a prompt only a person can answer in
@@ -649,13 +719,14 @@ export class HookServer {
    *  at most wait on him, so their stops and idles never reach the desktop.
    *  Michael raises anything the owner must decide on ASK ME
    *  (docs/designs/michael-only-notifications.md). */
-  private notify(agentId: string | undefined, body: string): void {
-    if (!this.getConfig().notifications) return;
-    if (!agentId || !this.isGod(agentId)) return;
+  private notify(agentId: string | undefined, body: string): boolean {
+    if (!this.getConfig().notifications) return false;
+    if (!agentId || !this.isGod(agentId)) return false;
     try {
-      if (!Notification.isSupported()) return;
+      if (!Notification.isSupported()) return false;
       new Notification({ title: this.displayName(agentId), body }).show();
-    } catch { /* notifications unsupported on this platform — ignore */ }
+      return true;
+    } catch { return false; /* notifications unsupported on this platform — ignore */ }
   }
 
   /** Is the owner in 1:1 with this agent (registry `onHold`)? */

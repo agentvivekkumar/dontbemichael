@@ -1,30 +1,165 @@
-import { useEffect, useState } from 'react';
-import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
-import { useScheduleRequests } from '@/components/ScheduleRequestCards';
+import { useSyncExternalStore } from 'react';
+import type { ScheduleRequest } from '@shared/missions';
+import type { OwnerRequest } from '@shared/ownerRequests';
+import type { WorkStyleOffer } from '@shared/workStyleUpdates';
+import { openQuestion, parseTasks, waitsOnHuman, type HiveTask } from '../components/hiveTasks';
 
 const POLL_MS = 5000;
 
 /**
- * How many things wait on the owner: the Ask me cards Michael raised (tasks with
- * an open question for the owner) plus the schedule requests he passed on. The
- * same two sources the Needs you board lists (branding/DESIGN.md 7.5 and 7.6).
+ * The one read of what waits on the owner (docs/designs/needs-you-empty-state.md,
+ * D3 and eng R4): the task ledger, polled every 5 s while the window is visible,
+ * and the schedule requests Michael passed on. The top bar pill, the coral strip,
+ * the Needs you board, the pods' "for you" chips and the Tasks view all read
+ * this, so they always agree. It used to be seven separate timers.
  */
+export interface NeedsYouFeed {
+  /** 'unknown' until the first task read returns: the pill shows nothing rather
+   *  than a false "Nothing needs you". A failed read keeps the last value. */
+  status: 'unknown' | 'ready';
+  tasks: HiveTask[];
+  /** Schedule requests Michael passed on to the owner. */
+  requests: ScheduleRequest[];
+  /** Owner answers Michael has not closed yet (card-lifecycle.md): the Tasks
+   *  view shows those cards as with Michael. They wait on him, not the owner,
+   *  so they are not in `count`. */
+  ownerRequests: OwnerRequest[];
+  /** New default job descriptions offered to the owner (shared/workStyleUpdates.ts). */
+  offers: WorkStyleOffer[];
+  /** Open asks, passed-on schedule requests and job description offers. */
+  count: number;
+}
+
+let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], count: 0 };
+// The offers need the team and the packs, which this module does not import;
+// the app hands it the reader at start (App.tsx).
+let offersSource: (() => Promise<WorkStyleOffer[]>) | null = null;
+let offerReads = 0;
+
+/** Set how job description offers are read (App.tsx, once). */
+export function setWorkStyleOffersSource(source: () => Promise<WorkStyleOffer[]>): void {
+  offersSource = source;
+  readOffers();
+}
+
+// Offers change only with the team, the packs or a decision, so the 5 s poll
+// reads them at most once a minute; refreshNeedsYou reads them at once.
+const OFFERS_EVERY_MS = 60_000;
+let offersReadAt = 0;
+
+function readOffers(force = true): void {
+  if (!offersSource) return;
+  if (!force && Date.now() - offersReadAt < OFFERS_EVERY_MS) return;
+  offersReadAt = Date.now();
+  const mine = ++offerReads;
+  void offersSource()
+    .then((offers) => { if (mine === offerReads) publish({ offers }); })
+    .catch(() => { /* keep the last value */ });
+}
+const listeners = new Set<() => void>();
+let timer: ReturnType<typeof setInterval> | null = null;
+let offRequests: (() => void) | null = null;
+// A read that started before a newer read or a local change must not land.
+let taskReads = 0;
+let requestReads = 0;
+let ownerReads = 0;
+
+function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers'>>): void {
+  // A poll that brings nothing new changes nothing, so nobody re-renders.
+  const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
+  if (!changed) return;
+  const merged = { ...feed, ...next };
+  feed = { ...merged, count: merged.tasks.filter(waitsOnHuman).length + merged.requests.length + merged.offers.length };
+  for (const l of [...listeners]) l();
+}
+
+function readTasks(): void {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const mine = ++taskReads;
+  void window.cth.hiveTasks()
+    .then((raw) => { if (mine === taskReads) publish({ status: 'ready', tasks: parseTasks(raw) }); })
+    .catch(() => { /* keep the last value */ });
+  // Main keeps these cached on its fleet tick, so this read touches no folders.
+  const ownerMine = ++ownerReads;
+  void window.cth.hiveOwnerRequests?.()
+    .then((open) => { if (ownerMine === ownerReads) publish({ ownerRequests: Array.isArray(open) ? open : [] }); })
+    .catch(() => { /* keep the last value */ });
+  readOffers(false);
+}
+
+function readRequests(): void {
+  const mine = ++requestReads;
+  void window.cth.listScheduleRequests()
+    .then((all) => { if (mine === requestReads) publish({ requests: all.filter((r) => r.escalated) }); })
+    .catch(() => { /* keep the last value */ });
+}
+
+/** Listen for changes; the first listener starts the poll, the last stops it. */
+export function subscribeNeedsYou(listener: () => void): () => void {
+  listeners.add(listener);
+  if (listeners.size === 1) {
+    readTasks();
+    readRequests();
+    timer = setInterval(readTasks, POLL_MS);
+    offRequests = window.cth.onScheduleRequestsUpdated(readRequests);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      if (timer) clearInterval(timer);
+      timer = null;
+      offRequests?.();
+      offRequests = null;
+    }
+  };
+}
+
+const snapshot = (): NeedsYouFeed => feed;
+
+/** Everything waiting on the owner, live. */
+export function useNeedsYou(): NeedsYouFeed {
+  return useSyncExternalStore(subscribeNeedsYou, snapshot, snapshot);
+}
+
+/** How many things wait on the owner (0 until the first read returns). */
 export function useNeedsYouCount(): number {
-  const [asks, setAsks] = useState(0);
-  const { requests } = useScheduleRequests();
+  return useNeedsYou().count;
+}
 
-  useEffect(() => {
-    let alive = true;
-    const poll = () => {
-      if (document.hidden) return;
-      void window.cth.hiveTasks()
-        .then((raw) => { if (alive) setAsks(parseTasks(raw).filter(waitsOnHuman).length); })
-        .catch(() => { /* keep the last count */ });
-    };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => { alive = false; clearInterval(timer); };
-  }, []);
+/** The latest feed, for event handlers that should not re-render on it. */
+export function getNeedsYouFeed(): NeedsYouFeed {
+  return feed;
+}
 
-  return asks + requests.length;
+/** Read again now: after the owner answers, approves or edits something. */
+export function refreshNeedsYou(): void {
+  readTasks();
+  readRequests();
+  readOffers();
+}
+
+/** Show a local change at once (an answer just saved, a card dismissed); the
+ *  next read from disk replaces it. */
+export function updateNeedsYouTasks(change: (tasks: HiveTask[]) => HiveTask[]): void {
+  taskReads++;
+  publish({ tasks: change(feed.tasks) });
+}
+
+/** What the top bar pill shows (D2, D3): nothing while unknown, a quiet label
+ *  at zero, the coral button above zero. */
+export function pillState(status: NeedsYouFeed['status'], count: number): 'blank' | 'quiet' | 'hot' {
+  if (status === 'unknown') return 'blank';
+  return count > 0 ? 'hot' : 'quiet';
+}
+
+/** The newest open ask among these people, for a pod's "for you" chip (D11). */
+export function newestAskFor(memberIds: string[], tasks: HiveTask[]): string | undefined {
+  const ids = new Set(memberIds);
+  let best: { id: string; at: string } | undefined;
+  for (const t of tasks) {
+    if (!t.assignee || !ids.has(t.assignee) || !waitsOnHuman(t)) continue;
+    const at = openQuestion(t)?.askedAt ?? t.createdAt;
+    if (!best || at > best.at) best = { id: t.id, at };
+  }
+  return best?.id;
 }

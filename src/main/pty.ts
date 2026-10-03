@@ -54,6 +54,9 @@ interface PtySession {
    *  never leaks into another. Null falls back to the default attached sink
    *  (the primary window), preserving single-window behavior. */
   owner: WebContents | null;
+  /** Writes into this PTY so far, so a typist can tell whether anyone else
+   *  typed since its own last keystroke. */
+  writes?: number;
   /** Epoch ms of the most recent byte this PTY emitted (bumped in onData). The
    *  heartbeat (Lane A #1) reads this for two things: floor-quiet detection (an
    *  agent printing/thinking counts as activity even before it writes a hive
@@ -337,30 +340,6 @@ export class PtyManager {
    *  sessions with no recorded owner; owned sessions route to their owner. */
   attachWebContents(wc: WebContents) {
     this.webContents = wc;
-  }
-
-  /** Count live PTYs owned by a given window — used to scope a floor's
-   *  close-confirmation to its OWN terminals, not the whole app's. */
-  countByOwner(wc: WebContents): number {
-    let n = 0;
-    for (const s of this.sessions.values()) if (s.owner === wc) n++;
-    return n;
-  }
-
-  /** Kill every PTY owned by a window (its onExit runs the normal teardown:
-   *  archive + worktree cleanup). Called when a floor window closes so its
-   *  terminals don't linger as orphaned processes writing to a dead webContents. */
-  killByOwner(wc: WebContents): void {
-    for (const [id, s] of [...this.sessions.entries()]) {
-      if (s.owner === wc) {
-        try {
-          const pid = s.proc.pid;
-          s.proc.kill();
-          ensureKilled(pid);
-        } catch { /* already gone */ }
-        void id;
-      }
-    }
   }
 
   /** Register the natural-exit teardown callback. Invoked from inside node-pty's
@@ -739,11 +718,17 @@ export class PtyManager {
     }
   }
 
+  /** How many writes this PTY has had (0 when unknown). */
+  writeCount(id: string): number {
+    return this.sessions.get(id)?.writes ?? 0;
+  }
+
   write(id: string, data: string): { ok: boolean; error?: string } {
     const s = this.sessions.get(id);
     if (!s) return { ok: false, error: `no pty: ${id}` };
     try {
       s.proc.write(data);
+      s.writes = (s.writes ?? 0) + 1;
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };

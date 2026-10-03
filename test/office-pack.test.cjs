@@ -129,7 +129,7 @@ test('a defaultPick naming an agent the pack does not define is an error', () =>
 
 test('a starter mission for an undefined agent is an error', () => {
   const res = validateOfficePack(
-    pack({ starterMissions: [{ agentId: 'creed', title: 'Opening checklist', schedule: 'mon 09:00' }] }),
+    pack({ starterMissions: [{ agentId: 'creed', title: 'Opening checklist', schedule: 'mon 09:00', focus: 'f' }] }),
     'bundled'
   );
   assert.equal(res.ok, false);
@@ -264,11 +264,15 @@ test('office hours reject a non-object, an unknown day and a malformed pause', (
 
 test('valid starter missions survive validation; a non-object mission is refused', () => {
   const ok = validateOfficePack(
-    pack({ starterMissions: [{ agentId: 'pam', title: 'Sort the inbox', schedule: 'mon 09:00' }] }),
+    pack({ starterMissions: [{ agentId: 'pam', title: 'Sort the inbox', schedule: 'every 2h during office hours', focus: 'Inbox to zero.' }] }),
     'bundled'
   );
   assert.equal(ok.ok, true, ok.errors.join('; '));
-  assert.deepEqual(ok.pack.starterMissions, [{ agentId: 'pam', title: 'Sort the inbox', schedule: 'mon 09:00' }]);
+  assert.deepEqual(ok.pack.starterMissions, [{ agentId: 'pam', title: 'Sort the inbox', schedule: 'every 2h during office hours', focus: 'Inbox to zero.' }]);
+  const noFocus = validateOfficePack(pack({ starterMissions: [{ agentId: 'pam', title: 'Sort', schedule: 'mon 09:00' }] }), 'bundled');
+  assert.equal(noFocus.ok, false, 'a starter job needs its focus area (FA1)');
+  const badWhen = validateOfficePack(pack({ starterMissions: [{ agentId: 'pam', title: 'Sort', schedule: 'twice daily', focus: 'f' }] }), 'bundled');
+  assert.match(badWhen.errors.join(' '), /is not a schedule this app reads/);
   assert.equal(ok.pack.glyph, 'bowl');
   assert.equal(ok.pack.extends, 'core');
 

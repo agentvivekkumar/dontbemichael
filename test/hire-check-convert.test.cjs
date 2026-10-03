@@ -190,3 +190,36 @@ test('convertWorkStyle: a failed or throwing call writes instructions from the o
   assert.equal(thrown.source, 'rules');
   assert.match(logs2[0].reason, /boom/);
 });
+
+// ─── checkFocusArea (schedule-focus-areas.md, FA3) ──────────────────────────
+
+test('checkFocusArea: a verdict is read, and a failed, garbled or throwing check never blocks the save', async () => {
+  // Value: protects=the focus check on save names a real conflict and a broken sign-in never stops the owner saving a job; fails_when=the renderer payload is trusted past its caps, a missing name or focus still runs the model, an unreadable or failed answer reads as a conflict, or a throw escapes to the IPC; why_new=focus-area tests pin only the prompt, the parser and a source line; seam=runHiddenClaude stubbed
+  assert.equal(C.readFocusCheckRequest(null), null);
+  assert.equal(C.readFocusCheckRequest({ name: 'Pam', focus: '   ' }), null, 'no focus, nothing to check');
+  assert.equal(C.readFocusCheckRequest({ name: ' ', focus: 'Customer mail' }), null, 'no name');
+  const others = Array.from({ length: 25 }, (_, i) => ({ job: `Job ${i}`, focus: `F ${i}` }));
+  const req = C.readFocusCheckRequest({ name: 'Pam', focus: 'f'.repeat(2000), job: '  ', workStyle: 5, others: [null, { job: 'Only a name' }, ...others] });
+  assert.equal(req.job, 'this job');
+  assert.equal(req.focus.length, 1000);
+  assert.equal(req.workStyle, '');
+  assert.deepEqual(req.others.map((o) => o.job), others.slice(0, 18).map((o) => o.job), 'at most 20 looked at, incomplete ones dropped');
+
+  const ask = { name: 'Pam', job: 'Check emails', focus: 'Send replies yourself', workStyle: 'Draft only.', others: [] };
+  const calls = stub({ ok: true, text: 'CONFLICT: It sends replies, but the work style keeps sending for the owner.' });
+  assert.deepEqual(await C.checkFocusArea(ask, deps([])), { checked: true, conflict: 'It sends replies, but the work style keeps sending for the owner.' });
+  assert.equal(calls[0].opts.noTools, true);
+  assert.match(calls[0].prompt, /--- NEW FOCUS AREA, for the job "Check emails" ---/);
+  stub({ ok: true, text: 'OK' });
+  assert.deepEqual(await C.checkFocusArea(ask, deps([])), { checked: true });
+  for (const [answer, reason] of [[{ ok: true, text: 'Looks fine to me!' }, 'unreadable'], [{ ok: false, error: 'not signed in' }, 'not signed in'], [{ ok: false }, 'failed']]) {
+    stub(answer);
+    const logs = [];
+    assert.deepEqual(await C.checkFocusArea(ask, deps(logs)), { checked: false });
+    assert.deepEqual(logs, [{ kind: 'focus-check-skipped', reason }]);
+  }
+  stub(new Error('boom'));
+  const logs = [];
+  assert.deepEqual(await C.checkFocusArea(ask, deps(logs)), { checked: false });
+  assert.match(logs[0].reason, /boom/);
+});

@@ -19,6 +19,8 @@ import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_TRACES, SHOW_IDE, SHOW_ORG_TRIGGER, SHO
 import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
+import { renamePatches } from '@shared/hireTemplates';
+import { canOpen } from '../shell/closingFloor';
 
 export type ToolKind =
   | 'Read' | 'Edit' | 'Write' | 'Bash' | 'WebFetch' | 'WebSearch'
@@ -190,6 +192,8 @@ export type SidebarTab = 'profile' | 'capabilities' | 'terminal' | 'messages' | 
  *  spawn errored). The empty-floor UI shows a loader while 'booting' so users
  *  don't see the "add agent" prompt before Michael has clocked in. */
 export type GodStatus = 'booting' | 'ready' | 'failed';
+/** What the right column shows: nothing, the Needs you board, or a person. */
+export type RightColumn = 'closed' | 'board' | 'person';
 
 interface State {
   agents: Agent[];
@@ -247,11 +251,24 @@ interface State {
   bumpToolCount: (id: string) => void;
   setGodStatus: (status: GodStatus) => void;
   select: (id: string) => void;
-  /** Design v2 (branding/DESIGN.md 7.6): the right column shows the Needs you
-   *  board instead of the selected person's panel. Selecting someone closes it;
-   *  the Needs you button and strip open it. Opens by default on launch. */
-  needsYouOpen: boolean;
-  setNeedsYouOpen: (open: boolean) => void;
+  /** Closing time: who has gone home (confirmed or closed without). Empty when
+   *  not closing. Nobody in it can be opened (docs/designs/closing-floor.md). */
+  goneHome: string[];
+  setGoneHome: (ids: string[]) => void;
+  /** What the right column shows (docs/designs/needs-you-empty-state.md, eng
+   *  R1): nothing ('closed', the office takes the window), the Needs you board,
+   *  or the selected person's panel. A selection always exists (Michael at
+   *  launch), so the column needs its own state. Starts closed; App opens the
+   *  board whenever anything waits and nothing may close it then. */
+  rightColumn: RightColumn;
+  setRightColumn: (column: RightColumn) => void;
+  /** Open the Needs you board from an owner action (the pill, the coral strip,
+   *  a "for you" chip). Asks the board to put focus in a reply field (D10),
+   *  on `taskId`'s card when given (D11). */
+  openNeedsYou: (opts?: { taskId?: string }) => void;
+  /** Bumped by openNeedsYou; the board focuses on each new seq. */
+  needsYouFocus: { seq: number; taskId?: string } | null;
+
   updateAgent: (id: string, patch: Partial<Agent>) => void;
   /** Copy durable hive roles onto roster descriptions (and the reverse is a
    *  no-op when the roster already has a real job string). */
@@ -863,14 +880,17 @@ export const useStore = create<State>((set, get) => ({
       selectedId,
       ccTabRequest: { tab: 'memory', seq },
       memoryFocusRequest: { agentId, seq },
-      needsYouOpen: false
+      rightColumn: 'person' as const
     };
   }),
   // 'human' was Michael's Ask me tab; in v2 Ask me is the Needs you board.
   requestCommandCenterTab: (tab) =>
     set((s) => tab === 'human'
-      ? { needsYouOpen: true }
-      : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, needsYouOpen: false }),
+      ? { rightColumn: 'board' as const }
+      // Not onto a person who has gone home at closing time (5A).
+      : s.selectedId && !canOpen(s.selectedId, s.goneHome)
+        ? {}
+        : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, rightColumn: 'person' as const }),
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
@@ -888,9 +908,22 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
-  select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, needsYouOpen: false }; }),
-  needsYouOpen: true,
-  setNeedsYouOpen: (open) => set({ needsYouOpen: open }),
+  // A person who has gone home at closing time opens from nowhere (5A).
+  select: (id) => set((s) => {
+    if (!canOpen(id, s.goneHome)) return {};
+    persistAgents(s.agents, id);
+    return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, rightColumn: 'person' };
+  }),
+  goneHome: [],
+  setGoneHome: (ids) => set((s) => (ids.length === s.goneHome.length && ids.every((id) => s.goneHome.includes(id)) ? {} : { goneHome: ids })),
+  rightColumn: 'closed',
+  setRightColumn: (column) => set({ rightColumn: column }),
+  openNeedsYou: (opts) => set((s) => ({
+    rightColumn: 'board',
+    needsYouFocus: { seq: (s.needsYouFocus?.seq ?? 0) + 1, ...(opts?.taskId ? { taskId: opts.taskId } : {}) }
+  })),
+  needsYouFocus: null,
+
   updateAgent: (id, patch) =>
     set((s) => {
       // The pty parser calls this on every chunk of output, mostly with what
@@ -952,10 +985,22 @@ export const useStore = create<State>((set, get) => ({
       const result = await window.cth.hiveRenameAgent(id, name);
       if (!result.ok || !result.name) return { ok: false, error: result.error ?? 'Could not rename agent' };
       const nextName = result.name;
+      const before = get();
+      const previousName = [...before.agents, ...before.archivedAgents, ...before.restorableAgents].find((a) => a.id === id)?.name;
+      // The old name, wherever the team's role lines and Work styles still
+      // carry it, becomes the new one (renamePatches, hireTemplates.ts).
+      const patches = previousName
+        ? renamePatches([...before.agents, ...before.archivedAgents, ...before.restorableAgents], previousName, nextName)
+        : [];
+      const patchOf = new Map(patches.map((p) => [p.id, p]));
 
       set((s) => {
         const rename = (agents: Agent[]): Agent[] =>
-          agents.map((agent) => agent.id === id ? { ...agent, name: nextName } : agent);
+          agents.map((agent) => {
+            const patch = patchOf.get(agent.id);
+            const next = patch ? { ...agent, ...patch } : agent;
+            return agent.id === id ? { ...next, name: nextName } : next;
+          });
         const agents = rename(s.agents);
         const archivedAgents = rename(s.archivedAgents);
         const restorableAgents = rename(s.restorableAgents);
@@ -964,6 +1009,10 @@ export const useStore = create<State>((set, get) => ({
         persistRestorable(restorableAgents);
         return { agents, archivedAgents, restorableAgents };
       });
+      // Michael routes by the role in the office registry: keep it in step.
+      for (const p of patches) {
+        if (p.description) void window.cth.hivePatchAgentRole(p.id, p.description).catch(() => undefined);
+      }
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : 'Could not rename agent' };

@@ -19,14 +19,17 @@ import { useMissions } from '@/components/triggers/ScheduleList';
 import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
 import { createBanter, createIdleLines } from '@/scene/office/cafeteriaLines';
-import { useNeedsYouCount } from '@/shell/useNeedsYou';
+import { getNeedsYouFeed, newestAskFor, useNeedsYou, useNeedsYouCount } from '@/shell/useNeedsYou';
+import { stillIn } from '@/shell/closingFloor';
+
+/** Nobody has gone home (not closing time). */
+const NOBODY: ReadonlySet<string> = new Set();
 import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
 import { HUB, HUB_CARD, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
 import { FLIGHT_MS, bendFor, useStudioLife } from './life';
 import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
-const POLL_MS = 5000;
 
 /** The agent fields the office draws. Changes to anything else (the terminal
  *  parser's station bookkeeping, timestamps) leave it alone. */
@@ -52,33 +55,24 @@ type Board = { todo: number; doing: number; blocked: number; done: number };
 interface TaskSnapshot { board: Board; doingBy: Record<string, number>; forYouBy: Record<string, number>; kept: number; done: Record<string, string | undefined> }
 
 function useTaskSnapshot(godId: string): TaskSnapshot {
-  const [snap, setSnap] = useState<TaskSnapshot>({ board: { todo: 0, doing: 0, blocked: 0, done: 0 }, doingBy: {}, forYouBy: {}, kept: 0, done: {} });
-  useEffect(() => {
-    let alive = true;
-    const poll = () => {
-      if (document.hidden) return;
-      void window.cth.hiveTasks().then((raw) => {
-        if (!alive) return;
-        const board: Board = { todo: 0, doing: 0, blocked: 0, done: 0 };
-        const doingBy: Record<string, number> = {};
-        const forYouBy: Record<string, number> = {};
-        let kept = 0;
-        const done: Record<string, string | undefined> = {};
-        for (const t of parseTasks(raw)) {
-          board[t.status]++;
-          if (t.status === 'done') done[t.id] = t.assignee;
-          if (t.status === 'doing' && t.assignee) doingBy[t.assignee] = (doingBy[t.assignee] ?? 0) + 1;
-          if (waitsOnHuman(t) && t.assignee) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + 1;
-          if (t.status !== 'done' && (t.assignee === godId || t.assignee === 'god')) kept++;
-        }
-        setSnap({ board, doingBy, forYouBy, kept, done });
-      }).catch(() => { /* keep the last snapshot */ });
-    };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => { alive = false; clearInterval(timer); };
-  }, [godId]);
-  return snap;
+  // The shared task read (shell/useNeedsYou.ts, eng R4): the "for you" chips
+  // always match the pill and the board.
+  const { tasks } = useNeedsYou();
+  return useMemo(() => {
+    const board: Board = { todo: 0, doing: 0, blocked: 0, done: 0 };
+    const doingBy: Record<string, number> = {};
+    const forYouBy: Record<string, number> = {};
+    let kept = 0;
+    const done: Record<string, string | undefined> = {};
+    for (const t of tasks) {
+      board[t.status]++;
+      if (t.status === 'done') done[t.id] = t.assignee;
+      if (t.status === 'doing' && t.assignee) doingBy[t.assignee] = (doingBy[t.assignee] ?? 0) + 1;
+      if (waitsOnHuman(t) && t.assignee) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + 1;
+      if (t.status !== 'done' && (t.assignee === godId || t.assignee === 'god')) kept++;
+    }
+    return { board, doingBy, forYouBy, kept, done };
+  }, [tasks, godId]);
 }
 
 /** Jobs Michael handed out today: his `request` messages in the hive log. */
@@ -149,7 +143,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const T = sceneTokens(dark);
   const config = useLiveConfig(initialConfig);
   const selectedId = useStore((s) => s.selectedId);
-  const needsYouOpen = useStore((s) => s.needsYouOpen);
+  const rightColumn = useStore((s) => s.rightColumn);
   const floorView = useStore((s) => s.floorView);
   const fullscreenAgentId = useStore((s) => s.fullscreenAgentId);
   // The office re-renders only when something it draws changes (review,
@@ -198,6 +192,29 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const ox = (fitW - STAGE_W * k) / 2;
   const oy = Math.max(0, (box.h - 70 - STAGE_H * k) / 2, ...lifted.map((r) => CARD_ROOM + r.h - (r.top + r.h) * k));
   const at = (x: number, y: number): CSSProperties => ({ position: 'absolute', left: ox + x * k, top: oy + y * k });
+
+  // Opening or closing the right column changes `bleed` once. The scene is laid
+  // out at its new size in that one render and eased there with a transform
+  // over 240 ms (FLIP, docs/designs/needs-you-empty-state.md eng R3), never
+  // re-rendered per frame. Reduced motion skips the ease.
+  const flipRef = useRef<HTMLDivElement>(null);
+  const geom = useRef<{ k: number; ox: number; oy: number; bleed: number } | null>(null);
+  useLayoutEffect(() => {
+    const prev = geom.current;
+    geom.current = { k, ox, oy, bleed };
+    const el = flipRef.current;
+    // Only a column change eases. The stage's own few pixel resize that
+    // follows it lands inside the running ease rather than restarting it.
+    if (!prev || !el || prev.bleed === bleed) return;
+    if (prev.k === k && prev.ox === ox && prev.oy === oy) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const sc = prev.k / k;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${prev.ox - ox * sc}px, ${prev.oy - oy * sc}px) scale(${sc})`;
+    void el.getBoundingClientRect();
+    el.style.transition = 'transform 240ms cubic-bezier(0.2, 0, 0, 1)';
+    el.style.transform = '';
+  }, [k, ox, oy, bleed]);
 
   // Pause every animation while nobody can see the stage (DESIGN.md 11.2).
   const [docHidden, setDocHidden] = useState(document.hidden);
@@ -252,7 +269,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const hour = useHour();
   const night = hour >= 19 || hour < 6;
 
-  const selected = needsYouOpen ? null : selectedId;
+  const selected = rightColumn === 'person' ? selectedId : null;
   // With someone selected, everything else on the stage dims to 45%
   // (DESIGN.md 7.14 and 8.5).
   const dimmed = (ids: string[]) => !!selected && !ids.includes(selected);
@@ -365,211 +382,231 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
 
   return (
     <div ref={hostRef} className={`cth-studio${paused ? ' cth-studio-paused' : ''}`} onKeyDown={onKeyDown} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: -bleed, overflow: 'hidden', background: 'var(--cth-bg)' }}>
-      {/* The stage's light (DESIGN.md 3.8) and a faint dot grid toward the edges. */}
-      <div aria-hidden="true" style={{
-        position: 'absolute', inset: 0,
-        background: `radial-gradient(900px 520px at ${fitW / 2}px 48%, ${dark ? '#211F31' : '#FFFFFF'} 0%, transparent 70%)`
-      }} />
-      <svg
-        ref={svgRef}
-        aria-hidden="true"
-        viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
-        width={STAGE_W * k}
-        height={STAGE_H * k}
-        style={{ position: 'absolute', left: ox, top: oy, overflow: 'visible' }}
-      >
-        <StudioDefs T={T} families={families} />
-        <Platform T={T} />
-        {plan.pods.map((pod) => (
-          <g key={`glow-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
-            <PodGlow grid={pod.grid} famKey={pod.dept} desks={pod.members.map((a) => ({ st: deskState(a) }))} />
-          </g>
-        ))}
-        {/* No standing wires (owner, 2026-09-30: lines everywhere looked busy).
-            A wire shows only while something moves along it: Michael's wire to a
-            pod when someone there starts working, a mailbox's wire while mail
-            moves. Messages draw their own path as they fly (life.tsx). */}
-        {plan.pods.map((pod) => kickoff[pod.members[0].id] ? (
-          <Flow key={`f-${pod.members[0].id}-${kickoff[pod.members[0].id]}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={2.4} opacity={0.45} T={T} flowing fade />
-        ) : null)}
-        {mailboxes.map((m, i) => {
-          const owner = ownerOf(m.id);
-          const seat = owner ? seatOf.get(owner.id) : undefined;
-          if (!seat || !life.postActive[m.id]) return null;
-          const from: Pt = [postGx(i, mailboxes.length), POST_GY - 0.3];
-          return <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} flowing fade />;
-        })}
-        {/* Objects, back to front. */}
-        {[
-          ...mailboxes.map((m, i) => {
-            const gx = postGx(i, mailboxes.length);
-            const owner = ownerOf(m.id);
-            return {
-              depth: gx + POST_GY,
-              // A mailbox stays bright when its watcher is the one selected.
-              node: <g key={`p-${m.id}`} style={dimStyle(dimmed(owner ? [owner.id] : []))}><MailPost gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} /></g>
-            };
-          }),
-          ...plan.pods.map((pod) => ({
-            depth: pod.grid[0] + pod.grid[1],
-            node: (
-              <g key={`pod-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
-              <Pod
-                grid={pod.grid}
-                desks={pod.members.map((a) => ({ st: deskState(a), away: away.has(a.id) }))}
-                c={families[pod.dept]} famKey={pod.dept}
-                selected={pod.members.some((a) => a.id === selected)}
-                T={T} dark={dark}
-                arriving={pod.members.some((a) => life.arriving.has(a.id))}
-                lightsOut={(!!closing && pod.members.every((a) => closing.out.has(a.id))) || pod.members.every((a) => away.has(a.id))}
-              />
-              </g>
-            )
-          })),
-          { depth: 0, node: <g key="hub" style={dimStyle(dimmed(god ? [god.id] : []))}><Hub T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} plateLit={!!god && (selected === god.id || peek === 'hub')} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
-            stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /></g> }
-        ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
-        {life.svg}
-      </svg>
-
-      {/* The light of the day (DESIGN.md 8.12): morning sun from the left, a
-          golden evening, a darker night where working desks keep their lamps on. */}
-      <DayLight hour={hour} dark={dark} />
-      {night && (
-        <svg aria-hidden="true" viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width={STAGE_W * k} height={STAGE_H * k}
-          style={{ position: 'absolute', left: ox, top: oy, overflow: 'visible', pointerEvents: 'none', mixBlendMode: 'screen' }}>
-          <defs>
-            <radialGradient id="st-lamp"><stop offset="0" stopColor="#FFD38A" stopOpacity={0.55} /><stop offset="1" stopColor="#FFD38A" stopOpacity={0} /></radialGradient>
-          </defs>
-          {plan.pods.filter((pod) => pod.members.some((a) => ACTIVE.has(a.status) && !away.has(a.id)) && !(closing && pod.members.every((a) => closing.out.has(a.id)))).map((pod) => {
-            const [x, y] = P(pod.grid[0], pod.grid[1], 30);
-            return <ellipse key={pod.members[0].id} cx={x} cy={y} rx={95} ry={60} fill="url(#st-lamp)" className="cth-st-breathe" />;
-          })}
-          {godBusy && !closing?.all && (() => { const [x, y] = P(0, -0.2, 40); return <ellipse cx={x} cy={y} rx={110} ry={70} fill="url(#st-lamp)" />; })()}
-        </svg>
-      )}
-
-      {/* Stems from each card to its pod. */}
-      <svg aria-hidden="true" width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {plan.pods.map((pod) => {
-          if (!working(pod)) return null;
-          const r = cardRect(pod.slot, pod.members.length);
-          const x = ox + r.stem.x * k;
-          return (
-            <g key={`stem-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
-              <line x1={x} y1={oy + r.stem.y1 * k} x2={x} y2={oy + r.stem.y2 * k} stroke={T.stem} strokeWidth={1} strokeDasharray="2 3" />
-              <circle cx={x} cy={oy + r.stem.y2 * k} r={2.2} fill={T.stem} />
+      {/* Eased to its new size when the right column opens or closes (FLIP,
+          eng R3): laid out once at the new size, then the transform runs. */}
+      <div ref={flipRef} style={{ position: 'absolute', inset: 0, transformOrigin: '0 0' }}>
+        {/* The stage's light (DESIGN.md 3.8) and a faint dot grid toward the edges. */}
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0,
+          background: `radial-gradient(900px 520px at ${fitW / 2}px 48%, ${dark ? '#211F31' : '#FFFFFF'} 0%, transparent 70%)`
+        }} />
+        <svg
+          ref={svgRef}
+          aria-hidden="true"
+          viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
+          width={STAGE_W * k}
+          height={STAGE_H * k}
+          style={{ position: 'absolute', left: ox, top: oy, overflow: 'visible' }}
+        >
+          <StudioDefs T={T} families={families} />
+          <Platform T={T} />
+          {plan.pods.map((pod) => (
+            <g key={`glow-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
+              <PodGlow grid={pod.grid} famKey={pod.dept} desks={pod.members.map((a) => ({ st: deskState(a) }))} />
             </g>
-          );
-        })}
-      </svg>
+          ))}
+          {/* No standing wires (owner, 2026-09-30: lines everywhere looked busy).
+              A wire shows only while something moves along it: Michael's wire to a
+              pod when someone there starts working, a mailbox's wire while mail
+              moves. Messages draw their own path as they fly (life.tsx). */}
+          {plan.pods.map((pod) => kickoff[pod.members[0].id] ? (
+            <Flow key={`f-${pod.members[0].id}-${kickoff[pod.members[0].id]}`} a={HUB} b={pod.grid} bend={bendFor(pod.grid)} color={T.req} width={2.4} opacity={0.45} T={T} flowing fade />
+          ) : null)}
+          {mailboxes.map((m, i) => {
+            const owner = ownerOf(m.id);
+            const seat = owner ? seatOf.get(owner.id) : undefined;
+            if (!seat || !life.postActive[m.id]) return null;
+            const from: Pt = [postGx(i, mailboxes.length), POST_GY - 0.3];
+            return <Flow key={`m-${m.id}`} a={from} b={seat.pod.grid} bend={0.3} color={T.req} width={2.2} opacity={0.5} T={T} flowing fade />;
+          })}
+          {/* Objects, back to front. */}
+          {[
+            ...mailboxes.map((m, i) => {
+              const gx = postGx(i, mailboxes.length);
+              const owner = ownerOf(m.id);
+              return {
+                depth: gx + POST_GY,
+                // A mailbox stays bright when its watcher is the one selected.
+                node: <g key={`p-${m.id}`} style={dimStyle(dimmed(owner ? [owner.id] : []) || (!!owner && !!closing?.out.has(owner.id)))}><MailPost gx={gx} gy={POST_GY} broken={m.status === 'needs-attention'} c={owner ? families[departmentOf(owner)] : null} T={T} active={life.postActive[m.id]} /></g>
+              };
+            }),
+            ...plan.pods.map((pod) => ({
+              depth: pod.grid[0] + pod.grid[1],
+              node: (
+                <g key={`pod-${pod.dept}-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
+                <Pod
+                  grid={pod.grid}
+                  // A person who has gone home at closing time has a dark desk (2A).
+                  desks={pod.members.map((a) => ({ st: deskState(a), away: away.has(a.id) || !!closing?.out.has(a.id) }))}
+                  c={families[pod.dept]} famKey={pod.dept}
+                  selected={pod.members.some((a) => a.id === selected)}
+                  T={T} dark={dark}
+                  arriving={pod.members.some((a) => life.arriving.has(a.id))}
+                  lightsOut={(!!closing && pod.members.every((a) => closing.out.has(a.id))) || pod.members.every((a) => away.has(a.id))}
+                />
+                </g>
+              )
+            })),
+            { depth: 0, node: <g key="hub" style={dimStyle(dimmed(god ? [god.id] : []))}><Hub T={T} dark={dark} board={snap.board} busy={godBusy} name={god?.name} plateLit={!!god && (selected === god.id || peek === 'hub')} ringing={life.clockRinging} lightsOut={!!closing?.all || hubAway}
+              stats={{ delegated, toYou, kept: snap.kept, ctx: god && god.contextTokens !== undefined && god.contextLimit ? Math.round((god.contextTokens / god.contextLimit) * 100) : null }} /></g> }
+          ].sort((a, b) => a.depth - b.depth).map((o) => o.node)}
+          {life.svg}
+        </svg>
 
-      {/* Label cards. */}
-      {plan.pods.map((pod) => {
-        const key = podKey(pod);
-        const { x: chipX, y: chipY } = chipAt(pod);
-        const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
-        const open = openCard(pod);
-        // Opened from the chip, the card takes the chip's place and rolls down
-        // over the monitors; the chip hides, so nothing shows twice (owner,
-        // 2026-10-01). A margin keeps it open while the pointer leaves the
-        // chip's spot.
-        if (open?.down) {
-          return (
-            <div key={`card-${pod.members[0].id}`} className="cth-st-roll"
-              onMouseEnter={() => openPeek(key)} onMouseLeave={closePeek}
-              style={{ position: 'absolute', left: open.l - ROLL_PAD, top: open.t - ROLL_PAD, padding: `${ROLL_PAD}px ${ROLL_PAD}px 0`, zIndex: 3 }}>
+        {/* The light of the day (DESIGN.md 8.12): morning sun from the left, a
+            golden evening, a darker night where working desks keep their lamps on. */}
+        <DayLight hour={hour} dark={dark} />
+        {night && (
+          <svg aria-hidden="true" viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width={STAGE_W * k} height={STAGE_H * k}
+            style={{ position: 'absolute', left: ox, top: oy, overflow: 'visible', pointerEvents: 'none', mixBlendMode: 'screen' }}>
+            <defs>
+              <radialGradient id="st-lamp"><stop offset="0" stopColor="#FFD38A" stopOpacity={0.55} /><stop offset="1" stopColor="#FFD38A" stopOpacity={0} /></radialGradient>
+            </defs>
+            {plan.pods.filter((pod) => pod.members.some((a) => ACTIVE.has(a.status) && !away.has(a.id)) && !(closing && pod.members.every((a) => closing.out.has(a.id)))).map((pod) => {
+              const [x, y] = P(pod.grid[0], pod.grid[1], 30);
+              return <ellipse key={pod.members[0].id} cx={x} cy={y} rx={95} ry={60} fill="url(#st-lamp)" className="cth-st-breathe" />;
+            })}
+            {godBusy && !closing?.all && (() => { const [x, y] = P(0, -0.2, 40); return <ellipse cx={x} cy={y} rx={110} ry={70} fill="url(#st-lamp)" />; })()}
+          </svg>
+        )}
+
+        {/* Stems from each card to its pod. */}
+        <svg aria-hidden="true" width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {plan.pods.map((pod) => {
+            if (!working(pod)) return null;
+            const r = cardRect(pod.slot, pod.members.length);
+            const x = ox + r.stem.x * k;
+            return (
+              <g key={`stem-${pod.members[0].id}`} style={dimStyle(dimmed(pod.members.map((a) => a.id)))}>
+                <line x1={x} y1={oy + r.stem.y1 * k} x2={x} y2={oy + r.stem.y2 * k} stroke={T.stem} strokeWidth={1} strokeDasharray="2 3" />
+                <circle cx={x} cy={oy + r.stem.y2 * k} r={2.2} fill={T.stem} />
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Label cards. */}
+        {plan.pods.map((pod) => {
+          const key = podKey(pod);
+          // Closing time (docs/designs/closing-floor.md): people who have gone
+          // home leave the chip and card (2A); with nobody left, the chip fades
+          // out with the lights and nothing on the pod opens anyone (1A, 8A).
+          const present = stillIn(pod.members, closing?.out ?? NOBODY);
+          if (!present.length) {
+            const { x, y } = chipAt(pod);
+            return (
+              <div key={`gone-${pod.members[0].id}`} className="cth-st-gone" aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}
+                style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -100%)' }}>
+                <PodChip style={{ position: 'relative' }} dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
+                  onSelect={() => undefined} onEnter={() => undefined} onLeave={() => undefined} quote={null} quoteSpot="up" />
+              </div>
+            );
+          }
+          if (present.length !== pod.members.length) pod = { ...pod, members: present };
+          const { x: chipX, y: chipY } = chipAt(pod);
+          const speaking = quote && pod.members.some((a) => a.id === quote.agentId) ? quote : null;
+          const open = openCard(pod);
+          // Opened from the chip, the card takes the chip's place and rolls down
+          // over the monitors; the chip hides, so nothing shows twice (owner,
+          // 2026-10-01). A margin keeps it open while the pointer leaves the
+          // chip's spot.
+          if (open?.down) {
+            return (
+              <div key={`card-${pod.members[0].id}`} className="cth-st-roll"
+                onMouseEnter={() => openPeek(key)} onMouseLeave={closePeek}
+                style={{ position: 'absolute', left: open.l - ROLL_PAD, top: open.t - ROLL_PAD, padding: `${ROLL_PAD}px ${ROLL_PAD}px 0`, zIndex: 3 }}>
+                <PodCard
+                  style={{ position: 'relative', width: open.r - open.l }}
+                  dept={pod.dept} members={pod.members} c={families[pod.dept]}
+                  snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+                />
+              </div>
+            );
+          }
+          // A pod at work shows its card at its slot, with a stem; a quiet pod
+          // its chip, just over its monitors (the right and front chips used to
+          // hang under the pod, on empty floor).
+          if (open) {
+            return (
               <PodCard
-                style={{ position: 'relative', width: open.r - open.l }}
+                key={`card-${pod.members[0].id}`}
+                // The selected person's card sits above any dimmed neighbour it overlaps.
+                style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, zIndex: selected && pod.members.some((a) => a.id === selected) ? 2 : undefined, ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
                 dept={pod.dept} members={pod.members} c={families[pod.dept]}
                 snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
               />
-            </div>
-          );
-        }
-        // A pod at work shows its card at its slot, with a stem; a quiet pod
-        // its chip, just over its monitors (the right and front chips used to
-        // hang under the pod, on empty floor).
-        if (open) {
+            );
+          }
           return (
-            <PodCard
-              key={`card-${pod.members[0].id}`}
-              // The selected person's card sits above any dimmed neighbour it overlaps.
-              style={{ position: 'absolute', left: open.l, top: open.bottomAt ?? open.t, width: open.r - open.l, transform: open.bottomAt !== undefined ? 'translateY(-100%)' : undefined, zIndex: selected && pod.members.some((a) => a.id === selected) ? 2 : undefined, ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
-              dept={pod.dept} members={pod.members} c={families[pod.dept]}
-              snap={snap} selected={selected} onSelect={select} missions={missions} godId={godId}
+            <PodChip
+              key={`chip-${pod.members[0].id}`}
+              style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)', ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
+              dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
+              onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
+              quote={speaking}
+              quoteSpot={speaking ? quoteSpot(pod, chipX, chipY - 28) : 'up'}
             />
           );
-        }
-        return (
-          <PodChip
-            key={`chip-${pod.members[0].id}`}
-            style={{ position: 'absolute', left: chipX, top: chipY, transform: 'translate(-50%, -100%)', ...dimStyle(dimmed(pod.members.map((a) => a.id))) }}
-            dept={pod.dept} members={pod.members} c={families[pod.dept]} snap={snap}
-            onSelect={select} onEnter={() => openPeek(key)} onLeave={closePeek}
-            quote={speaking}
-            quoteSpot={speaking ? quoteSpot(pod, chipX, chipY - 28) : 'up'}
-          />
-        );
-      })}
+        })}
 
-      {/* Michael: his name plate on the glass is the way in (owner, 2026-09-30).
-          Hover shows his full card under the plate; a click selects him, which
-          keeps the card open. His numbers live on his walls. */}
-      {god && (() => {
-        const sel = selected === god.id;
-        const plate = plateBox(god.name);
-        return (
-          <>
-            <button
-              data-studio-card=""
-              onClick={() => select(god.id)}
-              onMouseEnter={() => openPeek('hub')}
-              onMouseLeave={closePeek}
-              onFocus={() => openPeek('hub')}
-              onBlur={closePeek}
-              aria-label={`${god.name}, ${t('studio.officeManager')}`}
-              className="cth-st-plate"
-              style={{ position: 'absolute', left: plate.l, top: plate.t, width: plate.r - plate.l, height: plate.b - plate.t }}
-            />
-            {(sel || peek === 'hub') && (
-              <div onMouseEnter={() => openPeek('hub')} onMouseLeave={closePeek}
-                style={{ position: 'absolute', left: (plate.l + plate.r) / 2 - HUB_CARD.w / 2, top: plate.b + 8, width: HUB_CARD.w, zIndex: 3 }}>
-                <HubCard
-                  style={{ width: '100%' }}
-                  god={god} selected={sel} onSelect={() => select(god.id)}
-                  delegated={delegated} toYou={toYou} kept={snap.kept} board={snap.board}
-                />
-              </div>
-            )}
-          </>
-        );
-      })()}
+        {/* Michael: his name plate on the glass is the way in (owner, 2026-09-30).
+            Hover shows his full card under the plate; a click selects him, which
+            keeps the card open. His numbers live on his walls. */}
+        {god && (() => {
+          const sel = selected === god.id;
+          const plate = plateBox(god.name);
+          return (
+            <>
+              <button
+                data-studio-card=""
+                onClick={() => select(god.id)}
+                onMouseEnter={() => openPeek('hub')}
+                onMouseLeave={closePeek}
+                onFocus={() => openPeek('hub')}
+                onBlur={closePeek}
+                aria-label={`${god.name}, ${t('studio.officeManager')}`}
+                className="cth-st-plate"
+                style={{ position: 'absolute', left: plate.l, top: plate.t, width: plate.r - plate.l, height: plate.b - plate.t }}
+              />
+              {(sel || peek === 'hub') && (
+                <div onMouseEnter={() => openPeek('hub')} onMouseLeave={closePeek}
+                  style={{ position: 'absolute', left: (plate.l + plate.r) / 2 - HUB_CARD.w / 2, top: plate.b + 8, width: HUB_CARD.w, zIndex: 3 }}>
+                  <HubCard
+                    style={{ width: '100%' }}
+                    god={god} selected={sel} onSelect={() => select(god.id)}
+                    delegated={delegated} toYou={toYou} kept={snap.kept} board={snap.board}
+                  />
+                </div>
+              )}
+            </>
+          );
+        })()}
 
-      {/* Mailbox tags. */}
-      {mailboxes.map((m, i) => {
-        const [x, y] = P(postGx(i, mailboxes.length), POST_GY, 0);
-        const owner = ownerOf(m.id);
-        const broken = m.status === 'needs-attention';
-        const w = broken ? 170 : 96;
-        return (
-          <MailTag key={m.id} style={{ position: 'absolute', left: ox + x * k - (broken ? w / 2 - 16 : w / 2), top: oy + (y + 20) * k, minWidth: w, width: 'max-content', maxWidth: 230, ...dimStyle(dimmed(owner ? [owner.id] : [])) }}
-            width={w} address={m.address} owner={owner?.name} acc={owner ? families[departmentOf(owner)].acc : T.req}
-            broken={broken} reason={m.statusReason} />
-        );
-      })}
+        {/* Mailbox tags. */}
+        {mailboxes.map((m, i) => {
+          const [x, y] = P(postGx(i, mailboxes.length), POST_GY, 0);
+          const owner = ownerOf(m.id);
+          const broken = m.status === 'needs-attention';
+          const w = broken ? 170 : 96;
+          return (
+            <MailTag key={m.id} style={{ position: 'absolute', left: ox + x * k - (broken ? w / 2 - 16 : w / 2), top: oy + (y + 20) * k, minWidth: w, width: 'max-content', maxWidth: 230, ...dimStyle(dimmed(owner ? [owner.id] : []) || (!!owner && !!closing?.out.has(owner.id))) }}
+              width={w} address={m.address} owner={owner?.name} acc={owner ? families[departmentOf(owner)].acc : T.req}
+              broken={broken} reason={m.statusReason} />
+          );
+        })}
 
-      {/* A scheduled job's name, as it starts. */}
-      {life.bubbles.map((b) => (
-        <div key={b.key} className={b.tone === 'welcome' ? 'cth-st-sched cth-st-welcome' : 'cth-st-sched'} style={{ ...at(b.at[0], b.at[1]), transform: 'translateX(-50%)' }}>
-          {b.tone === 'welcome'
-            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8 5.8 1.9-5.8 1.9L12 18l-1.9-5.4L4.3 10.7l5.8-1.9z" /></svg>
-            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>}
-          {b.tone === 'welcome' ? t('studio.welcome', { name: b.text }) : b.text}
-        </div>
-      ))}
+        {/* A scheduled job's name, as it starts. */}
+        {life.bubbles.map((b) => (
+          <div key={b.key} className={b.tone === 'welcome' ? 'cth-st-sched cth-st-welcome' : 'cth-st-sched'} style={{ ...at(b.at[0], b.at[1]), transform: 'translateX(-50%)' }}>
+            {b.tone === 'welcome'
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8 5.8 1.9-5.8 1.9L12 18l-1.9-5.4L4.3 10.7l5.8-1.9z" /></svg>
+              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>}
+            {b.tone === 'welcome' ? t('studio.welcome', { name: b.text }) : b.text}
+          </div>
+        ))}
 
-      <div className="cth-sr-only" aria-live="polite">{t('studio.summary', { count: agents.length })}</div>
+        <div className="cth-sr-only" aria-live="polite">{t('studio.summary', { count: agents.length })}</div>
+      </div>
     </div>
   );
 }
@@ -600,7 +637,12 @@ function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, 
             onClick={() => openFirstDoing(lead.id)} style={sticky}>{doing}</button>
         )}
         {forYou > 0 && (
-          <span style={forYouBadge}><i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cth-coral-base)', display: 'block' }} />{t('studio.forYou', { count: forYou })}</span>
+          // Opens the board at this pod's newest ask, focus in its reply (D11).
+          <button
+            className="cth-for-you"
+            onClick={() => useStore.getState().openNeedsYou({ taskId: newestAskFor(members.map((a) => a.id), getNeedsYouFeed().tasks) })}
+            style={{ ...forYouBadge, background: undefined, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          ><i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cth-coral-base)', display: 'block' }} />{t('studio.forYou', { count: forYou })}</button>
         )}
       </div>
       {members.map((a, i) => (

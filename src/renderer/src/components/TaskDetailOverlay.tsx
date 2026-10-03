@@ -46,11 +46,17 @@ export function TaskDetailOverlay() {
   // into the number 3 and grafts `dependsOn: []` onto a card that spells the key
   // `deps`. Those are real values, so they survive the merge in hive.writeTasks
   // and land on disk — a status change quietly rewriting the god's cards.
+  //
+  // The owner's move goes through hiveMoveTask: Done is their decision to end
+  // the card (closedBy owner), and Michael is told of every move
+  // (card-lifecycle.md section 4).
   const move = async (status: HiveTask['status']) => {
-    const next = tasks.map((t) => (t.id === task.id ? { ...t, status } : t));
+    const next = tasks.map((t) => (t.id === task.id
+      ? { ...t, status, closedBy: status === 'done' ? (t.status === 'done' ? t.closedBy : 'owner' as const) : undefined }
+      : t));
     setTasks(next); // optimistic
     try {
-      const result = await window.cth.hivePatchTask(task.id, { status });
+      const result = await window.cth.hiveMoveTask(task.id, status);
       if (!result.ok) void refresh();
     } catch { void refresh(); }
   };
