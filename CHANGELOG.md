@@ -6,6 +6,63 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **Your Ask me answer is Michael's open work.** It reaches him as a request about the card and
+  stays in front of him on every turn until he routes the follow up and closes it. An answer
+  whose request did not go out is sent at the next launch. The Tasks view shows those cards as
+  With Michael, and as not moved after one work day of your office hours.
+- **Every scheduled job has a focus area:** what to concentrate on each time it runs. It is
+  written on the job, shown with the team member's Work style, sent only with that job's run,
+  and checked against the Work style when you save.
+- **Inbox zero for the Executive Admin** in every business type: every email is routed,
+  tracked, filed or cleared and leaves the inbox, and nothing is deleted. Her mail tools can now
+  archive under a label, mark read and mark junk, and every move is written to the office log.
+  A new hire comes with an Inbox to zero job every 2 hours during office hours, and an office
+  that hired her before is offered the new job description on Needs you.
+- Michael has a Work style like everyone else, with a default for every office. The hourly
+  standup's focus is to close your open requests first, then check the floor.
+
+### Changed
+
+- **Blocked always means waiting on you.** A blocked card with nothing on Needs you is shown to
+  Michael every turn, and marked Nothing asked on the Tasks view, until he asks you its question
+  or moves it on. Only Michael sets Blocked; Task detail and voice no longer offer it.
+- **A card ends only as Done.** Dismissing a card, or moving it to Done yourself, closes it as
+  Done by your decision, marked Closed by owner, and Michael is told of every card you move or
+  close. Nothing in the app deletes a card any more.
+- **Closing time:** someone who has gone home is gone from the floor. Their desk goes dark, their
+  name leaves the chip, and nothing opens them until you cancel. Michael stays at his desk until
+  the office is closed.
+- Job descriptions name nobody: role lines and Work styles name teammates by role, so renaming
+  anyone never leaves a stale name. Older text that still names someone is updated on rename.
+- The menus are trimmed to what the app uses: no File menu on the Mac, and no Reload or developer
+  tools in an installed app. The second office window (New Floor) is gone.
+- Edit agent is one column over the profile, with the engine folded away, in every language.
+  The Needs you column stays open while anything waits on you. Michael's idle notification
+  comes at most every few hours.
+
+### Fixed
+
+- Closing time no longer waits forever on Michael: his reply that the office closed reaches the
+  closing bar again.
+- A message an agent was still writing is no longer thrown away as broken; one that really is
+  broken gets the sender a notice, at most every few minutes.
+- A message typed into a busy team member's terminal is confirmed as sent, and Enter is pressed
+  again only while nobody is typing there.
+- An archive label can never name trash, junk or another system folder, or a folder inside one,
+  so archiving can never delete or junk mail.
+- The launch catch-up only relays answers you gave in the app, word for word, never text an
+  agent wrote into a card. Cards answered before this update show to Michael as Blocked with
+  nothing asked.
+- A message an agent wrote with broken line breaks is archived as it was delivered, so Michael's
+  reply in it still closes your request.
+- Answering a question on Ask me never erases a newer question added to the card while you typed.
+- A job description offer whose Use the new one could not be saved changes nothing and stays
+  offered.
+
 ## [0.0.15] (2026-10-02)
 
 ### Added
