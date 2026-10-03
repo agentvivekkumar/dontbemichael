@@ -1,13 +1,13 @@
-# Don't Be Michael v0.0.15
+# Don't Be Michael v0.0.16
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.0.15
+## What's new in 0.0.16
 
-- **Claude connectors, under your control.** Settings, Connections lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest). Each is off until you turn it on and give it to the team members who need it.
-- **Agents reach only what you allow.** Every connector is blocked at start up and on every call, and your own Claude Code servers stay yours. After the update, one Ask me card names the connectors that are now off.
-- **A simpler Settings.** One Agents tab, one About card with What's new right in the app, and a Danger zone you can't miss.
-- **Mailboxes fold** into one line, and schedule rows read in three quiet lines.
+- **Your answers become Michael's work.** An answer on Ask me reaches him as a request he must route and close, and the Tasks view shows which cards sit with him. Blocked always means waiting on you; a card ends only as Done.
+- **Inbox zero for your Executive Admin.** Every email is routed, tracked, filed or cleared and leaves the inbox, nothing is deleted, and a new hire arrives with an Inbox to zero job every 2 hours during office hours.
+- **Every scheduled job has a focus area:** what to concentrate on each time it runs, set on the job.
+- **Closing time clears the floor.** Whoever has gone home leaves it; Michael stays until the office is closed. Closing time no longer hangs on him.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
@@ -15,11 +15,11 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.15-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.15-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.0.16-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.0.16-mac-universal.dmg) |
 
 This release is for Mac only. Windows and Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.15.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.15.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.16.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.0.16.tar.gz)
 
 ## Installing on your Mac
 

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.15). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.0.16). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -20,6 +20,8 @@ moving, and brings you only the decisions that need you.
   Michael, so work never bounces between two agents. Teammates can still ask each other questions.
 - Michael decides the team's day to day requests himself, such as a new schedule, and asks you only
   when the facts can't settle it, sources disagree, or it is sensitive.
+- Your answer to a question becomes Michael's work: he routes it and closes it, and the Tasks view
+  shows which cards sit with him. Blocked always means waiting on you, and a card ends only as Done.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
 ### 2. Hire the right person in four steps
@@ -37,10 +39,13 @@ moving, and brings you only the decisions that need you.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
 - Choose Can send or Draft only for each one. A team member can't reach a mailbox you didn't give it.
+- The Executive Admin keeps the inbox at zero: every email is routed, tracked, filed or cleared and
+  leaves the inbox. Archiving, marking read and marking junk never delete anything.
 
 ### 4. Jobs on a clock
 - Each team member's schedules sit on its Access tab. Name the job ("Check the support
-  inbox") and when, and it does the job the way its work style says.
+  inbox"), when, and its focus area, what to concentrate on each run; it does the job the way its
+  work style says. A new hire can arrive with its jobs already set, like Inbox to zero.
 - One job can run at several times: every 2 hours on weekdays between 8 and 6, plus 2 pm at weekends.
 - Closing time pauses the office; opening it runs a missed job once, never a backlog.
 
@@ -78,7 +83,7 @@ moving, and brings you only the decisions that need you.
 
 ## Part 2: Every change, release by release
 
-### 0.0.16 (unreleased)
+### 0.0.16 (2026-10-03)
 - Your Ask me answer is now Michael's open work. It reaches him as a request about the card, stays
   in front of him on every turn until he routes the follow up and closes it, and one whose request
   did not go out is sent at the next launch. The Tasks view shows those cards as With Michael, and
