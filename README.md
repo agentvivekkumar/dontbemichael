@@ -131,8 +131,9 @@ business runs on, and each team member works from the one that matches its job.
 - **Hand it out per team member.** On a team member's Access tab, turn email on, pick its
   mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
-- **Each one stays in its lane.** A team member can only read, search and draft in the mailbox you
-  gave it, and cannot forward or attach mail from another one.
+- **Each one stays in its lane.** A team member can only read, search, draft and file mail (archive,
+  mark read, mark junk) in the mailbox you gave it, and cannot forward or attach mail from another
+  one. Nothing it does deletes mail.
 - **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
   and the team member sorts new mail, drafts replies and tells Michael what needs you.
 - **You hear when it breaks.** If a provider stops accepting the password, the mailbox shows
@@ -248,7 +249,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 </table>
 
 **Running the office**
-- **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it.
+- **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it. Michael gets it too, as work he routes and then closes.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
 - **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.

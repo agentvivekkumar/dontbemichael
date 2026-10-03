@@ -386,7 +386,7 @@ One window, four regions. Nothing else is permanent.
 |---|---|---|
 | Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
 | Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Who talks to whom (§7.22) |
-| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets; its grip shows only on hover) | Needs you board by default; the selected person's panel; Michael's panel. Work tab widens it to 480. It has no ground of its own (owner, 2026-09-30: a panel behind cards is a layer too many): the Needs you heading and cards, and the person and Michael panels (cards themselves), sit straight on the stage, which runs on underneath (`StudioStage` `bleed`); the scene still fits the space left of it |
+| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets; its grip shows only on hover) | Closed by default: while nothing waits and nobody is open the column is not there and the office takes the window (`bleed` 0, no splitter). Otherwise the Needs you board, the selected person's panel or Michael's panel (§7.6). Work tab widens it to 480. It has no ground of its own (owner, 2026-09-30: a panel behind cards is a layer too many): the Needs you heading and cards, and the person and Michael panels (cards themselves), sit straight on the stage, which runs on underneath (`StudioStage` `bleed`); the scene still fits the space left of it |
 | Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip, pack and Hire (§7.19) |
 
 Rules:
@@ -471,7 +471,8 @@ Pill, `card` fill, `line` border, padding 6 × 12. Green live dot (7 px with a 3
 `green` soft halo), mono time in `ink` 600, "Office open" in `ink-2`, a chevron. Click
 opens a menu: **Office schedule** (opens Michael's Office schedule tab), **Closing time**
 (starts the closing time flow). Office hours are not a setting in the app (packs carry
-`officeHours`, but nothing reads it), so the pill never shows a closing time; the reference
+`officeHours`, which only starter jobs and the Tasks view's "hasn't moved this" read), so the
+pill never shows a closing time; the reference
 screens' "closes 6:00 PM" is sample copy (§17).
 
 ### 7.4 Version chip (UpdateBadge, CliUpdateBadge)
@@ -485,15 +486,30 @@ Claude Code update. Click behaves as today's badges.
 Pill, `coral-strong` fill, white `t-ui` 600 text, `shadow-coral`, padding 6 × 7 × 6 × 14.
 A 7 px white dot that pulses (§11) and a white count bubble (mono 12 px 600, `coral-strong`
 text). With zero waiting it becomes a quiet pill: `card` fill, `line` border, `ink-3`
-text "Nothing needs you", no dot. Click shows the Needs you board in the right column.
+text "Nothing needs you", no dot, and it is a plain label, not a button. While the count is
+still unknown at launch it is the same quiet pill with no text, never a false "Nothing needs
+you". The coral pill shows the Needs you board (never closes it, since a waiting ask keeps the
+column open) and moves focus to the first card's reply field; a screen reader hears "Michael needs you: N" once each time
+the count rises (docs/designs/needs-you-empty-state.md).
 
 ### 7.6 Right column
 
-Three states, one region:
+Four states, one region (docs/designs/needs-you-empty-state.md):
 
-1. **Needs you board** (default). Heading "Needs you" (`t-panel`), a count bubble, an
-   info icon. Cards stack newest first (§7.8, §7.9) with 12 px gaps, straight on the
-   stage (the column has no ground of its own, §5.2).
+0. **Closed**. Only when nothing at all waits on the owner: not rendered, the office fills
+   the window. While any Ask me card or schedule request waits the column is open (the
+   board, or a person's panel with the coral strip) and cannot be closed: an ask arriving
+   opens the board, at launch too (owner, 2026-10-02). Focus moves only on the owner's
+   click (the pill, a "for you" chip). Opening and
+   closing slide the column over 240 ms while the office eases to its new size with a
+   transform (no per frame layout); reduced motion snaps.
+1. **Needs you board**. Heading "Needs you" (`t-panel`), a count bubble, an info icon,
+   and a close ✕ at its end only when nothing waits. Cards stack newest first (§7.8, §7.9) with 12 px gaps,
+   straight on the stage (the column has no ground of its own, §5.2). After the last
+   answer it reads "All clear." (`t-panel`) with one Office humor line (13 px, `ink-3`)
+   and the answered card, and closes on the next click outside it, Esc, or a pod.
+   Esc closes the column only with focus inside it and nothing waiting; a reply holding
+   text is left first.
 2. **Person panel** when a pod is selected (§7.10 to §7.12).
 3. **Michael's panel** when Michael's pod is selected (§7.12).
 
@@ -501,8 +517,12 @@ In states 2 and 3 a compact coral strip sits at the top: "Needs you N" with a ch
 `coral` soft fill, `coral` text, `r-lg`. It returns to the board. With nothing waiting
 the strip is hidden.
 
-A "Bring back last session's team" banner (restore all, dismiss one; today's restore
-team control) sits at the top of the board when there is a team to restore.
+A "Bring back last session's team" card (restore all, dismiss one) floats over the
+office's top left corner (top right in RTL), `card`, `r-xl`, `shadow-lg`, when there is a
+team to restore. It never opens the column or counts toward Needs you.
+
+Closing a person's or Michael's panel returns to the board while anything waits, and
+collapses the column when nothing does.
 
 ### 7.7 Buttons
 
@@ -669,7 +689,8 @@ instead of its label card, so an idle office stays calm (owner, 2026-09-30).
 
 Pill, `coral` soft fill, 1 px `#FFC7C9` border (dark: `coral` at 35%), `coral` text
 `#C8303A` (dark `#FF8C90`), `t-micro` 600, a 5 px `coral` dot, "1 for you". Shown only
-when an Ask me card is tagged to this person.
+when an Ask me card is tagged to this person. It is a button: it opens the Needs you board at
+the pod's newest ask with focus in its reply field; the rest of the pod still opens the panel.
 
 ### 7.16 Sticky count
 
@@ -732,7 +753,11 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
 - Task card: `card`, `line`, `r-lg`, padding 12. Mono id (`#112`, `ink-3`), title `t-ui` 600
   up to 2 lines, assignee avatar plus name. Waiting on the owner: a 18 px coral "?"
   circle top right. Done: a small green check, text in `ink-2`. Hover shows the dismiss
-  `x`. Done shows the last 5 and "N more".
+  `x`: it closes the card as Done by the owner's decision and never deletes it
+  (`docs/designs/card-lifecycle.md` section 4); such a card reads "Closed by owner". A card
+  whose owner answer Michael has not closed reads "With Michael" and how long, then
+  "Michael hasn't moved this" after one working day of office hours; a Blocked card with
+  nothing asked reads "Nothing asked". Done shows the last 5 and "N more".
 
 ### 7.21 Task detail (TaskDetailOverlay)
 
@@ -743,7 +768,9 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   `t-panel` under them at full width, cleaned like an Ask me title (§7.8) (owner,
   2026-10-01: side by side, a long id squeezed the title).
 - Four fields in a row with uppercase micro labels: STATUS (select, `coral` text when
-  Blocked), ASSIGNEE (person chip), PRIORITY (5 dots, filled `ink`), CREATED (mono).
+  Blocked; it offers To do, Doing and Done, and shows Blocked only as a blocked card's
+  current state, since only Michael sets it), ASSIGNEE (person chip), PRIORITY (5 dots,
+  filled `ink`), CREATED (mono).
 - NOTES: the card's `description`, else the `notes` agents keep on it (owner, 2026-10-01:
   the dialog read only `description`, so it was empty on every card); Michael is told to
   keep them to what the work is and where it stands. No section when a card has none.
@@ -787,6 +814,13 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   moon mark, "Closing time" and the counter strip ("5 / 8 workers confirmed"), a progress
   line, "3 still working" opening the rows (Remind, Close without them), "Cancel and go back
   to work", and "Force quit now", which asks once because unsaved work is lost.
+- A person who has gone home at closing time (confirmed, or closed without) is gone from the
+  floor (owner, 2026-10-03; `docs/designs/closing-floor.md`): their desk goes dark and they
+  leave the pod's chip and card; a pod with nobody left loses its chip, fading out with the
+  lights over 1.4 s (none with reduced motion), and nothing on it opens anyone. They open
+  from no view until closing is cancelled; a panel open on them closes (Needs you if anything
+  waits) and focus goes to the closing bar. Their mailbox tag and post dim to 45%. Michael
+  stays usable until closing completes. Cancel brings everything back at once.
 - Dialogs (Settings, hire wizard, edit person, add mailbox; `shell/Dialog.tsx`): `card`,
   `r-2xl`, `shadow-lg`, title row with a close, an optional footer for the actions,
   backdrop per §6.1 (a drag that ends past the edge never closes it), `role=dialog`, focus
@@ -800,8 +834,8 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   with a slow `indigo` pulse.
 - **No team yet**: the platform with Michael's pod only, a centered card "Your office is
   empty" and a primary "Hire" button.
-- **Needs you empty**: a small illustration of Michael's pod and "Nothing needs you right
-  now." with one line of Office humor allowed here.
+- **Needs you empty**: there is no empty board. With nothing waiting the column is closed
+  (§7.6); the one line of Office humor lives in the board's "All clear." moment.
 - **Office folder missing** and **GPU or render failure** keep their dedicated screens,
   restyled.
 
@@ -838,6 +872,15 @@ Keep every section, control and save rule from v1 (see the functional map in
 dialogs. The hire wizard's steps are numbered circles (done `green` with a check, current
 `ink`), its character tiles and job rows use the `indigo` soft selection, and its strings
 are sentence case. Closing time is the closing bar (§7.23), not a dialog.
+
+**Edit agent** (`docs/designs/edit-agent.md`, owner 2026-10-02) changes only what can change on
+someone already hired, in one column, laid exactly over the person's panel it edits (its
+box and radius, kept in step on resize; with no panel, 640 wide, full height, on the right,
+left in RTL): Name, Role,
+What they handle, Work style (it takes the height left over), then a folded "Engine" line
+that names the provider and model and opens to change them. No section headings; field
+labels only, with explanations behind info icons. The character is chosen once, in the hire wizard, and a
+person's color is their department's, set by the job; Edit agent offers neither.
 
 **Mailboxes** (Settings, Connections; `docs/designs/mailboxes-fold.md`, owner 2026-10-01) folds so
 many mailboxes never mean a long scroll. One header line: the `Disclosure` caret, the title, the
@@ -1029,7 +1072,7 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | The owner messages Michael (from `human`) | The envelope rises from the composer under the stage |
 | A new team member appears on the roster after launch | Their pod drops in, confetti in the department colors, and "Welcome, Jim" in front of the pod |
 | The office opens (each person's action is the clocking in marker) | Every light starts off. Michael's office comes on when he is in, a pod's when the first of its people is in, each desk when its person is; a light that comes on flickers like a strip light. A desk stays dark at most one minute, so a quiet engine never leaves it off |
-| Closing time (`onClosingTime`) | Each pod's lights go out as everyone in it confirms or is excused; Michael's office goes dark when it completes; cancelling turns them back on |
+| Closing time (`onClosingTime`) | Each person's desk goes dark and they leave the chip as they confirm or are excused; a pod with nobody left goes dark and its chip fades out; Michael's office goes dark when it completes; cancelling brings it all back |
 | Local time | Morning sun from the left (6 to 10), plain daylight, a golden evening (16 to 19), and a darker night (19 to 6) where working desks and Michael keep warm lamps on |
 
 All of it pauses with the stage (§11.2). With reduced motion the loops stop and a token
@@ -1272,6 +1315,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-03 | Tasks view: the dismiss `x` closes a card as Done by the owner's decision ("Closed by owner"), never deletes it; "With Michael", "Michael hasn't moved this" and "Nothing asked" on cards; Task detail's status offers To do, Doing and Done (§7.20, §7.21). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
 | 2026-10-01 | In repo register items closed (§17): retired kit fonts and `pixi.js` removed, the README shows the reference screens with no LimeZu credit, the release notes frame on v2. Five more reference screens (§20). Settings and setup copy in sentence case. |
 | 2026-10-01 | The Ask me answer box and the Talk to Michael box grow with the text (§7.8, §7.19). |

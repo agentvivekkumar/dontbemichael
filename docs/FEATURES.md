@@ -57,6 +57,8 @@ moving, and brings you only the decisions that need you.
   shows up in Settings by itself, off. Turn one on, then give it to the team members who need it.
   Nobody else can reach it, and your own Claude Code servers stay yours.
 - Spending money, deleting things and anything public come to you first, on the Needs you board.
+  While anything waits it stays open; when nothing at all waits it gets out of the way and the
+  office fills the window.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
   change it. Enforced by Claude Code's sandbox and checked again by the app.
 - House rules for every agent: say where a fact came from, say when it doesn't know, never make up
@@ -75,6 +77,49 @@ moving, and brings you only the decisions that need you.
 - Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
 
 ## Part 2: Every change, release by release
+
+### 0.0.16 (unreleased)
+- Your Ask me answer is now Michael's open work. It reaches him as a request about the card, stays
+  in front of him on every turn until he routes the follow up and closes it, and one whose request
+  did not go out is sent at the next launch. The Tasks view shows those cards as With Michael, and
+  as not moved after one work day of your office hours.
+- Blocked now always means waiting on you. A blocked card with nothing on Needs you is shown to
+  Michael every turn, and marked Nothing asked on the Tasks view, until he asks you its question
+  or moves it to Doing with who it waits on.
+- A card ends only as Done. Dismissing a card, or moving it to Done yourself, closes it as Done by
+  your decision, marked Closed by owner, instead of deleting it, and Michael is told of every card
+  you move or close.
+- Every scheduled job has a focus area: what to concentrate on each time it runs. It is written on
+  the job, shown with the team member's Work style, sent only with that job's run, and checked
+  against the Work style when you save. Older jobs keep running and show No focus area until
+  you add one on the job.
+- The Executive Admin works to inbox zero in every business type: every email is routed, tracked,
+  filed or cleared and leaves the inbox, and nothing is deleted. Her mail tools can now archive
+  under a label, mark read and mark junk. A new hire comes with an Inbox to zero job every 2 hours
+  during office hours, and an office that hired her before is offered the new job description on
+  Needs you.
+- At closing time, someone who has gone home is gone from the floor: their desk goes dark, their
+  name leaves the chip, and nothing opens them until you cancel. Michael stays at his desk until
+  the office is closed.
+- Job descriptions name nobody: a team member's role line and Work style say what the job is, and
+  teammates are named by role, so renaming anyone never leaves a stale name. Text from older hires
+  that still names someone is updated when that person is renamed.
+- Michael has a Work style like everyone else, with a default for every office, and the hourly
+  standup's focus is to close your open requests first, then check the floor.
+- The Needs you column stays open while anything waits on you and gets out of the way when nothing
+  does. Edit agent is one column over the profile, with the engine folded away. Profiles list only
+  the connections a team member really has. Every agent reports what its tools cannot do instead
+  of working around it. Michael's idle notification is a light reminder at most every few hours.
+- Only Michael sets a card to Blocked; Task detail and voice offer To do, Doing and Done. Nothing
+  in the app deletes a card any more.
+- An archive label can never name trash, junk or another system folder, or a folder inside one,
+  and every mail move an agent makes is written to the office log. The launch catch-up relays
+  only answers you gave in the app, word for word; cards answered before this update show to
+  Michael as Blocked with nothing asked.
+- Closing time no longer hangs on Michael, a message an agent is still writing is never thrown
+  away, and a message typed into a busy terminal is confirmed as sent.
+- The menus are trimmed: no File menu on the Mac, no Reload or developer tools in an installed
+  app, and the second office window (New Floor) is gone.
 
 ### 0.0.15 (2026-10-02)
 - Claude connectors. Settings > Connections lists every connector on your Claude account, read
