@@ -41,6 +41,7 @@ import { inferAgentProvider, BUILD_ENGINES, type AgentProvider } from '../shared
 import { ALLOW_VOICE_HIRE } from '../shared/buildFeatures';
 import { clearCommandForProvider } from '../shared/providerAutomation';
 import { resolveGodName } from '../shared/godIdentity';
+import { cleanFocus } from '../shared/missions';
 
 export const VOICE_ACTOR = 'michael-voice';
 
@@ -61,7 +62,10 @@ export interface RealtimeActionDeps {
   hiveTasks(): unknown;
   hiveAddTask(task: HiveTask): boolean;
   hivePatchTask(id: string, patch: Partial<Omit<HiveTask, 'id'>>): boolean;
-  hiveDeleteTask(id: string): boolean;
+  /** The owner moves a card; Michael is told (card-lifecycle.md section 4). */
+  hiveMoveTask(id: string, status: HiveTask['status']): boolean;
+  /** The owner ends a card: Done by the owner's decision, never deleted (D2). */
+  hiveCloseTask(id: string, reason?: string): boolean;
   hiveRegistry(): Registry;
   hiveLog(event: Record<string, unknown>): void;
   controlPause(agentId: string, on: boolean): void;
@@ -156,8 +160,7 @@ const SETTING_POLICY: Record<string, {
   maxTurns: { tier: 'confirm', type: 'number', min: 1, max: 1000 },
   slackEnabled: { tier: 'confirm', type: 'boolean' },
   webhookEnabled: { tier: 'confirm', type: 'boolean' },
-  semanticMemory: { tier: 'confirm', type: 'boolean' },
-  multiWindow: { tier: 'confirm', type: 'boolean' }
+  semanticMemory: { tier: 'confirm', type: 'boolean' }
 };
 
 const PENDING_TTL_MS = 120_000;
@@ -449,14 +452,26 @@ function execUpdateTask(deps: RealtimeActionDeps, a: Record<string, unknown>): A
   const status = str(a.status);
   const valid = ['todo', 'doing', 'blocked', 'done'];
   if (status && !valid.includes(status)) return { ok: false, spoken: `"${status}" isn't a valid status.` };
+  if (status === 'blocked') {
+    const reg = deps.hiveRegistry();
+    const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
+    return { ok: false, spoken: `Blocked is for a question waiting on Ask me, and only ${godName} sets it. Tell ${godName} what is holding it up, or leave it in To do.` };
+  }
   const patch: Partial<Omit<HiveTask, 'id'>> = {};
-  if (status) patch.status = status as HiveTask['status'];
   if (str(a.result)) patch.result = str(a.result);
   if (str(a.assignee)) patch.assignee = str(a.assignee);
-  if (!deps.hivePatchTask(card.id, patch)) {
+  if (Object.keys(patch).length && !deps.hivePatchTask(card.id, patch)) {
     return { ok: false, spoken: `I couldn't update "${card.title}" right now.` };
   }
-  attribute(deps, 'update_task', card.id, { status: patch.status ?? card.status });
+  // A status change is the owner's move: Done is their decision, and Michael
+  // hears about it either way. Done with a result is finished work, not a
+  // close by the owner, so it is recorded as Done like any finished card.
+  if (status === 'done' && patch.result) {
+    if (!deps.hivePatchTask(card.id, { status: 'done' })) return { ok: false, spoken: `I couldn't update "${card.title}" right now.` };
+  } else if (status && !deps.hiveMoveTask(card.id, status as HiveTask['status'])) {
+    return { ok: false, spoken: `I couldn't update "${card.title}" right now.` };
+  }
+  attribute(deps, 'update_task', card.id, { status: status || card.status });
   return { ok: true, spoken: `Updated "${card.title}"${status ? ` to ${status}` : ''}.` };
 }
 
@@ -502,15 +517,15 @@ function execGateTool(deps: RealtimeActionDeps, a: Record<string, unknown>): Act
 
 function execDeleteTask(deps: RealtimeActionDeps, a: Record<string, unknown>): ActionResult {
   const ref = str(a.taskId) || str(a.task) || str(a.title);
-  if (!ref) return { ok: false, spoken: 'Which task should I delete?' };
+  if (!ref) return { ok: false, spoken: 'Which task should I close?' };
   const { card, ambiguous } = findCard(deps, ref);
   if (ambiguous) return { ok: false, spoken: `Which one — ${ambiguous.map((c) => `"${c.title}"`).join(', or ')}?` };
   if (!card) return { ok: false, spoken: `I couldn't find a task matching "${ref}".` };
-  if (!deps.hiveDeleteTask(card.id)) {
-    return { ok: false, spoken: `I couldn't delete "${card.title}" right now.` };
+  if (!deps.hiveCloseTask(card.id, str(a.reason) || undefined)) {
+    return { ok: false, spoken: `I couldn't close "${card.title}" right now.` };
   }
   attribute(deps, 'delete_task', card.id, { title: card.title.slice(0, 120) });
-  return { ok: true, spoken: `Deleted the task "${card.title}". Recreate it any time if that was wrong.` };
+  return { ok: true, spoken: `Closed "${card.title}" as done, your call. It stays on the board, and Michael knows.` };
 }
 
 function execUnarchive(deps: RealtimeActionDeps, a: Record<string, unknown>): ActionResult {
@@ -706,8 +721,12 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
   if (verb === 'create_schedule') {
     const label = str(a.label) || str(a.name) || str(a.title);
     // A schedule says when and which job (its name); how the job is done lives
-    // in the agent's Work style (owner, 2026-09-25), so no prompt is taken.
+    // in the agent's Work style (owner, 2026-09-25). Its focus area says what
+    // to concentrate on in each run, and every new job needs one
+    // (docs/designs/schedule-focus-areas.md, FA1).
     if (!label) return { ok: false, spoken: 'I need a name for the schedule, the job it runs.' };
+    const focus = cleanFocus(a.focus);
+    if (!focus) return { ok: false, spoken: `What should the "${label}" run focus on each time? A sentence is enough.` };
     const minutes = typeof a.intervalMinutes === 'number' && isFinite(a.intervalMinutes)
       ? Math.min(7 * 24 * 60, Math.max(5, Math.round(a.intervalMinutes)))
       : 60;
@@ -720,6 +739,7 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
       intervalMs: minutes * 60_000,
       to: targetId,
       body: '',
+      focus,
       enabled: true,
       // Spoken by the owner and confirmed by them, so it is the owner's.
       createdBy: 'owner'
@@ -735,7 +755,7 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
     return {
       ok: true,
       needsConfirm: true,
-      spoken: `You want a new schedule "${label}", every ${minutes} minutes, messaging ${targetId}. To create it, say "confirm" or "schedule". Say "cancel" to stop.`
+      spoken: `You want a new schedule "${label}", every ${minutes} minutes, messaging ${targetId}, focused on: ${focus} To create it, say "confirm" or "schedule". Say "cancel" to stop.`
     };
   }
 

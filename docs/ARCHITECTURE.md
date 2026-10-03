@@ -100,7 +100,15 @@ src/
     handoffRule.ts           only Michael assigns: the router sends a teammate's request to another teammate to him
     agentProfile.ts          splits an agent's role line into the parts its Profile tab shows
     messageView.ts           the Messages tab as a day-grouped history, office notices counted on one line
-    askMeRouting.ts          where an owner's Ask me answer goes: the agent that raised the question
+    askMeRouting.ts          where an owner's Ask me answer goes: the agent that raised the question, and
+                             Michael as a request to route the follow up
+    ownerRequests.ts         Michael's open requests from the owner, Blocked cards with nothing asked, the launch
+                             catch-up and "hasn't moved this" in office hours (docs/designs/card-lifecycle.md)
+    starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
+    workStyleUpdates.ts      a newer default job description offered on Ask me to someone already hired
+    michaelWorkStyle.ts      Michael's default Work style
+    agentAccess.ts           what an agent can really reach, for its profile's Uses row
+    submitConfirm.ts         confirms a line typed into an agent's terminal was submitted, pressing Enter again if not
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring
@@ -125,6 +133,8 @@ src/
                              Michael's Office schedule tab (office mode); rules live in shared/missions.ts
     triggers/WhenLines,      the several "when" lines one schedule can have
     ScheduleRequestCards,    Ask me cards for schedule requests Michael passed to the owner (Approve / Decline)
+    WorkStyleUpdateCards,    Ask me cards offering a newer default job description (Use the new one / Keep mine)
+    ScheduledJobs,           an agent's scheduled jobs and their focus areas, shown with its Work style
     AddAgentModal,           the hire wizard (Who, Job, Role, Finalize); EditAgentModal edits the plain work style
     ProfileTab,              the first tab on every agent: job, folder (Open folder), full instructions
     MemoryNotes,             an agent's Memory tab as grouped notes; "Show the file" keeps the raw text
@@ -133,7 +143,8 @@ src/
     CliUpdateNotice,         "team upgrade ready" title-bar chip and corner note; its click runs closing time
                              with relaunch, "later" waits for a newer version (localStorage cth.cliUpdateLaterFor)
     ToolWaterfall,           per-agent tool-span waterfall for the observability view
-    TasksKanban,             dependency-aware kanban board (the Tasks view)
+    TasksKanban,             dependency-aware kanban board (the Tasks view); the owner closes a card as Done,
+                             never deletes it (hiveTasks.ts holds the card types and parser)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
     MessageQueueComposer,    park messages for a busy agent
     scene/studio/            the office studio: isometric SVG stage, pods, Michael's office, life layer (branding/DESIGN.md 8)

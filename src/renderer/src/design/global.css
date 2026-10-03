@@ -507,9 +507,27 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 @keyframes cth-arrive { 0% { transform: translateY(-60px); opacity: 0; } 60% { opacity: 1; } 100% { transform: translateY(0); opacity: 1; } }
 .cth-st-lightsout { filter: brightness(.66) saturate(.3); transition: filter 1.4s var(--cth-ease); }
 .cth-st-lightsout * { animation-play-state: paused !important; }
+/* Closing time: a pod whose people have all gone home loses its chip as its
+   lights go out, over the same 1.4 s (docs/designs/closing-floor.md, 8A). */
+.cth-st-gone { pointer-events: none; animation: cth-st-gone 1.4s var(--cth-ease) forwards; }
+@keyframes cth-st-gone { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .cth-st-gone { animation: none; opacity: 0; visibility: hidden; } }
 .cth-st-welcome { color: var(--cth-green-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cth-green) 55%, transparent), var(--cth-shadow-md); }
 .cth-needs-bump { animation: cth-needs-bump 700ms cubic-bezier(.3,1.6,.5,1) both; }
 @keyframes cth-needs-bump { 0% { transform: scale(1); } 30% { transform: scale(1.14) rotate(-3deg); } 60% { transform: scale(.97) rotate(1deg); } 100% { transform: scale(1); } }
+/* The right column slides in and out over 240 ms while the office eases to
+   its new size (docs/designs/needs-you-empty-state.md, D9 and eng R3). */
+.cth-col-in { animation: cth-col-in 240ms cubic-bezier(.2,0,0,1) backwards; } /* not `both`: a finished
+   animation that keeps a transform makes the column the containing block for fixed dialogs */
+.cth-col-out { animation: cth-col-out 240ms cubic-bezier(.2,0,0,1) both; pointer-events: none; }
+@keyframes cth-col-in { from { transform: translateX(var(--cth-col-shift, 100%)); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes cth-col-out { from { transform: none; opacity: 1; } to { transform: translateX(var(--cth-col-shift, 100%)); opacity: 0; } }
+[dir="rtl"] .cth-col-in, [dir="rtl"] .cth-col-out { --cth-col-shift: -100%; }
+@media (prefers-reduced-motion: reduce) { .cth-col-in, .cth-col-out { animation: none; } }
+/* A pod's "for you" chip is a button (D11). */
+.cth-for-you { background: var(--cth-coral-soft); }
+.cth-for-you:hover { background: color-mix(in srgb, var(--cth-coral-base) 22%, var(--cth-card)); }
+.cth-for-you:focus-visible { outline: 2px solid var(--cth-coral-base); outline-offset: 2px; }
 .cth-st-daylight { transition: background 2s var(--cth-ease); }
 .cth-st-wire { animation: cth-wire 3.2s var(--cth-ease) both; }
 @keyframes cth-wire { 0% { opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
@@ -523,6 +541,9 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 /* Ask me cards (DESIGN.md 7.8). */
 .cth-askme-head:hover .cth-askme-title { color: var(--cth-indigo-text) !important; }
 .cth-askme-head:focus-visible { outline: 2px solid var(--cth-indigo); outline-offset: 4px; border-radius: 6px; }
+/* Focus moves to the Needs you heading from code: no ring for a mouse, one for the keyboard. */
+.cth-needs-heading:focus { outline: none; }
+.cth-needs-heading:focus-visible { outline: 2px solid var(--cth-indigo); outline-offset: 4px; border-radius: 6px; }
 .cth-askme-card:not(.is-open):hover { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-md) !important; }
 .cth-askme-card:hover .cth-askme-chevron, .cth-askme-chevron:hover { background: var(--cth-neutral-soft); color: var(--cth-ink) !important; }
 .cth-askme-q p:first-child { margin-top: 0; }

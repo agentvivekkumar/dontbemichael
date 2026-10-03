@@ -46,3 +46,15 @@ test('the hire dialog can\'t be closed while Hire runs (pre-landing review)', ()
   assert.match(src, /<Dialog\n      title=\{tr\('addAgent\.title'\)\}\n      onClose=\{close\}/, 'Esc and the backdrop go through close() too');
   assert.match(src, /try \{ await submitHire\(\); \} finally \{ submitting\.current = false; \}/);
 });
+
+// 2026-10-02: Edit agent's Save changes was cut off. Opened from a person's
+// panel, the dialog was trapped by the column (a transform kept by its slide in
+// animation) and clipped by its overflow.
+test('dialogs render into document.body, and the column keeps no transform after sliding in', () => {
+  // Value: protects=every dialog sizes to the window and is never clipped by the panel it was opened from; fails_when=Dialog renders in place again or the column animation holds its transform; why_new=nothing checked where dialogs mount; seam=none
+  const frame = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/shell/Dialog.tsx'), 'utf8');
+  assert.match(frame, /return createPortal\(\(/);
+  assert.match(frame, /\), document\.body\);/);
+  const css = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/design/global.css'), 'utf8');
+  assert.match(css, /\.cth-col-in \{ animation: cth-col-in 240ms cubic-bezier\(\.2,0,0,1\) backwards; \}/);
+});

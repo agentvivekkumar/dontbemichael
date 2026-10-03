@@ -1,10 +1,11 @@
 'use strict';
 
 /**
- * The right column's Needs you board (branding/DESIGN.md 7.6): open on launch,
- * closed by picking a person or opening one of Michael's tabs, and opened by
- * the old Ask me tab request. Focus mode is hidden in this build, so nothing
- * opens it, not even a saved preference. Run against the real store.
+ * The right column (docs/designs/needs-you-empty-state.md, eng R1 and R5):
+ * closed at launch so the office takes the window, the board on the owner's
+ * click or once at launch when something waits, a person's panel when one is
+ * picked. Focus mode is hidden in this build, so nothing opens it, not even a
+ * saved preference. Run against the real store.
  */
 
 const test = require('node:test');
@@ -30,28 +31,34 @@ function runStore(body) {
   return JSON.parse(execFileSync(process.execPath, ['-e', script], { cwd: path.resolve(__dirname, '..'), encoding: 'utf8' }));
 }
 
-test('Needs you opens on launch, closes for a person or a tab, the Ask me request opens it; focus mode stays shut', () => {
-  // Value: protects=the right column shows the board or a person exactly as the owner asked; fails_when=select, openAgentMemory or requestCommandCenterTab stop setting needsYouOpen, or 'human' starts bumping a tab that no longer exists, or a SHOW_FOCUS_MODE guard goes; why_new=the store was only regex-pinned (michael-tabs, hidden-surfaces); seam=none
+test('the right column: closed at launch, a person or a tab shows the panel, Ask me shows the board, close closes; focus mode stays shut', () => {
+  // Value: protects=the right column shows nothing, the board or a person exactly as the owner asked; fails_when=select, openAgentMemory or requestCommandCenterTab set the wrong column, 'human' starts bumping a tab, the launch default reopens the board, or a SHOW_FOCUS_MODE guard goes; why_new=rewritten on rightColumn (eng R5), keeping every check of the needsYouOpen version; seam=none
   const r = runStore(`
-    out.atLaunch = s().needsYouOpen;
+    out.atLaunch = s().rightColumn;
     s().select('pam');
-    out.afterSelect = s().needsYouOpen;
+    out.afterSelect = s().rightColumn;
     s().requestCommandCenterTab('human');
-    out.afterHuman = [s().needsYouOpen, s().ccTabRequest];
+    out.afterHuman = [s().rightColumn, s().ccTabRequest];
     s().requestCommandCenterTab('triggers');
-    out.afterTab = [s().needsYouOpen, s().ccTabRequest];
+    out.afterTab = [s().rightColumn, s().ccTabRequest];
     s().requestCommandCenterTab('human');
     s().openAgentMemory('pam');
-    out.afterMemory = [s().needsYouOpen, s().selectedId, s().memoryFocusRequest];
-    s().setNeedsYouOpen(true);
-    out.afterSet = s().needsYouOpen;
+    out.afterMemory = [s().rightColumn, s().selectedId, s().memoryFocusRequest];
+    s().setRightColumn('closed');
+    out.afterClose = s().rightColumn;
+    s().openNeedsYou({ taskId: 't1' });
+    out.afterOpen = [s().rightColumn, s().needsYouFocus];
+    s().openNeedsYou();
+    out.afterOpenAgain = s().needsYouFocus;
   `);
-  assert.equal(r.atLaunch, true, 'the board is the default right column');
-  assert.equal(r.afterSelect, false, 'picking a person shows their panel');
-  assert.deepEqual(r.afterHuman, [true, null], 'Ask me opens the board and requests no tab');
-  assert.deepEqual(r.afterTab, [false, { tab: 'triggers', seq: 1 }], 'any other tab closes the board');
-  assert.deepEqual(r.afterMemory, [false, 'god', { agentId: 'pam', seq: 2 }], 'a memory link opens Michael\'s panel');
-  assert.equal(r.afterSet, true);
+  assert.equal(r.atLaunch, 'closed', 'intended change: the office takes the window at launch (D1)');
+  assert.equal(r.afterSelect, 'person', 'picking a person shows their panel');
+  assert.deepEqual(r.afterHuman, ['board', null], 'Ask me opens the board and requests no tab');
+  assert.deepEqual(r.afterTab, ['person', { tab: 'triggers', seq: 1 }], 'any other tab shows the panel');
+  assert.deepEqual(r.afterMemory, ['person', 'god', { agentId: 'pam', seq: 2 }], 'a memory link opens Michael\'s panel');
+  assert.equal(r.afterClose, 'closed', 'intended change: closing collapses the column, not back to the board (D6)');
+  assert.deepEqual(r.afterOpen, ['board', { seq: 1, taskId: 't1' }], 'a for you chip opens the board at its ask (D11)');
+  assert.deepEqual(r.afterOpenAgain, { seq: 2 }, 'each open asks for focus again (D10)');
   // Focus mode stays shut in this build, even with a saved preference.
   const f = runStore(`
     out.atLaunch = s().fullscreenAgentId;

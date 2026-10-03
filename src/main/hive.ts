@@ -42,10 +42,11 @@ import {
   type AgentProvider
 } from '../shared/agentProvider';
 import { MCP_CATALOG } from '../shared/mcpCatalog';
-import { openAskIndex } from '../shared/askMeRouting';
+import { cardConversation, openAskIndex } from '../shared/askMeRouting';
 import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
+import { answersWithoutRequest, blockedWithNothingAsked, openOwnerRequests, ownerChangeNote, type CardLike, type MessageLike, type OwnerCardChange, type OwnerRequest, type StuckCard } from '../shared/ownerRequests';
 import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, MCP_RESOURCE_TOOLS, type SpawnConnectorPlan } from '../shared/claudeConnectors';
 import { MAX_HOOK_FRAME_BYTES } from '../shared/hookEvents';
@@ -68,12 +69,13 @@ A schedule runs one of your jobs on a clock. You never change a schedule yoursel
 
 \`\`\`json
 { "to": "scheduler", "act": "request", "subject": "schedule", "body": "Invoices slip past 30 days because nobody checks them; a Friday check catches them first.",
-  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" } } }
+  "schedule": { "op": "add", "label": "Check unpaid invoices", "when": { "days": ["fri"], "at": "09:00" }, "focus": "Invoices more than 30 days unpaid: list each with its amount and send the list to Michael." } }
 \`\`\`
 
 - \`op\`: \`list\` (see your schedules and their ids), \`add\`, \`update\`, \`pause\`, \`resume\` or \`delete\`.
 - \`when\`: \`{ "every": "2h" }\` (m, h or d) runs around the clock; \`{ "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }\` limits it to those days and hours; \`{ "days": ["mon", "fri"] | ["weekdays"], "at": "09:00" }\` runs at a time. One job can have several: \`"when": [ { "every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"] }, { "days": ["weekends"], "at": "14:00" } ]\` runs at whichever comes due first. Ask for one schedule with several times rather than several schedules for the same job.
-- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, or both.
+- \`focus\`: what to concentrate on when this job runs, within your Work style, in a sentence or two. Required for \`add\`. It comes with each run of the job and applies to that run only; it can narrow or direct your work, never widen your duties or approvals.
+- \`update\`, \`pause\`, \`resume\` and \`delete\` need the schedule's \`id\`. \`update\` takes a new \`label\`, \`when\`, \`focus\`, or any of them.
 - \`body\` says why, in a sentence or two the owner reads on the card: what you noticed and what the change fixes. A request without it is not sent.
 - One job, one request: ask for every time a job needs in one \`when\` list. A second request about the same job joins the first as one card.
 - You can only ask about your own schedules. The scheduler replies to say it was sent, or why not, and again when the owner decides.
@@ -160,6 +162,12 @@ export interface HiveTask {
    *  once and never persisted), so a GET status lookup can match by hashing the
    *  presented token. Read-only capability: it never widens routing or exposure. */
   webhook?: { tokenHash: string };
+  /** Set when the card ended by the owner's decision rather than finished work
+   *  (card-lifecycle.md section 4, D2): it is Done like any other, marked
+   *  "Closed by owner". Cleared if the owner moves it out of Done. */
+  closedBy?: 'owner';
+  closedAt?: string;
+  closedReason?: string;
 }
 
 /**
@@ -180,7 +188,8 @@ export const HOUSE_RULES = [
   '2. When you don\'t know or can\'t find something, say so and say what would answer it. "I couldn\'t find last month\'s supplier invoice" helps the owner; a plausible guess misleads them.',
   '3. Keep what you checked apart from what you worked out. Mark estimates and assumptions as estimates and assumptions.',
   '4. Report outcomes as they are: what is done and checked, what failed and why, and what you skipped. Call work finished only when it is.',
-  '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.'
+  '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.',
+  '6. When your instructions or a request ask for something your tools cannot do, because no tool does it or a tool refuses, report it instead of skipping it: what you could not do, for which task, and why. A team member tells Michael; Michael tells the owner on the Ask me board. Do not work around a missing or refused tool. Your instructions can describe work you have no tool for, so check before you call that step done.'
 ].join('\n');
 
 /**
@@ -276,16 +285,17 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     '4. Drop it.',
     '',
     '## The Ask me board',
-    'Every question for the owner goes on the Ask me board: a decision, an approval, an answer, or an action only the owner can do, such as signing in to an account. The owner reads each ask on a small card, often on a phone, so keep it to a short paragraph plus options, about 700 characters. Open with one bold sentence saying exactly what you need. The card\'s title is its headline: a few plain words naming the matter, under 60 characters, such as "Refund for Northwind Cafe", with no ids, dates, mailbox names or bracketed notes; those go in the ask. Give each option its own bullet or number, with a blank line between paragraphs. Put amounts, file names and account names in backticks. Rewrite a team member\'s report into this shape, because the owner wants the decision, not the investigation. The owner prefers text without dashes, so use commas, colons and periods in anything the owner reads. Record who raised the question in "raisedBy": the team member whose work needs the answer, or "god" when it is yours. The answer goes straight to them and into their memory, and you are told so you can unblock the card and route any follow-up.',
+    'Every question for the owner goes on the Ask me board: a decision, an approval, an answer, or an action only the owner can do, such as signing in to an account. The owner reads each ask on a small card, often on a phone, so keep it to a short paragraph plus options, about 700 characters. Open with one bold sentence saying exactly what you need. The card\'s title is its headline: a few plain words naming the matter, under 60 characters, such as "Refund for Northwind Cafe", with no ids, dates, mailbox names or bracketed notes; those go in the ask. Give each option its own bullet or number, with a blank line between paragraphs. Put amounts, file names and account names in backticks. Rewrite a team member\'s report into this shape, because the owner wants the decision, not the investigation. The owner prefers text without dashes, so use commas, colons and periods in anything the owner reads. Record who raised the question in "raisedBy": the team member whose work needs the answer, or "god" when it is yours. The answer goes to them and into their memory, and comes to you as a request about the card: route the follow-up (hand the card to the same team member or another, or ask the owner again), then close the request with a "done" reply, in_reply_to its id. Until you do, it stays in your open requests from the owner, and the owner sees the card as waiting on you.',
+    'A card ends only as Done: with a "result" when the work is finished, or, when the owner decides to stop it (an answer such as "drop it"), with "closedBy": "owner" and a "closedReason" in the owner\'s words, so the board shows it was their call. Never delete a card. When the owner closes or moves a card themselves, you get a note saying so: tell whoever has it and route the work to match.',
     '',
     '## Keeping the task board accurate',
-    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Keep the card\'s "notes" to what the work is and where it stands, in a few plain sentences the owner can read: the owner sees them when they open the card. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
+    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Keep the card\'s "notes" to what the work is and where it stands, in a few plain sentences the owner can read: the owner sees them when they open the card. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. A card is "blocked" only while its question for the owner is open on Ask me, because Blocked tells the owner the card waits on them. A card waiting on someone outside the office, or on a team member, is "doing", with who it waits on in its notes. When you close a request from the owner, leave its card in one of these states. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
     '',
     '## Schedule requests',
     'You manage the office, so you decide the team\'s schedule requests. Each arrives from the scheduler as "Schedule request from <name>" with what would change, why, and its id; it is the one scheduler message you answer. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
     '',
     '## Scheduled runs',
-    'A scheduled run names a job. At the hourly ops standup, review every team member through fleet.json: who is doing what, whether each is still running, whether in-flight cards are on track, and whether anything is blocked or unowned. Re-engage anyone stalled, flag at-risk cards, and keep the board accurate. A scheduled run needs no reply, so do not answer it.',
+    'A scheduled run names a job, and its message carries that job\'s focus for this run only, such as what to cover at the hourly ops standup. A scheduled run needs no reply, so do not answer it.',
     '',
     '## Staying cheap',
     'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
@@ -1781,7 +1791,7 @@ export class HiveManager {
       : '';
     const godLine = meta.isGod
       ? 'You are the GOD / ORCHESTRATOR of this hive — your job is to ORCHESTRATE, not to implement: maintain live situational awareness and delegate the work. (1) AWARENESS — always know what is going on: keep an accurate picture of every agent (active vs archived/idle), the task board, and all in-flight work; drain your inbox continually and triage every other agent\'s requests, answering clarifications so the team runs autonomously. (2) DELEGATE — decompose work and fan it out to the hive agents via their inboxes (route messages and assign owners; do not do their jobs); do NOT take on grunt implementation yourself. Stay aware of who is already on the floor and delegate OPPORTUNISTICALLY: BEFORE you spawn anything, CHECK THE LIVE ROSTER (active agents in registry.json + their state in fleet.json) and prefer routing to an EXISTING agent that fits — above all when the request names one ("ask Pam to…", "have Jim…"), route to that agent instead of reflexively creating a new one. Reuse an idle or already-running agent whose role matches; only spawn a fresh agent when no existing one is a sensible fit, and say that you checked. One capable owner beats a duplicate. (3) OWN ONLY THE IMPORTANT, high-leverage things — task decomposition, dispatch decisions, sign-offs, conflict resolution, branch integration, and final QA — and remain the sole scribe of board.md. You are otherwise fully autonomous — there is NO separate approval queue. For the genuinely critical (destructive actions, spending real money, scope changes, unresolvable conflicts), ask the human directly in your own session and let the tool-permission prompt gate the action; the human approves natively, including remotely from their phone via /remote-control. Keep the team unblocked. When you DISPATCH a task, write it as a 4-part contract so the agent can run autonomously: (1) OBJECTIVE — the concrete goal; (2) OUTPUT — the expected deliverable/format; (3) TOOLS — what to use or avoid, and any references to read instead of re-deriving; (4) BOUNDARIES — scope limits + the definition of done. Pass references (file paths, message ids, board sections), not pasted content — keep dispatches short.'
-        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests. At the hourly ops standup, review every agent via fleet.json: who is doing what, and whether each is still running (not stalled or idle-stale); check whether in-flight tasks are on track and whether anything is blocked or unowned; re-engage anyone stalled, over-budget, or breaker-armed, flag stale agents and at-risk tasks, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). Keep the card's "notes" to what the work is and where it stands, in a few plain sentences: the owner reads them when they open the card. HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). When the app tells you a team member is waiting on something in their terminal, you can't answer it there: put it on ASK ME as it says, so the owner answers it in a 1:1. BEFORE YOU ADD AN ASK, read the asks already open on the board (a card whose newest humanQA entry has no "a"). If the new ask changes, replaces or contradicts one of them, do not open a second question: append the new ask to THAT card, because a card's newest ask replaces its older unanswered one, which is then withdrawn and never shown. If one answer settles several cards, ask it once and say on the others which card to answer. WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Give the card a TITLE the owner can read at a glance: a few plain words naming the matter, under 60 characters (e.g. "Refund for Northwind Cafe"), with no ids, dates, mailbox names or bracketed notes; those go in the ask. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives as an inbox message to you: unblock the card, and route any follow-up, so work continues. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
+        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests. A scheduled run carries its job's focus for that run (what to cover at the hourly ops standup comes in its message); re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). Keep the card's "notes" to what the work is and where it stands, in a few plain sentences: the owner reads them when they open the card. HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). When the app tells you a team member is waiting on something in their terminal, you can't answer it there: put it on ASK ME as it says, so the owner answers it in a 1:1. BEFORE YOU ADD AN ASK, read the asks already open on the board (a card whose newest humanQA entry has no "a"). If the new ask changes, replaces or contradicts one of them, do not open a second question: append the new ask to THAT card, because a card's newest ask replaces its older unanswered one, which is then withdrawn and never shown. If one answer settles several cards, ask it once and say on the others which card to answer. WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Give the card a TITLE the owner can read at a glance: a few plain words naming the matter, under 60 characters (e.g. "Refund for Northwind Cafe"), with no ids, dates, mailbox names or bracketed notes; those go in the ask. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives to you as a REQUEST about that card: route the follow-up (redelegate to the same agent or another, or ask the human again), then reply "done" with in_reply_to its id, so work continues; it stays open until you do. A card ends only as done: with a "result" when finished, or with "closedBy": "owner" and a "closedReason" when the owner decides to stop it; never delete a card. A card is "blocked" only while its question for the human is open on ASK ME; a card waiting on someone outside the office or on a teammate is "doing", with who it waits on in its notes. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
@@ -1940,6 +1950,16 @@ export class HiveManager {
       this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: msg.from, to: msg.to, id: msg.id });
       return;
     }
+    // Michael closing an owner request (docs/designs/card-lifecycle.md): his
+    // reply to the owner is noted as the closure, then routed like any message
+    // to the owner: logged, shown on the floor and seen by the observers
+    // (closing time reads CLOSING-TIME-COMPLETE there). It is never delivered
+    // back to him, because the targets below drop the sender ("human" resolves
+    // to Michael). An early return here once hid every such reply from the
+    // floor and the office log, and from closing time (2026-10-03).
+    if (msg.from === godId && resolveTo(msg.to) === godId && msg.in_reply_to) {
+      this.appendLog({ kind: 'owner-request-closed', id: msg.id, in_reply_to: msg.in_reply_to });
+    }
     const targets = msg.to === 'broadcast'
       // The roster for fan-out is the ACTIVE registry: skip the send-only prep
       // assistant and any archived agent (closed tab). Hookless providers are
@@ -2080,6 +2100,38 @@ export class HiveManager {
     if (this.routerTimer) { clearInterval(this.routerTimer); this.routerTimer = null; }
   }
 
+  /** How long an unreadable outbox file may be younger than before the router
+   *  gives up on it: long enough for any write to finish. */
+  static readonly OUTBOX_WRITE_GRACE_MS = 10_000;
+
+  private stillBeingWritten(full: string, now = Date.now()): boolean {
+    try { return now - statSync(full).mtimeMs < HiveManager.OUTBOX_WRITE_GRACE_MS; } catch { return false; }
+  }
+
+  /** When each agent was last told a file of theirs was unreadable. */
+  private quarantineNoticeAt = new Map<string, number>();
+  /** At most one "not delivered" notice per agent in this window, so an agent
+   *  that keeps writing broken files is not woken into a loop. */
+  static readonly QUARANTINE_NOTICE_GAP_MS = 10 * 60_000;
+
+  /** Set an unreadable outbox file aside and tell its sender, who otherwise
+   *  believes it was delivered. */
+  private quarantine(id: string, outbox: string, f: string): void {
+    this.appendLog({ kind: 'drop', reason: 'malformed-json', from: id, file: f });
+    try { renameSync(join(outbox, f), join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+    const last = this.quarantineNoticeAt.get(id) ?? 0;
+    if (Date.now() - last < HiveManager.QUARANTINE_NOTICE_GAP_MS) return;
+    this.quarantineNoticeAt.set(id, Date.now());
+    try {
+      this.routeMessage(this.normalize({
+        to: id,
+        act: 'inform',
+        subject: 'Message not delivered',
+        body: `Your outbox file ${f} is not valid JSON, so nobody received it. Write the message again as one valid JSON object, then check it left your outbox. The unreadable copy is in your outbox/.sent as bad-${f}.`
+      }, 'system'));
+    } catch { /* the drop is logged */ }
+  }
+
   routeOnce(): number {
     const root = this.root();
     if (!root) return 0;
@@ -2095,22 +2147,29 @@ export class HiveManager {
         try {
           const raw = readFileSync(full, 'utf8');
           let partial: Partial<HiveMessage>;
+          // A repaired file is archived as repaired, so everything that reads
+          // .sent later (owner requests, the log) parses what was delivered.
+          let repairedText: string | null = null;
           try {
             partial = JSON.parse(raw) as Partial<HiveMessage>;
           } catch {
             const repaired = repairLiteralLineBreaksInJsonStrings(raw);
-            if (!repaired.changed) {
-              this.appendLog({ kind: 'drop', reason: 'malformed-json', from: id, file: f });
-              try { renameSync(full, join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+            let parsed: Partial<HiveMessage> | null = null;
+            if (repaired.changed) {
+              try { parsed = JSON.parse(repaired.text) as Partial<HiveMessage>; } catch { /* still malformed */ }
+            }
+            if (!parsed) {
+              // A file still being written reads as empty or cut short: a shell
+              // `cat > file <<EOF` creates it empty, then fills it. Read it again
+              // on a later tick; quarantine it only once it has sat unchanged
+              // and still unreadable (2026-10-03: Michael's CLOSING-TIME-COMPLETE
+              // was caught mid-write, quarantined, and closing time hung).
+              if (this.stillBeingWritten(full)) continue;
+              this.quarantine(id, outbox, f);
               continue;
             }
-            try {
-              partial = JSON.parse(repaired.text) as Partial<HiveMessage>;
-            } catch {
-              this.appendLog({ kind: 'drop', reason: 'malformed-json', from: id, file: f });
-              try { renameSync(full, join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
-              continue;
-            }
+            partial = parsed;
+            repairedText = repaired.text;
             this.appendLog({
               kind: 'outbox-repair',
               from: id,
@@ -2137,6 +2196,9 @@ export class HiveManager {
             continue;
           }
           this.routeMessage(msg);
+          // Repaired text replaces the original in place, then one rename
+          // archives it, so a failed step can never deliver it twice.
+          if (repairedText !== null) writeFileSync(full, repairedText);
           renameSync(full, join(outbox, '.sent', f)); // archive, don't reprocess
           routed++;
         } catch {
@@ -2175,9 +2237,9 @@ export class HiveManager {
    *  one small edit through the UI deleted every unmodelled field on EVERY card
    *  on the board. Now an unmentioned field keeps its on-disk value.
    *
-   *  Deleting a card still works: the incoming list IS the membership, so a card
-   *  dropped from it (TasksKanban dismiss, the voice delete_task action) is
-   *  gone. Merging protects fields, never card membership. */
+   *  The incoming list IS the membership: merging protects fields, never card
+   *  membership. The app itself never drops a card; a card ends only as Done
+   *  (docs/designs/card-lifecycle.md). */
   writeTasks(tasks: HiveTask[]): void {
     const root = this.root();
     if (!root) return;
@@ -2214,15 +2276,45 @@ export class HiveManager {
     return true;
   }
 
-  /** Delete only the named card from the latest on-disk ledger. */
-  deleteTask(id: string): boolean {
+  /** The owner moves a card (Task detail, voice). Moving it to Done is the
+   *  owner's decision to end it (D2); moving it out of Done clears that. Michael
+   *  is told either way: he orchestrates, the app only records the change. The
+   *  owner never moves a card to Blocked: Blocked means a question waits for
+   *  them on Ask me, which only Michael raises (ship 2026-10-03). */
+  ownerMoveTask(id: string, status: HiveTask['status']): boolean {
+    if (status === 'blocked') return false;
     const ledger = this.tasks() as { tasks?: HiveTask[] };
-    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
-    const next = tasks.filter((task) => task?.id !== id);
-    if (next.length === tasks.length) return false;
-    this.writeTasks(next);
+    const card = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id);
+    if (!card) return false;
+    if (status === 'done') return card.status === 'done' ? true : this.ownerCloseTask(id);
+    const from = card.status;
+    if (!this.patchTask(id, { status, closedBy: undefined, closedAt: undefined, closedReason: undefined })) return false;
+    if (from !== status) this.tellGodOwnerChange(card, { kind: 'moved', from, to: status });
     return true;
   }
+
+  /** The owner ends a card: Done, marked as the owner's decision, never deleted
+   *  (D2). The Tasks view dismiss and the voice delete both land here. */
+  ownerCloseTask(id: string, reason?: string): boolean {
+    const ledger = this.tasks() as { tasks?: HiveTask[] };
+    const card = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id);
+    if (!card) return false;
+    const patch: Partial<Omit<HiveTask, 'id'>> = { status: 'done', closedBy: 'owner', closedAt: new Date().toISOString() };
+    if (reason?.trim()) patch.closedReason = reason.trim().slice(0, 500);
+    if (!this.patchTask(id, patch)) return false;
+    this.tellGodOwnerChange(card, { kind: 'closed', reason: patch.closedReason });
+    return true;
+  }
+
+  private tellGodOwnerChange(card: HiveTask, change: OwnerCardChange): void {
+    const godId = this.registry().godId;
+    if (!godId) return;
+    const note = ownerChangeNote(card, change);
+    try {
+      this.send({ to: godId, act: 'inform', subject: note.subject, body: note.body, conversation: cardConversation(card.id) }, 'human');
+    } catch { /* the card change stands; Michael sees it on the board */ }
+  }
+
   memory(id: string): string {
     if (!this.root()) return '';
     const p = join(this.agentDir(id), 'memory.md');
@@ -2311,6 +2403,82 @@ export class HiveManager {
       if (q && (q.raisedBy ?? t.assignee) === id) n++;
     }
     return n;
+  }
+
+  /** Michael's open requests from the owner, as of the last refresh. */
+  private ownerRequestsCache: OwnerRequest[] = [];
+  /** Blocked cards with nothing asked, as of the last refresh. */
+  private stuckCardsCache: StuckCard[] = [];
+
+  /**
+   * Recompute Michael's open requests from the owner
+   * (docs/designs/card-lifecycle.md): owner answers he has not closed with a
+   * reply. Run on the fleet tick so a prompt never scans folders; reads only
+   * the last 30 days of his mail.
+   */
+  refreshOwnerRequests(now = Date.now()): OwnerRequest[] {
+    if (!this.root()) return (this.ownerRequestsCache = []);
+    const dir = this.agentDir(this.registry().godId ?? 'god');
+    const since = new Date(now - 30 * 24 * 60 * 60_000).toISOString();
+    const toMichael = [...this.ownerMessages(join(dir, 'inbox'), since), ...this.ownerMessages(join(dir, 'inbox', '.done'), since)];
+    const fromMichael = [...this.ownerMessages(join(dir, 'outbox'), since), ...this.ownerMessages(join(dir, 'outbox', '.sent'), since)];
+    const raw = this.tasks() as { tasks?: unknown };
+    const tasks = Array.isArray(raw?.tasks) ? (raw.tasks as CardLike[]) : [];
+    // A card that has ended (Done, or closed by the owner) needs no routing.
+    const done = new Set(tasks.filter((t) => t?.status === 'done').map((t) => t.id));
+    this.ownerRequestsCache = openOwnerRequests(toMichael, fromMichael).filter((r) => !done.has(r.taskId));
+    // The same tick finds Blocked cards nothing is moving (card-lifecycle.md
+    // section 7): no open ask, no open owner request.
+    this.stuckCardsCache = blockedWithNothingAsked(tasks, this.ownerRequestsCache);
+    return this.ownerRequestsCache;
+  }
+
+  /** Parsed message fields by file path. A file in inbox/.done or outbox/.sent
+   *  never changes, so each is read once, not on every fleet tick. */
+  private messageCache = new Map<string, MessageLike | null>();
+
+  /** The messages in `dir` created at or after `sinceIso` (all when omitted),
+   *  oldest first. Filtered by each message's own time, not its file name:
+   *  agents name their outbox files freely. */
+  private ownerMessages(dir: string, sinceIso?: string): MessageLike[] {
+    if (!existsSync(dir)) return [];
+    const out: MessageLike[] = [];
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
+      const p = join(dir, f);
+      let m = this.messageCache.get(p);
+      if (m === undefined) {
+        try {
+          const raw = JSON.parse(readFileSync(p, 'utf8')) as Partial<HiveMessage>;
+          // An agent's own outbox file often has no created_at (the router adds
+          // it in memory; the archived copy keeps the raw file): use its time.
+          const at = typeof raw.created_at === 'string' && raw.created_at ? raw.created_at : new Date(statSync(p).mtimeMs).toISOString();
+          m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to };
+        } catch { m = null; }
+        // A file still being written is read again next time.
+        if (m || Date.now() - (statSync(p).mtimeMs || 0) > HiveManager.OUTBOX_WRITE_GRACE_MS) this.messageCache.set(p, m);
+      }
+      if (m && (!sinceIso || m.created_at >= sinceIso)) out.push(m);
+    }
+    return out;
+  }
+
+  ownerRequests(): OwnerRequest[] {
+    return this.ownerRequestsCache;
+  }
+
+  stuckCards(): StuckCard[] {
+    return this.stuckCardsCache;
+  }
+
+  /** Blocked cards whose answered question has no owner request to Michael
+   *  yet (card-lifecycle.md section 5). Reads all his mail; run once a launch. */
+  ownerAnswersWithoutRequest(): ReturnType<typeof answersWithoutRequest> {
+    if (!this.root()) return [];
+    const dir = this.agentDir(this.registry().godId ?? 'god');
+    const toMichael = [...this.ownerMessages(join(dir, 'inbox')), ...this.ownerMessages(join(dir, 'inbox', '.done'))];
+    const raw = this.tasks() as { tasks?: unknown };
+    const tasks = Array.isArray(raw?.tasks) ? (raw.tasks as CardLike[]) : [];
+    return answersWithoutRequest(tasks, toMichael);
   }
 
   /** Messages an agent sent in the last day that asked for a reply and haven't
@@ -3473,7 +3641,7 @@ const NO_FIT_CAST = Object.entries(OFFICE_ROLES)
 
 /** Michael's rule for a job nobody on the team covers (owner, 2026-09-24).
  *  Replaces starting a temporary worker: the owner decides, on the ASK ME board. */
-const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask with "raisedBy": "god", written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives, carry out their choice and unblock the card. Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
+const NO_FIT_LINE = `WHEN NO ONE FITS (this overrides anything above about spawning a fresh agent: you cannot start one): before you take on a request, check it against every team member's role (registry.json). If it is outside all of them AND big enough that doing it yourself would pull you off running the floor (research, a document or spreadsheet to build, anything past a few minutes of hands-on work), do NOT do it yourself and do NOT start a new agent. Put it on the owner's ASK ME board instead: add a card to tasks.json for the request with "status": "blocked" and one humanQA ask with "raisedBy": "god", written the short markdown way described above. Open with a bold sentence naming the job and why nobody on the team covers it, then give numbered options and mark the one you recommend: 1. add a team member for it (name the role, and the cast member whose standing job matches: ${NO_FIT_CAST}; the owner adds them with Add agent), 2. hand it to the closest team member (name them, and what they would put aside for it), 3. you do it yourself this once (say roughly how long it keeps you off the floor), 4. drop it. When the answer arrives as a request, carry out their choice, then close the request with "done". Small jobs (a quick answer, a short reply, a lookup) are not this: do or route them as usual.`;
 
 /** PROTOCOL.md's section on starting a temporary worker. Included only in a
  *  build that allows them (ALLOW_TEMP_WORKERS); otherwise the protocol never
@@ -3581,7 +3749,7 @@ card \`"status": "blocked"\` and appends the ask to its \`humanQA\` array:
 
 The harness shows the open ask on the ASK ME board and in the ASK ME tab. The human's reply lands in
 the same entry as \`"a"\`, goes to the agent that raised it (\`raisedBy\`) and into that agent's
-memory notes, and god is told so he can unblock the card. Every past entry stays on the card — that
+memory notes, and god gets it as a request to route the follow-up and close with "done". Every past entry stays on the card — that
 trail is the decision history.
 
 **Write the ask short, and in markdown.** The card renders it, so plain-text asterisks and backticks

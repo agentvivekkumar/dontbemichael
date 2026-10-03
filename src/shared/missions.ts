@@ -34,6 +34,11 @@ export interface ScheduledMission {
   /** A legacy prompt on older schedules (sent after the standard message), or
    *  the heartbeat's own description. New schedules leave it empty. */
   body: string;
+  /** The job's focus area (docs/designs/schedule-focus-areas.md, FA1): what the
+   *  agent concentrates on when this job runs, within its Work style, in plain
+   *  words. Sent only in the run message (FA2). Required on new jobs; older
+   *  jobs without one keep running as before (FA4). */
+  focus?: string;
   enabled: boolean;
   autoCompact?: boolean;
   lastFiredAt?: number;
@@ -49,6 +54,31 @@ export interface ScheduledMission {
 }
 
 export const OWNER = 'owner';
+
+/** The longest focus area a job keeps. */
+export const FOCUS_MAX = 600;
+
+/** A focus area as stored: trimmed, one paragraph, capped; undefined when empty. */
+export function cleanFocus(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.replace(/\s+/g, ' ').trim().slice(0, FOCUS_MAX);
+  return t || undefined;
+}
+
+/**
+ * The "Scheduled jobs" lines added to an agent's Work style at session start
+ * (FA2): each enabled job's name and times, without its focus, which comes
+ * with the run. Null when the agent has no jobs.
+ */
+export function scheduledJobsBlock(missions: ScheduledMission[], agentId: string, godId: string): string | null {
+  const jobs = missionsFor(missions, agentId, godId).filter((m) => m.enabled && (m.kind ?? 'dispatch') === 'dispatch');
+  if (!jobs.length) return null;
+  return [
+    '### Scheduled jobs',
+    ...jobs.map((m) => `- ${m.label.trim()}: ${whenWords(m)}`),
+    'Each job\'s focus comes with its run message and applies to that run only. Everything else you do follows this Work style alone.'
+  ].join('\n');
+}
 export const GOD_ALIAS = 'god';
 
 /** The agent id that owns `m`. Michael's aliases collapse to `godId`. */
@@ -161,7 +191,7 @@ export function firePayload(m: ScheduledMission): { to: string; subject: string;
   return {
     to: m.to,
     subject: m.label,
-    body: m.relay ? relayRunBody(m.label, m.body) : scheduledRunBody(m.label, m.body)
+    body: m.relay ? relayRunBody(m.label, m.body, m.focus) : scheduledRunBody(m.label, m.body, m.focus)
   };
 }
 
@@ -221,6 +251,8 @@ export interface ScheduleDraft {
   whenGiven?: boolean;
   weekly?: { days: number[]; minute: number };
   times?: ScheduleLine[];
+  /** The job's focus area (FA1): required on an add, optional on an update. */
+  focus?: string;
 }
 
 export interface ScheduleRequest {
@@ -352,7 +384,9 @@ export function parseWhen(when: unknown): { intervalMs: number; weekly?: { days:
 export function missionFingerprint(m: ScheduledMission): string {
   const w = normalizeWeekly(m.weekly);
   const t = normalizeTimes(m.times);
-  return JSON.stringify([m.label, m.intervalMs, w ? `${w.days.join(',')}@${w.minute}` : '', m.enabled, ...(t ? [JSON.stringify(t)] : [])]);
+  // The focus joins only when set, so a request filed before focus areas
+  // existed is not made stale by the upgrade.
+  return JSON.stringify([m.label, m.intervalMs, w ? `${w.days.join(',')}@${w.minute}` : '', m.enabled, ...(t ? [JSON.stringify(t)] : []), ...(m.focus ? [`focus:${m.focus}`] : [])]);
 }
 
 /**
@@ -375,19 +409,22 @@ function buildRequestShape(
   actor: string, payload: unknown, missions: ScheduledMission[], godId: string, now: number, id: string
 ): { ok: true; request: ScheduleRequest } | { ok: false; reason: string } {
   if (!payload || typeof payload !== 'object') return { ok: false, reason: 'The "schedule" field must be an object.' };
-  const p = payload as { op?: unknown; id?: unknown; label?: unknown; when?: unknown };
+  const p = payload as { op?: unknown; id?: unknown; label?: unknown; when?: unknown; focus?: unknown };
   const op = p.op;
   if (op !== 'add' && op !== 'update' && op !== 'pause' && op !== 'resume' && op !== 'delete') {
     return { ok: false, reason: 'Unknown op. Use add, update, pause, resume, delete or list.' };
   }
   const label = typeof p.label === 'string' ? p.label.trim() : '';
   if (label.length > LABEL_MAX) return { ok: false, reason: `Keep the label under ${LABEL_MAX} characters.` };
+  if (typeof p.focus === 'string' && p.focus.trim().length > FOCUS_MAX) return { ok: false, reason: `Keep the focus under ${FOCUS_MAX} characters.` };
+  const focus = cleanFocus(p.focus);
 
   if (op === 'add') {
     if (!label) return { ok: false, reason: 'An add needs a "label" naming the job.' };
     const when = parseWhen(p.when);
     if (!when) return { ok: false, reason: 'An add needs a usable "when": {"every": "2h"} (1 minute to 24 days), {"every": "2h", "days": ["weekdays"], "between": ["08:00", "18:00"]}, {"days": ["mon"], "at": "09:00"}, or a list of these.' };
-    return { ok: true, request: { id, agentId: actor, op, draft: { label, ...when }, createdAt: now } };
+    if (!focus) return { ok: false, reason: 'An add needs a "focus": what to concentrate on when this job runs, within your Work style, in a sentence or two.' };
+    return { ok: true, request: { id, agentId: actor, op, draft: { label, ...when, focus }, createdAt: now } };
   }
 
   const missionId = typeof p.id === 'string' ? p.id : '';
@@ -399,13 +436,14 @@ function buildRequestShape(
   if (op !== 'update') return { ok: true, request: base };
   const when = p.when === undefined ? null : parseWhen(p.when);
   if (p.when !== undefined && !when) return { ok: false, reason: 'That "when" is not usable.' };
-  if (!label && !when) return { ok: false, reason: 'An update needs a new "label", a new "when", or both.' };
+  if (!label && !when && !focus) return { ok: false, reason: 'An update needs a new "label", "when" or "focus".' };
   const draft: ScheduleDraft = {
     label: label || target.label,
     whenGiven: !!when,
     intervalMs: when ? when.intervalMs : target.intervalMs,
     ...(when ? (when.weekly ? { weekly: when.weekly } : {}) : (target.weekly ? { weekly: target.weekly } : {})),
-    ...(when ? (when.times ? { times: when.times } : {}) : (target.times ? { times: target.times } : {}))
+    ...(when ? (when.times ? { times: when.times } : {}) : (target.times ? { times: target.times } : {})),
+    ...(focus ?? target.focus ? { focus: focus ?? target.focus } : {})
   };
   return { ok: true, request: { ...base, draft } };
 }
@@ -454,7 +492,7 @@ export function fileScheduleRequest(pending: ScheduleRequest[], incoming: Schedu
     const label = incoming.draft!.label;
     if (incoming.op === 'update' && incoming.draft!.whenGiven === false) {
       // A rename after a timing change: the timing stays, the name is the new one.
-      merged = { ...base, ...reset, id: incoming.id, draft: { ...prev.draft!, label }, reason, createdAt: incoming.createdAt };
+      merged = { ...base, ...reset, id: incoming.id, draft: { ...prev.draft!, label, ...(incoming.draft!.focus ? { focus: incoming.draft!.focus } : {}) }, reason, createdAt: incoming.createdAt };
     } else if (prev.op === 'add' || incoming.op === 'add') {
       // Asking for another time for the job: both sets of times together.
       const a = draftLines(prev.draft!);
@@ -464,15 +502,19 @@ export function fileScheduleRequest(pending: ScheduleRequest[], incoming: Schedu
       const times = lines ? normalizeTimes(lines) : null;
       if (times) {
         const simple = simpleTimes(times);
-        const draft: ScheduleDraft = simple && 'intervalMs' in simple
+        const focus = incoming.draft!.focus ?? prev.draft!.focus;
+        const timing: ScheduleDraft = simple && 'intervalMs' in simple
           ? { label: base.draft!.label, intervalMs: simple.intervalMs }
           : simple && 'weekly' in simple
             ? { label: base.draft!.label, intervalMs: 86_400_000, weekly: simple.weekly }
             : { label: base.draft!.label, intervalMs: base.draft!.intervalMs, times };
+        const draft: ScheduleDraft = focus ? { ...timing, focus } : timing;
         merged = { ...base, ...reset, id: incoming.id, draft, reason, createdAt: incoming.createdAt };
       }
     }
-    // Two timing updates: the newer is a correction and replaces the older.
+    // Two timing updates: the newer is a correction and replaces the older,
+    // keeping a focus the older one asked for when the newer names none.
+    if (merged.draft && !merged.draft.focus && prev.draft?.focus) merged = { ...merged, draft: { ...merged.draft, focus: prev.draft.focus } };
   }
   return pending.map((p, j) => (j === i ? merged : p));
 }
@@ -495,10 +537,13 @@ export function whenWords(m: { intervalMs: number; weekly?: unknown; times?: unk
 export function requestSummary(req: ScheduleRequest, missions: ScheduledMission[]): string {
   const target = missions.find((m) => m.id === req.missionId);
   const label = target?.label ?? req.draft?.label ?? 'a schedule';
-  if (req.op === 'add' && req.draft) return `add "${req.draft.label}", ${whenWords(req.draft)}`;
+  const focusWords = (f?: string) => (f ? `, focus: "${f}"` : '');
+  if (req.op === 'add' && req.draft) return `add "${req.draft.label}", ${whenWords(req.draft)}${focusWords(req.draft.focus)}`;
   if (req.op === 'update' && req.draft) {
     const rename = target && req.draft.label !== target.label ? ` and rename it "${req.draft.label}"` : '';
-    return `change "${label}" from ${target ? whenWords(target) : 'its current times'} to ${whenWords(req.draft)}${rename}`;
+    const refocus = req.draft.focus && req.draft.focus !== target?.focus ? focusWords(req.draft.focus) : '';
+    if (refocus && !req.draft.whenGiven && !rename) return `set the focus of "${label}" to "${req.draft.focus}"`;
+    return `change "${label}" from ${target ? whenWords(target) : 'its current times'} to ${whenWords(req.draft)}${rename}${refocus}`;
   }
   return `${req.op} "${label}"`;
 }
@@ -520,6 +565,7 @@ export function applyScheduleRequest(
       id: newId, label: req.draft.label, intervalMs: Math.min(req.draft.intervalMs, MAX_INTERVAL_MS),
       ...(req.draft.weekly ? { weekly: req.draft.weekly } : {}),
       ...(req.draft.times ? { times: req.draft.times } : {}),
+      ...(req.draft.focus ? { focus: req.draft.focus } : {}),
       to: req.agentId, body: '', enabled: true, createdBy: req.agentId
     };
     return { ok: true, missions: [...missions, m], missionId: newId };
@@ -534,6 +580,7 @@ export function applyScheduleRequest(
     const target = missions.find((m) => m.id === id);
     if (!target) return { ok: false, error: 'stale' };
     const updated: ScheduledMission = { ...target, label: req.draft.label, intervalMs: req.draft.intervalMs };
+    if (req.draft.focus) updated.focus = req.draft.focus;
     if (req.draft.weekly) updated.weekly = req.draft.weekly; else delete updated.weekly;
     if (req.draft.times) updated.times = req.draft.times; else delete updated.times;
     return { ok: true, missions: missions.map((m) => (m.id === id ? updated : m)), missionId: id };

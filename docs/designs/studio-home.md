@@ -58,7 +58,7 @@ settings A/B/C/D).
 | F16 WebGL recovery | Not needed: SVG, no Pixi |
 | F17 TV show themes (flag off) | Dropped |
 | F18 seats, 15 desks, overflow at the door | Department pods, up to 4 people each; compact grid above about 30 |
-| F19 multiple floors (New Floor window) | Keep: one office per window |
+| F19 multiple floors (New Floor window) | Removed (2026-10-03): one office window; the New Floor item and its setting are gone |
 | F20 ghost status (unused) | Dropped |
 
 ### Views, strip, chrome
@@ -80,7 +80,7 @@ settings A/B/C/D).
 | C10 office folder missing, C11 quit and closing time | Office folder missing restyled; quitting now starts closing time at once, shown as a closing bar on the floor (2026-09-30) |
 | C12 cleared banner | Person panel |
 | C13 keyboard | Same, plus pod navigation; Esc on every overlay |
-| C14 menu, notifications (only Michael) | Unchanged |
+| C14 menu, notifications (only Michael) | Notifications unchanged. The menu is trimmed (2026-10-03): no File menu on the Mac, and Reload and the developer tools only in development |
 
 ### Person panel (was AgentDetailPanel)
 
@@ -153,4 +153,6 @@ mockups and the build.
 
 - 2026-10-01: an Ask me is cleared only by answering it; the board's dismiss is gone.
 - 2026-10-01: focus mode hidden (`SHOW_FOCUS_MODE`); the code stays behind the switch.
+- 2026-10-03: the second office window (New Floor) and its setting are removed, and the menus
+  are trimmed to what an office owner uses.
 - See branding/DESIGN.md §18 for every design change since 2026-09-30.

@@ -179,6 +179,10 @@ export interface HiveTask {
   /** SHA-256 of the capability token for a generic-webhook-sourced task (drives
    *  the GET status lookup; the raw token is never persisted). */
   webhook?: { tokenHash: string };
+  /** Ended by the owner's decision, not finished work (card-lifecycle.md D2). */
+  closedBy?: 'owner';
+  closedAt?: string;
+  closedReason?: string;
 }
 
 /** A message the router just delivered, with its resolved recipient ids. Drives
@@ -278,6 +282,8 @@ export interface HarnessConfig {
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
+  /** Owner decisions on offered job description updates (shared/workStyleUpdates.ts). */
+  workStyleUpdatesDecided?: Record<string, 'use' | 'keep'>;
   harnessHome: string | null;
   /** Recently-opened hive home folders (most-recent first). Mirrors src/main/config.ts. */
   recentHives?: string[];
@@ -652,6 +658,11 @@ const api = {
     ctx: { name: string; title?: string; business?: { name?: string; city?: string }; manager?: string };
     previous?: string;
   }): Promise<{ text: string; source: 'ai' | 'rules' }> => ipcRenderer.invoke('workStyle:convert', req),
+  /** Check a job's focus area against the Work style and the agent's other
+   *  jobs (schedule-focus-areas.md, FA3). `checked: false` when it couldn't run. */
+  workStyleCheckFocus: (req: {
+    name: string; job: string; focus: string; workStyle: string; others: Array<{ job: string; focus: string }>;
+  }): Promise<{ checked: boolean; conflict?: string }> => ipcRenderer.invoke('workStyle:checkFocus', req),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
     { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string }
@@ -1010,6 +1021,9 @@ const api = {
     ipcRenderer.invoke('history:search', query, limit),
   hiveSend: (msg: Partial<HiveMessage>, from?: string): Promise<{ ok: boolean; error?: string; message?: HiveMessage }> =>
     ipcRenderer.invoke('hive:send', msg, from),
+  /** Michael's open requests from the owner, oldest first (card-lifecycle.md). */
+  hiveOwnerRequests: (): Promise<Array<{ id: string; taskId: string; subject: string; createdAt: string }>> =>
+    ipcRenderer.invoke('hive:ownerRequests'),
 
   onHiveHookEvent: (
     cb: (e: HookEvent) => void
@@ -1127,11 +1141,6 @@ const api = {
     return () => ipcRenderer.removeListener('power:resume', listener);
   },
 
-  // ─── Multi-window floors ───────────────────────────────────────────────────
-  /** Open a new floor (independent office window). No-op when the multiWindow
-   *  flag is off. Resolves { ok } indicating whether a window opened. */
-  newFloor: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('window:newFloor'),
-
   // ─── Closing time (graceful shutdown via the hive) ─────────────────────────
   /** Start the closing-time protocol: the god broadcasts shutdown, every worker
    *  saves its memory and ACKs, the god concludes — then the app quits itself.
@@ -1237,9 +1246,12 @@ const api = {
     id: string,
     patch: Partial<Omit<HiveTask, 'id'>>
   ): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('hive:patchTask', id, patch),
-  /** Atomically remove one named card from the latest main-process ledger. */
-  hiveDeleteTask: (id: string): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('hive:deleteTask', id),
+  /** The owner moves a card; Done is their decision to end it. Michael is told. */
+  hiveMoveTask: (id: string, status: HiveTask['status']): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hive:moveTask', id, status),
+  /** The owner ends a card: Done, marked "Closed by owner", never deleted. */
+  hiveCloseTask: (id: string, reason?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hive:closeTask', id, reason),
 
   // ─── Scheduled missions (recurring auto-dispatch) ──────────────────────────
   listMissions: (): Promise<ScheduledMission[]> => ipcRenderer.invoke('missions:list'),

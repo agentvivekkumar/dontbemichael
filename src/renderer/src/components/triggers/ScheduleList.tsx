@@ -12,7 +12,8 @@ import {
 import { formatWeekly } from '@shared/weeklySchedule';
 import { formatTimes, normalizeTimes } from '@shared/scheduleTimes';
 import { WhenLines, fieldsFromLines, linesFromMission, sameLines, type LineDraft } from './WhenLines';
-import { GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
+import { cleanFocus, FOCUS_MAX, GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
+import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { useRtl } from '@/i18n/useDirection';
 
 /**
@@ -89,6 +90,70 @@ export function useSaveOp(): {
   return { busy, failed, setFailed, run };
 }
 
+/** Who a focus area is checked for (FA3): the agent's name, its Work style and
+ *  its other jobs' focus areas. */
+interface FocusOwner {
+  name: string;
+  workStyle: string;
+  /** Every job the agent has, to check against all but the one being saved. */
+  jobs: ScheduledMission[];
+}
+
+/**
+ * The focus area check on save (docs/designs/schedule-focus-areas.md, FA3). A
+ * conflict is named and the owner fixes the text or saves anyway; a check that
+ * can't run lets the save go ahead.
+ */
+function useFocusCheck(owner: FocusOwner): {
+  checking: boolean; conflict: string | null; clear: () => void;
+  /** True when the save may go ahead now. */
+  check: (job: string, focus: string, missionId?: string) => Promise<boolean>;
+} {
+  const [checking, setChecking] = useState(false);
+  const [conflict, setConflict] = useState<string | null>(null);
+  const check = async (job: string, focus: string, missionId?: string) => {
+    if (conflict !== null) { setConflict(null); return true; } // "Save anyway"
+    setChecking(true);
+    try {
+      const others = owner.jobs.filter((m) => m.id !== missionId && m.focus).map((m) => ({ job: m.label, focus: m.focus! }));
+      const res = await window.cth.workStyleCheckFocus({ name: owner.name, job, focus, workStyle: owner.workStyle, others });
+      if (res.conflict) { setConflict(res.conflict); return false; }
+      return true;
+    } catch {
+      return true;
+    } finally {
+      setChecking(false);
+    }
+  };
+  return { checking, conflict, clear: () => setConflict(null), check };
+}
+
+/** The focus area field: required on new jobs (FA1), with the conflict, if
+ *  any, named under it (FA3). */
+function FocusField({ value, onChange, conflict, hint, autoFocus }: {
+  value: string; onChange: (v: string) => void; conflict: string | null; hint?: string; autoFocus?: boolean;
+}) {
+  const { t } = useTranslation();
+  const rtl = useRtl();
+  return (
+    <Field label={t('schedulesSection.focus')}>
+      <textarea
+        dir={rtl ? 'auto' : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        maxLength={FOCUS_MAX}
+        autoFocus={autoFocus}
+        placeholder={t('schedulesSection.focusPlaceholder')}
+        aria-invalid={conflict ? true : undefined}
+        style={textareaStyle}
+      />
+      {hint && <Hint>{hint}</Hint>}
+      {conflict && <Line tone="error">{t('schedulesSection.focusConflict', { conflict })}</Line>}
+    </Field>
+  );
+}
+
 /** The loading line, or the load error with Try again, while nothing has loaded. */
 function loadState(status: string, empty: boolean, errorText: string, retry: () => void, t: TFunction): ReactNode | null {
   if (!empty) return null;
@@ -152,12 +217,12 @@ interface RowProps {
   /** Read only: plain text, no toggle, no editor and no link (the office
    *  schedule; owner, 2026-09-26). */
   readOnly?: boolean;
-  /** Move an older schedule's instructions into the owner's Work style. */
-  onMoveToWorkStyle?: () => void;
   ownerName: string;
+  /** For the focus area check on save; absent on read only rows. */
+  focusOwner?: FocusOwner;
 }
 
-function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }: RowProps) {
+function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowProps) {
   const { t, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
@@ -167,8 +232,14 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
   const [weekly, setWeekly] = useState<WeeklyDraft | null>(weeklyDraft(mission.weekly));
   const [lines, setLines] = useState<LineDraft[]>(() => linesFromMission(mission));
   const [body, setBody] = useState(mission.body);
+  // An older job's prompt is offered as the starting text of its focus area (FA4).
+  // Offering it is not a change: only a focus the owner edits is saved.
+  const startFocus = () => mission.focus ?? (mission.kind === 'heartbeat' ? '' : mission.body.trim());
+  const [focus, setFocus] = useState(startFocus);
+  const [focusTouched, setFocusTouched] = useState(false);
   const [saved, setSaved] = useState(false);
   const { busy, failed, setFailed, run } = useSaveOp();
+  const focusCheck = useFocusCheck(focusOwner ?? { name: ownerName, workStyle: '', jobs: [] });
   const [confirming, setConfirming] = useState(false);
   const deleteRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
@@ -182,6 +253,9 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
     setWeekly(weeklyDraft(mission.weekly));
     setLines(linesFromMission(mission));
     setBody(mission.body);
+    setFocus(startFocus());
+    setFocusTouched(false);
+    focusCheck.clear();
     setSaved(false);
     setConfirming(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,13 +263,14 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
   const heartbeat = mission.kind === 'heartbeat';
   const legacy = heartbeat ? '' : mission.body.trim();
+  const focusChanged = !heartbeat && (focusTouched || !!mission.focus) && (cleanFocus(focus) ?? '') !== (mission.focus ?? '');
   const storedWeekly = weeklyDraft(mission.weekly);
   const weeklyKey = (w: WeeklyDraft | null) => (w ? `${[...w.days].sort((a, b) => a - b).join(',')}@${w.minute}` : '');
   // A heartbeat keeps its single interval; every other schedule is edited as
   // "when" lines (WhenLines.tsx).
   const dirty = label !== mission.label || (heartbeat
     ? intervalMs !== mission.intervalMs || body !== mission.body || weeklyKey(weekly) !== weeklyKey(storedWeekly)
-    : !sameLines(lines, linesFromMission(mission)));
+    : !sameLines(lines, linesFromMission(mission)) || focusChanged);
   const whenFields = heartbeat ? null : fieldsFromLines(lines, mission.intervalMs);
   const whenIsUsable = heartbeat ? (!weekly || weeklyIsUsable(weekly)) : whenFields !== null;
 
@@ -216,15 +291,21 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
     creator
   ].filter(Boolean).join(', ');
 
-  const save = () => {
+  const save = async () => {
     const trimmed = label.trim();
     if (!trimmed) return;
     setLabel(trimmed);
+    const nextFocus = heartbeat ? undefined : (focusChanged ? cleanFocus(focus) : mission.focus);
+    if (nextFocus && focusChanged && !(await focusCheck.check(trimmed, nextFocus, mission.id))) return;
     // `weekly: undefined` is the switch back to interval mode; `times:
-    // undefined` drops extra lines the schedule no longer has.
+    // undefined` drops extra lines the schedule no longer has. A focus area
+    // the owner saved replaces an older job's prompt (FA4), but only when the
+    // focus holds all of it: a longer prompt, or one with line breaks, stays.
+    const legacyBody = mission.body.trim();
+    const keepBody = !nextFocus || /\n/.test(legacyBody) || cleanFocus(legacyBody) !== (legacyBody || undefined);
     void run(() => window.cth.upsertMission(heartbeat
       ? { ...mission, label: trimmed, intervalMs, body, weekly: weekly ?? undefined }
-      : { ...mission, label: trimmed, ...(whenFields ?? {}) }
+      : { ...mission, label: trimmed, ...(whenFields ?? {}), focus: nextFocus, body: keepBody ? mission.body : '' }
     ), () => { setSaved(true); setTimeout(() => setSaved(false), 1300); });
   };
   const toggle = () => { void run(() => window.cth.setMissionEnabled(mission.id, !mission.enabled)); };
@@ -254,6 +335,10 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
         </span>
         <span style={{ display: 'block', marginTop: 2, fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-700)' }}>{whenText(mission, t)}</span>
         {sub && <span style={{ display: 'block', fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-500)' }}>{sub}</span>}
+        {/* An older job without a focus area keeps running as before (FA4). */}
+        {!readOnly && !heartbeat && (mission.kind ?? 'dispatch') === 'dispatch' && !mission.focus && (
+          <span data-add-focus style={{ display: 'block', fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--cth-amber-text)' }}>{t('schedulesSection.addFocus')}</span>
+        )}
       </span>
     </>
   );
@@ -316,24 +401,13 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
               />
             </Field>
           )}
-          {!heartbeat && <Hint>{t('schedulesSection.labelHint')}</Hint>}
-          {legacy && (
-            <Field label={t('schedulesSection.olderInstructions')}>
-              <div style={{
-                borderRadius: 'var(--cth-r-md)',
-                padding: '4px 6px', background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-100)',
-                fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-700)', whiteSpace: 'pre-wrap'
-              }}>{legacy}</div>
-              <Hint>{t('schedulesSection.olderInstructionsHint', { name: ownerName })}</Hint>
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                {onMoveToWorkStyle && (
-                  <MiniButton onClick={onMoveToWorkStyle}>{t('schedulesSection.moveToWorkStyle', { name: ownerName })}</MiniButton>
-                )}
-                <MiniButton tone="danger" onClick={() => void run(() => window.cth.upsertMission({ ...mission, body: '' }))}>
-                  {t('schedulesSection.removeOlder')}
-                </MiniButton>
-              </div>
-            </Field>
+          {!heartbeat && (
+            <FocusField
+              value={focus}
+              onChange={(v) => { setFocus(v); setFocusTouched(true); focusCheck.clear(); }}
+              conflict={focusCheck.conflict}
+              hint={legacy && !mission.focus ? t('schedulesSection.focusFromOlder') : undefined}
+            />
           )}
           {failed && <Line tone="error">{t('schedulesSection.saveFailed')}</Line>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12 }}>
@@ -351,8 +425,10 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
             <MiniButton onClick={() => { setOpen(false); headerRef.current?.focus(); }}>
               {dirty ? t('common.cancel') : t('common.close')}
             </MiniButton>
-            <PixelButton variant="primary" size="sm" onClick={save} disabled={busy || !dirty || !label.trim() || !whenIsUsable}>
-              {saved && !dirty ? t('schedulesSection.saved') : t('common.save')}
+            <PixelButton variant="primary" size="sm" onClick={() => void save()} disabled={busy || focusCheck.checking || !dirty || !label.trim() || !whenIsUsable || (!!mission.focus && !cleanFocus(focus))}>
+              {focusCheck.checking ? t('schedulesSection.checking')
+                : focusCheck.conflict ? t('schedulesSection.saveAnyway')
+                  : saved && !dirty ? t('schedulesSection.saved') : t('common.save')}
             </PixelButton>
           </div>
         </div>
@@ -363,20 +439,25 @@ function ScheduleRow({ mission, nameOf, readOnly, onMoveToWorkStyle, ownerName }
 
 /* ─────────────────────────────── add form ─────────────────────────────── */
 
-function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
+function AddSchedule({ to, ownerName, focusOwner }: { to: string; ownerName: string; focusOwner: FocusOwner }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState('');
+  const [focus, setFocus] = useState('');
+  const focusCheck = useFocusCheck(focusOwner);
   const firstLines = (): LineDraft[] => linesFromMission({ intervalMs: DEFAULT_INTERVAL_MS });
   const [lines, setLines] = useState<LineDraft[]>(firstLines);
   const { busy, failed, setFailed, run } = useSaveOp();
   const whenFields = fieldsFromLines(lines, DEFAULT_INTERVAL_MS);
   const whenIsUsable = whenFields !== null;
-  const reset = () => { setAdding(false); setLabel(''); setLines(firstLines()); setFailed(false); };
+  const reset = () => { setAdding(false); setLabel(''); setFocus(''); focusCheck.clear(); setLines(firstLines()); setFailed(false); };
 
   const add = async () => {
-    if (!label.trim() || !whenIsUsable) return;
+    const cleanLabel = label.trim();
+    const cleanedFocus = cleanFocus(focus);
+    if (!cleanLabel || !whenIsUsable || !cleanedFocus) return;
     if (!whenFields) return;
+    if (!(await focusCheck.check(cleanLabel, cleanedFocus))) return;
     await run(() => window.cth.upsertMission({
       id: `m_${Date.now().toString(36)}`,
       label: label.trim(),
@@ -385,6 +466,7 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
       ...(whenFields.times ? { times: whenFields.times } : {}),
       to,
       body: '',
+      focus: cleanedFocus,
       enabled: true,
       createdBy: OWNER
     }), reset);
@@ -414,10 +496,11 @@ function AddSchedule({ to, ownerName }: { to: string; ownerName: string }) {
       <Field label={t('schedulesSection.when')}>
         <WhenLines lines={lines} onChange={setLines} />
       </Field>
+      <FocusField value={focus} onChange={(v) => { setFocus(v); focusCheck.clear(); }} conflict={focusCheck.conflict} />
       {failed && <Line tone="error">{t('schedulesSection.saveFailed')}</Line>}
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-        <PixelButton variant="primary" size="sm" onClick={() => void add()} disabled={busy || !label.trim() || !whenIsUsable}>
-          {t('common.add')}
+        <PixelButton variant="primary" size="sm" onClick={() => void add()} disabled={busy || focusCheck.checking || !label.trim() || !whenIsUsable || !cleanFocus(focus)}>
+          {focusCheck.checking ? t('schedulesSection.checking') : focusCheck.conflict ? t('schedulesSection.saveAnyway') : t('common.add')}
         </PixelButton>
         <PixelButton variant="ghost" size="sm" onClick={reset}>{t('common.cancel')}</PixelButton>
       </div>
@@ -449,7 +532,6 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   const godId = useGodId();
   const nameOf = useNameOf();
   const agents = useStore((s) => s.agents);
-  const updateAgent = useStore((s) => s.updateAgent);
   const mine = useMemo(() => missionsFor(missions, agentId, godId), [missions, agentId, godId]);
   const isGod = agentId === godId;
   // Michael's schedules keep the 'god' alias the router understands.
@@ -462,14 +544,10 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   const next = on.map((m) => nextRunAt(m, Date.now())).filter((x): x is number => x !== null).sort((a, b) => a - b)[0];
   const ordered = [...mine].sort((a, b) => (nextRunAt(a, Date.now()) ?? Infinity) - (nextRunAt(b, Date.now()) ?? Infinity));
 
-  /** An older schedule's instructions, appended to the owner's Work style. */
-  const moveToWorkStyle = (m: ScheduledMission) => {
-    const agent = agents.find((a) => a.id === agentId);
-    const text = m.body.trim();
-    if (!agent || !text) return;
-    updateAgent(agent.id, { goal: [agent.goal?.trim(), `${m.label}: ${text}`].filter(Boolean).join('\n\n') });
-    void window.cth.upsertMission({ ...m, body: '' });
-  };
+  // A focus area is checked against this agent's Work style and its other
+  // jobs on save (FA3).
+  const agent = agents.find((a) => a.id === agentId);
+  const focusOwner: FocusOwner = { name: agentName, workStyle: agent ? effectiveWorkStyle(agent) : '', jobs: mine };
 
   return (
     <div>
@@ -488,11 +566,11 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
             mission={m}
             nameOf={nameOf}
             ownerName={agentName}
-            onMoveToWorkStyle={agents.some((a) => a.id === agentId) ? () => moveToWorkStyle(m) : undefined}
+            focusOwner={focusOwner}
           />
         ))}
       </div>
-      <AddSchedule to={to} ownerName={agentName} />
+      <AddSchedule to={to} ownerName={agentName} focusOwner={focusOwner} />
     </div>
   );
 }

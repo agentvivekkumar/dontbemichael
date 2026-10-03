@@ -14,12 +14,14 @@ import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
 import { isDurableRole, MICHAEL_ROLE, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
 import { inboxNudgeText } from '../../../shared/hiveNudge';
 import { resolveGodName } from '../../../shared/godIdentity';
-import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
+import { acquireTerminal, resetTerminal, isTerminalAutomationSafe, hasTerminalDraft } from '@/components/terminalPool';
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart, rewrittenInstructions } from '../../../shared/teamPlan';
 import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
 import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
+import { seedStarterJobs } from '@/shell/seedStarterJobs';
+import { PromptSubmits, confirmSubmit } from '../../../shared/submitConfirm';
 
 const GOD_ID = 'god';
 /** Accent palette for MAIN-spawned (voice-hired) agents — picked deterministically
@@ -111,6 +113,10 @@ async function waitForTerminalReady(
  * input box. Without them, every "\n" in a multi-line message acted as Enter —
  * the message submitted line-by-line in fragments (the agent saw only the last
  * chunk). The closing Enter, sent a tick later, submits the whole block. (#24) */
+// When each agent last accepted a prompt (its UserPromptSubmit hook), so a
+// submit can confirm it landed (shared/submitConfirm.ts).
+const promptSubmits = new PromptSubmits();
+
 function submitToPty(
   ptyId: string,
   text: string,
@@ -120,6 +126,7 @@ function submitToPty(
   const prev = writeChains.get(ptyId) ?? Promise.resolve();
   const next = prev.catch(() => { /* a failed prior write must not stall the chain */ }).then(async () => {
     await waitForTerminalReady(ptyId, provider);
+    const typedAt = Date.now();
     // Bracketed paste (ESC[200~ … ESC[201~) only matters for MULTI-LINE text, so a
     // stray "\n" doesn't submit early (#24). Single-line text (nudges, slash
     // commands) is sent raw — some TUIs (Antigravity's agy) treat the paste
@@ -135,6 +142,18 @@ function submitToPty(
     await new Promise((r) => setTimeout(r, 140));
     const submitted = await window.cth.writePty(ptyId, '\r');
     if (!submitted?.ok) throw new Error(submitted?.error ?? `pty write failed: ${ptyId}`);
+    // Claude Code says when it accepts a prompt: wait for it, and press Enter
+    // again if a slow terminal took the first one as part of the text.
+    // Slash commands (/clear, /compact) are the TUI's own and fire no prompt hook.
+    const agentId = isClaudeProvider(provider) && !text.trimStart().startsWith('/') ? useStore.getState().agents.find((a) => a.ptyId === ptyId)?.id : undefined;
+    if (agentId) {
+      const ok = await confirmSubmit({
+        accepted: () => promptSubmits.since(agentId, typedAt),
+        pressEnter: () => window.cth.writePty(ptyId, '\r'),
+        stillSafe: () => isTerminalAutomationSafe(ptyId) && !hasTerminalDraft(ptyId)
+      });
+      if (!ok) console.warn(`[submit] ${agentId} did not accept the prompt after retries`);
+    }
     await new Promise((r) => setTimeout(r, settleMs));
   });
   writeChains.set(ptyId, next);
@@ -290,6 +309,8 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
     const def = defs.get(member.agentId);
     if (!def) continue;
     const id = member.agentId;
+    // The pack the card came from, in the same order defs was filled.
+    const cardPack = [pack, ...packs.map((x) => x.pack), core].find((p) => p?.agents?.some((a) => a.id === id));
     const floor = useStore.getState();
     const floorIds = new Set([...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents].map((a) => a.id));
     const decision = teamMemberStart(id, member.folder, floorIds, reg?.agents?.[id]?.cwd);
@@ -336,6 +357,8 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
       seedPrompt: res.seedPrompt,
       recentTextTs: Date.now()
     }, { select: false });
+    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03).
+    if (cardPack) await seedStarterJobs(`${cardPack.businessType}/${id}`, id);
   }
   await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
 }
@@ -611,6 +634,8 @@ export function useHive(config: HarnessConfig | null): void {
         // finished tool's detail goes, so the closing-time row never shows a
         // tool that already ended as still running (owner, 2026-09-29).
         if (!breakerArmed) updateAgent(e.agentId, { status: 'working', actionDetail: undefined, actionAt: Date.now() });
+        // The prompt landed: a submit waiting on it stops pressing Enter.
+        if (e.event === 'UserPromptSubmit') promptSubmits.note(e.agentId);
       } else if (e.event === 'PreInvocation') {
         // Antigravity (agy): the model is being called — it's thinking/working.
         if (!breakerArmed) updateAgent(e.agentId, { status: 'working', action: 'thinking', actionDetail: undefined, actionAt: Date.now() });

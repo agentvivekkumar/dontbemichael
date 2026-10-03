@@ -807,3 +807,25 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** S (human) / S (CC)
 **Priority:** P2
 **Depends on:** nothing.
+
+## Watch list (no issue seen yet; act only if the symptom shows up)
+
+### Agents skip their folder or company knowledge
+
+**Watch for:** an agent answers a policy, price or "how we do it" question from memory or the internet when the answer is in the company knowledge store; an agent asks the owner for a document already in its folder; this happens more late in a long session or after a compaction.
+
+**How it works today:** agents are only told, never reminded. At spawn, `injectedPrompt` (`src/main/hive.ts`) puts the folder line ("read it for context before searching the internet"), `companyKnowledgeLine` ("when a task touches any of that, search it") and `memoryRule` into `--append-system-prompt`. At session start the hook (`src/main/hooks.ts`) adds the company profile, which ends with a pointer to the knowledge store, and the memory index. `knowledgeUpdate` speaks only when the owner turns the store on or off. Nothing repeats per task, nothing searches for the agent, nothing lists the folder's files, and nothing records whether `kg search` ran.
+
+**Smaller gaps:** Michael's folder line does not say to read it for context; Michael's hand-off rules say "where to look" but never name company knowledge; Codex, Grok and agy get the text only as their first message.
+
+**Fixes, strongest first:**
+1. On a new task, have the hook run `kg search` on the task text and attach the top 2 or 3 matches (capped, skipped when nothing matches).
+2. A one-line reminder through the hook when a new inbox task arrives.
+3. A short list of the agent's folder files at session start, sent again when it changes (like the roster).
+4. Log `kg` calls from activity events so agents that never search are visible. Do this first if the symptom appears, to confirm it.
+
+**Context:** Investigated 2026-10-02 on the owner's question; owner chose to watch rather than build, since no issue has been seen.
+
+**Effort:** S to M (human) / S (CC)
+**Priority:** P3 (watch)
+**Depends on:** nothing.

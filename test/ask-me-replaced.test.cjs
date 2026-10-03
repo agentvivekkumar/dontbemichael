@@ -49,7 +49,8 @@ test('a replaced ask no longer holds its agent open for safe clear', async (t) =
 test('ASK ME and the card history use the same rule, and Michael is told to check open asks first', () => {
   const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
   const kanban = read('src/renderer/src/components/TasksKanban.tsx');
-  assert.match(kanban, /const i = openAskIndex\(t\.humanQA\);/);
+  // openQuestion moved to hiveTasks.ts with the parser (shared Needs you feed).
+  assert.match(read('src/renderer/src/components/hiveTasks.ts'), /const i = openAskIndex\(t\.humanQA\);/);
   assert.match(kanban, /isReplacedAsk\(task\.humanQA, i\) \?/);
   const hive = read('src/main/hive.ts');
   assert.match(hive, /BEFORE YOU ADD AN ASK, read the asks already open on the board/);

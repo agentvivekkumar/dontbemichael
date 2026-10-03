@@ -1,0 +1,46 @@
+import type { AgentDefinitionV2 } from '@shared/agentDefinition';
+import { decisionId, workStyleOffers, type WorkStyleOffer } from '@shared/workStyleUpdates';
+import { useStore } from '@/store/store';
+import { seedStarterJobs } from './seedStarterJobs';
+
+/**
+ * The renderer side of job description offers (src/shared/workStyleUpdates.ts):
+ * read them for the Needs you feed, and carry out the owner's choice.
+ */
+
+let cards: Promise<Map<string, AgentDefinitionV2>> | null = null;
+function loadCards(): Promise<Map<string, AgentDefinitionV2>> {
+  if (!cards) {
+    cards = window.cth.packsList()
+      .then(({ packs, core }) => {
+        const map = new Map<string, AgentDefinitionV2>();
+        for (const p of [...packs.map((x) => x.pack), core]) {
+          for (const a of p?.agents ?? []) map.set(`${p!.businessType}/${a.id}`, a);
+        }
+        return map;
+      })
+      .catch(() => { cards = null; return new Map(); });
+  }
+  return cards;
+}
+
+/** The offers due now, for the team on the floor. */
+export async function readWorkStyleOffers(): Promise<WorkStyleOffer[]> {
+  const [map, config] = await Promise.all([loadCards(), window.cth.getConfig()]);
+  const c = config as { businessType?: string; businessName?: string; businessCity?: string; workStyleUpdatesDecided?: Record<string, string> };
+  return workStyleOffers(useStore.getState().agents, map, c.businessType, { name: c.businessName, city: c.businessCity }, c.workStyleUpdatesDecided);
+}
+
+/** "Use the new one" or "Keep mine": recorded once, so the offer never returns. */
+export async function decideWorkStyleOffer(offer: WorkStyleOffer, choice: 'use' | 'keep'): Promise<void> {
+  if (choice === 'use') {
+    // The registry role first: Michael routes by it. If it can't be saved,
+    // nothing changes and the decision isn't recorded, so the offer stays.
+    const role = await window.cth.hivePatchAgentRole(offer.agentId, offer.description);
+    if (!role?.ok) throw new Error(role?.error ?? 'role not saved');
+    useStore.getState().updateAgent(offer.agentId, { goal: offer.goal, description: offer.description });
+    await seedStarterJobs(offer.sourceCard, offer.agentId);
+  }
+  const config = await window.cth.getConfig() as { workStyleUpdatesDecided?: Record<string, 'use' | 'keep'> };
+  await window.cth.updateConfig({ workStyleUpdatesDecided: { ...(config.workStyleUpdatesDecided ?? {}), [decisionId(offer.key, offer.agentId)]: choice } });
+}

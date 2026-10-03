@@ -160,3 +160,36 @@ export function instructionsFallback(plain: string, ctx: WorkStyleContext): stri
 export function cleanAnswer(text: string): string {
   return text.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
 }
+
+/**
+ * The check a job's focus area gets on save (docs/designs/schedule-focus-areas.md,
+ * FA3): against the team member's Work style and its other jobs' focus areas.
+ * A focus may narrow or direct the work; it may not widen duties or approvals,
+ * or contradict another job's focus.
+ */
+export function focusCheckPrompt(p: { name: string; workStyle: string; focus: string; job: string; others: Array<{ job: string; focus: string }> }): string {
+  return [
+    `${p.name} is an AI team member at a small business. The owner is adding a focus area to one of ${p.name}'s scheduled jobs: what ${p.name} concentrates on each time that job runs.`,
+    `A focus area may narrow or direct the work within ${p.name}'s work style. It conflicts when it asks for something the work style rules out or keeps for the owner's approval, when it adds duties or permissions the work style does not give, or when it contradicts another job's focus area.`,
+    'Answer with exactly "OK" when there is no conflict. Otherwise answer "CONFLICT: " followed by one short sentence for the owner naming what the focus area asks for and what it contradicts, in everyday words, without dashes.',
+    '',
+    '--- WORK STYLE ---',
+    p.workStyle.trim() || '(none written yet)',
+    '',
+    '--- OTHER JOBS\' FOCUS AREAS ---',
+    p.others.length ? p.others.map((o) => `${o.job}: ${o.focus}`).join('\n') : '(none)',
+    '',
+    `--- NEW FOCUS AREA, for the job "${p.job}" ---`,
+    p.focus.trim()
+  ].join('\n');
+}
+
+/** The check's answer: no conflict, or the conflict in one sentence. Anything
+ *  unreadable counts as unchecked, so a failed call never blocks a save. */
+export function parseFocusCheck(answer: string): { ok: true } | { ok: false; conflict: string } | null {
+  const a = cleanAnswer(answer);
+  if (/^ok\b\.?$/i.test(a)) return { ok: true };
+  const hit = /^conflict\s*:\s*([\s\S]+)$/i.exec(a);
+  if (hit && hit[1].trim()) return { ok: false, conflict: hit[1].trim().replace(/\s+/g, ' ').slice(0, 400) };
+  return null;
+}

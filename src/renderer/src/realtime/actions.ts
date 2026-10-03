@@ -132,12 +132,12 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
     tool({
       name: 'update_task',
       description:
-        'Change an existing task: its status (todo/doing/blocked/done), result note, or assignee. Soft action — runs immediately.',
+        'Change an existing task: its status (todo/doing/done; Blocked is only Michael\'s, for a question on Ask me), result note, or assignee. Soft action — runs immediately.',
       parameters: {
         type: 'object',
         properties: {
           taskId: { type: 'string', description: 'Task id or title to update.' },
-          status: { type: 'string', enum: ['todo', 'doing', 'blocked', 'done'], description: 'Optional new status.' },
+          status: { type: 'string', enum: ['todo', 'doing', 'done'], description: 'Optional new status.' },
           result: { type: 'string', description: 'Optional outcome note.' },
           assignee: { type: 'string', description: 'Optional new owner.' }
         },
@@ -300,10 +300,13 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
     tool({
       name: 'delete_task',
       description:
-        'Delete one task card from the board by title or id. Soft action — runs immediately (recreate it if wrong).',
+        'Close one task card by title or id because the owner decided to stop it. The card moves to Done marked "Closed by owner" (it is kept, not deleted) and Michael is told. Soft action, runs immediately.',
       parameters: {
         type: 'object',
-        properties: { taskId: { type: 'string', description: 'Task title or id to delete.' } },
+        properties: {
+          taskId: { type: 'string', description: 'Task title or id to close.' },
+          reason: { type: 'string', description: 'Optional: why the owner is stopping it, in their words.' }
+        },
         required: ['taskId'],
         additionalProperties: false
       },
@@ -352,10 +355,11 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
         type: 'object',
         properties: {
           label: { type: 'string', description: 'The job this schedule runs, e.g. "Follow up on unpaid invoices"; the timing is set separately. The agent does it the way its Work style says.' },
+          focus: { type: 'string', description: 'Required: what the agent concentrates on in each run of this job, in a sentence, within its Work style. Ask the user if they have not said.' },
           intervalMinutes: { type: 'number', description: 'How often it fires, in minutes (min 5). Default 60.' },
           to: { type: 'string', description: 'Target agent name or id. Default: the god orchestrator.' }
         },
-        required: ['label'],
+        required: ['label', 'focus'],
         additionalProperties: false
       },
       execute: (input) => act('create_schedule', input)
@@ -363,7 +367,7 @@ export function realtimeActionTools(): ReturnType<typeof tool>[] {
     tool({
       name: 'update_setting',
       description:
-        "Change one app setting from the voice-allowed list. Cosmetic/low-risk keys (notifications, terminalTheme, freeflowEnabled, strongKeepalive, realtimeIdleDisconnectMs) apply immediately; behavior-changing keys (autoMode, defaultModel, godProvider, godModel, maxConcurrentWorkers, costCapTokens, maxTurns, slackEnabled, webhookEnabled, semanticMemory, multiWindow) return an echo-back with old→new and need verbal confirmation ('setting' or 'confirm') — then call confirm_action. Secrets, folders and anything not listed are refused.",
+        "Change one app setting from the voice-allowed list. Cosmetic/low-risk keys (notifications, terminalTheme, freeflowEnabled, strongKeepalive, realtimeIdleDisconnectMs) apply immediately; behavior-changing keys (autoMode, defaultModel, godProvider, godModel, maxConcurrentWorkers, costCapTokens, maxTurns, slackEnabled, webhookEnabled, semanticMemory) return an echo-back with old→new and need verbal confirmation ('setting' or 'confirm') — then call confirm_action. Secrets, folders and anything not listed are refused.",
       parameters: {
         type: 'object',
         properties: {

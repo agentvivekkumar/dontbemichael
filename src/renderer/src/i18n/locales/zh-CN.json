@@ -111,7 +111,17 @@
     "scheduleMichael": "{{name}}：{{note}}",
     "draft": "草稿",
     "openTask": "查看完整背景",
-    "justNow": "刚刚"
+    "justNow": "刚刚",
+    "yourAnswer": "你的回答",
+    "workStyleTitle": "{{name}} 的新职位说明",
+    "workStyleReplaces": "使用后将替换 {{name}} 的工作方式和职位说明，并添加其定时任务。",
+    "workStyleSee": "查看新内容",
+    "workStyleHide": "隐藏新内容",
+    "workStyleUse": "使用新的",
+    "workStyleKeep": "保留我的",
+    "workStyleWhy": {
+      "pamInboxZero": "收件箱清零：每封邮件都有处理结果并移出收件箱，不删除任何邮件。"
+    }
   },
   "agentStrip": {
     "notePlaceholder": "每行一条…",
@@ -589,6 +599,31 @@
       "comparingWith": "正在与 {{name}} 的工作比对"
     }
   },
+  "editAgent": {
+    "title": "编辑成员",
+    "cancel": "取消",
+    "save": "保存更改",
+    "writing": "正在编写指令…",
+    "name": "名字",
+    "namePlaceholder": "Stanley",
+    "role": "职位",
+    "rolePlaceholder": "例如：财务",
+    "handles": "{{name}} 负责什么",
+    "handlesInfo": "{{manager}} 根据这里决定哪些工作交给 {{name}}。写明负责的请求、邮箱或客户，避免与其他同事重复。",
+    "handlesPlaceholder": "例如：回复写信到客服邮箱的客户，并把退款请求转给记账员。",
+    "workStyle": "工作方式",
+    "workStyleInfo": "{{name}} 如何做这份工作：目的是什么、你希望怎样做、哪些事要先经你批准。用你自己的话写；保存更改时，应用会把它转成指令。每个定时任务会加上自己的重点，在任务里设置。",
+    "workStylePlaceholder": "工作内容：{{name}} 做什么、为什么做。\n做法：负责人希望怎样做。\n先问负责人：哪些事需要批准。",
+    "errWorkStyle": "必须填写工作方式：写下 {{name}} 如何做这份工作。",
+    "describing": "正在把工作内容转成通俗的话…",
+    "errWrite": "无法生成指令。请再次保存。",
+    "errRename": "无法为该成员改名。",
+    "engine": "引擎",
+    "provider": "提供方",
+    "model": "模型",
+    "modelCurrent": "{{model}}（当前）",
+    "engineNote": "新的引擎或模型会在该成员下次启动时生效。"
+  },
   "onboarding": {
     "resume": {
       "headline": "我们找到了你的办公室",
@@ -1009,11 +1044,7 @@
     "saved": "已保存",
     "when": "何时",
     "beatCeiling": "心跳频率会根据楼层的繁忙程度调整，因此这是上限，而非精确间隔。",
-    "labelHint": "成员会收到这个任务名称，并按照自己的工作方式去完成。任务具体怎么做，请写在该成员的工作方式里。",
-    "olderInstructions": "旧的说明",
-    "olderInstructionsHint": "这个日程设置时带有自己的说明，每次运行仍会发送。任务怎么做应写在 {{name}} 的工作方式里，请把它移过去或删除。",
-    "moveToWorkStyle": "移到 {{name}} 的工作方式",
-    "removeOlder": "删除",
+    "labelHint": "任务名称。做法来自工作方式；重点说明每次运行关注什么。",
     "officeEmpty": "团队里还没有人开启定时工作。",
     "emptyAgent": "{{name}} 还没有定时工作。",
     "addFor": "为 {{name}} 添加定时任务",
@@ -1035,7 +1066,14 @@
     "closedNote": "{{name}} 已关闭，所以这些已暂停。",
     "relayHint": "{{godName}} 会把这项工作分给团队。",
     "approvedBy": "由 {{name}} 批准",
-    "everyInterval": "每 {{interval}}"
+    "everyInterval": "每 {{interval}}",
+    "focus": "重点",
+    "focusPlaceholder": "每次运行关注什么，例如：逾期超过 30 天的发票",
+    "focusConflict": "这可能有冲突：{{conflict}} 请修改，或仍然保存。",
+    "focusFromOlder": "以此任务的旧说明为起点。",
+    "addFocus": "添加重点",
+    "checking": "正在检查…",
+    "saveAnyway": "仍然保存"
   },
   "webhooksSection": {
     "summaryNone": "无",
@@ -1378,8 +1416,8 @@
     "colDone": "已完成",
     "openTaskDetails": "打开任务详情",
     "needsYouTitle": "等待你的回答，见「需要你处理」",
-    "dismissTitle": "忽略此任务（从看板上移除）",
-    "dismissAria": "忽略任务",
+    "dismissTitle": "按你的决定标为完成。{{godName}} 会收到通知。",
+    "dismissAria": "关闭任务",
     "taskTitle": "任务",
     "unassigned": "未分配",
     "humanQA": "问题",
@@ -1399,7 +1437,16 @@
     "notes": "备注",
     "question": "问题",
     "answer": "回答",
-    "assignHint": "交给 {{godName}} 分派"
+    "assignHint": "交给 {{godName}} 分派",
+    "withGod": "在 {{godName}} 手中 · {{age}}",
+    "godStalled": "{{godName}} 还没有处理",
+    "withGodTitle": "{{godName}} 已收到你的回答，并安排后续工作",
+    "ageUnderHour": "不到 1 小时",
+    "ageHours": "{{count}} 小时",
+    "ageDays": "{{count}} 天",
+    "closedByOwner": "由负责人关闭",
+    "nothingAsked": "没有提问",
+    "nothingAskedTitle": "已阻塞，但没有等待你回答的问题。{{godName}} 会被提醒向你提问或移动它。"
   },
   "queueComposer": {
     "recording": "● 录音中，点击停止转写",
@@ -1660,7 +1707,6 @@
     "facts": "关键信息",
     "folder": "文件夹",
     "connections": "使用",
-    "firstJob": "第一项工作",
     "model": "模型",
     "listJoiner": "、",
     "instructions": "{{name}} 的工作说明",
@@ -1806,8 +1852,13 @@
     "needsYou": "需要你处理",
     "nothingNeedsYou": "暂无需要你处理的事",
     "needsYouInfo": "只有 {{godName}} 自己解决不了的事才会找你。在这里回答，工作就会继续。",
-    "boardEmptyTitle": "现在没有需要你处理的事。",
-    "boardEmptySub": "{{godName}} 正在处理。给你的问题会出现在这里。",
+    "needsYouAnnounce": "{{godName}} 需要你：{{count}}",
+    "allClear": "全部处理完毕。",
+    "allClearLine1": "{{godName}} 说团队还能接更多活。",
+    "allClearLine2": "{{godName}} 把回形针又整理了一遍。两遍。",
+    "allClearLine3": "这里很安静。太安静了。有没有一直拖着没做的项目？",
+    "allClearLine4": "收件箱清零。团队随时待命。",
+    "allClearLine5": "可以接下一件事了。大事小事，办公室都能搞定。",
     "backToBoard": "返回“需要你处理”",
     "officeOpen": "办公室开放中",
     "officeSchedule": "办公室日程",
@@ -1934,5 +1985,10 @@
     "fullChangelog": "完整更新日志",
     "releasePage": "发布页面",
     "close": "关闭"
+  },
+  "scheduledJobs": {
+    "title": "定时任务",
+    "focus": "重点：{{focus}}",
+    "noFocus": "没有重点"
   }
 }

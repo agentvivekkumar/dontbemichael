@@ -7,7 +7,9 @@
 import { runHiddenClaude } from './hiddenClaude';
 import {
   cleanAnswer,
+  focusCheckPrompt,
   instructionsFallback,
+  parseFocusCheck,
   instructionsOpening,
   plainFallback,
   toInstructionsPrompt,
@@ -83,4 +85,51 @@ export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): 
     deps.log?.({ kind: 'work-style-fallback', to: req.to, reason: String(e).slice(0, 200) });
   }
   return { text: fallback(), source: 'rules' };
+}
+
+export interface FocusCheckRequest {
+  name: string;
+  job: string;
+  focus: string;
+  workStyle: string;
+  others: Array<{ job: string; focus: string }>;
+}
+
+/** The renderer's payload, trusted for nothing but short strings. */
+export function readFocusCheckRequest(v: unknown): FocusCheckRequest | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const name = str(o.name, 60).trim();
+  const focus = str(o.focus, 1000).trim();
+  if (!name || !focus) return null;
+  const others = Array.isArray(o.others)
+    ? o.others.slice(0, 20).map((x) => (x && typeof x === 'object' ? x as Record<string, unknown> : {}))
+      .map((x) => ({ job: str(x.job, 120).trim(), focus: str(x.focus, 1000).trim() }))
+      .filter((x) => x.job && x.focus)
+    : [];
+  return { name, job: str(o.job, 120).trim() || 'this job', focus, workStyle: str(o.workStyle, MAX_TEXT), others };
+}
+
+/**
+ * Check a job's focus area against the Work style and the other jobs' focus
+ * areas (schedule-focus-areas.md, FA3). `checked: false` when the check could
+ * not run: the save goes ahead, as hiring does when the rewrite can't run.
+ */
+export async function checkFocusArea(req: FocusCheckRequest, deps: ConvertDeps): Promise<{ checked: boolean; conflict?: string }> {
+  try {
+    const result = await runHiddenClaude(focusCheckPrompt(req), {
+      model: PLAIN_MODEL,
+      cwd: deps.cwd,
+      command: deps.command,
+      noTools: true,
+      env: deps.env,
+      timeoutMs: TIMEOUT_MS
+    });
+    const verdict = result.ok && result.text ? parseFocusCheck(result.text) : null;
+    if (verdict) return verdict.ok ? { checked: true } : { checked: true, conflict: verdict.conflict };
+    deps.log?.({ kind: 'focus-check-skipped', reason: result.ok ? 'unreadable' : (result.error ?? 'failed') });
+  } catch (e) {
+    deps.log?.({ kind: 'focus-check-skipped', reason: String(e).slice(0, 200) });
+  }
+  return { checked: false };
 }

@@ -204,6 +204,29 @@ export function swapName(text: string, from: string | undefined, to: string): st
   return text.replace(nameRe(f), t);
 }
 
+/**
+ * A rename reaches the team's text (owner, 2026-10-03: "work style and role
+ * should not mention the agent's own name; if the agent name is changed it may
+ * create problems"). Today's packs name nobody, but a team member hired from
+ * an older card, or a teammate's "that goes to <Name>" line, can still carry
+ * the old name: each such role line and Work style gets the new one. Returns
+ * only the agents whose text changes.
+ */
+export function renamePatches(
+  agents: Array<{ id: string; description?: string; goal?: string }>,
+  from: string,
+  to: string
+): Array<{ id: string; description?: string; goal?: string }> {
+  const out: Array<{ id: string; description?: string; goal?: string }> = [];
+  for (const a of agents) {
+    const description = a.description ? swapName(a.description, from, to) : a.description;
+    const goal = a.goal ? swapName(a.goal, from, to) : a.goal;
+    if (description === a.description && goal === a.goal) continue;
+    out.push({ id: a.id, ...(description !== a.description ? { description } : {}), ...(goal !== a.goal ? { goal } : {}) });
+  }
+  return out;
+}
+
 /** A job copied for `name`: its routing line and work style name them. */
 export function jobFor(job: HireJob, name: string): { title: string; routing: string; workStyle: string } {
   return {

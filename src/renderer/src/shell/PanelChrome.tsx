@@ -7,11 +7,14 @@ import { isComposingKey } from '@shared/imeGuard';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
 import { useAppTheme } from '@/design/theme';
+import { closeTarget, columnLocked, focusNeedsYouPill } from './rightColumn';
+import { getNeedsYouFeed } from './useNeedsYou';
 
 /**
  * The header of a person's panel and of Michael's (branding/DESIGN.md 7.10):
  * avatar in their department's colors, name, role, status and what they are
- * doing, Edit, and close (back to the Needs you board). A team member's private
+ * doing, Edit, and close (back to the Needs you board while anything waits,
+ * otherwise the column closes and the office takes the window). A team member's private
  * note sits under it; it used to live on their card in the agent strip.
  */
 export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
@@ -50,7 +53,7 @@ export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
               <PencilGlyph /> {t('panel.edit')}
             </button>
           )}
-          <button onClick={() => useStore.getState().setNeedsYouOpen(true)} aria-label={t('panel.close')} title={t('panel.close')} style={{ ...headerBtn, width: 32, padding: 0, justifyContent: 'center' }}>
+          <button onClick={() => { const f = getNeedsYouFeed(); const to = closeTarget(columnLocked(f.status, f.count)); useStore.getState().setRightColumn(to); if (to === 'closed') focusNeedsYouPill(); }} aria-label={t('panel.close')} title={t('panel.close')} style={{ ...headerBtn, width: 32, padding: 0, justifyContent: 'center' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
@@ -180,7 +183,8 @@ export function PanelTabs<K extends string>({ tabs, current, onChange }: {
 /** The white card a panel sits in. */
 export function PanelCard({ children }: { children: ReactNode }) {
   return (
-    <div style={{
+    // data-panel-card: Edit agent lays itself exactly over this card.
+    <div data-panel-card style={{
       display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden',
       background: 'var(--cth-card)', borderRadius: 'var(--cth-r-xl)',
       boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'

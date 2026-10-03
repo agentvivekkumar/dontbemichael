@@ -1,4 +1,4 @@
-- **Claude connectors:** each one is off until you give it to a team member.
-- **Agents reach only what you allow,** checked on every call.
-- **Simpler Settings,** with What's new right in the app.
-- **Mailboxes fold** into one line.
+- **Your answers become Michael's work** until he closes them.
+- **Inbox zero** for your Executive Admin; nothing is deleted.
+- **Focus areas** on every scheduled job.
+- **Closing time clears the floor** and no longer hangs.

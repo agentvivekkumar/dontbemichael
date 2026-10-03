@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppTheme } from '@/design/theme';
 import { GrowingTextarea } from './GrowingTextarea';
@@ -13,7 +13,9 @@ import { compareByNewestAsk } from './askMeOrder';
 import { answerMessages, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
-import { ScheduleRequestCards, useScheduleRequests } from './ScheduleRequestCards';
+import { ScheduleRequestCards } from './ScheduleRequestCards';
+import { WorkStyleUpdateCards } from './WorkStyleUpdateCards';
+import { refreshNeedsYou, updateNeedsYouTasks, useNeedsYou } from '@/shell/useNeedsYou';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
 /**
@@ -34,14 +36,11 @@ import { useResolvedGodName } from '@/hooks/useResolvedGodName';
  *      work continues — no separate HumanQuestion.md side-channel anymore.
  */
 
-const POLL_MS = 5000;
-
-function parse(raw: unknown): HiveTask[] {
-  const list = (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown }).tasks))
-    ? (raw as { tasks: HiveTask[] }).tasks
-    : [];
-  return list.filter((t) => !!t && typeof t === 'object');
-}
+/** How many Office humor lines the All clear moment rotates through (D8). */
+const ALL_CLEAR_LINES = 5;
+/** The last focus request the board acted on, so a board that mounts later
+ *  (the launch open, D7) never takes focus for an old one. */
+let handledFocusSeq = 0;
 
 /** All tasks transitively waiting on `id` (dependents chain), cycle-safe. */
 function dependentsTree(id: string, all: HiveTask[], seen = new Set<string>()): HiveTask[] {
@@ -57,7 +56,9 @@ export function AskMeTab() {
   const godName = useResolvedGodName();
   const agents = useStore((s) => s.agents);
   const restorable = useStore((s) => s.restorableAgents);
-  const [tasks, setTasks] = useState<HiveTask[]>([]);
+  // One shared read with the pill, the strip and the chips (D3, eng R4).
+  const { tasks, requests: scheduleRequests, offers } = useNeedsYou();
+  const refreshScheduleRequests = refreshNeedsYou;
   // Drafts live in the STORE (keyed by task id) — switching tabs unmounts this
   // view, and a half-typed answer must survive the round trip.
   const drafts = useStore((s) => s.answerDrafts);
@@ -69,19 +70,32 @@ export function AskMeTab() {
   // Which cards have their "holding up" list open.
   const [openStuck, setOpenStuck] = useState<Record<string, boolean>>({});
   const dark = useAppTheme() === 'dark';
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Schedule changes the team asked for; they wait here for the owner (R6).
-  const { requests: scheduleRequests, refresh: refreshScheduleRequests } = useScheduleRequests();
+  // Answers given since the board opened: they stay under All clear until the
+  // column closes (D4), so the owner sees the reply landed.
+  const [answeredHere, setAnsweredHere] = useState<{ id: string; title: string; a: string; who?: string }[]>([]);
+  const [line] = useState(() => 1 + Math.floor(Math.random() * ALL_CLEAR_LINES));
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  const refresh = useCallback(async () => {
-    try { setTasks(parse(await window.cth.hiveTasks())); } catch { /* keep last good */ }
-  }, []);
-
+  // Opened from the pill, the strip or a "for you" chip: put focus in the
+  // reply field of the asked for card, or the newest one (D10, D11).
+  const focusReq = useStore((s) => s.needsYouFocus);
   useEffect(() => {
-    refresh();
-    timer.current = setInterval(refresh, POLL_MS);
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, [refresh]);
+    if (!focusReq || focusReq.seq <= handledFocusSeq) return;
+    handledFocusSeq = focusReq.seq;
+    if (focusReq.taskId) setOpenId(focusReq.taskId);
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        const wanted = focusReq.taskId ? root.querySelector<HTMLElement>(`[data-askme-id="${CSS.escape(focusReq.taskId)}"]`) : null;
+        const cardEl = wanted ?? root.querySelector<HTMLElement>('.cth-askme-card.is-open');
+        const field = cardEl?.querySelector<HTMLTextAreaElement>('textarea');
+        if (field && cardEl) { cardEl.scrollIntoView({ block: 'nearest' }); field.focus(); return; }
+        root.closest('[data-right-column]')?.querySelector<HTMLElement>('[data-needs-you-heading]')?.focus();
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusReq]);
 
   const nameFor = (id?: string): string | undefined =>
     id ? (agents.find((a) => a.id === id)?.name ?? restorable.find((a) => a.id === id)?.name ?? id) : undefined;
@@ -130,18 +144,24 @@ export function AskMeTab() {
         ? await window.cth.hivePatchTask(task.id, { humanQA: updated.humanQA })
         : { ok: false };
       if (!result.ok) throw new Error('task changed before answer could be saved');
-      setTasks(next);
+      updateNeedsYouTasks(() => next);
       // 2) The answer goes to whoever raised the question, and into their
-      //    memory notes, and Michael is told so he can unblock the card
-      //    (askMeRouting.ts).
+      //    memory notes, and reaches Michael as a request about the card,
+      //    which he closes with done once he has routed it (askMeRouting.ts).
       const agents = useStore.getState().agents;
       const raiser = raiserOf(open, task, new Set(agents.map((a) => a.id)));
       const raiserName = agents.find((a) => a.id === raiser)?.name ?? raiser;
       for (const m of answerMessages({ raiser, raiserName, taskId: task.id, title: task.title, q: open.q, a: text })) {
-        await window.cth.hiveSend({ to: m.to, act: 'inform', subject: m.subject, body: m.body }, 'human');
+        await window.cth.hiveSend({
+          to: m.to, act: m.act, subject: m.subject, body: m.body,
+          ...(m.conversation ? { conversation: m.conversation } : {}),
+          ...(m.requires_reply !== undefined ? { requires_reply: m.requires_reply } : {})
+        }, 'human');
       }
       await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, q: open.q, a: text }).catch(() => undefined);
       setAnswerDraft(task.id, '');
+      setAnsweredHere((list) => [{ id: task.id, title: task.title, a: text, who: nameFor(typeof task.assignee === 'string' ? task.assignee : undefined) }, ...list.filter((x) => x.id !== task.id)]);
+      refreshNeedsYou();
     } catch { /* leave the draft so the user can retry */ }
     setSending(null);
   };
@@ -150,14 +170,25 @@ export function AskMeTab() {
     // Design v2 (branding/DESIGN.md 7.8): plain white cards. Michael's question,
     // a one row answer, and what is stuck behind it. Scrolls on its own so the
     // board heading stays put.
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '2px 2px 10px', margin: '-2px -2px 0' }}>
+    <div ref={rootRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '2px 2px 10px', margin: '-2px -2px 0' }}>
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
-      {waiting.length === 0 && scheduleRequests.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--cth-ink-3)', fontSize: 12.5, lineHeight: '19px' }}>
-          <div style={{ fontWeight: 600, color: 'var(--cth-ink-2)', marginBottom: 4 }}>{translate('shell.boardEmptyTitle')}</div>
-          {translate('shell.boardEmptySub', { godName })}
+      <WorkStyleUpdateCards offers={offers} />
+      {/* Nothing left (D4, D8): All clear, one light line, and what was just
+          answered. The column closes on the next click outside it. */}
+      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && (
+        <div style={{ padding: '4px 2px 2px' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{translate('shell.allClear')}</div>
+          <div style={{ marginTop: 4, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-3)' }}>{translate(`shell.allClearLine${line}`, { godName })}</div>
         </div>
       )}
+      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && answeredHere.map((x) => (
+        <section key={x.id} aria-label={askTitle(x.title)} style={card}>
+          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>{askTitle(x.title)}</div>
+          {x.who && <div style={{ marginTop: 6 }}><span style={personChip}><span aria-hidden="true" style={chipAvatar}>{x.who.slice(0, 1).toUpperCase()}</span>{x.who}</span></div>}
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--cth-ink-3)' }}>{translate('askMe.yourAnswer')}</div>
+          <div dir={rtl ? 'auto' : undefined} style={{ marginTop: 2, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.a}</div>
+        </section>
+      ))}
       {waiting.map((t, idx) => {
         const open = openQuestion(t)!;
         const stuck = dependentsTree(t.id, tasks);
@@ -179,7 +210,7 @@ export function AskMeTab() {
           // Design v2 (DESIGN.md 7.8; owner, 2026-09-30): folded cards read as a
           // list (title, who, when, the ask in a line or two); one opens to the
           // full question, a one row reply and what it holds up.
-          <section key={t.id} aria-label={askTitle(t.title)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
+          <section key={t.id} data-askme-id={t.id} aria-label={askTitle(t.title)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
             {/* The header folds and unfolds the card. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div

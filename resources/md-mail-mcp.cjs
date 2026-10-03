@@ -42,7 +42,7 @@ const compose = {
 const TOOLS = [
   {
     name: 'list_mailboxes',
-    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first.',
+    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first. These tools search, read, archive (with a label), mark read, mark junk, draft and send. They never delete mail: if you are asked to delete, report it (house rule 6).',
     inputSchema: { type: 'object', properties: {} }
   },
   {
@@ -67,6 +67,21 @@ const TOOLS = [
     name: 'read',
     description: 'Read one message (text, sender, recipients, attachment names).',
     inputSchema: { type: 'object', properties: { mailbox, id: { type: 'string', description: 'Message id from search.' } }, required: ['mailbox', 'id'] }
+  },
+  {
+    name: 'archive',
+    description: 'Take messages out of the inbox once each has its outcome: marks them read and moves them to the archive, or under a label if you give one (a Gmail label, or a folder of that name). Nothing is deleted; the owner can find every message.',
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' }, label: { type: 'string', description: 'Optional label, for example "Finance" or "Waiting".' } }, required: ['mailbox', 'ids'] }
+  },
+  {
+    name: 'mark_read',
+    description: 'Mark messages read and leave them in the inbox.',
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' } }, required: ['mailbox', 'ids'] }
+  },
+  {
+    name: 'mark_junk',
+    description: 'Mark messages read and move them to the junk folder. Use it only for junk: some providers (Gmail) empty the junk folder after 30 days.',
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' } }, required: ['mailbox', 'ids'] }
   },
   {
     name: 'draft',

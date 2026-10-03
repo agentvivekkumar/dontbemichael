@@ -1,4 +1,5 @@
-import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useDialog } from './useDialog';
 import { useBackdropClose } from '@/hooks/useBackdropClose';
@@ -10,8 +11,13 @@ import { useBackdropClose } from '@/hooks/useBackdropClose';
  * only when both the press and the click land on it, so a text selection that
  * ends past the edge never does (useBackdropClose). While `busy`, nothing
  * closes it (backdrop, Esc and the close button all wait).
+ *
+ * Rendered into document.body (owner, 2026-10-02: Edit agent's Save changes
+ * was cut off): opened from a panel, an ancestor with a transform or an
+ * animation holding one becomes the containing block for `position: fixed`,
+ * so the dialog sized to the panel and its overflow clipped the footer.
  */
-export function Dialog({ title, onClose, busy = false, width = 520, footer, children, bodyStyle, zIndex = 300, closable = true }: {
+export function Dialog({ title, onClose, busy = false, width = 520, footer, children, bodyStyle, zIndex = 300, closable = true, fill = false, align = 'center', over }: {
   title: ReactNode;
   onClose: () => void;
   busy?: boolean;
@@ -22,16 +28,41 @@ export function Dialog({ title, onClose, busy = false, width = 520, footer, chil
   zIndex?: number;
   /** False for a dialog that must be answered (no close button, no Esc, no backdrop click). */
   closable?: boolean;
+  /** Take the window's full height (less the backdrop's padding) instead of
+   *  sizing to the content, for a dialog built around a long text box. */
+  fill?: boolean;
+  /** 'end' sits the dialog on the right edge (left in RTL), over the panel it
+   *  edits, instead of in the middle of the window. */
+  align?: 'center' | 'end';
+  /** Lay the dialog exactly over this element (its box, kept in step as it
+   *  resizes), like a sheet on the panel it edits. A stable function; when it
+   *  finds nothing, `width`, `fill` and `align` apply. */
+  over?: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement | null>(null);
   const close = () => { if (!busy && closable) onClose(); };
   useDialog(ref, close);
   const backdrop = useBackdropClose(close);
-  return (
+  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = over?.();
+    if (!el) { setBox(null); return; }
+    const measure = (): void => {
+      const r = el.getBoundingClientRect();
+      setBox((b) => (b && b.left === r.left && b.top === r.top && b.width === r.width && b.height === r.height)
+        ? b : { left: r.left, top: r.top, width: r.width, height: r.height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [over]);
+  return createPortal((
     <div {...backdrop} style={{
       position: 'fixed', inset: 0, zIndex, background: 'var(--cth-backdrop)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+      display: 'flex', alignItems: 'center', justifyContent: align === 'end' ? 'flex-end' : 'center', padding: 16
     }}>
       <div
         ref={ref}
@@ -40,8 +71,11 @@ export function Dialog({ title, onClose, busy = false, width = 520, footer, chil
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
         style={{
-          width, maxWidth: '100%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', outline: 'none',
-          background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
+          ...(box
+            ? { position: 'fixed', left: box.left, top: box.top, width: box.width, height: box.height }
+            : { width, maxWidth: '100%', maxHeight: fill ? 'calc(100vh - 32px)' : '88vh', ...(fill ? { height: 'calc(100vh - 32px)' } : {}) }),
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', outline: 'none',
+          background: 'var(--cth-card)', borderRadius: box ? 'var(--cth-r-xl)' : 'var(--cth-r-2xl)',
           boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)',
           fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink)'
         }}
@@ -64,7 +98,7 @@ export function Dialog({ title, onClose, busy = false, width = 520, footer, chil
         )}
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 const closeBtn: CSSProperties = {

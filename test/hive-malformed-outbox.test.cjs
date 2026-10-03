@@ -28,6 +28,12 @@ async function floor(t) {
   return { hive, outbox };
 }
 
+/** An unreadable file older than the write grace, so it is quarantined. */
+function age(outbox, filename) {
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(path.join(outbox, filename), old, old);
+}
+
 function writeOutbox(outbox, filename, raw) {
   const file = path.join(outbox, filename);
   fs.writeFileSync(file, raw, 'utf8');
@@ -66,6 +72,10 @@ test('literal LF inside a JSON string is repaired and routed', async (t) => {
   assert.equal(hive.routeOnce(), 1);
   assert.equal(hive.inbox('god-1')[0].body, `first line${LF}second line`);
   assert.equal(fs.existsSync(path.join(outbox, '.sent', filename)), true);
+  // Archived as delivered, so readers of .sent (owner requests) can parse it
+  // (Codex adversarial review, ship 2026-10-03).
+  assert.equal(JSON.parse(fs.readFileSync(path.join(outbox, '.sent', filename), 'utf8')).body, `first line${LF}second line`);
+  assert.equal(fs.existsSync(file), false, 'the original is gone from the outbox');
   assert.equal(fs.existsSync(path.join(outbox, '.sent', `bad-${filename}`)), false);
   const events = eventsFor(hive, filename);
   assert.equal(events.length, 1);
@@ -95,7 +105,10 @@ test('irreparable structural JSON is logged and quarantined', async (t) => {
   const { hive, outbox } = await floor(t);
   const filename = 'structural.json';
   writeOutbox(outbox, filename, '{"to":"god","body":');
-
+  // A fresh unreadable file may still be being written (outbox-partial-write.test.cjs).
+  assert.equal(hive.routeOnce(), 0);
+  assert.equal(fs.existsSync(path.join(outbox, filename)), true, 'read again on a later tick first');
+  age(outbox, filename);
   assert.equal(hive.routeOnce(), 0);
   assert.equal(hive.inbox('god-1').length, 0);
   assert.equal(fs.existsSync(path.join(outbox, filename)), false);
@@ -124,6 +137,7 @@ test('escaped quotes and backslashes keep their JSON semantics', async (t) => {
 test('an irreparable poison file does not block a valid file in the same pass', async (t) => {
   const { hive, outbox } = await floor(t);
   writeOutbox(outbox, 'a-poison.json', '{"to":"god","body":');
+  age(outbox, 'a-poison.json');
   writeOutbox(outbox, 'b-good.json', JSON.stringify({ to: 'god', act: 'inform', body: 'still routed' }));
 
   assert.equal(hive.routeOnce(), 1);

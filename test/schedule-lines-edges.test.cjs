@@ -162,8 +162,9 @@ test('parseWhen keeps several lines as times, with the first every as the interv
 // ─── fileScheduleRequest ─────────────────────────────────────────────────────
 
 const job = { id: 'm1', label: 'Check Emails', intervalMs: 2 * H, to: 'nick', body: '', enabled: true, createdBy: 'owner' };
+// Every add carries its focus area (schedule-focus-areas.md, FA1).
 const req = (agent, payload, n, why = 'why') => {
-  const b = M.buildScheduleRequest(agent, payload, [job], 'god', n, `r${n}`, why);
+  const b = M.buildScheduleRequest(agent, payload.op === 'add' && !payload.focus ? { ...payload, focus: 'the job' } : payload, [job], 'god', n, `r${n}`, why);
   assert.equal(b.ok, true, JSON.stringify(b));
   return b.request;
 };
@@ -195,7 +196,7 @@ test('two adds at the same weekly time merge back into a weekly draft', () => {
   const a = req('nick', { op: 'add', label: 'Backup', when: { days: ['fri'], at: '09:00' } }, 1);
   const b = req('nick', { op: 'add', label: 'Backup', when: { days: ['fri'], at: '09:00' } }, 2);
   const [merged] = M.fileScheduleRequest([a], b, [job]);
-  assert.deepEqual(merged.draft, { label: 'Backup', intervalMs: DAY, weekly: { days: [5], minute: 540 } });
+  assert.deepEqual(merged.draft, { label: 'Backup', intervalMs: DAY, weekly: { days: [5], minute: 540 }, focus: 'the job' }, 'the focus rides along');
 });
 
 test('an interval longer than a day cannot join another line, so the newer replaces it', () => {
@@ -227,7 +228,7 @@ test('different jobs, or the same job from another agent, stay separate cards', 
 
 test('requestSummary says what a request would do, for every op', () => {
   const add = req('nick', { op: 'add', label: 'Backup', when: { every: '4h' } }, 1);
-  assert.equal(M.requestSummary(add, [job]), 'add "Backup", every 4h');
+  assert.equal(M.requestSummary(add, [job]), 'add "Backup", every 4h, focus: "the job"');
   const rename = req('nick', { op: 'update', id: 'm1', label: 'Inbox sweep' }, 2);
   assert.equal(M.requestSummary(rename, [job]), 'change "Check Emails" from every 2h to every 2h and rename it "Inbox sweep"');
   const pause = req('nick', { op: 'pause', id: 'm1' }, 3);

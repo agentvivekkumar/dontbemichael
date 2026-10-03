@@ -55,13 +55,41 @@ export interface ImapLike {
   connect(): Promise<void>;
   logout(): Promise<void>;
   close?(): void;
-  list(): Promise<Array<{ path: string; specialUse?: string; flags?: Set<string> }>>;
+  list(): Promise<Array<{ path: string; specialUse?: string; flags?: Set<string>; delimiter?: string }>>;
   getMailboxLock(path: string): Promise<{ release(): void }>;
   search(query: Record<string, unknown>, opts?: { uid?: boolean }): Promise<number[] | false>;
   fetchOne(uid: string | number, query: Record<string, unknown>, opts?: { uid?: boolean }): Promise<any>;
   fetch(range: string | number[], query: Record<string, unknown>, opts?: { uid?: boolean }): AsyncIterable<any>;
   append(path: string, content: Buffer | string, flags?: string[]): Promise<unknown>;
+  messageFlagsAdd?(range: string | number[], flags: string[], opts?: { uid?: boolean; useLabels?: boolean }): Promise<unknown>;
+  messageMove?(range: string | number[], destination: string, opts?: { uid?: boolean }): Promise<unknown>;
+  mailboxCreate?(path: string): Promise<unknown>;
   on?(event: string, fn: (...a: any[]) => void): unknown;
+}
+
+/** The most messages one archive, mark_read or mark_junk call moves. */
+const ORGANIZE_MAX = 50;
+
+/** Folder names an archive label may never be: a label is a place to file
+ *  mail, and these would trash, junk or misfile it (security review,
+ *  2026-10-03: the label "\\Trash" really trashed mail on Gmail). */
+const RESERVED_LABELS = new Set([
+  'inbox', 'trash', 'bin', 'deleted', 'deleted items', 'deleted messages', 'junk', 'junk e-mail', 'junk email',
+  'spam', 'bulk mail', 'sent', 'sent items', 'sent mail', 'sent messages', 'drafts', 'draft', 'all mail',
+  'important', 'starred', 'flagged', 'outbox'
+]);
+/** Special-use folders a label must not name either, whatever they are called. */
+const RESERVED_USES = new Set(['\\Trash', '\\Junk', '\\Sent', '\\Drafts', '\\All', '\\Flagged', '\\Important']);
+
+/** Why an archive label is refused, or null when it is a plain label. */
+export function labelProblem(label: string): string | null {
+  if (/^\\/.test(label)) return 'A label cannot start with a backslash.';
+  if (/[\u0000-\u001f\u007f(){}"%*\]]/.test(label)) return 'A label can use letters, numbers, spaces and simple punctuation only.';
+  const name = label.trim().toLowerCase().replace(/^\[gmail\]\//, '').replace(/^inbox[./]/, '');
+  // Its first level too: a folder inside the trash is emptied with it.
+  const top = name.split(/[./]/)[0].trim();
+  if (RESERVED_LABELS.has(name) || RESERVED_LABELS.has(top)) return `"${label}" is a system folder, not a label: archive files mail, it never trashes or junks it.`;
+  return null;
 }
 
 export interface SmtpLike {
@@ -292,6 +320,60 @@ export class MailService {
     }, 'Searching the mailbox');
   }
 
+  /**
+   * Inbox zero (owner, 2026-10-03): take messages out of the inbox without
+   * deleting any. `archive` marks them read and moves them to the archive, or,
+   * with a label, to that label (a Gmail label, or a folder of that name on
+   * other servers, made when missing). `mark_junk` marks them read and moves
+   * them to the junk folder. `mark_read` leaves them where they are. Every
+   * outcome can be undone in the mailbox.
+   */
+  async organize(id: string, action: 'archive' | 'mark_read' | 'mark_junk', uids: number[], label?: string) {
+    if (!uids.length) throw new MailError('bad-request', `${action} needs the message ids from search.`);
+    return this.inFolder(id, MailService.inbox, async (c) => {
+      if (!c.messageFlagsAdd || !c.messageMove) throw new MailError('unsupported', 'This mailbox cannot move messages.');
+      // Only the asked-for ids are searched, not the whole inbox.
+      const present = new Set(((await c.search({ uid: uids.join(',') }, { uid: true })) || []).map(Number));
+      const found = uids.filter((u) => present.has(u));
+      const missing = uids.filter((u) => !present.has(u));
+      if (!found.length) throw new MailError('not-found', 'None of those messages are in the inbox any more.');
+      if (action === 'mark_read') {
+        await c.messageFlagsAdd(found, ['\\Seen'], { uid: true });
+        return { done: found.map(String), missing: missing.map(String) };
+      }
+      // Where they go is settled before anything changes, so a mailbox with no
+      // junk folder leaves the messages exactly as they were.
+      const folders = await c.list();
+      const gmail = folders.some((f) => f.specialUse === '\\All');
+      let destination: string;
+      if (action === 'mark_junk') {
+        const junk = folders.find((f) => f.specialUse === '\\Junk') ?? folders.find((f) => /^(junk|spam|junk e-?mail|\[gmail\]\/spam|inbox\.junk)$/i.test(f.path));
+        if (!junk) throw new MailError('not-found', 'This mailbox has no junk folder.');
+        destination = junk.path;
+      } else if (label && folders.some((f) => {
+        if (!f.specialUse || !RESERVED_USES.has(f.specialUse)) return false;
+        const sys = f.path.toLowerCase();
+        const l = label.toLowerCase();
+        // The folder itself, or one inside it, whatever its name in this language.
+        return l === sys || [f.delimiter, '/', '.'].some((d) => !!d && l.startsWith(sys + d));
+      })) {
+        throw new MailError('bad-request', `"${label}" is a system folder, not a label.`);
+      } else if (gmail) {
+        // Gmail: the label is added in place, then the message leaves the inbox
+        // for All Mail, where it keeps every label.
+        if (label) await c.messageFlagsAdd(found, [label], { uid: true, useLabels: true });
+        destination = folders.find((f) => f.specialUse === '\\All')!.path;
+      } else {
+        const archive = folders.find((f) => f.specialUse === '\\Archive') ?? folders.find((f) => /^(inbox\.)?archive$/i.test(f.path));
+        destination = label ?? archive?.path ?? 'Archive';
+        if (!folders.some((f) => f.path === destination)) await c.mailboxCreate?.(destination);
+      }
+      await c.messageFlagsAdd(found, ['\\Seen'], { uid: true });
+      await c.messageMove(found, destination, { uid: true });
+      return { done: found.map(String), missing: missing.map(String), ...(label ? { label } : {}) };
+    }, action === 'mark_read' ? 'Marking mail read' : action === 'mark_junk' ? 'Moving mail to junk' : 'Archiving mail');
+  }
+
   private async source(c: ImapLike, uid: string): Promise<Buffer> {
     const m = await c.fetchOne(uid, { uid: true, source: true }, { uid: true });
     if (!m || !m.source) throw new MailError('not-found', `No message with id ${uid} in this mailbox.`);
@@ -446,7 +528,13 @@ function ref(v: unknown): MailRef | undefined {
  * is trusted). Checks `mailAccess` for the op, MB-8 for references, then runs it.
  * Never throws: every outcome is a status and a JSON body the MCP server relays.
  */
-export async function handleMailRequest(svc: MailService, deps: Pick<MailDeps, 'getConfig'>, agentId: string, op: string, body: Record<string, unknown>): Promise<MailRequestResult> {
+export async function handleMailRequest(
+  svc: MailService,
+  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void },
+  agentId: string,
+  op: string,
+  body: Record<string, unknown>
+): Promise<MailRequestResult> {
   const cfg = deps.getConfig();
   const mop = MAIL_TOOL_OPS[op];
   if (!mop) return { status: 404, body: { error: `Unknown mail tool "${op}".` } };
@@ -492,6 +580,20 @@ export async function handleMailRequest(svc: MailService, deps: Pick<MailDeps, '
       const id = str(body.id, 40) ?? (typeof body.id === 'number' ? String(body.id) : undefined);
       if (!id) return { status: 400, body: { error: 'read needs the message id from search.' } };
       return { status: 200, body: await svc.read(mailbox!, id) };
+    }
+    if (op === 'archive' || op === 'mark_read' || op === 'mark_junk') {
+      const raw = Array.isArray(body.ids) ? body.ids : body.id !== undefined ? [body.id] : [];
+      const uids = [...new Set(raw.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0))];
+      if (!uids.length) return { status: 400, body: { error: `${op} needs "ids": the message ids from search.` } };
+      if (uids.length > ORGANIZE_MAX) return { status: 400, body: { error: `At most ${ORGANIZE_MAX} messages per call.` } };
+      const label = op === 'archive' ? str(body.label, 60)?.trim().replace(/[\r\n]/g, ' ') : undefined;
+      const problem = label ? labelProblem(label) : null;
+      if (problem) return { status: 400, body: { error: problem } };
+      const done = await svc.organize(mailbox!, op, uids, label);
+      // Every move is written to the office log, so the owner can see what an
+      // agent cleared from the inbox and where it went.
+      try { deps.audit?.({ kind: 'mail-organize', agentId, mailbox, action: op, ids: done.done, ...(label ? { label } : {}) }); } catch { /* the move stands */ }
+      return { status: 200, body: done };
     }
     if (!input.to || !input.subject) return { status: 400, body: { error: `${op} needs "to" and "subject".` } };
     if (op === 'draft') return { status: 200, body: await svc.draft(mailbox!, input) };

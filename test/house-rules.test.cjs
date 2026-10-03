@@ -39,6 +39,17 @@ test('the rules cover sources, not knowing, estimates, honest reports and real p
   assert.match(HOUSE_RULES, /Make up an example only when the owner asks for a sample/);
 });
 
+// 2026-10-02: Pam's work style said delete handled mail; her mail tools cannot,
+// so she read a cold pitch, left it unread and said nothing about it.
+test('every agent reports what its tools cannot do instead of skipping it, and the mail tools say their limits', () => {
+  // Value: protects=an instruction the tools cannot carry out reaches Michael or the owner instead of vanishing; fails_when=rule 6 is dropped or the mail tools stop naming what they cannot do; why_new=no rule covered a missing tool; seam=none
+  assert.match(HOUSE_RULES, /6\. When your instructions or a request ask for something your tools cannot do/);
+  assert.match(HOUSE_RULES, /A team member tells Michael; Michael tells the owner on the Ask me board\./);
+  assert.match(HOUSE_RULES, /Do not work around a missing or refused tool\./);
+  const mail = fs.readFileSync(path.resolve(__dirname, '..', 'resources/md-mail-mcp.cjs'), 'utf8');
+  assert.match(mail, /They never delete mail: if you are asked to delete, report it \(house rule 6\)\./);
+});
+
 test('written calmly: no dashes, no shouting, no dates that would break the prompt cache', () => {
   assert.doesNotMatch(HOUSE_RULES, /[–—]/);
   assert.doesNotMatch(HOUSE_RULES.replace(/^HOUSE RULES\./, ''), /\b(MUST|NEVER|ALWAYS|CRITICAL)\b/);

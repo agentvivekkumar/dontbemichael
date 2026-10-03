@@ -39,11 +39,11 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.0.8: Michael runs the office, and hiring makes sense.**
-> A four step hire wizard where each character brings a real job, a check that no two teammates do
-> the same work, and work styles in plain words. Only Michael assigns work and decides the team's
-> schedule requests, asking you only when he can't settle one. One job can now run at several
-> times. [Every feature, release by release](./docs/FEATURES.md).
+> **New in 0.0.16: your answers become Michael's work, and the inbox reaches zero.**
+> An answer you give on Ask me is a request Michael routes and closes, and the Tasks view shows
+> which cards sit with him. Your Executive Admin files every email out of the inbox and deletes
+> nothing. Every scheduled job has a focus area, and closing time clears the floor.
+> [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
 
@@ -131,10 +131,12 @@ business runs on, and each team member works from the one that matches its job.
 - **Hand it out per team member.** On a team member's Access tab, turn email on, pick its
   mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
-- **Each one stays in its lane.** A team member can only read, search and draft in the mailbox you
-  gave it, and cannot forward or attach mail from another one.
+- **Each one stays in its lane.** A team member can only read, search, draft and file mail (archive,
+  mark read, mark junk) in the mailbox you gave it, and cannot forward or attach mail from another
+  one. Nothing it does deletes mail.
 - **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
-  and the team member sorts new mail, drafts replies and tells Michael what needs you.
+  with a focus area for each run, and the team member sorts new mail, drafts replies and tells
+  Michael what needs you. A new Executive Admin arrives with an Inbox to zero job already set.
 - **You hear when it breaks.** If a provider stops accepting the password, the mailbox shows
   "needs you" and Michael asks you to fix it once, on the Needs you board.
 
@@ -153,8 +155,9 @@ on and give them to a team member.
 Michael is the one you talk to. He sends each job to the team member whose role fits, keeps an eye
 on the task board, and brings you only what needs you. He is the only one who hands out work: when
 one team member needs another to do something, the request goes to Michael and he decides who
-does it. Team members can still ask each other questions directly. Once an hour he runs a standup
-with the team. He is the only one who sends you desktop notifications. To speak with one team member
+does it. Team members can still ask each other questions directly. When you answer a question, the
+answer becomes his work until he routes it and closes it. Once an hour he runs a standup with the
+team. He is the only one who sends you desktop notifications. To speak with one team member
 directly, open it and choose **Talk 1:1**; Michael sends it no work until you end the 1:1.
 
 </td>
@@ -248,7 +251,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 </table>
 
 **Running the office**
-- **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it.
+- **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it. Michael gets it too, as work he routes and then closes.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
 - **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.

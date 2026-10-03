@@ -74,7 +74,7 @@ export function ClosingTimeBar({ closing, onCancel, onForceQuit, onRetry }: Clos
         : headerLine(c, t);
 
   return (
-    <div ref={regionRef} tabIndex={-1} role="region" aria-label={t('closingBar.title')} style={{
+    <div ref={regionRef} data-closing-bar="" tabIndex={-1} role="region" aria-label={t('closingBar.title')} style={{
       // Above every dialog and the release notes, which stay open behind it
       // (their keyboard traps pause while closing time runs).
       position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 650,

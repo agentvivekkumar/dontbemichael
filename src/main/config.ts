@@ -32,23 +32,44 @@ import {
  *  renderer can't drift apart. */
 export type { ScheduledMission } from '../shared/missions';
 
+/** The standup's focus area (schedule-focus-areas.md F6, card-lifecycle.md
+ *  section 6): what Michael concentrates on in each standup run. */
+export const OPS_STANDUP_FOCUS =
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+  'or move it to doing with who it waits on, or to done. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+  'Re-engage anyone stalled and keep the board accurate.';
+
+/** Standup focus texts the app shipped before. An office still carrying one
+ *  word for word gets the current one at launch; the owner's own text stays. */
+export const OPS_STANDUP_BUILT_IN_FOCUSES: readonly string[] = [
+  // 2026-10-02, before blocked cards with nothing asked were listed.
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card is blocked or has nobody on it. ' +
+  'Re-engage anyone stalled and keep the board accurate.'
+];
+
 /** The built-in hourly ops standup. A schedule says when and which job
- *  (owner, 2026-09-25): the label names the job, and what Michael does at a
- *  standup lives in his own instructions (hive.ts), not here. Shipped enabled;
- *  users can toggle it off in the Command Center. */
+ *  (owner, 2026-09-25): the label names the job, and what Michael covers at a
+ *  standup is its focus area (OPS_STANDUP_FOCUS), sent with each run. Shipped
+ *  enabled; users can toggle it off in the Command Center. */
 export const OPS_STANDUP_MISSION: ScheduledMission = {
   id: 'ops-standup',
   label: 'Hourly ops standup',
   intervalMs: 3_600_000,
   to: 'god',
   body: '',
+  focus: OPS_STANDUP_FOCUS,
   enabled: true
   // NO autoCompact. Compaction belongs to contextTrigger.compact and nothing else.
 };
 
 /** Standup prompts the app itself shipped. An office still carrying one of
  *  them word for word gets the current (empty) body at launch, because its
- *  content now lives in Michael's instructions; text the owner wrote is kept. */
+ *  content now lives in the standup's focus area; text the owner wrote is kept. */
 export const OPS_STANDUP_BUILT_IN_BODIES: readonly string[] = [
   // Until 2026-09-25 (morning): told Michael each agent would compact.
   'Hourly ops standup. Review every agent: who is doing what, and confirm each ' +
@@ -190,6 +211,9 @@ export interface HarnessConfig {
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
+  /** Owner decisions on offered job description updates
+   *  (shared/workStyleUpdates.ts), by `${key}:${agentId}`: 'use' or 'keep'. */
+  workStyleUpdatesDecided?: Record<string, 'use' | 'keep'>;
   /** Folder where the harness keeps its own state (agent metadata, logs). */
   harnessHome: string | null;
   /** Recently-opened office folders (most-recent first), offered by the missing
@@ -262,6 +286,12 @@ export interface HarnessConfig {
   /** One-time guard: has the built-in hourly ops standup been seeded into an
    *  existing install's missions? Prevents re-adding it after a user deletes it. */
   opsStandupSeeded?: boolean;
+  /** One-time guard: the standup got its focus area (schedule-focus-areas.md
+   *  F6). An owner who later edits or clears it keeps their choice. */
+  standupFocusSeeded?: boolean;
+  /** Owner answers the app recorded from Ask me (shared/ownerRequests.ts
+   *  answerKey): the launch catch-up relays only these. */
+  ownerAnswerKeys?: string[];
   /** One-time guard: the knowledge feature was switched on for this install
    *  when it became the company knowledge store (2026-09-25). An owner who
    *  turns it off afterwards keeps it off. */
@@ -333,15 +363,6 @@ export interface HarnessConfig {
    *  updates (updater.ts), and the switch is gone. Kept so older config files
    *  still read. (Mirrored in preload + renderer config.) */
   autoUpdate?: boolean;
-  /** Multi-window "floors": expose a New Floor action that opens additional
-   *  windows, each an independent office with isolated renderer state (its own
-   *  session partition) and per-window PTY routing. ON by default (v0.3.4: code
-   *  and comment disagreed; the shipped behavior — enabled — wins) —
-   *  the window/PTY-ownership plumbing is always active and single-window-safe,
-   *  but the New Floor entry points (app menu item + IPC) only appear when on.
-   *  The on-disk hive (god orchestration under harnessHome) stays process-global;
-   *  floors share it. */
-  multiWindow?: boolean;
   /** Terminal theme — mirrored into each agent's per-session Claude settings
    *  ("theme" key) at spawn so the TUI's truecolor palette matches. Scoped to
    *  harness agents only; the user's global Claude theme is never touched. */
@@ -473,7 +494,6 @@ const DEFAULTS: HarnessConfig = {
   notifications: false,
   strongKeepalive: false,
   telemetryEnabled: true,
-  multiWindow: true,
   tvShowOffices: false,
   officeTheme: 'office',
   slackEnabled: false,
