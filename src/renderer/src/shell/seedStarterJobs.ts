@@ -7,19 +7,29 @@ import { useStore } from '@/store/store';
  * (src/shared/starterJobs.ts): its schedules, each with its focus area. Run
  * after a hire and at team start; a job it already has by name is skipped, so
  * running it twice adds nothing. `sourceCard` is "<businessType>/<card id>".
+ * `paused` adds them switched off, as a closed hire's schedules are. False
+ * when a job could not be read or saved, so a caller can try again later.
  */
-export async function seedStarterJobs(sourceCard: string | undefined, agentId: string): Promise<void> {
-  if (!sourceCard) return;
+export async function seedStarterJobs(sourceCard: string | undefined, agentId: string, opts: { paused?: boolean } = {}): Promise<boolean> {
+  if (!sourceCard) return true;
   const [type, defId] = sourceCard.split('/');
-  if (!type || !defId) return;
+  if (!type || !defId) return true;
   try {
     const { packs, core } = await window.cth.packsList();
     const pack = [...packs.map((p) => p.pack), core].find((p) => p?.businessType === type);
-    if (!pack?.starterMissions?.length) return;
+    if (!pack?.starterMissions?.length) return true;
     const existing = await window.cth.listMissions();
     const godId = useStore.getState().agents.find((a) => a.isGod)?.id ?? GOD_ALIAS;
     const stamp = Date.now().toString(36);
     const add = starterMissionsFor(pack.starterMissions, pack.officeHours, defId, agentId, existing, godId, (i) => `m_${stamp}_${agentId}_${i}`);
-    for (const m of add) await window.cth.upsertMission(m).catch(() => undefined);
-  } catch { /* the hire stands; the owner can add the job on the Access tab */ }
+    let ok = true;
+    for (const m of add) {
+      const saved = await window.cth.upsertMission(opts.paused ? { ...m, enabled: false } : m).then((r) => (r as { ok?: boolean } | undefined)?.ok !== false, () => false);
+      ok = ok && saved;
+    }
+    return ok;
+  } catch {
+    // The hire stands; the owner can add the job on the Access tab.
+    return false;
+  }
 }

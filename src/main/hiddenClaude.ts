@@ -6,6 +6,8 @@ import { expandTilde } from './fs';
 import { projectDir } from './transcript';
 import { lastAssistantText, transcriptFile } from './transcriptText';
 import { ensureKilled } from './procKill';
+import { Terminal } from '@xterm/headless';
+import { ANSWER_MARK, screenAnswer } from './screenAnswer';
 
 /**
  * Shared helper: run a HIDDEN interactive claude session (ephemeral PTY) and
@@ -50,7 +52,28 @@ export interface HiddenClaudeOptions {
   timeoutMs?: number;
   /** Extra env merged over the resolved shell env (e.g. the shared MemPalace). */
   env?: Record<string, string>;
+  /** False for a quick judgment (the hire overlap check, the focus check):
+   *  no extended thinking. Claude Code thinks by default, and on these short
+   *  prompts that took Haiku 18 to 70 seconds of hidden thinking and sometimes
+   *  hit the timeout; with MAX_THINKING_TOKENS=0 the same verdict comes in
+   *  about a second (measured 2026-10-03). Defaults to the CLI's own setting. */
+  thinking?: boolean;
+  /** The answer as it is being written, read off the session's screen through
+   *  a headless terminal, for a live preview (screenAnswer.ts). The result
+   *  still comes from the transcript. */
+  onScreenText?: (text: string) => void;
+  /** Stops the call: the session is killed and the result is 'cancelled'. */
+  signal?: AbortSignal;
 }
+
+/** How often the live preview is read off the screen. */
+const SCREEN_READ_MS = 300;
+/** The hidden terminal's size, shared by the PTY and the preview's screen. */
+const COLS = 220;
+const ROWS = 50;
+
+/** How often a no tools call looks for its answer in its own transcript. */
+const ANSWER_POLL_MS = 250;
 
 export interface HiddenClaudeResult {
   ok: boolean;
@@ -102,13 +125,14 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     try {
       ptyProc = pty.spawn(spawnFile, spawnArgs, {
         name: 'xterm-color',
-        cols: 220,
-        rows: 50,
+        cols: COLS,
+        rows: ROWS,
         cwd: opts.cwd,
         env: {
           ...process.env,
           PATH: userShellPath(),
           ...(opts.env ?? {}),
+          ...(opts.thinking === false ? { MAX_THINKING_TOKENS: '0' } : {}),
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
         } as Record<string, string>,
       });
@@ -123,6 +147,25 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     let idleTimer: NodeJS.Timeout | null = null;
     let bootMaxTimer: NodeJS.Timeout;
     let globalTimer: NodeJS.Timeout;
+    let answerPoll: NodeJS.Timeout | null = null;
+    // The live preview: the PTY output rendered by a headless terminal, read
+    // a few times a second once the prompt is in.
+    const screen = opts.onScreenText ? new Terminal({ cols: COLS, rows: ROWS, scrollback: 2000, allowProposedApi: true }) : null;
+    let screenTimer: NodeJS.Timeout | null = null;
+    let lastScreenText = '';
+    const readScreen = () => {
+      if (!screen || !promptSent) return;
+      const buf = screen.buffer.active;
+      // Only the answer being written counts, and it sits at the bottom: walk
+      // back to its marker instead of translating the whole scrollback.
+      let from = buf.length - 1;
+      while (from >= 0 && !(buf.getLine(from)?.translateToString(true) ?? '').includes(ANSWER_MARK)) from--;
+      if (from < 0) return; // still thinking: no answer on screen yet
+      const lines: string[] = [];
+      for (let i = from; i < buf.length; i++) lines.push(buf.getLine(i)?.translateToString(true) ?? '');
+      const text = screenAnswer(lines);
+      if (text && text !== lastScreenText) { lastScreenText = text; try { opts.onScreenText?.(text); } catch { /* a preview never breaks the call */ } }
+    };
 
     // Hidden sessions are ephemeral CHECKS — nothing they spawn (MCP servers,
     // helpers) may outlive them. Kill politely, then sweep the process group so
@@ -138,6 +181,10 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       settled = true;
       if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
       if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+      if (answerPoll) { clearInterval(answerPoll); answerPoll = null; }
+      if (screenTimer) { clearInterval(screenTimer); screenTimer = null; }
+      opts.signal?.removeEventListener('abort', onAbort);
+      screen?.dispose();
       clearTimeout(bootMaxTimer);
       clearTimeout(globalTimer);
       kill();
@@ -163,6 +210,16 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       // Bracketed paste + enter — same mechanism as submitToPty in useHive.ts.
       ptyProc.write(`\x1b[200~${prompt}\x1b[201~`);
       setTimeout(() => { if (!settled) ptyProc.write('\r'); }, 140);
+      // With no tools the first answer is the last one, so it is taken the
+      // moment it lands in this session's transcript instead of after the
+      // screen has been quiet for idleMs (which added 3.5s to every call).
+      if (screen) screenTimer = setInterval(readScreen, SCREEN_READ_MS);
+      if (opts.noTools) {
+        answerPoll = setInterval(() => {
+          const text = ownAnswer();
+          if (text) finish({ ok: true, text });
+        }, ANSWER_POLL_MS);
+      }
     };
 
     bootMaxTimer = setTimeout(sendPrompt, bootCapMs);
@@ -171,7 +228,12 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       timeoutMs,
     );
 
-    ptyProc.onData(() => {
+    const onAbort = () => finish({ ok: false, error: 'cancelled' });
+    if (opts.signal?.aborted) { finish({ ok: false, error: 'cancelled' }); return; }
+    opts.signal?.addEventListener('abort', onAbort);
+
+    ptyProc.onData((data) => {
+      screen?.write(data);
       if (!promptSent) {
         // Boot phase: reset quiet timer; send prompt once output goes quiet.
         if (bootTimer) clearTimeout(bootTimer);

@@ -67,7 +67,7 @@ settings A/B/C/D).
 |---|---|
 | V1 OFFICE, TASKS, GRAPH toggle | Top bar view tabs: Office, Tasks, Who talks to whom |
 | V3, V4 kanban and task detail | Tasks view, same functions; add Esc to close detail |
-| V5 memory graph | Who talks to whom view: people and topic nodes, edge thickness by message count, hover an edge for count and last message (others dim), Topics switch, Refresh, drag to pin; clicking a person opens their Memory |
+| V5 memory graph | Who talks to whom view: people drawn as their props, edge thickness by message count over a time range (Last 1 hour to Last 1 month, default Last 1 day), hover an edge for count and last message (others dim), Refresh, drag to pin; clicking a person opens their Memory. Topic nodes and the Topics switch removed (2026-10-03) |
 | S1 to S5 card, select, status, typing, info line, context gauge | Pod label card: name, role, status pill, typing dot, caption, small context gauge |
 | S6 doing sticky note | Sticky count on the pod; click opens the task |
 | S7 private note | Person panel header |

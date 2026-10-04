@@ -124,11 +124,18 @@ export interface AgentDefinitionV2 {
   /** Per-agent total-token ceiling. */
   tokenCap?: number;
   /**
-   * What this agent will do first, shown on the floor before anything has
-   * happened (design review Decision 29). A reactive agent states its trigger
-   * ("when a catering enquiry arrives") instead of a time.
+   * Older packs' owner-facing "what this agent does first" line (design review
+   * Decision 29). Still accepted from imported packs and shown nowhere; the
+   * first task is `firstTask` now.
    */
   firstAction?: string;
+  /**
+   * The one-time job a new hire starts with (docs/designs/first-task-card.md):
+   * at hire it becomes a card Michael hands out and keeps until Done, so it is
+   * never part of the standing Work style. `title` is what the board shows, a
+   * few plain words with no names; `ask` is written to the hire, with no times.
+   */
+  firstTask?: { title: string; ask: string };
   /**
    * The folder this agent works in, by name — "Finance", "Marketing" (Decision
    * 47). It becomes `~/Documents/<Business>/<folder>` unless the owner points it
@@ -143,8 +150,9 @@ export interface AgentDefinitionV2 {
    */
   routing?: string;
   /**
-   * The agent's Work style: the job, how to work (with reasons), what needs the
-   * owner's approval, and a first task with a recipient. Written to the agent;
+   * The agent's Work style: the job, how to work (with reasons) and what needs
+   * the owner's approval. Standing duties only: one-time work is `firstTask`.
+   * Written to the agent;
    * `{Business}` and `{City}` are filled at setup.
    */
   workStyle?: string;
@@ -169,6 +177,7 @@ const KNOWN_KEYS: readonly string[] = [
   'modelTier',
   'tokenCap',
   'firstAction',
+  'firstTask',
   'folder',
   'routing',
   'workStyle'
@@ -252,6 +261,15 @@ export function validateAgentDefinition(
   const modelTier = enumField(o.modelTier, ['best', 'fast'] as const, 'modelTier', out);
   const tokenCap = intInRange(o.tokenCap, 1, MAX_AGENT_TOKEN_CAP, 'tokenCap', out);
   const firstAction = cappedString(o.firstAction, 200, 'firstAction', out);
+  let firstTask: { title: string; ask: string } | undefined;
+  if (o.firstTask !== undefined) {
+    if (!isPlainObject(o.firstTask)) out.errors.push('"firstTask" must be an object with a title and an ask');
+    else {
+      const title = cappedString(o.firstTask.title, 60, 'firstTask.title', out, true);
+      const ask = cappedString(o.firstTask.ask, 400, 'firstTask.ask', out, true);
+      if (title && ask) firstTask = { title, ask };
+    }
+  }
   const routing = cappedString(o.routing, 500, 'routing', out);
   const workStyle = cappedString(o.workStyle, 3000, 'workStyle', out);
   // A folder name becomes a real path on the owner's disk, and packs can be
@@ -317,6 +335,7 @@ export function validateAgentDefinition(
       ...(modelTier ? { modelTier } : {}),
       ...(tokenCap ? { tokenCap } : {}),
       ...(firstAction ? { firstAction } : {}),
+      ...(firstTask ? { firstTask } : {}),
       ...(folder ? { folder } : {}),
       ...(routing ? { routing } : {}),
       ...(workStyle ? { workStyle } : {})

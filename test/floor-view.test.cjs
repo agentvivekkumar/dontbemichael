@@ -28,9 +28,9 @@ test('the office shows by default, and the choice is remembered', () => {
 // top bar; the board covers the office and leaves room for the bottom bar.
 test('the view tabs sit in the top bar, and the board covers the office above the bottom bar', () => {
   const app = read('src/renderer/src/App.tsx');
-  const office = app.indexOf('<StudioStage config={config} bleed={columnOpen ? sidebarWidth + 10 : 0} />');
+  const office = app.indexOf('<StudioStage config={config} bleed={columnShown ? sidebarWidth + 10 : 0} />');
   const board = app.indexOf("{floorView !== 'office' && (");
-  const bottom = app.indexOf('<BottomBar config={config} />');
+  const bottom = app.indexOf('<BottomBar />');
   assert.ok(office > 0 && board > office && bottom > board, 'office, then the board over it, then the bottom bar over both');
   assert.match(app.slice(board, board + 700), /position: 'absolute', inset: 0, zIndex: 50,[\s\S]*paddingBottom: 96,[\s\S]*\{floorView === 'tasks' && <TasksKanban \/>\}/);
   assert.match(read('src/renderer/src/shell/TopBar.tsx'), /<ViewTabs \/>/);
@@ -107,4 +107,21 @@ test('TASKS and GRAPH explain themselves behind an info icon', () => {
     const j = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`));
     for (const k of ['tasksIntro', 'graphIntroShort']) assert.ok(j.floorView[k], `${l} ${k}`);
   }
+});
+
+test('Tasks and Who talks to whom take the whole window: the right column hides there and opening it goes back to the office', () => {
+  // Value: protects=the owner's 2026-10-03 ask (no side column on Tasks or the graph) without losing a person's terminal or a half written reply, and a click that opens the column still shows what was clicked; fails_when=the column shows on Tasks or the graph, is unmounted there, or select, openNeedsYou, openAgentMemory or a Michael tab request leaves the view on Tasks or the graph; why_new=owner ask; seam=source pins
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
+  const app = read('src/renderer/src/App.tsx');
+  assert.match(app, /const columnShown = columnOpen && floorView === 'office';/);
+  assert.match(app, /\{columnShown && \(\n\s+<SidebarSplitter/);
+  assert.match(app, /display: floorView === 'office' \? 'flex' : 'none', flexDirection: 'column'/);
+  assert.match(app, /\{\(columnOpen \|\| exiting\) && \(/, 'the column stays mounted while hidden');
+  const store = read('src/renderer/src/store/store.ts');
+  assert.match(store, /function officeView\(view: FloorView\): \{ floorView\?: FloorView \} \{\n\s+if \(view === 'office'\) return \{\};\n\s+try \{ window\.localStorage\.setItem\(LS_FLOOR_VIEW, 'office'\); \}/);
+  assert.equal((store.match(/\.\.\.officeView\(s\.floorView\)/g) || []).length, 5, 'select, openAgentMemory, openNeedsYou and both Michael tab requests');
+  assert.match(store, /rightColumn: 'person', \.\.\.officeView\(s\.floorView\) \};/);
+  assert.match(store, /rightColumn: 'board',\n\s+\.\.\.officeView\(s\.floorView\),/);
 });

@@ -18,7 +18,8 @@ import {
   modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
-import { answerMessages, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
+import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
+import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
 import { answerKey, catchUpRequests } from '../shared/ownerRequests';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
@@ -45,7 +46,7 @@ import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
 import { checkDistinct, readJobProfile } from './hireCheck';
-import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckRequest } from './workStyleConvert';
+import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckRequest, readSuggestRequest, suggestWorkStyle } from './workStyleConvert';
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
@@ -2824,14 +2825,29 @@ function createWindow(): BrowserWindow {
     }, 400);
     win.on('resized', saveBounds);
     win.on('moved', saveBounds);
+    // Whether it was left filling the screen (kv `window.maximized`), so the
+    // next launch opens the same way.
+    const saveMaximized = () => {
+      if (win.isDestroyed() || win.isMinimized()) return;
+      try { persist.setKv('window.maximized', win.isMaximized()); } catch { /* DB best-effort */ }
+    };
+    win.on('maximize', saveMaximized);
+    win.on('unmaximize', saveMaximized);
     win.on('close', () => {
+      saveMaximized();
       if (win.isDestroyed() || win.isMinimized() || win.isMaximized()) return;
       try { persist.setKv('window.bounds', win.getBounds()); } catch { /* DB best-effort */ }
     });
   }
 
-
-  win.once('ready-to-show', () => win.show());
+  // The office opens filling the screen (owner, 2026-10-03: it always came
+  // back at about 70%), unless the owner last left it at a smaller size.
+  let openMaximized = true;
+  try { openMaximized = persist.getKv('window.maximized') !== false; } catch { /* DB best-effort: fill the screen */ }
+  win.once('ready-to-show', () => {
+    if (openMaximized) win.maximize();
+    win.show();
+  });
 
   // Never opens a window; hands the URL to the OS browser instead.
   //
@@ -4075,7 +4091,7 @@ ipcMain.handle('hive:setAgentHold', (_evt, id: unknown, hold: unknown) => {
 });
 ipcMain.handle('hive:board', () => hive.board());
 ipcMain.handle('hive:tasks', () => hive.tasks());
-ipcMain.handle('hive:log', (_evt, n: unknown) => hive.logTail(typeof n === 'number' ? n : 200));
+ipcMain.handle('hive:log', (_evt, n: unknown, kind: unknown, since: unknown) => hive.logTail(typeof n === 'number' ? n : 200, typeof kind === 'string' ? kind : undefined, typeof since === 'number' ? since : undefined));
 ipcMain.handle('hive:memory', (_evt, id: unknown) => (typeof id === 'string' ? hive.memory(id) : ''));
 ipcMain.handle('hive:memoryDetail', (_evt, id: unknown) => (typeof id === 'string' ? hive.memoryDetail(id) : { index: '', waiting: 0 }));
 ipcMain.handle('hive:procedure', (_evt, id: unknown, slug: unknown) =>
@@ -4355,6 +4371,41 @@ ipcMain.handle('hive:send', (_evt, partial: Partial<HiveMessage>, from: unknown)
 // Michael's open requests from the owner, by card (card-lifecycle.md): the
 // Tasks view shows these cards as with Michael.
 ipcMain.handle('hive:ownerRequests', () => (hive.enabled() ? hive.ownerRequests() : []));
+/** A hire's first task (docs/designs/first-task-card.md): the card, and an
+ *  owner request to Michael about it, once per hire. The card id comes from
+ *  the agent id, so a second call finds the card and sends nothing. */
+ipcMain.handle('hive:firstTask', (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { sourceCard?: unknown; agentId?: unknown; name?: unknown; ask?: unknown; role?: unknown; existing?: unknown };
+  if (typeof p.agentId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(p.agentId)) return { ok: false, error: 'invalid first task' };
+  // An owner's edited First task (from a hire's old Work style) comes with its
+  // words; a new hire's comes from its pack card.
+  const rawAsk = typeof p.ask === 'string' ? p.ask.trim() : '';
+  if (rawAsk.length > FIRST_TASK_EDITED_MAX) return { ok: false, error: 'first task too long' };
+  if (typeof p.sourceCard !== 'string' && !rawAsk) return { ok: false, error: 'invalid first task' };
+  if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  const [type, defId] = typeof p.sourceCard === 'string' ? p.sourceCard.split('/') : [];
+  const loaded = loadBundledPacks({ packsDir });
+  const def = type ? [...loaded.packs.map((x) => x.pack), loaded.core].find((x) => x?.businessType === type)?.agents.find((a) => a.id === defId) : undefined;
+  const cfg = readConfig();
+  const oneLine = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[\r\n]+/g, ' ').trim().slice(0, max) : '');
+  const name = oneLine(p.name, 60) || undefined;
+  const now = new Date();
+  const packed = def ? firstTaskCard(def, { agentId: p.agentId, name }, { name: cfg.businessName, city: cfg.businessCity }, now) : null;
+  const who = name ?? p.agentId;
+  const first = rawAsk
+    ? firstTaskCardFromText({ agentId: p.agentId, name: who, role: def?.role ?? oneLine(p.role, 80) }, packed?.card.title ?? `First task for ${who}`, rawAsk, now, { existing: p.existing !== false })
+    : packed;
+  if (!first) return { ok: true, sent: false };
+  // A First task the owner typed is new work even when the hire's first card
+  // exists already (their pack one, long done): it gets its own card id.
+  if (!hive.addTask(first.card)) {
+    if (!rawAsk) return { ok: true, sent: false };
+    first.card.id = `${first.card.id}-${now.getTime().toString(36)}`;
+    if (!hive.addTask(first.card)) return { ok: true, sent: false };
+  }
+  hive.send({ to: MICHAEL_ID, act: 'request', subject: first.card.title, body: first.body, conversation: cardConversation(first.card.id), requires_reply: true }, 'human');
+  return { ok: true, sent: true };
+});
 ipcMain.handle('hive:addTask', (_evt, task: unknown) => {
   if (!task || typeof task !== 'object' || Array.isArray(task)
     || typeof (task as { id?: unknown }).id !== 'string') {
@@ -4387,6 +4438,10 @@ ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
     return { ok: false, error: 'invalid task patch' };
   }
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  // The renderer patches a card only to record Ask me answers. A move goes
+  // through hive:moveTask, which keeps Blocked and Waiting Michael's (Codex
+  // adversarial review, 2026-10-04), so any other field is refused here.
+  if (Object.keys(patch).some((k) => k !== 'humanQA')) return { ok: false, error: 'only Ask me answers can be patched' };
   // The owner's Ask me answers arrive here; recording them is what lets the
   // launch catch-up tell an owner's answer from text an agent wrote into the
   // card (security review, 2026-10-03).
@@ -4522,22 +4577,67 @@ ipcMain.handle('folders:exists', (_evt, payload: unknown) => {
   return out;
 });
 
+/** Overlap checks still running, by request id: one the owner moved past is
+ *  stopped, so clicking through jobs never leaves hidden sessions behind. */
+const checkRuns = new Map<string, AbortController>();
 /** The hire wizard's distinct job check (design D6): a hidden Haiku call that
  *  compares the new job with every teammate's, the instant rules when it can't. */
 ipcMain.handle('hire:checkDistinct', async (_evt, payload: unknown) => {
-  const p = (payload ?? {}) as { job?: unknown; team?: unknown };
+  const p = (payload ?? {}) as { job?: unknown; team?: unknown; requestId?: unknown };
   const job = readJobProfile(p.job);
   if (!job) return { distinct: false, overlapsWith: [], why: '', source: 'rules' };
   const team = Array.isArray(p.team) ? p.team.map(readJobProfile).filter((m): m is NonNullable<typeof m> => !!m) : [];
   const cfg = readConfig();
-  return checkDistinct(job, team, {
-    cwd: cfg.harnessHome ?? app.getPath('home'),
-    command: cfg.defaultCommand ?? 'claude',
-    env: memory.env(),
-    log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
-  });
+  const requestId = typeof p.requestId === 'string' ? p.requestId.slice(0, 80) : '';
+  const stop = new AbortController();
+  if (requestId) checkRuns.set(requestId, stop);
+  try {
+    return await checkDistinct(job, team, {
+      cwd: cfg.harnessHome ?? app.getPath('home'),
+      command: cfg.defaultCommand ?? 'claude',
+      env: memory.env(),
+      log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } },
+      signal: stop.signal
+    });
+  } finally {
+    if (requestId) checkRuns.delete(requestId);
+  }
+});
+ipcMain.handle('hire:checkStop', (_evt, requestId: unknown) => {
+  if (typeof requestId === 'string') checkRuns.get(requestId)?.abort();
+  return { ok: true };
 });
 
+/** "Suggest me" on the hire wizard: a first work style for the owner to edit.
+ *  The draft streams to the window as `workStyle:suggestText` while it is
+ *  written, and `workStyle:suggestStop` ends it (owner, 2026-10-03). */
+const suggestRuns = new Map<string, AbortController>();
+ipcMain.handle('workStyle:suggest', async (evt, payload: unknown) => {
+  const req = readSuggestRequest(payload);
+  if (!req) return { text: '' };
+  const raw = (payload ?? {}) as { requestId?: unknown };
+  const requestId = typeof raw.requestId === 'string' ? raw.requestId.slice(0, 80) : '';
+  const stop = new AbortController();
+  if (requestId) suggestRuns.set(requestId, stop);
+  const cfg = readConfig();
+  try {
+    return await suggestWorkStyle(req, {
+      cwd: cfg.harnessHome ?? app.getPath('home'),
+      command: cfg.defaultCommand ?? 'claude',
+      env: memory.env(),
+      log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+    }, {
+      signal: stop.signal,
+      onText: requestId ? (text) => { if (!evt.sender.isDestroyed()) evt.sender.send('workStyle:suggestText', { requestId, text }); } : undefined
+    });
+  } finally {
+    if (requestId) suggestRuns.delete(requestId);
+  }
+});
+ipcMain.handle('workStyle:suggestStop', (_evt, requestId: unknown) => {
+  if (typeof requestId === 'string') suggestRuns.get(requestId)?.abort();
+  return { ok: true };
+});
 /** A work style between the owner's plain description and the agent's
  *  instructions (owner, 2026-09-27). Falls back to a plain-text rewrite. */
 ipcMain.handle('workStyle:convert', async (_evt, payload: unknown) => {

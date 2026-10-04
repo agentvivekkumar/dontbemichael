@@ -17,7 +17,7 @@ const loadTs = require('./load-ts.cjs');
 const { renamePatches } = loadTs('src/shared/hireTemplates.ts');
 const dir = path.resolve(__dirname, '../resources/packs');
 
-test('no pack card names an agent in its role, Work style, summary or duties', () => {
+test('no pack card names an agent in its role, Work style, summary, duties or first task', () => {
   // Value: protects=a rename never leaves a stale name in what an agent or Michael reads; fails_when=a card says "Pam runs..." or "route to Kelly"; why_new=owner rule 2026-10-03; seam=none
   const packs = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
   const names = new Set();
@@ -25,8 +25,8 @@ test('no pack card names an agent in its role, Work style, summary or duties', (
   const found = [];
   for (const p of packs) {
     for (const a of p.agents) {
-      for (const field of ['role', 'routing', 'workStyle', 'summary', 'does', 'wontDo', 'firstAction']) {
-        const text = [].concat(a[field] ?? []).join(' | ');
+      for (const field of ['role', 'routing', 'workStyle', 'summary', 'does', 'wontDo', 'firstTask']) {
+        const text = [].concat(field === 'firstTask' ? [a.firstTask?.title, a.firstTask?.ask].filter(Boolean) : a[field] ?? []).join(' | ');
         for (const n of names) if (new RegExp(`(?<![\\p{L}\\p{N}])${n}(?![\\p{L}\\p{N}])`, 'u').test(text)) found.push(`${p.businessType}/${a.id}.${field}: ${n}`);
       }
     }

@@ -4,9 +4,7 @@ import { useStore, actionText, type Agent } from '@/store/store';
 import { PixelBadge, type StatusKind } from '@/components/PixelBadge';
 import { useRtl } from '@/i18n/useDirection';
 import { isComposingKey } from '@shared/imeGuard';
-import { departmentOf } from '@/scene/studio/layout';
-import { family } from '@/scene/studio/theme';
-import { useAppTheme } from '@/design/theme';
+import { PersonAvatar } from '@/scene/office/props';
 import { closeTarget, columnLocked, focusNeedsYouPill } from './rightColumn';
 import { getNeedsYouFeed } from './useNeedsYou';
 
@@ -21,18 +19,12 @@ export function PanelHeader({ agent, role, onEdit, extra, withNote = true }: {
   agent: Agent; role: string; onEdit?: () => void; extra?: ReactNode; withNote?: boolean;
 }) {
   const { t } = useTranslation();
-  const dark = useAppTheme() === 'dark';
-  const c = agent.isGod ? null : family(departmentOf(agent), dark);
   const raw = agent.action?.trim() ? actionText(agent.action.trim(), t) : '';
   const caption = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
   return (
     <div style={{ flexShrink: 0, padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
-        <span aria-hidden="true" style={{
-          width: 44, height: 44, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
-          background: c ? c.l : 'var(--cth-ink)', color: c ? c.acc : 'var(--cth-bg)',
-          boxShadow: c ? `inset 0 0 0 1px ${c.m}` : 'none', fontSize: 18, fontWeight: 700
-        }}>{agent.name.slice(0, 1).toUpperCase()}</span>
+        <PersonAvatar who={agent} size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.name}</span>

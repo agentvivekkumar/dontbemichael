@@ -40,7 +40,7 @@ test('the instructions prompt carries the house prompting rules and the previous
   assert.match(p, /add no duties of your own/);
   assert.match(p, /under 300 words/);
   assert.match(p, /--- PREVIOUS WORK STYLE ---\nold text/);
-  assert.match(W.toPlainPrompt(pam, ctx), /in the third person/);
+  assert.match(W.toPlainPrompt(pam, ctx), /Write about the team member by role, never by name/);
   assert.equal(W.cleanAnswer('```\nhello\n```'), 'hello');
 });
 
@@ -72,12 +72,27 @@ test('the plain description names the owner and Michael, never "you" (owner, 202
   const p = W.toPlainPrompt(pam, { ...ctx, manager: 'Michael' });
   assert.match(p, /Never write "you" or "your"/);
   assert.match(p, /The business owner is "the owner"\. Michael is the office manager/);
-  assert.match(p, /anything Erin sends, reports or asks for approval goes to Michael/);
+  assert.match(p, /anything this role sends, reports or asks for approval goes to Michael/);
+  assert.doesNotMatch(p.slice(0, p.indexOf('--- INSTRUCTIONS ---')), /\bErin\b/, 'the name never reaches the rewrite');
+  assert.match(p, /Call a teammate by their role, such as the Sales Director; where the instructions give only a name, say "a teammate"\. Michael is the only name to keep\./);
   assert.match(p, /"Asks the owner first:"/);
   assert.match(W.toInstructionsPrompt('x', { ...ctx, manager: 'Michael' }), /Team members send reports and approvals to Michael, never to the owner directly\./);
-  const quick = W.plainFallback('### How to work\nYou are the admin. Send your summary to Michael so you can move on.', 'Erin');
+  const quick = W.plainFallback('### How to work\nYou are the admin. Send your summary to Michael so you can move on.', W.roleLabel('Executive Admin'));
   assert.doesNotMatch(quick, /\byou\b|\byour\b/i);
-  assert.match(quick, /Erin is the admin\. Send Erin's summary to Michael so Erin can move on\./);
+  assert.match(quick, /Executive Admin is the admin\. Send Executive Admin's summary to Michael so Executive Admin can move on\./, 'the role stands in for "you", never a name');
+  assert.equal(W.roleLabel(''), 'This role');
+  assert.match(W.plainFallback('### The job\nYou sort mail.', W.roleLabel(undefined)), /This role sorts mail\./);
   // The owner's old label still reads back as the approval heading.
   assert.match(W.instructionsFallback('Asks you first: refunds.', ctx), /### Needs the owner's approval\nrefunds\./);
+});
+
+test('the Add and Edit agent views read a work style by role, never by the agent\'s name', () => {
+  // Value: protects=no name reaches the plain description an owner edits and saves; fails_when=a view passes the agent's name to plainFallback or the rewrite; why_new=owner 2026-10-03: "fix the card job view to not use names either"; seam=source pin
+  const read = (p) => require('node:fs').readFileSync(require('node:path').resolve(__dirname, '..', p), 'utf8');
+  for (const f of ['AddAgentModal', 'EditAgentModal']) {
+    const src = read(`src/renderer/src/components/${f}.tsx`);
+    assert.doesNotMatch(src, /plainFallback\([^)]*\b(agent\.name|pendingHire\.name|forName)\)/, `${f} passes a name`);
+    assert.match(src, /plainFallback\([^\n]*roleLabel\(/, `${f} passes the role`);
+  }
+  assert.match(read('src/main/workStyleConvert.ts'), /plainFallback\(req\.text, roleLabel\(req\.ctx\.title\)\)/);
 });

@@ -13,6 +13,7 @@ import { useStore, actionText, liveActivity, ACTION_CLOCKING_IN, type Agent } fr
 import type { HarnessConfig } from '@/store/config';
 import { departments, type DepartmentName } from '@/design/tokens';
 import { useAppTheme } from '@/design/theme';
+import { DeptIcon, PersonAvatar } from '@/scene/office/props';
 import { PixelBadge, type StatusKind } from '@/components/PixelBadge';
 import { useHasTerminalDraft } from '@/components/terminalPool';
 import { useMissions } from '@/components/triggers/ScheduleList';
@@ -20,7 +21,7 @@ import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
 import { createBanter, createIdleLines } from '@/scene/office/cafeteriaLines';
 import { getNeedsYouFeed, newestAskFor, useNeedsYou, useNeedsYouCount } from '@/shell/useNeedsYou';
-import { stillIn } from '@/shell/closingFloor';
+import { chatCandidates, stillIn } from '@/shell/closingFloor';
 
 /** Nobody has gone home (not closing time). */
 const NOBODY: ReadonlySet<string> = new Set();
@@ -28,7 +29,7 @@ import { P, STAGE_H, STAGE_W, type Pt } from './iso';
 import { family, sceneTokens, type Family } from './theme';
 import { HUB, HUB_CARD, POST_GY, cardRect, departmentOf, planStudio, postGx, roleOf, type PodPlan } from './layout';
 import { FLIGHT_MS, bendFor, useStudioLife } from './life';
-import { Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
+import { DECOR, Decor, Flow, Hub, MailPost, Platform, Pod, PodGlow, StudioDefs, plateAt, plateWidth, type DeskState } from './StudioArt';
 
 
 /** The agent fields the office draws. Changes to anything else (the terminal
@@ -65,7 +66,8 @@ function useTaskSnapshot(godId: string): TaskSnapshot {
     let kept = 0;
     const done: Record<string, string | undefined> = {};
     for (const t of tasks) {
-      board[t.status]++;
+      // Michael's board has four columns; a Waiting card is nobody's work right now.
+      if (t.status !== 'waiting') board[t.status]++;
       if (t.status === 'done') done[t.id] = t.assignee;
       if (t.status === 'doing' && t.assignee) doingBy[t.assignee] = (doingBy[t.assignee] ?? 0) + 1;
       if (waitsOnHuman(t) && t.assignee) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + 1;
@@ -257,7 +259,9 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
     posts: mailboxes.map((m) => ({ id: m.id, ownerId: ownerOf(m.id)?.id })),
     accentOf
   });
-  const quote = useIdleQuote(plan.pods, paused, life.throwNote, accentOf);
+  // Closing time first: banter never flies to or from someone gone home.
+  const closing = useClosingLights();
+  const quote = useIdleQuote(plan.pods, paused || !!closing?.all, life.throwNote, accentOf, closing?.out ?? NOBODY);
   const godBusy = !!god && ['working', 'thinking', 'looping', 'compacting'].includes(god.status);
   // Opening (DESIGN.md 8.12): a desk's light comes on as its person clocks in,
   // a pod's when the first of its people is in, Michael's office when he is.
@@ -265,7 +269,6 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
   const godStatus = useStore((s) => s.godStatus);
   const hubAway = godStatus === 'booting' || (!!god && away.has(god.id));
   const kickoff = useKickoff(plan.pods, paused);
-  const closing = useClosingLights();
   const hour = useHour();
   const night = hour >= 19 || hour < 6;
 
@@ -421,6 +424,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
           })}
           {/* Objects, back to front. */}
           {[
+            ...DECOR.map((d) => ({ depth: d.at[0] + d.at[1], node: <Decor key={`decor-${d.at[0]}-${d.at[1]}`} kind={d.kind} at={d.at} T={T} /> })),
             ...mailboxes.map((m, i) => {
               const gx = postGx(i, mailboxes.length);
               const owner = ownerOf(m.id);
@@ -437,7 +441,7 @@ export function StudioStage({ config: initialConfig, bleed = 0, quietCards = fal
                 <Pod
                   grid={pod.grid}
                   // A person who has gone home at closing time has a dark desk (2A).
-                  desks={pod.members.map((a) => ({ st: deskState(a), away: away.has(a.id) || !!closing?.out.has(a.id) }))}
+                  desks={pod.members.map((a) => ({ st: deskState(a), prop: a.character, away: away.has(a.id) || !!closing?.out.has(a.id) }))}
                   c={families[pod.dept]} famKey={pod.dept}
                   selected={pod.members.some((a) => a.id === selected)}
                   T={T} dark={dark}
@@ -631,7 +635,7 @@ function PodCard({ style, dept, members, c, snap, selected, onSelect, missions, 
       boxShadow: isSel ? 'inset 0 0 0 1px var(--cth-ink), var(--cth-ring-select), var(--cth-shadow-md)' : 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-md)'
     }}>
       <div style={{ position: 'absolute', insetInlineStart: 9, top: -9, display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={deptTab}>{t(`studio.dept.${dept}`)}</span>
+        <span style={{ ...deptTab, boxShadow: `inset 0 0 0 1px ${c.m}` }}><DeptIcon dept={dept} size={10} color={c.acc} />{t(`studio.dept.${dept}`)}</span>
         {doing > 0 && (
           <button title={t('studio.doing', { count: doing })} aria-label={t('studio.doing', { count: doing })}
             onClick={() => openFirstDoing(lead.id)} style={sticky}>{doing}</button>
@@ -690,10 +694,7 @@ function MemberRow({ a, c, divider, onSelect, missions, godId }: {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, position: 'relative', paddingInlineEnd: 2 }}>
-        <span style={{
-          width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1,
-          background: c.l, color: c.acc, boxShadow: `inset 0 0 0 1px ${c.m}`, fontSize: 11.5, fontWeight: 700
-        }}>{a.name.slice(0, 1).toUpperCase()}</span>
+        <PersonAvatar who={a} size={24} style={{ marginTop: 1 }} />
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
           <b style={{ fontSize: 12.5, fontWeight: 600, lineHeight: '15px', letterSpacing: '-0.02em', color: a.status === 'idle' ? 'var(--cth-ink-3)' : 'var(--cth-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingInlineEnd: 78 }}>{a.name}</b>
           <i style={{ fontStyle: 'normal', fontSize: 10, lineHeight: '13px', color: 'var(--cth-ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roleOf(a)}</i>
@@ -762,11 +763,9 @@ function PodChip({ style, dept, members, c, snap, onSelect, onEnter, onLeave, qu
     >
       <span style={{ display: 'inline-flex' }}>
         {members.map((a, i) => (
-          <span key={a.id} className={i === speakerAt ? 'cth-st-speak' : undefined} style={{
-            width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', marginInlineStart: i ? -6 : 0,
-            position: 'relative', zIndex: i === speakerAt ? 1 : undefined,
-            background: c.l, color: c.acc, boxShadow: i === speakerAt ? `0 0 0 1.5px var(--cth-card), 0 0 0 3px ${c.acc}` : `0 0 0 1.5px var(--cth-card), inset 0 0 0 1px ${c.m}`, fontSize: 10, fontWeight: 700
-          }}>{a.name.slice(0, 1).toUpperCase()}</span>
+          <PersonAvatar key={a.id} who={a} size={20} className={i === speakerAt ? 'cth-st-speak' : undefined}
+            ring={i === speakerAt ? c.acc : undefined} separator={i !== speakerAt}
+            style={{ marginInlineStart: i ? -6 : 0, position: 'relative', zIndex: i === speakerAt ? 1 : undefined }} />
         ))}
       </span>
       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{names}</span>
@@ -788,6 +787,7 @@ function sentence(s: string): string {
 }
 
 const deptTab: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
   fontSize: 9.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--cth-ink-2)',
   background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)', borderRadius: 6, padding: '2px 6px', lineHeight: '12px'
 };
@@ -832,9 +832,7 @@ function HubCard({ style, god, selected, onSelect, delegated, toYou, kept, board
         position: 'relative', display: 'block', width: '100%', padding: '9px 11px 8px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)'
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--cth-ink)', color: 'var(--cth-bg)', fontSize: 12, fontWeight: 700 }}>
-            {god.name.slice(0, 1).toUpperCase()}
-          </span>
+          <PersonAvatar who={god} size={26} />
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <b style={{ fontSize: 12.5, fontWeight: 600, lineHeight: '15px', color: 'var(--cth-ink)', paddingInlineEnd: 76 }}>{god.name}</b>
             <i style={{ fontStyle: 'normal', fontSize: 10, color: 'var(--cth-ink-3)', whiteSpace: 'nowrap' }}>{t('studio.officeManager')}</i>
@@ -1042,11 +1040,12 @@ type Quote = { agentId: string; text: string; key: number; from?: { name: string
 function useIdleQuote(
   pods: PodPlan<Agent>[], paused: boolean,
   throwNote: (fromId: string, toId: string, look: 'plane' | 'mail') => boolean,
-  accentOf: (id: string) => string
+  accentOf: (id: string) => string,
+  gone: ReadonlySet<string>
 ): Quote | null {
   const [quote, setQuote] = useState<Quote | null>(null);
-  const live = useRef({ pods, throwNote, accentOf });
-  live.current = { pods, throwNote, accentOf };
+  const live = useRef({ pods, throwNote, accentOf, gone });
+  live.current = { pods, throwNote, accentOf, gone };
   // One deck of lines and one of exchanges, so nothing repeats until it must.
   const [lines] = useState(() => createIdleLines());
   const [banter] = useState(() => createBanter());
@@ -1064,11 +1063,11 @@ function useIdleQuote(
       window.clearTimeout(hide);
       hide = window.setTimeout(() => setQuote(null), q.ms);
     };
-    // Someone idle and in (not still clocking in), in a pod where nobody is at
-    // work, so a bubble never sits on an open card.
-    const isIn = (a: Agent) => a.status === 'idle' && a.action !== ACTION_CLOCKING_IN;
-    const quietPods = () => live.current.pods.filter((p) => !p.members.some((a) => ACTIVE.has(a.status)));
-    const quietPeople = () => quietPods().flatMap((p) => p.members).filter(isIn);
+    // Someone idle and in (not clocking in, not gone home at closing time), in
+    // a pod where nobody still at work is busy, so a bubble never sits on an
+    // open card or a dark office.
+    const quietPeople = () => chatCandidates(live.current.pods, live.current.gone, ACTIVE, ACTION_CLOCKING_IN);
+    const podOfId = (id: string) => live.current.pods.find((p) => p.members.some((m) => m.id === id));
     const pickOne = (people: Agent[]) => {
       const others = people.length > 1 ? people.filter((x) => x.id !== lastSpeaker.current) : people;
       const a = others[Math.floor(Math.random() * others.length)];
@@ -1090,12 +1089,13 @@ function useIdleQuote(
     const chat = (): boolean => {
       const idle = quietPeople();
       if (idle.length < 2) return false;
-      const podOf = (id: string) => quietPods().find((p) => p.members.some((m) => m.id === id));
       const a = pickOne(idle);
-      const partners = idle.filter((b) => podOf(b.id) !== podOf(a.id));
-      if (!partners.length) return false;
-      const b = partners[Math.floor(Math.random() * partners.length)];
-      const beats = banter(a.character);
+      const partners = idle.filter((b) => podOfId(b.id) !== podOfId(a.id));
+      // The exchange picks the partner, so each side is said by someone who would.
+      const pick = banter(a.character, partners.map((x) => x.character));
+      if (!pick) return false;
+      const b = partners[pick.partner];
+      const beats = pick.beats;
       const look = Math.random() < 0.5 ? 'plane' : 'mail';
       const holdFor = (text: string) => Math.min(3600, Math.max(2000, 1200 + text.length * 50));
       busyUntil = Date.now() + beats.reduce((t, x) => t + FLIGHT_MS + holdFor(x), 0) + 2000;

@@ -71,5 +71,5 @@ test('the rewrite runs once, backs up first, and stops if the backup fails', () 
   assert.match(fn, /if \(!backup\.ok\) return;/);
   assert.match(fn, /hivePatchAgentRole\(p\.id, p\.description\)/);
   assert.match(fn, /updateConfig\(\{ instructionsRewritten: true \}\)/);
-  assert.match(src, /void rewriteTeamInstructions\(config\)\.catch\(\(\) => undefined\)\.then\(\(\) => startBusinessTeam\(config\)\);/);
+  assert.match(src, /void rewriteTeamInstructions\(config\)\.catch\(\(\) => undefined\)\.then\(\(\) => removeLegacyFirstTasks\(config\)\)\.catch\(\(\) => undefined\)\.then\(\(\) => startBusinessTeam\(config\)\);/);
 });

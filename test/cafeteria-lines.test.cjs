@@ -36,7 +36,7 @@ test('the new characters speak in their own voice, briefly and without dashes', 
       assert.ok(line.length <= 44, `${c}: "${line}" fits the bubble`);
       assert.doesNotMatch(line, /[–—]| - /, `${c}: "${line}"`);
     }
-    assert.ok(createBanter(() => 0)(c).length >= 2, `${c} opens with a bit of their own`);
+    assert.ok(createBanter(() => 0)(c, ['jim']).beats.length >= 2, `${c} opens with a bit of their own`);
   }
 });
 
@@ -66,16 +66,109 @@ test('studio conversations are the full set of Office exchanges', () => {
   const next = createBanter(random);
   const seen = new Set();
   let twssSeen = 0;
-  for (let i = 0; i < 120; i++) {
-    const ex = next('ryan');
+  // Everyone takes a turn opening, with the rest of the office free to reply.
+  for (let i = 0; i < 600; i++) {
+    const opener = cast[i % cast.length];
+    const ex = next(opener, cast.filter((c) => c !== opener)).beats;
     assert.ok(ex.length >= 2, 'at least a line and a reply');
     seen.add(ex.join(' / '));
     if (twss.includes(`['${ex[0]}', '${ex[1]}'`)) twssSeen++;
   }
-  assert.ok(seen.size >= 100, `${seen.size} different exchanges`);
+  const pool = (src.slice(src.indexOf('const EXCHANGES'), src.indexOf('// Everything a pair can draw from')).match(/^  (?:bit\()?\['/gm) || []).length;
+  assert.ok(pool >= 100, `${pool} exchanges in the file`);
+  assert.ok(seen.size >= pool, `${seen.size} of ${pool} exchanges played`);
   assert.ok(twssSeen > 0, 'the that\'s what she said bits are in');
   // A signature opener plays once at most for the same person.
   const keyed = createBanter(() => 0);
-  assert.deepEqual([...keyed('stanley')], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
-  assert.notDeepEqual([...keyed('stanley')], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
+  assert.deepEqual([...keyed('stanley', ['jim']).beats], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
+  assert.notDeepEqual([...keyed('stanley', ['jim']).beats], ['is it Pretzel Day?', 'no, Stanley.', '...did I stutter?']);
+});
+
+/**
+ * Each side of an exchange is said by someone who said it on the show
+ * (owner, 2026-10-03: Pam was saying "that's what she said", and Pam never
+ * did). "that's what she said" is Michael's alone.
+ */
+test('only Michael says that\'s what she said in a conversation', () => {
+  const others = cast.filter((c) => c !== 'michael');
+  let seed = 7;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const next = createBanter(random);
+  let michaelSaid = 0;
+  for (let i = 0; i < 2000; i++) {
+    const opener = cast[i % cast.length];
+    const partners = i % 3 ? others.filter((c) => c !== opener) : cast.filter((c) => c !== opener);
+    const pick = next(opener, partners);
+    if (!pick) continue;
+    const partner = partners[pick.partner];
+    assert.ok(partner, 'the partner is one of those offered');
+    pick.beats.forEach((beat, j) => {
+      const who = j % 2 ? partner : opener;
+      if (/that.s what she said/i.test(beat.replace(/^\*[^*]+\*\s*/, '')) && !/^(you|why|nobody)/.test(beat)) {
+        assert.equal(who, 'michael', `${who} said "${beat}" in ${JSON.stringify(pick.beats)}`);
+        michaelSaid++;
+      }
+    });
+  }
+  assert.ok(michaelSaid > 0, 'Michael still says it');
+});
+
+test('signature lines go to their owner, whoever else is idle', () => {
+  const next = createBanter(() => 0.5);
+  const lines = new Map();
+  for (let i = 0; i < 3000; i++) {
+    const opener = cast[i % cast.length];
+    const partners = cast.filter((c) => c !== opener);
+    const pick = next(opener, partners);
+    if (!pick) continue;
+    pick.beats.forEach((beat, j) => lines.set(beat, (lines.get(beat) || new Set()).add(j % 2 ? partners[pick.partner] : opener)));
+  }
+  const only = (beat, who) => assert.deepEqual([...(lines.get(beat) || [])], [who], `"${beat}"`);
+  only('I went to Cornell.', 'andy');
+  only('Phyllis Vance.', 'phyllis');
+  only('why few word when lot word?', 'kevin');
+  only('victory. and beets.', 'dwight');
+});
+
+test('nobody can be paired when no partner fits, and Michael never warns about himself', () => {
+  assert.equal(createBanter(() => 0.5)('pam', []), null);
+  const shared = createIdleLines(() => 0.99);
+  for (let i = 0; i < 60; i++) assert.doesNotMatch(shared('michael'), /michael/i);
+});
+
+/**
+ * More of the show's small talk (owner, 2026-10-03: "lot of short small talk
+ * that was funny"), from each character's running jokes, each line said by
+ * someone who would say it.
+ */
+test('the running gags are in, short, and nobody says a line about themselves', () => {
+  // Value: protects=the new exchanges play, fit the bubble, and never put a name in its own mouth; fails_when=the block is dropped from the pool, a beat is too long or has a dash, or Michael says "Michael's in the warehouse"; why_new=104 new exchanges and the not list; seam=none
+  const block = src.slice(src.indexOf('const RUNNING_GAGS'), src.indexOf('// Everything a pair can draw from'));
+  assert.ok((block.match(/^  (?:bit\()?\['/gm) || []).length >= 100, 'at least 100 running gags');
+  assert.match(src, /\[\.\.\.EXCHANGES, \.\.\.RUNNING_GAGS, \.\.\.TWSS_EXCHANGES\]/);
+  for (const m of block.matchAll(/'((?:[^'\\]|\\.)*)'/g)) {
+    if (cast.includes(m[1])) continue;
+    assert.ok(m[1].length <= 44, `"${m[1]}" fits the bubble`);
+    assert.doesNotMatch(m[1], /[–—]| - /, m[1]);
+  }
+  let seed = 3;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const next = createBanter(random);
+  // Saying your own name on purpose: an introduction, or the joke itself.
+  const own = new Set(['Meredith.', 'hi. Nick. from IT.', '...Nick.', 'Phyllis Vance.', 'Creed isn’t my real name.', 'three-hole-punch Jim returns.', 'what Jim?', 'Dunder Mifflin, this is Pam.']);
+  const gags = new Set();
+  for (let i = 0; i < 20000; i++) {
+    const opener = cast[i % cast.length];
+    const partners = cast.filter((c) => c !== opener);
+    const pick = next(opener, partners);
+    if (!pick) continue;
+    if (block.includes(pick.beats[0].replace(/'/g, "\\'"))) gags.add(pick.beats[0]);
+    pick.beats.forEach((beat, j) => {
+      const who = j % 2 ? partners[pick.partner] : opener;
+      const name = who[0].toUpperCase() + who.slice(1);
+      if (!own.has(beat)) assert.doesNotMatch(beat, new RegExp(`\\b${name}\\b`), `${who} says "${beat}"`);
+    });
+    if (pick.beats[0] === 'Michael’s in the warehouse.') assert.ok(opener !== 'michael' && partners[pick.partner] === 'darryl');
+  }
+  assert.ok(gags.size >= 95, `${gags.size} running gags played`);
 });

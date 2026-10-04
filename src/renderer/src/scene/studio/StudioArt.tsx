@@ -8,6 +8,7 @@ import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 're
 import { P, curvePts, dpath, pts, type Pt } from './iso';
 import { Box, EllipseAt, Poly } from './shapes';
 import type { Family, SceneTokens } from './theme';
+import { PROP_ART, hasProp } from '@/scene/office/props';
 
 /** What a desk's screen and floor show (DESIGN.md 3.5, 8.5). */
 export type DeskState = 'working' | 'thinking' | 'waiting' | 'needs' | 'compacting' | 'looping' | 'success' | 'idle';
@@ -78,8 +79,10 @@ export function Platform({ T }: { T: SceneTokens }) {
 
 /* ── A desk (station) ─────────────────────────────────────────────────────── */
 
-export function Station({ gx, gy, st, sc = 1, plant = false, c, famKey, T, dark }: {
+export function Station({ gx, gy, st, sc = 1, plant = false, prop, c, famKey, T, dark }: {
   gx: number; gy: number; st: DeskState; sc?: number; plant?: boolean; c: Family; famKey: string; T: SceneTokens; dark: boolean;
+  /** Whose desk this is: their signature prop stands on it. */
+  prop?: string;
 }) {
   const mz0 = 33;
   const mh = sc >= 1 ? 24 : 21;
@@ -139,10 +142,60 @@ export function Station({ gx, gy, st, sc = 1, plant = false, c, famKey, T, dark 
       <Box gx={gx - cw} gy={gy + 0.2} w={2 * cw} d={0.32} h={4} z0={16} top={T.seat[0]} left={T.seat[1]} right={T.seat[2]} T={T} />
       <Box gx={gx - cw} gy={gy + 0.46} w={2 * cw} d={0.07} h={20} z0={20} top={T.back[0]} left={T.back[1]} right={T.back[2]} T={T} />
       {plant && <Plant gx={gx - 0.47 * sc} gy={gy - 0.45} T={T} />}
+      {hasProp(prop) && <DeskProp at={P(gx - 0.34 * sc, gy - 0.1, 28)} size={15 * Math.min(sc, 1)}>{PROP_ART[prop]}</DeskProp>}
       {(st === 'thinking') && <ThinkBubble at={P(gx + 0.1, gy - 0.4, 70)} T={T} />}
       {st === 'compacting' && <CompactGlyph at={P(gx + 0.25 * sc, gy - 0.2, 36)} T={T} />}
       {st === 'looping' && <LoopRing at={P(gx, gy + 0.36, 16)} T={T} />}
       {st === 'success' && <CheckBurst at={P(gx, gy - 0.4, 74)} T={T} />}
+    </g>
+  );
+}
+
+/** A prop standing on a desk: drawn flat, its base on the desk top at `at`. */
+function DeskProp({ at: [x, y], size, children }: { at: Pt; size: number; children: ReactNode }) {
+  return (
+    <g>
+      <ellipse cx={x} cy={y - 0.5} rx={size * 0.32} ry={size * 0.12} fill="#1E1B2E" opacity={0.12} />
+      <svg x={x - size / 2} y={y - size} width={size} height={size} viewBox="0 0 24 24" overflow="visible">{children}</svg>
+    </g>
+  );
+}
+
+/* ── Floor decor (owner, 2026-10-03: more life on the floor) ──────────────── */
+
+/** Plants and the water cooler, on open floor clear of every ring slot,
+ *  the mailbox row and Michael's office. Grid points. */
+export const DECOR: { kind: 'plant' | 'cooler'; at: Pt }[] = [
+  { kind: 'cooler', at: [4.45, -4.45] },
+  { kind: 'plant', at: [2.1, -1.9] },
+  { kind: 'plant', at: [-1.95, 2.15] },
+  { kind: 'plant', at: [-4.55, -4.55] }
+];
+
+export function Decor({ kind, at: [gx, gy], T }: { kind: 'plant' | 'cooler'; at: Pt; T: SceneTokens }) {
+  if (kind === 'plant') {
+    const [x, y] = P(gx, gy, 30);
+    return (
+      <g>
+        <EllipseAt gx={gx} gy={gy} z={0} r={0.24} fill={T.papSh} opacity={T.papShOp} />
+        <Box gx={gx - 0.13} gy={gy - 0.13} w={0.26} d={0.26} h={16} z0={0} top={T.pot[0]} left={T.pot[1]} right={T.pot[2]} T={T} />
+        <g className="cth-st-sway">
+          <circle cx={x - 7} cy={y + 2} r={8} fill="#4DB97E" />
+          <circle cx={x + 7} cy={y} r={8.5} fill="#3FA463" />
+          <circle cx={x} cy={y - 7} r={8} fill="#6BCB94" />
+          <circle cx={x + 1} cy={y + 4} r={6.5} fill="#86D9A8" />
+        </g>
+      </g>
+    );
+  }
+  const [bx, by] = P(gx, gy, 34);
+  return (
+    <g>
+      <EllipseAt gx={gx} gy={gy} z={0} r={0.26} fill={T.papSh} opacity={T.papShOp} />
+      <Box gx={gx - 0.14} gy={gy - 0.14} w={0.28} d={0.28} h={34} z0={0} top={T.seat[0]} left={T.seat[1]} right={T.seat[2]} T={T} />
+      <Box gx={gx + 0.1} gy={gy - 0.06} w={0.02} d={0.12} h={4} z0={20} top="#3D8BE6" left="#3D8BE6" right="#2F6FBF" rim={false} T={T} />
+      <rect x={bx - 9} y={by - 25} width={18} height={24} rx={7} fill="#B4D5F8" stroke="#93BEEE" strokeWidth={1} opacity={0.92} />
+      <rect x={bx - 4} y={by - 22} width={3} height={16} rx={1.5} fill="#FFFFFF" opacity={0.65} />
     </g>
   );
 }
@@ -198,6 +251,8 @@ function CheckBurst({ at: [x, y], T }: { at: Pt; T: SceneTokens }) {
 
 export interface PodDesk {
   st: DeskState;
+  /** The character at this desk, for their prop. */
+  prop?: string;
   /** This person has not clocked in yet: their desk light is off. */
   away?: boolean;
 }
@@ -250,7 +305,7 @@ export function Pod({ grid: [gx, gy], desks, c, famKey, selected, T, dark, arriv
         fill="none" stroke={T.inset} strokeOpacity={T.insetOp} strokeWidth={1} />
       {spots.map((sp, i) => {
         const d = desks[i];
-        const inner = <Station gx={gx + sp.dx} gy={gy + sp.dy} st={d.st} sc={sp.sc} plant={i === 0 && n <= 2} c={c} famKey={famKey} T={T} dark={dark} />;
+        const inner = <Station gx={gx + sp.dx} gy={gy + sp.dy} st={d.st} sc={sp.sc} plant={i === 0 && n <= 2} prop={d.prop} c={c} famKey={famKey} T={T} dark={dark} />;
         return <DeskLight key={i} away={!lightsOut && !!d.away} idle={d.st === 'idle' && !allIdle}>{inner}</DeskLight>;
       })}
       {needs && <Beacon at={[gx + 0.42, gy - hd + 0.2]} T={T} />}
@@ -383,6 +438,7 @@ export function Hub({ T, dark, board, busy = false, ringing = false, lightsOut =
         );
       })}
       <polygon points={pts([P(-0.2, -0.16, ph + 22.3), P(0.2, -0.16, ph + 22.3), P(0.2, -0.04, ph + 22.3), P(-0.2, -0.04, ph + 22.3)])} fill={T.kb} stroke={T.kbBd} strokeWidth={0.8} />
+      <DeskProp at={P(-0.48, -0.06, ph + 22)} size={14}>{PROP_ART.michael}</DeskProp>
       <Box gx={0.36} gy={-0.2} w={0.2} d={0.16} h={3} z0={ph + 22} top={T.tray[0]} left={T.tray[1]} right={T.tray[2]} rim={false} T={T} />
       <Box gx={0.38} gy={-0.18} w={0.16} d={0.12} h={2} z0={ph + 25} top={T.tray2[0]} left={T.tray2[1]} right={T.tray2[2]} rim={false} T={T} />
       <Box gx={-0.03} gy={0.28} w={0.06} d={0.06} h={12} z0={ph} top={T.metal[0]} left={T.metal[1]} right={T.metal[2]} rim={false} T={T} />

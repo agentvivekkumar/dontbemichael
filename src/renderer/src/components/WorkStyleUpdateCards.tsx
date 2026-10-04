@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
 import { InfoTip } from './InfoTip';
 import { useStore } from '@/store/store';
+import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { workStyleBody } from '@shared/agentProfile';
 import { decisionId, type WorkStyleOffer } from '@shared/workStyleUpdates';
@@ -42,10 +43,7 @@ export function WorkStyleUpdateCards({ offers }: { offers: WorkStyleOffer[] }) {
             display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--cth-font-ui)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, lineHeight: '17px', color: 'var(--cth-ink)' }}>
-              <span style={{
-                width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', flexShrink: 0,
-                background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)', fontSize: 9, fontWeight: 700
-              }}>{name.slice(0, 1).toUpperCase()}</span>
+              <AgentAvatar id={offer.agentId} name={name} size={17} />
               {t('askMe.workStyleTitle', { name })}
             </div>
             <div style={{ fontSize: 12, lineHeight: '16.5px', color: 'var(--cth-ink)' }}>

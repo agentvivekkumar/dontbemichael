@@ -1,4 +1,13 @@
-# Memory Graph Visualization — Spec (Phase 1)
+# Memory Graph Visualization, Spec (Phase 1)
+
+> **Changed 2026-10-03.** The topic layer (§3 topic nodes, §4.2, §5, the Topics
+> toggle and `extractTopics.ts`) was removed at the owner's request. The fixed
+> 200 entry window became a time range picker (Last 1 hour to Last 1 month, default
+> Last 1 day) reading `hiveLog(max, 'message', since)`. Endpoints resolve by id,
+> then by the agent's name (agents address Michael as "michael"), then by the one
+> delivered recipient; a message from "human" counts only when it goes to Michael.
+> People are drawn as their props (DESIGN.md 3.4). The sections below are the
+> original phase 1 spec, kept for history.
 
 **Feature #8** of the harness roadmap · author: Jim · branch `feature/memory-graph`
 **Status:** awaiting god sign-off. No component code is written yet — this document is the contract for Phase 2.

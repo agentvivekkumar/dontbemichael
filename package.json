@@ -1,6 +1,6 @@
 {
   "name": "dontbemichael",
-  "version": "0.0.16",
+  "version": "0.1.0",
   "private": true,
   "description": "An AI office for small business owners: Michael, your office manager, runs a team of AI agents on your own Mac.",
   "main": "out/main/index.js",
@@ -47,6 +47,7 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-unicode11": "^0.9.0",
     "@xterm/addon-webgl": "^0.19.0",
+    "@xterm/headless": "^5.5.0",
     "@xterm/xterm": "^5.5.0",
     "better-sqlite3": "^11.10.0",
     "commit-graph": "^2.4.0",

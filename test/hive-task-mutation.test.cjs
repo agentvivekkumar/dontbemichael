@@ -160,12 +160,13 @@ test('the renderer and voice can no longer delete a card', () => {
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'src/main/realtimeActions.ts'), 'utf8'), /hiveDeleteTask/);
 });
 
-test('the owner cannot move a card to Blocked from Task detail or the IPC', () => {
+test('the owner cannot move a card to Blocked or Waiting from Task detail or the IPC', () => {
   // Value: protects=Blocked always means a question waits on Ask me, which only Michael raises; fails_when=the status menu offers Blocked again or the IPC accepts it; why_new=owner, ship 2026-10-03; seam=source pin
   const root = path.resolve(__dirname, '..');
   const kanban = fs.readFileSync(path.join(root, 'src/renderer/src/components/TasksKanban.tsx'), 'utf8');
-  assert.match(kanban, /COLUMNS\.filter\(\(c\) => c\.key !== 'blocked' \|\| task\.status === 'blocked'\)/);
-  assert.match(kanban, /disabled=\{c\.key === 'blocked'\}/);
+  // Waiting names who the card waits on, so it is Michael's too (owner, 2026-10-03).
+  assert.match(kanban, /COLUMNS\.filter\(\(c\) => \(c\.key !== 'blocked' && c\.key !== 'waiting'\) \|\| task\.status === c\.key\)/);
+  assert.match(kanban, /disabled=\{c\.key === 'blocked' \|\| c\.key === 'waiting'\}/);
   assert.match(fs.readFileSync(path.join(root, 'src/main/index.ts'), 'utf8'), /!\['todo', 'doing', 'done'\]\.includes\(status as string\)/);
 });
 

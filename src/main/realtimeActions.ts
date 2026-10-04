@@ -450,12 +450,17 @@ function execUpdateTask(deps: RealtimeActionDeps, a: Record<string, unknown>): A
   }
   if (!card) return { ok: false, spoken: `I couldn't find a task matching "${ref}".` };
   const status = str(a.status);
-  const valid = ['todo', 'doing', 'blocked', 'done'];
+  const valid = ['todo', 'doing', 'waiting', 'blocked', 'done'];
   if (status && !valid.includes(status)) return { ok: false, spoken: `"${status}" isn't a valid status.` };
   if (status === 'blocked') {
     const reg = deps.hiveRegistry();
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
     return { ok: false, spoken: `Blocked is for a question waiting on Ask me, and only ${godName} sets it. Tell ${godName} what is holding it up, or leave it in To do.` };
+  }
+  if (status === 'waiting') {
+    const reg = deps.hiveRegistry();
+    const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
+    return { ok: false, spoken: `Waiting names who the card waits on, so only ${godName} sets it. Tell ${godName} who it is waiting on.` };
   }
   const patch: Partial<Omit<HiveTask, 'id'>> = {};
   if (str(a.result)) patch.result = str(a.result);

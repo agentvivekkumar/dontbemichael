@@ -174,7 +174,7 @@ test('a Blocked card with no open ask and no open owner request is listed as not
   assert.deepEqual(stuck.map((c) => c.id), ['answered', 'dismissed', 'bare']);
   const ctx = stuckCardsContext(stuck);
   assert.match(ctx, /^BLOCKED CARDS WITH NOTHING ASKED\./);
-  assert.match(ctx, /add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "doing"/);
+  assert.match(ctx, /add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "waiting" and name who in "waitingOn"/);
   assert.match(ctx, /- card answered: Pipeline \(with dwight\)/);
   assert.equal(stuckCardsContext([]), null);
 });

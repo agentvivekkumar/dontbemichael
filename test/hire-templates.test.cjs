@@ -45,8 +45,8 @@ test('the office pack comes first, core text shown once, every job filled for th
   }
   // Erin's own job in a restaurant is this office's Pam card.
   assert.equal(H.ownJob('erin', [], cards).sourceCard, 'restaurant-food/pam');
-  // Nick has no restaurant card, so another pack's IT card is used.
-  assert.equal(H.ownJob('nick', [], cards).sourceCard.split('/')[1], 'nick');
+  // Nick's own job in a restaurant is the restaurant's IT card.
+  assert.equal(H.ownJob('nick', [], cards).sourceCard, 'restaurant-food/nick');
 });
 
 test('a live teammate in the family wins over the card, with the owner edits', () => {
@@ -129,4 +129,76 @@ test('renaming the job title never clears an overlap (owner, 2026-09-27)', () =>
     assert.deepEqual(H.overlapsByRules(jim(title), [dwight]), ['Dwight'], title);
   }
   assert.match(H.distinctPrompt(jim('x'), [dwight]), /The job title and the person's name never make a job distinct/);
+});
+
+test('Creed\'s own job fits the business he is hired into', () => {
+  // Value: protects=hiring Creed as Quality Control never brings another trade's duties; fails_when=a business without its own Creed card borrows the restaurant's food safety job; why_new=owner 2026-10-03: a SaaS hire showed food safety checks; seam=none
+  const expect = {
+    'saas-consulting': /release checklist/,
+    'home-services': /completion checklist/,
+    'pro-services': /review checklist/,
+    'retail-shop': /reason for every return/,
+    'restaurant-food': /food safety/
+  };
+  for (const [type, duty] of Object.entries(expect)) {
+    const job = H.ownJob('creed', [], H.cardJobs(packs, core, type, business));
+    assert.equal(job.sourceCard, `${type}/creed`, `${type} has its own Creed card`);
+    assert.equal(job.title, 'Quality Control');
+    assert.match(job.routing, duty, type);
+    if (type !== 'restaurant-food') assert.doesNotMatch(`${job.routing} ${job.workStyle} ${job.summary}`, /food|kitchen|temperature|inspector/i, type);
+  }
+});
+
+test('every character\'s own job comes from the business they are hired into', () => {
+  // Value: protects=no hire starts on another trade's duties (van parts in SaaS, food handler training in a shop); fails_when=a business pack lacks a card for a job family, so ownJob borrows another pack's; why_new=owner 2026-10-03: write fitting cards for the borrowed jobs; seam=none
+  const borrowed = [];
+  for (const p of packs) {
+    const cards = H.cardJobs(packs, core, p.businessType, business);
+    for (const c of Object.keys(H.CHARACTER_CARD)) {
+      const job = H.ownJob(c, [], cards);
+      if (!job.sourceCard.startsWith(`${p.businessType}/`)) borrowed.push(`${p.businessType}: ${c} from ${job.sourceCard}`);
+    }
+  }
+  assert.deepEqual(borrowed, []);
+  // And none of the new cards keeps the trade it was borrowed from.
+  const text = (type, id) => { const a = all.find((x) => x.businessType === type).agents.find((x) => x.id === id); return `${a.summary} ${a.routing} ${a.workStyle}`; };
+  for (const t of ['home-services', 'pro-services', 'retail-shop']) assert.doesNotMatch(text(t, 'toby'), /food|cook|kitchen|inspection/i, `${t} HR`);
+  for (const t of ['home-services', 'pro-services', 'restaurant-food', 'retail-shop']) assert.doesNotMatch(text(t, 'nick'), /\bthe product\b|bug report/i, `${t} IT`);
+  for (const t of ['home-services', 'restaurant-food', 'retail-shop']) assert.doesNotMatch(text(t, 'sadiq'), /tax return|closing documents|license/i, `${t} security`);
+  for (const t of ['pro-services', 'saas-consulting']) for (const id of ['meredith', 'darryl']) assert.doesNotMatch(text(t, id), /\bvan\b|parts|before a job/i, `${t} ${id}`);
+  assert.doesNotMatch(text('restaurant-food', 'dwight'), /maintenance|service visit/i);
+});
+
+test('"Write a new job" keeps the picked character\'s role and folder, for the owner to change', () => {
+  // Value: protects=picking Creed and writing a new job starts at Quality Control, not a blank title; fails_when=the new job path clears the title, or a family member (Erin, Jim) gets a different role than their family's cards; why_new=owner 2026-10-03; seam=source pin for the wizard
+  assert.deepEqual(H.newJobStart('creed'), { title: 'Quality Control', folder: 'Quality' });
+  assert.deepEqual(H.newJobStart('erin'), { title: 'Executive Admin', folder: 'Admin' });
+  assert.deepEqual(H.newJobStart('jim'), { title: 'Sales Director', folder: 'Sales' });
+  assert.deepEqual(H.newJobStart('darryl'), { title: 'Inventory & Shipping', folder: 'Inventory' });
+  assert.deepEqual(H.newJobStart('michael'), { title: '' }, 'no job family, nothing to carry');
+  // The same title every pack card for that character uses.
+  for (const p of all) for (const a of p.agents) assert.equal(H.newJobStart(a.character).title, a.role, `${p.businessType}/${a.id}`);
+  const wizard = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/AddAgentModal.tsx'), 'utf8');
+  assert.match(wizard, /if \(!chosenJob\) \{ setTitle\(newJobStart\(character\)\.title\); setRouting\(''\); setInstructions\(''\); setSourceCard\(undefined\); return; \}/);
+  assert.match(wizard, /const sig = `\$\{chosenKey\}\|\$\{name\.trim\(\)\}\|\$\{character\}`;/, 'a different character applies again');
+});
+
+test('SaaS Quality Control tests releases and leaves bugs to the IT Engineer', () => {
+  // Value: protects=hiring Creed in a SaaS office is not always flagged as overlapping the IT Engineer; fails_when=the card claims the bug list, bug reports or fix checks again; why_new=the real overlap check flagged Nick until the card was narrowed (2026-10-03); seam=none
+  const saas = all.find((p) => p.businessType === 'saas-consulting');
+  const creed = saas.agents.find((a) => a.id === 'creed');
+  assert.match(creed.routing, /Not for bug reports, fixes or the bug list; that goes to IT Engineer\./);
+  assert.doesNotMatch(`${creed.routing} ${creed.workStyle}`, /keep the open bug list|really fixed|before you mark it fixed/i);
+  assert.deepEqual(H.overlapsByRules({ name: 'Creed', title: creed.role, routing: creed.routing, workStyle: creed.workStyle }, saas.agents.filter((a) => a.id !== 'creed').map((a) => ({ name: a.id, title: a.role, routing: a.routing, workStyle: a.workStyle }))), []);
+});
+
+test('a binding whose scope has a period or a semicolon is released too', () => {
+  // Value: protects=every "Not for X; that goes to Name." line bindingLines writes leaves with the hire; fails_when=the release pattern stops at a period or semicolon inside the scope; why_new=ship review 2026-10-03 (QA probe 004: "orders over $1.5k" and "refunds; returns" stayed); seam=none
+  for (const scope of ['the data in HubSpot', 'orders over $1.5k', 'refunds; returns', 'mail to support@x.com']) {
+    const { others } = H.bindingLines(scope, 'Creed');
+    assert.deepEqual(H.releaseBindings('Creed', [{ id: 'o', description: `Finance: Books. ${others}` }]), [{ id: 'o', description: 'Finance: Books.' }], scope);
+  }
+  // Only that hire's lines: another hire's binding stays.
+  const { others } = H.bindingLines('the data in HubSpot', 'Nick');
+  assert.deepEqual(H.releaseBindings('Creed', [{ id: 'o', description: `Finance: Books. ${others}` }]), []);
 });

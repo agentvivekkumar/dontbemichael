@@ -37,6 +37,7 @@ import { NeedsYouBoard, RestoreTeamBanner } from '@/shell/NeedsYouBoard';
 import { setWorkStyleOffersSource, useNeedsYou } from '@/shell/useNeedsYou';
 import { readWorkStyleOffers } from '@/shell/workStyleOffers';
 import { columnAfterGoneHome } from '@/shell/closingFloor';
+import { watchReturningBindings } from '@/shell/releaseBindings';
 import { NEEDS_YOU_PILL_ID, columnEscAction, columnLocked, focusNeedsYouPill } from '@/shell/rightColumn';
 import { BottomBar } from '@/shell/BottomBar';
 
@@ -84,6 +85,8 @@ export function App() {
   const [closing, setClosing] = useState<ClosingTimeState | null>(null);
   const [vpWidth, setVpWidth] = useState<number>(window.innerWidth);
 
+  // A closed bound hire who comes back gets their bindings back (SR3).
+  useEffect(() => watchReturningBindings(), []);
   // Deep link into Settings from anywhere in the tree. Settings' open state is
   // local to App, so a nested control (e.g. "set it now" beside a disabled Talk
   // button) has no path to it without threading a prop through every layer
@@ -319,6 +322,10 @@ export function App() {
     document.querySelector<HTMLElement>('[data-closing-bar]')?.focus({ preventScroll: true });
   }, [goneHome, locked]);
   const columnOpen = rightColumn !== 'closed';
+  // Tasks and Who talks to whom take the whole window (owner, 2026-10-03). The
+  // column stays mounted there, only hidden, so a person's terminal and a half
+  // written reply survive the switch; opening it goes back to the office.
+  const columnShown = columnOpen && floorView === 'office';
   const columnRef = useRef<HTMLDivElement>(null);
   const lastColumnMode = useRef<'board' | 'person'>('board');
   // An ask arriving, or waiting at launch, opens the board. Focus stays put.
@@ -327,7 +334,9 @@ export function App() {
   }, [locked, rightColumn]);
   // D4: after the last answer the board shows All clear and closes on the next
   // click outside it (not the pill, which toggles it, nor the splitter).
-  const allClear = rightColumn === 'board' && feed.status === 'ready' && feed.count === 0;
+  // Off the office the column is hidden, so a click on Tasks or the graph is
+  // not "outside" it (ship review 2026-10-03).
+  const allClear = rightColumn === 'board' && floorView === 'office' && feed.status === 'ready' && feed.count === 0;
   useEffect(() => {
     if (!allClear) return;
     const onDown = (e: PointerEvent) => {
@@ -431,7 +440,7 @@ export function App() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', background: 'var(--cth-bg)' }}>
-          <StudioStage config={config} bleed={columnOpen ? sidebarWidth + 10 : 0} />
+          <StudioStage config={config} bleed={columnShown ? sidebarWidth + 10 : 0} />
           {/* Over the office only, never over Tasks or the graph (DESIGN.md 7.6). */}
           {floorView === 'office' && <RestoreTeamBanner config={config} />}
           {agentCount === 0 && godStatus === 'booting' && <MichaelBooting />}
@@ -469,7 +478,7 @@ export function App() {
           {/* The bottom bar stays mounted behind the closing bar, so a Cancel
               finds Talk to Michael with its attached files still there. */}
           <div style={{ display: closingOpen ? 'none' : 'contents' }}>
-            <BottomBar config={config} />
+            <BottomBar />
           </div>
           {closingOpen && (
             <ClosingTimeBar
@@ -490,7 +499,7 @@ export function App() {
           )}
         </div>
 
-        {columnOpen && (
+        {columnShown && (
           <SidebarSplitter
             width={sidebarWidth}
             onChange={setSidebarWidth}
@@ -511,7 +520,7 @@ export function App() {
             className={columnOpen ? 'cth-col-in' : 'cth-col-out'}
             style={{
               width: sidebarWidth, flexShrink: 0, minHeight: 0, zIndex: 60,
-              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              display: floorView === 'office' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden',
               ...(columnOpen
                 ? { position: 'relative', margin: '4px 6px 0 0' }
                 : { position: 'absolute', top: 4, bottom: 0, insetInlineEnd: 6 })

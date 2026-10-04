@@ -98,7 +98,8 @@ owner's dismiss on the Tasks view, which now closes the card instead of deleting
 it. It sits in Done marked "Closed by owner". Michael is told when the owner
 changes a card (status, Done, dismiss), as a note with what changed. Nothing in
 the app deletes a card, by click or by voice. The owner's moves in Task detail
-and by voice offer To do, Doing and Done; only Michael sets Blocked (section 7).
+and by voice offer To do, Doing and Done; only Michael sets Blocked and Waiting
+(sections 7 and 8).
 
 ### 5. Answers that never reached Michael (launch catch-up)
 
@@ -137,6 +138,31 @@ nothing made Blocked mean anything.
 - The standup focus works the list after the open requests. Offices still on
   the earlier built-in focus get the new one at launch.
 - The Tasks view marks those cards "Nothing asked".
+
+- A hire's first task (`first-task-card.md`) arrives the same way: the app
+  adds the card and sends Michael an owner request about it, which he closes
+  with done once he has handed it out. The card is his like any other until
+  Done.
+
+### 8. Waiting has its own column (2026-10-03)
+
+Doing showed Kelly and Oscar as busy while neither was working: Kelly waited on
+a customer's answer, and Oscar's card waited on a question parked on another
+card. Section 7 had put "waiting on someone outside the office or a team
+member" in Doing, so Doing could not tell work in progress from work on hold.
+
+- A card waiting on someone outside the office, or on a team member, is
+  `"waiting"`, with `waitingOn` naming who in a few words ("customer Gopi",
+  "Nick"). It goes back to Doing when they answer. Doing means someone is
+  working on it now. Michael's instructions and the nothing asked list say so.
+- The Tasks view has a Waiting column between Doing and Blocked (yellow, `amber`), and
+  each card shows "Waiting on {who}".
+- Michael sets Waiting, as he does Blocked: the owner's status menu, the move
+  IPC and voice do not offer it, because it needs who the card waits on.
+- A Waiting card is nobody's work right now: it is not counted as Doing on
+  Michael's board on the floor, nor as busy on the team roster.
+- No migration (no outside offices yet): Michael moves cards to Waiting under
+  the new rule as he works them.
 
 ## What is not built
 

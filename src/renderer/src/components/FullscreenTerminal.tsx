@@ -15,6 +15,7 @@ import { SpritePortrait } from './SpritePortrait';
 import { RealtimeMichaelToggle } from './RealtimeMichaelToggle';
 import { CostHud } from '@/realtime/CostHud';
 import { useStore, type Agent } from '@/store/store';
+import { releaseBindingsOf } from '@/shell/releaseBindings';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import { useRestoreTeam } from '@/hooks/useRestoreTeam';
 import { useTerminalFontSize } from './terminalFontSize';
@@ -902,6 +903,8 @@ function Header({ agent, onEdit }: { agent: Agent; onEdit: () => void }) {
     if (!confirm(closeConfirmText(agent.id, agent.name, t))) return;
     // Closing on purpose pauses the agent's schedules (design 6A).
     await window.cth.closeAgentByOwner(agent.id).catch(() => undefined);
+    // Their bound work goes back to the teammates it was taken from.
+    await releaseBindingsOf(agent.id);
     await window.cth.killPty(agent.ptyId);
     disposeTerminal(agent.ptyId);
     // archiveAgent re-homes focus mode to the next agent, and only leaves it when

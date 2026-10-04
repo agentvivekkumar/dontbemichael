@@ -12,8 +12,11 @@ import {
   parseFocusCheck,
   instructionsOpening,
   plainFallback,
+  roleLabel,
+  suggestWorkStylePrompt,
   toInstructionsPrompt,
   toPlainPrompt,
+  type SuggestRequest,
   type WorkStyleContext
 } from '../shared/workStyleText';
 
@@ -60,7 +63,7 @@ export function readConvertRequest(v: unknown): ConvertRequest | null {
 }
 
 export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): Promise<{ text: string; source: 'ai' | 'rules' }> {
-  const fallback = () => (req.to === 'plain' ? plainFallback(req.text, req.ctx.name) : instructionsFallback(req.text, req.ctx));
+  const fallback = () => (req.to === 'plain' ? plainFallback(req.text, roleLabel(req.ctx.title)) : instructionsFallback(req.text, req.ctx));
   try {
     const prompt = req.to === 'plain' ? toPlainPrompt(req.text, req.ctx) : toInstructionsPrompt(req.text, req.ctx, req.previous);
     const result = await runHiddenClaude(prompt, {
@@ -122,6 +125,8 @@ export async function checkFocusArea(req: FocusCheckRequest, deps: ConvertDeps):
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // A quick judgment, like the hire check: no extended thinking.
+      thinking: false,
       env: deps.env,
       timeoutMs: TIMEOUT_MS
     });
@@ -132,4 +137,60 @@ export async function checkFocusArea(req: FocusCheckRequest, deps: ConvertDeps):
     deps.log?.({ kind: 'focus-check-skipped', reason: String(e).slice(0, 200) });
   }
   return { checked: false };
+}
+
+/** The renderer's "Suggest me" payload, trusted for nothing but short strings. */
+export function readSuggestRequest(v: unknown): SuggestRequest | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const c = (o.ctx && typeof o.ctx === 'object' ? o.ctx : {}) as Record<string, unknown>;
+  const b = (c.business && typeof c.business === 'object' ? c.business : {}) as Record<string, unknown>;
+  const name = str(c.name, 60).trim();
+  const handles = str(o.handles, 1500).trim();
+  if (!name || !handles) return null;
+  const team = Array.isArray(o.team) ? o.team.slice(0, 20).flatMap((m) => {
+    const t = (m && typeof m === 'object' ? m : {}) as Record<string, unknown>;
+    const n = str(t.name, 60).trim();
+    return n ? [{ name: n, title: str(t.title, 120) || undefined, handles: str(t.handles, 600) || undefined }] : [];
+  }) : [];
+  return {
+    ctx: { name, title: str(c.title, 120) || undefined, business: { name: str(b.name, 120) || undefined, city: str(b.city, 120) || undefined }, manager: str(c.manager, 60).trim() || undefined },
+    handles,
+    businessType: str(o.businessType, 80) || undefined,
+    team
+  };
+}
+
+/**
+ * "Suggest me" on the hire wizard: a first work style in the owner's plain
+ * form, for them to review and edit (owner, 2026-10-03). Sonnet writes it, as
+ * it writes instructions, without extended thinking so the owner waits
+ * seconds. Empty when the call can't run: the owner writes their own.
+ */
+export async function suggestWorkStyle(
+  req: SuggestRequest,
+  deps: ConvertDeps,
+  live?: { onText?: (text: string) => void; signal?: AbortSignal }
+): Promise<{ text: string; cancelled?: boolean }> {
+  try {
+    const result = await runHiddenClaude(suggestWorkStylePrompt(req), {
+      model: INSTRUCTIONS_MODEL,
+      cwd: deps.cwd,
+      command: deps.command,
+      noTools: true,
+      thinking: false,
+      env: deps.env,
+      timeoutMs: TIMEOUT_MS,
+      // The draft streams into the owner's field while it is written.
+      onScreenText: live?.onText,
+      signal: live?.signal
+    });
+    if (result.error === 'cancelled') return { text: '', cancelled: true };
+    const text = result.ok && result.text ? cleanAnswer(result.text) : '';
+    if (text) return { text };
+    deps.log?.({ kind: 'work-style-suggest-failed', reason: result.ok ? 'empty' : (result.error ?? 'failed') });
+  } catch (e) {
+    deps.log?.({ kind: 'work-style-suggest-failed', reason: String(e).slice(0, 200) });
+  }
+  return { text: '' };
 }

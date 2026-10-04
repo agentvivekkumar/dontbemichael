@@ -164,7 +164,7 @@ test('convertWorkStyle: reading back uses Haiku, writing uses Sonnet, both witho
   assert.equal(calls[0].opts.model, 'claude-haiku-4-5');
   assert.equal(calls[1].opts.model, 'claude-sonnet-5');
   assert.ok(calls.every((c) => c.opts.noTools === true));
-  assert.match(calls[0].prompt, /in the third person/);
+  assert.match(calls[0].prompt, /Write about the team member by role, never by name, because names change/);
   assert.match(calls[1].prompt, /--- PREVIOUS WORK STYLE ---\nold words/);
 });
 
@@ -173,7 +173,7 @@ test('convertWorkStyle: an empty answer uses the quick rewrite and says so', asy
   const logs = [];
   const plain = await C.convertWorkStyle({ to: 'plain', text: instructions, ctx }, deps(logs));
   assert.equal(plain.source, 'rules');
-  assert.match(plain.text, /^The job:\nErin is the inbox keeper\.$/);
+  assert.match(plain.text, /^The job:\nExecutive Admin is the inbox keeper\.$/, 'the role, never the name (owner, 2026-10-03)');
   assert.deepEqual(logs, [{ kind: 'work-style-fallback', to: 'plain', reason: 'empty' }]);
 });
 
@@ -222,4 +222,48 @@ test('checkFocusArea: a verdict is read, and a failed, garbled or throwing check
   const logs = [];
   assert.deepEqual(await C.checkFocusArea(ask, deps(logs)), { checked: false });
   assert.match(logs[0].reason, /boom/);
+});
+
+test('suggestWorkStyle: the draft streams, Stop is not a failure, and a failed or throwing call leaves the field to the owner', async () => {
+  // Value: protects=Suggest me gives a clean draft, passes the live preview and Stop through, and never throws to the IPC; fails_when=onText or signal is not passed, a cancel is logged or shown as failed, an empty or failed answer returns text, or a throw escapes; why_new=only readSuggestRequest and the prompt are tested; seam=runHiddenClaude stubbed
+  const req = C.readSuggestRequest({ ctx: { name: 'Erin', title: 'Executive Admin', business: { name: 'Sunrise Bakery' } }, handles: 'The business inbox.', team: [] });
+  const onText = () => {};
+  const signal = new AbortController().signal;
+  const calls = stub({ ok: true, text: '```\nThe job: Keeps the inbox at zero.\n```' });
+  const logs = [];
+  assert.deepEqual(await C.suggestWorkStyle(req, deps(logs), { onText, signal }), { text: 'The job: Keeps the inbox at zero.' });
+  assert.equal(calls[0].opts.onScreenText, onText, 'the live draft reaches the field');
+  assert.equal(calls[0].opts.signal, signal, 'Stop reaches the session');
+  assert.equal(calls[0].opts.model, 'claude-sonnet-5');
+  assert.deepEqual([calls[0].opts.noTools, calls[0].opts.thinking], [true, false]);
+  assert.match(calls[0].prompt, /whose job is Executive Admin, at Sunrise Bakery\./);
+  assert.deepEqual(logs, []);
+
+  stub({ ok: false, error: 'cancelled' });
+  const cancelLogs = [];
+  assert.deepEqual(await C.suggestWorkStyle(req, deps(cancelLogs)), { text: '', cancelled: true });
+  assert.deepEqual(cancelLogs, [], 'the owner stopping it is not a failure');
+
+  for (const [answer, reason] of [[{ ok: true, text: '   ' }, 'empty'], [{ ok: false, error: 'not signed in' }, 'not signed in'], [{ ok: false }, 'failed']]) {
+    stub(answer);
+    const failLogs = [];
+    assert.deepEqual(await C.suggestWorkStyle(req, deps(failLogs)), { text: '' });
+    assert.deepEqual(failLogs, [{ kind: 'work-style-suggest-failed', reason }]);
+  }
+  stub(new Error('boom'));
+  const thrown = [];
+  assert.deepEqual(await C.suggestWorkStyle(req, deps(thrown)), { text: '' });
+  assert.match(thrown[0].reason, /boom/);
+});
+
+test('checkDistinct: a stopped check returns the rules quietly and passes Stop through', async () => {
+  // Value: protects=a check the owner moved past ends without logging a failure, gets the abort signal and runs without extended thinking; fails_when=the cancel branch moves after the fallback log, the signal is not passed, or thinking comes back on; why_new=ship review pass 3 testing finding; seam=none
+  const calls = stub({ ok: false, error: 'cancelled' });
+  const logs = [];
+  const signal = new AbortController().signal;
+  const v = await K.checkDistinct(erinCopy, [pam, ryan], { ...deps(logs), signal });
+  assert.deepEqual(v, K.rulesVerdict(erinCopy, [pam, ryan]));
+  assert.deepEqual(logs, [], 'a stop is not a failure');
+  assert.equal(calls[0].opts.signal, signal);
+  assert.equal(calls[0].opts.thinking, false);
 });

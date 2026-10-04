@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
+import { AgentAvatar } from './AgentAvatar';
 import { useMissions, whenText } from './triggers/ScheduleList';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { requestIsStale, type ScheduleRequest, type ScheduledMission } from '@shared/missions';
@@ -68,10 +69,7 @@ export function ScheduleRequestCards({ requests, refresh }: { requests: Schedule
             {/* Design v2 (branding/DESIGN.md 7.9): the only card with Approve and
                 Decline. Same frame as an Ask me card. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, lineHeight: '17px', color: 'var(--cth-ink)' }}>
-              <span style={{
-                width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', flexShrink: 0,
-                background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)', fontSize: 9, fontWeight: 700
-              }}>{name.slice(0, 1).toUpperCase()}</span>
+              <AgentAvatar id={req.agentId} name={name} size={17} />
               {t('askMe.scheduleTitle', { name })}
             </div>
             <div style={{ fontSize: 12, lineHeight: '16.5px', color: 'var(--cth-ink)' }}>{describe(req, target, t)}</div>

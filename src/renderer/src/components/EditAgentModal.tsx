@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { FIRST_TASK_EDITED_MAX } from '@shared/firstTask';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
 import { InfoTip } from './InfoTip';
@@ -18,9 +19,10 @@ import {
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
-import { plainFallback } from '@shared/workStyleText';
+import { firstTaskSection, roleLabel, plainFallback } from '@shared/workStyleText';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { ScheduledJobsList } from './ScheduledJobs';
+import { sendTypedFirstTask } from '@/shell/typedFirstTask';
 
 export interface EditAgentModalProps {
   agent: Agent;
@@ -59,8 +61,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   // description (`goal` here); the agent keeps its instructions (agent.goal),
   // rewritten from the description on save only when it changed.
   // Michael starts from his default Work style (schedule-focus-areas.md F6).
-  const [goal, setGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), agent.name));
-  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), agent.name));
+  const [goal, setGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), roleLabel(splitAgentRole(agent.description).role)));
+  const [plainOfGoal, setPlainOfGoal] = useState(() => plainFallback(effectiveWorkStyle(agent), roleLabel(splitAgentRole(agent.description).role)));
   const [describing, setDescribing] = useState(false);
   const [writing, setWriting] = useState(false);
   const [goalError, setGoalError] = useState(false);
@@ -70,7 +72,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
    *  at once, the model's when it arrives, unless the owner started typing. */
   const describe = (instructions: string): void => {
     const seq = ++describeSeq.current;
-    const quick = instructions.trim() ? plainFallback(instructions, agent.name) : '';
+    const quick = instructions.trim() ? plainFallback(instructions, roleLabel(splitAgentRole(agent.description).role)) : '';
     setGoal(quick);
     setPlainOfGoal(quick);
     if (!instructions.trim()) { setDescribing(false); return; }
@@ -166,6 +168,12 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       description: trimmedDescription,
       goal: trimmedGoal || undefined
     });
+    // A First task the owner typed is one-time work, which the instructions
+    // leave out: it goes to Michael as a card instead (ship review SR5).
+    const typedFirstTask = goal.trim() !== plainOfGoal.trim() ? firstTaskSection(goal)?.body.trim().slice(0, FIRST_TASK_EDITED_MAX) : '';
+    if (typedFirstTask && !agent.isGod) {
+      void sendTypedFirstTask(agent.sourceCard, agent.id, trimmedName, { ask: typedFirstTask, role: role.trim(), existing: true });
+    }
     // Michael routes work by the role in the office registry. Update it now, so
     // he sees the change on his next message instead of after a restart.
     if (trimmedDescription !== agent.description) {

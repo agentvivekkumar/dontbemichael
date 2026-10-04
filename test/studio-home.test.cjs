@@ -44,7 +44,7 @@ test('a department comes from the hired job card, then the character, then the r
   for (const c of ['creed', 'meredith', 'darryl']) assert.equal(L.departmentOf({ id: c, character: c }), 'operations', c);
 });
 
-test('pods are departments on a seven slot ring; Michael is never a pod', () => {
+test('pods are departments on a nine slot ring; Michael is never a pod', () => {
   const team = ['pam', 'kelly', 'dwight', 'oscar', 'ryan', 'toby', 'nick'].map((c) => ({ id: c, character: c }));
   const plan = L.planStudio([{ id: 'god', character: 'michael', isGod: true }, ...team, { id: 'erin', character: 'erin', sourceCard: 'x/kelly' }]);
   assert.equal(plan.compact, false);
@@ -66,8 +66,26 @@ test('a fifth person opens a second pod; past the ring the view goes compact', (
   assert.deepEqual(plan.pods.map((p) => p.members.length), [4, 1]);
   const many = Array.from({ length: 30 }, (_, i) => ({ id: `a${i}`, character: 'x', description: 'Makes the tea' }));
   assert.equal(L.planStudio(many).compact, true);
-  const eightDepts = ['Sales', 'Support', 'Finance', 'Marketing', 'HR', 'IT', 'Inventory', 'Admin', 'Tea'].map((d, i) => ({ id: `d${i}`, character: 'x', description: d }));
-  assert.equal(L.planStudio(eightDepts).compact, true, 'more departments than slots');
+  // Nine department pods fit the ring (owner, 2026-10-03); a tenth pod does not.
+  const nineDepts = ['Sales', 'Support', 'Finance', 'Marketing', 'HR', 'IT', 'Inventory', 'Admin', 'Tea'].map((d, i) => ({ id: `d${i}`, character: 'x', description: d }));
+  assert.equal(L.planStudio(nineDepts).compact, false, 'every kind of department has a slot');
+  const tenPods = [...nineDepts, ...Array.from({ length: 4 }, (_, i) => ({ id: `s${i}`, character: 'x', description: 'Sales rep' }))];
+  assert.equal(L.planStudio(tenPods).compact, true, 'more pods than slots');
+});
+
+test('an office with one person in every department keeps the studio, Operations and the team pod included', () => {
+  // Value: protects=adding Creed (Operations, the eighth department) never flips the floor to the card grid; fails_when=the ring has no slot for operations or team, or they take another department's slot; why_new=owner 2026-10-03: "after adding a new agent the whole office floor changed to this chart layout"; seam=none
+  const team = ['pam', 'kelly', 'dwight', 'oscar', 'ryan', 'toby', 'nick', 'creed'].map((c) => ({ id: c, character: c }));
+  const plan = L.planStudio([{ id: 'god', character: 'michael', isGod: true }, ...team, { id: 'sadiq', character: 'sadiq' }]);
+  assert.equal(plan.compact, false);
+  assert.equal(plan.pods.length, 8);
+  const slotOf = (d) => plan.pods.find((p) => p.dept === d)?.slot;
+  assert.deepEqual([slotOf('operations').x, slotOf('operations').y], [470, 590], 'Operations has its own slot, front left');
+  const withTeam = L.planStudio([...team, { id: 'r', character: 'x', description: 'Researcher: studies competitors' }]);
+  assert.equal(withTeam.compact, false);
+  assert.deepEqual([withTeam.pods.find((p) => p.dept === 'team').slot.x, withTeam.pods.find((p) => p.dept === 'team').slot.y], [615, 615], 'the team pod has its own slot, front');
+  assert.equal(new Set(withTeam.pods.map((p) => `${p.slot.x},${p.slot.y}`)).size, withTeam.pods.length, 'no shared slots');
+  assert.equal(L.MAX_RING_DEPARTMENTS, 9);
 });
 
 test('a card above its pod is anchored by its bottom edge, so it grows away from the pod', () => {
@@ -80,7 +98,7 @@ test('a card above its pod is anchored by its bottom edge, so it grows away from
 
 test('the app shows the studio, not the pixel floor', () => {
   const app = read('src/renderer/src/App.tsx');
-  assert.match(app, /<StudioStage config=\{config\} bleed=\{columnOpen \? sidebarWidth \+ 10 : 0\} \/>/);
+  assert.match(app, /<StudioStage config=\{config\} bleed=\{columnShown \? sidebarWidth \+ 10 : 0\} \/>/);
   assert.doesNotMatch(app, /<OfficeFloor \/>/);
 });
 
@@ -215,8 +233,8 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
   assert.match(chip.slice(0, 6000), /className=\{i === speakerAt \? 'cth-st-speak' : undefined\}/);
   assert.doesNotMatch(stage, /One in-character line over an idle pod/, 'no free floating bubble');
   // Only someone in a quiet pod (a chip) speaks; never someone clocking in.
-  assert.match(stage, /const quietPeople = \(\) => quietPods\(\)\.flatMap\(\(p\) => p\.members\)\.filter\(isIn\);/);
-  assert.match(stage, /a\.status === 'idle' && a\.action !== ACTION_CLOCKING_IN/);
+  assert.match(stage, /const quietPeople = \(\) => chatCandidates\(live\.current\.pods, live\.current\.gone, ACTIVE, ACTION_CLOCKING_IN\);/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/shell/closingFloor.ts'), 'utf8'), /a\.status === 'idle' && a\.action !== clockingIn/);
   assert.match(stage, /const wait = first \? 8000 \+ Math\.random\(\) \* 7000 : 15_000 \+ Math\.random\(\) \* 15_000;/);
   // Up from the chip, up and leftward, or down under it: the first that covers no card.
   assert.match(stage, /const free = spots\.find\(/);
@@ -232,7 +250,7 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
 test('idle banter: planes or mail between two quiet pods, the line shown where it lands', () => {
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
   const life = read('src/renderer/src/scene/studio/life.tsx');
-  assert.match(stage, /const partners = idle\.filter\(\(b\) => podOf\(b\.id\) !== podOf\(a\.id\)\);/, 'two different pods');
+  assert.match(stage, /const partners = idle\.filter\(\(b\) => podOfId\(b\.id\) !== podOfId\(a\.id\)\);/, 'two different pods');
   assert.match(stage, /live\.current\.throwNote\(from\.id, to\.id, look\)/);
   assert.match(stage, /later\(FLIGHT_MS, \(\) => \{\n\s*show\(\{ agentId: to\.id, text, from: \{ name: from\.name, acc: live\.current\.accentOf\(from\.id\) \}/, 'the line shows on landing, at the catcher');
   assert.match(stage, /if \(!still\.includes\(from\.id\) \|\| !still\.includes\(to\.id\)\) \{ busyUntil = 0; return; \}/, 'work ends the chat');
@@ -286,7 +304,7 @@ test('Michael\'s office has a name plate by the door, not an M badge (owner, 202
 test('the right column has no ground of its own; its cards sit on the office (owner, 2026-09-30)', () => {
   const app = read('src/renderer/src/App.tsx');
   // Closed, the office takes the window (docs/designs/needs-you-empty-state.md D1).
-  assert.match(app, /<StudioStage config=\{config\} bleed=\{columnOpen \? sidebarWidth \+ 10 : 0\} \/>/);
+  assert.match(app, /<StudioStage config=\{config\} bleed=\{columnShown \? sidebarWidth \+ 10 : 0\} \/>/);
   const col = app.slice(app.indexOf("The right column has no ground of its own"), app.indexOf("{columnMode === 'board' || !agent ? ("));
   assert.doesNotMatch(col, /background:|backdropFilter|boxShadow/);
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');

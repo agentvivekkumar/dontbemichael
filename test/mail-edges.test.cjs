@@ -151,7 +151,7 @@ test('search pages newest first, caps the page size, and ignores a bad date', as
   assert.equal(capped.body.messages.length, 50);
   assert.equal(capped.body.more, true);
   await call('dwight', 'search', { mailbox: 'sales', since: 'not a date' });
-  assert.deepEqual(state.queries.at(-1), { all: true }, 'a bad date is dropped, not sent to the server');
+  assert.deepEqual(state.queries.at(-1), { all: true, draft: false }, 'a bad date is dropped, not sent to the server; drafts never come back');
   const zero = await call('dwight', 'search', { mailbox: 'sales', limit: 0 });
   assert.equal(zero.body.messages.length, 1, 'a limit under one becomes one');
 });

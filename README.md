@@ -39,10 +39,10 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.0.16: your answers become Michael's work, and the inbox reaches zero.**
-> An answer you give on Ask me is a request Michael routes and closes, and the Tasks view shows
-> which cards sit with him. Your Executive Admin files every email out of the inbox and deletes
-> nothing. Every scheduled job has a focus area, and closing time clears the floor.
+> **New in 0.1.0: first task cards, a Waiting column, and a floor with character.**
+> A new hire's first job is a card Michael hands out. The Tasks view shows who a waiting card
+> waits on. Every team member has a signature prop, and Who talks to whom reads by time, from the
+> last hour to the last month.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

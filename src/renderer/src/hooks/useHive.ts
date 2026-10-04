@@ -19,6 +19,9 @@ import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { teamMemberName, teamMemberRole, teamMemberGoal, teamAccent, teamMemberStart, rewrittenInstructions } from '../../../shared/teamPlan';
 import type { AgentDefinitionV2 } from '../../../shared/agentDefinition';
+import { FIRST_TASK_EDITED_MAX, withoutLegacyFirstTask } from '../../../shared/firstTask';
+import { firstTaskSection } from '../../../shared/workStyleText';
+import { splitAgentRole } from '../../../shared/agentRole';
 import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
 import { seedStarterJobs } from '@/shell/seedStarterJobs';
 import { PromptSubmits, confirmSubmit } from '../../../shared/submitConfirm';
@@ -261,6 +264,62 @@ async function rewriteTeamInstructions(config: HarnessConfig): Promise<void> {
 }
 
 /**
+ * The one-time cleanup of the First task text in team members' Work styles
+ * (docs/designs/first-task-card.md, D1 and the ship review): a section that is
+ * word for word a pack's old first task comes out with no card, since that
+ * person has been working. One the owner edited becomes a first task card for
+ * Michael and leaves the Work style; it stays in the Work style when the card
+ * cannot be made, the text is too long for a card, or the hire is closed.
+ */
+async function removeLegacyFirstTasks(config: HarnessConfig): Promise<void> {
+  if (config.firstTasksRemoved) return;
+  const floor = useStore.getState();
+  const team = [...floor.agents, ...floor.archivedAgents, ...floor.restorableAgents].filter((a) => !a.isGod);
+  const manager = floor.agents.find((a) => a.isGod)?.name;
+  const closed = new Set(floor.archivedAgents.map((a) => a.id));
+  // The pack's own text comes out. A First task the owner edited becomes a
+  // card Michael hands out, then leaves the Work style too (ship review
+  // 2026-10-03, SR2): left there, the editor no longer showed it and the next
+  // save dropped it without a word.
+  const patches: Array<{ id: string; description: string; goal: string }> = [];
+  const edited: Array<{ a: Agent; ask: string }> = [];
+  const cleaned: Agent[] = [];
+  for (const a of team) {
+    const legacy = withoutLegacyFirstTask(a.goal, manager);
+    if (legacy !== null) { patches.push({ id: a.id, description: a.description ?? '', goal: legacy }); cleaned.push(a); continue; }
+    const section = a.goal ? firstTaskSection(a.goal) : null;
+    // A closed hire cannot be handed a card, and a card holds at most
+    // FIRST_TASK_EDITED_MAX characters: those keep their words where they are.
+    if (!section?.body.trim() || closed.has(a.id) || section.body.trim().length > FIRST_TASK_EDITED_MAX) continue;
+    edited.push({ a, ask: section.body.trim() });
+    patches.push({ id: a.id, description: a.description ?? '', goal: section.without });
+  }
+  let retry = false;
+  if (patches.length > 0) {
+    const backup = await window.cth.rosterBackup('first-task-cleanup').catch(() => ({ ok: false }));
+    if (!backup.ok) return;
+    const keep = (id: string) => patches.splice(patches.findIndex((p) => p.id === id), 1);
+    // Some old pack "first tasks", edited or not, were standing duties (the
+    // daily special, the monthly note to past clients): the card's starter
+    // jobs keep them on a schedule (ship review SR4, 2026-10-03). They are
+    // added before the text comes out, so a failure keeps the words and the
+    // cleanup runs again next launch; a closed hire's are added switched off,
+    // as its other schedules are (Codex adversarial review, 2026-10-04).
+    for (const a of cleaned) {
+      if (!(await seedStarterJobs(a.sourceCard, a.id, { paused: closed.has(a.id) }))) { keep(a.id); retry = true; }
+    }
+    for (const { a, ask } of edited) {
+      if (!(await seedStarterJobs(a.sourceCard, a.id))) { keep(a.id); retry = true; continue; }
+      const sent = await window.cth.hiveFirstTask(a.sourceCard, a.id, a.name, { ask, role: splitAgentRole(a.description).role }).catch(() => ({ ok: false }));
+      // Not on a card yet: keep it in the Work style rather than lose it.
+      if (!sent.ok) keep(a.id);
+    }
+    if (patches.length > 0) useStore.getState().rewriteInstructions(patches);
+  }
+  if (!retry) await window.cth.updateConfig({ firstTasksRemoved: true }).catch(() => undefined);
+}
+
+/**
  * Start the team the owner picked during onboarding (Decisions 44, 47), ONCE.
  *
  * Each member is spawned exactly as the hire dialog spawns an agent — same
@@ -357,8 +416,14 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
       seedPrompt: res.seedPrompt,
       recentTextTs: Date.now()
     }, { select: false });
-    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03).
-    if (cardPack) await seedStarterJobs(`${cardPack.businessType}/${id}`, id);
+    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03),
+    // and its first task as a card Michael hands out (first-task-card.md).
+    if (cardPack) {
+      await seedStarterJobs(`${cardPack.businessType}/${id}`, id);
+      // Only a true first start: a member the registry already knew has been
+      // working, so it gets no first task (first-task-card.md D1).
+      if (!reg?.agents?.[id]) await window.cth.hiveFirstTask(`${cardPack.businessType}/${id}`, id, name).catch(() => undefined);
+    }
   }
   await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
 }
@@ -584,7 +649,7 @@ export function useHive(config: HarnessConfig | null): void {
       useStore.getState().setGodStatus('ready');
       // The team picked during onboarding starts once Michael is up, each member
       // inside its own folder. After this they restore like any hired agent.
-      void rewriteTeamInstructions(config).catch(() => undefined).then(() => startBusinessTeam(config));
+      void rewriteTeamInstructions(config).catch(() => undefined).then(() => removeLegacyFirstTasks(config)).catch(() => undefined).then(() => startBusinessTeam(config));
 
       // Nothing is typed into Michael's terminal at start (owner cleanup,
       // 2026-09-25): his startup instructions cover orientation, and the standup
