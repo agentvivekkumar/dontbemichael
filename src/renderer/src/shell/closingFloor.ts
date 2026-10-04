@@ -27,3 +27,22 @@ export function columnAfterGoneHome(
   if (rightColumn !== 'person' || !selectedId || !gone.includes(selectedId)) return null;
   return locked ? 'board' : 'closed';
 }
+
+/**
+ * Who can trade idle banter (DESIGN.md 8.8): people who are in, idle and not
+ * clocking in, in pods where nobody still at work is busy. Someone who has
+ * gone home at closing time is out of it (owner, 2026-10-03: paper planes kept
+ * flying between offices that were already dark). Their terminal can still be
+ * open and idle until the office closes, so status alone does not say they left.
+ */
+export function chatCandidates<T extends { id: string; status: string; action?: string }>(
+  pods: Array<{ members: T[] }>,
+  gone: ReadonlySet<string>,
+  busy: ReadonlySet<string>,
+  clockingIn: string
+): T[] {
+  return pods
+    .map((p) => stillIn(p.members, gone))
+    .filter((present) => present.length > 0 && !present.some((a) => busy.has(a.status)))
+    .flatMap((present) => present.filter((a) => a.status === 'idle' && a.action !== clockingIn));
+}

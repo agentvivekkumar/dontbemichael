@@ -97,7 +97,7 @@ test('every pack\'s Executive Admin works to inbox zero, and her Work style name
     assert.match(pam.summary, /inbox at zero/, n);
     assert.deepEqual(pam.wontDo, ['Reply on your behalf without asking', 'Delete any email']);
     const jobs = (pack(n).starterMissions || []).filter((j) => j.agentId === 'pam');
-    assert.deepEqual(jobs[0], { agentId: 'pam', title: 'Inbox to zero', schedule: 'every 2h during office hours', focus: 'Bring the inbox to zero: give every new message its outcome, bring back the Waiting items you noted as due today, and tell Michael what is left and why. If you have no mailbox yet, stop without messaging anyone.' }, n);
+    assert.deepEqual(jobs[0], { agentId: 'pam', title: 'Inbox to zero', schedule: 'every 2h during office hours', focus: 'Bring the inbox to zero: give every new message its outcome, bring back the Waiting items you noted as due today, and tell Michael what is left and why. If you have no email tools yet, from Mailboxes or a Claude connector such as Gmail, stop without messaging anyone.' }, n);
   }
   assert.equal(pack('home-services').starterMissions.find((j) => j.title === "Tomorrow's jobs").schedule, '18:00 on office days');
 });
@@ -115,7 +115,7 @@ test('a starter job\'s timing follows the pack\'s office hours, and a hire gets 
   assert.deepEqual(added.map((m) => [m.label, m.to, m.createdBy, !!m.focus]), [['Inbox to zero', 'pam-2', 'owner', true], ["Tomorrow's jobs", 'pam-2', 'owner', true]]);
   assert.deepEqual(starterMissionsFor(jobs, hours, 'pam', 'pam-2', added, 'god', (i) => `x${i}`), [], 'once');
   assert.match(read('src/renderer/src/components/AddAgentModal.tsx'), /void seedStarterJobs\(sourceCard, id\);/);
-  assert.match(read('src/renderer/src/hooks/useHive.ts'), /if \(cardPack\) await seedStarterJobs\(`\$\{cardPack\.businessType\}\/\$\{id\}`, id\);/);
+  assert.match(read('src/renderer/src/hooks/useHive.ts'), /if \(cardPack\) \{\n      await seedStarterJobs\(`\$\{cardPack\.businessType\}\/\$\{id\}`, id\);/);
 });
 
 test('offices that already hired her are offered the new text once, never given it silently', () => {
@@ -195,4 +195,28 @@ test('organize cleans its ids and label, and fails plainly when it cannot move m
   const cannot = await handleMailRequest(svc, deps, 'pam', 'archive', { mailbox: 'ceo', ids: ['12'] });
   assert.equal(cannot.body.kind, 'unsupported');
   assert.notEqual(cannot.status, 200);
+});
+
+test('a server with its own All folder that is not Gmail archives to its Archive, where a search looks', async () => {
+  // Value: protects=archive and search agree on where archived mail lives off Gmail, so the team can find what inbox zero filed; fails_when=organize takes the Gmail label path for any \All folder; why_new=Codex adversarial review 2026-10-04; seam=fake IMAP
+  const folders = [{ path: 'INBOX' }, { path: 'All Mail', specialUse: '\\All' }, { path: 'Archive', specialUse: '\\Archive' }];
+  const st = { moved: [], flags: [], created: [] };
+  const imap = {
+    usable: true, async connect() {}, async logout() {},
+    async list() { return folders; }, async getMailboxLock() { return { release() {} }; },
+    async search() { return [11, 12]; },
+    async messageFlagsAdd(uids, flags, opts) { st.flags.push({ flags, labels: !!opts?.useLabels }); },
+    async messageMove(uids, to) { st.moved.push(to); }, async mailboxCreate(p) { st.created.push(p); folders.push({ path: p }); }
+  };
+  const server = { host: 'h', port: 993, secure: true };
+  const config = {
+    mailboxes: [{ id: 'ceo', address: 'ceo@example.com', provider: 'other', imap: server, smtp: server, status: 'connected', createdAt: 1, updatedAt: 1 }],
+    agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['ceo'], send: false } } }
+  };
+  const deps = { getConfig: () => config, getPassword: () => 'x', markStatus() {}, createImap: () => imap };
+  const svc = new MailService(deps);
+  await handleMailRequest(svc, deps, 'pam', 'archive', { mailbox: 'ceo', ids: ['11'] });
+  await handleMailRequest(svc, deps, 'pam', 'archive', { mailbox: 'ceo', ids: ['12'], label: 'Waiting' });
+  assert.deepEqual(st.moved, ['Archive', 'Waiting']);
+  assert.ok(st.flags.every((f) => !f.labels), 'no Gmail labels off Gmail');
 });

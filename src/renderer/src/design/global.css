@@ -555,5 +555,3 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
    composer while its message box has focus. */
 .cth-composer { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); }
 .cth-composer:focus-within { box-shadow: inset 0 0 0 2px var(--cth-indigo), var(--cth-shadow-lg); }
-/* The bottom bar on a narrow stage: the pack note goes first. */
-@container (max-width: 960px) { .cth-bb-pack { display: none; } }

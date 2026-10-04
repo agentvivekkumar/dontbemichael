@@ -19,6 +19,7 @@ import type { AgentDefinitionV2 } from './agentDefinition';
 import type { OfficePack } from './officePack';
 import { splitAgentRole, joinAgentRole } from './agentRole';
 import { teamMemberGoal, teamMemberName, folderNameFor } from './teamPlan';
+import { OFFICE_ROLES } from './officeRoles';
 
 export type HireJobSource = 'card' | 'team' | 'new';
 
@@ -48,6 +49,49 @@ export interface HireJob {
 }
 
 export const NEW_JOB_KEY = 'new';
+
+/**
+ * Who does a clone of a teammate's job (owner, 2026-10-03: the people already
+ * on the team are greyed with "Clone", so nobody hires a second Dwight). The
+ * first free person in the same job family (Dwight to Jim), else in the same
+ * cast group, else anyone free, in the cast's order. Michael is the office
+ * manager on every team, never a hire. Null when nobody is free.
+ */
+export function cloneCharacter(of: string, taken: ReadonlySet<string>, groups: ReadonlyArray<ReadonlyArray<string>>): string | null {
+  const order = groups.flat().filter((c) => c !== 'michael' && !taken.has(c) && c !== of);
+  const family = CHARACTER_CARD[of];
+  const group = groups.find((g) => g.includes(of)) ?? [];
+  return order.find((c) => !!family && CHARACTER_CARD[c] === family)
+    ?? order.find((c) => group.includes(c))
+    ?? order[0]
+    ?? null;
+}
+
+/** The Who step's groups with a free person first, in their usual order, and
+ *  the groups whose people are all on the team at the end (owner, 2026-10-03). */
+export function freeGroupsFirst<T extends { members: readonly string[] }>(groups: readonly T[], taken: ReadonlySet<string>): T[] {
+  const full = (g: T) => g.members.every((m) => taken.has(m));
+  return [...groups.filter((g) => !full(g)), ...groups.filter(full)];
+}
+
+/** The first person free to hire, for the wizard's opening pick. */
+export function firstFreeCharacter(preferred: string, taken: ReadonlySet<string>, groups: ReadonlyArray<ReadonlyArray<string>>): string {
+  if (preferred !== 'michael' && !taken.has(preferred)) return preferred;
+  return groups.flat().find((c) => c !== 'michael' && !taken.has(c)) ?? preferred;
+}
+
+/**
+ * What "Write a new job" starts with: the job of the character the owner
+ * picked (owner, 2026-10-03: picking Creed and writing a new job should keep
+ * "Quality Control", for the owner to change). Their family's role and folder
+ * from the office role map, the same ones every pack card uses; empty for a
+ * character with no job family.
+ */
+export function newJobStart(character: string): { title: string; folder?: string } {
+  const card = CHARACTER_CARD[character] as keyof typeof OFFICE_ROLES | undefined;
+  const role = card ? OFFICE_ROLES[card] : undefined;
+  return role ? { title: role.role, folder: role.folder } : { title: '' };
+}
 
 /**
  * Each character's own job: the pack card of their job family. Characters with
@@ -306,11 +350,83 @@ export function bindingLines(binding: string, name: string): { own: string; othe
   return { own: `Only ${b}.`, others: `Not for ${b}; that goes to ${name}.` };
 }
 
+// Lazy up to the fixed ending, so a scope with a period or a semicolon
+// ("orders over $1.5k", "refunds; returns") matches too.
+const bindingRe = (n: string) => new RegExp(`\\s*Not for (?:(?!Not for ).)+?; that goes to ${escapeRe(n)}\\.(?![\\p{L}\\p{N}])`, 'gu');
+
+/** The "Not for ...; that goes to <name>." lines in one teammate's role line,
+ *  so they can be put back if that hire returns (ship review 2026-10-03). */
+export function bindingLinesFor(name: string, description: string | undefined): string[] {
+  const n = name.trim();
+  if (!n || !description) return [];
+  return (description.match(bindingRe(n)) ?? []).map((l) => l.trim());
+}
+
+type WithLines = { id: string; releasedBindings?: Array<{ id: string; line: string }> };
+
+/**
+ * Hires that just came back onto the floor with released binding lines. The
+ * spawn that brings a closed hire back builds a fresh roster entry and drops
+ * the archived one, so the lines are read from the entry it had before.
+ */
+export function returningBindings(
+  prev: { agents: WithLines[]; archived: WithLines[]; restorable: WithLines[] },
+  next: WithLines[]
+): Array<{ id: string; lines: Array<{ id: string; line: string }> }> {
+  const before = new Set(prev.agents.map((a) => a.id));
+  const kept = new Map([...prev.archived, ...prev.restorable].map((a) => [a.id, a.releasedBindings]));
+  return next
+    .filter((a) => !before.has(a.id))
+    .map((a) => ({ id: a.id, lines: a.releasedBindings?.length ? a.releasedBindings : kept.get(a.id) ?? [] }))
+    .filter((r) => r.lines.length > 0);
+}
+
+/**
+ * The role lines a returning hire's released bindings put back: each line goes
+ * back once, only on a teammate still here, never twice on the same line.
+ */
+export function restoredRoles<T extends { id: string; description?: string }>(lines: Array<{ id: string; line: string }>, team: T[]): Array<{ id: string; description: string }> {
+  const next = new Map<string, string>();
+  for (const { id, line } of lines) {
+    const mate = team.find((a) => a.id === id);
+    if (!mate) continue;
+    const current = next.get(id) ?? mate.description ?? '';
+    if (current.includes(line)) continue;
+    const split = splitAgentRole(current);
+    next.set(id, hireRole(split.role, appendOnce(split.roleDescription, line)));
+  }
+  return [...next].map(([id, description]) => ({ id, description }));
+}
+
+/**
+ * The teammates' role lines without the bindings that send work to `name`,
+ * for when that hire leaves (owner, 2026-10-03): "Not for catering enquiries;
+ * that goes to Creed." would otherwise send Michael's routing to nobody. The
+ * bound hire's own "Only ..." goes with them. Lines are matched by the name, so
+ * bindings made before this are cleaned too; a rename keeps them matching
+ * (renamePatches). Only the teammates whose line changes are returned.
+ */
+export function releaseBindings<T extends { id: string; description?: string }>(name: string, team: T[]): Array<{ id: string; description: string }> {
+  const n = name.trim();
+  if (!n) return [];
+  const re = bindingRe(n);
+  const out: Array<{ id: string; description: string }> = [];
+  for (const t of team) {
+    const d = t.description ?? '';
+    const next = d.replace(re, '').trim();
+    if (next !== d.trim()) out.push({ id: t.id, description: next });
+  }
+  return out;
+}
+
 /** `line` with `extra` appended once (no duplicate on a second bind). */
 export function appendOnce(line: string, extra: string): string {
   const l = line.trim();
   if (!extra || l.includes(extra)) return l;
-  return l ? `${l.replace(/\s+$/, '')} ${extra}` : extra;
+  if (!l) return extra;
+  // A line the owner left without a full stop gets one, so the added sentence
+  // never runs into theirs ("data issues Only the data in HubSpot.").
+  return `${/[.!?:;)"'”’]$/.test(l) ? l : `${l}.`} ${extra}`;
 }
 
 /** The stored role line for a hire. */

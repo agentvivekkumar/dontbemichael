@@ -7,6 +7,7 @@ import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
 import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
+import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { type HiveTask, type HumanQA, openQuestion, waitsOnHuman } from './TasksKanban';
 import { compareByNewestAsk } from './askMeOrder';
@@ -72,7 +73,7 @@ export function AskMeTab() {
   const dark = useAppTheme() === 'dark';
   // Answers given since the board opened: they stay under All clear until the
   // column closes (D4), so the owner sees the reply landed.
-  const [answeredHere, setAnsweredHere] = useState<{ id: string; title: string; a: string; who?: string }[]>([]);
+  const [answeredHere, setAnsweredHere] = useState<{ id: string; title: string; a: string; who?: string; whoId?: string }[]>([]);
   const [line] = useState(() => 1 + Math.floor(Math.random() * ALL_CLEAR_LINES));
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -160,7 +161,7 @@ export function AskMeTab() {
       }
       await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, q: open.q, a: text }).catch(() => undefined);
       setAnswerDraft(task.id, '');
-      setAnsweredHere((list) => [{ id: task.id, title: task.title, a: text, who: nameFor(typeof task.assignee === 'string' ? task.assignee : undefined) }, ...list.filter((x) => x.id !== task.id)]);
+      setAnsweredHere((list) => [{ id: task.id, title: task.title, a: text, who: nameFor(typeof task.assignee === 'string' ? task.assignee : undefined), whoId: typeof task.assignee === 'string' ? task.assignee : undefined }, ...list.filter((x) => x.id !== task.id)]);
       refreshNeedsYou();
     } catch { /* leave the draft so the user can retry */ }
     setSending(null);
@@ -184,7 +185,7 @@ export function AskMeTab() {
       {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && answeredHere.map((x) => (
         <section key={x.id} aria-label={askTitle(x.title)} style={card}>
           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>{askTitle(x.title)}</div>
-          {x.who && <div style={{ marginTop: 6 }}><span style={personChip}><span aria-hidden="true" style={chipAvatar}>{x.who.slice(0, 1).toUpperCase()}</span>{x.who}</span></div>}
+          {x.who && <div style={{ marginTop: 6 }}><span style={personChip}><AgentAvatar id={x.whoId} name={x.who} size={16} />{x.who}</span></div>}
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--cth-ink-3)' }}>{translate('askMe.yourAnswer')}</div>
           <div dir={rtl ? 'auto' : undefined} style={{ marginTop: 2, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.a}</div>
         </section>
@@ -228,7 +229,7 @@ export function AskMeTab() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6, flexWrap: 'wrap' }}>
                   {who && (
                     <span style={{ ...personChip, ...(fam ? { background: fam.l, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {}) }}>
-                      <span aria-hidden="true" style={{ ...chipAvatar, ...(fam ? { background: fam.m, color: fam.acc } : {}) }}>{who.slice(0, 1).toUpperCase()}</span>
+                      <AgentAvatar id={typeof t.assignee === 'string' ? t.assignee : undefined} name={who} size={16} />
                       {who}
                     </span>
                   )}
@@ -359,10 +360,6 @@ const draftTag: CSSProperties = {
 const personChip: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px 0 3px', borderRadius: 'var(--cth-r-pill)',
   background: 'var(--cth-neutral-soft)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-ink-2)'
-};
-const chipAvatar: CSSProperties = {
-  width: 16, height: 16, borderRadius: '50%', display: 'inline-grid', placeItems: 'center',
-  background: 'var(--cth-indigo-soft)', color: 'var(--cth-indigo-text)', fontSize: 9, fontWeight: 700
 };
 const quietLink: CSSProperties = {
   padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',

@@ -246,7 +246,7 @@ export function blockedWithNothingAsked(tasks: CardLike[], open: Pick<OwnerReque
 export function stuckCardsContext(stuck: StuckCard[]): string | null {
   if (!stuck.length) return null;
   return [
-    'BLOCKED CARDS WITH NOTHING ASKED. These cards are in Blocked, but none has a question for the owner on Ask me or an open request from the owner, so nothing is moving them. Blocked means waiting on the owner\'s answer. For each one: if it needs the owner, add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "doing" and say who in its notes; if the work is finished, or the owner decided to stop it, move it to "done".',
+    'BLOCKED CARDS WITH NOTHING ASKED. These cards are in Blocked, but none has a question for the owner on Ask me or an open request from the owner, so nothing is moving them. Blocked means waiting on the owner\'s answer. For each one: if it needs the owner, add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "waiting" and name who in "waitingOn"; if the work is finished, or the owner decided to stop it, move it to "done".',
     ...stuck.slice(0, LIST_MAX).map((c) => `- card ${cardText(c.id, 60)}: ${cardText(c.title)}${c.assignee ? ` (with ${cardText(c.assignee, 40)})` : ''}`),
     ...(stuck.length > LIST_MAX ? [`- and ${stuck.length - LIST_MAX} more`] : [])
   ].join('\n');

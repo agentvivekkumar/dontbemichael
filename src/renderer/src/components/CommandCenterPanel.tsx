@@ -23,6 +23,7 @@ import { useFleetTelemetry } from '@/hooks/useTelemetry';
 import { COMMAND_GROUPS } from '@shared/claudeCommands';
 import { roleForHiveSpawn } from '@shared/agentRole';
 import { useStore, triggerHistoryVisible, type Agent } from '@/store/store';
+import { releaseBindingsOf } from '@/shell/releaseBindings';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import {
   buildSpawnCommand,
@@ -1038,7 +1039,7 @@ function ArchivedSection() {
             <div style={{ fontSize: 11, color: 'var(--cth-ink-500)', wordBreak: 'break-all' }}>{a.cwd}</div>
           </div>
           <button
-            onClick={() => removeArchivedAgent(a.id)}
+            onClick={() => { void releaseBindingsOf(a.id).finally(() => removeArchivedAgent(a.id)); }}
             style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-500)', flexShrink: 0 }}
           ><Icon name="x" /></button>
         </div>

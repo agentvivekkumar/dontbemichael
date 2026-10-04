@@ -165,10 +165,11 @@ function Shell() {
               {floorView === 'graph' && <MemoryGraphPanel godId="god" onJumpToMemory={() => {}} />}
             </div>
           )}
-          <BottomBar config={config} />
+          <BottomBar />
         </div>
-        <SidebarSplitter width={SIDEBAR} onChange={() => {}} viewportWidth={1440} />
-        <div style={{ width: SIDEBAR, flexShrink: 0, minHeight: 0, position: 'relative', zIndex: 60, display: 'flex', flexDirection: 'column', overflow: 'hidden', margin: '4px 6px 0 0' }}>
+        {/* As in the app: Tasks and Who talks to whom take the whole window. */}
+        {floorView === 'office' && <SidebarSplitter width={SIDEBAR} onChange={() => {}} viewportWidth={1440} />}
+        <div style={{ width: SIDEBAR, flexShrink: 0, minHeight: 0, position: 'relative', zIndex: 60, display: floorView === 'office' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden', margin: '4px 6px 0 0' }}>
           {needsYouOpen || !agent ? <NeedsYouBoard config={config} /> : (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 12px 0' }}>
               <NeedsYouStrip />

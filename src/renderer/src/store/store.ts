@@ -19,7 +19,7 @@ import { SHOW_FOCUS_MODE, SHOW_GIT, SHOW_TRACES, SHOW_IDE, SHOW_ORG_TRIGGER, SHO
 import type { ScheduledMission } from '@shared/missions';
 import { refocusAfterRemoval, focusOnLoad, restoreFocus } from './focusMode';
 import { chooseRosterSource } from './rosterSource';
-import { renamePatches } from '@shared/hireTemplates';
+import { renamePatches, swapName } from '@shared/hireTemplates';
 import { canOpen } from '../shell/closingFloor';
 
 export type ToolKind =
@@ -67,6 +67,9 @@ export interface Agent {
   goal?: string;
   /** User-authored private note shown and edited from the roster-card hover. */
   note?: string;
+  /** Binding lines this hire's leaving took off teammates ("Not for ...; that
+   *  goes to <Name>."), put back if they return (ship review SR3, 2026-10-03). */
+  releasedBindings?: Array<{ id: string; line: string }>;
   status: StatusKind;
   action: string;
   progress: number;
@@ -423,6 +426,15 @@ const LS_QUEUES = 'cth.messageQueues';
 const LS_ROSTER_HOME = 'cth.rosterHome';
 const LS_FOCUS_MODE = 'cth.prefersFocusMode';
 const LS_FLOOR_VIEW = 'cth.floorView';
+
+/** Opening the right column on purpose (Needs you, a person, Michael's tabs)
+ *  goes back to the office: Tasks and Who talks to whom hide the column
+ *  (owner, 2026-10-03). */
+function officeView(view: FloorView): { floorView?: FloorView } {
+  if (view === 'office') return {};
+  try { window.localStorage.setItem(LS_FLOOR_VIEW, 'office'); } catch { /* per-Mac nicety only */ }
+  return { floorView: 'office' };
+}
 
 export type FloorView = 'office' | 'tasks' | 'graph';
 const initialFloorView: FloorView = (() => {
@@ -880,17 +892,18 @@ export const useStore = create<State>((set, get) => ({
       selectedId,
       ccTabRequest: { tab: 'memory', seq },
       memoryFocusRequest: { agentId, seq },
-      rightColumn: 'person' as const
+      rightColumn: 'person' as const,
+      ...officeView(s.floorView)
     };
   }),
   // 'human' was Michael's Ask me tab; in v2 Ask me is the Needs you board.
   requestCommandCenterTab: (tab) =>
     set((s) => tab === 'human'
-      ? { rightColumn: 'board' as const }
+      ? { rightColumn: 'board' as const, ...officeView(s.floorView) }
       // Not onto a person who has gone home at closing time (5A).
       : s.selectedId && !canOpen(s.selectedId, s.goneHome)
         ? {}
-        : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, rightColumn: 'person' as const }),
+        : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, rightColumn: 'person' as const, ...officeView(s.floorView) }),
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
@@ -912,7 +925,7 @@ export const useStore = create<State>((set, get) => ({
   select: (id) => set((s) => {
     if (!canOpen(id, s.goneHome)) return {};
     persistAgents(s.agents, id);
-    return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, rightColumn: 'person' };
+    return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, rightColumn: 'person', ...officeView(s.floorView) };
   }),
   goneHome: [],
   setGoneHome: (ids) => set((s) => (ids.length === s.goneHome.length && ids.every((id) => s.goneHome.includes(id)) ? {} : { goneHome: ids })),
@@ -920,6 +933,7 @@ export const useStore = create<State>((set, get) => ({
   setRightColumn: (column) => set({ rightColumn: column }),
   openNeedsYou: (opts) => set((s) => ({
     rightColumn: 'board',
+    ...officeView(s.floorView),
     needsYouFocus: { seq: (s.needsYouFocus?.seq ?? 0) + 1, ...(opts?.taskId ? { taskId: opts.taskId } : {}) }
   })),
   needsYouFocus: null,
@@ -999,7 +1013,10 @@ export const useStore = create<State>((set, get) => ({
           agents.map((agent) => {
             const patch = patchOf.get(agent.id);
             const next = patch ? { ...agent, ...patch } : agent;
-            return agent.id === id ? { ...next, name: nextName } : next;
+            // Lines a closed hire released name them; a rename keeps them true (SR3).
+            return agent.id === id
+              ? { ...next, name: nextName, ...(next.releasedBindings ? { releasedBindings: next.releasedBindings.map((b) => ({ ...b, line: swapName(b.line, previousName, nextName) })) } : {}) }
+              : next;
           });
         const agents = rename(s.agents);
         const archivedAgents = rename(s.archivedAgents);

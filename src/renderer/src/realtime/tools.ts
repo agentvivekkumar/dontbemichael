@@ -155,7 +155,7 @@ export function realtimeReadTools(): ReturnType<typeof tool>[] {
         properties: {
           status: {
             type: 'string',
-            enum: ['todo', 'doing', 'blocked', 'done'],
+            enum: ['todo', 'doing', 'waiting', 'blocked', 'done'],
             description: 'Optional. Restrict the answer to one status.'
           }
         },
@@ -171,7 +171,7 @@ export function realtimeReadTools(): ReturnType<typeof tool>[] {
           if (!list.length) return 'The task board is empty.';
           const tasks = list.map(obj);
           const by = (s: string): Record<string, unknown>[] => tasks.filter((t) => str(t.status) === s);
-          const counts = `${plural(by('todo').length, 'to do')}, ${by('doing').length} in progress, ${plural(
+          const counts = `${plural(by('todo').length, 'to do')}, ${by('doing').length} in progress, ${by('waiting').length} waiting on someone, ${plural(
             by('blocked').length,
             'blocked'
           )}, and ${by('done').length} done`;
@@ -186,8 +186,10 @@ export function realtimeReadTools(): ReturnType<typeof tool>[] {
           }
           const doing = by('doing');
           const blocked = by('blocked');
+          const waiting = by('waiting');
           const detail = [
             doing.length ? `In progress: ${doing.slice(0, 8).map(describe).join('; ')}.` : '',
+            waiting.length ? `Waiting: ${waiting.slice(0, 8).map((t) => `${describe(t)}${str(t.waitingOn) ? ` on ${clip(str(t.waitingOn), 40)}` : ''}`).join('; ')}.` : '',
             blocked.length ? `Blocked: ${blocked.slice(0, 8).map(describe).join('; ')}.` : ''
           ]
             .filter(Boolean)
@@ -591,10 +593,11 @@ export function realtimeReadTools(): ReturnType<typeof tool>[] {
             }));
           const doing = tasks.filter((t) => str(t.status) === 'doing').map((t) => ({ title: str(t.title), owner: str(t.assignee) || undefined }));
           const blocked = tasks.filter((t) => str(t.status) === 'blocked').map((t) => ({ title: str(t.title), owner: str(t.assignee) || undefined }));
-          const summary = `${plural(rows.length, 'agent')} on the floor, ${doing.length} in progress, ${blocked.length} blocked.`;
+          const waiting = tasks.filter((t) => str(t.status) === 'waiting').map((t) => ({ title: str(t.title), owner: str(t.assignee) || undefined, waitingOn: str(t.waitingOn) || undefined }));
+          const summary = `${plural(rows.length, 'agent')} on the floor, ${doing.length} in progress, ${waiting.length} waiting on someone, ${blocked.length} blocked.`;
           // Flagged JSON per the Realtime prompting guidance: precise fields the
           // model can quote verbatim, with the spoken line separate.
-          return `${summary} DATA: ${JSON.stringify({ agents: rows, doing, blocked })}`;
+          return `${summary} DATA: ${JSON.stringify({ agents: rows, doing, waiting, blocked })}`;
         }, 'floor state')
     }),
 
@@ -644,11 +647,13 @@ export async function realtimeSessionSummary(): Promise<string> {
     });
     const list = Array.isArray(obj(tasksRaw).tasks) ? (obj(tasksRaw).tasks as unknown[]).map(obj) : [];
     const doing = list.filter((t) => str(t.status) === 'doing');
+    const waiting = list.filter((t) => str(t.status) === 'waiting');
     const blocked = list.filter((t) => str(t.status) === 'blocked');
     const taskLine = [
       doing.length
         ? `In progress: ${doing.slice(0, 5).map((t) => `"${str(t.title)}"${str(t.assignee) ? ` with ${str(t.assignee)}` : ''}`).join('; ')}.`
         : 'Nothing is in progress on the board.',
+      waiting.length ? `Waiting: ${waiting.slice(0, 4).map((t) => `"${str(t.title)}"${str(t.waitingOn) ? ` on ${clip(str(t.waitingOn), 40)}` : ''}`).join('; ')}.` : '',
       blocked.length ? `Blocked: ${blocked.slice(0, 4).map((t) => `"${str(t.title)}"`).join('; ')}.` : ''
     ].filter(Boolean).join(' ');
     return (

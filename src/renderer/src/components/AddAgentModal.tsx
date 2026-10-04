@@ -24,11 +24,17 @@ import {
 } from '@/store/config';
 import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole } from '@shared/agentRole';
+import { FIRST_TASK_EDITED_MAX } from '@shared/firstTask';
 import { teamAccent } from '@shared/teamPlan';
 import { mailboxHolder } from '@shared/mailboxes';
+import { connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
 import { Select } from './triggers/ui';
 import {
   NEW_JOB_KEY,
+  cloneCharacter,
+  firstFreeCharacter,
+  freeGroupsFirst,
+  newJobStart,
   activeTeam,
   appendOnce,
   bindingLines,
@@ -45,11 +51,12 @@ import {
   type HireJob,
   type JobProfile
 } from '@shared/hireTemplates';
-import { plainFallback } from '@shared/workStyleText';
+import { firstTaskSection, roleLabel, plainFallback } from '@shared/workStyleText';
 import { useRtl } from '@/i18n/useDirection';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { SHOW_IMPORT_HIRE, SHOW_ENGINE_PICKER } from '@shared/buildFeatures';
 import { seedStarterJobs } from '@/shell/seedStarterJobs';
+import { sendTypedFirstTask } from '@/shell/typedFirstTask';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -115,7 +122,10 @@ function uniqueId(name: string): string {
 const TOPIC_MAX = 120;
 
 /** A binding that makes an overlapping job particular (D6). */
-interface Binding { scope: string; mailboxId?: string; others: string[] }
+/** `connectorKey`: a connection binding (owner, 2026-10-03: "his only access
+ *  would be to HubSpot"). The hire is given that one Claude connector before
+ *  it starts, and holds no other. */
+interface Binding { scope: string; mailboxId?: string; connectorKey?: string; others: string[] }
 
 export interface AddAgentModalProps {
   onClose: () => void;
@@ -180,13 +190,28 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const command = commandEdit ?? buildSpawnCommand(config, model, provider);
 
   // ── Who ──
+  // People already on the team, Michael included: their tiles are greyed with
+  // "Clone" instead (owner, 2026-10-03: no second Dwight, and a calmer grid).
+  const onTeam = useMemo(() => new Set(agents.filter((a) => !a.archived && a.character).map((a) => a.character as string)), [agents]);
+  const castGroups = CAST_GROUPS.map((g) => g.members as string[]);
   const firstCharacter = pendingHire?.character
     ? knownCharacter(pendingHire.character)
-    : (characterForName(pendingHire?.name ?? '') ?? DEFAULT_CHARACTER);
+    : (characterForName(pendingHire?.name ?? '') ?? (firstFreeCharacter(DEFAULT_CHARACTER, onTeam, castGroups) as OfficeCharacterName));
   const [step, setStep] = useState<Step>(pendingHire ? 'role' : 'who');
   const [character, setCharacter] = useState<OfficeCharacterName>(firstCharacter);
   const [name, setName] = useState(pendingHire?.name ?? CAST_BY_NAME[firstCharacter].displayName);
   const [hireMeta, setHireMeta] = useState<HireManifest | null>(pendingHire ?? null);
+  /** The teammate whose job is being cloned, by agent id. */
+  const [cloneOf, setCloneOf] = useState<string | null>(null);
+  const cloneFrom = (of: OfficeCharacterName): void => {
+    const mate = team.find((a) => a.character === of);
+    const next = cloneCharacter(of, onTeam, castGroups) as OfficeCharacterName | null;
+    if (!mate || !next) return;
+    setCharacter(next);
+    setName(CAST_BY_NAME[next].displayName);
+    setCloneOf(mate.id);
+    setJobKey(`team:${mate.id}`);
+  };
 
   // ── Job ──
   const [cards, setCards] = useState<HireJob[]>([]);
@@ -198,7 +223,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     return () => { alive = false; };
   }, [config.businessType, business]);
   const officeJobs = useMemo(() => teamJobs(team, cards), [team, cards]);
-  const theirJob = useMemo(() => ownJob(character, officeJobs, cards), [character, officeJobs, cards]);
+  // A clone's own job is the teammate's it copies.
+  const theirJob = useMemo(
+    () => (cloneOf && officeJobs.find((j) => j.key === `team:${cloneOf}`)) || ownJob(character, officeJobs, cards),
+    [character, officeJobs, cards, cloneOf]
+  );
   // Every job list opens on the character's own family, office and packs alike;
   // "show all jobs" opens the rest (owner, 2026-09-27). A character with no
   // family shows everything.
@@ -229,19 +258,78 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   // plain description (`workStyle`); the agent gets instructions written from
   // it at Hire. `baseInstructions` are the copied job's instructions, used as
   // they are when the owner leaves the description unchanged.
-  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, pendingHire.name) : '');
+  const [workStyle, setWorkStyle] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, roleLabel(splitAgentRole(pendingHire.description).role)) : '');
   const [baseInstructions, setBaseInstructions] = useState(pendingHire?.goal ?? '');
-  const [plainOfBase, setPlainOfBase] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, pendingHire.name) : '');
+  const [plainOfBase, setPlainOfBase] = useState(pendingHire?.goal ? plainFallback(pendingHire.goal, roleLabel(splitAgentRole(pendingHire.description).role)) : '');
   const [describing, setDescribing] = useState(false);
+  // "Suggest me" (owner, 2026-10-03): a first work style written from the
+  // role, what they handle, the business and the team, for the owner to edit.
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestFailed, setSuggestFailed] = useState(false);
   const [writingInstructions, setWritingInstructions] = useState(false);
   const describeSeq = useRef(0);
   const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business, manager: godName });
+  // The run being written, with the text it replaces, so Stop puts it back.
+  const suggestRun = useRef<{ id: string; before: string } | null>(null);
+  const suggestWorkStyle = async (): Promise<void> => {
+    if (suggesting || !routing.trim()) return;
+    if (workStyle.trim() && !window.confirm(tr('addAgent.wizard.suggestReplace', { name: name.trim() }))) return;
+    // A suggestion replaces the description, so a rewrite still on its way
+    // from the picked job must not land on top of it.
+    describeSeq.current++;
+    setDescribing(false);
+    setSuggestFailed(false);
+    setSuggesting(true);
+    const id = `suggest-${crypto.randomUUID()}`;
+    const before = workStyle;
+    suggestRun.current = { id, before };
+    // The draft streams into the field as it is written (owner, 2026-10-03:
+    // "the user has no clue if it is still working").
+    const off = window.cth.onWorkStyleSuggestText?.((e) => {
+      if (e.requestId === id && suggestRun.current?.id === id) setWorkStyle(e.text);
+    });
+    try {
+      const res = await window.cth.workStyleSuggest({
+        requestId: id,
+        ctx: styleCtx(),
+        handles: routing.trim(),
+        businessType: cards.find((c) => c.sourceCard?.startsWith(`${config.businessType}/`))?.business,
+        team: team.map((a) => { const r = splitAgentRole(a.description); return { name: a.name, title: r.role || undefined, handles: r.roleDescription || undefined }; })
+      });
+      if (suggestRun.current?.id !== id) return; // stopped
+      const text = res?.text?.trim();
+      if (!text) { setWorkStyle(before); if (!res?.cancelled) setSuggestFailed(true); return; }
+      setWorkStyle(text);
+      // It is the owner's new description, not an edit of the picked job's
+      // instructions: Hire writes the instructions from it alone.
+      setBaseInstructions('');
+      setPlainOfBase('');
+    } catch {
+      // Whatever went wrong, the field and the button come back.
+      if (suggestRun.current?.id === id) { setWorkStyle(before); setSuggestFailed(true); }
+    } finally {
+      off?.();
+      if (suggestRun.current?.id === id) suggestRun.current = null;
+      setSuggesting(false);
+    }
+  };
+  /** Stop: the session ends and the field goes back to what it held. */
+  const stopSuggest = (): void => {
+    const run = suggestRun.current;
+    if (!run) return;
+    suggestRun.current = null;
+    void window.cth.workStyleSuggestStop?.(run.id)?.catch(() => undefined);
+    setWorkStyle(run.before);
+    setSuggesting(false);
+  };
+  // Closing the wizard mid suggestion stops it.
+  useEffect(() => () => { const run = suggestRun.current; if (run) void window.cth.workStyleSuggestStop?.(run.id)?.catch(() => undefined); }, []);
   /** Show a job's instructions as a plain description: the quick rewrite at
    *  once, the model's when it arrives, unless the owner has started typing. */
   const setInstructions = (instructions: string, forName = name.trim(), forTitle = title.trim()): void => {
     const seq = ++describeSeq.current;
     setBaseInstructions(instructions);
-    const quick = instructions.trim() ? plainFallback(instructions, forName) : '';
+    const quick = instructions.trim() ? plainFallback(instructions, roleLabel(forTitle)) : '';
     setWorkStyle(quick);
     setPlainOfBase(quick);
     if (!instructions.trim()) { setDescribing(false); return; }
@@ -258,13 +346,15 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [sourceCard, setSourceCard] = useState<string | undefined>(undefined);
   const applied = useRef<string | null>(pendingHire ? 'manifest' : null);
   const applyJob = (): void => {
-    const sig = `${chosenKey}|${name.trim()}`;
+    const sig = `${chosenKey}|${name.trim()}|${character}`;
     if (applied.current === sig) return;
     // A queued hire keeps its manifest's job until the owner picks another.
     if (applied.current === 'manifest' && jobKey === null) return;
     applied.current = sig;
     setBinding(null);
-    if (!chosenJob) { setTitle(''); setRouting(''); setInstructions(''); setSourceCard(undefined); return; }
+    // A new job keeps the picked character's role (Creed: Quality Control),
+    // for the owner to change.
+    if (!chosenJob) { setTitle(newJobStart(character).title); setRouting(''); setInstructions(''); setSourceCard(undefined); return; }
     const copy = jobFor(chosenJob, name.trim());
     setTitle(copy.title);
     setRouting(copy.routing);
@@ -280,7 +370,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const cwd = customCwd ?? (michaelFolder && safeFolder(folderName) ? joinPath(michaelFolder, safeFolder(folderName)) : '');
   const suggestFolder = async (): Promise<void> => {
     if (!michaelFolder) return;
-    const base = safeFolder(chosenJob?.folder ?? title) || safeFolder(name);
+    const base = safeFolder(chosenJob?.folder ?? (title.trim() === newJobStart(character).title ? newJobStart(character).folder : undefined) ?? title) || safeFolder(name);
     const n = name.trim();
     const candidates = [base, `${base}_${n}`, ...Array.from({ length: 8 }, (_, i) => `${base}_${n}_${i + 2}`)];
     const onDisk = await window.cth.foldersExist(michaelFolder, candidates).catch(() => ({} as Record<string, boolean>));
@@ -316,44 +406,107 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const checkSeq = useRef(0);
   const ruleOverlaps = overlapsByRules(profile, teamProfiles);
   const verdict = check && check.sig === checkSig ? check.verdict : null;
-  const runCheck = async (): Promise<DistinctVerdict | null> => {
+  // The hidden session behind the check still running, stopped once nobody
+  // will read its answer (ship review: superseded checks kept running).
+  const checkRun = useRef<string | null>(null);
+  const stopCheckRun = (): void => {
+    if (checkRun.current) void window.cth.hireCheckStop?.(checkRun.current).catch(() => undefined);
+    checkRun.current = null;
+  };
+  useEffect(() => () => stopCheckRun(), []);
+  // `job` and `sig` default to the form; the job step passes the picked job's
+  // text instead, so its check can start before Review opens.
+  const runCheck = async (job: JobProfile = profile, sig = checkSig): Promise<DistinctVerdict | null> => {
     const seq = ++checkSeq.current;
-    const sig = checkSig;
+    stopCheckRun();
+    const run = `check-${crypto.randomUUID()}`;
+    checkRun.current = run;
     setChecking(true);
     try {
-      const v = await window.cth.hireCheckDistinct(profile, teamProfiles);
+      const v = await window.cth.hireCheckDistinct(job, teamProfiles, run);
+      if (checkRun.current === run) checkRun.current = null;
       if (seq !== checkSeq.current) return null;
       setCheck({ sig, verdict: v });
       return v;
     } catch {
-      const v: DistinctVerdict = { distinct: ruleOverlaps.length === 0, overlapsWith: ruleOverlaps, why: '', source: 'rules' };
+      const overlaps = overlapsByRules(job, teamProfiles);
+      const v: DistinctVerdict = { distinct: overlaps.length === 0, overlapsWith: overlaps, why: '', source: 'rules' };
       if (seq === checkSeq.current) setCheck({ sig, verdict: v });
       return v;
     } finally {
       if (seq === checkSeq.current) setChecking(false);
     }
   };
-  // Run once when Review opens with a job to check.
+  // Run once when Review opens with a job to check: the check judges what to
+  // send, so a title alone (a new job keeps the character's role) is nothing to
+  // check yet.
   useEffect(() => {
-    if (step === 'role' && profile.name && (profile.title || profile.routing) && !verdict && !checking) void runCheck();
+    if (step === 'role' && profile.name && profile.routing && !verdict && !checking) void runCheck();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
+  // Going back to pick another person or job drops a check still running: its
+  // answer is for a job that is no longer on the form, and it must not keep
+  // Review showing "checking" (owner, 2026-10-03).
+  const prefetchSig = useRef('');
+  useEffect(() => {
+    if (step === 'who' || step === 'job') {
+      checkSeq.current++; stopCheckRun(); setChecking(false); prefetchSig.current = '';
+      // A suggestion still streaming was for the job left behind: end it, and
+      // leave the field to the job picked next (ship review pass 3).
+      const run = suggestRun.current;
+      if (run) { suggestRun.current = null; void window.cth.workStyleSuggestStop?.(run.id)?.catch(() => undefined); setSuggesting(false); }
+    }
+  }, [step]);
+  // The check starts as soon as a job is picked on the job step (owner,
+  // 2026-10-03: waiting for it on Review was slow), with the same name and
+  // what they handle that Review will show, so Review reuses the answer or
+  // shows the check already under way. A short pause lets the owner click
+  // through jobs without starting one for each.
+  useEffect(() => {
+    if (step !== 'job' || !chosenJob || !name.trim()) return;
+    const copy = jobFor(chosenJob, name.trim());
+    const job: JobProfile = { name: name.trim(), title: copy.title.trim(), routing: copy.routing.trim(), workStyle: copy.workStyle };
+    if (!job.routing) return;
+    const sig = `${job.name}\n${job.routing}`;
+    if (check?.sig === sig || prefetchSig.current === sig) return;
+    const timer = window.setTimeout(() => { prefetchSig.current = sig; void runCheck(job, sig); }, 400);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, chosenKey, name]);
+
   // The instant rules always count, live on every edit, so a job whose what to
   // send reads like a teammate's is flagged even before or after the AI check.
   const overlapNames = [...new Set([...(verdict?.overlapsWith ?? []), ...ruleOverlaps])];
   const cleared = !!verdict && (overlapNames.length === 0 || !!binding);
 
-  const [bindMode, setBindMode] = useState<'mailbox' | 'topic' | null>(null);
+  const [bindMode, setBindMode] = useState<'mailbox' | 'topic' | 'connection' | null>(null);
   const [topic, setTopic] = useState('');
   const [bindMailbox, setBindMailbox] = useState('');
   const freeMailboxes = mailboxes.filter((m) => !mailboxHolder(config.agentCapabilities, m.id));
-  const applyBinding = (scope: string, mailboxId?: string): void => {
+  // Every connector on the owner's Claude account is listed (owner, 2026-10-03:
+  // "do not let system decide which connector make available ... nothing
+  // should be hidden"). Those switched on can be bound; those switched off
+  // show greyed with where to turn them on. A binding grants its most
+  // restrictive access: QuickBooks read only.
+  const bindConnectors = (config.claudeConnectors?.list ?? [])
+    .map((c) => ({ key: c.key, on: connectorOn(config, c.key), signIn: c.status === 'needs-sign-in' }))
+    .sort((a, b) => Number(b.on) - Number(a.on));
+  const [bindConnector, setBindConnector] = useState('');
+  const [connectionScope, setConnectionScope] = useState('');
+  const pickConnector = (key: string): void => {
+    setBindConnector(key);
+    setConnectionScope(key ? tr('addAgent.wizard.connectionScope', { name: key }) : '');
+  };
+  const applyBinding = (scope: string, mailboxId?: string, connectorKey?: string): void => {
     const s = scope.trim().slice(0, TOPIC_MAX);
     if (!s) return;
     const lines = bindingLines(s, name.trim());
     setRouting((r) => appendOnce(binding ? r.replace(bindingLines(binding.scope, name.trim()).own, '').trim() : r, lines.own));
-    setBinding({ scope: s, mailboxId, others: overlapNames });
+    setBinding({ scope: s, mailboxId, connectorKey, others: overlapNames });
     setBindMode(null);
+    // The overlap is resolved: an "overlaps a teammate" message from an earlier
+    // Next no longer applies (owner, 2026-10-03: it stayed after binding).
+    setError(undefined);
   };
   const clearBinding = (): void => {
     if (binding) setRouting((r) => r.replace(bindingLines(binding.scope, name.trim()).own, '').trim());
@@ -423,10 +576,13 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const nameTaken = (n: string) => agents.some((a) => a.name.trim().toLowerCase() === n.trim().toLowerCase());
   const whoError = !name.trim() ? tr('addAgent.errName') : nameTaken(name) ? tr('addAgent.wizard.nameTaken', { name: name.trim() }) : undefined;
 
-  /** The role step's gate: a name, a role, and a job that is distinct from
-   *  every teammate's or bound to its own mailbox or topic (D6). */
+  /** The role step's gate: a name, what they handle, and a job that is
+   *  distinct from every teammate's or bound to its own mailbox, topic or
+   *  connection (D6). */
   const roleReady = async (): Promise<boolean> => {
-    if (!title.trim() && !routing.trim()) { setError(tr('addAgent.wizard.errJob', { name: name.trim() })); return false; }
+    // What they handle is what the check judges and what Michael routes by, so
+    // there is nothing to check, or to hire, without it (owner, 2026-10-03).
+    if (!routing.trim()) { setError(tr('addAgent.wizard.errJob', { name: name.trim(), godName })); return false; }
     let v = verdict;
     if (!v) v = await runCheck();
     if (!v) return false;
@@ -481,6 +637,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     // description as it was, else written from the description, to the house
     // prompting guidelines (owner, 2026-09-27).
     let goal = baseInstructions.trim();
+    // What the owner typed under "First task", which the instructions leave out.
+    const typedFirstTask = firstTaskSection(workStyle)?.body.trim().slice(0, FIRST_TASK_EDITED_MAX) || '';
     if (!goal || workStyle.trim() !== plainOfBase.trim()) {
       setWritingInstructions(true);
       const res = await window.cth.workStyleConvert({ to: 'instructions', text: workStyle, ctx: styleCtx(), previous: baseInstructions || undefined })
@@ -502,15 +660,31 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     const id = uniqueId(name);
     const ptyId = `pty-${id}`;
     const description = hireRole(title, routing);
+    // Give back what a binding granted (a mailbox, a connector) when the hire fails.
+    const releaseBindingAccess = (): void => {
+      if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
+      if (binding?.connectorKey) {
+        void (isQuickBooksKey(binding.connectorKey)
+          ? window.cth.quickbooksSetAccess(id, { enabled: false, changes: false })
+          : window.cth.connectorsSetGrant(id, binding.connectorKey, false)).catch(() => undefined);
+      }
+    };
     // A mailbox binding is set before the spawn, so the agent starts with it.
     if (binding?.mailboxId) {
       const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false } }).catch(() => null);
       if (!res?.ok) { setBusy(false); setError(tr('capabilities.saveFailed')); return; }
     }
+    // So is a connection binding: the agent starts holding that one connector.
+    if (binding?.connectorKey) {
+      const res = await (isQuickBooksKey(binding.connectorKey)
+        ? window.cth.quickbooksSetAccess(id, { enabled: true, changes: false })
+        : window.cth.connectorsSetGrant(id, binding.connectorKey, true)).catch(() => null);
+      if (!res?.ok) {
+        releaseBindingAccess();
+        setBusy(false); setError(tr('capabilities.saveFailed')); return;
+      }
+    }
     const [exe, ...args] = tokenizeCommand(command.trim());
-    const giveBackMailbox = (): void => {
-      if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
-    };
     const spawnRes = await window.cth.spawnPty({
       id: ptyId,
       cwd,
@@ -531,8 +705,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       }
     }).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e), cwd: undefined, seedPrompt: undefined }));
     if (!spawnRes.ok) {
-      // Give back a mailbox the failed hire was holding.
-      giveBackMailbox();
+      // Give back what the failed hire was holding.
+      releaseBindingAccess();
       setBusy(false);
       setError(spawnRes.error ?? 'spawn failed');
       return;
@@ -561,8 +735,15 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
       recentTextTs: Date.now()
     };
     addAgent(agent);
-    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03).
+    // The card's starter jobs, each with its focus area (inbox zero, 2026-10-03),
+    // and its first task as a card Michael hands out (first-task-card.md).
     void seedStarterJobs(sourceCard, id);
+    // A First task the owner typed into the Work style is one-time work: it
+    // becomes this hire's first task card (ship review SR5), in place of the
+    // pack's. Otherwise only a job taken straight from a pack card sends its
+    // first task: a clone copies the teammate's job, not their one-time work (SR1).
+    if (typedFirstTask) void sendTypedFirstTask(sourceCard, id, name.trim(), { ask: typedFirstTask, role: title.trim(), existing: false });
+    else if (sourceCard && chosenJob?.source === 'card') void window.cth.hiveFirstTask(sourceCard, id, name.trim()).catch(() => undefined);
     // A binding hands the bound work back from every overlapping teammate:
     // their line gains "Not for ...; that goes to <Name>." (D6).
     if (binding) {
@@ -649,7 +830,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               {step === 'role' && checking ? tr('addAgent.wizard.checking') : tr('addAgent.wizard.next')}
             </PixelButton>
           ) : (
-            <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || !workStyle.trim()}>
+            <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || suggesting || !workStyle.trim()}>
               {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
             </PixelButton>
           )}
@@ -742,15 +923,47 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
               <Row label={tr('addAgent.character')}>
                 {/* Grouped by each character's job in the show (owner, 2026-09-27). */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 20, rowGap: 12, alignItems: 'flex-start' }}>
-                  {CAST_GROUPS.map((g) => (
+                  {/* Departments with someone free come first; those whose people are
+                      all on the team move to the end (owner, 2026-10-03). */}
+                  {freeGroupsFirst(CAST_GROUPS, onTeam).map((g) => (
                     <div key={g.key} role="group" aria-label={tr(`addAgent.castGroup.${g.key}`)} style={{ flex: '0 0 auto' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)', marginBottom: 6 }}>{tr(`addAgent.castGroup.${g.key}`)}</div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {g.members.map((m) => CAST_BY_NAME[m]).map((c) => (
+                        {g.members.map((m) => CAST_BY_NAME[m]).map((c) => onTeam.has(c.name) ? (
+                          <div
+                            key={c.name}
+                            title={tr('addAgent.wizard.onTeam', { name: c.displayName })}
+                            style={{
+                              padding: '8px 4px 7px', borderRadius: 'var(--cth-r-lg)', background: 'var(--cth-card)',
+                              boxShadow: 'inset 0 0 0 1px var(--cth-line)', display: 'flex', flexDirection: 'column',
+                              alignItems: 'center', gap: 3, width: 78, fontFamily: 'var(--cth-font-ui)'
+                            }}
+                          >
+                            {/* Faded portrait, readable name: the name stays at ink-3, not
+                                at 40% (ship review 2026-10-03: about 2.4:1 before). */}
+                            <span style={{ opacity: 0.4, display: 'flex' }}><SpritePortrait character={c.name} scale={1.5} /></span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-3)' }}>{c.displayName}</span>
+                            {c.name === 'michael' ? (
+                              <span style={{ fontSize: 11, lineHeight: '13px', color: 'var(--cth-ink-3)' }}>{tr('addAgent.wizard.onTeamShort')}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => cloneFrom(c.name)}
+                                disabled={!cloneCharacter(c.name, onTeam, castGroups)}
+                                title={cloneCharacter(c.name, onTeam, castGroups) ? undefined : tr('addAgent.wizard.cloneNoneFree')}
+                                aria-label={tr('addAgent.wizard.cloneAria', { name: c.displayName })}
+                                style={{
+                                  ...linkStyle, fontSize: 11, lineHeight: '13px',
+                                  ...(cloneCharacter(c.name, onTeam, castGroups) ? {} : { color: 'var(--cth-ink-4)', textDecoration: 'none', cursor: 'default' })
+                                }}
+                              >{tr('addAgent.wizard.clone')}</button>
+                            )}
+                          </div>
+                        ) : (
                           <button
                             key={c.name}
                             type="button"
-                            onClick={() => { setCharacter(c.name); setName(c.displayName); setJobKey(null); }}
+                            onClick={() => { setCharacter(c.name); setName(c.displayName); setJobKey(null); setCloneOf(null); }}
                             title={c.blurb}
                             aria-pressed={character === c.name}
                             style={{
@@ -779,12 +992,14 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                     const next = e.target.value;
                     setName(next);
                     const match = characterForName(next);
-                    if (match) { setCharacter(match); setJobKey(null); }
+                    // A teammate's name never picks their greyed tile.
+                    if (match && !onTeam.has(match)) { setCharacter(match); setJobKey(null); setCloneOf(null); }
                   }}
                   placeholder={tr('addAgent.namePlaceholder')}
                   className="cth-input" style={inputStyle}
                 />
                 {name.trim() && nameTaken(name) && <span role="alert" style={helperStyle}>{tr('addAgent.wizard.nameTaken', { name: name.trim() })}</span>}
+                {cloneOf && <span style={helperStyle}>{tr('addAgent.wizard.cloning', { name: name.trim() || CAST_BY_NAME[character].displayName, mate: team.find((a) => a.id === cloneOf)?.name ?? '' })}</span>}
               </Row>
             </>
           )}
@@ -855,7 +1070,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 <textarea
                   dir={rtl ? 'auto' : undefined}
                   value={routing}
-                  onChange={(e) => setRouting(e.target.value)}
+                  onChange={(e) => { setRouting(e.target.value); setError(undefined); }}
                   placeholder={tr('addAgent.roleDescriptionPlaceholder')}
                   rows={3}
                   className="cth-input" style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
@@ -879,6 +1094,12 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 setTopic={setTopic}
                 onBindMailbox={() => { const a = mailboxAddress(bindMailbox); if (a) applyBinding(tr('addAgent.wizard.mailboxScope', { address: a }), bindMailbox); }}
                 onBindTopic={() => applyBinding(topic)}
+                bindConnectors={bindConnectors}
+                bindConnector={bindConnector}
+                setBindConnector={pickConnector}
+                connectionScope={connectionScope}
+                setConnectionScope={setConnectionScope}
+                onBindConnection={() => { if (bindConnector && bindConnectors.some((c) => c.key === bindConnector && c.on)) applyBinding(connectionScope, undefined, bindConnector); }}
                 onClearBinding={clearBinding}
               />
             </>
@@ -900,12 +1121,28 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 <textarea
                   dir={rtl ? 'auto' : undefined}
                   value={workStyle}
+                  readOnly={suggesting}
+                  aria-busy={suggesting}
                   onChange={(e) => { describeSeq.current++; setDescribing(false); setWorkStyle(e.target.value); }}
                   placeholder={tr('addAgent.wizard.workStylePlaceholder', { name: name.trim() })}
                   rows={7}
                   className="cth-input" style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'vertical' }}
                 />
                 {describing && <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.describing')}</span>}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {suggesting ? (
+                    <>
+                      <span aria-live="polite" style={helperStyle}>{tr('addAgent.wizard.suggesting', { name: name.trim() })}</span>
+                      <PixelButton variant="secondary" size="sm" onClick={stopSuggest}>{tr('addAgent.wizard.suggestStop')}</PixelButton>
+                    </>
+                  ) : (
+                    <PixelButton variant="secondary" size="sm" onClick={() => { void suggestWorkStyle(); }} disabled={busy || !routing.trim()}
+                      title={!routing.trim() ? tr('addAgent.wizard.suggestNeedsHandles', { name: name.trim() || CAST_BY_NAME[character].displayName }) : undefined}>
+                      {tr('addAgent.wizard.suggest')}
+                    </PixelButton>
+                  )}
+                  {suggestFailed && <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-2)' }}>{tr('addAgent.wizard.suggestFailed')}</span>}
+                </div>
               </Row>
 
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -1095,8 +1332,8 @@ interface DistinctBoxProps {
   name: string;
   team: Agent[];
   onRecheck: () => void;
-  bindMode: 'mailbox' | 'topic' | null;
-  setBindMode: (m: 'mailbox' | 'topic' | null) => void;
+  bindMode: 'mailbox' | 'topic' | 'connection' | null;
+  setBindMode: (m: 'mailbox' | 'topic' | 'connection' | null) => void;
   freeMailboxes: Array<{ id: string; address: string }>;
   bindMailbox: string;
   setBindMailbox: (id: string) => void;
@@ -1104,6 +1341,13 @@ interface DistinctBoxProps {
   setTopic: (t: string) => void;
   onBindMailbox: () => void;
   onBindTopic: () => void;
+  /** Every connector on the Claude account; only those switched on can be bound. */
+  bindConnectors: Array<{ key: string; on: boolean; signIn: boolean }>;
+  bindConnector: string;
+  setBindConnector: (key: string) => void;
+  connectionScope: string;
+  setConnectionScope: (s: string) => void;
+  onBindConnection: () => void;
   onClearBinding: () => void;
 }
 
@@ -1144,6 +1388,7 @@ function DistinctBox(p: DistinctBoxProps) {
       {p.binding ? (
         <>
           <span>{t('addAgent.wizard.boundTo', { name: p.name, scope: p.binding.scope })}</span>
+          {p.binding.connectorKey && <span>{t(isQuickBooksKey(p.binding.connectorKey) ? 'addAgent.wizard.boundConnectionReadOnly' : 'addAgent.wizard.boundConnection', { name: p.name, connector: p.binding.connectorKey })}</span>}
           {p.team.filter((m) => p.binding!.others.includes(m.name)).map((m) => (
             <span key={m.id} style={helperStyle}>{t('addAgent.wizard.otherLine', { name: m.name, line: others })}</span>
           ))}
@@ -1154,8 +1399,9 @@ function DistinctBox(p: DistinctBoxProps) {
           <span>{t('addAgent.wizard.makeParticular', { name: p.name })}</span>
           {p.verdict?.suggestion && <span style={helperStyle}>{t('addAgent.wizard.suggestion', { text: p.verdict.suggestion })}</span>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => p.setBindMode('mailbox')} style={chip(p.bindMode === 'mailbox')} disabled={p.freeMailboxes.length === 0} title={p.freeMailboxes.length === 0 ? t('addAgent.wizard.noFreeMailbox') : undefined}>{t('addAgent.wizard.bindMailbox')}</button>
+            <button type="button" onClick={() => p.setBindMode('mailbox')} style={chip(p.bindMode === 'mailbox', p.freeMailboxes.length === 0)} disabled={p.freeMailboxes.length === 0} title={p.freeMailboxes.length === 0 ? t('addAgent.wizard.noFreeMailbox') : undefined}>{t('addAgent.wizard.bindMailbox')}</button>
             <button type="button" onClick={() => p.setBindMode('topic')} style={chip(p.bindMode === 'topic')}>{t('addAgent.wizard.bindTopic')}</button>
+            <button type="button" onClick={() => p.setBindMode('connection')} style={chip(p.bindMode === 'connection', p.bindConnectors.length === 0)} disabled={p.bindConnectors.length === 0} title={p.bindConnectors.length === 0 ? t('addAgent.wizard.noConnection') : undefined}>{t('addAgent.wizard.bindConnection')}</button>
             <button type="button" onClick={p.onRecheck} style={chip(false)}>{t('addAgent.wizard.checkAgain')}</button>
           </div>
           {p.bindMode === 'mailbox' && (
@@ -1165,6 +1411,20 @@ function DistinctBox(p: DistinctBoxProps) {
                 {p.freeMailboxes.map((m) => <option key={m.id} value={m.id}>{m.address}</option>)}
               </select>
               <PixelButton variant="secondary" size="sm" onClick={p.onBindMailbox} disabled={!p.bindMailbox}>{t('addAgent.wizard.bind')}</PixelButton>
+            </div>
+          )}
+          {p.bindMode === 'connection' && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={p.bindConnector} onChange={(e) => p.setBindConnector(e.target.value)} aria-label={t('addAgent.wizard.bindConnection')} className="cth-input" style={{ ...inputStyle, width: 'auto' }}>
+                <option value="">{t('addAgent.wizard.pickConnection')}</option>
+                {p.bindConnectors.map((c) => (
+                  <option key={c.key} value={c.key} disabled={!c.on}>
+                    {!c.on ? t('addAgent.wizard.connectionOff', { name: c.key }) : c.signIn ? t('addAgent.wizard.connectionSignIn', { name: c.key }) : c.key}
+                  </option>
+                ))}
+              </select>
+              {p.bindConnector && <input value={p.connectionScope} maxLength={TOPIC_MAX} onChange={(e) => p.setConnectionScope(e.target.value)} aria-label={t('addAgent.wizard.connectionScopeLabel', { name: p.name })} placeholder={t('addAgent.wizard.connectionScopeLabel', { name: p.name })} className="cth-input" style={{ ...inputStyle, flex: 1 }} />}
+              <PixelButton variant="secondary" size="sm" onClick={p.onBindConnection} disabled={!p.bindConnector || !p.connectionScope.trim()}>{t('addAgent.wizard.bind')}</PixelButton>
             </div>
           )}
           {p.bindMode === 'topic' && (
@@ -1181,12 +1441,12 @@ function DistinctBox(p: DistinctBoxProps) {
   );
 }
 
-const chip = (active: boolean): CSSProperties => ({
+const chip = (active: boolean, disabled = false): CSSProperties => ({
   height: 28, padding: '0 11px', borderRadius: 999,
   background: active ? 'var(--cth-indigo-soft)' : 'var(--cth-card)',
   boxShadow: active ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-line-2)',
   fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: active ? 600 : 500,
-  color: 'var(--cth-ink)', cursor: 'pointer', border: 'none'
+  color: disabled ? 'var(--cth-ink-4)' : 'var(--cth-ink)', cursor: disabled ? 'default' : 'pointer', border: 'none'
 });
 const chipRow: CSSProperties = { display: 'flex', gap: 4, alignItems: 'baseline', flexWrap: 'wrap', marginTop: 2 };
 const TONE = { paprika: 'coral', mint: 'green', sky: 'blue' } as const;

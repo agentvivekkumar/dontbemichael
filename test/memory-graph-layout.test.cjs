@@ -16,7 +16,7 @@ const nodes = Array.from({ length: 30 }, (_, i) => ({ id: `n${i}`, gravityBias: 
 const edges = nodes.slice(1).map((n) => ({ source: 'n0', target: n.id }));
 
 test('nodes stay clear of the header and legend; a dragged node stays where it was dropped', () => {
-  // Value: protects=no person or topic is hidden under the graph's header or legend; fails_when=forceLayout ignores insetTop/insetBottom in the seed, the centre or the clamp, or a short window yields NaN; why_new=forceLayout had no test and the insets are new; seam=none
+  // Value: protects=no person is hidden under the graph's header or legend; fails_when=forceLayout ignores insetTop/insetBottom in the seed, the centre or the clamp, or a short window yields NaN; why_new=forceLayout had no test and the insets are new; seam=none
   const opts = { width: 600, height: 400, padding: 20, insetTop: 80, insetBottom: 60 };
   const pos = forceLayout(nodes, edges, { ...opts, pinned: { n5: { x: 10, y: 5 } } });
   for (const [id, p] of pos) {

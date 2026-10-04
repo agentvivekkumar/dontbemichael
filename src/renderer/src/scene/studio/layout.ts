@@ -1,8 +1,9 @@
 /**
  * Where everyone sits in the studio (branding/DESIGN.md 8.9): departments, not
  * seats. Each department gets one pod on the ring around Michael's glass pod; a
- * pod holds up to four desks. Past seven departments, or about thirty people,
- * the Office view switches to a compact grid instead of crowding the ring.
+ * pod holds up to four desks. Past nine pods (one for every kind of department),
+ * or 28 people, the Office view switches to a compact grid instead of crowding
+ * the ring.
  */
 import type { DepartmentName } from '@/design/tokens';
 import { OFFICE_ROLES } from '@shared/officeRoles';
@@ -60,7 +61,10 @@ export interface Slot {
   dx: number; gap: number;            // card horizontal offset, and gap to the pod
 }
 
-/** Seven slots around Michael, tuned against the approved reference screen. */
+/** Nine slots around Michael: the seven tuned against the approved reference
+ *  screen, then Operations front left and the team pod front (owner,
+ *  2026-10-03: an eighth department flipped a small office to the grid). The
+ *  two front slots were placed in the studio lab with every card open. */
 const SLOTS: Slot[] = [
   { x: 400, y: 335, mode: 'above', dx: -34, gap: 100 },   // 0 left, near
   { x: 490, y: 245, mode: 'above', dx: -30, gap: 88 },    // 1 back left
@@ -68,14 +72,16 @@ const SLOTS: Slot[] = [
   { x: 765, y: 335, mode: 'above', dx: 66, gap: 74 },     // 3 back right
   { x: 900, y: 460, mode: 'below', dx: -10, gap: 42 },    // 4 right
   { x: 730, y: 540, mode: 'below', dx: 24, gap: 42 },     // 5 front right
-  { x: 270, y: 385, mode: 'above', dx: -30, gap: 80 }     // 6 far left
+  { x: 270, y: 385, mode: 'above', dx: -30, gap: 80 },    // 6 far left
+  { x: 470, y: 590, mode: 'below', dx: -70, gap: 42 },    // 7 front left (operations)
+  { x: 615, y: 615, mode: 'above', dx: -40, gap: 60 }     // 8 front, card toward Michael (team)
 ];
 export const MAX_RING_DEPARTMENTS = SLOTS.length;
 export const MAX_RING_PEOPLE = 28;
 
 /** Each department's preferred slot, so the office looks the same every day. */
 const PREFERRED: Partial<Record<DepartmentName, number>> = {
-  'front-desk': 0, marketing: 1, support: 2, sales: 3, finance: 4, it: 5, people: 6
+  'front-desk': 0, marketing: 1, support: 2, sales: 3, finance: 4, it: 5, people: 6, operations: 7, team: 8
 };
 const ORDER: DepartmentName[] = ['front-desk', 'support', 'sales', 'finance', 'marketing', 'people', 'it', 'operations', 'team'];
 

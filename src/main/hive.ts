@@ -142,7 +142,9 @@ export interface HiveTask {
   title: string;
   description?: string;
   assignee?: string;
-  status: 'todo' | 'doing' | 'blocked' | 'done';
+  status: 'todo' | 'doing' | 'waiting' | 'blocked' | 'done';
+  /** Who a Waiting card waits on, in a few words ("customer Gopi", "Nick"). */
+  waitingOn?: string;
   dependsOn: string[];
   priority: number;
   createdAt: string;
@@ -189,7 +191,7 @@ export const HOUSE_RULES = [
   '3. Keep what you checked apart from what you worked out. Mark estimates and assumptions as estimates and assumptions.',
   '4. Report outcomes as they are: what is done and checked, what failed and why, and what you skipped. Call work finished only when it is.',
   '5. Use real people, customers, quotes and messages only. Make up an example only when the owner asks for a sample, and label it as one.',
-  '6. When your instructions or a request ask for something your tools cannot do, because no tool does it or a tool refuses, report it instead of skipping it: what you could not do, for which task, and why. A team member tells Michael; Michael tells the owner on the Ask me board. Do not work around a missing or refused tool. Your instructions can describe work you have no tool for, so check before you call that step done.'
+  '6. When your instructions or a request ask for something your tools cannot do, because no tool does it or a tool refuses, report it instead of skipping it: what you could not do, for which task, and why. A team member tells Michael; Michael tells the owner on the Ask me board. Do not work around a missing or refused tool. Your instructions can describe work you have no tool for, so check before you call that step done. Say what the tool did or refused; offer the owner a setting or a fix only when a tool result or your instructions name it, because a guessed setting sends the owner looking for something that is not there.'
 ].join('\n');
 
 /**
@@ -289,7 +291,7 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     'A card ends only as Done: with a "result" when the work is finished, or, when the owner decides to stop it (an answer such as "drop it"), with "closedBy": "owner" and a "closedReason" in the owner\'s words, so the board shows it was their call. Never delete a card. When the owner closes or moves a card themselves, you get a note saying so: tell whoever has it and route the work to match.',
     '',
     '## Keeping the task board accurate',
-    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Keep the card\'s "notes" to what the work is and where it stands, in a few plain sentences the owner can read: the owner sees them when they open the card. Move cards between todo, doing, blocked and done as the work moves, so the board is right whenever the owner looks. A card is "blocked" only while its question for the owner is open on Ask me, because Blocked tells the owner the card waits on them. A card waiting on someone outside the office, or on a team member, is "doing", with who it waits on in its notes. When you close a request from the owner, leave its card in one of these states. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
+    'Record each piece of work as a card. Set its assignee to the team member when you hand the work off and keep it through every status change, because the owner reads the board by who did what. Keep the card\'s "notes" to what the work is and where it stands, in a few plain sentences the owner can read: the owner sees them when they open the card. Move cards between todo, doing, waiting, blocked and done as the work moves, so the board is right whenever the owner looks. A card is "blocked" only while its question for the owner is open on Ask me, because Blocked tells the owner the card waits on them. A card waiting on someone outside the office, or on a team member, is "waiting", with "waitingOn" naming who in a few words (like "customer Gopi" or "Nick"); move it back to "doing" when they answer and the work starts again. "doing" means someone is working on it now. When you close a request from the owner, leave its card in one of these states. You alone edit board.md, the office\'s notes on plans and priorities; team members send you changes.',
     '',
     '## Schedule requests',
     'You manage the office, so you decide the team\'s schedule requests. Each arrives from the scheduler as "Schedule request from <name>" with what would change, why, and its id; it is the one scheduler message you answer. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
@@ -1791,7 +1793,7 @@ export class HiveManager {
       : '';
     const godLine = meta.isGod
       ? 'You are the GOD / ORCHESTRATOR of this hive — your job is to ORCHESTRATE, not to implement: maintain live situational awareness and delegate the work. (1) AWARENESS — always know what is going on: keep an accurate picture of every agent (active vs archived/idle), the task board, and all in-flight work; drain your inbox continually and triage every other agent\'s requests, answering clarifications so the team runs autonomously. (2) DELEGATE — decompose work and fan it out to the hive agents via their inboxes (route messages and assign owners; do not do their jobs); do NOT take on grunt implementation yourself. Stay aware of who is already on the floor and delegate OPPORTUNISTICALLY: BEFORE you spawn anything, CHECK THE LIVE ROSTER (active agents in registry.json + their state in fleet.json) and prefer routing to an EXISTING agent that fits — above all when the request names one ("ask Pam to…", "have Jim…"), route to that agent instead of reflexively creating a new one. Reuse an idle or already-running agent whose role matches; only spawn a fresh agent when no existing one is a sensible fit, and say that you checked. One capable owner beats a duplicate. (3) OWN ONLY THE IMPORTANT, high-leverage things — task decomposition, dispatch decisions, sign-offs, conflict resolution, branch integration, and final QA — and remain the sole scribe of board.md. You are otherwise fully autonomous — there is NO separate approval queue. For the genuinely critical (destructive actions, spending real money, scope changes, unresolvable conflicts), ask the human directly in your own session and let the tool-permission prompt gate the action; the human approves natively, including remotely from their phone via /remote-control. Keep the team unblocked. When you DISPATCH a task, write it as a 4-part contract so the agent can run autonomously: (1) OBJECTIVE — the concrete goal; (2) OUTPUT — the expected deliverable/format; (3) TOOLS — what to use or avoid, and any references to read instead of re-deriving; (4) BOUNDARIES — scope limits + the definition of done. Pass references (file paths, message ids, board sections), not pasted content — keep dispatches short.'
-        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests. A scheduled run carries its job's focus for that run (what to cover at the hourly ops standup comes in its message); re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). Keep the card's "notes" to what the work is and where it stands, in a few plain sentences: the owner reads them when they open the card. HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). When the app tells you a team member is waiting on something in their terminal, you can't answer it there: put it on ASK ME as it says, so the owner answers it in a 1:1. BEFORE YOU ADD AN ASK, read the asks already open on the board (a card whose newest humanQA entry has no "a"). If the new ask changes, replaces or contradicts one of them, do not open a second question: append the new ask to THAT card, because a card's newest ask replaces its older unanswered one, which is then withdrawn and never shown. If one answer settles several cards, ask it once and say on the others which card to answer. WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Give the card a TITLE the owner can read at a glance: a few plain words naming the matter, under 60 characters (e.g. "Refund for Northwind Cafe"), with no ids, dates, mailbox names or bracketed notes; those go in the ask. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives to you as a REQUEST about that card: route the follow-up (redelegate to the same agent or another, or ask the human again), then reply "done" with in_reply_to its id, so work continues; it stays open until you do. A card ends only as done: with a "result" when finished, or with "closedBy": "owner" and a "closedReason" when the owner decides to stop it; never delete a card. A card is "blocked" only while its question for the human is open on ASK ME; a card waiting on someone outside the office or on a teammate is "doing", with who it waits on in its notes. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
+        + ` MONITOR the floor by reading ${inRoot('fleet.json')} (live per-agent tokens, cost, status, last tool, breaker level, inbox backlog) and ${inRoot('registry.json')} — note that running 'claude agents' will NOT list your hive's sibling agents. A full Claude Code command reference is at ${inRoot('COMMANDS.md')} (slash commands act ONLY on your own session; CLI commands run in your shell and can target the fleet). You periodically receive scheduler / "Heartbeat" standup requests. A scheduled run carries its job's focus for that run (what to cover at the hourly ops standup comes in its message); re-engage anyone stalled, over-budget, or breaker-armed, and keep board.md and tasks.json accurate. In tasks.json, ALWAYS set each task's "assignee" to the worker's agent id the moment you dispatch it, and NEVER clear it on status changes — a done card must still say who did the work (the human reads the board by who-did-what). Keep the card's "notes" to what the work is and where it stands, in a few plain sentences: the owner reads them when they open the card. HUMAN FEEDBACK is first-class in the ledger: when a task can only proceed with the human's input — a QUESTION to answer OR an ACTION only the human can perform (create an account, approve a purchase, provide credentials/screenshots, test on their device) — set its status to "blocked" and append the concrete ask to the card's "humanQA" array (push {"q":"...","askedAt":"<iso>","raisedBy":"<agent id>"}; raisedBy is the team member whose work needs the answer, or "god" when you raised it yourself, because the answer goes back to them and into their memory; phrase actions as clear to-dos; keep every past entry — the history documents the card's decisions). When the app tells you a team member is waiting on something in their terminal, you can't answer it there: put it on ASK ME as it says, so the owner answers it in a 1:1. BEFORE YOU ADD AN ASK, read the asks already open on the board (a card whose newest humanQA entry has no "a"). If the new ask changes, replaces or contradicts one of them, do not open a second question: append the new ask to THAT card, because a card's newest ask replaces its older unanswered one, which is then withdrawn and never shown. If one answer settles several cards, ask it once and say on the others which card to answer. WRITE THE ASK SHORT AND IN MARKDOWN. The human reads it on a CARD, not in a terminal, so an ask longer than a short paragraph plus its options (roughly 700 characters) is a report, not a question — cut the narrative, keep the decision. Give the card a TITLE the owner can read at a glance: a few plain words naming the matter, under 60 characters (e.g. "Refund for Northwind Cafe"), with no ids, dates, mailbox names or bracketed notes; those go in the ask. Open with ONE **bold** sentence saying exactly what you need from them; put paths, commands, values and identifiers in \`backticks\`; give each option or step its own "-" bullet or "1." number; leave a blank line between paragraphs (a single newline is a line break, so each option stays on its own line). When the ask originates in another agent's report, REWRITE it into that shape — never paste the report body in as the question, and never make the human read the investigation to find the decision. The harness surfaces open questions on the office floor's ASK ME board; the human's answer lands in the same entry ("a"), goes straight to whoever raised it (and into their memory notes), AND arrives to you as a REQUEST about that card: route the follow-up (redelegate to the same agent or another, or ask the human again), then reply "done" with in_reply_to its id, so work continues; it stays open until you do. A card ends only as done: with a "result" when finished, or with "closedBy": "owner" and a "closedReason" when the owner decides to stop it; never delete a card. A card is "blocked" only while its question for the human is open on ASK ME; a card waiting on someone outside the office or on a teammate is "waiting", with "waitingOn" naming who in a few words (like "customer Gopi" or "Nick"), and goes back to "doing" when they answer. "doing" means someone is working on it now. Do NOT park human questions in separate files (no HumanQuestion.md) and never sit waiting on the human in your own session. Steward the token budget.`
       : meta.isAssistant
       ? `You are ${godNameForPrompt}'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in ${godNameForPrompt}'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that ${godNameForPrompt} can execute autonomously, preserving the user's original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to ${godNameForPrompt}.`
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
@@ -2282,13 +2284,15 @@ export class HiveManager {
    *  owner never moves a card to Blocked: Blocked means a question waits for
    *  them on Ask me, which only Michael raises (ship 2026-10-03). */
   ownerMoveTask(id: string, status: HiveTask['status']): boolean {
-    if (status === 'blocked') return false;
+    // Blocked and Waiting are Michael's: one needs a question on Ask me, the
+    // other who the card waits on.
+    if (status === 'blocked' || status === 'waiting') return false;
     const ledger = this.tasks() as { tasks?: HiveTask[] };
     const card = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id);
     if (!card) return false;
     if (status === 'done') return card.status === 'done' ? true : this.ownerCloseTask(id);
     const from = card.status;
-    if (!this.patchTask(id, { status, closedBy: undefined, closedAt: undefined, closedReason: undefined })) return false;
+    if (!this.patchTask(id, { status, waitingOn: undefined, closedBy: undefined, closedAt: undefined, closedReason: undefined })) return false;
     if (from !== status) this.tellGodOwnerChange(card, { kind: 'moved', from, to: status });
     return true;
   }
@@ -3319,8 +3323,11 @@ export class HiveManager {
    * only when a line's name, role or description does; `statusKey` only when a
    * tag does, so the hook can send the full roster on a team change and a
    * short status line otherwise (hooks.ts).
+   *
+   * @param accessOf what a team member can reach and from which Settings
+   *   screen (agentAccess.ts accessLine), so Michael names the right one.
    */
-  teamRoster(): { full: string; status: string; layoutKey: string; statusKey: string } | null {
+  teamRoster(accessOf?: (agentId: string) => string | null): { full: string; status: string; layoutKey: string; statusKey: string } | null {
     const root = this.root();
     if (!root) return null;
     try {
@@ -3336,7 +3343,8 @@ export class HiveManager {
       const tagged: string[] = [];
       const layout: string[] = [];
       for (const a of team) {
-        const base = `- ${a.name ?? a.id} (${a.id}), ${a.role ?? 'team member'}`;
+        const uses = accessOf?.(a.id);
+        const base = `- ${a.name ?? a.id} (${a.id}), ${a.role ?? 'team member'}${accessOf ? `; uses: ${uses ?? 'no mail or connectors'}` : ''}`;
         layout.push(base);
         const tags: string[] = [];
         const busy = busyOn(a.id);
@@ -3356,12 +3364,47 @@ export class HiveManager {
     } catch { return null; }
   }
 
-  logTail(n = 200): unknown[] {
+  /** The last `n` log entries; with `kind`, the last `n` entries of that kind;
+   *  with `since` (ms), only entries from then on (Who talks to whom reads the
+   *  messages of a time range). The log is in time order, so the scan stops at
+   *  the first older entry. */
+  logTail(n = 200, kind?: string, since?: number): unknown[] {
     const root = this.root();
     if (!root || !existsSync(join(root, 'log.jsonl'))) return [];
-    const lines = readFileSync(join(root, 'log.jsonl'), 'utf8').trim().split('\n').filter(Boolean);
-    return lines.slice(-n).map((l) => { try { return JSON.parse(l); } catch { return { raw: l }; } });
+    // Who talks to whom asks every 5 s. When the log has not changed since the
+    // last read for the same kind and size, a later start is a filter of that
+    // answer (the newest n with ts >= a later time are among the newest n
+    // with ts >= an earlier one), so the file is not read again.
+    const file = join(root, 'log.jsonl');
+    let stamp = '';
+    try { const st = statSync(file); stamp = `${st.size}:${st.mtimeMs}`; } catch { /* read it */ }
+    const c = this.tailCache;
+    if (c && stamp && kind && since !== undefined && c.stamp === stamp && c.kind === kind && c.n === n && c.since <= since) {
+      return c.out.filter((e) => typeof (e as { ts?: unknown }).ts !== 'number' || ((e as { ts: number }).ts >= since));
+    }
+    const lines = readFileSync(file, 'utf8').trim().split('\n').filter(Boolean);
+    const parse = (l: string): unknown => { try { return JSON.parse(l); } catch { return { raw: l }; } };
+    if (!kind && since === undefined) return lines.slice(-n).map(parse);
+    const out: unknown[] = [];
+    const mark = kind ? `"kind":${JSON.stringify(kind)}` : '';
+    for (let i = lines.length - 1; i >= 0 && out.length < n; i--) {
+      // Cheap test first: a line without the kind cannot match, so read only
+      // its time (to stop at the start of the range) and skip the parse.
+      if (mark && !lines[i].includes(mark)) {
+        const ts = since === undefined ? null : /"ts":(\d+)/.exec(lines[i]);
+        if (ts && Number(ts[1]) < (since as number)) break;
+        continue;
+      }
+      const e = parse(lines[i]) as { kind?: unknown; ts?: unknown };
+      if (since !== undefined && typeof e.ts === 'number' && e.ts < since) break;
+      if (!kind || e.kind === kind) out.push(e);
+    }
+    out.reverse();
+    if (stamp && kind && since !== undefined) this.tailCache = { stamp, kind, n, since, out };
+    return out;
   }
+  /** logTail's last ranged answer, reused while log.jsonl is unchanged. */
+  private tailCache: { stamp: string; kind: string; n: number; since: number; out: unknown[] } | null = null;
 
   private listMessages(dir: string): HiveMessage[] {
     if (!existsSync(dir)) return [];
@@ -3436,6 +3479,8 @@ export class HiveManager {
   appendLog(event: Record<string, unknown>): void {
     const root = this.root();
     if (!root) return;
+    // Compact JSON with a top-level numeric ts first: logTail's fast path
+    // reads "kind":"..." and "ts":N straight from the line text.
     const line = JSON.stringify({ ts: Date.now(), ...event }) + '\n';
     try { appendFileSync(join(root, 'log.jsonl'), line, 'utf8'); } catch { /* noop */ }
   }
@@ -3735,7 +3780,7 @@ ${SCHEDULES_PROTOCOL}
 ## The work: board.md vs tasks.json
 There are two shared surfaces, both in the hive root:
 - \`board.md\` — the freeform narrative plan. The god agent is its sole scribe; others \`propose\` edits.
-- \`tasks.json\` — the structured task ledger (a kanban: \`todo / doing / blocked / done\`, with title,
+- \`tasks.json\` — the structured task ledger (a kanban: \`todo / doing / waiting / blocked / done\`, with title,
   assignee, priority, deps). Keep the task you're working reflected in its status.
 
 ## Asking the human (the ASK ME card)
@@ -3831,7 +3876,7 @@ The app fills in the id, the sender and the times. Only \`request\` and \`query\
 
 ${SCHEDULES_PROTOCOL}
 ## The task board
-\`tasks.json\` in the hive folder holds the cards (todo, doing, blocked, done), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.
+\`tasks.json\` in the hive folder holds the cards (todo, doing, waiting, blocked, done; waiting names who in waitingOn), each with a title and the team member it is assigned to. Keep your own card's status current. \`board.md\` is Michael's; send him changes.
 
 ## Asking the owner
 Only Michael asks the owner, on the Ask me board. He sets the card to blocked and adds \`{ "q": "...", "askedAt": "<time>", "raisedBy": "<id, or god>" }\` to its \`humanQA\` list. A card's newest ask replaces an older unanswered one, so before asking he checks the open asks and puts a question that changes or contradicts one on that same card. The owner's answer goes to whoever raised it, into their memory, and to Michael.

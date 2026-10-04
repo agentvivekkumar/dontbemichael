@@ -80,7 +80,7 @@ test('the restaurant pack ships the full starter cast', () => {
   const core = validateOfficePack(readPack('core.json'), 'bundled').pack;
   const restaurant = validateOfficePack(readPack('restaurant-food.json'), 'bundled').pack;
   const ids = mergeWithCore(restaurant, core).agents.map((a) => a.id).sort();
-  assert.deepEqual(ids, ['creed', 'kelly', 'meredith', 'oscar', 'pam', 'ryan', 'toby']);
+  assert.deepEqual(ids, ['creed', 'darryl', 'dwight', 'kelly', 'meredith', 'nick', 'oscar', 'pam', 'ryan', 'sadiq', 'toby']);
 });
 
 test('no shipped pack pre-sets an outward capability to on-its-own', () => {
@@ -98,14 +98,17 @@ test('no shipped pack pre-sets an outward capability to on-its-own', () => {
   }
 });
 
-test('every agent states a first action, so the floor is never blank on day one', () => {
+test('a first task is its own card field, never part of the Work style', () => {
+  // Value: protects=one-time work becomes a card Michael tracks and the Work style holds standing duties only (first-task-card.md); fails_when=a Work style carries a First task, or a firstTask has no title or ask; why_new=firstAction was shown nowhere and the First task lived in the Work style forever; seam=none
   for (const file of packFiles()) {
     const res = validateOfficePack(readPack(file), 'bundled');
     for (const agent of res.pack.agents) {
-      assert.ok(
-        agent.firstAction && agent.firstAction.length > 0,
-        `${file}: ${agent.id} has no firstAction, so its card would show nothing on first run`
-      );
+      assert.doesNotMatch(agent.workStyle ?? '', /^(#+\s*)?first task/im, `${file}: ${agent.id}`);
+      assert.equal(agent.firstAction, undefined, `${file}: ${agent.id} still has a firstAction`);
+      if (agent.firstTask) {
+        assert.ok(agent.firstTask.title.length <= 60 && agent.firstTask.ask.length > 0, `${file}: ${agent.id}`);
+        assert.doesNotMatch(agent.firstTask.ask, /\b\d{1,2}(:\d{2})? ?(am|pm)\b|\bat \d{1,2}:\d{2}|first (day|morning)|each day|every day/i, `${file}: ${agent.id} first task has a time; Michael hands it out`);
+      }
     }
   }
 });

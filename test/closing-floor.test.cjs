@@ -50,3 +50,24 @@ test('the store, the stage and the app follow the rule, and Cancel brings everyt
   assert.match(css, /\.cth-st-gone \{ pointer-events: none; animation: cth-st-gone 1\.4s var\(--cth-ease\) forwards; \}/);
   assert.match(css, /prefers-reduced-motion: reduce\) \{ \.cth-st-gone \{ animation: none;/);
 });
+
+test('nobody who has gone home trades banter, and a closed office has none', () => {
+  // Value: protects=no paper plane or envelope flies to or from a dark office at closing time; fails_when=a gone person is a chat candidate, their busy status still blocks the pod, or banter runs once the office is closed; why_new=owner 2026-10-03: ghost mail flew between offices already down; seam=source pin for the stage wiring
+  const { chatCandidates } = loadTs('src/renderer/src/shell/closingFloor.ts');
+  const busy = new Set(['working', 'thinking']);
+  const p = (id, status = 'idle', action = '') => ({ id, status, action });
+  const pods = [
+    { members: [p('pam'), p('jim')] },
+    { members: [p('oscar'), p('kevin', 'working')] },
+    { members: [p('toby')] },
+    { members: [p('erin', 'idle', 'clocking in…')] }
+  ];
+  const ids = (gone) => chatCandidates(pods, new Set(gone), busy, 'clocking in…').map((a) => a.id);
+  assert.deepEqual(ids([]), ['pam', 'jim', 'toby'], 'busy pods and people clocking in are left out, as before');
+  assert.deepEqual(ids(['pam', 'toby']), ['jim'], 'gone home is out');
+  assert.deepEqual(ids(['kevin']), ['pam', 'jim', 'oscar', 'toby'], 'someone gone home no longer makes their pod busy');
+  assert.deepEqual(ids(['pam', 'jim', 'oscar', 'kevin', 'toby']), []);
+  const stage = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/scene/studio/StudioStage.tsx'), 'utf8');
+  assert.match(stage, /const closing = useClosingLights\(\);\n\s+const quote = useIdleQuote\(plan\.pods, paused \|\| !!closing\?\.all, life\.throwNote, accentOf, closing\?\.out \?\? NOBODY\);/);
+  assert.match(stage, /const quietPeople = \(\) => chatCandidates\(live\.current\.pods, live\.current\.gone, ACTIVE, ACTION_CLOCKING_IN\);/);
+});

@@ -211,6 +211,9 @@ export interface HarnessConfig {
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
+  /** Set once the pack's First task text was taken out of existing team
+   *  members' Work styles (docs/designs/first-task-card.md, D1). */
+  firstTasksRemoved?: boolean;
   /** Owner decisions on offered job description updates
    *  (shared/workStyleUpdates.ts), by `${key}:${agentId}`: 'use' or 'keep'. */
   workStyleUpdatesDecided?: Record<string, 'use' | 'keep'>;

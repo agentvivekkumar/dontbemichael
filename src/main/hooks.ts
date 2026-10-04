@@ -71,6 +71,7 @@ import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
 import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
+import { accessLine, agentAccessSummary } from '../shared/agentAccess';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
@@ -569,7 +570,10 @@ export class HookServer {
     // the live roster on every prompt.
     let roster: string | null = null;
     if (wantsRoster && this.getConfig().businessFolder && typeof this.hive.teamRoster === 'function') {
-      const r = this.hive.teamRoster();
+      // Each member's real access, read per prompt, so a grant or a new
+      // mailbox changes the layout key and the full roster goes out again.
+      const cfg = this.getConfig();
+      const r = this.hive.teamRoster((id) => accessLine(agentAccessSummary(cfg, id, this.roleReadsBooks?.(id) ?? false)));
       const sessionId = p.session_id ?? null;
       const last = this.deliveredRosterByAgent.get(agentId!);
       if (r) {

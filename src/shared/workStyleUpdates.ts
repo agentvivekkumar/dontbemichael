@@ -13,14 +13,20 @@ import { appendOnce, swapName } from './hireTemplates';
 export interface WorkStyleUpdate {
   /** Stable id, recorded once the owner decides. */
   key: string;
-  /** The pack card id it applies to, in every pack. */
+  /** The pack card id it applies to, in every pack unless `packs` names some. */
   cardId: string;
+  /** The business types whose card changed, when the others did not: a Kelly
+   *  in another pack is offered nothing, since her text is the same. */
+  packs?: readonly string[];
   /** Locale key for the one line saying what changed. */
   whyKey: string;
 }
 
 export const WORK_STYLE_UPDATES: readonly WorkStyleUpdate[] = [
-  { key: 'pam-inbox-zero-2026-10', cardId: 'pam', whyKey: 'askMe.workStyleWhy.pamInboxZero' }
+  { key: 'pam-inbox-zero-2026-10', cardId: 'pam', whyKey: 'askMe.workStyleWhy.pamInboxZero' },
+  // Facts come from the teammate who has them, Michael only when they can't help (owner, 2026-10-03).
+  { key: 'kelly-ask-teammates-2026-10', cardId: 'kelly', packs: ['saas-consulting'], whyKey: 'askMe.workStyleWhy.askTeammates' },
+  { key: 'ryan-ask-teammates-2026-10', cardId: 'ryan', packs: ['retail-shop'], whyKey: 'askMe.workStyleWhy.askTeammates' }
 ];
 
 export interface WorkStyleOffer {
@@ -54,8 +60,8 @@ export function workStyleOffers(
     if (a.isGod || a.isAssistant) continue;
     const sourceCard = a.sourceCard ?? (businessType ? `${businessType}/${a.id}` : undefined);
     if (!sourceCard) continue;
-    const cardId = sourceCard.split('/')[1];
-    const update = WORK_STYLE_UPDATES.find((u) => u.cardId === cardId);
+    const [pack, cardId] = sourceCard.split('/');
+    const update = WORK_STYLE_UPDATES.find((u) => u.cardId === cardId && (!u.packs || u.packs.includes(pack)));
     const def = cards.get(sourceCard);
     if (!update || !def || decided?.[decisionId(update.key, a.id)]) continue;
     // Someone hired from the card under another name gets the text with their

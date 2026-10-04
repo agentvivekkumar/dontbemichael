@@ -1,7 +1,5 @@
 import type { OfficeCharacterName } from '@/scene/office/cast';
-import { useAppTheme } from '@/design/theme';
-import { departmentOf } from '@/scene/studio/layout';
-import { family } from '@/scene/studio/theme';
+import { PersonAvatar } from '@/scene/office/props';
 
 export interface SpritePortraitProps {
   character: OfficeCharacterName;
@@ -11,22 +9,11 @@ export interface SpritePortraitProps {
 }
 
 /**
- * A cast member as a design v2 avatar (branding/DESIGN.md 3.4, 7.10): the
- * initial on their usual department's pastel, Michael in ink. The pixel
- * portraits this used to paint are gone: the Struck M is the brand's only
- * pixel art. The name stays for its call sites.
+ * A cast member as their avatar (branding/DESIGN.md 3.4, 7.10): their
+ * signature prop on their usual department's pastel, Michael's mug on ink.
+ * The name stays for its call sites.
  */
 export function SpritePortrait({ character, scale = 2 }: SpritePortraitProps) {
-  const dark = useAppTheme() === 'dark';
   const size = Math.round(Math.max(22, 16 * scale + 8));
-  const isMichael = character === 'michael';
-  const fam = isMichael ? null : family(departmentOf({ id: character, character }), dark);
-  return (
-    <span aria-hidden="true" style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0, display: 'inline-grid', placeItems: 'center',
-      background: fam ? fam.l : 'var(--cth-ink)', color: fam ? fam.acc : 'var(--cth-bg)',
-      boxShadow: fam ? `inset 0 0 0 1px ${fam.m}` : 'none',
-      fontFamily: 'var(--cth-font-ui)', fontSize: Math.round(size * 0.42), fontWeight: 700, lineHeight: 1
-    }}>{character.slice(0, 1).toUpperCase()}</span>
-  );
+  return <PersonAvatar who={{ id: character, character, isGod: character === 'michael' }} size={size} />;
 }

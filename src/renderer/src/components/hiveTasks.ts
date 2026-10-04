@@ -29,7 +29,9 @@ export interface HiveTask {
   /** The running notes agents keep on a card (Michael is told the owner reads them). */
   notes?: string;
   assignee?: string;
-  status: 'todo' | 'doing' | 'blocked' | 'done';
+  status: 'todo' | 'doing' | 'waiting' | 'blocked' | 'done';
+  /** Who a Waiting card waits on, in a few words (Michael writes it). */
+  waitingOn?: string;
   dependsOn: string[];
   priority: number;
   createdAt: string;
@@ -89,8 +91,9 @@ export function parseTasks(raw: unknown): HiveTask[] {
       description: typeof t.description === 'string' ? t.description : undefined,
       notes: typeof t.notes === 'string' ? t.notes : undefined,
       assignee: typeof t.assignee === 'string' ? t.assignee : undefined,
-      status: (['todo', 'doing', 'blocked', 'done'] as const).includes(t.status as TaskStatus)
+      status: (['todo', 'doing', 'waiting', 'blocked', 'done'] as const).includes(t.status as TaskStatus)
         ? (t.status as TaskStatus) : 'todo',
+      waitingOn: typeof t.waitingOn === 'string' && t.waitingOn.trim() ? t.waitingOn.trim() : undefined,
       dependsOn: Array.isArray(t.dependsOn) ? t.dependsOn.filter((d): d is string => typeof d === 'string') : [],
       priority: typeof t.priority === 'number' ? t.priority : 3,
       createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),

@@ -3,9 +3,7 @@ import { cityLine, cleanCompanyProfile, missingProfileFields, prefillLegalName, 
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { OnboardingStudio } from '@/scene/studio/OnboardingStudio';
-import { departmentOf } from '@/scene/studio/layout';
-import { family } from '@/scene/studio/theme';
-import { useAppTheme } from '@/design/theme';
+import { PersonAvatar } from '@/scene/office/props';
 import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
 import lockupDark from '@brandkit/logo/lockup/dbm-lockup-horizontal-dark.svg?url';
 import { PixelButton } from './PixelButton';
@@ -1430,9 +1428,7 @@ function TeamCard({
 }) {
   const pickable = picked !== undefined;
   const active = !pickable || picked;
-  const dark = useAppTheme() === 'dark';
   const isMichael = character === 'michael';
-  const fam = isMichael ? null : family(departmentOf({ id: character ?? '', character }), dark);
   // The folder row lines up under the text: checkbox + gap + avatar + gap.
   const textIndent = (pickable ? 18 + 12 : 18 + 12) + 36 + 12;
   const [first, ...rest] = name.split(' · ');
@@ -1451,11 +1447,7 @@ function TeamCard({
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
           </span>
         )}
-        <span aria-hidden="true" style={{
-          width: 36, height: 36, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
-          background: fam ? fam.l : 'var(--cth-ink)', color: fam ? fam.acc : 'var(--cth-bg)',
-          boxShadow: fam ? `inset 0 0 0 1px ${fam.m}` : 'none', fontSize: 14, fontWeight: 700
-        }}>{first.slice(0, 1).toUpperCase()}</span>
+        <PersonAvatar who={{ id: character ?? first, character, name: first, isGod: isMichael }} size={36} />
         <span style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', marginBottom: 2 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cth-ink)' }}>{first}</span>

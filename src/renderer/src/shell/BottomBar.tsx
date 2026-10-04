@@ -1,7 +1,6 @@
 import { useEffect, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore, type QueuedMessage } from '@/store/store';
-import type { HarnessConfig } from '@/store/config';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { nextRunAt } from '@shared/missions';
@@ -17,21 +16,18 @@ const EMPTY_QUEUE: QueuedMessage[] = [];
  * Michael's terminal exactly like the composer on his Work tab: same store
  * queue, same draft, same attachment convention.
  */
-export function BottomBar({ config }: { config: HarnessConfig }) {
+export function BottomBar() {
   return (
     <div style={{
       position: 'absolute', insetInlineStart: 24, insetInlineEnd: 22, bottom: 24, zIndex: 70,
-      display: 'flex', alignItems: 'flex-end', gap: 14, pointerEvents: 'none',
-      // A narrow window drops the pack note first (global.css), so the
-      // composer keeps its width.
-      containerType: 'inline-size'
+      display: 'flex', alignItems: 'flex-end', gap: 14, pointerEvents: 'none'
     }}>
       <TalkToMichael />
       {/* Centered on the composer's resting height, so they stay put while a
           long message grows the composer upward. */}
       <div style={{ height: 50, display: 'flex', alignItems: 'center', gap: 14 }}>
         <NextJobChip />
-        <PackAndHire config={config} />
+        <HireButton />
       </div>
     </div>
   );
@@ -207,23 +203,13 @@ function NextJobChip() {
   );
 }
 
-/** Which pack the team came from, and the Hire button (opens the hire wizard). */
-function PackAndHire({ config }: { config: HarnessConfig }) {
+/** The Hire button, pushed right (opens the hire wizard). Which pack a job
+ *  comes from shows on each job in the wizard, not here (owner, 2026-10-03:
+ *  the pack caption beside Hire looked awkward). */
+function HireButton() {
   const { t } = useTranslation();
-  const [pack, setPack] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void window.cth.packsList().then((res) => {
-      if (!alive) return;
-      const p = res.packs.find((x) => x.pack.businessType === config.businessType)?.pack;
-      setPack(p?.displayName ?? null);
-    }).catch(() => { /* no pack line */ });
-    return () => { alive = false; };
-  }, [config.businessType]);
-
   return (
     <div style={{ marginInlineStart: 'auto', pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-      {pack && <span className="cth-bb-pack" style={{ fontSize: 11.5, color: 'var(--cth-ink-3)', whiteSpace: 'nowrap' }}>{t('shell.teamFromPack', { pack })}</span>}
       <button onClick={() => useStore.getState().setAddAgentOpen(true)} style={{
         height: 32, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 6,
         border: 'none', borderRadius: 10, cursor: 'pointer',

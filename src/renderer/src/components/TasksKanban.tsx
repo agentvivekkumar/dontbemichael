@@ -5,6 +5,7 @@ import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { InfoTip } from './InfoTip';
 import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
+import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useRtl } from '@/i18n/useDirection';
 import { isReplacedAsk } from '@shared/askMeRouting';
@@ -23,6 +24,9 @@ type Status = TaskStatus;
 const COLUMNS: { key: Status; labelKey: string; accent: string; soft: string; text: string }[] = [
   { key: 'todo',    labelKey: 'kanban.colTodo',    accent: 'var(--cth-ink-4)',      soft: 'var(--cth-neutral-soft)', text: 'var(--cth-ink-2)' },
   { key: 'doing',   labelKey: 'kanban.colDoing',   accent: 'var(--cth-blue)',       soft: 'var(--cth-blue-soft)',    text: 'var(--cth-blue-text)' },
+  // Held on someone outside the office or a teammate (owner, 2026-10-03: Doing
+  // showed people as busy while they waited on a customer).
+  { key: 'waiting', labelKey: 'kanban.colWaiting', accent: 'var(--cth-amber)',      soft: 'var(--cth-amber-soft)',   text: 'var(--cth-amber-text)' },
   { key: 'blocked', labelKey: 'kanban.colBlocked', accent: 'var(--cth-coral-base)', soft: 'var(--cth-coral-soft)',   text: 'var(--cth-coral-text)' },
   { key: 'done',    labelKey: 'kanban.colDone',    accent: 'var(--cth-green)',      soft: 'var(--cth-green-soft)',   text: 'var(--cth-green-text)' }
 ];
@@ -227,11 +231,16 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
         }}>{askTitle(task.title)}</span>
         {assigneeName && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--cth-ink-3)' }}>
-            <span style={{ width: 17, height: 17, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)', fontSize: 9, fontWeight: 700 }}>
-              {assigneeName.slice(0, 1).toUpperCase()}
-            </span>
+            <AgentAvatar id={task.assignee} name={assigneeName} size={17} />
             {assigneeName}
           </span>
+        )}
+        {task.status === 'waiting' && (
+          <span data-waiting-on title={t('kanban.waitingOnTitle', { godName })} style={{
+            alignSelf: 'flex-start', maxWidth: '100%', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 999,
+            fontSize: 10.5, fontWeight: 600, background: 'var(--cth-amber-soft)', color: 'var(--cth-amber-text)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          }}>{task.waitingOn ? t('kanban.waitingOn', { who: task.waitingOn }) : t('kanban.waitingOnUnknown')}</span>
         )}
         {done && task.closedBy === 'owner' && (
           <span data-closed-by="owner" title={task.closedReason || undefined} style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--cth-ink-3)' }}>
@@ -354,12 +363,19 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
                 background: col.soft, color: col.text, boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
                 fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 600
               }}>
-                {/* Blocked means a question waits on Ask me, so only Michael sets it; a
-                    blocked card shows it as its current state (ship 2026-10-03). */}
-                {COLUMNS.filter((c) => c.key !== 'blocked' || task.status === 'blocked').map((c) => (
-                  <option key={c.key} value={c.key} disabled={c.key === 'blocked'}>{t(c.labelKey)}</option>
+                {/* Blocked means a question waits on Ask me, and Waiting names who the
+                    card waits on, so only Michael sets them; a card in one shows it as
+                    its current state (ship 2026-10-03). */}
+                {COLUMNS.filter((c) => (c.key !== 'blocked' && c.key !== 'waiting') || task.status === c.key).map((c) => (
+                  <option key={c.key} value={c.key} disabled={c.key === 'blocked' || c.key === 'waiting'}>{t(c.labelKey)}</option>
                 ))}
               </select>
+              {task.status === 'waiting' && (
+                <div data-waiting-on style={{ marginTop: 4, fontSize: 11, color: 'var(--cth-amber-text)' }}>
+                  {task.waitingOn ? t('kanban.waitingOn', { who: task.waitingOn }) : t('kanban.waitingOnUnknown')}
+                  <InfoTip text={t('kanban.waitingOnTitle', { godName: detailGodName })} />
+                </div>
+              )}
               {task.status === 'done' && task.closedBy === 'owner' && (
                 <div data-closed-by="owner" style={{ marginTop: 4, fontSize: 11, color: 'var(--cth-ink-3)' }}>
                   {t('kanban.closedByOwner')}{task.closedReason ? <InfoTip text={task.closedReason} /> : null}
@@ -369,7 +385,7 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
             <div>{label(t('kanban.assignee'))}
               {assigneeName
                 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 10px 0 4px', borderRadius: 999, background: 'var(--cth-neutral-soft)', fontSize: 12.5, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
-                    <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', background: 'var(--cth-card)', fontSize: 10, fontWeight: 700 }}>{assigneeName.slice(0, 1).toUpperCase()}</span>
+                    <AgentAvatar id={task.assignee} name={assigneeName} size={22} />
                     {assigneeName}
                   </span>
                 : <span style={{ fontSize: 12.5, color: 'var(--cth-ink-3)' }}>{t('kanban.unassigned')}</span>}

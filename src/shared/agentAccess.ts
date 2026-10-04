@@ -31,3 +31,19 @@ export function agentAccessSummary(cfg: MailAccessConfig & ConnectorConfig, agen
   }
   return items;
 }
+
+/**
+ * The same access in one line for Michael's roster, with the Settings screen
+ * each part comes from, so a team member's mail limit is never blamed on the
+ * wrong one (owner, 2026-10-03: an office may use the app's own Mailboxes,
+ * Claude connectors such as Gmail, or both). Null when the agent has none.
+ */
+export function accessLine(items: AccessItem[]): string | null {
+  const parts: string[] = [];
+  for (const i of items) {
+    if (i.kind === 'mailbox') parts.push(`mailbox ${i.address} (Settings, Connections, Mailboxes; ${i.send ? 'can send' : 'draft only'})`);
+  }
+  const connectors = items.flatMap((i) => (i.kind === 'connector' ? [i.key] : i.kind === 'quickbooks' ? [`QuickBooks ${i.changes ? 'with changes' : 'read only'}`] : []));
+  if (connectors.length) parts.push(`Claude connectors ${connectors.join(', ')} (Settings, Connections, Claude connectors)`);
+  return parts.length ? parts.join('; ') : null;
+}

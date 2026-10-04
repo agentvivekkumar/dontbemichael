@@ -14,7 +14,7 @@ const tasks = { tasks: [
   { id: 'T119', title: 'Pipeline report', status: 'todo', assignee: 'dwight', dependsOn: ['T118'] },
   { id: 'T121', title: 'Close September support tickets', status: 'todo', assignee: 'kelly', dependsOn: ['T112'] },
   { id: 'T115', title: 'Reply to Maria', status: 'doing', assignee: 'kelly' },
-  { id: 'T116', title: 'Returns', status: 'doing', assignee: 'kelly' },
+  { id: 'T116', title: 'Returns', status: 'waiting', waitingOn: 'customer Maria', assignee: 'kelly' },
   { id: 'T114', title: 'Lakeview follow up', status: 'doing', assignee: 'dwight' },
   { id: 'T113', title: 'Match payments', status: 'doing', assignee: 'oscar' },
   { id: 'T120', title: 'Billing email sign in', status: 'blocked', assignee: 'oscar', humanQA: [{ q: 'Sign in again?', askedAt: ago(5), raisedBy: 'god' }] },

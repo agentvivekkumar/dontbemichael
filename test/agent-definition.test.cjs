@@ -253,3 +253,24 @@ test('folder is optional: an agent without one still validates', () => {
   assert.equal(res.ok, true, res.errors.join('; '));
   assert.equal(res.definition.folder, undefined);
 });
+
+test('a first task needs both a title and an ask, within their caps', () => {
+  // Value: protects=an imported pack cannot hand Michael a first task card with no title, no ask or an overlong title; fails_when=the firstTask object, required or 60/400 cap checks are dropped, or a valid one is not kept; why_new=only shipped packs (all valid) reach firstTask today; seam=none
+  const task = { title: 'Clear the inbox backlog', ask: 'Bring the current inbox to zero and tell Michael what is left.' };
+  const ok = validateAgentDefinition(base({ firstTask: task }));
+  assert.equal(ok.ok, true, ok.errors.join('; '));
+  assert.deepEqual(ok.definition.firstTask, task);
+  assert.equal('firstTask' in validateAgentDefinition(base()).definition, false, 'absent stays absent');
+  for (const [over, re] of [
+    [{ firstTask: 'Clear the inbox' }, /"firstTask" must be an object with a title and an ask/],
+    [{ firstTask: ['Clear the inbox'] }, /"firstTask" must be an object/],
+    [{ firstTask: { title: 'Clear the inbox' } }, /"firstTask\.ask" is required/],
+    [{ firstTask: { ask: task.ask } }, /"firstTask\.title" is required/],
+    [{ firstTask: { title: 'x'.repeat(61), ask: task.ask } }, /firstTask\.title.*exceeds 60/],
+    [{ firstTask: { title: task.title, ask: 'x'.repeat(401) } }, /firstTask\.ask.*exceeds 400/]
+  ]) {
+    const res = validateAgentDefinition(base(over));
+    assert.equal(res.ok, false, `${JSON.stringify(over).slice(0, 80)} must be refused`);
+    assert.match(res.errors.join(' '), re);
+  }
+});

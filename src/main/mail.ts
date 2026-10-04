@@ -67,6 +67,44 @@ export interface ImapLike {
   on?(event: string, fn: (...a: any[]) => void): unknown;
 }
 
+/**
+ * Where a message is (owner, 2026-10-03: inbox zero archived mail the team
+ * could then never find, and nobody could see what the owner sent). IMAP
+ * numbers each folder separately, so an id carries its folder: a plain number
+ * is the inbox (every id from before this), "sent:12", "archive:12", and
+ * "label:Finance:12". A bare number is never read in another folder, where it
+ * would open a different message.
+ */
+export type FolderKey = 'inbox' | 'sent' | 'archive' | { label: string };
+
+/** The folder a search names: "inbox" (default), "sent", "archive", or a label. */
+export function folderKey(folder: string | undefined): FolderKey {
+  const f = (folder ?? '').trim();
+  const low = f.toLowerCase();
+  if (!f || low === 'inbox') return 'inbox';
+  if (low === 'sent') return 'sent';
+  if (low === 'archive' || low === 'archived' || low === 'all' || low === 'all mail') return 'archive';
+  return { label: f.replace(/[\r\n]/g, ' ').slice(0, 60) };
+}
+
+const folderName = (key: FolderKey): string => (typeof key === 'string' ? key : key.label);
+
+export function messageIdFor(key: FolderKey, uid: number | string): string {
+  if (key === 'inbox') return String(uid);
+  return typeof key === 'string' ? `${key}:${uid}` : `label:${key.label}:${uid}`;
+}
+
+/** The folder and IMAP uid an id names. Anything else is refused, never guessed. */
+export function parseMessageId(id: string): { key: FolderKey; uid: string } {
+  const s = String(id).trim();
+  if (/^\d+$/.test(s)) return { key: 'inbox', uid: s };
+  const m = /^(sent|archive):(\d+)$/.exec(s) ?? /^label:(.+):(\d+)$/.exec(s);
+  if (!m) throw new MailError('bad-request', `"${s}" is not a message id from search.`);
+  return { key: m[1] === 'sent' || m[1] === 'archive' ? m[1] : { label: m[1] }, uid: m[2] };
+}
+
+const uidOf = (id: string): number => Number(id.slice(id.lastIndexOf(':') + 1));
+
 /** The most messages one archive, mark_read or mark_junk call moves. */
 const ORGANIZE_MAX = 50;
 
@@ -79,7 +117,16 @@ const RESERVED_LABELS = new Set([
   'important', 'starred', 'flagged', 'outbox'
 ]);
 /** Special-use folders a label must not name either, whatever they are called. */
+/** Gmail, told by its "[Gmail]/" (or "[Google Mail]/") system folders, which
+ *  keep that name in every language. Another server's \All is not Gmail's. */
+function isGmail(list: Array<{ path: string }>): boolean {
+  return list.some((f) => /^\[(?:gmail|google mail)\]\//i.test(f.path));
+}
+
 const RESERVED_USES = new Set(['\\Trash', '\\Junk', '\\Sent', '\\Drafts', '\\All', '\\Flagged', '\\Important']);
+/** Folders a label search never opens: spam, trash and drafts. */
+const OFF_LIMITS_USES = new Set(['\\Trash', '\\Junk', '\\Drafts']);
+const OFF_LIMITS_NAMES = /^(?:\[(?:gmail|google mail)\]\/(?:spam|trash|bin|drafts)|(?:inbox[./])?(?:junk|spam|junk e-?mail|bulk|bulk mail|trash|deleted items|deleted messages|bin|drafts?))$/i;
 
 /** Why an archive label is refused, or null when it is a plain label. */
 export function labelProblem(label: string): string | null {
@@ -286,13 +333,48 @@ export class MailService {
     return hit.path;
   }
   private static inbox = async (): Promise<string> => 'INBOX';
+  /** The folder a search looks in (owner, 2026-10-03: inbox zero archived mail
+   *  the team could then never find). `archive` is Gmail's All Mail, which
+   *  holds every message but spam and trash; elsewhere it is the archive
+   *  folder. A label is a Gmail label, or a folder of that name. */
+  private static folderOf = (key: FolderKey) => async (c: ImapLike): Promise<string> => {
+    if (key === 'inbox') return 'INBOX';
+    if (key === 'sent') return MailService.sentBox(c);
+    const list = await c.list();
+    if (key === 'archive') {
+      // Gmail's All Mail leaves out spam and trash; another server's \All may
+      // not (RFC 6154), so elsewhere the archive is its \Archive folder.
+      const gmail = isGmail(list);
+      const hit = (gmail ? list.find((f) => f.specialUse === '\\All') : undefined) ?? list.find((f) => f.specialUse === '\\Archive') ?? list.find((f) => /^(inbox\.)?archive$/i.test(f.path));
+      if (!hit) throw new MailError('not-found', 'This mailbox has no archive folder yet: nothing has been archived.');
+      return hit.path;
+    }
+    const label = key.label.toLowerCase();
+    const hit = list.find((f) => f.path.toLowerCase() === label) ?? list.find((f) => f.path.toLowerCase() === `inbox${f.delimiter ?? '.'}${label}`);
+    if (!hit) throw new MailError('not-found', `This mailbox has no label or folder called "${key.label}".`);
+    // Spam, trash and the owner's unsent drafts are not team mail (ship review
+    // 2026-10-03): spam is where injected instructions live, and a draft is the
+    // owner's own unsent words. Sent and the archive have their own names.
+    // The folder or any folder it sits in ("Trash/Old", "INBOX.Junk.2025").
+    const parts = hit.delimiter ? hit.path.split(hit.delimiter) : [hit.path];
+    const offLimits = parts.some((_, i) => {
+      const at = parts.slice(0, i + 1).join(hit.delimiter ?? '');
+      const f = list.find((x) => x.path === at);
+      return OFF_LIMITS_USES.has(f?.specialUse ?? '') || OFF_LIMITS_NAMES.test(at);
+    });
+    if (offLimits) {
+      throw new MailError('bad-request', `"${key.label}" is spam, trash or drafts, which the team does not read.`);
+    }
+    return hit.path;
+  };
   private static drafts = (c: ImapLike): Promise<string> => MailService.special(c, '\\Drafts', ['Drafts', '[Gmail]/Drafts', 'INBOX.Drafts', 'Draft']);
   private static sentBox = (c: ImapLike): Promise<string> => MailService.special(c, '\\Sent', ['Sent', '[Gmail]/Sent Mail', 'Sent Messages', 'INBOX.Sent', 'Sent Items']);
 
-  async search(id: string, q: { text?: string; from?: string; subject?: string; since?: string; unread?: boolean; limit?: number; page?: number }) {
+  async search(id: string, q: { text?: string; from?: string; subject?: string; since?: string; unread?: boolean; limit?: number; page?: number; folder?: string }) {
     const limit = Math.min(Math.max(1, Math.floor(q.limit ?? SEARCH_DEFAULT)), SEARCH_MAX);
     const page = Math.max(0, Math.floor(q.page ?? 0));
-    return this.inFolder(id, MailService.inbox, async (c) => {
+    const key = folderKey(q.folder);
+    return this.inFolder(id, MailService.folderOf(key), async (c) => {
       const query: Record<string, unknown> = {};
       if (q.text) query.text = q.text;
       if (q.from) query.from = q.from;
@@ -300,6 +382,8 @@ export class MailService {
       if (q.since) { const d = new Date(q.since); if (!Number.isNaN(d.getTime())) query.since = d; }
       if (q.unread) query.seen = false;
       if (!Object.keys(query).length) query.all = true;
+      // Never the owner's unsent drafts: Gmail's All Mail (the archive) holds them too.
+      query.draft = false;
       const uids = (await c.search(query, { uid: true })) || [];
       const newest = [...uids].sort((a, b) => b - a);
       const slice = newest.slice(page * limit, page * limit + limit);
@@ -307,7 +391,7 @@ export class MailService {
       if (slice.length) {
         for await (const m of c.fetch(slice, { uid: true, envelope: true, flags: true }, { uid: true })) {
           messages.push({
-            id: String(m.uid),
+            id: messageIdFor(key, m.uid),
             from: addrText(m.envelope?.from),
             subject: m.envelope?.subject ?? '',
             date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : '',
@@ -315,8 +399,8 @@ export class MailService {
           });
         }
       }
-      messages.sort((a, b) => Number(b.id) - Number(a.id));
-      return { messages, total: newest.length, page, more: newest.length > (page + 1) * limit };
+      messages.sort((a, b) => uidOf(b.id) - uidOf(a.id));
+      return { folder: folderName(key), messages, total: newest.length, page, more: newest.length > (page + 1) * limit };
     }, 'Searching the mailbox');
   }
 
@@ -344,7 +428,9 @@ export class MailService {
       // Where they go is settled before anything changes, so a mailbox with no
       // junk folder leaves the messages exactly as they were.
       const folders = await c.list();
-      const gmail = folders.some((f) => f.specialUse === '\\All');
+      // The same test as a search's archive, so archived mail is where the
+      // team later looks for it (Codex adversarial review, 2026-10-04).
+      const gmail = isGmail(folders) && folders.some((f) => f.specialUse === '\\All');
       let destination: string;
       if (action === 'mark_junk') {
         const junk = folders.find((f) => f.specialUse === '\\Junk') ?? folders.find((f) => /^(junk|spam|junk e-?mail|\[gmail\]\/spam|inbox\.junk)$/i.test(f.path));
@@ -375,19 +461,23 @@ export class MailService {
   }
 
   private async source(c: ImapLike, uid: string): Promise<Buffer> {
-    const m = await c.fetchOne(uid, { uid: true, source: true }, { uid: true });
+    const m = await c.fetchOne(uid, { uid: true, source: true, flags: true }, { uid: true });
     if (!m || !m.source) throw new MailError('not-found', `No message with id ${uid} in this mailbox.`);
+    // A draft is the owner's own unsent words, whichever folder holds it.
+    const flags: Set<string> = m.flags instanceof Set ? m.flags : new Set(Array.isArray(m.flags) ? m.flags : []);
+    if (flags.has('\\Draft')) throw new MailError('bad-request', 'That message is an unsent draft, which the team does not read.');
     return Buffer.isBuffer(m.source) ? m.source : Buffer.from(m.source);
   }
 
-  async read(id: string, uid: string) {
-    return this.inFolder(id, MailService.inbox, async (c) => {
+  async read(id: string, messageId: string) {
+    const { key, uid } = parseMessageId(messageId);
+    return this.inFolder(id, MailService.folderOf(key), async (c) => {
       const parsed = await simpleParser(await this.source(c, uid));
       let text = parsed.text ?? (typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]+>/g, ' ') : '') ?? '';
       const truncated = text.length > BODY_MAX_CHARS;
       if (truncated) text = `${text.slice(0, BODY_MAX_CHARS)}\n\n[message cut at ${BODY_MAX_CHARS} characters]`;
       return {
-        id: uid,
+        id: messageId,
         from: addrText(parsed.from), to: addrText(parsed.to), cc: addrText(parsed.cc),
         subject: parsed.subject ?? '', date: parsed.date ? parsed.date.toISOString() : '',
         messageId: parsed.messageId ?? '',
@@ -403,25 +493,29 @@ export class MailService {
     const msg: Record<string, unknown> = { from, to: input.to, cc: input.cc, subject: input.subject, text: input.body, messageId };
     const refs = [input.replyTo, input.forward, ...(input.attachFrom ?? [])].filter(Boolean) as MailRef[];
     if (!refs.length) return msg;
-    await this.inFolder(id, MailService.inbox, async (c) => {
-      const attachments: Array<Record<string, unknown>> = [];
-      if (input.replyTo) {
-        const parsed = await simpleParser(await this.source(c, input.replyTo.id));
-        if (parsed.messageId) {
-          msg.inReplyTo = parsed.messageId;
-          const prior = Array.isArray(parsed.references) ? parsed.references : parsed.references ? [parsed.references] : [];
-          msg.references = [...prior, parsed.messageId];
-        }
+    // Each reference is read from its own folder: a reply to sent or archived
+    // mail names it by an id that says where it is.
+    const fetch = (ref: MailRef) => {
+      const { key, uid } = parseMessageId(ref.id);
+      return this.inFolder(id, MailService.folderOf(key), (c) => this.source(c, uid), 'Fetching the referenced message');
+    };
+    const attachments: Array<Record<string, unknown>> = [];
+    if (input.replyTo) {
+      const parsed = await simpleParser(await fetch(input.replyTo));
+      if (parsed.messageId) {
+        msg.inReplyTo = parsed.messageId;
+        const prior = Array.isArray(parsed.references) ? parsed.references : parsed.references ? [parsed.references] : [];
+        msg.references = [...prior, parsed.messageId];
       }
-      if (input.forward) {
-        attachments.push({ filename: 'forwarded-message.eml', content: await this.source(c, input.forward.id), contentType: 'message/rfc822' });
-      }
-      for (const ref of input.attachFrom ?? []) {
-        const parsed = await simpleParser(await this.source(c, ref.id));
-        for (const a of parsed.attachments ?? []) attachments.push({ filename: a.filename ?? 'attachment', content: a.content, contentType: a.contentType });
-      }
-      if (attachments.length) msg.attachments = attachments;
-    }, 'Fetching the referenced message');
+    }
+    if (input.forward) {
+      attachments.push({ filename: 'forwarded-message.eml', content: await fetch(input.forward), contentType: 'message/rfc822' });
+    }
+    for (const ref of input.attachFrom ?? []) {
+      const parsed = await simpleParser(await fetch(ref));
+      for (const a of parsed.attachments ?? []) attachments.push({ filename: a.filename ?? 'attachment', content: a.content, contentType: a.contentType });
+    }
+    if (attachments.length) msg.attachments = attachments;
     return msg;
   }
 
@@ -552,7 +646,11 @@ export async function handleMailRequest(
           const r = recs.find((m) => m.id === mid);
           return { mailbox: mid, address: r?.address, status: r?.status };
         }),
-        sending: email?.send ? 'can send' : 'draft only'
+        sending: email?.send ? 'can send' : 'draft only',
+        // Where this access comes from, so a limit is never blamed on a setting
+        // the owner does not have (owner, 2026-10-03).
+        source: 'Settings, Connections, Mailboxes (the app\'s own mail connection, not a Claude connector)',
+        folders: 'search looks in the inbox, or in "sent", "archive" (Gmail: All Mail) or a label'
       }
     };
   }
@@ -573,16 +671,21 @@ export async function handleMailRequest(
     if (op === 'search') {
       return { status: 200, body: await svc.search(mailbox!, {
         text: str(body.text, 200), from: str(body.from, 200), subject: str(body.subject, 200), since: str(body.since, 40),
-        unread: body.unread === true, limit: typeof body.limit === 'number' ? body.limit : undefined, page: typeof body.page === 'number' ? body.page : undefined
+        unread: body.unread === true, limit: typeof body.limit === 'number' ? body.limit : undefined, page: typeof body.page === 'number' ? body.page : undefined,
+        folder: str(body.folder, 80)
       }) };
     }
     if (op === 'read') {
-      const id = str(body.id, 40) ?? (typeof body.id === 'number' ? String(body.id) : undefined);
+      // Long enough for the longest id search gives: "label:" + a 60 character label + ":" + uid.
+      const id = str(body.id, 100) ?? (typeof body.id === 'number' ? String(body.id) : undefined);
       if (!id) return { status: 400, body: { error: 'read needs the message id from search.' } };
       return { status: 200, body: await svc.read(mailbox!, id) };
     }
     if (op === 'archive' || op === 'mark_read' || op === 'mark_junk') {
       const raw = Array.isArray(body.ids) ? body.ids : body.id !== undefined ? [body.id] : [];
+      // Only inbox mail is archived, marked or moved: anything else is already out of the inbox.
+      const outside = raw.find((v) => typeof v === 'string' && /^(sent|archive|label):/.test(v.trim()));
+      if (outside !== undefined) return { status: 400, body: { error: `${op} works on inbox messages only; "${outside}" is already out of the inbox.` } };
       const uids = [...new Set(raw.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0))];
       if (!uids.length) return { status: 400, body: { error: `${op} needs "ids": the message ids from search.` } };
       if (uids.length > ORGANIZE_MAX) return { status: 400, body: { error: `At most ${ORGANIZE_MAX} messages per call.` } };

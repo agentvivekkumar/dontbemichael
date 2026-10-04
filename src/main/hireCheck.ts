@@ -27,6 +27,8 @@ export interface HireCheckDeps {
   command: string;
   env?: Record<string, string>;
   log?: (event: Record<string, unknown>) => void;
+  /** Stops the check when the owner moves on to another job (ship review). */
+  signal?: AbortSignal;
 }
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -60,9 +62,14 @@ export async function checkDistinct(job: JobProfile, teamIn: JobProfile[], deps:
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // A quick judgment: no extended thinking, so the verdict takes seconds.
+      thinking: false,
       env: deps.env,
-      timeoutMs: CHECK_TIMEOUT_MS
+      timeoutMs: CHECK_TIMEOUT_MS,
+      signal: deps.signal
     });
+    // Stopped because the owner picked another job: nobody reads this answer.
+    if (!result.ok && result.error === 'cancelled') return rulesVerdict(job, team);
     const verdict = result.ok && result.text ? parseDistinctAnswer(result.text, team.map((m) => m.name)) : null;
     // The rules always count too, so the model can't be talked past a job
     // whose what to send reads like a teammate's.

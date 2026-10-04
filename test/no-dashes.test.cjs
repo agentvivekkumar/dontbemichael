@@ -49,7 +49,7 @@ test('no shipped Office Pack puts a dash in anything the owner reads', () => {
     const texts = [
       ['displayName', p.displayName], ['tagline', p.tagline],
       ...p.agents.flatMap((a) => [
-        [`${a.id}.role`, a.role], [`${a.id}.summary`, a.summary], [`${a.id}.firstAction`, a.firstAction],
+        [`${a.id}.role`, a.role], [`${a.id}.summary`, a.summary], [`${a.id}.firstTask.title`, a.firstTask?.title], [`${a.id}.firstTask.ask`, a.firstTask?.ask],
         ...a.does.map((d, i) => [`${a.id}.does[${i}]`, d]),
         ...a.wontDo.map((d, i) => [`${a.id}.wontDo[${i}]`, d])
       ])

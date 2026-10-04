@@ -42,3 +42,27 @@ test('runHiddenClaude names its session and never picks the newest file in the f
   // A quiet screen without an answer waits instead of failing.
   assert.match(src, /if \(text\) \{ finish\(\{ ok: true, text \}\); return; \}\s*if \(idleTimer\) clearTimeout\(idleTimer\);\s*idleTimer = setTimeout\(captureAndFinish, idleMs\);/);
 });
+
+test('a quick judgment skips extended thinking and takes its answer the moment it lands', () => {
+  // Value: protects=the hire overlap check answers in seconds, not 20 to 60 (owner 2026-10-03: "very slow and frustrating"); fails_when=the checks stop passing thinking: false, the env stops setting MAX_THINKING_TOKENS=0, or a no tools call waits for a quiet screen again; why_new=measured 41.4s before, 9.4s after, same verdict; seam=source pin
+  const src = read('src/main/hiddenClaude.ts');
+  assert.match(src, /\.\.\.\(opts\.thinking === false \? \{ MAX_THINKING_TOKENS: '0' \} : \{\}\),/);
+  assert.match(src, /if \(opts\.noTools\) \{\s*answerPoll = setInterval\(\(\) => \{\s*const text = ownAnswer\(\);\s*if \(text\) finish\(\{ ok: true, text \}\);\s*\}, ANSWER_POLL_MS\);/);
+  assert.match(src, /if \(answerPoll\) \{ clearInterval\(answerPoll\); answerPoll = null; \}/, 'the poll stops with the call');
+  assert.match(read('src/main/hireCheck.ts'), /noTools: true,\s*\/\/[^\n]*\n\s*thinking: false,/);
+  const convert = read('src/main/workStyleConvert.ts');
+  const focus = convert.slice(convert.indexOf('export async function checkFocusArea'));
+  assert.match(focus, /thinking: false,/);
+  // Writing a work style is not a quick judgment: it keeps the CLI's setting.
+  assert.doesNotMatch(convert.slice(0, convert.indexOf('export async function checkFocusArea')), /thinking: false/);
+});
+
+test('an answer is only taken once its text block is complete', () => {
+  // Value: protects=polling never takes a thinking block or a half written line as the answer; fails_when=lastAssistantText returns thinking or partial JSON; why_new=the transcript is now read while the model is still writing; seam=none
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hidden-claude-'));
+  const f = transcriptFile(dir, 's');
+  fs.writeFileSync(f, line('user', 'check') + '\n' + JSON.stringify({ type: 'assistant', message: { content: [{ type: 'thinking', thinking: '' }] } }));
+  assert.equal(lastAssistantText(f), null, 'thinking alone is no answer');
+  fs.appendFileSync(f, '\n{"type":"assistant","message":{"content":[{"type":"text","text":"{\\"distin');
+  assert.equal(lastAssistantText(f), null, 'a half written line is skipped');
+});

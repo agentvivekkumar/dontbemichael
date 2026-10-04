@@ -18,6 +18,7 @@ import { GitTab } from './GitTab';
 import { SHOW_TRACES, SHOW_FOCUS_MODE, SHOW_GIT, SHOW_IDE, SHOW_CLOSE_AGENT, SHOW_OPEN_TERMINAL } from '@shared/buildFeatures';
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
+import { releaseBindingsOf } from '@/shell/releaseBindings';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import { closeConfirmText } from './triggers/ScheduleList';
 import { OneOnOneLine, OwnerViaMichaelBar } from './OwnerViaMichaelBar';
@@ -79,6 +80,8 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
     // The owner is closing this agent on purpose: its schedules pause (design
     // 6A). A crash or a quit only archives it and leaves them running.
     await window.cth.closeAgentByOwner(agent.id).catch(() => undefined);
+    // Their bound work goes back to the teammates it was taken from.
+    await releaseBindingsOf(agent.id);
     await window.cth.killPty(agent.ptyId);
     disposeTerminal(agent.ptyId);
     archiveAgent(agent.id);

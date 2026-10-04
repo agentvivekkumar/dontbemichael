@@ -42,16 +42,17 @@ const compose = {
 const TOOLS = [
   {
     name: 'list_mailboxes',
-    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first. These tools search, read, archive (with a label), mark read, mark junk, draft and send. They never delete mail: if you are asked to delete, report it (house rule 6).',
+    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first. These tools search, read, archive (with a label), mark read, mark junk, draft and send. They never delete mail: if you are asked to delete, report it (house rule 6). The mailbox is the app\'s own connection, set up in Settings, Connections, Mailboxes; it is not a Claude connector. If you also have a Claude connector such as Gmail, that is a separate connection with its own tools, possibly to another account. What these tools can and cannot do is built into the app, not a setting the owner can change: report a limit as a gap in the tool, without suggesting a setting.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'search',
-    description: 'Find messages in one of your mailboxes (newest first, 20 per page by default, 50 at most).',
+    description: 'Find messages in one of your mailboxes (newest first, 20 per page by default, 50 at most). Looks in the inbox unless you name another folder: "sent" for what the owner and the team sent, "archive" for mail taken out of the inbox (in Gmail this is All Mail, which holds every message but spam and trash), or a label such as "Finance". Each id says where its message is: use it as it is with read, reply_to, forward and attach_from.',
     inputSchema: {
       type: 'object',
       properties: {
         mailbox,
+        folder: { type: 'string', description: 'Where to look: "inbox" (the default), "sent", "archive", or a label name.' },
         text: { type: 'string', description: 'Words anywhere in the message.' },
         from: { type: 'string' },
         subject: { type: 'string' },
@@ -65,23 +66,23 @@ const TOOLS = [
   },
   {
     name: 'read',
-    description: 'Read one message (text, sender, recipients, attachment names).',
+    description: 'Read one message (text, sender, recipients, attachment names), from any folder search looked in.',
     inputSchema: { type: 'object', properties: { mailbox, id: { type: 'string', description: 'Message id from search.' } }, required: ['mailbox', 'id'] }
   },
   {
     name: 'archive',
     description: 'Take messages out of the inbox once each has its outcome: marks them read and moves them to the archive, or under a label if you give one (a Gmail label, or a folder of that name). Nothing is deleted; the owner can find every message.',
-    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' }, label: { type: 'string', description: 'Optional label, for example "Finance" or "Waiting".' } }, required: ['mailbox', 'ids'] }
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Inbox message ids from search (a plain number; sent:, archive: and label: ids are already out of the inbox), at most 50.' }, label: { type: 'string', description: 'Optional label, for example "Finance" or "Waiting".' } }, required: ['mailbox', 'ids'] }
   },
   {
     name: 'mark_read',
     description: 'Mark messages read and leave them in the inbox.',
-    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' } }, required: ['mailbox', 'ids'] }
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Inbox message ids from search (a plain number; sent:, archive: and label: ids are already out of the inbox), at most 50.' } }, required: ['mailbox', 'ids'] }
   },
   {
     name: 'mark_junk',
     description: 'Mark messages read and move them to the junk folder. Use it only for junk: some providers (Gmail) empty the junk folder after 30 days.',
-    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Message ids from search, at most 50.' } }, required: ['mailbox', 'ids'] }
+    inputSchema: { type: 'object', properties: { mailbox, ids: { type: 'array', items: { type: 'string' }, description: 'Inbox message ids from search (a plain number; sent:, archive: and label: ids are already out of the inbox), at most 50.' } }, required: ['mailbox', 'ids'] }
   },
   {
     name: 'draft',

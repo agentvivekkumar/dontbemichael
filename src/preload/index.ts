@@ -165,7 +165,9 @@ export interface HiveTask {
   title: string;
   description?: string;
   assignee?: string;
-  status: 'todo' | 'doing' | 'blocked' | 'done';
+  status: 'todo' | 'doing' | 'waiting' | 'blocked' | 'done';
+  /** Who a Waiting card waits on (Michael writes it). */
+  waitingOn?: string;
   dependsOn: string[];
   priority: number;
   createdAt: string;
@@ -282,6 +284,9 @@ export interface HarnessConfig {
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
+  /** Set once the pack's First task text was taken out of existing team
+   *  members' Work styles (docs/designs/first-task-card.md, D1). */
+  firstTasksRemoved?: boolean;
   /** Owner decisions on offered job description updates (shared/workStyleUpdates.ts). */
   workStyleUpdatesDecided?: Record<string, 'use' | 'keep'>;
   harnessHome: string | null;
@@ -647,9 +652,29 @@ const api = {
   /** The hire wizard's distinct job check against every teammate (design D6). */
   hireCheckDistinct: (
     job: { name: string; title: string; routing: string; workStyle?: string; mailbox?: string },
-    team: Array<{ name: string; title: string; routing: string; workStyle?: string; mailbox?: string }>
+    team: Array<{ name: string; title: string; routing: string; workStyle?: string; mailbox?: string }>,
+    requestId?: string
   ): Promise<{ distinct: boolean; overlapsWith: string[]; why: string; suggestion?: string; source: 'ai' | 'rules' }> =>
-    ipcRenderer.invoke('hire:checkDistinct', { job, team }),
+    ipcRenderer.invoke('hire:checkDistinct', { job, team, requestId }),
+  /** Stop a check the owner moved past (another job picked, or back a step). */
+  hireCheckStop: (requestId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('hire:checkStop', requestId),
+  /** "Suggest me": a first work style for the owner to edit; empty when it can't
+   *  run. With a `requestId`, the draft streams to onWorkStyleSuggestText. */
+  workStyleSuggest: (req: {
+    requestId?: string;
+    ctx: { name: string; title?: string; business?: { name?: string; city?: string }; manager?: string };
+    handles: string;
+    businessType?: string;
+    team: Array<{ name: string; title?: string; handles?: string }>;
+  }): Promise<{ text: string; cancelled?: boolean }> => ipcRenderer.invoke('workStyle:suggest', req),
+  /** The draft as it is written, for the run with this request id. */
+  onWorkStyleSuggestText: (cb: (e: { requestId: string; text: string }) => void): (() => void) => {
+    const listener = (_e: unknown, payload: { requestId: string; text: string }) => cb(payload);
+    ipcRenderer.on('workStyle:suggestText', listener);
+    return () => ipcRenderer.removeListener('workStyle:suggestText', listener);
+  },
+  /** Stop a suggestion that is still being written. */
+  workStyleSuggestStop: (requestId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('workStyle:suggestStop', requestId),
   /** Rewrite a work style: the agent's instructions as the owner's plain
    *  description, or the owner's description as instructions. */
   workStyleConvert: (req: {
@@ -860,6 +885,12 @@ const api = {
   /** Persist a hire/job role to hive registry.json + identity.md (no respawn). */
   hivePatchAgentRole: (id: string, role: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:patchAgentRole', id, role),
+  /** A hire's first task: its card, and a request to Michael to hand it out.
+   *  Once per hire; `sent` is false when there was nothing to send. With
+   *  `edited`, the words are an owner's edited First task from an older Work
+   *  style (sourceCard may then be empty: a hire with no pack card). */
+  hiveFirstTask: (sourceCard: string | undefined, agentId: string, name: string, edited?: { ask: string; role?: string; existing?: boolean }): Promise<{ ok: boolean; sent?: boolean; error?: string }> =>
+    ipcRenderer.invoke('hive:firstTask', { sourceCard, agentId, name, ...(edited ? { ask: edited.ask, role: edited.role, existing: edited.existing } : {}) }),
   /** Rename an agent's display name. Its id, hive directory, and PTY are unchanged. */
   hiveRenameAgent: (id: string, name: string): Promise<{ ok: boolean; name?: string; error?: string }> =>
     ipcRenderer.invoke('hive:renameAgent', id, name),
@@ -869,7 +900,7 @@ const api = {
     ipcRenderer.invoke('hive:setAgentHold', id, hold),
   hiveBoard: (): Promise<string> => ipcRenderer.invoke('hive:board'),
   hiveTasks: (): Promise<unknown> => ipcRenderer.invoke('hive:tasks'),
-  hiveLog: (n?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200),
+  hiveLog: (n?: number, kind?: string, since?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200, kind, since),
   /** When the app last cleared this agent's conversation, or null. */
   hiveClearedState: (id: string): Promise<{ at: number; oldSession: string; tokensBefore: number } | null> =>
     ipcRenderer.invoke('hive:clearedState', id),

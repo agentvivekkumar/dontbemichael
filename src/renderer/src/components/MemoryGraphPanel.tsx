@@ -4,10 +4,12 @@ import type { TFunction } from 'i18next';
 import { useStore } from '@/store/store';
 import { PixelBadge } from './PixelBadge';
 import { InfoTip } from './InfoTip';
-import { Toggle as V2Toggle } from './triggers/ui';
+import { Select } from './triggers/ui';
+import { DEFAULT_RANGE, MAX_RANGE_MESSAGES, TIME_RANGES, isRangeKey, rangeStart, type TimeRangeKey } from './memoryGraph/timeRanges';
 import { useAppTheme } from '@/design/theme';
 import { departmentOf } from '@/scene/studio/layout';
 import { family } from '@/scene/studio/theme';
+import { INK_FIXED, PROP_ART, hasProp } from '@/scene/office/props';
 import {
   buildGraph,
   type GraphData,
@@ -17,8 +19,17 @@ import {
 } from './memoryGraph/buildGraph';
 import { forceLayout, type Positions } from './memoryGraph/forceLayout';
 
-/** Who talks to whom: hive agents as nodes, messages as edges, an optional
- *  topic layer from each agent's memory file. SVG-rendered as avatars in
+/** The chosen time range, remembered on this computer. */
+const RANGE_KEY = 'cth.graphRange';
+function loadRange(): TimeRangeKey {
+  try {
+    const v = window.localStorage.getItem(RANGE_KEY);
+    return isRangeKey(v) ? v : DEFAULT_RANGE;
+  } catch { return DEFAULT_RANGE; }
+}
+
+/** Who talks to whom: hive agents as nodes, messages as edges (the Topics
+ *  layer was removed, owner 2026-10-03). SVG-rendered as avatars in
  *  department colors on a dot grid (branding/DESIGN.md 7.22).
  *
  *  All data comes from the existing preload bridge: store.agents + hiveLog +
@@ -34,21 +45,30 @@ export function MemoryGraphPanel({
   const agents = useStore((s) => s.agents);
 
   const [log, setLog] = useState<MessageLogEntry[]>([]);
-  const [showTopics, setShowTopics] = useState(false);
+  const [range, setRange] = useState<TimeRangeKey>(loadRange);
   const [memories, setMemories] = useState<Record<string, string>>({});
-  const [loadingTopics, setLoadingTopics] = useState(false);
 
   // ── poll the message log (same cadence as the Activity tab) ──────────────────
   const refresh = useCallback(async () => {
-    try { setLog((await window.cth.hiveLog(200)) as MessageLogEntry[]); } catch { /* noop */ }
-  }, []);
+    try {
+      const next = (await window.cth.hiveLog(MAX_RANGE_MESSAGES, 'message', rangeStart(range, Date.now()))) as MessageLogEntry[];
+      // The same messages as last poll: keep the array, so the graph and its
+      // layout are not rebuilt every 5 s for nothing.
+      setLog((prev) => (prev.length === next.length && prev[0]?.id === next[0]?.id && prev[prev.length - 1]?.id === next[next.length - 1]?.id ? prev : next));
+    } catch { /* noop */ }
+  }, [range]);
+  const pickRange = (v: string) => {
+    if (!isRangeKey(v)) return;
+    setRange(v);
+    try { window.localStorage.setItem(RANGE_KEY, v); } catch { /* the choice just isn't remembered */ }
+  };
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
   }, [refresh]);
 
-  // ── lazy memory loads: one on hover, all when the topic layer turns on ───────
+  // ── lazy memory loads: one on hover ──────────────────────────────────────────
   const fetchMemory = useCallback(async (id: string) => {
     try {
       const text = await window.cth.hiveMemory(id);
@@ -56,24 +76,11 @@ export function MemoryGraphPanel({
     } catch { setMemories((m) => ({ ...m, [id]: '' })); }
   }, []);
 
-  useEffect(() => {
-    if (!showTopics) return;
-    const missing = agents.map((a) => a.id).filter((id) => !(id in memories));
-    if (missing.length === 0) return;
-    setLoadingTopics(true);
-    Promise.all(missing.map((id) => window.cth.hiveMemory(id).then(
-      (t) => [id, t ?? ''] as const,
-      () => [id, ''] as const
-    ))).then((pairs) => {
-      setMemories((m) => ({ ...m, ...Object.fromEntries(pairs) }));
-      setLoadingTopics(false);
-    });
-  }, [showTopics, agents, memories]);
 
   // ── graph model ──────────────────────────────────────────────────────────────
   const graph: GraphData = useMemo(
-    () => buildGraph(agents, log, { showTopics, memories }),
-    [agents, log, showTopics, memories]
+    () => buildGraph(agents, log),
+    [agents, log]
   );
 
   // ── canvas sizing ─────────────────────────────────────────────────────────────
@@ -102,12 +109,12 @@ export function MemoryGraphPanel({
   const layout: Positions = useMemo(() => {
     const lnodes = graph.nodes.map((n) => ({
       id: n.id,
-      gravityBias: n.kind === 'topic' ? 0.6 : n.kind === 'pseudo' ? 1.4 : n.id === godId ? 2.4 : 1
+      gravityBias: n.kind === 'pseudo' ? 1.4 : n.id === godId ? 2.4 : 1
     }));
     const ledges = graph.edges.map((e) => ({
       source: e.source,
       target: e.target,
-      strength: e.kind === 'topic' ? 0.35 : 0.7 + Math.min(e.weight, 5) * 0.06
+      strength: 0.7 + Math.min(e.weight, 5) * 0.06
     }));
     return forceLayout(lnodes, ledges, {
       width: dims.w, height: dims.h, pinned,
@@ -229,7 +236,6 @@ export function MemoryGraphPanel({
               const sn = nodeById.get(e.source);
               const tn = nodeById.get(e.target);
               if (!sp || !tp || !sn || !tn) return null;
-              const isTopic = e.kind === 'topic';
               const hot = hoverEdge?.id === e.id;
               const touches = hoverEdge ? hot : (!hoverNodeId || e.source === hoverNodeId || e.target === hoverNodeId);
               const dx = tp.x - sp.x;
@@ -239,7 +245,7 @@ export function MemoryGraphPanel({
               const uy = dy / dist;
               const sr = nodeRadius(sn) + 3;
               const tr = nodeRadius(tn) + 3;
-              const w = isTopic ? 1 : 1 + Math.min(e.weight, 10) * 0.5;
+              const w = 1 + Math.min(e.weight, 10) * 0.5;
               return (
                 <g key={e.id}>
                   {/* a wide invisible stroke makes thin edges easy to hover */}
@@ -252,8 +258,7 @@ export function MemoryGraphPanel({
                     stroke={hot ? 'var(--cth-violet)' : 'var(--cth-ink-4)'}
                     strokeWidth={hot ? 3 : w}
                     strokeLinecap="round"
-                    strokeDasharray={isTopic ? '3 4' : undefined}
-                    opacity={touches ? (hot ? 1 : isTopic ? 0.45 : 0.4 + Math.min(e.weight, 10) * 0.03) : 0.12}
+                    opacity={touches ? (hot ? 1 : 0.4 + Math.min(e.weight, 10) * 0.03) : 0.12}
                     pointerEvents="none"
                   />
                   {hot && (
@@ -285,25 +290,27 @@ export function MemoryGraphPanel({
                   style={{ cursor: navigable ? 'pointer' : 'grab' }}
                 >
                   {n.kind === 'agent' ? (
-                    // An avatar in the person's department colors, ringed in
-                    // its accent; Michael in ink (DESIGN.md 7.22).
+                    // The person's prop on their department's light pastel,
+                    // ringed in its accent; Michael's mug on ink (DESIGN.md
+                    // 3.4, 7.22). No known character keeps the initial.
                     <>
                       <circle r={r + 3} fill={n.isGod ? 'var(--cth-indigo)' : fam?.acc ?? 'var(--cth-ink-4)'} opacity={n.isGod ? 0.35 : 1} />
-                      <circle r={r} fill={n.isGod ? 'var(--cth-ink)' : fam?.l ?? 'var(--cth-neutral-soft)'} stroke="var(--cth-card)" strokeWidth={2} />
-                      <text y={r * 0.32} textAnchor="middle" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: r * 0.9, fontWeight: 700, fill: n.isGod ? 'var(--cth-bg)' : fam?.acc ?? 'var(--cth-ink-2)' }}>
-                        {n.label.slice(0, 1).toUpperCase()}
-                      </text>
+                      <circle r={r} fill={n.isGod ? INK_FIXED : (hasProp(n.character) ? fam?.lit : fam?.l) ?? 'var(--cth-neutral-soft)'} stroke="var(--cth-card)" strokeWidth={2} />
+                      {hasProp(n.character) || n.isGod ? (
+                        <svg x={-r * 0.72} y={-r * 0.72} width={r * 1.44} height={r * 1.44} viewBox="0 0 24 24" overflow="visible" pointerEvents="none">
+                          {PROP_ART[hasProp(n.character) ? n.character : 'michael']}
+                        </svg>
+                      ) : (
+                        <text y={r * 0.32} textAnchor="middle" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: r * 0.9, fontWeight: 700, fill: fam?.acc ?? 'var(--cth-ink-2)' }}>
+                          {n.label.slice(0, 1).toUpperCase()}
+                        </text>
+                      )}
                       {pinned[n.id] && (
                         <g transform={`translate(${r * 0.72},${-r * 0.72})`}>
                           <circle r={8} fill="var(--cth-card)" stroke="var(--cth-line-2)" />
                           <path d="M-2.5,-3 L2.5,-3 L1.5,0 L3,1.5 L-3,1.5 L-1.5,0 Z M0,1.5 L0,4.5" fill="var(--cth-ink-2)" stroke="var(--cth-ink-2)" strokeWidth={0.8} strokeLinejoin="round" />
                         </g>
                       )}
-                    </>
-                  ) : n.kind === 'topic' ? (
-                    <>
-                      <rect x={-r * 2.4} y={-11} width={r * 4.8} height={22} rx={11} fill="var(--cth-card)" stroke="var(--cth-line-2)" />
-                      <circle cx={-r * 2.4 + 11} cy={0} r={3} fill="var(--cth-ink-4)" />
                     </>
                   ) : (
                     <circle r={r} fill={n.id === 'human' ? 'var(--cth-coral-soft)' : 'var(--cth-neutral-soft)'} stroke={n.id === 'human' ? 'var(--cth-coral-base)' : 'var(--cth-line-2)'} strokeWidth={1.5} />
@@ -318,18 +325,17 @@ export function MemoryGraphPanel({
             {graph.nodes.map((n) => {
               const p = posOf(n.id);
               if (!p) return null;
-              const isTopic = n.kind === 'topic';
               return (
                 <text
                   key={n.id}
-                  x={isTopic ? p.x + 5 : p.x} y={isTopic ? p.y + 4 : p.y + nodeRadius(n) + 17}
+                  x={p.x} y={p.y + nodeRadius(n) + 17}
                   textAnchor="middle"
                   opacity={isDim(n.id) ? 0.25 : 1}
                   style={{
-                    fontFamily: 'var(--cth-font-ui)', fontSize: isTopic ? 11 : 12, fontWeight: isTopic ? 500 : 600,
-                    fill: isTopic ? 'var(--cth-ink-2)' : 'var(--cth-ink)'
+                    fontFamily: 'var(--cth-font-ui)', fontSize: 12, fontWeight: 600,
+                    fill: 'var(--cth-ink)'
                   }}
-                >{truncate(n.label, isTopic ? 20 : 16)}</text>
+                >{truncate(n.label, 16)}</text>
               );
             })}
           </g>
@@ -341,20 +347,20 @@ export function MemoryGraphPanel({
           padding: '8px 10px 8px 14px', borderRadius: 'var(--cth-r-lg)', background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-md)'
         }}>
           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{t('floorView.graph')}</span>
-          <span style={{ fontSize: 11.5, color: 'var(--cth-ink-3)' }}>{t('memoryGraph.lastN', { count: 200 })}</span>
-          <V2Toggle on={showTopics} onClick={() => setShowTopics((v) => !v)} onLabel={t('memoryGraph.topics')} offLabel={t('memoryGraph.topics')} label={t('memoryGraph.topics')} />
+          <Select value={range} onChange={pickRange} label={t('memoryGraph.rangeLabel')} style={{ width: 'auto', height: 28, fontSize: 12 }}>
+            {TIME_RANGES.map((r) => <option key={r.key} value={r.key}>{t(`memoryGraph.range.${r.key}`)}</option>)}
+          </Select>
           <button onClick={refresh} title={t('memoryGraph.refresh')} aria-label={t('memoryGraph.refresh')} style={iconBtn}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" /></svg>
           </button>
-          {showTopics && loadingTopics && <span style={{ fontSize: 11, color: 'var(--cth-ink-3)' }}>{t('memoryGraph.readingMemory')}</span>}
         </div>
 
         {/* empty hint */}
-        {messageEdgeCount === 0 && !showTopics && (
+        {messageEdgeCount === 0 && (
           <div style={{
             position: 'absolute', top: '45%', left: 0, right: 0, textAlign: 'center',
             fontSize: 13, color: 'var(--cth-ink-3)', pointerEvents: 'none'
-          }}>{t('memoryGraph.noMessages')}</div>
+          }}>{t('memoryGraph.noMessagesInRange')}</div>
         )}
 
         {/* tooltip */}
@@ -390,14 +396,6 @@ function NodeTip({ node, memories }: { node: GraphNode; memories: Record<string,
       </>
     );
   }
-  if (node.kind === 'topic') {
-    return (
-      <>
-        <div style={tipTitle}>{node.label}</div>
-        <div style={tipBody}>shared by {node.weight} agents</div>
-      </>
-    );
-  }
   return (
     <>
       <div style={tipTitle}>{node.label}</div>
@@ -410,9 +408,6 @@ function EdgeTip({ edge, nodeById }: { edge: GraphEdge; nodeById: Map<string, Gr
   const { t } = useTranslation();
   const a = nodeById.get(edge.source)?.label ?? edge.source;
   const b = nodeById.get(edge.target)?.label ?? edge.target;
-  if (edge.kind === 'topic') {
-    return <div style={tipBody}>{t('memoryGraph.knowsAbout', { a, b })}</div>;
-  }
   return (
     <>
       <div style={tipTitle}>{t('memoryGraph.pair', { a, b })}</div>
@@ -434,9 +429,6 @@ function Legend() {
     }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--cth-blue-soft)', boxShadow: 'inset 0 0 0 2px var(--cth-blue)' }} />{t('memoryGraph.legendPerson')}
-      </span>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 16, height: 10, borderRadius: 5, background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line-2)' }} />{t('memoryGraph.legendTopic')}
       </span>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 18, height: 2, borderRadius: 1, background: 'var(--cth-ink-4)' }} />{t('memoryGraph.legendMessages')}
@@ -470,7 +462,6 @@ const GRAPH_LEGEND_H = 56;
 // Avatars: Michael 72px, everyone else 48px (DESIGN.md 7.22).
 function nodeSize(n: GraphNode): number {
   if (n.kind === 'agent') return n.isGod ? 72 : 48;
-  if (n.kind === 'topic') return 12 + Math.min(n.weight, 6) * 1.4;
   return 30; // pseudo
 }
 function nodeRadius(n: GraphNode): number { return nodeSize(n) / 2; }
