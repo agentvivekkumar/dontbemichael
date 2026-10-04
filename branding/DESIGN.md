@@ -236,7 +236,21 @@ one directly: they go to Michael first (§8.6).
 
 Pods, avatars and illustration faces use a pastel family per department. Each family has
 `l` (lit screen, lightest face), `m` (main face), `d` (shaded face) and `acc` (glow,
-avatar letter, tag rule).
+department icon, tag rule).
+
+**Avatars.** A person is drawn as their character's signature prop on a circle of their
+department's `l` (the light `l` in dark theme too, with an `m` edge), so a prop reads the
+same in both themes: Michael's World's Best Boss mug (on ink in both themes), Pam's
+palette, Erin's balloon, Dwight's beet, Jim's tuna can, Stanley's pretzel, Phyllis's
+knitting, Andy's banjo, Ryan's rocket, Oscar's calculator, Angela's cat, Kevin's chili
+pot, Toby's island palm, Kelly's phone, Nick's router, Sadiq's lock, Creed's sprout,
+Meredith's party hat, Darryl's music note (owner, 2026-10-03: the letter added nothing).
+Someone with no known character keeps their initial. One component draws them all
+(`PersonAvatar`, `scene/office/props.tsx`).
+
+**Department icons.** One line icon per job function, stroked in `acc`: front desk tray,
+support headset, sales trend arrow, finance coins, marketing megaphone, people pair, IT
+monitor with code, operations box, team sparkle. They sit in the department tab (§7.14).
 
 | Department | Roles today | `l` | `m` | `d` | `acc` |
 |---|---|---|---|---|---|
@@ -328,7 +342,7 @@ Rules:
 - Uppercase is only for micro labels (department tabs, field labels, eyebrows) with
   `+0.05em` to `+0.08em` tracking. Never uppercase a sentence.
 - Weights: 400 body, 500 labels and tabs, 600 names, titles and buttons, 700 only for
-  avatar initials.
+  avatar initials (someone with no character, §3.4).
 
 ### 4.2 App scale [App]
 
@@ -387,7 +401,7 @@ One window, four regions. Nothing else is permanent.
 | Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
 | Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Who talks to whom (§7.22) |
 | Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets; its grip shows only on hover) | Closed by default: while nothing waits and nobody is open the column is not there and the office takes the window (`bleed` 0, no splitter). Otherwise the Needs you board, the selected person's panel or Michael's panel (§7.6). Work tab widens it to 480. It has no ground of its own (owner, 2026-09-30: a panel behind cards is a layer too many): the Needs you heading and cards, and the person and Michael panels (cards themselves), sit straight on the stage, which runs on underneath (`StudioStage` `bleed`); the scene still fits the space left of it |
-| Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip, pack and Hire (§7.19) |
+| Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip and Hire (§7.19) |
 
 Rules:
 
@@ -494,7 +508,11 @@ the count rises (docs/designs/needs-you-empty-state.md).
 
 ### 7.6 Right column
 
-Four states, one region (docs/designs/needs-you-empty-state.md):
+Four states, one region (docs/designs/needs-you-empty-state.md). The column shows on the
+Office view only: Tasks and Who talks to whom take the whole window (owner, 2026-10-03). It
+stays mounted there, hidden, so a person's terminal and a half written reply survive the
+switch; anything that opens it (the Needs you pill, a "?" or "for you" badge, a person, the
+next job chip) goes back to the Office first.
 
 0. **Closed**. Only when nothing at all waits on the owner: not rendered, the office fills
    the window. While any Ask me card or schedule request waits the column is open (the
@@ -582,7 +600,7 @@ Decline.
 
 ### 7.10 Person panel header
 
-- 44 px avatar (department `l` fill, `acc` letter, 700), name `t-panel`, role `t-meta`
+- 44 px avatar (their prop, §3.4), name `t-panel`, role `t-meta`
   `ink-3`, status pill (§7.13), caption with a dot (`t-meta`, `ink-2`).
 - Right: "Edit" secondary button with a pencil (opens EditAgentModal), close `x` (secondary,
   32 × 32).
@@ -644,8 +662,8 @@ Colors per §3.5.
 The card floating by each pod on the stage.
 
 - `r-xl`, padding 12 × 10 × 0 × 9, `card` at 96%, `line` border, `shadow-md`.
-- Department tab on the top edge, offset −9 px: uppercase `t-micro` in a `card` chip with
-  a `line-2` border and `r-sm`. Beside it: the sticky count (§7.16) and the for you badge
+- Department tab on the top edge, offset −9 px: the department icon (§3.4, 10 px, `acc`)
+  and uppercase `t-micro` in a `card` chip with an `m` border and `r-sm`. Beside it: the sticky count (§7.16) and the for you badge
   (§7.15).
 - Row: 24 px avatar, name (12.5 → `t-ui` 600), role (`t-micro` 400 `ink-3`, not
   uppercase), status pill top right.
@@ -707,7 +725,7 @@ or focusing it opens the full hub card just under the plate and lights the plate
 
 The hub card: 196 px wide, `r-2xl`, `shadow-hub`.
 
-- Top: 26 px ink avatar "M", name, "Office Manager", status pill, caption.
+- Top: 26 px avatar (Michael's mug on ink, §3.4), name, "Office Manager", status pill, caption.
 - Stats strip (`card-2`): three columns, mono 16 px 600 numbers: **delegated** (today's
   hive messages from Michael with act `request`), **to you** (open Ask me cards), **kept**
   (tasks assigned to Michael himself). Labels `t-micro` 400 `ink-3`. "to you" in `coral`
@@ -733,23 +751,25 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
   an arrow. The box grows with the text up to 140 px, then scrolls; the composer grows
   upward from the bar's bottom edge with its buttons on the bottom row, and the chips
   beside it stay put. Enter sends, Shift+Enter starts a new line (owner, 2026-10-01). It
-  keeps at least 300 px; on a narrow stage the pack note hides first, so the placeholder never
-  wraps. A pasted screenshot or Finder files attach, as on Michael's Work tab. Focus rings the
+  keeps at least 300 px, so the placeholder never wraps. A pasted screenshot or Finder files attach, as on Michael's Work tab. Focus rings the
   whole composer in `indigo`.
   Queued messages show as a count chip on the composer; the full queue opens
   above it.
 - **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.
   `card`, `line`, `r-lg`, 40 px tall. Click opens Office schedule.
-- **Pack and Hire**, pushed right: "Team from the Pro Services pack" `t-meta` `ink-3`, then
-  secondary "Hire" with a plus (opens the hire wizard).
+- **Hire**, pushed right: secondary "Hire" with a plus (opens the hire wizard). No pack
+  caption beside it (owner, 2026-10-03: a bare caption among card chips looked orphaned);
+  each job in the hire wizard carries its pack's name.
 
 ### 7.20 Tasks view (TasksKanban)
 
-- Header on the stage: "Tasks" `t-view`, count chips (To do, Doing, Blocked in coral soft,
-  Done in green soft), right aligned lock icon plus "New work goes through Michael"
+- Header on the stage: "Tasks" `t-view`, count chips (To do, Doing, Waiting, Blocked in
+  coral soft, Done in green soft), right aligned lock icon plus "New work goes through Michael"
   (`t-meta`, `ink-3`). No add button; the board is read only.
-- Four columns on a `floor` tinted ground, `r-xl`, 16 px gaps. Column head: key dot, name
-  `t-ui` 600, mono count. Blocked column tinted `coral` soft.
+- Five columns on a `floor` tinted ground, `r-xl`, 16 px gaps: To do, Doing, Waiting
+  (`amber` key, yellow), Blocked, Done. Column head: key dot, name `t-ui` 600, mono count. Blocked
+  column tinted `coral` soft. A Waiting card shows an `amber` soft chip "Waiting on {who}"
+  (card-lifecycle.md section 8).
 - Task card: `card`, `line`, `r-lg`, padding 12. Mono id (`#112`, `ink-3`), title `t-ui` 600
   up to 2 lines, assignee avatar plus name. Waiting on the owner: a 18 px coral "?"
   circle top right. Done: a small green check, text in `ink-2`. Hover shows the dismiss
@@ -768,8 +788,9 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   `t-panel` under them at full width, cleaned like an Ask me title (§7.8) (owner,
   2026-10-01: side by side, a long id squeezed the title).
 - Four fields in a row with uppercase micro labels: STATUS (select, `coral` text when
-  Blocked; it offers To do, Doing and Done, and shows Blocked only as a blocked card's
-  current state, since only Michael sets it), ASSIGNEE (person chip), PRIORITY (5 dots,
+  Blocked; it offers To do, Doing and Done, and shows Blocked or Waiting only as the card's
+  current state, since only Michael sets them; a Waiting card reads "Waiting on {who}"
+  under it, `amber` text), ASSIGNEE (person chip), PRIORITY (5 dots,
   filled `ink`), CREATED (mono).
 - NOTES: the card's `description`, else the `notes` agents keep on it (owner, 2026-10-01:
   the dialog read only `description`, so it was empty on every card); Michael is told to
@@ -783,18 +804,18 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 ### 7.22 Who talks to whom (MemoryGraphPanel)
 
 - Canvas on the stage: `floor` tinted, `r-2xl`, a 24 × 18 px dot grid at 55%.
-- Toolbar card top left: title `t-panel`, "Last 200 messages" `t-meta` `ink-3`, a Topics
-  switch, a Refresh icon button.
-- Person nodes: avatar circles (Michael 72 px, others 48 px) with a 3 px department `acc`
-  ring and the name under them. A pinned node shows a small pin badge.
-- Topic nodes: `card` pills with a `line-2` border and a 6 px `ink-4` dot.
+- Toolbar card top left: title `t-panel`, a time range select (Last 1 hour, 4 hours,
+  8 hours, 1 day, 3 days, 1 week, 2 weeks, 1 month; default Last 1 day, remembered on this
+  computer) and a Refresh icon button. An empty range says so in the middle.
+- Person nodes: avatar circles (Michael 72 px, others 48 px) showing the person's prop
+  (§3.4), with a 3 px department `acc` ring and the name under them. A pinned node shows a small pin badge.
 - Edges behind nodes: `ink-4` at 40% to 70%, 1 to 6 px wide by message count.
 - Hovering an edge: the edge turns `violet` 3 px with a handle dot; non neighbors dim to
   30%; a tooltip card (`r-lg`, `shadow-lg`) shows both avatars, "Dwight and Oscar",
   "6 messages today" in `violet` text, and "Last: ..." with a mono time.
 - Hovering a node shows its memory snippet instead (one card at a time). Drag pins a node.
   Click a person opens their Memory tab.
-- Legend card bottom left: Person, Topic, Messages, and an info icon.
+- Legend card bottom left: Person, Messages, and an info icon.
 - Nodes stay clear of both cards: the layout keeps 44 px from every edge, plus 52 px under
   the toolbar and 56 px above the legend.
 
@@ -925,7 +946,10 @@ light (§3.8) and a faint dot grid masked to the edges.
 ### 8.3 Pods
 
 A department pod is a desk block, a monitor on a stand, a chair, a keyboard, and a small
-plant or mug, all in the department family (§3.4) on a paper pad slab. A pod holds one to
+plant or mug, all in the department family (§3.4) on a paper pad slab. Each desk carries
+its person's prop (§3.4) at the front left corner, and Michael's desk his mug. Open floor
+holds three potted plants and a water cooler (`DECOR` in StudioArt), on spots clear of
+every ring slot, the mailbox row and Michael's office. A pod holds one to
 four desks (§8.9). The monitor screen is the status surface:
 
 - Lit: `l` fill with a soft inner light and a floor glow ellipse in `acc` at 42% core,
@@ -1009,7 +1033,10 @@ bubble with the sender's name on top and the sender's color on the ring. Each li
 to 3.6 s by its length while the reply flies back, so the conversation reads in order; the
 last one holds a little longer. Exchanges are the full set in the file: `EXCHANGES`, the "that's
 what she said" bits (owner, 2026-10-01: "bring full set back") and each character's
-signature opener (once a day). A conversation ends early if either person gets work.
+signature opener (once a day). A bit that belongs to someone on the show says who may say
+each side (Michael lands "that's what she said", Andy went to Cornell), and the partner is
+picked to fit; a break-room line never names its own speaker (owner, 2026-10-03). A
+conversation ends early if either person gets work.
 
 The first line or conversation comes 8 to 15 s after the office opens, then every 15 to
 30 s. A single line is visible 8 s. Never from a pod with someone at work, and never from
@@ -1020,9 +1047,10 @@ someone still clocking in.
 - Departments, not seats. Each department has one pod holding up to 4 desks (1: single
   desk; 2: side by side; 3 and 4: a 2 × 2 cluster). A fifth person in a department opens a
   second pod for it.
-- Up to 7 department pods sit on a ring around Michael's pod, each department in the same
-  slot every day (front desk, marketing, support, sales, finance, IT, people; operations
-  and team take any free slot).
+- Up to 9 department pods sit on a ring around Michael's pod, each department in the same
+  slot every day (front desk, marketing, support, sales, finance, IT, people, then
+  operations front left and the team pod front, its card toward Michael; owner,
+  2026-10-03). A second pod for a busy department takes any free slot.
 - More pods than slots, or more than 28 people, switches the Office view to a compact grid
   of label cards grouped by department, with the same states and badges.
 - A department is read from the job card a person was hired with, then their character's
@@ -1282,7 +1310,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | # | Surface | Gap | Where | Status |
 |---|---|---|---|---|
-| 1 | App | Pixel office floor (Pixi.js) is the main view | `src/renderer/src/scene/office/` | Done: `scene/studio/`; the Pixi files, tilesets and maps are deleted (only `cast.ts` and `cafeteriaLines.ts` remain, as data) |
+| 1 | App | Pixel office floor (Pixi.js) is the main view | `src/renderer/src/scene/office/` | Done: `scene/studio/`; the Pixi files, tilesets and maps are deleted (`cast.ts` and `cafeteriaLines.ts` remain, as data; `props.tsx`, added 2026-10-03, draws the props of §3.4) |
 | 2 | App | Bottom agent strip and right Command Center layout | `AgentStrip`, `AgentCard`, `CommandCenterPanel`, `App.tsx` | Done: `shell/`; strip and card deleted |
 | 3 | App | Pixel primitives and pixel fonts | `PixelPanel`, `PixelButton`, `PixelBadge`, `fonts.css`, `tokens.css` | Done; Press Start 2P removed with the floor |
 | 4 | App | Tokens are the v1 cream and ink palette | `design/tokens.css`, `tokens.ts` | Done |
@@ -1315,6 +1343,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 
 | Date | Change |
 |---|---|
+| 2026-10-03 | Floor character: each person is drawn as their character's prop, and each department has a line icon (§3.4, §7.10, §7.14, §7.17); desks carry their person's prop, and the floor has plants and a water cooler (§8.3); the ring holds up to 9 pods, operations and team included (§8.9); banter goes to a partner who would say it (§8.8). The right column shows on the Office view only (§7.6). No pack caption beside Hire (§7.19). Tasks view: a Waiting column that only Michael sets (§7.20, §7.21). Who talks to whom: a time range instead of the last 200 messages, people as their props, no Topics (§7.22). |
 | 2026-10-03 | Tasks view: the dismiss `x` closes a card as Done by the owner's decision ("Closed by owner"), never deletes it; "With Michael", "Michael hasn't moved this" and "Nothing asked" on cards; Task detail's status offers To do, Doing and Done (§7.20, §7.21). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
 | 2026-10-01 | In repo register items closed (§17): retired kit fonts and `pixi.js` removed, the README shows the reference screens with no LimeZu credit, the release notes frame on v2. Five more reference screens (§20). Settings and setup copy in sentence case. |
@@ -1350,7 +1379,8 @@ In `reference/studio/` (PNG, 1440 × 900); the README uses them too. First appro
 2026-10-01 from the app's own components on the fictional Harbor & Pine office, so they show
 the build as it is. `npm run shoot` re-shoots them all (or `npm run shoot -- home-dark` for
 one) from `tools/studio-lab/reference.tsx`, with the clock fixed at 10:42 and a seeded
-random, so a re-shoot changes only what the app changed. Then
+random, so a re-shoot changes only what the app changed. `home-light`, `home-dark`,
+`tasks-detail` and `who-talks-to-whom` were re-shot 2026-10-03. Then
 `python3 branding/source/build.py social guide` rebuilds the social card and the brand
 guide PDF, which use them. Re-shoot after any visible change to these screens.
 

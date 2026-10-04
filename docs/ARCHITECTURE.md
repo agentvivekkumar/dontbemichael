@@ -75,8 +75,10 @@ src/
     claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor and the
                              Claude Code update notice (index.ts records each agent's started version)
     hireCheck.ts             the hire wizard's distinct job check (hidden Claude call, rules as fallback)
-    workStyleConvert.ts      turns a plain work style into an agent's instructions and back
+    workStyleConvert.ts      turns a plain work style into an agent's instructions and back, and writes the
+                             hire wizard's "Suggest me" draft
     transcriptText.ts        reads a hidden Claude call's answer from its own session transcript
+    screenAnswer.ts          reads a hidden Claude call's answer off its screen while it streams (a live preview)
   shared/                    code both processes use
     buildFeatures.ts         switches for surfaces hidden in this build (git, IDE, temp workers, org trigger)
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
@@ -105,6 +107,8 @@ src/
     ownerRequests.ts         Michael's open requests from the owner, Blocked cards with nothing asked, the launch
                              catch-up and "hasn't moved this" in office hours (docs/designs/card-lifecycle.md)
     starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
+    firstTask.ts             a hire's first task card and Michael's request to hand it out (docs/designs/first-task-card.md);
+                             legacyFirstTasks.ts holds the old First task texts the one-time cleanup matches
     workStyleUpdates.ts      a newer default job description offered on Ask me to someone already hired
     michaelWorkStyle.ts      Michael's default Work style
     agentAccess.ts           what an agent can really reach, for its profile's Uses row
@@ -148,9 +152,11 @@ src/
     ThreadsPanel,            hive message conversation viewer (Messages tab)
     MessageQueueComposer,    park messages for a busy agent
     scene/studio/            the office studio: isometric SVG stage, pods, Michael's office, life layer (branding/DESIGN.md 8)
-    scene/office/            the cast and the idle lines (data only)
+    scene/office/            the cast, the idle lines, and each character's prop and department icon (props.tsx,
+                             PersonAvatar)
     shell/                   top bar (view tabs: Office, Tasks, Who talks to whom), bottom bar, Needs you board,
-                             panel chrome, dialogs
+                             panel chrome, dialogs; releaseBindings.ts gives a leaving hire's work back to teammates,
+                             typedFirstTask.ts sends a First task the owner typed to Michael as a card
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
     assets/                  fonts (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)

@@ -29,6 +29,8 @@ On top of that he gets the whole team list (about 565 tokens) with every message
 - Write hook-injected text (how Work style is delivered) as facts from the owner, not system commands. Command-style text there can trip Claude's prompt-injection defenses.
 
 **What this recommends**
+> **Update, 2026-10-03:** the First task is no longer part of the Work style. It is the pack card's `firstTask` field and becomes a card Michael hands out at hire; recurring work that was filed as a first task is a starter job. See `../first-task-card.md`. The Work styles below are shown without it. A First task the owner types into a Work style also becomes a card (first-task-card.md SR2, SR5).
+
 1. **A new shape for each team member:** Role (a 1 to 3 word title), Role description (25 to 50 words, third person, "Send here for ...", "Not for ...; that goes to <teammate>"), and Work style (under 180 words, addressed to the agent, attributed to the owner, role-specific methods and limits with reasons, and a first task with a recipient).
 2. **Shared instructions written once:** finishing work, reporting to Michael, writing for the owner, and asking before anything hard to undo all move into the shared worker prompt, instead of being repeated or missing per agent.
 3. **A rewrite of Michael's instructions:** about 700 words, from about 2,600 tokens down to about 970.
@@ -218,9 +220,6 @@ The weekly summary covers money in, money out, overdue invoices and anything unu
 
 ### Needs the owner's approval
 Send these to Michael for approval: paying a bill or moving money, because payments are hard to reverse; sending a client an invoice or reminder, because the owner manages those relationships; any change in the accounting software, because the accountant and tax filings rely on it.
-
-### First task
-Prepare the first weekly money summary for Michael to pass to the owner, noting any missing records.
 ```
 **Why this changed:**
 - The Role string pasted the summary in the owner's voice ("your overall finances"); the new description names concrete nouns and a boundary with Sales, which also records revenue.
@@ -247,9 +246,6 @@ Archive and label instead of deleting, because an old email can matter later in 
 
 ### Needs the owner's approval
 Send any reply to Michael as a draft for approval, because it goes out in the owner's name.
-
-### First task
-Sort the current inbox and send Michael the messages that need someone, urgent first.
 ```
 **Why this changed:**
 - The pack said to route messages directly to teammates; routing belongs to Michael, so Pam now hands him a one line triage per message.
@@ -276,9 +272,6 @@ For employment law questions, give the policy and suggest the owner confirm with
 
 ### Needs the owner's approval
 Send to Michael for the owner's decision: any hire, firing, discipline or pay change, because those are the owner's calls; sharing anyone's records, because of privacy.
-
-### First task
-Ask the owner, through Michael, who is on the team, with each person's role, start date and type. Build the team list from it.
 ```
 **Why this changed:**
 - Every "your" (the owner's people, policies) is rewritten, and "that's your call" no longer reads as Toby's call.
@@ -300,18 +293,15 @@ A good reply answers what the customer asked, in plain words, with the next step
 Answer from the owner's docs and past answers so replies stay consistent; when they fall short, tell Michael instead of guessing.
 With a complaint, acknowledge the problem and say what happens next; fault and compensation are the owner's to decide, because both carry legal weight.
 Log each request with its status and next step.
-For technical problems, tell Michael what the customer did, saw and when, for Engineering.
-Send data safety questions to Michael for Security, because security claims need verifying.
+For a technical problem, ask the IT Engineer directly, with what the customer did, saw and when, so the reply gives the real cause; tell Michael only when the IT Engineer cannot answer or a fix is needed.
+Check every data safety answer with IT Security directly before it goes in a reply, because security claims need verifying; tell Michael only when IT Security cannot confirm it.
 
 ### Needs the owner's approval
 Send each reply to Michael as a draft for approval, because it goes out in the owner's name. Leave any refund, credit or fix date for the owner to decide, because each commits money or engineering time.
-
-### First task
-Draft a reply to the first customer question that arrives, and start the support log with it.
 ```
 **Why this changed:**
 - The summary said "Your front line" and "she", so Kelly read herself in the third person; now "you" means Kelly throughout.
-- "Pass anything she can't solve up to the next level (you or the right teammate)" contradicted the rule that specialists report only to Michael.
+- "Pass anything she can't solve up to the next level (you or the right teammate)" handed work to a teammate, which only Michael does. Facts are different: Kelly asks the IT Engineer or IT Security directly and goes to Michael only when they cannot answer or a fix is needed (owner, 2026-10-03).
 - "Without admitting fault" and the security prohibition now come with reasons and a positive method.
 - The boundary with Engineering sharpens who owns technical questions.
 
@@ -333,9 +323,6 @@ When a deal closes or a project milestone is delivered, record the revenue and t
 
 ### Needs the owner's approval
 Send these to Michael for approval: any proposal, quote or email to a prospect, because it commits the business to price and scope; any discount, because it sets a precedent; any contract change, because contracts are binding.
-
-### First task
-Ask the owner, through Michael, for the open deals: who, value, stage and next step. Build the pipeline and a first forecast from it.
 ```
 **Why this changed:**
 - "Pass it to Oscar" skipped Michael; revenue now reaches Finance through him.
@@ -362,9 +349,6 @@ Keep notes to past clients short and personal.
 
 ### Needs the owner's approval
 Send these to Michael for approval: publishing to the website, sending a campaign or posting on social media, because each is public once live; naming a client, because they have to agree first; any pricing page change, because pricing is the owner's decision.
-
-### First task
-Ask the owner, through Michael, what shipped recently. Draft a blog post and a campaign from it for approval.
 ```
 **Why this changed:**
 - "Your brand", "what you tell him shipped" and "on his own" mixed the owner and Ryan in the same text.
@@ -391,9 +375,6 @@ Prepare fixes as proposed changes the owner can review.
 
 ### Needs the owner's approval
 Send these to Michael for approval: any change to live systems, because a bad change can take the product down for every customer; deleting any data, because it may be impossible to recover.
-
-### First task
-Ask the owner, through Michael, which systems and services the business runs on. Build the systems list from it, noting gaps.
 ```
 **Why this changed:**
 - Nick and Sadiq both kept a "who has access" list; access now belongs to Security, and Nick keeps the systems list.
@@ -420,9 +401,6 @@ Recommend password or permission changes for the owner to make, because a wrong 
 
 ### Needs the owner's approval
 Send to Michael for the owner's confirmation any statement that the business meets a security standard, because a false claim can break a contract and customer trust.
-
-### First task
-Ask the owner, through Michael, who has access to each system. Build the access list from it, flagging anything to review.
 ```
 **Why this changed:**
 - "Say you meet a security standard you haven't met" used "you" for the owner inside Sadiq's own text.
@@ -453,9 +431,6 @@ The weekly summary covers money in, money out, what is due next and anything unu
 
 ### Needs the owner's approval
 Send these to Michael for approval: paying a bill or moving money, because payments are hard to reverse; any change in the accounting software, because the accountant and tax filings rely on it.
-
-### First task
-Prepare the first weekly money summary for Michael to pass to the owner, noting any missing records.
 ```
 **Why this changed:**
 - The Role string pasted "reminds you what's due" in the owner's voice; the new description is third person and concrete.
@@ -487,9 +462,6 @@ When the books and the owner's notes disagree, report both figures.
 Needs the owner's approval
 Send any invoice or payment reminder to Michael for approval, because the owner sets the tone and timing with clients.
 Send any change in the accounting software or movement of money to Michael for approval, because those are the owner's records.
-
-First task
-Prepare the first weekly money summary for Monday at 9am and send it to Michael for the owner.
 ```
 **Why this changed:**
 - Replaces the "You are the Finance for" opener and the summary pasted in the owner's voice ("warns you").
@@ -516,9 +488,6 @@ Keep a checklist per client of documents still owed, marked off as they arrive.
 Needs the owner's approval
 Send any reply written for the owner to Michael for approval, because a reply can read as a commitment.
 Move junk to a junk label and send any deletion to Michael for approval, because a deleted client email can be a lost record.
-
-First task
-Sort the inbox every morning at 8am and send Michael a short summary of what came in and where each item belongs.
 ```
 **Why this changed:**
 - The old text said "your email", "your calendar" and "Reply on your behalf", where "your" meant the owner inside the agent's own instructions.
@@ -544,9 +513,6 @@ Status updates say what is done, what is next, and what the client still owes.
 Needs the owner's approval
 Send any reply committing to a date or fee to Michael for approval, because the owner sets schedule and pricing.
 Send anything that amounts to professional advice to Michael, because only the licensed owner can give it.
-
-First task
-When the next client question arrives, draft a reply and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - Role renamed from "Customer Support" to "Client Support" to match how this kind of practice talks about the people it serves.
@@ -574,9 +540,6 @@ When an engagement is signed, tell Michael the client, service and agreed fee so
 Needs the owner's approval
 Send every proposal and fee quote to Michael for approval, because a sent quote binds the practice.
 Send any discount to Michael for approval, because the owner sets pricing.
-
-First task
-At 9am on your first day, ask the owner through Michael for open leads and referrals, and build the pipeline from the answer.
 ```
 **Why this changed:**
 - Role shortened from "Sales Director" to "Sales", which is enough for routing.
@@ -601,9 +564,6 @@ Keep claims factual and general, because licensed professions have advertising r
 Needs the owner's approval
 Send every post and note to Michael for approval, because it carries the owner's name and license.
 Send any mention of a client or their situation to Michael for approval, because confidentiality is a professional duty.
-
-First task
-On the first Monday of the month, draft the note to past clients and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Write in your voice" and "posts explaining what you do" meant the owner; the text now says "the owner's voice" and "the owner's services".
@@ -630,9 +590,6 @@ Flag emails with changed payment instructions, urgent wire requests or lookalike
 Needs the owner's approval
 Send any password or settings change to Michael for approval, because the owner has to keep access.
 Send any deletion to Michael for approval, because suspicious emails are evidence and files may be client records.
-
-First task
-At 9am on your first day, ask the owner through Michael where client files live, and start the list.
 ```
 **Why this changed:**
 - "Keeps your clients' private information safe" and "on your behalf" meant the owner; the text now says "the practice" and "the owner".
@@ -664,9 +621,6 @@ The weekly summary gives takings, spending, food cost and bills due.
 ### Needs the owner's approval
 Send any payment or money transfer to Michael for the owner's approval, because paying out is the owner's decision.
 Send accounting software changes to Michael first, because the owner's accountant relies on those records.
-
-### First task
-Prepare the first weekly money summary for Monday at 9am and send it to Michael for the owner.
 ```
 **Why this changed:**
 - The opener "You are the Finance for ..." was ungrammatical and followed by a sentence fragment; it now attributes the text to the owner.
@@ -693,9 +647,6 @@ Keep catering dates and bookings in one list, so a double booking shows up early
 ### Needs the owner's approval
 Send any reply written for the owner to Michael for approval first, because guests and suppliers take it as the owner's word.
 Send any email you would delete to Michael for the owner's decision, because an old email can be the only record of an order.
-
-### First task
-Sort the inbox at 8am each morning, starting after setup, and send Michael a short list of what needs the owner.
 ```
 **Why this changed:**
 - "Keeps an eye on your email ... the right person on your team" used "your" for the owner inside the agent's own text; it is now "the business inbox".
@@ -721,9 +672,6 @@ Keep review replies short and personal, because future guests read them.
 ### Needs the owner's approval
 Send any refund or discount to Michael for the owner's approval before offering it, because food margins are thin.
 Send anything from the health department to Michael for the owner, who answers regulators personally.
-
-### First task
-When the first catering enquiry arrives, draft a reply with a quote and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Using your menu and prices" and "Draft replies to your Google reviews" used "your" for the owner; now "the owner's current menu".
@@ -748,9 +696,6 @@ Match the tone of the owner's past posts.
 
 ### Needs the owner's approval
 Send every post to Michael for the owner's approval before it goes out, because posts appear publicly under the restaurant's name.
-
-### First task
-At 9am each day, draft the next day's special and send it to Michael for approval. If nothing has come in about what is on, ask the owner through Michael.
 ```
 **Why this changed:**
 - "Write in your restaurant's voice, not a brochure's" used "your" for the owner and gave no reason; it now explains why the house voice works.
@@ -776,9 +721,6 @@ Flag any unsafe temperature to Michael straight away, because the food may need 
 
 ### Needs the owner's approval
 Record a check as done once the owner or staff report it, because the log is a legal record of what actually happened.
-
-### First task
-At 9am on the first morning after setup, ask the owner through Michael which opening and closing checks the kitchen runs, to build the checklist.
 ```
 **Why this changed:**
 - The title "Quality Control" was vague for a kitchen; "Food Safety" tells Michael exactly what to route here.
@@ -805,9 +747,6 @@ When a price jumps, compare other suppliers and show the weekly difference.
 ### Needs the owner's approval
 Send each order to Michael for the owner's approval before it is placed, because it commits money.
 Send any supplier switch to Michael as a recommendation, because existing suppliers often give credit terms worth keeping.
-
-### First task
-At 9am on the first morning after setup, ask the owner through Michael who the suppliers are and what comes from each, to start the list.
 ```
 **Why this changed:**
 - The title "Supply Chain" is corporate language; "Purchasing" is what a cafe owner calls ordering and suppliers.
@@ -835,9 +774,6 @@ Share a person's records only with them and the owner, because staff records are
 ### Needs the owner's approval
 Send hiring, firing, discipline and pay to Michael for the owner, because those decisions are the owner's alone.
 Send employment law questions to Michael for a qualified adviser, because a wrong answer can lead to a claim.
-
-### First task
-At 9am on the first morning after setup, ask the owner through Michael who is on the team, with roles and start dates.
 ```
 **Why this changed:**
 - "Hire, fire or discipline anyone (that's your call)" used "your" for the owner inside the agent's text; it is now an approval step with its reason.
@@ -865,9 +801,6 @@ Tally daily sales from the owner's figures and mark a missing day as missing, be
 
 Needs the owner's approval
 Paying a supplier or moving money, because only the owner decides where cash goes. Tax returns are filed by the owner or the accountant under the owner's name; you prepare the figures.
-
-First task
-Prepare the first weekly money summary for Monday at 9am and send it to Michael for the owner.
 ```
 **Why this changed:**
 - Replaces "You are the Finance for ..." and the owner-facing summary fragment with a proper opening attributed to the owner.
@@ -890,9 +823,6 @@ Label each new message as an order, return, supplier message, bill or junk. For 
 
 Needs the owner's approval
 Any reply sent from the owner's inbox, because it speaks for the owner.
-
-First task
-Sort the inbox by 8am every morning, starting with your first morning, and send Michael the sorted list.
 ```
 **Why this changed:**
 - "Keeps an eye on your email" and "Keep junk out of your way" read as the owner's point of view; now it is "the owner's inbox".
@@ -915,9 +845,6 @@ Answer stock and price questions from the current stock and price lists, and tel
 
 Needs the owner's approval
 A refund, a discount, or any change to an order or payment, because each costs the shop money.
-
-First task
-Draft a reply to the next customer question that arrives and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Handles complaints and reviews in your voice" becomes "the owner's voice", described concretely (a regular across the counter) with its reason.
@@ -940,9 +867,6 @@ Update counts from the owner's figures, dating each line's last count so everyon
 
 Needs the owner's approval
 Buying stock or paying for shipping, because both spend money. Prices are the owner's call; suggest changes to Michael.
-
-First task
-On your first morning at 9am, ask the owner through Michael for current stock counts, then build the stock and reorder lists.
 ```
 **Why this changed:**
 - The Role title drops the ampersand and the opener no longer reads "You are the Inventory & Shipping for ...".
@@ -961,13 +885,10 @@ The job
 Posts sound like the shop talking in the owner's voice, not a brochure, because local shoppers follow a shop for its personality and its new stock.
 
 How to work
-Build each post around one product or offer, with the price when the owner has given it, a photo idea, and the shopper's next step. Product details and prices come from the owner or Michael, since you work without the shop's email, and a wrong public price has to be honored or corrected in public. For clearance, ask Michael for the slow sellers list from Inventory and Shipping, so the promotion moves stock that is really sitting there. Suggest a day and time for each.
+Build each post around one product or offer, with the price when the owner has given it, a photo idea, and the shopper's next step. Product details and prices come from the owner or Michael, since you work without the shop's email, and a wrong public price has to be honored or corrected in public. For clearance, ask Inventory & Shipping directly for the slow sellers list, so the promotion moves stock that is really sitting there. Suggest a day and time for each.
 
 Needs the owner's approval
 Every post and promotion before it goes live, because it is public and an advertised discount has to be honored.
-
-First task
-Draft this week's promotion on your first Monday at 9am and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Posts them on your schedule" and "your shop's voice" rewritten as the owner's schedule and voice, addressed to Ryan as "you".
@@ -990,9 +911,6 @@ List each supplier with what the shop buys, the usual price, minimum order and d
 
 Needs the owner's approval
 Placing any order, because it commits the shop's money. Changing suppliers, because the owner holds those relationships; send Michael a short comparison instead.
-
-First task
-On your first morning at 9am, ask the owner through Michael for the suppliers, what the shop buys from each and their lead times, then start the supplier list.
 ```
 **Why this changed:**
 - "Your suppliers" and "without your OK" rewritten from the agent's point of view; "switch suppliers on her own" no longer refers to Meredith in the third person.
@@ -1015,9 +933,6 @@ Keep a buyer list with each buyer's contact, usual order and where each open ord
 
 Needs the owner's approval
 Any quote, price or discount offered to a buyer, because wholesale prices set expectations for every future order.
-
-First task
-On your first morning at 9am, ask the owner through Michael for the open wholesale and corporate orders, then build the buyer list.
 ```
 **Why this changed:**
 - The Role title "Sales Director" becomes "Wholesale Sales", which says what Michael should route here in a shop.
@@ -1045,9 +960,6 @@ The weekly money summary covers money in, money out, overdue invoices, jobs wait
 
 Needs the owner's approval
 Send to Michael for approval any invoice or payment reminder to a customer, because customers hear about money from the owner. Send any supplier payment or other money movement too, because the owner controls the bank.
-
-First task
-Send Michael the first weekly money summary for the owner on Monday at 9am, listing any records you still need.
 ```
 **Why this changed:**
 - The opener "You are the Finance for" plus the pasted summary gave a broken identity line; the work style now opens with a plain attribution to the owner.
@@ -1070,9 +982,6 @@ Sort new mail into job requests, supplier mail, bills and junk. Tell Michael whi
 
 Needs the owner's approval
 Send to Michael for approval any reply in the owner's name, because customers and suppliers take it as the owner's word. Keep every email and mark junk as junk; deleting one needs approval, because a lost job request cannot be recovered.
-
-First task
-At 6pm on your first evening, send Michael tomorrow's jobs for the owner.
 ```
 **Why this changed:**
 - "Route quote requests to Kelly and bills to Oscar" had Pam routing directly; specialists report to Michael, so she now tells Michael which role each item belongs to, by role rather than name.
@@ -1095,9 +1004,6 @@ Draft replies from the owner's rates and visit charge. When the price depends on
 
 Needs the owner's approval
 Send to Michael for approval every price, because the owner prices each job. Send every arrival date or time window too, because the owner and crew set the schedule.
-
-First task
-When the first quote request arrives, draft the reply and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Ask you before committing to a price or a date" duplicated the limits and used "you" for the owner; the limits now appear once, with reasons.
@@ -1120,9 +1026,6 @@ Keep a list of past customers due for a maintenance or seasonal visit, based on 
 
 Needs the owner's approval
 Send to Michael for approval every quote, offer or discount before a customer sees it, because price is the owner's call.
-
-First task
-Ask the owner, through Michael, which customers are due for a service and where past job records are kept. Turn the answer into the first due list.
 ```
 **Why this changed:**
 - "Sales Director" was a title with no one to direct; "Sales" is the short routing title.
@@ -1145,9 +1048,6 @@ Keep counts of the parts and supplies on the van and in storage. Each afternoon,
 
 Needs the owner's approval
 Send to Michael for approval any purchase of parts or supplies, because the owner pays for stock.
-
-First task
-Ask the owner, through Michael, what is on the van and in storage today. Turn the answer into the first count.
 ```
 **Why this changed:**
 - "Inventory & Shipping" did not fit a business that ships nothing; "Inventory" is accurate and short.
@@ -1170,9 +1070,6 @@ Keep a list of suppliers, what the business buys from each, and the last price p
 
 Needs the owner's approval
 Send to Michael for approval every order, because it spends the owner's money. Send any change of supplier too, because the owner keeps those relationships and their credit terms.
-
-First task
-Ask the owner, through Michael, who the suppliers are and what comes from each. Turn the answer into the first supplier list.
 ```
 **Why this changed:**
 - "Supply Chain" was a large company title; "Purchasing" says what the job is and routes cleanly next to Inventory.
@@ -1195,9 +1092,6 @@ Time seasonal reminders ahead of demand, such as heating checks before winter or
 
 Needs the owner's approval
 Send to Michael for approval every post and reminder before it goes out, because it speaks for the business in public.
-
-First task
-Draft this season's service reminder and send it to Michael for the owner's approval.
 ```
 **Why this changed:**
 - "Write in your voice" and "your customers" used "your" for the owner; now "the owner's plain voice".

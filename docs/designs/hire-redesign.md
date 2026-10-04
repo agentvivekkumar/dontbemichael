@@ -372,3 +372,13 @@ About 16 files. Two new main modules, one new shared module.
 - E5 Hire through Michael: deferred to TODOS.md (D5.5).
 - Copying mailbox or schedules from the source teammate (R2: set on Capabilities; E4 opens it).
 - Saving custom jobs anywhere other than on the teammate (E3 reads the live team).
+
+## Update, 2026-10-03 (ship review)
+
+What the wizard does now, beyond the plan above:
+
+- **Bindings.** A job that takes work from teammates writes their "Not for ...; that goes to <Name>." lines. Closing the hire (or forgetting it from the archived list) takes the lines off and keeps them on the hire; they go back on the teammates still there when the hire returns (`releaseBindings.ts`, `returningBindings`). A newer hire with the same name keeps the lines; a rename keeps the kept lines true.
+- **The overlap check** runs once per job picked, keyed by a request id, and is stopped when the owner picks another job, goes back, or closes the wizard (`hire:checkStop`). A stopped check returns the rules verdict and logs nothing.
+- **Clone** is greyed, with a reason on hover, when every character of that family is already on the team.
+- **Suggest me** needs the handles first (greyed with a reason) and stops when the owner goes back to Who or Job.
+- **First task.** A First task the owner types into the Work style, at hire or in Edit, goes to Michael as a first task card instead of staying in the instructions (first-task-card.md SR5).
