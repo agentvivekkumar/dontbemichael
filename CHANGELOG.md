@@ -6,6 +6,50 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **A first task is a card.** A new hire's one time first job (build a list, a first sweep, a
+  first draft) is no longer a line in their Work style: it becomes a card Michael hands out at
+  hire. A First task you type into a Work style, when hiring or in Edit, becomes a card too.
+  Existing team members' old First task text is moved out once, and any standing duty it held is
+  now a scheduled starter job.
+- **A Waiting column on Tasks**, in yellow: a card someone is working on but is waiting for a
+  teammate's reply shows who it waits on, instead of sitting in Doing with nobody working.
+  Only Michael moves cards into Waiting or Blocked.
+- **The floor has character:** each team member has a signature prop as their avatar and on
+  their desk, departments have painted floor signs, and the office has plants, a water cooler
+  and Michael's mug.
+- **Who talks to whom** reads by time: Last 1 hour up to Last 1 month, Last 1 day by default,
+  with prop avatars on the graph.
+- **Suggest me** on the hire wizard writes a first Work style from the role, what they handle
+  and the team, streamed into the field as it is written.
+- A team member who needs a fact asks the teammate who has it, and goes to Michael only when
+  nobody can help or someone has to do work.
+- Every character has break room lines of their own.
+
+### Changed
+
+- Who talks to whom shows teammates talking to each other, and the owner talking only to
+  Michael. The Topics layer is gone.
+- The side column is hidden on the Tasks and Who talks to whom views, and All clear shows only
+  on the office floor.
+- The pack caption beside Hire moved into Hire.
+- Closing a hire who took work from teammates gives that work back to them, and it returns to
+  the hire when they come back. Clone is greyed when every character of that kind is already on
+  the team.
+- An office with an Operations or team pod keeps the ring layout up to nine pods.
+- The office window opens filling the screen.
+
+### Fixed
+
+- Mail tools never read or search drafts, trash, junk or Gmail's system folders, and a long
+  label's message id is no longer cut short.
+- People who went home at closing time no longer trade paper planes between dark offices.
+- An overlap check the owner moved past on the hire wizard is stopped instead of running on.
+- Michael's roster names where each team member's mail access comes from.
+
 ## [0.0.16] (2026-10-03)
 
 ### Added

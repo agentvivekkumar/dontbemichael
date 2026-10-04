@@ -358,18 +358,6 @@
 
 ## Agents and 1:1
 
-### Clean up a "Not for" clause when its teammate leaves
-
-**What:** When a hire is bound to a mailbox or topic, overlapping teammates' routing lines gain "Not for <scope>; that goes to <Name>." If that teammate is later renamed or removed, rewrite or drop the clause.
-
-**Why:** A stale clause sends Michael to a name that no longer exists, and the work bounces.
-
-**Context:** Found by the spec review of the hire wizard redesign (2026-09-27). The clause format is `bindingLines` in `src/shared/hireTemplates.ts`; hook the rename path in `hive.ts` and agent removal in the renderer.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** the hire wizard redesign.
-
 ### Show the rewritten instructions before saving a work style
 
 **What:** When the owner edits a plain work style (hire or Edit Agent), show the instructions the app wrote from it and let them accept or undo, instead of saving straight away.
@@ -734,6 +722,18 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Clean up a "Not for" clause when its teammate leaves
+
+**What:** When a hire is bound to a mailbox or topic, overlapping teammates' routing lines gain "Not for <scope>; that goes to <Name>." If that teammate is later renamed or removed, rewrite or drop the clause.
+
+**Why:** A stale clause sends Michael to a name that no longer exists, and the work bounces.
+
+**Context:** Found by the spec review of the hire wizard redesign (2026-09-27). The clause format is `bindingLines` in `src/shared/hireTemplates.ts`; hook the rename path in `hive.ts` and agent removal in the renderer.
+
+**Effort:** S
+**Priority:** P2
+**Completed:** 0.1.0 (2026-10-04). A rename rewrites the clause on every teammate (renamePatches); closing or forgetting the hire takes it off and keeps it on the hire, and it goes back when they return (src/renderer/src/shell/releaseBindings.ts).
 
 ### Recognise the connector behind an opaque server name
 
