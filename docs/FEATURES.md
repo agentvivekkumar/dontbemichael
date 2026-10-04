@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.0.16). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.0). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -21,7 +21,8 @@ moving, and brings you only the decisions that need you.
 - Michael decides the team's day to day requests himself, such as a new schedule, and asks you only
   when the facts can't settle it, sources disagree, or it is sensitive.
 - Your answer to a question becomes Michael's work: he routes it and closes it, and the Tasks view
-  shows which cards sit with him. Blocked always means waiting on you, and a card ends only as Done.
+  shows which cards sit with him. Blocked always means waiting on you, Waiting shows who a card
+  waits on, and a card ends only as Done.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
 ### 2. Hire the right person in four steps
@@ -30,7 +31,9 @@ moving, and brings you only the decisions that need you.
   business. Or write a new one.
 - No two teammates do the same work. The app checks every new job against the team by what each
   one handles; an overlap has to be tied to its own mailbox or topic before you can hire.
-- The work style is in plain words you can edit. The app turns it into the agent's instructions.
+- The work style is in plain words you can edit, or Suggest me writes a first one for you. The app
+  turns it into the agent's instructions.
+- A new hire's one time first job is a card Michael hands out, not a line in their work style.
 - Every hire gets its own private folder and starts working.
 
 ### 3. A mailbox for every job
@@ -70,11 +73,13 @@ moving, and brings you only the decisions that need you.
   people, customers or quotes. A looping agent is steered, then held, then stopped.
 
 ### 7. An office you can watch
-- A pod for each department around Michael's glass office. Desks light up as team members clock
+- A pod for each department around Michael's glass office, each with its painted floor sign, and
+  every team member with a signature prop on their desk and as their avatar. Desks light up as team members clock
   in and go dark at closing time, envelopes fly between pods as work moves, and idle teammates
   trade lines across the office.
 - Every team member has a Profile, Access, Messages, Memory and Work tab written for owners, not
-  developers. Views for the task board and for who talks to whom.
+  developers. Views for the task board and for who talks to whom, over any time from the last hour
+  to the last month.
 
 ### 8. Built for small business owners
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
@@ -82,6 +87,24 @@ moving, and brings you only the decisions that need you.
 - Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
 
 ## Part 2: Every change, release by release
+
+### 0.1.0 (2026-10-04)
+- A new hire's one time first task is a card Michael hands out at hire, not a line in their Work
+  style. A First task you type into a Work style, when hiring or in Edit, becomes a card too.
+  Existing team members' old First task text is moved out once, and any standing duty it held
+  is now a scheduled starter job.
+- The Tasks view has a yellow Waiting column: a card someone is working on but waiting for a
+  teammate's reply shows who it waits on. Only Michael moves cards into Waiting or Blocked.
+- The floor has character: each team member has a signature prop as their avatar and on their
+  desk, departments have painted floor signs, and the office has plants, a water cooler and
+  Michael's mug. An office keeps the ring layout up to nine pods.
+- Who talks to whom reads by time, from the last hour to the last month, shows teammates talking
+  to each other, and connects you only to Michael. The Topics layer is gone.
+- Suggest me on the hire wizard writes a first Work style, streamed into the field as it is
+  written. Closing a hire who took work from teammates gives it back, and it returns with them.
+- Mail tools search sent mail, the archive and labels, and never read drafts, trash or junk.
+- A team member who needs a fact asks the teammate who has it before Michael. Every character
+  has break room lines of their own, and the office window opens filling the screen.
 
 ### 0.0.16 (2026-10-03)
 - Your Ask me answer is now Michael's open work. It reaches him as a request about the card, stays

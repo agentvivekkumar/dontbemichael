@@ -1,4 +1,4 @@
-- **Your answers become Michael's work** until he closes them.
-- **Inbox zero** for your Executive Admin; nothing is deleted.
-- **Focus areas** on every scheduled job.
-- **Closing time clears the floor** and no longer hangs.
+- **A first task is a card** Michael hands out to each new hire.
+- **A Waiting column** shows who a card is waiting on.
+- **Every teammate has a prop** on the floor and in every avatar.
+- **Who talks to whom** reads by time, from the last hour to the last month.
