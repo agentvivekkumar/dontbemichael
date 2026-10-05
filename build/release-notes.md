@@ -1,4 +1,4 @@
-- **A first task is a card** Michael hands out to each new hire.
-- **A Waiting column** shows who a card is waiting on.
-- **Every teammate has a prop** on the floor and in every avatar.
-- **Who talks to whom** reads by time, from the last hour to the last month.
+- **Ask me never loses a question:** it stays until you answer or Michael withdraws it.
+- **Open the file a question names,** right from its card.
+- **Your answers go only to Michael,** who routes them.
+- **A Beta pill and Report a problem** in Settings.
