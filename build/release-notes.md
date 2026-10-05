@@ -1,3 +1,3 @@
-- **Windows 11 (beta)** ships with every release now.
-- **A Beta pill beside the version** in the top bar.
-- **The Beta tip opens above the Tasks board.**
+- **The GitHub page offers the Windows beta** beside the Mac download.
+- **Install steps for Windows 11,** including the Run anyway step.
+- **The docs say what is Mac only for now:** scans, photos and the folder sandbox.

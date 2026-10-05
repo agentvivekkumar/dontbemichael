@@ -1,12 +1,12 @@
-# Don't Be Michael v0.1.2
+# Don't Be Michael v0.1.3
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.1.2
+## What's new in 0.1.3
 
-- **Windows 11 (beta) ships with every release** now, as an x64 installer next to the Mac download.
-- **A Beta pill beside the version** in the top bar, with a tip that says where to report a problem.
-- **The Beta tip opens above the Tasks board** instead of under it.
+- **The GitHub page offers the Windows beta** beside the Mac download, with its own badge and download link.
+- **Install steps for Windows 11,** including what to click when Windows says it protected your PC.
+- **The docs say what is Mac only for now:** reading scans and photos, and the sandbox that keeps shell commands inside each team member's folder.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
@@ -14,15 +14,15 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.1.2-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.1.2-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.1.3-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.1.3-mac-universal.dmg) |
 
 <!-- windows -->
-**Windows 11 (x64, beta):** [`Dont-Be-Michael-0.1.2-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.1.2/Dont-Be-Michael-0.1.2-win-x64-setup.exe). Windows on ARM PCs is not supported in the beta. This build is not signed yet: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
+**Windows 11 (x64, beta):** [`Dont-Be-Michael-0.1.3-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.1.3/Dont-Be-Michael-0.1.3-win-x64-setup.exe). Windows on ARM PCs is not supported in the beta. This build is not signed yet: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
 <!-- /windows -->
 
 Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.2.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.2.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.3.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.3.tar.gz)
 
 ## Installing on your Mac
 

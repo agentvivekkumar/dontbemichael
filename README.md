@@ -39,10 +39,10 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.2: a Windows 11 beta with every release, and a Beta pill in the top bar.**
-> Every release now carries a Windows 11 (x64) installer beside the Mac download. The top bar
-> shows Beta beside the version, with a tip that says where to report a problem. In 0.1.1, Ask me
-> stopped losing questions and learned to open the file a question names.
+> **New in 0.1.3: this page offers the Windows beta beside the Mac download.**
+> The install steps now cover Windows 11, and the docs say what works only on a Mac for now:
+> reading scans and photos, and the sandbox that keeps shell commands inside each team member's
+> folder. In 0.1.2, Windows started shipping with every release and the top bar got a Beta pill.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

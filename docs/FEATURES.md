@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.2). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.3). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -91,6 +91,13 @@ moving, and brings you only the decisions that need you.
   A Windows 11 (x64) beta ships with every release.
 
 ## Part 2: Every change, release by release
+
+### 0.1.3 (2026-10-05)
+- The GitHub page offers the Windows 11 beta beside the Mac download: platform badge, download
+  link, what you need and install steps, including Run anyway when Windows protects your PC.
+- The docs say what is Mac only for now: reading scans and photos, and the sandbox that keeps
+  shell commands inside each team member's folder. Saved passwords are described as encrypted on
+  your computer.
 
 ### 0.1.2 (2026-10-05)
 - The Windows 11 (x64) beta installer ships with every release, beside the Mac download.
