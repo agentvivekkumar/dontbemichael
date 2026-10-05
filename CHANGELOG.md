@@ -14,7 +14,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 ### Fixed
 
-- The Beta tip in the top bar is never drawn under the Tasks board, and a tip never blocks a click on what lies under it.
+- The Beta tip in the top bar is never drawn under the Tasks board.
 
 ## [0.1.1] (2026-10-05)
 

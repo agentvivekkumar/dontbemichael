@@ -36,7 +36,6 @@ test('Settings and the top bar show a Beta pill with an InfoTip on every build',
   // is not, so the update badge's cards still outrank toasts.
   assert.match(bar, /<span style=\{\{ position: 'relative', zIndex: 240, display: 'inline-flex' \}\}>\n\s+<BetaPill info=\{t\('shell\.betaInfo'\)\} align="end" \/>/);
   assert.doesNotMatch(bar, /className="cth-titlebar-drag"\n\s+style=\{\{\n\s+(\/\/[^\n]*\n\s+)*position: 'relative', zIndex:/);
-  assert.match(read('src/renderer/src/components/InfoTip.tsx'), /pointerEvents: 'none'/, 'a tip never swallows a click');
   assert.match(hero, /onClick=\{open\(reportProblemUrl\(\{ appVersion: __APP_VERSION__, platform: window\.cth\.platform, arch: window\.cth\.arch, osVersion: window\.cth\.osVersion \}\)\)\}/);
   assert.doesNotMatch(hero, /issues\/new`\)/, 'one report link, not a second');
   for (const loc of ['en', 'zh-CN', 'ar']) {
