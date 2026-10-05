@@ -43,8 +43,8 @@ test('checksums and notes match what was published', () => {
 
 test('the release workflow builds Windows as a beta leg and publishes through the gate', () => {
   const wf = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/release.yml'), 'utf8');
-  assert.match(wf, /- os: windows-latest\n\s+args: --win/);
-  assert.match(wf, /continue-on-error: \$\{\{ matrix\.os == 'windows-latest' \}\}/, 'only the Windows leg may fail (R1)');
+  assert.match(wf, /- os: windows-2022\n\s+args: --win/);
+  assert.match(wf, /continue-on-error: \$\{\{ matrix\.os == 'windows-2022' \}\}/, 'only the Windows leg may fail (R1)');
   assert.match(wf, /- name: Package installers\n\s+shell: bash/, 'bash on the pwsh default Windows runner');
   assert.match(wf, /node tools\/release-assets\.cjs artifacts release RELEASE\.md release-notes\.md/);
   assert.match(wf, /WINDOWS_RELEASE: \$\{\{ vars\.WINDOWS_RELEASE \}\}/);
@@ -60,13 +60,13 @@ test('the publish step copies only the gated files from both build legs, with on
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'md-release-cli-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   // actions/download-artifact lays out one folder per build leg.
-  const legs = { 'macos-latest-dist': [...mac, 'SHA256SUMS-macos-latest.txt'], 'windows-latest-dist': [...win, 'SHA256SUMS-windows-latest.txt'] };
+  const legs = { 'macos-latest-dist': [...mac, 'SHA256SUMS-macos-latest.txt'], 'windows-2022-dist': [...win, 'SHA256SUMS-windows-2022.txt'] };
   for (const [leg, files] of Object.entries(legs)) {
     fs.mkdirSync(path.join(base, 'artifacts', leg), { recursive: true });
     for (const f of files) fs.writeFileSync(path.join(base, 'artifacts', leg, f), `content of ${f}`);
   }
   fs.writeFileSync(path.join(base, 'artifacts', 'macos-latest-dist', 'SHA256SUMS-macos-latest.txt'), 'aaa  Dont-Be-Michael-0.1.1-mac-universal.dmg\nbbb  Dont-Be-Michael-0.1.1-mac-universal.zip\n');
-  fs.writeFileSync(path.join(base, 'artifacts', 'windows-latest-dist', 'SHA256SUMS-windows-latest.txt'), 'ccc  Dont-Be-Michael-0.1.1-win-x64-setup.exe\n');
+  fs.writeFileSync(path.join(base, 'artifacts', 'windows-2022-dist', 'SHA256SUMS-windows-2022.txt'), 'ccc  Dont-Be-Michael-0.1.1-win-x64-setup.exe\n');
   fs.writeFileSync(path.join(base, 'artifacts', 'macos-latest-dist', 'builder-debug.yml'), 'x');
   const notes = path.join(base, 'RELEASE.md');
   fs.writeFileSync(notes, 'Mac\n<!-- windows -->\nWindows row\n<!-- /windows -->\nLinux will follow.\n');

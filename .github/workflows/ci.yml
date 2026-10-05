@@ -43,7 +43,9 @@ jobs:
 
   test-windows:
     name: Tests (Windows)
-    runs-on: windows-latest
+    # windows-2022: its Visual Studio 2022 is one node-gyp can find; the newer
+    # image's Visual Studio 18 is not, so native modules fail to build.
+    runs-on: windows-2022
     # Advisory while the first POSIX-only test failures are triaged (R9,
     # docs/designs/windows-11-installer.md). Once this job is green, delete this
     # line and the owner adds "Tests (Windows)" as a required check.

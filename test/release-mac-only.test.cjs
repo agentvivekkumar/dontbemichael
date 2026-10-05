@@ -18,8 +18,8 @@ test('the release workflow builds Mac, and Windows as a beta that never blocks i
   const yml = read('.github/workflows/release.yml');
   const live = yml.split('\n').filter((l) => !l.trim().startsWith('#'));
   const oses = live.map((l) => /^\s*- os:\s*(\S+)/.exec(l)).filter(Boolean).map((m) => m[1]);
-  assert.deepEqual(oses, ['macos-latest', 'windows-latest']);
-  assert.match(yml, /continue-on-error: \$\{\{ matrix\.os == 'windows-latest' \}\}/);
+  assert.deepEqual(oses, ['macos-latest', 'windows-2022']);
+  assert.match(yml, /continue-on-error: \$\{\{ matrix\.os == 'windows-2022' \}\}/);
 });
 
 test('the release workflow unsets an empty signing cert before packaging', () => {

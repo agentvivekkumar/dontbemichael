@@ -20,14 +20,15 @@ jobs:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     # Windows is a beta: its failure never blocks the Mac release (R1).
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    continue-on-error: ${{ matrix.os == 'windows-2022' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             args: --mac
-          - os: windows-latest
+          # windows-2022, as in ci.yml: node-gyp cannot find the newer image's Visual Studio 18.
+          - os: windows-2022
             args: --win
           # - os: ubuntu-latest
           #   args: --linux
