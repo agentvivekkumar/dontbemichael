@@ -39,10 +39,10 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.1: Ask me never loses a question, and opens the file it names.**
-> A question stays on Ask me until you answer it or Michael withdraws it, and your answer goes
-> only to Michael. When a question names a report or sheet saved in the office, open it right
-> from the card. A Windows 11 beta now ships with every release.
+> **New in 0.1.2: a Windows 11 beta with every release, and a Beta pill in the top bar.**
+> Every release now carries a Windows 11 (x64) installer beside the Mac download. The top bar
+> shows Beta beside the version, with a tip that says where to report a problem. In 0.1.1, Ask me
+> stopped losing questions and learned to open the file a question names.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.1). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.2). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -90,6 +90,11 @@ moving, and brings you only the decisions that need you.
   A Windows 11 (x64) beta ships with every release.
 
 ## Part 2: Every change, release by release
+
+### 0.1.2 (2026-10-05)
+- The Windows 11 (x64) beta installer ships with every release, beside the Mac download.
+- A Beta pill sits beside the version in the top bar, with a tip that says where Report a
+  problem is; its tip opens above the Tasks board.
 
 ### 0.1.1 (2026-10-05)
 - A question on Ask me never disappears unanswered: it leaves only when you answer it or Michael
