@@ -53,5 +53,8 @@ const bubble: CSSProperties = {
   width: 'max-content', maxWidth: 260, padding: '7px 10px',
   background: 'var(--cth-ink)', borderRadius: 'var(--cth-r-md)', boxShadow: 'var(--cth-shadow-md)',
   fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, lineHeight: '16px', fontWeight: 400, letterSpacing: 0,
-  color: 'var(--cth-bg)', textTransform: 'none', whiteSpace: 'normal', textAlign: 'start'
+  color: 'var(--cth-bg)', textTransform: 'none', whiteSpace: 'normal', textAlign: 'start',
+  // Text only: a click on it reaches what lies under it, and the pointer
+  // moving onto it leaves the tip, which closes it.
+  pointerEvents: 'none'
 };

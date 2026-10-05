@@ -468,9 +468,10 @@ Names in parentheses are today's components that the v2 component replaces or re
 Left to right: lockup (§1.5, 26 px mark); view tabs (§7.2); then, pushed right: clock
 pill (§7.3), version chip (§7.4), Beta pill (lemon-light, 10 px caps, with an InfoTip that opens toward the start), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
 `r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
-(§7.5). The bar is a drag region; interactive children are `no-drag`. The bar is its own
-layer above the stage, the right column and the bottom bar, so a tip or menu opening down
-from it is never drawn under the Tasks board; dialogs and focus mode stay above it.
+(§7.5). The bar is a drag region; interactive children are `no-drag`. The Beta pill is its
+own layer (240) above the stage, the right column and the bottom bar, so its tip is never
+drawn under the Tasks board; focus mode, toasts and dialogs stay above it. The bar itself
+has no layer, so the update badge's cards keep competing at 400.
 
 ### 7.2 View tabs (TopBar)
 

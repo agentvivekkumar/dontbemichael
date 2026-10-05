@@ -15,7 +15,8 @@ export function BetaPill({ info, align }: { info: string; align?: 'start' | 'end
         fontSize: 10, lineHeight: '14px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
         background: 'var(--cth-lemon-light)', color: 'var(--cth-ink)'
       }}>{t('settingsHero.beta')}</span>
-      <InfoTip label={t('settingsHero.beta')} text={info} align={align} />
+      {/* A screen reader hears what Beta means without opening the tip. */}
+      <InfoTip label={`${t('settingsHero.beta')}: ${info}`} text={info} align={align} />
     </span>
   );
 }

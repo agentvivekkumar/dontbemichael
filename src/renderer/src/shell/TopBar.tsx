@@ -45,10 +45,6 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
     <div
       className="cth-titlebar-drag"
       style={{
-        // Its own layer above the stage (50), the right column (60) and the
-        // bottom bar (70), so a tip or menu opening down from the bar is never
-        // painted under the board; dialogs and focus mode (200 up) stay above.
-        position: 'relative', zIndex: 100,
         height: 56, minHeight: 56,
         display: 'flex', alignItems: 'center', gap: 10,
         // The macOS traffic lights sit in the top left of a hiddenInset window.
@@ -65,8 +61,14 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
         <ClockPill />
         <span className="cth-titlebar-nodrag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <UpdateBadge />
-          {/* Beta beside the version, as in Settings (owner, 2026-10-05). */}
-          <BetaPill info={t('shell.betaInfo')} align="end" />
+          {/* Beta beside the version, as in Settings (owner, 2026-10-05). Its
+              own layer, so its tip opens above the stage (50), the right
+              column (60) and the bottom bar (70), and stays under focus mode
+              (250) and toasts (400). The bar itself keeps no layer: the update
+              badge's cards compete at 400 as before. */}
+          <span style={{ position: 'relative', zIndex: 240, display: 'inline-flex' }}>
+            <BetaPill info={t('shell.betaInfo')} align="end" />
+          </span>
           <CliUpdateBadge />
         </span>
         <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} onClick={toggleTheme}>

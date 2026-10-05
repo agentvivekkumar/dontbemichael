@@ -27,13 +27,16 @@ test('Settings and the top bar show a Beta pill with an InfoTip on every build',
   const hero = read('src/renderer/src/components/SettingsHeroCard.tsx');
   assert.match(hero, /<BetaPill info=\{t\('settingsHero\.betaInfo'\)\} \/>/);
   const pill = read('src/renderer/src/components/BetaPill.tsx');
-  assert.match(pill, /\{t\('settingsHero\.beta'\)\}<\/span>\n\s+<InfoTip label=\{t\('settingsHero\.beta'\)\} text=\{info\} align=\{align\} \/>/);
+  assert.match(pill, /\{t\('settingsHero\.beta'\)\}<\/span>[\s\S]*?<InfoTip label=\{`\$\{t\('settingsHero\.beta'\)\}: \$\{info\}`\} text=\{info\} align=\{align\} \/>/);
   // Beside the version in the top bar too (owner, 2026-10-05), its tip pointing to Settings.
   const bar = read('src/renderer/src/shell/TopBar.tsx');
   const at = (needle) => bar.indexOf(needle);
   assert.ok(at('<UpdateBadge />') > 0 && at('<UpdateBadge />') < at(`<BetaPill info={t('shell.betaInfo')} align="end" />`) && at(`<BetaPill info={t('shell.betaInfo')} align="end" />`) < at('<CliUpdateBadge />'), 'the pill sits right after the version');
-  // The bar is its own layer, or the tip opens under the Tasks board.
-  assert.match(bar, /className="cth-titlebar-drag"\n\s+style=\{\{[\s\S]*?position: 'relative', zIndex: 100,/);
+  // The pill is its own layer (or its tip opens under the Tasks board); the bar
+  // is not, so the update badge's cards still outrank toasts.
+  assert.match(bar, /<span style=\{\{ position: 'relative', zIndex: 240, display: 'inline-flex' \}\}>\n\s+<BetaPill info=\{t\('shell\.betaInfo'\)\} align="end" \/>/);
+  assert.doesNotMatch(bar, /className="cth-titlebar-drag"\n\s+style=\{\{\n\s+(\/\/[^\n]*\n\s+)*position: 'relative', zIndex:/);
+  assert.match(read('src/renderer/src/components/InfoTip.tsx'), /pointerEvents: 'none'/, 'a tip never swallows a click');
   assert.match(hero, /onClick=\{open\(reportProblemUrl\(\{ appVersion: __APP_VERSION__, platform: window\.cth\.platform, arch: window\.cth\.arch, osVersion: window\.cth\.osVersion \}\)\)\}/);
   assert.doesNotMatch(hero, /issues\/new`\)/, 'one report link, not a second');
   for (const loc of ['en', 'zh-CN', 'ar']) {
