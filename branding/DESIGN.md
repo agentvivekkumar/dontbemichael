@@ -1358,6 +1358,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 |---|---|
 | 2026-10-03 | Floor character: each person is drawn as their character's prop, and each department has a line icon (§3.4, §7.10, §7.14, §7.17); desks carry their person's prop, and the floor has plants and a water cooler (§8.3); the ring holds up to 9 pods, operations and team included (§8.9); banter goes to a partner who would say it (§8.8). The right column shows on the Office view only (§7.6). No pack caption beside Hire (§7.19). Tasks view: a Waiting column that only Michael sets (§7.20, §7.21). Who talks to whom: a time range instead of the last 200 messages, people as their props, no Topics (§7.22). |
 | 2026-10-03 | Tasks view: the dismiss `x` closes a card as Done by the owner's decision ("Closed by owner"), never deletes it; "With Michael", "Michael hasn't moved this" and "Nothing asked" on cards; Task detail's status offers To do, Doing and Done (§7.20, §7.21). |
+| 2026-10-05 | Top bar: the Beta pill also sits beside the version, its InfoTip pointing to Report a problem in Settings. |
 | 2026-10-05 | Settings: a Beta pill (with an InfoTip) beside the version on every build, and Report a problem opens a bug report with the app version and OS filled in (docs/designs/windows-11-installer.md, E4). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |

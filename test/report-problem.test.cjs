@@ -23,14 +23,20 @@ test('the report link fills the bug form\'s version and OS fields, and nothing e
   for (const os of ['macOS (Apple Silicon)', 'macOS (Intel)', 'Windows']) assert.ok(form.includes(`- ${os}`), `${os} is a dropdown option`);
 });
 
-test('Settings shows a Beta pill with an InfoTip on every build', () => {
+test('Settings and the top bar show a Beta pill with an InfoTip on every build', () => {
   const hero = read('src/renderer/src/components/SettingsHeroCard.tsx');
-  assert.match(hero, /\{t\('settingsHero\.beta'\)\}<\/span>\n\s+<InfoTip label=\{t\('settingsHero\.beta'\)\} text=\{t\('settingsHero\.betaInfo'\)\} \/>/);
+  assert.match(hero, /<BetaPill info=\{t\('settingsHero\.betaInfo'\)\} \/>/);
+  const pill = read('src/renderer/src/components/BetaPill.tsx');
+  assert.match(pill, /\{t\('settingsHero\.beta'\)\}<\/span>\n\s+<InfoTip label=\{t\('settingsHero\.beta'\)\} text=\{info\} align=\{align\} \/>/);
+  // Beside the version in the top bar too (owner, 2026-10-05), its tip pointing to Settings.
+  const bar = read('src/renderer/src/shell/TopBar.tsx');
+  assert.match(bar, /<UpdateBadge \/>\n[^\n]*\n\s+<BetaPill info=\{t\('shell\.betaInfo'\)\} align="end" \/>/);
   assert.match(hero, /onClick=\{open\(reportProblemUrl\(\{ appVersion: __APP_VERSION__, platform: window\.cth\.platform, arch: window\.cth\.arch, osVersion: window\.cth\.osVersion \}\)\)\}/);
   assert.doesNotMatch(hero, /issues\/new`\)/, 'one report link, not a second');
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const h = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).settingsHero;
-    assert.ok(h.beta && h.betaInfo, loc);
-    assert.doesNotMatch(h.beta + h.betaInfo, /[–—]/, `${loc}: no dashes`);
+    const shell = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).shell;
+    assert.ok(h.beta && h.betaInfo && shell.betaInfo, loc);
+    assert.doesNotMatch(h.beta + h.betaInfo + shell.betaInfo, /[–—]/, `${loc}: no dashes`);
   }
 });

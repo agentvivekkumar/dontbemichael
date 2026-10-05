@@ -5,6 +5,7 @@ import { useStore, type FloorView } from '@/store/store';
 import { useAppTheme, toggleAppTheme } from '@/design/theme';
 import { notifyThemeChangeAll } from '@/components/terminalPool';
 import { UpdateBadge } from '@/components/UpdateBadge';
+import { BetaPill } from '@/components/BetaPill';
 import { CliUpdateBadge } from '@/components/CliUpdateNotice';
 import { pillState, useNeedsYou, useNeedsYouCount } from './useNeedsYou';
 import { NEEDS_YOU_PILL_ID } from './rightColumn';
@@ -58,8 +59,10 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
       <ViewTabs />
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         <ClockPill />
-        <span className="cth-titlebar-nodrag" style={{ display: 'inline-flex', gap: 6 }}>
+        <span className="cth-titlebar-nodrag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <UpdateBadge />
+          {/* Beta beside the version, as in Settings (owner, 2026-10-05). */}
+          <BetaPill info={t('shell.betaInfo')} align="end" />
           <CliUpdateBadge />
         </span>
         <IconButton label={theme === 'dark' ? t('shell.themeLight') : t('shell.themeDark')} onClick={toggleTheme}>

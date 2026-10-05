@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
 import { InfoTip } from './InfoTip';
+import { BetaPill } from './BetaPill';
 import { useWhatsNew, WhatsNewPopover } from './WhatsNewPopover';
 import { useUpdates, UpdateButtons, UpdateDetails, UpdateStatusLine } from './UpdatesSection';
 import { DEFAULT_HERO, type HeroPayload } from '@shared/heroPayload';
@@ -65,13 +66,7 @@ export function SettingsHeroCard() {
                 Don&apos;t Be Michael
               </span>
               <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-2)' }}>v{__APP_VERSION__}</span>
-              {/* Beta, on every build (docs/designs/windows-11-installer.md, E4). */}
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--cth-r-pill)', padding: '1px 8px',
-                fontSize: 10, lineHeight: '14px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
-                background: 'var(--cth-lemon-light)', color: 'var(--cth-ink)'
-              }}>{t('settingsHero.beta')}</span>
-              <InfoTip label={t('settingsHero.beta')} text={t('settingsHero.betaInfo')} />
+              <BetaPill info={t('settingsHero.betaInfo')} />
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 'var(--cth-r-pill)', padding: '1px 8px',
                 fontSize: 10, lineHeight: '14px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
