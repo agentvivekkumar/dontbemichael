@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **A Beta pill beside the version in the top bar,** with a tip that says where Report a problem is. Windows builds now ship with every release.
+
+### Fixed
+
+- Tips and menus that open down from the top bar are no longer drawn under the Tasks board.
+
 ## [0.1.1] (2026-10-05)
 
 ### Added

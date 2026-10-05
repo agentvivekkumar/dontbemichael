@@ -146,6 +146,9 @@ Mode: SELECTIVE EXPANSION (D2 answer A, 2026-10-04). Approved: A1, E1 to E5, R1 
    - schedule: a scheduled run fires and shows on the floor
    - update: rc.1 offers rc.2, restarts into it, the office reopens
    If any step fails, nothing ships to Windows users: fix and repeat from rc.N+1.
+   Owner, 2026-10-05: `WINDOWS_RELEASE` is on before this check, so every clean release
+   carries Windows (v0.1.1 got its installer after release). The check still runs to
+   confirm it works (TODOS.md).
 5. **Signing (E1, R5):** deferred. TODOS.md entry: pick Microsoft Trusted Signing or a
    vendor cloud HSM (DigiCert KeyLocker, SSL.com eSigner), then wire release.yml so
    absent secrets mean an unsigned build and no failure.

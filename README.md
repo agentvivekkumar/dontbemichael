@@ -42,7 +42,7 @@ own memory, working on your Mac.
 > **New in 0.1.1: Ask me never loses a question, and opens the file it names.**
 > A question stays on Ask me until you answer it or Michael withdraws it, and your answer goes
 > only to Michael. When a question names a report or sheet saved in the office, open it right
-> from the card. A Windows 11 beta is in testing.
+> from the card. A Windows 11 beta now ships with every release.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
@@ -295,7 +295,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-A Windows 11 beta is in testing on release candidates; Linux will follow.
+A Windows 11 (x64) beta ships with every release, on the same release page; Linux will follow.
 
 ## Your data
 

@@ -87,7 +87,7 @@ moving, and brings you only the decisions that need you.
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
-  A Windows 11 beta is in testing on release candidates.
+  A Windows 11 (x64) beta ships with every release.
 
 ## Part 2: Every change, release by release
 
@@ -101,7 +101,7 @@ moving, and brings you only the decisions that need you.
   folder on Windows). Only files in the office and team folders count.
 - Closing time and office open notices no longer fly to desks; idle chit chat is paper planes.
 - A Beta pill and Report a problem in Settings. Archive and Sent mail searches explain a miss.
-- Windows 11 (x64) beta, built with every release candidate.
+- Windows 11 (x64) beta, on the 0.1.1 release and every release after it.
 
 ### 0.1.0 (2026-10-04)
 - A new hire's one time first task is a card Michael hands out at hire, not a line in their Work

@@ -8,7 +8,7 @@
 - **Open the file a question is about.** When a question names a report, sheet or draft saved in the office, the card lists it with Open, or Show in Finder.
 - **Your answer goes only to Michael,** who routes it to whoever asked.
 - **A Beta pill and Report a problem** in Settings open a GitHub issue with your app version and system filled in.
-- **Windows 11 (beta)** is built with every release candidate and joins a release once it passes a check on a real PC.
+- **Windows 11 (beta)** now ships with every release, as an x64 installer.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
