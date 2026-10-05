@@ -28,8 +28,8 @@ const { HookServer } = loadTs('src/main/hooks.ts');
 
 const req = (id, card, at, extra = {}) => ({ id, from: 'human', act: 'request', conversation: card ? cardConversation(card) : 'conv-x', subject: `OWNER ANSWER on card ${card}`, created_at: at, ...extra });
 
-test('an owner request stays open until Michael replies to it; a newer answer on the card replaces an older one', () => {
-  // Value: protects=an answered card stays Michael's open work until he closes it; fails_when=a reply is not matched by in_reply_to, an older request lingers beside a newer one, or a Talk to Michael message or a teammate's note counts; why_new=new contract; seam=none
+test('an owner request stays open until Michael replies to it or to a newer one on its card', () => {
+  // Value: protects=an answered card stays Michael's open work until he closes it, and a second answer on a card never hides the first; fails_when=a reply is not matched by in_reply_to, only the newest request per card counts, a reply leaves older requests on its card open, or a Talk to Michael message or a teammate's note counts; why_new=pre-landing review 2026-10-05: one card holds several questions; seam=none
   const toMichael = [
     req('a1', 'c1', '2026-10-01T09:00:00Z'),
     req('a2', 'c1', '2026-10-02T09:00:00Z'),
@@ -43,21 +43,24 @@ test('an owner request stays open until Michael replies to it; a newer answer on
     // A hand-off to a teammate in the same thread is routing, not the closure.
     { id: 'r2', from: 'god', to: 'nick', act: 'request', in_reply_to: 'a2', created_at: '2026-10-02T10:00:00Z' }
   ]);
-  assert.deepEqual(open.map((r) => [r.id, r.taskId]), [['a2', 'c1']]);
-  const ctx = ownerRequestsContext(open, Date.parse('2026-10-02T12:00:00Z'));
+  assert.deepEqual(open.map((r) => [r.id, r.taskId]), [['a1', 'c1'], ['a2', 'c1']], 'both answers on c1 wait on Michael');
+  const settled = openOwnerRequests([...toMichael, req('a3', 'c1', '2026-10-03T09:00:00Z')], [
+    { id: 'r3', from: 'god', to: 'human', act: 'done', in_reply_to: 'a2', created_at: '2026-10-02T11:00:00Z' }
+  ]);
+  assert.deepEqual(settled.map((r) => r.id), ['b1', 'a3'], 'a reply settles its card up to it, and a later answer stays open');
+  const ctx = ownerRequestsContext(open.slice(1), Date.parse('2026-10-02T12:00:00Z'));
   assert.match(ctx, /^OPEN REQUESTS FROM THE OWNER\./);
   assert.match(ctx, /- card c1: OWNER ANSWER on card c1 \(open 3 h, id a2\)/);
   assert.equal(ownerRequestsContext([], Date.now()), null, 'nothing open adds nothing');
 });
 
-test('the answer is a request to Michael tied to its card; the raiser gets a note that Michael routes the follow-up', () => {
-  // Value: protects=the answer re-enters the request loop and Michael, not the worker, restarts the card; fails_when=Michael's message goes back to inform, loses its card conversation, or the raiser is told to carry on; why_new=the old test pinned the inform contract; seam=none
-  const [toOscar, toMichael] = answerMessages({ raiser: 'oscar', raiserName: 'Oscar', taskId: 't1', title: 'Pay the supplier', q: 'Pay now?', a: 'Yes.' });
+test('the answer is a request to Michael tied to its card, and nothing goes to the raiser', () => {
+  // Value: protects=the answer re-enters the request loop and Michael, not the worker, restarts the card; fails_when=Michael's message goes back to inform, loses its card conversation, or the owner messages the raiser directly; why_new=owner, 2026-10-04: the owner only talks to Michael; seam=none
+  const sent = answerMessages({ raiser: 'oscar', raiserName: 'Oscar', taskId: 't1', title: 'Pay the supplier', q: 'Pay now?', a: 'Yes.' });
+  assert.equal(sent.length, 1);
+  const [toMichael] = sent;
   assert.deepEqual([toMichael.to, toMichael.act, toMichael.requires_reply, toMichael.conversation], ['god', 'request', true, 'card:t1']);
   assert.match(toMichael.body, /Then close this request with a "done" reply \(in_reply_to this message\)\. It stays open until you do\./);
-  assert.equal(toOscar.act, 'inform');
-  assert.match(toOscar.body, /Michael will route the follow-up\.$/);
-  assert.doesNotMatch(toOscar.body, /Carry on with the work/);
 });
 
 test('cards answered before this change get their request once, at launch', () => {
@@ -115,7 +118,7 @@ test('Michael is told to route the follow-up and close the request, not to unblo
   // Value: protects=his instructions match the request loop; fails_when=the old "unblock the card" wording returns; why_new=instructions changed; seam=none
   const src = fs.readFileSync(path.resolve(__dirname, '../src/main/hive.ts'), 'utf8');
   assert.doesNotMatch(src, /unblock the card/);
-  assert.match(src, /comes to you as a request about the card: route the follow-up/);
+  assert.match(src, /comes to you, and only you, as a request about the card, because the owner talks only to you, so tell the team member yourself: route the follow-up/);
 });
 
 test('the Tasks view shows a card as with Michael, and as not moved after one working day; closed days do not count', () => {
@@ -153,7 +156,7 @@ test('the Tasks view reads open owner requests from the shared feed and badges t
   // Value: protects=the badge comes from the same cached read as everything else and never lands on Ask me; fails_when=the feed stops reading owner requests, counts them as needing the owner, or the card loses its badge; why_new=new UI wiring (T5); seam=source pin, the renderer has no DOM test harness
   const feed = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/shell/useNeedsYou.ts'), 'utf8');
   assert.match(feed, /window\.cth\.hiveOwnerRequests\?\.\(\)/);
-  assert.match(feed, /count: merged\.tasks\.filter\(waitsOnHuman\)\.length \+ merged\.requests\.length \+ merged\.offers\.length \};/, 'they wait on Michael, not the owner');
+  assert.match(feed, /count: merged\.tasks\.reduce\(\(n, t\) => n \+ openQuestions\(t\)\.length, 0\) \+ merged\.requests\.length \+ merged\.offers\.length \};/, 'they wait on Michael, not the owner');
   const kanban = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/TasksKanban.tsx'), 'utf8');
   assert.match(kanban, /michaelCardState\(r\.createdAt, now, office\.days, office\.work\)/);
   assert.match(kanban, /pack\?\.officeHours\?\.days/);
@@ -196,11 +199,11 @@ test('Michael sees the nothing asked list every turn, the owner sees it on the T
   assert.match(await ctx(), /BLOCKED CARDS WITH NOTHING ASKED\./, 'every turn');
   assert.doesNotMatch(await ctx('pam'), /BLOCKED CARDS/);
   stuck = [];
-  assert.match(await ctx(), /BLOCKED CARDS WITH NOTHING ASKED: none now\./);
-  assert.doesNotMatch(await ctx(), /BLOCKED CARDS/);
+  assert.match(await ctx(), /^CARDS TO TIDY \(Blocked with nothing asked, or open questions held the wrong way\): none now\.$/m);
+  assert.doesNotMatch(await ctx(), /BLOCKED CARDS|CARDS TO TIDY/);
   const hiveSrc = fs.readFileSync(path.resolve(__dirname, '../src/main/hive.ts'), 'utf8');
   assert.match(hiveSrc, /A card is "blocked" only while its question for the owner is open on Ask me/);
-  assert.match(hiveSrc, /this\.stuckCardsCache = blockedWithNothingAsked\(/);
+  assert.match(hiveSrc, /this\.stuckCardsCache = \[\.\.\.blockedWithNothingAsked\(/);
   const kanban = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/TasksKanban.tsx'), 'utf8');
   assert.match(kanban, /blockedWithNothingAsked\(tasks, ownerRequests\)/);
   assert.match(kanban, /t\('kanban\.nothingAsked'\)/);
@@ -255,4 +258,45 @@ test('the launch catch-up resends only an answer newer than the card\'s last own
   ];
   const out = answersWithoutRequest(tasks, toMichael);
   assert.deepEqual(out.map((x) => [x.task.id, x.q, x.a]), [['again', 'Q2?', 'A2.'], ['peer', 'Q?', 'A.']]);
+});
+
+test('the launch catch-up sends every answer since the card\'s last owner request, on any card not done', () => {
+  // Value: protects=an answer whose request never reached Michael is relayed even on a card that left Blocked or holds several answers; fails_when=only the newest entry counts, only Blocked cards count, a Done card is relayed, or an untimed answer is a candidate; why_new=pre-landing review 2026-10-05; seam=none
+  const tasks = [
+    { id: 'two', status: 'blocked', humanQA: [{ q: 'Q1?', a: 'A1.', answeredAt: '2026-10-02T09:00:00Z' }, { q: 'Q2?' }, { q: 'Q3?', a: 'A3.', answeredAt: '2026-10-02T10:00:00Z' }] },
+    { id: 'moved', status: 'doing', humanQA: [{ q: 'Q?', a: 'A.', answeredAt: '2026-10-02T09:00:00Z' }, { q: 'Later?' }] },
+    { id: 'old-and-new', status: 'waiting', humanQA: [{ q: 'Old?', a: 'Sent.', answeredAt: '2026-10-01T09:00:00Z' }, { q: 'New?', a: 'Not sent.', answeredAt: '2026-10-02T09:00:00Z' }] },
+    { id: 'closed', status: 'done', humanQA: [{ q: 'Q?', a: 'A.', answeredAt: '2026-10-02T09:00:00Z' }] },
+    { id: 'untimed', status: 'blocked', humanQA: [{ q: 'Q?', a: 'A.' }] }
+  ];
+  const out = answersWithoutRequest(tasks, [req('r1', 'old-and-new', '2026-10-01T09:00:01Z')]);
+  assert.deepEqual(out.map((x) => [x.task.id, x.q]), [['two', 'Q1?'], ['two', 'Q3?'], ['moved', 'Q?'], ['old-and-new', 'New?']]);
+});
+
+test('an owner request on a Done card stays open only when it came after the owner closed the card', async (t) => {
+  // Value: protects=an answer given after a card closed still reaches Michael's open requests, and one settled by the close is dropped; fails_when=every request on a Done card is dropped, or one older than the close lingers; why_new=pre-landing review 2026-10-05; seam=none
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-owner-req-done-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true });
+  const before = hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card early', body: 'x', conversation: 'card:early' }, 'human');
+  const after = hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card late', body: 'x', conversation: 'card:late' }, 'human');
+  hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card plain', body: 'x', conversation: 'card:plain' }, 'human');
+  const shift = (iso, ms) => new Date(Date.parse(iso) + ms).toISOString();
+  hive.writeTasks([
+    { id: 'early', title: 'Early', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', closedBy: 'owner', closedAt: shift(before.created_at, 60_000) },
+    { id: 'late', title: 'Late', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', closedBy: 'owner', closedAt: shift(after.created_at, -60_000) },
+    { id: 'plain', title: 'Plain', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'finished' }
+  ]);
+  assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['late']);
+});
+
+test('Michael withdraws a question on a card the owner moved, and never moves that card back', () => {
+  // Value: protects=Michael's tidy note never tells him to undo an owner's move; fails_when=the off Blocked note says only to move the card back to Blocked; why_new=pre-landing review 2026-10-05; seam=none
+  const { asksToTidy } = loadTs('src/shared/ownerRequests.ts');
+  const ctx = stuckCardsContext(asksToTidy([{ id: 'c', title: 'Card', status: 'doing', humanQA: [{ q: 'Q?' }] }]));
+  assert.match(ctx, /if you moved the card out of Blocked and the work still needs the answer, move it back to "blocked"/);
+  assert.match(ctx, /If the owner moved it, the card is done, or the question no longer matters, withdraw the question/);
+  assert.match(ctx, /Never move a card the owner moved\./);
+  assert.doesNotMatch(ctx, /[\u2013\u2014]/);
 });

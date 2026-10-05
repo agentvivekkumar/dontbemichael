@@ -39,10 +39,10 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.0: first task cards, a Waiting column, and a floor with character.**
-> A new hire's first job is a card Michael hands out. The Tasks view shows who a waiting card
-> waits on. Every team member has a signature prop, and Who talks to whom reads by time, from the
-> last hour to the last month.
+> **New in 0.1.1: Ask me never loses a question, and opens the file it names.**
+> A question stays on Ask me until you answer it or Michael withdraws it, and your answer goes
+> only to Michael. When a question names a report or sheet saved in the office, open it right
+> from the card. A Windows 11 beta is in testing.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
@@ -295,7 +295,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-Windows and Linux will follow.
+A Windows 11 beta is in testing on release candidates; Linux will follow.
 
 ## Your data
 

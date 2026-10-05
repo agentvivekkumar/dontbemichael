@@ -5,7 +5,7 @@
 //   * solo: one line on the speaker's chip. createIdleLines deals the
 //     speaker's own lines about 60% of the time, else a break-room line
 //     (SHARED_SOLO), never repeating until a pool runs out.
-//   * pair: an exchange two quiet people trade as paper planes or envelopes.
+//   * pair: an exchange two quiet people trade as paper planes.
 //     createBanter deals EXCHANGES, the "that's what she said" bits and each
 //     character's signature opener, and only to a pair who would say them on
 //     the show: Michael lands "that's what she said", Andy went to Cornell.

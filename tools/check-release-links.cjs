@@ -27,6 +27,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { windowsSection } = require('./release-assets.cjs');
 
 const root = path.join(__dirname, '..');
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
@@ -35,7 +36,8 @@ const releaseMd = fs.readFileSync(path.join(root, 'RELEASE.md'), 'utf8');
 const problems = [];
 
 // — 1. every pinned artifact name must carry the current version —
-const assetRe = /Dont-Be-Michael-(\d+\.\d+\.\d+)-([^\s`)]+)/g;
+// A release candidate carries its suffix (0.1.1-rc.1) in asset names and tags.
+const assetRe = /Dont-Be-Michael-(\d+\.\d+\.\d+(?:-(?:rc|beta|alpha)\.\d+)?)-([^\s`)]+)/g;
 const assets = new Set();
 for (const m of releaseMd.matchAll(assetRe)) {
   if (m[1] !== version) {
@@ -46,7 +48,7 @@ for (const m of releaseMd.matchAll(assetRe)) {
 if (assets.size === 0) problems.push('RELEASE.md advertises no download assets at all — did the table move?');
 
 // — 2. source tarball tags too; a stale tag silently ships last release's source —
-for (const m of releaseMd.matchAll(/archive\/refs\/tags\/v(\d+\.\d+\.\d+)/g)) {
+for (const m of releaseMd.matchAll(/archive\/refs\/tags\/v(\d+\.\d+\.\d+(?:-(?:rc|beta|alpha)\.\d+)?)/g)) {
   if (m[1] !== version) {
     problems.push(`RELEASE.md links source for tag v${m[1]} but package.json says ${version}`);
   }
@@ -65,14 +67,32 @@ async function head(url, label) {
   else console.log(`  ok  ${label}`);
 }
 
+// The Windows section ships only when the owner turns Windows on
+// (docs/designs/windows-11-installer.md, R10); until then its links are stripped
+// from the published notes and are not checked live.
+const windowsAssets = new Set([...windowsSection(releaseMd).matchAll(assetRe)].map((m) => `Dont-Be-Michael-${m[1]}-${m[2]}`));
+
 async function checkLive() {
-  const base = 'https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/';
-  for (const name of [...assets, 'SHA256SUMS.txt']) await head(base + name, name);
+  // latest never points at a prerelease, so an rc's files (and its notes' links,
+  // see release-assets.cjs) live under its own tag.
+  const base = version.includes('-')
+    ? `https://github.com/agentvivekkumar/dontbemichael/releases/download/v${version}/`
+    : 'https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/';
+  for (const name of [...assets, 'SHA256SUMS.txt']) {
+    if (windowsAssets.has(name)) {
+      // An rc always carries Windows (R10); a clean release only once switched on.
+      if (!version.includes('-') && process.env.WINDOWS_RELEASE !== 'on') continue;
+      // Windows links are pinned to their tag, so a later release without Windows never breaks them.
+      await head(`https://github.com/agentvivekkumar/dontbemichael/releases/download/v${version}/${name}`, name);
+      continue;
+    }
+    await head(base + name, name);
+  }
 }
 
 (async () => {
   if (process.argv.includes('--live')) {
-    console.log(`Checking advertised downloads for v${version} against the live latest release…`);
+    console.log(`Checking advertised downloads for v${version} against the live ${version.includes('-') ? `v${version}` : 'latest'} release…`);
     await checkLive();
   }
   if (problems.length) {

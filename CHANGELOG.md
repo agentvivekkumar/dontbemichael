@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.1.1] (2026-10-05)
+
+### Added
+
+- **Windows 11 (beta).** An x64 installer for Windows 11, built with every release candidate
+  and shipped with a release once it passes a check on a real PC. Windows asks once before it
+  runs an unsigned app: choose More info, then Run anyway.
+- **Open the file a question is about.** When a question on Ask me names a file saved in the
+  office (a report, a sheet, a draft), the card lists it with Open, or Show in Finder (Show in
+  folder on Windows) for anything that is not a plain document. Task detail lists them too.
+- **A Beta pill and Report a problem** in Settings, on Mac and Windows. Report a problem opens
+  a GitHub issue with the app version and your system already filled in.
+
+### Changed
+
+- **A question on Ask me never disappears unanswered.** It leaves only when you answer it or
+  Michael withdraws it, and Task detail says when one was withdrawn and why. Before, a second
+  question on the same card, or a card leaving Blocked, could hide the first. Michael is told
+  each turn about cards holding questions the wrong way, so he folds or withdraws them.
+- **Your answer goes only to Michael.** He routes it to whoever asked; the floor shows one
+  envelope, from you to Michael.
+- Closing time and office open notices no longer fly to team members' desks.
+- Idle chit chat between team members always uses paper planes. The envelope means a real
+  message.
+- Closing a card, fixing a mailbox, or finishing a card by voice withdraws its open questions.
+
+### Fixed
+
+- Answering one question could undo Michael withdrawing another on the same card.
+- Searching or reading archived and Sent mail gives a clear hint when nothing is found in the
+  inbox, instead of an unexplained miss.
+- The manual Mac download link points at the universal installer.
+- A release candidate build is offered the final release when it ships.
+
 ## [0.1.0] (2026-10-04)
 
 ### Added

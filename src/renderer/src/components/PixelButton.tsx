@@ -12,6 +12,8 @@ export interface PixelButtonProps {
   fullWidth?: boolean;
   style?: CSSProperties;
   title?: string;
+  /** Accessible name when the visible label alone is ambiguous ("Open" on a list of files). */
+  ariaLabel?: string;
 }
 
 // Design system v2 (branding/DESIGN.md 7.7): 28 in cards, 32 in bars, 36 in dialogs.
@@ -26,7 +28,8 @@ export function PixelButton({
   disabled = false,
   fullWidth = false,
   style,
-  title
+  title,
+  ariaLabel
 }: PixelButtonProps) {
   const [pressed, setPressed] = useState(false);
   const [hover, setHover] = useState(false);
@@ -53,6 +56,7 @@ export function PixelButton({
   return (
     <button
       title={title}
+      aria-label={ariaLabel}
       onClick={disabled ? undefined : onClick}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}

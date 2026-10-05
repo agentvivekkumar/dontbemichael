@@ -49,7 +49,7 @@ test('the feed is unknown until the first read, then counts open asks plus passe
     out.after = [f.status, f.count, f.tasks.length, f.requests.length];
   `);
   assert.equal(r.before, 'unknown');
-  assert.deepEqual(r.after, ['ready', 2, 2, 1], 'one open ask and one passed on request; the doing card and the request Michael kept do not count');
+  assert.deepEqual(r.after, ['ready', 3, 2, 1], 'both open asks (a card\'s status never hides one, owner 2026-10-04) and one passed on request; the request Michael kept does not count');
 });
 
 test('a failed read keeps the last value, and an older read never lands over a newer one', () => {

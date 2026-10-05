@@ -837,6 +837,14 @@ const api = {
    *  agent output. */
   revealPath: (p: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('fs:revealPath', p),
+  /** The files an Ask me question names: whether each opens in its default
+   *  app, is only shown in Finder, or is missing. Main decides
+   *  (docs/designs/ask-me-open-file.md). */
+  askFiles: (paths: string[], who: { raisedBy?: string; assignee?: string }): Promise<Array<'open' | 'reveal' | 'missing'>> =>
+    ipcRenderer.invoke('fs:askFiles', paths, who),
+  /** Open (or, when main says so, show in Finder) one file an Ask me question names. */
+  openAskFile: (p: string, who: { raisedBy?: string; assignee?: string }): Promise<{ ok: boolean; action?: 'opened' | 'revealed'; error?: string }> =>
+    ipcRenderer.invoke('fs:openAskFile', p, who),
 
   // ─── Git ─────────────────────────────────────────────────────────────────
   gitIsRepo: (cwd: string): Promise<boolean> => ipcRenderer.invoke('git:isRepo', cwd),
@@ -1272,11 +1280,12 @@ const api = {
   /** Atomically append one card against the latest main-process ledger. */
   hiveAddTask: (task: HiveTask): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:addTask', task),
-  /** Atomically patch one named card without replacing unrelated cards/fields. */
+  /** Record Ask me answers on one card, merged against the card on disk.
+   *  `landed`: at least one answer was added to a question still open there. */
   hivePatchTask: (
     id: string,
     patch: Partial<Omit<HiveTask, 'id'>>
-  ): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('hive:patchTask', id, patch),
+  ): Promise<{ ok: boolean; landed?: boolean; error?: string }> => ipcRenderer.invoke('hive:patchTask', id, patch),
   /** The owner moves a card; Done is their decision to end it. Michael is told. */
   hiveMoveTask: (id: string, status: HiveTask['status']): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:moveTask', id, status),
@@ -1640,6 +1649,8 @@ const api = {
   /** Which OS this window runs on, for platform-specific copy. */
   platform: process.platform as string,
   arch: process.arch as string,
+  /** The OS version (e.g. 10.0.26100 on Windows 11), for a prefilled problem report. */
+  osVersion: (typeof process.getSystemVersion === 'function' ? process.getSystemVersion() : '') as string,
   /** DEV ONLY — fabricate an update status so the toast can be inspected without
    *  cutting a release. Refused (`{ok:false}`) in a packaged build; see the
    *  handler in updater.ts. Call it from the devtools console:

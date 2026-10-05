@@ -2,8 +2,10 @@ name: Release
 
 # Build the Mac installer and publish it to a GitHub Release whenever a v* tag
 # is pushed. Run manually (workflow_dispatch) to dry-build without publishing.
-# Mac only for now (owner, 2026-09-24). Windows and Linux stay configured in
-# electron-builder.yml; restore their matrix rows below to ship them again.
+# Mac, and Windows as a beta (owner, 2026-10-04; docs/designs/windows-11-installer.md).
+# Windows builds on every tag but only its leg may fail; tools/release-assets.cjs
+# publishes Windows files on rc tags, and on clean tags only once the repository
+# variable WINDOWS_RELEASE is "on". Linux stays configured in electron-builder.yml.
 on:
   push:
     tags:
@@ -17,14 +19,17 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Windows is a beta: its failure never blocks the Mac release (R1).
+    continue-on-error: ${{ matrix.os == 'windows-2022' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             args: --mac
-          # - os: windows-2022
-          #   args: --win
+          # windows-2022, as in ci.yml: node-gyp cannot find the newer image's Visual Studio 18.
+          - os: windows-2022
+            args: --win
           # - os: ubuntu-latest
           #   args: --linux
     steps:
@@ -58,6 +63,7 @@ jobs:
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
 
       - name: Package installers
+        shell: bash
         # GH_TOKEN lets electron-builder skip its own publish; we upload via the
         # release step below for full control over the asset set.
         #
@@ -133,18 +139,21 @@ jobs:
         with:
           path: artifacts
 
-      - name: Flatten + merge checksums
+      - name: Choose assets, checksums and notes
+        # Windows files only on rc tags, or once WINDOWS_RELEASE is "on"; a release
+        # without Windows also drops its checksum lines and the notes' Windows section.
+        env:
+          TAG: ${{ github.ref_name }}
+          WINDOWS_RELEASE: ${{ vars.WINDOWS_RELEASE }}
         run: |
-          mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.blockmap' -o -name 'latest*.yml' \) -exec cp {} release/ \;
-          cat artifacts/*/SHA256SUMS-*.txt > release/SHA256SUMS.txt 2>/dev/null || true
+          node tools/release-assets.cjs artifacts release RELEASE.md release-notes.md
           ls -la release
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           # RELEASE.md is the human-facing notes; GitHub shows it as the body.
-          body_path: RELEASE.md
+          body_path: release-notes.md
           # A tag carrying a pre-release suffix (v0.4.4-rc.1, -beta.2 …) publishes
           # as a PRE-RELEASE. This is load-bearing, not cosmetic: the in-app
           # updater polls /releases/latest, and GitHub excludes pre-releases from

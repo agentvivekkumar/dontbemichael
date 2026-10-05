@@ -41,7 +41,7 @@ test('updates come from this repo, with installers named for this app', () => {
   const { REPO, installerUrl } = loadTs('src/shared/updateState.ts');
   assert.equal(REPO, 'agentvivekkumar/dontbemichael');
   assert.equal(installerUrl('1.0.0', 'darwin', 'arm64'),
-    'https://github.com/agentvivekkumar/dontbemichael/releases/download/v1.0.0/Dont-Be-Michael-1.0.0-mac-arm64.dmg');
+    'https://github.com/agentvivekkumar/dontbemichael/releases/download/v1.0.0/Dont-Be-Michael-1.0.0-mac-universal.dmg', 'Mac releases ship one universal dmg');
   assert.match(read('src/main/updater.ts'), /import \{[^}]*\bREPO\b[^}]*\} from '\.\.\/shared\/updateState';/, 'one REPO, shared');
   const builder = read('electron-builder.yml');
   assert.match(builder, /publish:\n\s+provider: github\n\s+owner: agentvivekkumar\n\s+repo: dontbemichael/);

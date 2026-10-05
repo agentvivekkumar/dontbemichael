@@ -58,7 +58,18 @@ When the owner answers an Ask me card, Michael receives a `request` with
 `requires_reply`, about that card: the question, the answer, who raised it, and
 "Route the follow-up: hand it to the same team member or another, or ask the
 owner again; then close this with done." The card's ask is answered, so it
-leaves Ask me (D3).
+leaves Ask me (D3). Each answer is its own request: a card with two answered
+questions holds two open requests until Michael closes each one.
+
+An open question (no answer, no `dismissedAt`) never leaves Ask me any other
+way (owner, 2026-10-04). Whatever the card's status and however many asks
+follow it, it stays until the owner answers it or it is withdrawn with
+`dismissedAt`. Michael withdraws with a short `dismissedReason`; a card the
+owner closes, a mailbox that works again, and a card finished by voice withdraw
+their open questions with `dismissedBy: 'card-closed'`, shown in Task detail in
+the owner's language. The renderer can only add an answer: main merges it onto
+the card on disk, so a stale Ask me view never undoes a withdrawal, and an
+answer that did not land keeps the owner's draft.
 
 The team member who raised the question is told the answer as a note
 (`inform`): "Michael will route the follow-up." It no longer says "carry on",
@@ -103,8 +114,9 @@ and by voice offer To do, Doing and Done; only Michael sets Blocked and Waiting
 
 ### 5. Answers that never reached Michael (launch catch-up)
 
-Once each launch, when Michael starts, a blocked card whose newest ask is
-answered, with no owner request to Michael sent since that answer, gets one:
+Once each launch, when Michael starts, each answered question (not withdrawn)
+on a card that is not Done, with no owner request to Michael sent since that
+answer, gets one:
 Michael receives the same request as in section 1 (the send failed, or the app
 quit first). Only answers the app itself recorded count. When the owner answers
 on Ask me the app keeps the card, the answer time and a sha256 digest of the
@@ -163,6 +175,17 @@ member" in Doing, so Doing could not tell work in progress from work on hold.
   Michael's board on the floor, nor as busy on the team roster.
 - No migration (no outside offices yet): Michael moves cards to Waiting under
   the new rule as he works them.
+
+### 9. Questions held the wrong way (2026-10-04)
+
+Since an open question stays until answered or withdrawn, Michael's context
+lists each turn, beside "Blocked cards with nothing asked", the cards holding
+questions the wrong way (`asksToTidy`, `ownerRequests.ts`): a card out of
+Blocked with a question still open, and a card with more than one open
+question. He moves a card he took out of Blocked back, folds several questions
+into one, or withdraws what no longer matters. He never moves a card the owner
+moved. Offices with questions left over from the old rule (a newer ask hid the
+older one) are tidied this way too; there is no migration (owner, 2026-10-05).
 
 ## What is not built
 
@@ -233,7 +256,7 @@ eng D2 (structure A); D1 to D4 from the owner's answers.
 owner answers on Ask me
   -> card humanQA answered (leaves Ask me)
   -> request to Michael (requires_reply, card id)      -> open
-  -> inform to the raiser ("Michael will route it")
+  -> raiser's memory notes (no message: the owner only talks to Michael, 2026-10-04)
 Michael: redelegate (request to a worker) or ask again
   -> done, in_reply_to the owner request               -> closed (filed, not delivered)
 open > 1 working day -> Tasks view: "Michael hasn't moved this"
@@ -291,7 +314,9 @@ Skipped: the owner's rule keeps Codex to the adversarial pass.
 
 - [x] **T1 (P1)** `answerMessages`: Michael gets `act: 'request'`,
   `requires_reply`, the card id and "route the follow-up, then close with done";
-  the raiser gets an `inform`, "Michael will route the follow-up".
+  the raiser gets an `inform`, "Michael will route the follow-up". (2026-10-04:
+  the raiser's inform is gone; the owner only talks to Michael, and the floor
+  flew a second envelope straight to the raiser.)
   Files: `src/shared/askMeRouting.ts`, `src/renderer/src/components/AskMeTab.tsx`,
   `test/ask-me-routing.test.cjs`.
 - [x] **T2 (P1)** `openOwnerRequests` (pure) and its cache on the fleet tick;

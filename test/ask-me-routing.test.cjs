@@ -33,12 +33,12 @@ test('the raiser is who the card says, else the assignee, else Michael', () => {
   assert.equal(raiserOf({ raisedBy: 'god' }, { assignee: 'pam' }, known), 'god', 'Michael\'s own question');
 });
 
-test('a team member\'s answer goes to them and to Michael; Michael\'s own goes to him once', () => {
+test('the owner only talks to Michael: an answer is one message, to him, whoever raised it', () => {
+  // Value: protects=the owner never messages a team member directly, so the floor flies one envelope to Michael; fails_when=answerMessages sends the raiser its own copy again; why_new=owner, 2026-10-04: two envelopes flew on one answer; seam=none
   const two = answerMessages({ raiser: 'oscar', raiserName: 'Oscar', taskId: 't1', title: 'Pay the supplier', q: 'Pay now?', a: 'Yes, always pay on time.' });
-  assert.deepEqual(two.map((m) => m.to), ['oscar', 'god']);
-  assert.match(two[0].body, /added to your memory notes\. Michael will route the follow-up\./);
-  assert.match(two[1].body, /Oscar has it as a note[\s\S]*Route the follow-up/);
-  assert.deepEqual([two[0].act, two[1].act], ['inform', 'request'], 'the answer is Michael\'s open work (card-lifecycle.md)');
+  assert.deepEqual(two.map((m) => m.to), ['god'], 'nothing goes from the owner to Oscar');
+  assert.match(two[0].body, /the question Oscar raised[\s\S]*It is in Oscar's memory notes\.[\s\S]*Route the follow-up/);
+  assert.equal(two[0].act, 'request', 'the answer is Michael\'s open work (card-lifecycle.md)');
   const one = answerMessages({ raiser: 'god', raiserName: 'Michael', taskId: 't2', title: 'Market research', q: 'Who does it?', a: 'Hire a researcher.' });
   assert.deepEqual(one.map((m) => m.to), ['god']);
   assert.match(one[0].body, /the question you raised/);

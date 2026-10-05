@@ -8,14 +8,15 @@ import { useStore } from '@/store/store';
 import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { useRtl } from '@/i18n/useDirection';
-import { isReplacedAsk } from '@shared/askMeRouting';
 import { useDialog } from '@/shell/useDialog';
 import { useBackdropClose } from '@/hooks/useBackdropClose';
 
-export { openQuestion, waitsOnHuman, parseTasks, type HiveTask, type HumanQA } from './hiveTasks';
+export { openQuestion, openQuestions, waitsOnHuman, parseTasks, type HiveTask, type HumanQA } from './hiveTasks';
 import { refreshNeedsYou, updateNeedsYouTasks, useNeedsYou } from '@/shell/useNeedsYou';
 import { waitsOnHuman, type HiveTask, type TaskStatus } from './hiveTasks';
+import { AskFileRows, useAskFileVerdicts } from './AskFileRows';
 import { blockedWithNothingAsked, michaelCardState, type WorkHours } from '@shared/ownerRequests';
+import { isAnswered, isWithdrawn } from '@shared/askMeRouting';
 
 type Status = TaskStatus;
 
@@ -77,10 +78,16 @@ export function TasksKanban() {
     return () => { alive = false; };
   }, []);
   const now = Date.now();
-  const withGod = new Map<string, WithGod>(ownerRequests.map((r) => [r.taskId, {
-    state: michaelCardState(r.createdAt, now, office.days, office.work),
-    hours: Math.max(0, Math.floor((now - Date.parse(r.createdAt)) / 3_600_000))
-  }]));
+  // A card can hold several open requests (oldest first): it is timed from
+  // the oldest, the one waiting longest.
+  const withGod = new Map<string, WithGod>();
+  for (const r of ownerRequests) {
+    if (withGod.has(r.taskId)) continue;
+    withGod.set(r.taskId, {
+      state: michaelCardState(r.createdAt, now, office.days, office.work),
+      hours: Math.max(0, Math.floor((now - Date.parse(r.createdAt)) / 3_600_000))
+    });
+  }
   // Blocked with nothing asked (card-lifecycle.md section 7): waiting on nobody.
   // Michael sees the same list every turn; the owner sees it here.
   const stuck = new Set(blockedWithNothingAsked(tasks, ownerRequests).map((c) => c.id));
@@ -314,6 +321,9 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
   const { t } = useTranslation();
   const rtl = useRtl();
   const detailGodName = useResolvedGodName();
+  // Every file the Q&A trail names, checked in one go rather than per question.
+  const qaAssignee = typeof task.assignee === 'string' ? task.assignee : undefined;
+  const qaFiles = useAskFileVerdicts(task.humanQA, qaAssignee);
   const col = COLUMNS.find((c) => c.key === task.status) ?? COLUMNS[0];
   // Belt + suspenders: parseTasks normalizes these, but the ledger is a
   // hand-written file — never trust a card's shape at the point of use.
@@ -413,7 +423,7 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
             <div>{label(t('kanban.humanQA'))}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {task.humanQA!.map((e, i) => {
-                  const open = !e.a && !isReplacedAsk(task.humanQA, i) && !e.dismissedAt;
+                  const open = !isAnswered(e) && !isWithdrawn(e);
                   return (
                     <div key={i} style={{
                       padding: '10px 12px', borderRadius: 'var(--cth-r-lg)',
@@ -426,13 +436,22 @@ export function TaskDetail({ task, all, assigneeName, onMove, onAssign, onClose 
                         {open && <span style={{ marginInlineStart: 'auto', padding: '1px 8px', borderRadius: 999, background: 'var(--cth-coral-strong)', color: 'var(--cth-on-coral)', fontSize: 10.5, fontWeight: 600 }}>{t('kanban.awaitingAnswer')}</span>}
                       </div>
                       <MarkdownPreview source={e.q} variant="card" />
-                      {e.a ? (
+                      <AskFileRows question={e.q} raisedBy={e.raisedBy} assignee={qaAssignee} verdicts={qaFiles[e.raisedBy ?? ''] ?? {}} endRule={!isAnswered(e)} style={{ marginTop: 8 }} />
+                      {isAnswered(e) ? (
                         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--cth-line)' }}>
                           <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--cth-green-text)', marginBottom: 2 }}>{t('kanban.answer')}</div>
-                          <MarkdownPreview source={e.a} variant="card" />
+                          <MarkdownPreview source={e.a ?? ''} variant="card" />
                         </div>
-                      ) : isReplacedAsk(task.humanQA, i) ? (
-                        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--cth-ink-3)' }}>{t('kanban.askReplaced')}</div>
+                      ) : isWithdrawn(e) ? (
+                        // Closing the card withdrew it: said in the owner's language. Michael's
+                        // own reason is his text, isolated so its direction cannot reorder the line.
+                        <div dir={rtl ? 'auto' : undefined} style={{ marginTop: 6, fontSize: 12, color: 'var(--cth-ink-3)' }}>
+                          {e.dismissedBy === 'card-closed'
+                            ? t('kanban.askWithdrawnCardClosed')
+                            : e.dismissedReason?.trim()
+                              ? t('kanban.askWithdrawnBecause', { reason: `\u2068${e.dismissedReason.trim()}\u2069` })
+                              : t('kanban.askWithdrawn')}
+                        </div>
                       ) : null}
                     </div>
                   );

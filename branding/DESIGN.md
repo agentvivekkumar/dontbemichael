@@ -587,6 +587,18 @@ stands on its own.
   respects IME composition.
 - "Holding up N tasks", when tasks wait on the answer, opens to their titles in `ink-2`
   (a status dot each, up to 6, then "+N more").
+- Files the question names (owner, 2026-10-04; `docs/designs/ask-me-open-file.md`): on
+  the open card, between the question and the answer, one plain row per file between
+  `line` hairlines (no fill or ring of its own): a 16 px `file` or `sheet` icon in
+  `ink-3`, the file name without folder or extension (12, `ink`, one line, ellipsis, the
+  full path as its tooltip), its kind in `ink-3` (Markdown, Excel, PDF...), and a
+  secondary `sm` button: "Open" for a document inside the office folders, "Show in
+  Finder" ("Show in folder" on Windows) for anything else. The button is as wide as its
+  longer label from the start, so the name does not shrink when the check lands; if the
+  check fails it offers Show in Finder. A file that is gone keeps its row, the name in
+  `ink-3` and "Not found" as text, no button. Folded cards show nothing. Task detail
+  shows the same rows under each question, all checked at once, with no hairline under
+  the last row when an answer follows.
 - Optional secondary actions Michael attached (for a broken mailbox: "Open Mailboxes").
 
 ### 7.9 Schedule request card (ScheduleRequestCards)
@@ -1027,8 +1039,8 @@ could speak.
 
 **Banter.** A little over half the time, when two quiet people sit in different pods, they
 trade an exchange instead (owner, 2026-10-01: Kelly and Ryan throwing paper planes or mail
-at each other). Each beat flies pod to pod as a paper plane or an envelope (one look per
-conversation) in the sender's department color, and on landing shows in the catcher's
+at each other). Each beat flies pod to pod as a paper plane, never an envelope (owner,
+2026-10-04: envelopes are only real messages), in the sender's department color, and on landing shows in the catcher's
 bubble with the sender's name on top and the sender's color on the ring. Each line holds 2
 to 3.6 s by its length while the reply flies back, so the conversation reads in order; the
 last one holds a little longer. Exchanges are the full set in the file: `EXCHANGES`, the "that's
@@ -1096,7 +1108,7 @@ Every effect starts from a real event or state; nothing is decorative noise.
 | Michael hands work out (`request` from Michael) | He points first: a soft beam from his office lights the pod's floor, then the envelope leaves |
 | A question for the owner (a message to the owner, or a new Needs you item) | A paper plane flies from Michael's office toward Needs you, and the Needs you button bumps as it lands |
 | Two people message back and forth | A dashed violet arc joins their pods with a count bubble; it fades a minute after their last message |
-| Two quiet people banter (§8.8) | A paper plane or an envelope in the sender's color flies pod to pod; the line pops up on the catcher's chip as it lands, and the reply flies back |
+| Two quiet people banter (§8.8) | A paper plane in the sender's color flies pod to pod; the line pops up on the catcher's chip as it lands, and the reply flies back |
 | The owner messages Michael (from `human`) | The envelope rises from the composer under the stage |
 | A new team member appears on the roster after launch | Their pod drops in, confetti in the department colors, and "Welcome, Jim" in front of the pod |
 | The office opens (each person's action is the clocking in marker) | Every light starts off. Michael's office comes on when he is in, a pod's when the first of its people is in, each desk when its person is; a light that comes on flickers like a strip light. A desk stays dark at most one minute, so a quiet engine never leaves it off |
@@ -1169,6 +1181,7 @@ Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
   it.
 - Sizes: 14 (inline in meta), 16 (buttons, rows), 18 (top bar), 20 (empty states).
 - Every icon only button has an `aria-label` and a tooltip.
+- `file` (a document) and `sheet` (a spreadsheet or CSV) mark Ask me file rows (§7.8).
 - `components/Icon.tsx` draws these outline icons; the v1 pixel set is retired (§17, row 6).
 
 ---
@@ -1345,6 +1358,9 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 |---|---|
 | 2026-10-03 | Floor character: each person is drawn as their character's prop, and each department has a line icon (§3.4, §7.10, §7.14, §7.17); desks carry their person's prop, and the floor has plants and a water cooler (§8.3); the ring holds up to 9 pods, operations and team included (§8.9); banter goes to a partner who would say it (§8.8). The right column shows on the Office view only (§7.6). No pack caption beside Hire (§7.19). Tasks view: a Waiting column that only Michael sets (§7.20, §7.21). Who talks to whom: a time range instead of the last 200 messages, people as their props, no Topics (§7.22). |
 | 2026-10-03 | Tasks view: the dismiss `x` closes a card as Done by the owner's decision ("Closed by owner"), never deletes it; "With Michael", "Michael hasn't moved this" and "Nothing asked" on cards; Task detail's status offers To do, Doing and Done (§7.20, §7.21). |
+| 2026-10-05 | Settings: a Beta pill (with an InfoTip) beside the version on every build, and Report a problem opens a bug report with the app version and OS filled in (docs/designs/windows-11-installer.md, E4). |
+| 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
+| 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
 | 2026-10-01 | In repo register items closed (§17): retired kit fonts and `pixi.js` removed, the README shows the reference screens with no LimeZu credit, the release notes frame on v2. Five more reference screens (§20). Settings and setup copy in sentence case. |
 | 2026-10-01 | The Ask me answer box and the Talk to Michael box grow with the text (§7.8, §7.19). |

@@ -31,3 +31,12 @@ test('null when nothing matches, so the button falls back to the releases page',
   assert.equal(pickDownloadAsset([], 'darwin', 'arm64'), null);
   assert.equal(pickDownloadAsset(undefined, 'darwin', 'arm64'), null);
 });
+
+test('a universal Mac dmg serves both chips when no per-arch dmg exists', () => {
+  // Value: protects=Mac users are offered the release they can install; fails_when=only -mac-<arch>.dmg matches, so the shipped universal dmg is never picked; why_new=releases ship mac-universal.dmg (RELEASE.md); seam=none
+  const universal = [{ name: 'Dont-Be-Michael-0.1.1-mac-universal.dmg', browser_download_url: 'https://github.com/x/y/releases/download/v0.1.1/Dont-Be-Michael-0.1.1-mac-universal.dmg' }];
+  assert.match(pickDownloadAsset(universal, 'darwin', 'arm64'), /mac-universal\.dmg$/);
+  assert.match(pickDownloadAsset(universal, 'darwin', 'x64'), /mac-universal\.dmg$/);
+  assert.match(pickDownloadAsset([...assets, ...universal], 'darwin', 'arm64'), /mac-arm64\.dmg$/, 'a per-arch dmg still wins');
+  assert.equal(pickDownloadAsset(universal, 'win32', 'x64'), null, 'a release without Windows offers Windows nothing (R8)');
+});

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.0). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.1). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -23,6 +23,8 @@ moving, and brings you only the decisions that need you.
 - Your answer to a question becomes Michael's work: he routes it and closes it, and the Tasks view
   shows which cards sit with him. Blocked always means waiting on you, Waiting shows who a card
   waits on, and a card ends only as Done.
+- A question stays on Ask me until you answer it or Michael withdraws it, and your answer goes only
+  to Michael. When a question names a file saved in the office, open it right from the card.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
 ### 2. Hire the right person in four steps
@@ -76,7 +78,7 @@ moving, and brings you only the decisions that need you.
 - A pod for each department around Michael's glass office, each with its painted floor sign, and
   every team member with a signature prop on their desk and as their avatar. Desks light up as team members clock
   in and go dark at closing time, envelopes fly between pods as work moves, and idle teammates
-  trade lines across the office.
+  trade lines across the office by paper plane.
 - Every team member has a Profile, Access, Messages, Memory and Work tab written for owners, not
   developers. Views for the task board and for who talks to whom, over any time from the last hour
   to the last month.
@@ -85,8 +87,21 @@ moving, and brings you only the decisions that need you.
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
+  A Windows 11 beta is in testing on release candidates.
 
 ## Part 2: Every change, release by release
+
+### 0.1.1 (2026-10-05)
+- A question on Ask me never disappears unanswered: it leaves only when you answer it or Michael
+  withdraws it, and Task detail says when one was withdrawn and why. Each open question has its
+  own row. Michael is told each turn about cards holding questions the wrong way.
+- Your answer goes only to Michael, who routes it. Closing a card, fixing a mailbox or finishing
+  a card by voice withdraws its open questions.
+- A question that names a file saved in the office lists it with Open, or Show in Finder (Show in
+  folder on Windows). Only files in the office and team folders count.
+- Closing time and office open notices no longer fly to desks; idle chit chat is paper planes.
+- A Beta pill and Report a problem in Settings. Archive and Sent mail searches explain a miss.
+- Windows 11 (x64) beta, built with every release candidate.
 
 ### 0.1.0 (2026-10-04)
 - A new hire's one time first task is a card Michael hands out at hire, not a line in their Work

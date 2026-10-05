@@ -39,9 +39,11 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
  * carries cache-busting suffixes (`./shot.png?v=2`), and treating `png?v=2` as
  * the extension would silently drop exactly the screenshots we want to render.
  * Only the LAST path segment is considered, so a dotted directory name
- * (`v1.2/report`) can never masquerade as an extension.
+ * (`v1.2/report`) can never masquerade as an extension. For a URL or a
+ * markdown link; a filesystem path uses `extensionOf` (askFiles.ts), where a
+ * literal `?` is part of the name.
  */
-export function extensionOf(p: string): string {
+export function urlExtensionOf(p: string): string {
   if (typeof p !== 'string') return '';
   const clean = p.split('#')[0].split('?')[0];
   const base = clean.split('/').pop() ?? '';
@@ -52,7 +54,7 @@ export function extensionOf(p: string): string {
 
 /** The image mime for `p`, or null when the extension isn't a known image. */
 export function imageMimeForPath(p: string): string | null {
-  return MIME_BY_EXT[extensionOf(p)] ?? null;
+  return MIME_BY_EXT[urlExtensionOf(p)] ?? null;
 }
 
 /** True when `p` names a raster or vector image we can render. */
@@ -68,7 +70,7 @@ export function isImagePath(p: string): boolean {
  * preview would have done.
  */
 export function isSvgPath(p: string): boolean {
-  return extensionOf(p) === 'svg';
+  return urlExtensionOf(p) === 'svg';
 }
 
 /** Human byte size for a status line: "864 B", "1.4 MB". */

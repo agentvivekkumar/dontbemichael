@@ -221,7 +221,11 @@ test('no Arabic string is left as its English source', () => {
     'onboarding.team.conn.mailchimp',
     'onboarding.team.conn.github',
     'mcpDefaults.toggleNote',                // "{{id}}: {{state}}" — pure interpolation
-    'webhooksSection.summary'                // "{{count}} · {{state}}" — same
+    'webhooksSection.summary',               // "{{count}} · {{state}}" — same
+    'askMe.fileKind.markdown',               // file kinds on Ask me file rows are
+    'askMe.fileKind.excel',                  // product names (Markdown, Excel,
+    'askMe.fileKind.word',                   // Word, PowerPoint)
+    'askMe.fileKind.powerpoint'
   ]);
   const e = pathsOf(en), a = pathsOf(ar);
   const untranslated = [];

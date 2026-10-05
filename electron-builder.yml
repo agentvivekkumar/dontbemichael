@@ -156,8 +156,6 @@ win:
   target:
     - target: nsis
       arch: [x64]
-    - target: portable
-      arch: [x64]
 
 nsis:
   oneClick: false
@@ -166,8 +164,8 @@ nsis:
   artifactName: Dont-Be-Michael-${version}-win-x64-setup.exe
   shortcutName: "Don't Be Michael"
 
-portable:
-  artifactName: Dont-Be-Michael-${version}-win-x64-portable.exe
+# No portable exe (R2, docs/designs/windows-11-installer.md): it never updates
+# itself and does not register dontbemichael:// links.
 
 # ---- Linux ----
 linux:

@@ -40,10 +40,11 @@ export const REPO_URL = `https://github.com/${REPO}`;
 
 /** The installer for THIS machine in the release tagged v{version}, by the
  *  names electron-builder.yml produces. Used when a status carries no
- *  `downloadUrl` of its own (the native updater path never does). */
-export function installerUrl(version: string, platform: string, arch: string): string {
+ *  `downloadUrl` of its own (the native updater path never does). Mac builds
+ *  are universal, so the Mac name never carries the machine's arch. */
+export function installerUrl(version: string, platform: string, _arch: string): string {
   const v = version.replace(/^v/, '');
-  const file = platform === 'darwin' ? `Dont-Be-Michael-${v}-mac-${arch}.dmg`
+  const file = platform === 'darwin' ? `Dont-Be-Michael-${v}-mac-universal.dmg`
     : platform === 'win32' ? `Dont-Be-Michael-${v}-win-x64-setup.exe`
     : `Dont-Be-Michael-${v}-linux-x86_64.AppImage`;
   return `https://github.com/${REPO}/releases/download/v${v}/${file}`;
@@ -55,7 +56,7 @@ export function installerUrl(version: string, platform: string, arch: string): s
 export function pendingVersion(status: UpdateStatus | null, current: string): string | null {
   if (!status || !('version' in status)) return null;
   if (status.state === 'just-updated') return null;
-  return isNewer(status.version, current) ? status.version : null;
+  return isNewerRelease(status.version, current) ? status.version : null;
 }
 
 /** Where a manual download of `status`'s release goes: the asset the release
@@ -81,6 +82,39 @@ export interface UpdateBadgeView {
 export function parseVersion(v: string): [number, number, number] | null {
   const m = String(v ?? '').trim().replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+/**
+ * Release order for app updates, prerelease aware (docs/designs/windows-11-installer.md,
+ * R7 and G1): 0.1.1-rc.1 < 0.1.1-rc.2 < 0.1.1 < 0.1.2. Only the update check and
+ * the update badge use it, so an rc build updates to the next rc and then to its
+ * release. `isNewer` below keeps ignoring the suffix on purpose: it also gates
+ * Claude CLI updates and model version floors, which must not change.
+ */
+export function isNewerRelease(candidate: string, current: string): boolean {
+  const parse = (v: string) => {
+    const m = String(v ?? '').trim().replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?/);
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ? m[4].split('.') : [] } : null;
+  };
+  const a = parse(candidate);
+  const b = parse(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a.core[i] !== b.core[i]) return a.core[i] > b.core[i];
+  // Same x.y.z: a release outranks any of its prereleases.
+  if (!a.pre.length || !b.pre.length) return !a.pre.length && b.pre.length > 0;
+  for (let i = 0; i < Math.max(a.pre.length, b.pre.length); i++) {
+    const x = a.pre[i];
+    const y = b.pre[i];
+    if (x === undefined) return false;
+    if (y === undefined) return true;
+    if (x === y) continue;
+    const nx = /^\d+$/.test(x);
+    const ny = /^\d+$/.test(y);
+    if (nx && ny) return Number(x) > Number(y);
+    if (nx !== ny) return !nx;
+    return x > y;
+  }
+  return false;
 }
 
 export function isNewer(candidate: string, current: string): boolean {
@@ -115,7 +149,8 @@ export function isNewer(candidate: string, current: string): boolean {
  * asking "is this a downgrade?" lets that case through DELIBERATELY (a new
  * build does have new notes) while still refusing a real downgrade. Doing it
  * here rather than by teaching `isNewer` about prereleases keeps the change off
- * the badge/pending state machine, which reads `isNewer` for other decisions.
+ * the Claude CLI and model version checks, which still read `isNewer`. The
+ * badge and pending state order releases with `isNewerRelease` instead.
  */
 export function shouldShowReleaseDrop(previous: string | null, current: string): boolean {
   if (previous === current) return false;
@@ -164,7 +199,7 @@ export function reduceStatus(prev: UpdateStatus | null, next: UpdateStatus): Upd
   if (!prev) return next;
   const pv = versionOf(prev);
   const nv = versionOf(next);
-  if (pv && nv && isNewer(nv, pv)) return next;   // a newer release supersedes
+  if (pv && nv && isNewerRelease(nv, pv)) return next;   // a newer release supersedes
   if (pv && nv && pv !== nv) return next;         // different (e.g. rolled back) release
   return rank(next) >= rank(prev) ? next : prev;
 }

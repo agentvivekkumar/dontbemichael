@@ -23,6 +23,7 @@ import { useWhatsNew, WhatsNewPopover } from './WhatsNewPopover';
 import { useUpdates, UpdateButtons, UpdateDetails, UpdateStatusLine } from './UpdatesSection';
 import { DEFAULT_HERO, type HeroPayload } from '@shared/heroPayload';
 import { REPO_URL } from '@shared/updateState';
+import { reportProblemUrl } from '@shared/reportProblem';
 
 declare const __APP_VERSION__: string;
 
@@ -64,6 +65,13 @@ export function SettingsHeroCard() {
                 Don&apos;t Be Michael
               </span>
               <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--cth-ink-2)' }}>v{__APP_VERSION__}</span>
+              {/* Beta, on every build (docs/designs/windows-11-installer.md, E4). */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--cth-r-pill)', padding: '1px 8px',
+                fontSize: 10, lineHeight: '14px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
+                background: 'var(--cth-lemon-light)', color: 'var(--cth-ink)'
+              }}>{t('settingsHero.beta')}</span>
+              <InfoTip label={t('settingsHero.beta')} text={t('settingsHero.betaInfo')} />
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 'var(--cth-r-pill)', padding: '1px 8px',
                 fontSize: 10, lineHeight: '14px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
@@ -106,7 +114,7 @@ export function SettingsHeroCard() {
       <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 18, padding: '9px 16px', borderTop: '1px solid var(--cth-line)' }}>
         <button type="button" ref={whatsNewRef} style={footLink} onClick={toggleNotes} aria-expanded={notesOpen} aria-haspopup="dialog">{t('settingsHero.whatsNew')}</button>
         <button type="button" style={footLink} onClick={open(GITHUB_REPO_URL)}>{t('settingsHero.starOnGitHub')}</button>
-        <button type="button" style={footLink} onClick={open(`${GITHUB_REPO_URL}/issues/new`)}>{t('settingsHero.reportProblem')}</button>
+        <button type="button" style={footLink} onClick={open(reportProblemUrl({ appVersion: __APP_VERSION__, platform: window.cth.platform, arch: window.cth.arch, osVersion: window.cth.osVersion }))}>{t('settingsHero.reportProblem')}</button>
         {notesOpen && <WhatsNewPopover notes={whatsNew.notes} loading={whatsNew.loading} anchor={whatsNewRef} onClose={() => setNotesOpen(false)} />}
       </div>
     </div>

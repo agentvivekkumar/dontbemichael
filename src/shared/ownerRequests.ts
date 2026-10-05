@@ -1,4 +1,4 @@
-import { answerMessages, cardOfConversation, cardText, MICHAEL_ID, openAskIndex, raiserOf, type AnswerMessage } from './askMeRouting';
+import { answerMessages, cardOfConversation, cardText, isAnswered, isWithdrawn, MICHAEL_ID, openAskIndexes, raiserOf, type AnswerMessage } from './askMeRouting';
 
 /**
  * Michael's open requests from the owner (docs/designs/card-lifecycle.md): an
@@ -33,25 +33,32 @@ export interface OwnerRequest {
 /**
  * `toMichael`: messages delivered to Michael (his inbox and inbox/.done).
  * `fromMichael`: messages he sent (his outbox/.sent and outbox).
- * Only the newest owner request on a card counts: a later answer on the same
- * card replaces an older one. Oldest first.
+ * Every owner request on a card stays open until Michael replies to it or to
+ * a newer one on the same card: a card can hold answers to several questions,
+ * and a second answer must not hide the first. A reply settles the card's
+ * requests up to it. Oldest first.
  */
 export function openOwnerRequests(toMichael: MessageLike[], fromMichael: MessageLike[]): OwnerRequest[] {
   // Only his reply to the owner closes it; a hand-off to a teammate in the
   // same thread is routing, not the closure.
   const replied = new Set(fromMichael.filter((m) => (m.to ?? '').toLowerCase() === 'human').map((m) => m.in_reply_to).filter((id): id is string => !!id));
-  const newestByCard = new Map<string, MessageLike>();
+  const byCard = new Map<string, MessageLike[]>();
+  const seen = new Set<string>();
   for (const m of toMichael) {
-    if (m.from !== 'human' || m.act !== 'request') continue;
+    if (m.from !== 'human' || m.act !== 'request' || seen.has(m.id)) continue;
     const taskId = cardOfConversation(m.conversation);
     if (!taskId) continue;
-    const prev = newestByCard.get(taskId);
-    if (!prev || m.created_at > prev.created_at) newestByCard.set(taskId, m);
+    seen.add(m.id);
+    byCard.set(taskId, [...(byCard.get(taskId) ?? []), m]);
   }
-  return [...newestByCard.entries()]
-    .filter(([, m]) => !replied.has(m.id))
-    .map(([taskId, m]) => ({ id: m.id, taskId, subject: m.subject ?? '', createdAt: m.created_at }))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const out: OwnerRequest[] = [];
+  for (const [taskId, list] of byCard) {
+    const settled = list.reduce((at, m) => (replied.has(m.id) && m.created_at > at ? m.created_at : at), '');
+    for (const m of list) {
+      if (!replied.has(m.id) && m.created_at > settled) out.push({ id: m.id, taskId, subject: m.subject ?? '', createdAt: m.created_at });
+    }
+  }
+  return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /** How Michael's open owner requests read in his context each turn. Null when
@@ -79,10 +86,12 @@ export interface CardLike {
 }
 
 /**
- * Cards whose newest question the owner answered while the card is still
- * blocked, with no owner request to Michael sent since that answer: the
- * launch catch-up's candidates (card-lifecycle.md section 5). catchUpRequests
- * keeps only the answers the app recorded itself.
+ * Answers the owner gave on a card that is not done, with no owner request to
+ * Michael sent on that card since: the launch catch-up's candidates
+ * (card-lifecycle.md section 5). Every answered, timed entry counts, not only
+ * the newest on a Blocked card, because a card can hold several questions and
+ * an answered card often leaves Blocked. catchUpRequests keeps only the
+ * answers the app recorded itself.
  */
 export function answersWithoutRequest(
   tasks: CardLike[],
@@ -96,12 +105,13 @@ export function answersWithoutRequest(
   }
   const out: Array<{ task: CardLike; q: string; a: string; raisedBy?: string; answeredAt?: string }> = [];
   for (const t of tasks) {
-    if (!t || t.status !== 'blocked' || !Array.isArray(t.humanQA) || !t.humanQA.length) continue;
-    const last = t.humanQA[t.humanQA.length - 1];
-    if (!last || typeof last.a !== 'string' || !last.a.trim() || last.dismissedAt || typeof last.q !== 'string') continue;
+    if (!t || t.status === 'done' || !Array.isArray(t.humanQA)) continue;
     const sent = lastRequestAt.get(t.id);
-    if (sent && (!last.answeredAt || sent >= last.answeredAt)) continue;
-    out.push({ task: t, q: last.q, a: last.a, raisedBy: last.raisedBy, answeredAt: last.answeredAt });
+    for (const e of t.humanQA) {
+      if (!e || typeof e.q !== 'string' || !isAnswered(e) || isWithdrawn(e) || typeof e.answeredAt !== 'string') continue;
+      if (sent && sent >= e.answeredAt) continue;
+      out.push({ task: t, q: e.q, a: e.a as string, raisedBy: e.raisedBy, answeredAt: e.answeredAt });
+    }
   }
   return out;
 }
@@ -225,8 +235,16 @@ export function ownerChangeNote(task: { id: string; title?: string }, change: Ow
   };
 }
 
-/** A card in Blocked that nothing is moving. */
-export interface StuckCard { id: string; title: string; assignee?: string }
+/** A card Michael has to tidy: in Blocked with nothing asked (no `issue`), or
+ *  holding an open question the wrong way (`issue`). */
+export interface StuckCard { id: string; title: string; assignee?: string; issue?: 'ask-off-blocked' | 'several-asks' }
+
+const stuckOf = (t: CardLike, issue?: StuckCard['issue']): StuckCard => ({
+  id: t.id,
+  title: (t.title ?? t.id).trim(),
+  ...(t.assignee ? { assignee: t.assignee } : {}),
+  ...(issue ? { issue } : {})
+});
 
 /**
  * Blocked cards with nothing asked (card-lifecycle.md section 7): in Blocked,
@@ -238,16 +256,47 @@ export interface StuckCard { id: string; title: string; assignee?: string }
 export function blockedWithNothingAsked(tasks: CardLike[], open: Pick<OwnerRequest, 'taskId'>[]): StuckCard[] {
   const withMichael = new Set(open.map((r) => r.taskId));
   return tasks
-    .filter((t) => !!t && t.status === 'blocked' && openAskIndex(t.humanQA as never) < 0 && !withMichael.has(t.id))
-    .map((t) => ({ id: t.id, title: (t.title ?? t.id).trim(), ...(t.assignee ? { assignee: t.assignee } : {}) }));
+    .filter((t) => !!t && t.status === 'blocked' && openAskIndexes(t.humanQA as never).length === 0 && !withMichael.has(t.id))
+    .map((t) => stuckOf(t));
 }
+
+/**
+ * Open questions held the wrong way (owner, 2026-10-04). A question stays on
+ * Ask me until the owner answers it or Michael withdraws it, so a card that
+ * left Blocked, or that gained a second question, still shows the old one.
+ * Michael is told each turn until he moves the card back to Blocked, folds the
+ * questions into one, or withdraws what no longer matters.
+ */
+export function asksToTidy(tasks: CardLike[]): StuckCard[] {
+  const out: StuckCard[] = [];
+  for (const t of tasks) {
+    if (!t) continue;
+    const open = openAskIndexes(t.humanQA as never).length;
+    if (!open) continue;
+    if (t.status !== 'blocked') out.push(stuckOf(t, 'ask-off-blocked'));
+    else if (open > 1) out.push(stuckOf(t, 'several-asks'));
+  }
+  return out;
+}
+
+const STUCK_HEADS: Record<NonNullable<StuckCard['issue']> | 'nothing-asked', string> = {
+  'nothing-asked': 'BLOCKED CARDS WITH NOTHING ASKED. These cards are in Blocked, but none has a question for the owner on Ask me or an open request from the owner, so nothing is moving them. Blocked means waiting on the owner\'s answer. For each one: if it needs the owner, add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "waiting" and name who in "waitingOn"; if the work is finished, or the owner decided to stop it, move it to "done".',
+  'ask-off-blocked': 'OPEN QUESTIONS ON CARDS OUT OF BLOCKED. Each of these cards left Blocked with a question still open, and the owner still sees it on Ask me until they answer it or you withdraw it. For each one: if you moved the card out of Blocked and the work still needs the answer, move it back to "blocked". If the owner moved it, the card is done, or the question no longer matters, withdraw the question by setting "dismissedAt" (the time) and a short "dismissedReason" on that humanQA entry. Never move a card the owner moved.',
+  'several-asks': 'CARDS WITH MORE THAN ONE OPEN QUESTION. The owner sees every one of them on Ask me. Keep one open question per card: fold what still matters into the newest, and withdraw the others by setting "dismissedAt" (the time) and a short "dismissedReason" on each.'
+};
 
 /** How those cards read in Michael's context each turn. Null when none. */
 export function stuckCardsContext(stuck: StuckCard[]): string | null {
   if (!stuck.length) return null;
-  return [
-    'BLOCKED CARDS WITH NOTHING ASKED. These cards are in Blocked, but none has a question for the owner on Ask me or an open request from the owner, so nothing is moving them. Blocked means waiting on the owner\'s answer. For each one: if it needs the owner, add the question to its humanQA so it shows on Ask me; if it waits on someone outside the office or on a team member, move it to "waiting" and name who in "waitingOn"; if the work is finished, or the owner decided to stop it, move it to "done".',
-    ...stuck.slice(0, LIST_MAX).map((c) => `- card ${cardText(c.id, 60)}: ${cardText(c.title)}${c.assignee ? ` (with ${cardText(c.assignee, 40)})` : ''}`),
-    ...(stuck.length > LIST_MAX ? [`- and ${stuck.length - LIST_MAX} more`] : [])
-  ].join('\n');
+  const parts: string[] = [];
+  for (const kind of ['nothing-asked', 'ask-off-blocked', 'several-asks'] as const) {
+    const cards = stuck.filter((c) => (c.issue ?? 'nothing-asked') === kind);
+    if (!cards.length) continue;
+    parts.push([
+      STUCK_HEADS[kind],
+      ...cards.slice(0, LIST_MAX).map((c) => `- card ${cardText(c.id, 60)}: ${cardText(c.title)}${c.assignee ? ` (with ${cardText(c.assignee, 40)})` : ''}`),
+      ...(cards.length > LIST_MAX ? [`- and ${cards.length - LIST_MAX} more`] : [])
+    ].join('\n'));
+  }
+  return parts.join('\n\n');
 }

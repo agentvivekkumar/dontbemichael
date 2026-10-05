@@ -15,7 +15,7 @@ const loadTs = require('./load-ts.cjs');
 const { compareByNewestAsk, askedAtMs } = loadTs('src/renderer/src/components/askMeOrder.ts');
 
 // A card's OPEN ask is what the board ranks by; the comparator takes that entry
-// directly, exactly as AskMeTab passes openQuestion(t).
+// directly, exactly as AskMeTab passes each open ask.
 const ask = (askedAt) => (askedAt === undefined ? undefined : { askedAt });
 
 function order(...times) {
@@ -57,8 +57,8 @@ const tab = fs.readFileSync(
   path.resolve(__dirname, '..', 'src/renderer/src/components/AskMeTab.tsx'), 'utf8'
 );
 
-test('AskMeTab sorts the card list by each card open question', () => {
-  assert.match(tab, /\.filter\(waitsOnHuman\)\s*\n\s*\.sort\(\(a, b\) => compareByNewestAsk\(openQuestion\(a\), openQuestion\(b\)\)\)/);
+test('AskMeTab sorts every open question, newest first', () => {
+  assert.match(tab, /\.sort\(\(a, b\) => compareByNewestAsk\(a\.ask, b\.ask\)\)/);
 });
 
 test('the humanQA history inside a card is never reversed', () => {

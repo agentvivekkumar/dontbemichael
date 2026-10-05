@@ -1,10 +1,10 @@
 /**
  * Where an owner's Ask me answer goes (owner, 2026-09-25). Ask me is how the
  * office reaches the owner when it can't decide or do something itself.
- * Michael surfaces the question, but the answer belongs to the agent that
- * raised it: it goes to that agent and into its memory notes, and Michael
- * gets it as a request to route the follow-up. When Michael raised it himself
- * (a job no one fits, a technical failure), both are Michael.
+ * The owner only talks to Michael (owner, 2026-10-04): the answer goes to him
+ * as a request to route the follow-up, and into the memory notes of the agent
+ * that raised it. When Michael raised it himself (a job no one fits, a
+ * technical failure), both are Michael.
  */
 
 export const MICHAEL_ID = 'god';
@@ -46,14 +46,6 @@ export interface AnswerMessage {
   requires_reply?: boolean;
 }
 
-/**
- * The messages an answer sends (docs/designs/card-lifecycle.md): Michael gets a
- * REQUEST about the card, so the answer is his open work until he closes it
- * with done; it used to be an inform, a note he could read and set aside, and
- * answered cards stalled in Blocked (owner, 2026-10-02). The team member who
- * raised the question gets the answer as a note: Michael routes the follow-up,
- * to them or someone else.
- */
 /** Card text an agent wrote, as one short line: it goes into messages that
  *  come from the owner and into Michael's context, so it can never pass for a
  *  new line of instructions. */
@@ -62,6 +54,15 @@ export function cardText(s: string | undefined, max = 120): string {
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
 
+/**
+ * The messages an answer sends (docs/designs/card-lifecycle.md): one, a REQUEST
+ * to Michael about the card, so the answer is his open work until he closes it
+ * with done; it used to be an inform, a note he could read and set aside, and
+ * answered cards stalled in Blocked (owner, 2026-10-02). The team member who
+ * raised the question used to get the answer straight from the owner too; now
+ * Michael routes the follow-up, to them or someone else (owner, 2026-10-04:
+ * the owner only talks to Michael).
+ */
 export function answerMessages(p: {
   raiser: string;
   raiserName: string;
@@ -87,58 +88,56 @@ export function answerMessages(p: {
       ...qa,
       p.raiser === MICHAEL_ID
         ? 'It is on the card and in your memory notes.'
-        : `${p.raiserName} has it as a note and in their memory notes.`,
+        : `It is in ${p.raiserName}'s memory notes.`,
       'Route the follow-up: hand the card to the same team member or another, or ask the owner again. Then close this request with a "done" reply (in_reply_to this message). It stays open until you do.'
     ].join('\n')
   };
-  if (p.raiser === MICHAEL_ID) return [forMichael];
-  return [
-    {
-      to: p.raiser,
-      act: 'inform',
-      subject: `OWNER ANSWER to your question on "${title}"`,
-      body: [
-        `The owner answered the question you raised on card ${id} ("${title}"):`,
-        ...qa,
-        'It has been added to your memory notes. Michael will route the follow-up.'
-      ].join('\n')
-    },
-    forMichael
-  ];
+  return [forMichael];
 }
 
 /**
- * A card has at most one open ask: its NEWEST ask, while unanswered and not
- * dismissed (owner, 2026-09-25). A newer ask on the same card replaces an older
- * unanswered one, which then counts as withdrawn: ASK ME never shows it, it can't
- * be answered, and it never holds an agent open. Before this, ASK ME showed only
- * the newest but the older one stayed "open" forever, hidden from the owner.
+ * An open ask stays open until the owner answers it or Michael withdraws it
+ * ("dismissedAt"), whatever the card's status and however many asks follow it
+ * (owner, 2026-10-04: an open question must never vanish). It used to be only
+ * the card's newest ask, so a second, different question on a card silently
+ * withdrew the first, and a card moved out of Blocked hid its ask; replaying
+ * the ledger found six questions lost that way.
  */
 export interface AskEntry { q?: unknown; a?: unknown; dismissedAt?: unknown }
 
-/** Index of the card's open ask, or -1. */
-export function openAskIndex(qa: readonly (AskEntry | null | undefined)[] | undefined): number {
-  if (!Array.isArray(qa)) return -1;
-  for (let i = qa.length - 1; i >= 0; i--) {
-    const e = qa[i];
-    if (!e || typeof e.q !== 'string') continue;
-    return !e.a && !e.dismissedAt ? i : -1;
-  }
-  return -1;
+/** Whether an ask carries a real answer or a real withdrawal: text, never a
+ *  blank or a stray value, so a worker writing " " into tasks.json cannot hide
+ *  a question from the owner (Codex adversarial review, 2026-10-05). */
+const filled = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
+export const isAnswered = (e: AskEntry | null | undefined): boolean => !!e && filled(e.a);
+export const isWithdrawn = (e: AskEntry | null | undefined): boolean => !!e && filled(e.dismissedAt);
+
+/** Indexes of the card's open asks, oldest first. */
+export function openAskIndexes(qa: readonly (AskEntry | null | undefined)[] | undefined): number[] {
+  if (!Array.isArray(qa)) return [];
+  const out: number[] = [];
+  qa.forEach((e, i) => { if (e && typeof e.q === 'string' && !isAnswered(e) && !isWithdrawn(e)) out.push(i); });
+  return out;
 }
 
-/** An older ask a newer one on the same card replaced before it was answered. */
-export function isReplacedAsk(qa: readonly (AskEntry | null | undefined)[] | undefined, i: number): boolean {
-  const e = qa?.[i];
-  if (!e || typeof e.q !== 'string' || e.a || e.dismissedAt) return false;
-  return openAskIndex(qa) !== i;
-}
-
-/** The renderer's humanQA merged onto the card's list on disk: entry by entry
- *  while the question is the same, the disk entry where it is not, and every
- *  entry added on disk since the renderer read the card. */
-export function mergeHumanQA(onDisk: unknown[], incoming: unknown[]): unknown[] {
-  const qOf = (e: unknown): unknown => (e && typeof e === 'object' ? (e as { q?: unknown }).q : undefined);
-  const merged = incoming.map((e, i) => (i < onDisk.length && qOf(onDisk[i]) !== qOf(e) ? onDisk[i] : e));
-  return [...merged, ...onDisk.slice(incoming.length)];
+/** The renderer's humanQA merged onto the card's list on disk. The renderer
+ *  can only add an answer: the list stays the disk's, entry for entry, and a
+ *  slot takes the renderer's "a" and "answeredAt" only while the question is
+ *  the same and still open on disk. Its list is a few seconds old, so a
+ *  withdrawal (dismissedAt) Michael wrote since, a slot whose question changed
+ *  and an entry added on disk all stand (pre-landing review, 2026-10-05).
+ *  `added`: the slots that took an answer. */
+export function mergeHumanQA(onDisk: unknown[], incoming: unknown[]): { humanQA: unknown[]; added: number[] } {
+  const added: number[] = [];
+  const humanQA = onDisk.map((d, i) => {
+    const e = incoming[i];
+    if (!d || typeof d !== 'object' || !e || typeof e !== 'object') return d;
+    const disk = d as AskEntry;
+    const next = e as AskEntry & { answeredAt?: unknown };
+    if (typeof disk.q !== 'string' || disk.q !== next.q || isAnswered(disk) || isWithdrawn(disk)) return d;
+    if (typeof next.a !== 'string' || !next.a.trim()) return d;
+    added.push(i);
+    return { ...d, a: next.a, ...(typeof next.answeredAt === 'string' ? { answeredAt: next.answeredAt } : {}) };
+  });
+  return { humanQA, added };
 }

@@ -1,14 +1,14 @@
-# Don't Be Michael v0.1.0
+# Don't Be Michael v0.1.1
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.1.0
+## What's new in 0.1.1
 
-- **A first task is a card.** A new hire's one time first job goes to Michael as a card he hands out. A First task you type into a Work style becomes a card too, and standing duties stay on a schedule.
-- **A Waiting column on Tasks.** A card someone is working on but waiting for a reply shows who it waits on. Only Michael moves cards into Waiting or Blocked.
-- **The floor has character.** Every team member has a signature prop as their avatar and on their desk, departments have painted floor signs, and the office has plants, a water cooler and Michael's mug.
-- **Who talks to whom reads by time,** from the last hour to the last month, and shows teammates talking to each other.
-- **Suggest me** writes a first Work style when you hire.
+- **A question on Ask me never disappears unanswered.** It stays until you answer it or Michael withdraws it, and Task detail says when one was withdrawn and why.
+- **Open the file a question is about.** When a question names a report, sheet or draft saved in the office, the card lists it with Open, or Show in Finder.
+- **Your answer goes only to Michael,** who routes it to whoever asked.
+- **A Beta pill and Report a problem** in Settings open a GitHub issue with your app version and system filled in.
+- **Windows 11 (beta)** is built with every release candidate and joins a release once it passes a check on a real PC.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
@@ -16,11 +16,15 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.1.0-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.1.0-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.1.1-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.1.1-mac-universal.dmg) |
 
-This release is for Mac only. Windows and Linux will follow.
+<!-- windows -->
+**Windows 11 (x64, beta):** [`Dont-Be-Michael-0.1.1-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.1.1/Dont-Be-Michael-0.1.1-win-x64-setup.exe). Windows on ARM PCs is not supported in the beta. This build is not signed yet: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
+<!-- /windows -->
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.0.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.0.tar.gz)
+Linux will follow.
+
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.1.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.1.tar.gz)
 
 ## Installing on your Mac
 

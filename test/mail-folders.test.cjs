@@ -88,6 +88,17 @@ test('archived mail is found in All Mail and read by its own id', async () => {
   assert.equal(r.body.id, 'archive:8');
   assert.match(r.body.text, /offer letter is attached/);
   assert.equal(state.opened.at(-1), '[Gmail]/All Mail');
+  // An old inbox id of mail that was archived says where to look instead.
+  // Value: protects=an agent reading a stale inbox id is told to search the archive; fails_when=the not-found text stops naming the folder and the archive search; why_new=owner 2026-10-04, Pam read an archived id and blamed her mail connection; seam=none
+  const stale = await call('read', { id: '8' });
+  assert.notEqual(stale.status, 200);
+  assert.match(stale.body.error, /No message with id 8 in the inbox\. If it was archived or sent, search with folder "archive" or "sent"/);
+  const gone = await call('read', { id: 'archive:999' });
+  assert.match(gone.body.error, /No message with id 999 in that folder\. Search again for its current id\./);
+  // An empty inbox search points to the archive and Sent; other searches carry no hint.
+  // Value: protects=an agent that searched only the inbox learns where else to look; fails_when=the empty inbox answer drops the hint; why_new=owner 2026-10-04, Pam searched the inbox only after the fix and asked the owner again; seam=none
+  assert.match(inbox.body.hint, /folder "archive"[\s\S]*folder "sent"/);
+  assert.equal(found.body.hint, undefined);
 });
 
 test('sent mail and labels are searchable; a missing label says so', async () => {
