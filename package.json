@@ -20,7 +20,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test:focused": "node --test test/*.test.cjs",
+    "test:focused": "node tools/run-tests.cjs",
     "check:links": "node tools/check-release-links.cjs",
     "lab": "node tools/studio-lab/build.mjs",
     "shoot": "node tools/studio-lab/shoot.mjs",

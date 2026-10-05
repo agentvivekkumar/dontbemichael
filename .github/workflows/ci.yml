@@ -40,3 +40,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  test-windows:
+    name: Tests (Windows)
+    runs-on: windows-latest
+    # Advisory while the first POSIX-only test failures are triaged (R9,
+    # docs/designs/windows-11-installer.md). Once this job is green, delete this
+    # line and the owner adds "Tests (Windows)" as a required check.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # node-gyp (native node-pty rebuild in npm ci) needs distutils.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Provide distutils for node-gyp
+        run: python -m pip install --upgrade setuptools
+      # Install scripts must run: they finish the Electron runtime and node-pty.
+      - name: Install dependencies
+        run: npm ci
+      - name: Test suite
+        run: npm run test:focused
+

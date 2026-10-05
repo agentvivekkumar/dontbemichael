@@ -18,7 +18,11 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 |---|---|
 | Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.1.0-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.1.0-mac-universal.dmg) |
 
-This release is for Mac only. Windows and Linux will follow.
+<!-- windows -->
+**Windows 11 (x64, beta):** [`Dont-Be-Michael-0.1.0-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.1.0/Dont-Be-Michael-0.1.0-win-x64-setup.exe). Windows on ARM PCs is not supported in the beta. This build is not signed yet: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
+<!-- /windows -->
+
+Linux will follow.
 
 [Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.0.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.1.0.tar.gz)
 
