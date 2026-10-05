@@ -105,7 +105,7 @@ test('absolute, home, and Windows paths are all recognised', () => {
 });
 
 test('a dotted directory name cannot masquerade as an extension', () => {
-  // extOf looks at the LAST segment only, so v1.2 here is not the extension.
+  // extensionOf looks at the LAST segment only, so v1.2 here is not the extension.
   assert.equal(classifyPathToken('reports/v1.2/summary.md'), 'preview');
 });
 

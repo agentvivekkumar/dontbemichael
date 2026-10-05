@@ -234,9 +234,28 @@ export class HookServer {
       });
       conn.on('error', () => { /* shim hung up — ignore */ });
     });
-    this.server.on('error', (e) => console.error('[hive] hook server error:', e));
-    this.server.listen(sock);
+    const server = this.server;
+    server.on('error', (e) => {
+      console.error('[hive] hook server error:', e);
+      const code = (e as NodeJS.ErrnoException).code ?? null;
+      try { this.hive.appendLog({ kind: 'hook-server-error', code }); } catch { /* noop */ }
+      // An error once the channel is open (a refused connection, out of file
+      // handles) leaves it open; only a channel that never opened blocks spawns.
+      if (server.listening) return;
+      // Without this channel agents run unwatched, or, on Windows, a pipe taken
+      // by something else would hear them (S1): no agent starts until a restart.
+      const inUse = code === 'EADDRINUSE' || (code === 'EACCES' && process.platform === 'win32');
+      this.listenError = `The office can't start its team: its private channel on this computer ${inUse ? 'is in use' : 'could not open'} (${code ?? 'error'}). Quit Don't Be Michael and open it again.`;
+    });
+    server.on('listening', () => { this.listenError = null; });
+    server.listen(sock);
   }
+
+  /** Why agents cannot start, when the hook channel failed to open; else null. */
+  channelError(): string | null {
+    return this.listenError;
+  }
+  private listenError: string | null = null;
 
   stop(): void {
     try { this.server?.close(); } catch { /* noop */ }
@@ -661,7 +680,7 @@ export class HookServer {
       : null;
     const stuckCards = michaelTurn && typeof this.hive.stuckCards === 'function'
       ? this.everyTurnNote(this.stuckCardsShown, agentId!, p.session_id ?? null, this.hive.stuckCards(),
-        stuckCardsContext, 'BLOCKED CARDS WITH NOTHING ASKED: none now.')
+        stuckCardsContext, 'CARDS TO TIDY (Blocked with nothing asked, or open questions held the wrong way): none now.')
       : null;
 
     // Company knowledge turned on or off since this agent was last told.

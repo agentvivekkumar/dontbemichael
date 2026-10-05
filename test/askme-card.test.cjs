@@ -30,10 +30,10 @@ test('how long ago, in plain words', () => {
 
 test('one card is open at a time, the newest by default; folded cards show the headline', () => {
   const src = read('src/renderer/src/components/AskMeTab.tsx');
-  assert.match(src, /const pinned = openId !== undefined && \(openId === null \|\| waiting\.some\(\(x\) => x\.id === openId\)\);/);
-  assert.match(src, /const expanded = pinned \? openId === t\.id : idx === 0;/);
+  assert.match(src, /const pinned = openId !== undefined && \(openId === null \|\| waiting\.some\(\(x\) => x\.key === openId\)\);/);
+  assert.match(src, /const expanded = pinned \? openId === row\.key : idx === 0;/);
   // Typing pins the card, so a newer ask never folds it mid answer (review, 2026-10-01).
-  assert.match(src, /onFocus=\{\(\) => setOpenId\(t\.id\)\}/);
+  assert.match(src, /onFocus=\{\(\) => setOpenId\(row\.key\)\}/);
   assert.match(src, /\{askHeadline\(open\.q\)\}/);
   assert.match(src, /WebkitLineClamp: 2/);
   // A chevron shows a card folds and opens, and turns as it opens.
@@ -51,7 +51,7 @@ test('an ask is cleared only by answering it: no dismiss on the board (owner, 20
   assert.doesNotMatch(src, /const dismiss = /);
   assert.doesNotMatch(src, /dismissedAt: new Date/);
   assert.doesNotMatch(src, /askMe\.dismiss/);
-  // Older dismissed entries are still read as closed (askMeRouting openAskIndex).
+  // Older dismissed entries are still read as closed (askMeRouting openAskIndexes).
   assert.match(read('src/shared/askMeRouting.ts'), /dismissedAt/);
 });
 

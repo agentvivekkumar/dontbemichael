@@ -8,6 +8,7 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { buildPtyEnv } from './ptyEnv';
+import { buildCmdCommandLine, type ProcessLaunch } from './pty';
 import { userShellPath } from './shellEnv';
 import { parseMcpList, type McpList } from '../shared/claudeConnectors';
 
@@ -21,6 +22,18 @@ export function claudeBinFor(defaultCommand: string | undefined): string {
   const first = (words.find((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w)) ?? '').replace(/^["']|["']$/g, '');
   const leaf = (first.split(/[\\/]/).pop() ?? '').replace(/\.(exe|cmd|bat)$/i, '').toLowerCase();
   return leaf === 'claude' ? first : 'claude';
+}
+
+/** How to run `claude mcp list`. On Windows an npm install puts a `claude.cmd`
+ *  launcher on PATH, and execFile cannot start a `.cmd` file directly, so the
+ *  status read was always "Couldn't check" there (docs/designs/
+ *  windows-11-installer.md, E2). It runs through cmd.exe with the same quoting
+ *  agents' terminals use. */
+export function mcpListLaunch(platform: NodeJS.Platform, binPath: string, comSpec = 'cmd.exe'): ProcessLaunch {
+  if (platform === 'win32' && /\.(cmd|bat)$/i.test(binPath)) {
+    return { file: comSpec, args: [buildCmdCommandLine(binPath, ['mcp', 'list'])], windowsVerbatimArguments: true };
+  }
+  return { file: binPath, args: ['mcp', 'list'] };
 }
 
 /** One `claude mcp list` run. Claude Code 2.1.287 exits 0 even when a server
@@ -37,7 +50,8 @@ function runMcpList(binPath: string): Promise<{ stdout: string; failed: boolean;
   env.MCP_TIMEOUT = env.MCP_TIMEOUT || '10000';
   return new Promise((resolve) => {
     try {
-      execFile(binPath, ['mcp', 'list'], { timeout: 30_000, encoding: 'utf8', cwd: homedir(), env }, (err, stdout) => {
+      const launch = mcpListLaunch(process.platform, binPath, process.env.ComSpec || 'cmd.exe');
+      execFile(launch.file, launch.args, { timeout: 30_000, encoding: 'utf8', cwd: homedir(), env, windowsVerbatimArguments: launch.windowsVerbatimArguments }, (err, stdout) => {
         const e = err as (NodeJS.ErrnoException & { killed?: boolean; signal?: string | null }) | null;
         resolve({ stdout: String(stdout ?? ''), failed: !!e, timedOut: !!(e && (e.killed || e.signal)) });
       });

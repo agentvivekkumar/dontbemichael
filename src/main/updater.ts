@@ -4,7 +4,7 @@ import { request as httpsRequest } from 'node:https';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_DROP_HTML } from '../shared/releaseDrop';
-import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDrop, REPO, type UpdateStatus } from '../shared/updateState';
+import { reduceStatus, clampPercent, isNewerRelease, installerUrl, shouldShowReleaseDrop, REPO, type UpdateStatus } from '../shared/updateState';
 
 /**
  * Auto-update from GitHub releases.
@@ -18,7 +18,9 @@ import { reduceStatus, clampPercent, isNewer, installerUrl, shouldShowReleaseDro
  *
  * Fallback path (win-portable exe, or a genuine updater error): a plain
  * `releases/latest` poll — semver-compare against the running version and show a
- * notify-only state linking the release page.
+ * notify-only state linking the release page. An rc build also runs it after a
+ * native check that found nothing: the native updater only looks inside the rc
+ * channel, so the clean release after an rc reaches it through this poll.
  *
  * Every installed build checks; dev runs never poll (`app.isPackaged`). The old
  * `autoUpdate` config flag is ignored (owner, 2026-10-02: "always check for
@@ -157,8 +159,20 @@ function errText(e: unknown): string {
   return m.length > 300 ? `${m.slice(0, 300)}…` : m;
 }
 
+/** A release published without this platform's update file (docs/designs/
+ *  windows-11-installer.md, R8: a red Windows build, or Windows not switched on
+ *  yet, ships that release without Windows). That is "no update for you", not
+ *  an error to show every few hours. */
+export function isMissingChannelFile(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  if (e && e.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND') return true;
+  const message = typeof err === 'string' ? err : typeof e?.message === 'string' ? e.message : '';
+  return /Cannot find [\w.-]+\.yml in the latest release artifacts/.test(message);
+}
+
 /** The one asset in a release that installs on THIS machine, by the names
- *  electron-builder.yml produces: mac-{arch}.dmg, win-x64-setup.exe,
+ *  electron-builder.yml produces: mac-{arch}.dmg (falling back to the
+ *  mac-universal.dmg releases actually ship), win-x64-setup.exe,
  *  linux-x86_64.AppImage. Null when the release has no matching asset, and the
  *  caller falls back to the releases page. Download URLs live under
  *  github.com/REPO/releases/download/, so the openRelease prefix guard already
@@ -169,13 +183,16 @@ export function pickDownloadAsset(
   arch: string = process.arch
 ): string | null {
   if (!Array.isArray(assets)) return null;
-  const want = platform === 'darwin' ? new RegExp(`-mac-${arch}\\.dmg$`)
-    : platform === 'win32' ? /-win-x64-setup\.exe$/
-    : platform === 'linux' ? /-linux-x86_64\.AppImage$/
-    : null;
-  if (!want) return null;
-  const hit = assets.find((a) => typeof a.name === 'string' && want.test(a.name) && typeof a.browser_download_url === 'string');
-  return hit?.browser_download_url ?? null;
+  // Releases ship one universal Mac dmg; a per-arch one wins when present.
+  const wants = platform === 'darwin' ? [new RegExp(`-mac-${arch}\\.dmg$`), /-mac-universal\.dmg$/]
+    : platform === 'win32' ? [/-win-x64-setup\.exe$/]
+    : platform === 'linux' ? [/-linux-x86_64\.AppImage$/]
+    : [];
+  for (const want of wants) {
+    const hit = assets.find((a) => typeof a.name === 'string' && want.test(a.name) && typeof a.browser_download_url === 'string');
+    if (hit?.browser_download_url) return hit.browser_download_url;
+  }
+  return null;
 }
 
 /** Body of the release tagged v{version}, or undefined. Never throws. */
@@ -229,13 +246,16 @@ function fallbackCheck(reason: string | undefined, force = false): void {
           try {
             const rel = JSON.parse(body) as { tag_name?: string; html_url?: string; body?: string; assets?: Array<{ name?: string; browser_download_url?: string }> };
             const tag = rel.tag_name ?? '';
-            if (tag && isNewer(tag, app.getVersion())) {
+            // Offer a release only when it carries this platform's installer: a
+            // release published without Windows (R8) is not an update for Windows.
+            const downloadUrl = pickDownloadAsset(rel.assets);
+            if (tag && downloadUrl && isNewerRelease(tag, app.getVersion())) {
               emit({
                 state: 'available-manual',
                 version: tag.replace(/^v/, ''),
                 url: rel.html_url ?? `https://github.com/${REPO}/releases/latest`,
                 reason,
-                downloadUrl: pickDownloadAsset(rel.assets) ?? undefined,
+                downloadUrl,
                 // Already in the response we just parsed — carrying it costs
                 // nothing and lets the notify-only toast show "What's new" too.
                 // NOT a new request: see TELEMETRY.md, this app never adds one.
@@ -292,14 +312,28 @@ async function runCheck(): Promise<{ ok: boolean; error?: string }> {
       CHECK_TIMEOUT_MS,
       'update check'
     );
-    if (!result || !isNewer(result.updateInfo.version, app.getVersion())) {
+    if (!result || !isNewerRelease(result.updateInfo.version, app.getVersion())) {
       emit({ state: 'not-available' });
+      // An rc build asks the native updater for prereleases, and GitHubProvider
+      // then only takes releases in the SAME channel ('rc'), so the clean
+      // release that follows (0.1.1 after 0.1.1-rc.2) is never offered
+      // natively. Ask releases/latest too (cached like any fallback); it offers
+      // a newer clean release as available-manual. rc to rc stays native.
+      if (/^\d+\.\d+\.\d+-/.test(app.getVersion())) fallbackCheck(undefined);
     }
     // `update-available` / `download-progress` / `update-downloaded` handlers
     // (wired in initAutoUpdater) carry it from here.
     return { ok: true };
   } catch (e) {
     const message = errText(e);
+    // electron-updater emits 'error' and then rethrows, so the error listener
+    // has already said not-available for a release without this platform's
+    // update file (R8). Stay there: no error state, no fallback.
+    if (isMissingChannelFile(e)) {
+      logLine(`no update file for this platform in the latest release: ${message}`);
+      emit({ state: 'not-available' });
+      return { ok: true };
+    }
     logLine(`native check failed: ${message}`);
     emit({ state: 'error', message });
     fallbackCheck(message);
@@ -315,6 +349,11 @@ async function runDownload(): Promise<{ ok: boolean; error?: string }> {
     return { ok: true };
   } catch (e) {
     const message = errText(e);
+    if (isMissingChannelFile(e)) {
+      logLine(`no update file for this platform in the latest release: ${message}`);
+      emit({ state: 'not-available' });
+      return { ok: true };
+    }
     logLine(`download failed: ${message}`);
     emit({ state: 'error', message });
     fallbackCheck(message);
@@ -526,6 +565,12 @@ export function initAutoUpdater(getWebContents: () => WebContents | null): void 
       });
       autoUpdater.on('error', (err) => {
         const message = errText(err);
+        if (isMissingChannelFile(err)) {
+          logLine(`no update file for this platform in the latest release: ${message}`);
+          emit({ state: 'not-available' });
+          failPendingRestart(message);
+          return;
+        }
         logLine(`native updater error: ${message}`);
         emit({ state: 'error', message });
         // A restart-to-install that failed reports here, not as a throw. Settle

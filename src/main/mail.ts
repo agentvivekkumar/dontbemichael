@@ -400,7 +400,14 @@ export class MailService {
         }
       }
       messages.sort((a, b) => uidOf(b.id) - uidOf(a.id));
-      return { folder: folderName(key), messages, total: newest.length, page, more: newest.length > (page + 1) * limit };
+      // An empty inbox is not "no such mail": inbox zero archives everything
+      // with an outcome, and the owner's replies live in Sent. Say so in the
+      // answer itself (owner, 2026-10-04: Pam searched only the inbox after the
+      // folders shipped and concluded her tool could not see the rest).
+      const hint = key === 'inbox' && !newest.length
+        ? { hint: 'Nothing in the inbox. Archived mail is in folder "archive" and mail the owner or the team sent is in folder "sent": search there too.' }
+        : {};
+      return { folder: folderName(key), messages, total: newest.length, page, more: newest.length > (page + 1) * limit, ...hint };
     }, 'Searching the mailbox');
   }
 
@@ -460,9 +467,17 @@ export class MailService {
     }, action === 'mark_read' ? 'Marking mail read' : action === 'mark_junk' ? 'Moving mail to junk' : 'Archiving mail');
   }
 
-  private async source(c: ImapLike, uid: string): Promise<Buffer> {
+  private async source(c: ImapLike, uid: string, key: FolderKey = 'inbox'): Promise<Buffer> {
     const m = await c.fetchOne(uid, { uid: true, source: true, flags: true }, { uid: true });
-    if (!m || !m.source) throw new MailError('not-found', `No message with id ${uid} in this mailbox.`);
+    if (!m || !m.source) {
+      // A plain number is an inbox id, and mail leaves the inbox when it is
+      // archived. Say where to look, so an agent searches the archive instead of
+      // deciding archived mail is out of reach (owner, 2026-10-04: Pam read an
+      // old inbox id after inbox zero and asked the owner to restart her mail).
+      throw new MailError('not-found', key === 'inbox'
+        ? `No message with id ${uid} in the inbox. If it was archived or sent, search with folder "archive" or "sent" and read the id that search gives.`
+        : `No message with id ${uid} in that folder. Search again for its current id.`);
+    }
     // A draft is the owner's own unsent words, whichever folder holds it.
     const flags: Set<string> = m.flags instanceof Set ? m.flags : new Set(Array.isArray(m.flags) ? m.flags : []);
     if (flags.has('\\Draft')) throw new MailError('bad-request', 'That message is an unsent draft, which the team does not read.');
@@ -472,7 +487,7 @@ export class MailService {
   async read(id: string, messageId: string) {
     const { key, uid } = parseMessageId(messageId);
     return this.inFolder(id, MailService.folderOf(key), async (c) => {
-      const parsed = await simpleParser(await this.source(c, uid));
+      const parsed = await simpleParser(await this.source(c, uid, key));
       let text = parsed.text ?? (typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]+>/g, ' ') : '') ?? '';
       const truncated = text.length > BODY_MAX_CHARS;
       if (truncated) text = `${text.slice(0, BODY_MAX_CHARS)}\n\n[message cut at ${BODY_MAX_CHARS} characters]`;
@@ -497,7 +512,7 @@ export class MailService {
     // mail names it by an id that says where it is.
     const fetch = (ref: MailRef) => {
       const { key, uid } = parseMessageId(ref.id);
-      return this.inFolder(id, MailService.folderOf(key), (c) => this.source(c, uid), 'Fetching the referenced message');
+      return this.inFolder(id, MailService.folderOf(key), (c) => this.source(c, uid, key), 'Fetching the referenced message');
     };
     const attachments: Array<Record<string, unknown>> = [];
     if (input.replyTo) {

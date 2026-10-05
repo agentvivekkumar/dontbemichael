@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { ScheduleRequest } from '@shared/missions';
 import type { OwnerRequest } from '@shared/ownerRequests';
 import type { WorkStyleOffer } from '@shared/workStyleUpdates';
-import { openQuestion, parseTasks, waitsOnHuman, type HiveTask } from '../components/hiveTasks';
+import { openQuestion, openQuestions, parseTasks, waitsOnHuman, type HiveTask } from '../components/hiveTasks';
 
 const POLL_MS = 5000;
 
@@ -69,7 +69,7 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
   const merged = { ...feed, ...next };
-  feed = { ...merged, count: merged.tasks.filter(waitsOnHuman).length + merged.requests.length + merged.offers.length };
+  feed = { ...merged, count: merged.tasks.reduce((n, t) => n + openQuestions(t).length, 0) + merged.requests.length + merged.offers.length };
   for (const l of [...listeners]) l();
 }
 

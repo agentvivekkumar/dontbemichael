@@ -9,13 +9,14 @@ import { PixelButton } from './PixelButton';
 import { useStore } from '@/store/store';
 import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
-import { type HiveTask, type HumanQA, openQuestion, waitsOnHuman } from './TasksKanban';
+import { type HiveTask, type HumanQA } from './TasksKanban';
 import { compareByNewestAsk } from './askMeOrder';
-import { answerMessages, raiserOf } from '@shared/askMeRouting';
+import { answerMessages, isAnswered, isWithdrawn, openAskIndexes, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 import { ScheduleRequestCards } from './ScheduleRequestCards';
 import { WorkStyleUpdateCards } from './WorkStyleUpdateCards';
+import { AskFileRows } from './AskFileRows';
 import { refreshNeedsYou, updateNeedsYouTasks, useNeedsYou } from '@/shell/useNeedsYou';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 
@@ -43,6 +44,11 @@ const ALL_CLEAR_LINES = 5;
  *  (the launch open, D7) never takes focus for an old one. */
 let handledFocusSeq = 0;
 
+/** One open question on the board. A card can hold several, and each is its
+ *  own row with its own answer, so a newer question never hides an older one
+ *  (askMeRouting.ts, owner 2026-10-04). */
+interface AskRow { key: string; task: HiveTask; index: number; ask: HumanQA }
+
 /** All tasks transitively waiting on `id` (dependents chain), cycle-safe. */
 function dependentsTree(id: string, all: HiveTask[], seen = new Set<string>()): HiveTask[] {
   if (seen.has(id)) return [];
@@ -60,13 +66,13 @@ export function AskMeTab() {
   // One shared read with the pill, the strip and the chips (D3, eng R4).
   const { tasks, requests: scheduleRequests, offers } = useNeedsYou();
   const refreshScheduleRequests = refreshNeedsYou;
-  // Drafts live in the STORE (keyed by task id) — switching tabs unmounts this
+  // Drafts live in the STORE (keyed by row) — switching tabs unmounts this
   // view, and a half-typed answer must survive the round trip.
   const drafts = useStore((s) => s.answerDrafts);
   const setAnswerDraft = useStore((s) => s.setAnswerDraft);
   const openTaskDetail = useStore((s) => s.openTaskDetail);
   const [sending, setSending] = useState<string | null>(null);
-  // The open card: undefined means the newest, null means none.
+  // The open row: undefined means the newest, null means none.
   const [openId, setOpenId] = useState<string | null | undefined>(undefined);
   // Which cards have their "holding up" list open.
   const [openStuck, setOpenStuck] = useState<Record<string, boolean>>({});
@@ -83,11 +89,16 @@ export function AskMeTab() {
   useEffect(() => {
     if (!focusReq || focusReq.seq <= handledFocusSeq) return;
     handledFocusSeq = focusReq.seq;
-    if (focusReq.taskId) setOpenId(focusReq.taskId);
+    if (focusReq.taskId) {
+      const first = rowsRef.current.find((r) => r.task.id === focusReq.taskId);
+      if (first) setOpenId(first.key);
+    }
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
         const root = rootRef.current;
         if (!root) return;
+        // Every row of a card carries its id; the first in the list is the
+        // one just opened.
         const wanted = focusReq.taskId ? root.querySelector<HTMLElement>(`[data-askme-id="${CSS.escape(focusReq.taskId)}"]`) : null;
         const cardEl = wanted ?? root.querySelector<HTMLElement>('.cth-askme-card.is-open');
         const field = cardEl?.querySelector<HTMLTextAreaElement>('textarea');
@@ -101,40 +112,46 @@ export function AskMeTab() {
   const nameFor = (id?: string): string | undefined =>
     id ? (agents.find((a) => a.id === id)?.name ?? restorable.find((a) => a.id === id)?.name ?? id) : undefined;
 
-  // Newest ask at the top, oldest at the bottom. Before this the board had no
-  // comparator at all, so a question's position was an accident of where its
-  // card sat in tasks.json. `filter` already returns a fresh array, so sorting
-  // in place never touches the store's own ordering. The ask each card is
-  // ranked by comes from openQuestion() — the same predicate waitsOnHuman uses
-  // — and only this OUTER list is sorted; a card's humanQA history stays
-  // chronological (see askMeOrder.ts).
-  const waiting = tasks
-    .filter(waitsOnHuman)
-    .sort((a, b) => compareByNewestAsk(openQuestion(a), openQuestion(b)));
+  // Every open question, newest at the top, oldest at the bottom. Before this
+  // the board had no comparator at all, so a question's position was an
+  // accident of where its card sat in tasks.json. Only this OUTER list is
+  // sorted; a card's humanQA history stays chronological (see askMeOrder.ts).
+  const waiting: AskRow[] = tasks
+    .flatMap((t) => openAskIndexes(t.humanQA).map((index) => ({ key: `${t.id}#${index}`, task: t, index, ask: t.humanQA![index] })))
+    .sort((a, b) => compareByNewestAsk(a.ask, b.ask));
+  const rowsRef = useRef<AskRow[]>(waiting);
+  rowsRef.current = waiting;
+  // A card with several open questions has a row for each: their labels add
+  // the start of the question, so a screen reader can tell them apart.
+  const rowsPerCard = new Map<string, number>();
+  for (const r of waiting) rowsPerCard.set(r.task.id, (rowsPerCard.get(r.task.id) ?? 0) + 1);
+  const rowLabel = (r: AskRow): string => {
+    const title = askTitle(r.task.title);
+    if ((rowsPerCard.get(r.task.id) ?? 0) < 2) return title;
+    const q = askHeadline(r.ask.q);
+    return `${title}: ${q.length > 60 ? `${q.slice(0, 59).trimEnd()}…` : q}`;
+  };
 
   /**
-   * Apply `patch` to the OPEN humanQA entry of one card, on the RAW ledger.
-   * Returns whether it landed.
+   * Record the owner's answer on one open question, then tell Michael.
    *
-   * Re-reads tasks.json first rather than writing this view's 5s-old snapshot,
-   * because `hive:writeTasks` treats the incoming array as the card MEMBERSHIP:
-   * writing our snapshot back would delete any card the god added since the last
-   * poll. Re-locating the open question by its text also means an answer can
-   * never land on a different question the god swapped in underneath us — in
-   * that case nothing is written and the draft is kept.
+   * This view's card is a few seconds old, so main merges it against the card
+   * on disk (askMeRouting.ts mergeHumanQA): the answer lands only on the same
+   * question, still open there. When it does not land (the question changed,
+   * or Michael withdrew it meanwhile), nothing is sent or remembered and the
+   * draft is kept.
    */
-
-  const sendAnswer = async (task: HiveTask) => {
-    const text = (drafts[task.id] ?? '').trim();
-    const open = openQuestion(task);
-    if (!text || !open || sending) return;
-    setSending(task.id);
+  const sendAnswer = async (row: AskRow) => {
+    const { task, index, ask: open } = row;
+    const text = (drafts[row.key] ?? '').trim();
+    if (!text || sending) return;
+    setSending(row.key);
     try {
-      // 1) Document the answer ON the card.
+      // 1) Document the answer ON the card, on this question only.
       const next = tasks.map((t) => {
         if (t.id !== task.id) return t;
-        const qa = (t.humanQA ?? []).map((e) =>
-          e === open || (e.q === open.q && !e.a)
+        const qa = (t.humanQA ?? []).map((e, i) =>
+          i === index && e.q === open.q && !isAnswered(e) && !isWithdrawn(e)
             ? { ...e, a: text, answeredAt: new Date().toISOString() }
             : e
         );
@@ -143,12 +160,13 @@ export function AskMeTab() {
       const updated = next.find((candidate) => candidate.id === task.id);
       const result = updated
         ? await window.cth.hivePatchTask(task.id, { humanQA: updated.humanQA })
-        : { ok: false };
-      if (!result.ok) throw new Error('task changed before answer could be saved');
+        : { ok: false, landed: false };
+      if (!result.ok || result.landed === false) throw new Error('task changed before answer could be saved');
       updateNeedsYouTasks(() => next);
-      // 2) The answer goes to whoever raised the question, and into their
-      //    memory notes, and reaches Michael as a request about the card,
-      //    which he closes with done once he has routed it (askMeRouting.ts).
+      // 2) The answer reaches Michael as a request about the card, which he
+      //    closes with done once he has routed it, and goes into the memory
+      //    notes of whoever raised the question. The owner only talks to
+      //    Michael (askMeRouting.ts).
       const agents = useStore.getState().agents;
       const raiser = raiserOf(open, task, new Set(agents.map((a) => a.id)));
       const raiserName = agents.find((a) => a.id === raiser)?.name ?? raiser;
@@ -160,8 +178,8 @@ export function AskMeTab() {
         }, 'human');
       }
       await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, q: open.q, a: text }).catch(() => undefined);
-      setAnswerDraft(task.id, '');
-      setAnsweredHere((list) => [{ id: task.id, title: task.title, a: text, who: nameFor(typeof task.assignee === 'string' ? task.assignee : undefined), whoId: typeof task.assignee === 'string' ? task.assignee : undefined }, ...list.filter((x) => x.id !== task.id)]);
+      setAnswerDraft(row.key, '');
+      setAnsweredHere((list) => [{ id: row.key, title: task.title, a: text, who: nameFor(typeof task.assignee === 'string' ? task.assignee : undefined), whoId: typeof task.assignee === 'string' ? task.assignee : undefined }, ...list.filter((x) => x.id !== row.key)]);
       refreshNeedsYou();
     } catch { /* leave the draft so the user can retry */ }
     setSending(null);
@@ -190,28 +208,28 @@ export function AskMeTab() {
           <div dir={rtl ? 'auto' : undefined} style={{ marginTop: 2, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.a}</div>
         </section>
       ))}
-      {waiting.map((t, idx) => {
-        const open = openQuestion(t)!;
+      {waiting.map((row, idx) => {
+        const { task: t, ask: open } = row;
         const stuck = dependentsTree(t.id, tasks);
         const owner = t.assignee ? agents.find((a) => a.id === t.assignee) : undefined;
         // Agents write tasks.json: a card's assignee may not be a string.
         const who = nameFor(typeof t.assignee === 'string' ? t.assignee : undefined);
         const fam = owner && !owner.isGod ? family(departmentOf(owner), dark) : null;
         const answered = t.humanQA?.filter((e) => e.a).length ?? 0;
-        const draft = drafts[t.id] ?? '';
-        const showStuck = openStuck[t.id] ?? false;
+        const draft = drafts[row.key] ?? '';
+        const showStuck = openStuck[row.key] ?? false;
         // One card open at a time; the newest is open until the owner picks another.
         // The newest is open by default, and after the open card is answered
         // (it leaves the list) the newest opens again.
-        const pinned = openId !== undefined && (openId === null || waiting.some((x) => x.id === openId));
-        const expanded = pinned ? openId === t.id : idx === 0;
-        const toggle = () => setOpenId(expanded ? null : t.id);
+        const pinned = openId !== undefined && (openId === null || waiting.some((x) => x.key === openId));
+        const expanded = pinned ? openId === row.key : idx === 0;
+        const toggle = () => setOpenId(expanded ? null : row.key);
         const ago = askedAgo(open.askedAt, Date.now(), i18n.language, translate('askMe.justNow'));
         return (
           // Design v2 (DESIGN.md 7.8; owner, 2026-09-30): folded cards read as a
           // list (title, who, when, the ask in a line or two); one opens to the
           // full question, a one row reply and what it holds up.
-          <section key={t.id} data-askme-id={t.id} aria-label={askTitle(t.title)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
+          <section key={row.key} data-askme-id={t.id} aria-label={rowLabel(row)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
             {/* The header folds and unfolds the card. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div
@@ -266,16 +284,18 @@ export function AskMeTab() {
             <div dir={rtl ? 'auto' : undefined} className="cth-askme-q" style={{ margin: '10px 0 12px', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink)' }}>
               <MarkdownPreview source={open.q} variant="card" />
             </div>
+            {/* The files the question names, each with Open (docs/designs/ask-me-open-file.md). */}
+            <AskFileRows question={open.q} raisedBy={open.raisedBy} assignee={typeof t.assignee === 'string' ? t.assignee : undefined} style={{ margin: '-2px 0 12px' }} />
             {/* One row: the answer, and Reply. */}
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
               <GrowingTextarea
                 className="cth-input"
                 dir={rtl ? 'auto' : undefined}
                 value={draft}
-                onChange={(e) => setAnswerDraft(t.id, e.target.value)}
+                onChange={(e) => setAnswerDraft(row.key, e.target.value)}
                 // Typing pins this card open, so a newer ask arriving never folds it mid answer.
-                onFocus={() => setOpenId(t.id)}
-                onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(t); }}
+                onFocus={() => setOpenId(row.key)}
+                onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(row); }}
                 placeholder={translate('askMe.answerPlaceholder')}
                 style={{
                   flex: 1, minWidth: 0, display: 'block', boxSizing: 'border-box', padding: '7px 10px', minHeight: 34,
@@ -286,18 +306,18 @@ export function AskMeTab() {
               />
               <PixelButton
                 variant="primary" size="sm"
-                disabled={!draft.trim() || sending === t.id}
-                onClick={() => void sendAnswer(t)}
+                disabled={!draft.trim() || sending === row.key}
+                onClick={() => void sendAnswer(row)}
                 style={{ height: 34, flexShrink: 0 }}
               >
-                {sending === t.id ? translate('askMe.sending') : translate('askMe.respond')}
+                {sending === row.key ? translate('askMe.sending') : translate('askMe.respond')}
               </PixelButton>
             </div>
             {/* The cascade: what is stuck behind this answer, folded to one line. */}
             {stuck.length > 0 && (
               <div style={{ marginTop: 9 }}>
                 <button
-                  onClick={() => setOpenStuck((m) => ({ ...m, [t.id]: !showStuck }))}
+                  onClick={() => setOpenStuck((m) => ({ ...m, [row.key]: !showStuck }))}
                   aria-expanded={showStuck}
                   style={{ ...quietLink, display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none', color: 'var(--cth-ink-3)' }}
                 >

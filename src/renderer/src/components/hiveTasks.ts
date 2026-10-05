@@ -1,4 +1,4 @@
-import { openAskIndex } from '@shared/askMeRouting';
+import { openAskIndexes } from '@shared/askMeRouting';
 
 /* The hive task ledger as the renderer reads it: the card types, the open
  * question rule and the one parser every reader goes through. Plain TypeScript
@@ -13,10 +13,13 @@ export interface HumanQA {
   a?: string;
   askedAt?: string;
   answeredAt?: string;
-  /** Set when the human dismisses the ask from the ASK ME board WITHOUT
-   *  answering — the question stays on the card (history is preserved) but
-   *  openQuestion() stops returning it, so the card leaves ASK ME. */
+  /** Set when Michael withdraws the ask without an answer (or the owner closes
+   *  the card): the question stays on the card as history and leaves ASK ME. */
   dismissedAt?: string;
+  /** Why it was withdrawn, in a few words. */
+  dismissedReason?: string;
+  /** Set when the card closing withdrew it; shown in the owner's language. */
+  dismissedBy?: 'card-closed';
   /** The agent whose work needs the answer, and which learns from it; "god"
    *  when Michael raised it himself. */
   raisedBy?: string;
@@ -44,18 +47,23 @@ export interface HiveTask {
   closedReason?: string;
 }
 
-/** The card's currently open question for the human, if any. An entry the human
- *  dismissed (dismissedAt) counts as resolved, same as an answered one. */
-export function openQuestion(t: HiveTask): HumanQA | undefined {
-  // Only the newest ask can be open; an older unanswered one was replaced by it
-  // (askMeRouting.ts openAskIndex, owner 2026-09-25).
-  const i = openAskIndex(t.humanQA);
-  return i >= 0 ? t.humanQA![i] : undefined;
+/** The card's open questions for the human, oldest first: every ask with no
+ *  answer and no withdrawal (dismissedAt), whatever the card's status
+ *  (askMeRouting.ts openAskIndexes, owner 2026-10-04). */
+export function openQuestions(t: HiveTask): HumanQA[] {
+  return openAskIndexes(t.humanQA).map((i) => t.humanQA![i]);
 }
 
-/** Waiting on the human = blocked with an unanswered question on the card. */
+/** The card's newest open question, if any. */
+export function openQuestion(t: HiveTask): HumanQA | undefined {
+  const open = openQuestions(t);
+  return open[open.length - 1];
+}
+
+/** Waiting on the human = a question on the card still open. The card's status
+ *  never hides it: a question leaves only when answered or withdrawn. */
 export function waitsOnHuman(t: HiveTask): boolean {
-  return t.status === 'blocked' && !!openQuestion(t);
+  return openQuestions(t).length > 0;
 }
 
 export type TaskStatus = HiveTask['status'];
@@ -113,6 +121,8 @@ export function parseTasks(raw: unknown): HiveTask[] {
             // Preserve a dismissal across the 5s re-parse, else the card would
             // resurface on the next poll (openQuestion would see it as open).
             dismissedAt: typeof e.dismissedAt === 'string' ? e.dismissedAt : undefined,
+            dismissedReason: typeof e.dismissedReason === 'string' ? e.dismissedReason : undefined,
+            dismissedBy: e.dismissedBy === 'card-closed' ? 'card-closed' as const : undefined,
             raisedBy: typeof e.raisedBy === 'string' ? e.raisedBy : undefined
           }))
         : undefined,

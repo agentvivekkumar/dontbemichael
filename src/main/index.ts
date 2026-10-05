@@ -9,7 +9,7 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { join, resolve, sep, basename, dirname, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { request as httpsRequest } from 'node:https';
-import { PtyManager, type SpawnOptions } from './pty';
+import { PtyManager, type ProcessLaunch, type SpawnOptions } from './pty';
 import { resolveCommand as resolveCliCommand, isSafeCommandName } from './shellEnv';
 import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
@@ -17,7 +17,8 @@ import {
   readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
   modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
-import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde } from './fs';
+import { terminalLaunches } from './terminalAtFolder';
+import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde, askFileVerdict, askFileRootsFor, resolveAskFileRoots, opensAsFolder, type AskFileAgent } from './fs';
 import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
 import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
 import { answerKey, catchUpRequests } from '../shared/ownerRequests';
@@ -1032,7 +1033,7 @@ function tellOfficeOpen(agentId: string): void {
   }
 }
 /** Once a launch, when Michael starts (docs/designs/card-lifecycle.md section
- *  5): an answer the owner gave through Ask me on a still blocked card whose
+ *  5): an answer the owner gave through Ask me on a card not yet done whose
  *  request never reached Michael (a send that failed, the app quitting) is sent
  *  to him now. Only answers the app recorded count, word for word; an answer
  *  already on a card before the app kept that record is not relayed as the
@@ -1041,13 +1042,16 @@ function tellOfficeOpen(agentId: string): void {
 let ownerCatchUpDone = false;
 function catchUpOwnerAnswers(): void {
   if (ownerCatchUpDone || !hive.enabled()) return;
-  ownerCatchUpDone = true;
   try {
     const recorded = new Set(readConfig().ownerAnswerKeys ?? []);
     for (const m of catchUpRequests(hive.ownerAnswersWithoutRequest(), recorded, hive.registry().agents, answerDigest)) {
       hive.send({ to: m.to, act: m.act, subject: m.subject, body: m.body, conversation: m.conversation, requires_reply: true }, 'human');
     }
     hive.refreshOwnerRequests();
+    // Done only once the sweep finished: a failure retries on the next call,
+    // and an answer already re-sent has its request now, so it is not sent
+    // twice (Codex adversarial review, 2026-10-05).
+    ownerCatchUpDone = true;
   } catch (e) {
     console.error('[owner answers catch-up]', e);
   }
@@ -3077,6 +3081,11 @@ ipcMain.handle('pty:spawn', async (evt, opts: AgentSpawnOptions) => {
  *  no renderer `evt`). `owner` is the window that should receive this PTY's output
  *  (null → the primary window). Behavior-identical to the prior inline handler. */
 async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebContents | null): Promise<{ ok: boolean; error?: string; cwd?: string; worktreePath?: string; resumeNotFound?: boolean; resumed?: boolean; seedPrompt?: string }> {
+  // A team member never starts without the hook channel (S1,
+  // docs/designs/windows-11-installer.md): it would run unwatched, or report to
+  // whatever holds the channel's name.
+  const channelError = opts.hive ? hookServer.channelError() : null;
+  if (channelError) return { ok: false, error: channelError };
   // ── cwd INGESTION — expand `~` exactly once, here ───────────────────────────
   // This is the single door every agent spawn comes through (`pty:spawn` IPC and
   // the god-triggered ephemeral-worker watcher), so it is where a user-typed
@@ -3676,19 +3685,26 @@ ipcMain.handle('dialog:chooseFolder', async (evt) => {
   return { ok: true as const, path: res.filePaths[0] };
 });
 
-// ─── IPC: Terminal.app at a folder ──────────────────────────────────────────
+// ─── IPC: a terminal window at a folder ─────────────────────────────────────
 ipcMain.handle('terminal:openAtFolder', async (_evt, cwd: unknown) => {
   if (typeof cwd !== 'string' || cwd.length === 0) return { ok: false, error: 'invalid cwd' };
-  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
-    const p = spawn('open', ['-a', 'Terminal', cwd]);
+  try { if (!statSync(cwd).isDirectory()) return { ok: false, error: 'not a folder' }; } catch { return { ok: false, error: 'not a folder' }; }
+  const launches = terminalLaunches(process.platform, cwd, process.env.ComSpec || 'cmd.exe');
+  if (!Array.isArray(launches)) return { ok: false, error: launches.error };
+  const run = (l: ProcessLaunch) => new Promise<{ ok: boolean; error?: string; missing?: boolean }>((resolve) => {
+    const p = spawn(l.file, l.args, { windowsVerbatimArguments: l.windowsVerbatimArguments, windowsHide: false });
     let err = '';
-    p.stderr.on('data', (d) => { err += d.toString(); });
-    p.on('error', (e) => resolve({ ok: false, error: e.message }));
-    p.on('close', (code) => {
-      if (code === 0) resolve({ ok: true });
-      else resolve({ ok: false, error: err.trim() || `open exited ${code}` });
-    });
+    p.stderr?.on('data', (d) => { err += d.toString(); });
+    p.on('error', (e) => resolve({ ok: false, error: e.message, missing: (e as NodeJS.ErrnoException).code === 'ENOENT' }));
+    p.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: err.trim() || `${l.file} exited ${code}` }));
   });
+  let last: { ok: boolean; error?: string } = { ok: false, error: 'no terminal found' };
+  for (const l of launches) {
+    const r = await run(l);
+    if (r.ok || !r.missing) return r.ok ? { ok: true } : { ok: false, error: r.error };
+    last = r;
+  }
+  return { ok: false, error: last.error };
 });
 
 // ─── IPC: integrations (Phase 2 registry — backend for Ryan's Settings UI) ────
@@ -3964,19 +3980,55 @@ ipcMain.handle('fs:statAbs', (_evt, p: unknown) => {
  *  can achieve by printing a path is a window at a folder the user could
  *  already open themselves.
  *
- *  openPath IS used for a directory, and only after statAbs has confirmed it is
- *  one — a directory has no default application to launch, so the execution
- *  argument above does not apply, and revealing a folder inside its parent is
- *  not what "open this folder" means to anyone. */
+ *  openPath IS used for a plain directory, and only after statAbs has confirmed
+ *  it is one: revealing a folder inside its parent is not what "open this
+ *  folder" means to anyone. The exception is a directory with a macOS package
+ *  ending (PACKAGE_EXTENSIONS in fs.ts, such as `.app` or `.pages`): openPath
+ *  launches `Tool.app`, so it is shown in its parent like a file (eng review
+ *  R4, 2026-10-04). Every other folder opens, dots in its name included
+ *  (`acme.com`, `Q3.2026`). */
 ipcMain.handle('fs:revealPath', async (_evt, p: unknown) => {
   if (typeof p !== 'string' || !p.length || p.length > 4096 || p.includes('\0')) {
     return { ok: false, error: 'bad request' };
   }
   const st = await statAbs(p);
   if (!st.exists) return { ok: false, error: 'not found' };
-  if (st.isFile) { shell.showItemInFolder(st.path); return { ok: true }; }
+  if (st.isFile || !opensAsFolder(st.path)) { shell.showItemInFolder(st.path); return { ok: true }; }
   const err = await shell.openPath(st.path);
   return err ? { ok: false, error: err } : { ok: true };
+});
+
+/** Where an Ask me question's files may be found and opened (askFileRootsFor
+ *  in fs.ts). Main reads the office and the registry itself; the renderer only
+ *  names who raised the question and who it is assigned to. */
+function askFileRoots(who: unknown): string[] {
+  const cfg = readConfig();
+  const office = cfg.businessFolder ?? legacyBusinessFolder(cfg.officeFolder);
+  // gstack-shortcut(dec-150d1c26-a7b6-4411-b059-faad20888603): a team folder outside the office folder widens Open, upgrade when any team folder sits outside businessFolder or an outside user onboards
+  let agents: Record<string, AskFileAgent> = {};
+  try { agents = hive.registry().agents; } catch { /* no hive yet */ }
+  return askFileRootsFor(office, agents, who);
+}
+
+const askFilePathOk = (p: unknown): p is string => typeof p === 'string' && p.length > 0 && p.length <= 1024 && !p.includes('\0');
+
+/** What each named file of an Ask me question can do: open, reveal or missing. */
+ipcMain.handle('fs:askFiles', async (_evt, paths: unknown, who: unknown) => {
+  if (!Array.isArray(paths)) return [];
+  // Each root's realpath once for the whole card, not once per path.
+  const roots = await resolveAskFileRoots(askFileRoots(who));
+  return Promise.all(paths.slice(0, 20).map((p) => (askFilePathOk(p) ? askFileVerdict(p, roots).then((r) => r.verdict) : 'missing')));
+});
+
+/** Open an Ask me question's file. The check runs again here, so the renderer's
+ *  earlier verdict never decides; a document that cannot open is shown instead. */
+ipcMain.handle('fs:openAskFile', async (_evt, p: unknown, who: unknown) => {
+  if (!askFilePathOk(p)) return { ok: false, error: 'bad request' };
+  const r = await askFileVerdict(p, askFileRoots(who));
+  if (r.verdict === 'missing') return { ok: false, error: 'not found' };
+  if (r.verdict === 'open' && !(await shell.openPath(r.path))) return { ok: true, action: 'opened' as const };
+  shell.showItemInFolder(r.path);
+  return { ok: true, action: 'revealed' as const };
 });
 
 // ─── IPC: git ───────────────────────────────────────────────────────────────
@@ -4447,20 +4499,19 @@ ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
   // card (security review, 2026-10-03).
   // Only answers this patch adds count: the renderer sends the card's whole
   // list, and an entry already on disk may be one an agent wrote.
-  let qa = (patch as { humanQA?: unknown }).humanQA;
-  if (Array.isArray(qa)) {
-    const ledger = hive.tasks() as { tasks?: HiveTask[] };
-    const onDisk = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id)?.humanQA ?? [];
-    // The renderer's list is a few seconds old: an entry added on disk since
-    // (a newer ask) is kept, and a slot whose question changed keeps the disk
-    // entry, so answering never erases a question it did not see.
-    qa = mergeHumanQA(onDisk, qa);
-    patch = { ...(patch as object), humanQA: qa };
-    const had = new Set(onDisk.map((e) => (e && typeof e.answeredAt === 'string' ? e.answeredAt : '')).filter(Boolean));
-    const keys = answerKeysOf(id, (qa as unknown[]).filter((e) => !(e && typeof e === 'object' && had.has((e as { answeredAt?: string }).answeredAt ?? ''))));
-    if (keys.length) recordOwnerAnswerKeys(keys);
-  }
-  return { ok: hive.patchTask(id, patch as Partial<Omit<HiveTask, 'id'>>) };
+  const qa = (patch as { humanQA?: unknown }).humanQA;
+  if (!Array.isArray(qa)) return { ok: false, landed: false, error: 'no Ask me answers in the patch' };
+  const ledger = hive.tasks() as { tasks?: HiveTask[] };
+  const onDisk = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id)?.humanQA ?? [];
+  // The renderer's list is a few seconds old, so it only adds answers to
+  // questions still open on disk: a newer ask, a changed question or a
+  // withdrawal written since all stand (askMeRouting.ts mergeHumanQA).
+  const { humanQA, added } = mergeHumanQA(onDisk, qa);
+  if (!added.length) return { ok: true, landed: false };
+  const ok = hive.patchTask(id, { humanQA: humanQA as HiveTask['humanQA'] });
+  const keys = answerKeysOf(id, added.map((i) => humanQA[i]));
+  if (ok && keys.length) recordOwnerAnswerKeys(keys);
+  return { ok, landed: ok };
 });
 /** The most recorded owner answers kept: far more than any office has open. */
 const OWNER_ANSWER_KEYS_MAX = 2000;

@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { imageMimeForPath } from '../shared/imageTypes';
+import { OPEN_EXTENSIONS, extensionOf, type AskFileVerdict } from '../shared/askFiles';
 
 /**
  * Lexical containment — pure string math, no filesystem access.
@@ -106,7 +107,14 @@ export async function safeResolve(root: string, rel: string): Promise<string | n
   } catch {
     return null;
   }
-  const abs = await canonicalize(realRoot, lex.absPath);
+  return confineCanonical(realRoot, lex.absPath);
+}
+
+/** The second half of `safeResolve`, for a caller that has already run
+ *  `realpath` on the root (askFileVerdict checks many paths against the same
+ *  roots). `absPath` must have passed `lexicalJoin` against that root. */
+async function confineCanonical(realRoot: string, absPath: string): Promise<string | null> {
+  const abs = await canonicalize(realRoot, absPath);
   if (!abs) return null;
   if (await hasSymlinkComponent(realRoot, abs)) return null;
   return abs;
@@ -364,3 +372,118 @@ export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boo
     return { exists: false, isFile: false, path: abs };
   }
 }
+
+/** The registry fields `askFileRootsFor` reads. */
+export interface AskFileAgent {
+  cwd?: string;
+  isGod?: boolean;
+  isAssistant?: boolean;
+}
+
+/**
+ * Where an Ask me question's files may be found and opened
+ * (docs/designs/ask-me-open-file.md): the office folder, then the folder of the
+ * team member who raised the question, the card's assignee, and every other
+ * team member. Michael and his assistant are not team members here, the same
+ * rule as the folder access layout, so their folders never widen Open. Ids
+ * the registry does not know are dropped; each folder appears once.
+ */
+export function askFileRootsFor(
+  office: string | undefined,
+  agents: Record<string, AskFileAgent | undefined>,
+  who: unknown
+): string[] {
+  const w = (who ?? {}) as { raisedBy?: unknown; assignee?: unknown };
+  const member = (id: unknown): id is string => {
+    const a = typeof id === 'string' ? agents[id] : undefined;
+    return !!a && !a.isGod && !a.isAssistant;
+  };
+  const first = [w.raisedBy, w.assignee].filter(member);
+  const ids = [...first, ...Object.keys(agents).filter((id) => member(id) && !first.includes(id))];
+  const roots = [office, ...ids.map((id) => agents[id]?.cwd)]
+    .filter((r): r is string => typeof r === 'string' && !!r.trim())
+    .map((r) => expandTilde(r));
+  return [...new Set(roots)];
+}
+
+/** A root with its canonical path worked out once (null: unusable). */
+export interface AskFileRoot {
+  root: string;
+  real: string | null;
+}
+
+/** Runs `realpath` once per root, so a batch of verdicts shares the work. */
+export async function resolveAskFileRoots(roots: readonly string[]): Promise<AskFileRoot[]> {
+  return Promise.all(roots.map(async (root) => {
+    if (!root || !isAbsolute(root)) return { root, real: null };
+    try { return { root, real: await realpath(resolve(root)) }; } catch { return { root, real: null }; }
+  }));
+}
+
+/**
+ * What Open may do with a file an Ask me question names
+ * (docs/designs/ask-me-open-file.md). The path is agent written, so it opens in
+ * the owner's default app only when `safeResolve` places it inside one of
+ * `roots` (the office folder, then team members' folders) AND the canonical
+ * path it lands on is a regular file with an extension on OPEN_EXTENSIONS. A
+ * link named `notes.md` that resolves to `Tool.app` is judged as the app.
+ * Anything else inside a root is only shown in Finder; a path outside every
+ * root, or not found, is missing.
+ * `roots` may come from `resolveAskFileRoots` when many paths are checked.
+ */
+export async function askFileVerdict(
+  pathText: string,
+  roots: readonly string[] | readonly AskFileRoot[]
+): Promise<{ verdict: AskFileVerdict; path: string }> {
+  const resolved = roots.length && typeof roots[0] === 'string'
+    ? await resolveAskFileRoots(roots as readonly string[])
+    : roots as readonly AskFileRoot[];
+  const p = expandTilde(pathText.trim());
+  if (!p || p.includes('\0')) return { verdict: 'missing', path: pathText };
+  for (const { root, real } of resolved) {
+    if (!root || !isAbsolute(root)) continue;
+    let rel = p;
+    if (isAbsolute(p)) {
+      // Against the root as written, then as it resolves: an office reached
+      // through a link is named either way.
+      const inside = (base: string): string | null => {
+        const r = relative(base, normalize(p));
+        return r.startsWith('..') || isAbsolute(r) ? null : r;
+      };
+      const r = inside(resolve(root)) ?? (real ? inside(real) : null);
+      if (r === null) continue;
+      rel = r;
+    }
+    // safeResolve(root, rel), with the root's realpath taken from the batch.
+    const lex = lexicalJoin(root, rel);
+    if (!lex || !real) continue;
+    const abs = await confineCanonical(real, lex.absPath);
+    if (!abs) continue;
+    let st;
+    try { st = await stat(abs); } catch { continue; }
+    return { verdict: st.isFile() && OPEN_EXTENSIONS.has(extensionOf(abs)) ? 'open' : 'reveal', path: abs };
+  }
+  // Outside every root, or behind a link that leaves it: agent text never
+  // opens or shows anything there (Codex adversarial review, 2026-10-05).
+  const first = resolved.find(({ root }) => root && isAbsolute(root));
+  return { verdict: 'missing', path: isAbsolute(p) || !first ? p : resolve(first.root, p) };
+}
+
+/** macOS package endings: directories Finder treats as an app or a document. */
+const PACKAGE_EXTENSIONS = new Set([
+  'app', 'appex', 'bundle', 'framework', 'plugin', 'prefpane', 'kext', 'xpc', 'saver', 'qlgenerator', 'mdimporter',
+  'pkg', 'mpkg', 'workflow', 'action', 'service', 'scptd', 'pages', 'numbers', 'key', 'rtfd', 'photoslibrary',
+  'logicx', 'band', 'playground', 'xcodeproj', 'xcworkspace', 'xcarchive', 'dsym',
+]);
+
+/**
+ * Whether revealing a directory may open it as a folder. On macOS an app, and
+ * many documents, are directories whose names carry a package ending
+ * (`Tool.app`, `Report.pages`); `shell.openPath` launches those, so they are
+ * shown in their parent instead (eng review R4). Any other folder opens, dots
+ * in its name included (`Sales`, `acme.com`, `Q3.2026`).
+ */
+export function opensAsFolder(path: string): boolean {
+  return !PACKAGE_EXTENSIONS.has(extensionOf(path));
+}
+

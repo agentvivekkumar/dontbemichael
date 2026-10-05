@@ -111,7 +111,7 @@ test('only what is real: mail paths run to the person who watches the mailbox, a
   assert.match(src, /section: 'Connections'/);
   // Counts come from the ledger and the hive log, never from sample numbers.
   assert.match(src, /e\.from !== 'god' \|\| e\.act !== 'request'/, 'delegated = Michael\'s requests today');
-  assert.match(src, /waitsOnHuman\(t\) && t\.assignee/, 'for you = Ask me cards tagged to that person');
+  assert.match(src, /const asks = openQuestions\(t\)\.length; if \(asks\) forYouBy\[t\.assignee\]/, 'for you = open Ask me questions on that person\'s cards');
   assert.doesNotMatch(src, /closes 6:00|Harbor|Northwind/);
 });
 
@@ -200,6 +200,11 @@ test('more life: plane to Needs you, pointing, conversations, owner messages, hi
   assert.match(life, /filter\(\(\[, c\]\) => c\.ab && c\.ba\)/, 'an arc only for a real back and forth');
   assert.match(life, /now - c\.last < 60_000/);
   assert.match(life, /const fromOwner = e\.from === 'human';/);
+  // Banter is paper planes only; an envelope is always a real message (owner, 2026-10-04).
+  assert.match(life, /kind: 'note-plane', color: acc\(fromId\)/);
+  assert.doesNotMatch(life + read('src/renderer/src/scene/studio/StudioStage.tsx'), /note-mail|Math\.random\(\) < 0\.5 \? 'plane' : 'mail'/);
+  // The owner only talks to Michael: an owner message to anyone else flies nothing (owner, 2026-10-04).
+  assert.match(life, /if \(fromOwner\) \{\s*if \(dest !== 'hub'\) continue;/);
   // Hires and Needs you planes ignore what was already there when the office opened.
   assert.match(life, /Date\.now\(\) - openedAt\.current < 6000/);
   assert.match(life, /Date\.now\(\) - openedAt\.current < 4000/);
@@ -247,15 +252,14 @@ test('the idle quote belongs to the speaker\'s chip and never covers a card (own
  * bubble with the message"): a beat flies pod to pod, then shows on the
  * catcher's chip with the sender's name and color.
  */
-test('idle banter: planes or mail between two quiet pods, the line shown where it lands', () => {
+test('idle banter: paper planes between two quiet pods, the line shown where it lands', () => {
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
   const life = read('src/renderer/src/scene/studio/life.tsx');
   assert.match(stage, /const partners = idle\.filter\(\(b\) => podOfId\(b\.id\) !== podOfId\(a\.id\)\);/, 'two different pods');
-  assert.match(stage, /live\.current\.throwNote\(from\.id, to\.id, look\)/);
+  assert.match(stage, /live\.current\.throwNote\(from\.id, to\.id\)/);
   assert.match(stage, /later\(FLIGHT_MS, \(\) => \{\n\s*show\(\{ agentId: to\.id, text, from: \{ name: from\.name, acc: live\.current\.accentOf\(from\.id\) \}/, 'the line shows on landing, at the catcher');
   assert.match(stage, /if \(!still\.includes\(from\.id\) \|\| !still\.includes\(to\.id\)\) \{ busyUntil = 0; return; \}/, 'work ends the chat');
   assert.match(stage, /\{\(quote\.from \|\| members\.length > 1\) && <span className="cth-st-quote-who">\{quote\.from\?\.name \?\? speaker\.name\}<\/span>\}/);
-  assert.match(life, /kind: look === 'plane' \? 'note-plane' : 'note-mail', color: acc\(fromId\)/);
   assert.match(life, /kind === 'you' \|\| kind === 'note-plane' \?/);
 });
 

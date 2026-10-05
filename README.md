@@ -295,7 +295,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-Windows and Linux will follow.
+A Windows 11 beta is in testing on release candidates; Linux will follow.
 
 ## Your data
 

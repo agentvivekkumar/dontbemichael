@@ -94,7 +94,7 @@ test('the app records an Ask me answer only when the patch adds it', () => {
   // Value: protects=the catch-up ledger holds only answers the owner gave through the app; fails_when=every answered entry in the patch is recorded, including ones already on disk, or the list grows without bound; why_new=security review, ship 2026-10-03; seam=source pin
   const main = read('src/main/index.ts');
   const h = main.slice(main.indexOf("ipcMain.handle('hive:patchTask'"), main.indexOf("ipcMain.handle('hive:patchTask'") + 2000);
-  assert.match(h, /answerKeysOf\(id, \(qa as unknown\[\]\)\.filter\(\(e\) => !\(e && typeof e === 'object' && had\.has\(/);
+  assert.match(h, /const keys = answerKeysOf\(id, added\.map\(\(i\) => humanQA\[i\]\)\);/);
   assert.match(main, /writeConfig\(\{ ownerAnswerKeys: \[\.\.\.new Set\(\[\.\.\.prior, \.\.\.keys\]\)\]\.slice\(-OWNER_ANSWER_KEYS_MAX\) \}\)/);
   assert.match(main, /createHash\('sha256'\)\.update\(`\$\{q\}\\u0000\$\{a\}`\)/, 'keyed by the question and answer text');
   assert.match(main, /catchUpRequests\(hive\.ownerAnswersWithoutRequest\(\), recorded, hive\.registry\(\)\.agents, answerDigest\)/);
@@ -172,11 +172,45 @@ test('answering from a few seconds old card never erases a question added since'
   // Value: protects=an ask Michael added while the owner typed survives the answer; fails_when=the renderer's stale list replaces the card's; why_new=Codex adversarial review pass 2, ship 2026-10-03; seam=none
   const disk = [{ q: 'Old?' }, { q: 'Newer?', askedAt: 't2' }];
   const stale = [{ q: 'Old?', a: 'Yes.', answeredAt: 't3' }];
-  assert.deepEqual(mergeHumanQA(disk, stale), [{ q: 'Old?', a: 'Yes.', answeredAt: 't3' }, { q: 'Newer?', askedAt: 't2' }]);
+  assert.deepEqual(mergeHumanQA(disk, stale), { humanQA: [{ q: 'Old?', a: 'Yes.', answeredAt: 't3' }, { q: 'Newer?', askedAt: 't2' }], added: [0] });
   const replaced = [{ q: 'Rewritten on disk?' }];
-  assert.deepEqual(mergeHumanQA(replaced, stale), replaced, 'a slot whose question changed keeps the disk entry');
+  assert.deepEqual(mergeHumanQA(replaced, stale), { humanQA: replaced, added: [] }, 'a slot whose question changed keeps the disk entry');
   const main = read('src/main/index.ts');
-  assert.match(main, /qa = mergeHumanQA\(onDisk, qa\);\s*patch = \{ \.\.\.\(patch as object\), humanQA: qa \};/);
+  assert.match(main, /const \{ humanQA, added \} = mergeHumanQA\(onDisk, qa\);\s*if \(!added\.length\) return \{ ok: true, landed: false \};/);
+});
+
+test('a stale answer never undoes a withdrawal Michael wrote after the owner opened the card', () => {
+  // Value: protects=a question Michael withdrew stays withdrawn when the owner answers another one from an older snapshot; fails_when=mergeHumanQA takes the renderer's entry for a same question slot; why_new=pre-landing review 2026-10-05; seam=none
+  const a = { q: 'Approve the supplier order?', askedAt: 't1', raisedBy: 'god' };
+  const b = { q: 'Send the quote today?', askedAt: 't2', raisedBy: 'god' };
+  const disk = [{ ...a, dismissedAt: 't3', dismissedReason: 'folded into the quote question' }, b];
+  const stale = [a, { ...b, a: 'Yes.', answeredAt: 't4' }];
+  const { humanQA, added } = mergeHumanQA(disk, stale);
+  assert.deepEqual(humanQA[0], disk[0], 'A stays withdrawn, reason and all');
+  assert.deepEqual(humanQA[1], { ...b, a: 'Yes.', answeredAt: 't4' }, 'the answer to B lands');
+  assert.deepEqual(added, [1]);
+});
+
+test('the renderer can only add an answer: no rewrites, no blank answers, no answer over a withdrawal or an answer', () => {
+  // Value: protects=the disk entry wins for every field but a new answer; fails_when=incoming q, raisedBy or an earlier answer overwrite disk, a blank answer lands, or extra incoming entries are appended; why_new=pre-landing review 2026-10-05; seam=none
+  const disk = [
+    { q: 'Q1?', a: 'First.', answeredAt: 't1' },
+    { q: 'Q2?', dismissedAt: 't2' },
+    { q: 'Q3?', raisedBy: 'nick' },
+    { q: 'Q4?' }
+  ];
+  const incoming = [
+    { q: 'Q1?', a: 'Changed.', answeredAt: 't9' },
+    { q: 'Q2?', a: 'Late.', answeredAt: 't9' },
+    { q: 'Q3?', a: 'Yes.', answeredAt: 't9', raisedBy: 'someone-else', dismissedAt: 'tx' },
+    { q: 'Q4?', a: '   ', answeredAt: 't9' },
+    { q: 'Q5?', a: 'Made up.' }
+  ];
+  const { humanQA, added } = mergeHumanQA(disk, incoming);
+  assert.deepEqual(humanQA, [disk[0], disk[1], { q: 'Q3?', raisedBy: 'nick', a: 'Yes.', answeredAt: 't9' }, disk[3]]);
+  assert.deepEqual(added, [2]);
+  const tab = read('src/renderer/src/components/AskMeTab.tsx');
+  assert.match(tab, /if \(!result\.ok \|\| result\.landed === false\) throw new Error/, 'an answer that did not land keeps the draft and sends nothing');
 });
 
 test('a card id from the ledger reaches Michael cleaned, like the title', () => {

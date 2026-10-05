@@ -21,7 +21,7 @@ const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
-const { extensionOf, imageMimeForPath, isImagePath, isSvgPath, formatBytes } = loadTs('src/shared/imageTypes.ts');
+const { urlExtensionOf, imageMimeForPath, isImagePath, isSvgPath, formatBytes } = loadTs('src/shared/imageTypes.ts');
 const { readFileBinary } = loadTs('src/main/fs.ts');
 const { resolveLocalImageRel, resolveRel } = loadTs('src/renderer/src/markdown/mdLinks.ts');
 
@@ -56,13 +56,13 @@ test('non-images are not images', () => {
 test('query strings and hashes do not hide the extension', () => {
   // Agent-written markdown carries cache-busters; treating `png?v=2` as the
   // extension would silently drop exactly the screenshots we want to render.
-  assert.equal(extensionOf('shot.png?v=2'), 'png');
-  assert.equal(extensionOf('shot.png#fig1'), 'png');
+  assert.equal(urlExtensionOf('shot.png?v=2'), 'png');
+  assert.equal(urlExtensionOf('shot.png#fig1'), 'png');
   assert.ok(isImagePath('./out/shot.png?v=2'));
 });
 
 test('a dotted DIRECTORY name cannot masquerade as an extension', () => {
-  assert.equal(extensionOf('v1.2/report'), '');
+  assert.equal(urlExtensionOf('v1.2/report'), '');
   assert.equal(isImagePath('release-1.png/report'), false);
 });
 

@@ -17,7 +17,7 @@ import { DeptIcon, PersonAvatar } from '@/scene/office/props';
 import { PixelBadge, type StatusKind } from '@/components/PixelBadge';
 import { useHasTerminalDraft } from '@/components/terminalPool';
 import { useMissions } from '@/components/triggers/ScheduleList';
-import { parseTasks, waitsOnHuman } from '@/components/TasksKanban';
+import { openQuestions, parseTasks } from '@/components/TasksKanban';
 import { missionsFor, nextRunAt } from '@shared/missions';
 import { createBanter, createIdleLines } from '@/scene/office/cafeteriaLines';
 import { getNeedsYouFeed, newestAskFor, useNeedsYou, useNeedsYouCount } from '@/shell/useNeedsYou';
@@ -70,7 +70,7 @@ function useTaskSnapshot(godId: string): TaskSnapshot {
       if (t.status !== 'waiting') board[t.status]++;
       if (t.status === 'done') done[t.id] = t.assignee;
       if (t.status === 'doing' && t.assignee) doingBy[t.assignee] = (doingBy[t.assignee] ?? 0) + 1;
-      if (waitsOnHuman(t) && t.assignee) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + 1;
+      if (t.assignee) { const asks = openQuestions(t).length; if (asks) forYouBy[t.assignee] = (forYouBy[t.assignee] ?? 0) + asks; }
       if (t.status !== 'done' && (t.assignee === godId || t.assignee === 'god')) kept++;
     }
     return { board, doingBy, forYouBy, kept, done };
@@ -1039,7 +1039,7 @@ type Quote = { agentId: string; text: string; key: number; from?: { name: string
 
 function useIdleQuote(
   pods: PodPlan<Agent>[], paused: boolean,
-  throwNote: (fromId: string, toId: string, look: 'plane' | 'mail') => boolean,
+  throwNote: (fromId: string, toId: string) => boolean,
   accentOf: (id: string) => string,
   gone: ReadonlySet<string>
 ): Quote | null {
@@ -1084,8 +1084,9 @@ function useIdleQuote(
     };
 
     // Two people in different pods trade an exchange: each beat flies across
-    // as a paper plane or an envelope and shows where it lands, held long
-    // enough to read while the reply is on its way back.
+    // as a paper plane (envelopes are only ever real messages; owner,
+    // 2026-10-04) and shows where it lands, held long enough to read while
+    // the reply is on its way back.
     const chat = (): boolean => {
       const idle = quietPeople();
       if (idle.length < 2) return false;
@@ -1096,7 +1097,6 @@ function useIdleQuote(
       if (!pick) return false;
       const b = partners[pick.partner];
       const beats = pick.beats;
-      const look = Math.random() < 0.5 ? 'plane' : 'mail';
       const holdFor = (text: string) => Math.min(3600, Math.max(2000, 1200 + text.length * 50));
       busyUntil = Date.now() + beats.reduce((t, x) => t + FLIGHT_MS + holdFor(x), 0) + 2000;
       const play = (i: number) => {
@@ -1104,7 +1104,7 @@ function useIdleQuote(
         // Someone got work mid conversation: it ends there.
         const still = quietPeople().map((x) => x.id);
         if (!still.includes(from.id) || !still.includes(to.id)) { busyUntil = 0; return; }
-        if (!live.current.throwNote(from.id, to.id, look)) { busyUntil = 0; return; }
+        if (!live.current.throwNote(from.id, to.id)) { busyUntil = 0; return; }
         const text = beats[i];
         const last = i === beats.length - 1;
         const hold = holdFor(text);

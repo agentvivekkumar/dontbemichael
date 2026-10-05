@@ -149,6 +149,15 @@ export function buildCmdCommandLine(resolved: string, args: string[]): string {
   return `/d /s /c "${inner}"`;
 }
 
+/** A process to start: the file, its arguments, and whether the arguments are
+ *  already one pre-quoted command line (a cmd.exe line from buildCmdCommandLine
+ *  is), so Node must pass them through as they are. */
+export interface ProcessLaunch {
+  file: string;
+  args: string[];
+  windowsVerbatimArguments?: boolean;
+}
+
 /** What an npm-style Windows `.cmd` shim actually runs, decoded from its text. */
 export interface NpmShimTarget {
   /** BARE interpreter name — `node`, `bun` or `deno` — to be resolved off PATH by

@@ -30,6 +30,7 @@
  */
 
 import { isImagePath } from './imageTypes';
+import { extensionOf } from './askFiles';
 
 /** Extensions that open in the markdown preview. */
 const PREVIEW_EXTS = new Set(['md', 'markdown']);
@@ -60,19 +61,6 @@ const EDIT_EXTS = new Set([
 ]);
 
 export type PathAction = 'preview' | 'edit' | 'reveal';
-
-/**
- * Lower-cased extension of the last path segment, or '' when there is none.
- * Local rather than imported from imageTypes so a `?query` suffix cannot reach
- * a filesystem call: terminal tokens are filesystem paths, and a literal `?` in
- * a filename is legal on every platform we ship.
- */
-function extOf(token: string): string {
-  const base = token.split(/[/\\]/).pop() ?? '';
-  const dot = base.lastIndexOf('.');
-  if (dot <= 0 || dot === base.length - 1) return '';
-  return base.slice(dot + 1).toLowerCase();
-}
 
 /**
  * Candidate path tokens in one line of terminal output.
@@ -112,7 +100,7 @@ export function stripPathToken(raw: string): string {
  * false positive is one underline that stats to nothing and does nothing.
  */
 export function isPathToken(token: string): boolean {
-  const ext = extOf(token);
+  const ext = extensionOf(token);
   if (!ext) return false;
   if (PREVIEW_EXTS.has(ext) || EDIT_EXTS.has(ext) || isImagePath(token)) return true;
   return /[/\\]/.test(token);
@@ -129,7 +117,7 @@ export function isPathToken(token: string): boolean {
  * place that decides.
  */
 export function classifyPathToken(token: string): PathAction {
-  const ext = extOf(token);
+  const ext = extensionOf(token);
   if (PREVIEW_EXTS.has(ext)) return 'preview';
   if (isImagePath(token)) return 'reveal';
   if (EDIT_EXTS.has(ext)) return 'edit';

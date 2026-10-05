@@ -24,7 +24,25 @@ export interface AtomicFileOps {
   closeSync: typeof closeSync;
   renameSync: typeof renameSync;
   rmSync: typeof rmSync;
+  /** Blocks for `ms`; the rename retry's wait. */
+  sleepSync: (ms: number) => void;
+  /** Which system's rename rules apply; only Windows retries a held rename. */
+  platform: NodeJS.Platform;
 }
+
+/** Rename errors that mean "the target is briefly held", not "this can never
+ *  work": on Windows, antivirus and backup tools open a freshly written file.
+ *  Elsewhere these errors are permanent, and the wait would only freeze the
+ *  main process, so only Windows retries. */
+const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES']);
+/** Block this thread for `ms` (a held file, a git index lock). */
+export function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** Waits before each retry of a held rename: about 1.3 s in all, at most once
+ *  per save (docs/designs/windows-11-installer.md, E2). */
+const RENAME_RETRY_MS = [100, 300, 900];
 
 const defaultOps: AtomicFileOps = {
   openSync,
@@ -34,8 +52,23 @@ const defaultOps: AtomicFileOps = {
   fsyncSync,
   closeSync,
   renameSync,
-  rmSync
+  rmSync,
+  sleepSync,
+  platform: process.platform
 };
+
+function renameWithRetry(from: string, to: string, ops: AtomicFileOps): void {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      ops.renameSync(from, to);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code ?? '';
+      if (ops.platform !== 'win32' || !BUSY.has(code) || attempt >= RENAME_RETRY_MS.length) throw e;
+      ops.sleepSync(RENAME_RETRY_MS[attempt]);
+    }
+  }
+}
 
 export function writeFileAtomic(path: string, data: string, mode = 0o600, ops: AtomicFileOps = defaultOps): void {
   const tmp = `${path}.${randomBytes(6).toString('hex')}.tmp`;
@@ -55,7 +88,7 @@ export function writeFileAtomic(path: string, data: string, mode = 0o600, ops: A
     } finally {
       ops.closeSync(fd);
     }
-    ops.renameSync(tmp, path);
+    renameWithRetry(tmp, path, ops);
   } catch (e) {
     if (created) { try { ops.rmSync(tmp, { force: true }); } catch { /* nothing left to clean */ } }
     throw e;

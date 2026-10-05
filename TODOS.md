@@ -138,15 +138,6 @@
 
 ## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
 
-### Retry the secrets rename on Windows
-
-**What:** Retry `renameSync` a few times with a short backoff on EPERM/EBUSY/EACCES in `src/main/atomicFile.ts`.
-
-**Why:** On Windows, antivirus or backup tools holding the file open make the rename fail; the save then fails (safely) and the owner sees an error.
-
-**Effort:** S
-**Priority:** P3
-
 ### Sweep leftover secrets temp files
 
 **What:** On first secret-store access, remove `integration-secrets.json.*.tmp` older than a minute.
@@ -192,15 +183,6 @@
 **What:** Show a separate message for `✘ Failed to connect` instead of "needs you to sign in again".
 
 **Why:** A network or server failure tells the owner to sign in.
-
-**Effort:** S
-**Priority:** P3
-
-### Status check on Windows with the npm Claude shim
-
-**What:** Run `claude.cmd` through the Windows shim handling the pty module uses.
-
-**Why:** `execFile` refuses `.cmd` files, so the status is always "Couldn't check" on Windows npm installs. Windows builds are not shipped yet.
 
 **Effort:** S
 **Priority:** P3
@@ -829,3 +811,130 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** S to M (human) / S (CC)
 **Priority:** P3 (watch)
 **Depends on:** nothing.
+
+## Windows
+
+### Sign the Windows installer
+
+**What:** Choose a Windows signing service (Microsoft Trusted Signing, or a vendor cloud key such as DigiCert KeyLocker or SSL.com eSigner), then wire `release.yml` so the Windows leg signs when its secrets exist and builds unsigned, without failing, when they don't.
+
+**Why:** Unsigned installers show "Windows protected your PC"; people must click More info, then Run anyway. Some small business owners stop there.
+
+**Pros:** Removes or shortens the warning; the publisher name shows in the install prompt.
+
+**Cons:** A paid account and a one-time identity check; a new signature can still warn until Windows' reputation system trusts it.
+
+**Context:** Accepted as E1 in `docs/designs/windows-11-installer.md` (CEO review 2026-10-04), with wiring deferred by R5 until the owner picks a service at sign up. New certificates must keep their key in hardware or a cloud vault, so a certificate file in CI secrets is not an option. Mirror the Mac notarize step: absent secrets mean an unsigned build and no failure.
+
+**Effort:** human M / CC S
+**Priority:** P2
+**Depends on / blocked by:** the owner choosing a service and passing its identity check.
+
+### Copy diagnostics for problem reports
+
+**What:** A "Copy diagnostics" button beside Settings' Report a problem: app and OS versions, the last 50 office event types from `log.jsonl`, agent exit summaries, with paths and names redacted; copied to the clipboard only.
+
+**Why:** Report a problem carries version numbers only, on purpose, so beta reports can lack what happened just before the failure.
+
+**Pros:** Remote debugging of Windows beta problems without back and forth.
+
+**Cons:** Redaction must be exact: office names, folder paths and customer names must never reach the copy.
+
+**Context:** Deferred as S3 in `docs/designs/windows-11-installer.md` (CEO review 2026-10-04) to design from what the first real beta reports lack. Sources: hive `log.jsonl`, `crashes/` (raw terminal tails, never copied raw).
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on / blocked by:** the first Windows beta reports.
+
+### Go live steps for the Windows beta
+
+**What:** In order:
+1. Push an rc tag (vX.Y.Z-rc.1).
+2. Read the first "Tests (Windows)" CI run and fix each POSIX-only test, or skip it on win32 with a reason.
+3. Run the rc.1 and rc.2 checklist on the clean x64 Windows 11 PC: install through SmartScreen, onboard, hire, task, mail archive search, schedule, rc.1 updates to rc.2, a user name with a space and an accent, an office folder in OneDrive, and agent start time under Defender. Also check that rc.2 is offered the clean release.
+4. Once it is green, remove `continue-on-error: true` from the `test-windows` job and make "Tests (Windows)" a required check.
+5. Set the repository variable `WINDOWS_RELEASE=on`.
+6. After the first clean release that carries Windows, add the Windows (beta) download to the website, and confirm with the owner before that push.
+
+**Why:** Windows ships only on rc tags until these pass (R9, R10). The website push is a production deploy.
+
+**Context:** Deferred from the ship of feat/windows-beta-askme-fixes (2026-10-05). These are post-merge steps from `docs/designs/windows-11-installer.md` (T5, T10, R9, R10, E5).
+
+**Effort:** human M / CC S
+**Priority:** P1
+**Depends on / blocked by:** this branch merged; the physical PC.
+
+### Decide the Git for Windows check
+
+**What:** On the clean PC, install Claude Code and start one session. If it needs Git Bash, add a Git for Windows check to onboarding (E3).
+
+**Why:** If Git Bash is missing, a Windows beta user would get stuck at their first agent start.
+
+**Context:** E3 in `docs/designs/windows-11-installer.md` depends on that smoke test, which has not run yet.
+
+**Effort:** human S / CC S
+**Priority:** P1
+**Depends on / blocked by:** the PC smoke test.
+
+## Ask me (deferred from ship of feat/windows-beta-askme-fixes, 2026-10-05)
+
+### FEATURES.md entries at land
+
+**What:** Add the Ask me file rows and the Windows beta to `docs/FEATURES.md` when this branch lands.
+
+**Why:** FEATURES.md is updated at each land.
+
+**Context:** Deferred from plan: `docs/designs/ask-me-open-file.md` and `docs/designs/windows-11-installer.md`.
+
+**Effort:** human S / CC S
+**Priority:** P1
+
+### Match catch-up requests to their answer
+
+**What:** The launch catch-up compares each answer with the card's newest owner request. If the request for one answer failed, and the owner then answered another question on the same card, the first answer is never sent. Match each request to its answer instead, by the answer key or answeredAt carried in the request.
+
+**Context:** Re-review of this ship, P3. Rare: it needs a failed send plus a second answer on the same card before the next launch.
+
+**Effort:** human S / CC S
+**Priority:** P3
+
+### Owner requests on cards Michael marked Done
+
+**What:** A request on a Done card counts as open only when it came after the card's `closedAt`, and only owner closes set `closedAt`. If Michael marks a card Done in the ledger while a question is still open, the owner's answer to it is left out of his open requests list. It still reaches his inbox.
+
+**Fix options:** Stamp a done time whenever a card enters Done. Or keep a request whose answer came after the card's last open question.
+
+**Context:** Re-review of this ship, P2 at confidence 6. Michael's instructions already forbid closing a card that has an open question.
+
+**Effort:** human S / CC S
+**Priority:** P3
+
+### Tell Michael when finishing by voice withdrew a question
+
+**What:** A voice "done with a result" withdraws the card's open questions, but Michael gets no owner change note for it, unlike a close from Tasks.
+
+**Effort:** human S / CC S
+**Priority:** P3
+
+### Answer only the question being answered
+
+**What:** hive:patchTask accepts an answer on any open slot whose question text matches. Send the target index with the patch, and accept the answer only on that slot.
+
+**Context:** Re-review of this ship, P3 at confidence 4. It needs Michael to clear an answer and ask the same text again within the 5 s snapshot.
+
+**Effort:** human S / CC S
+**Priority:** P4
+
+### A React test harness
+
+**What:** Add a small render harness (jsdom with react-dom) so these renderer paths get behavior tests instead of source regex pins:
+- Ask me rows
+- the per-index answer
+- AskFileRows states
+- Task detail withdrawn text
+- the floor's flight rules
+
+**Context:** The coverage audit for this ship found 7 paths that are only pinned by source regex (73% value-weighted). The same applies to the IPC handlers in `src/main/index.ts`, which tests cannot load.
+
+**Effort:** human M / CC M
+**Priority:** P2

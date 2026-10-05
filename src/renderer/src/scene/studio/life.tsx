@@ -20,7 +20,8 @@
  * - Something the owner sends Michael comes up from the composer below.
  * - A new hire's pod drops in with confetti and a welcome.
  * - Idle banter (DESIGN.md 8.8): two quiet people trade lines as paper planes
- *   or envelopes (`throwNote`); the stage shows each line where it lands.
+ *   (`throwNote`); the stage shows each line where it lands. Envelopes are only
+ *   ever real messages (owner, 2026-10-04).
  *
  * Apart from the banter, nothing here is invented: every effect starts from a
  * hive message, a hook event or the task ledger. Effects stop while the stage is paused, and with
@@ -39,7 +40,7 @@ export const FLIGHT_MS = 2200;
 
 export type SeatMap = Map<string, { pod: PodPlan<Agent>; index: number }>;
 
-type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail' | 'owner' | 'note-plane' | 'note-mail';
+type FlightKind = 'request' | 'question' | 'propose' | 'inform' | 'done' | 'refuse' | 'you' | 'clock' | 'mail' | 'owner' | 'note-plane';
 interface Flight { key: string; d: string; start: Pt; end: Pt; kind: FlightKind; color?: string; ping: boolean }
 interface Pop { key: string; at: Pt; glyph: Glyph; color: string }
 interface Burst { key: string; at: Pt }
@@ -75,10 +76,10 @@ export interface Life {
   postActive: Record<string, 'in' | 'out'>;
   /** New hires whose pod is dropping in right now. */
   arriving: Set<string>;
-  /** Idle banter: a paper plane or an envelope from one person's pod to
+  /** Idle banter: a paper plane (never an envelope) from one person's pod to
    *  another's, in the sender's department color. False when it can't fly
    *  (paused, or either one has no seat). It lands after FLIGHT_MS. */
-  throwNote: (fromId: string, toId: string, look: 'plane' | 'mail') => boolean;
+  throwNote: (fromId: string, toId: string) => boolean;
 }
 
 /** Where the Brief Michael composer sits, below the stage. */
@@ -185,9 +186,12 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
       for (const to of targets) {
         const dest = node(to);
         if (!from || !dest) continue;
-        // The owner's message rises from the composer under the stage.
-        if (fromOwner && dest !== 'you') {
-          const [ex, ey] = dest === 'hub' ? HUB_TOP : P(dest[0], dest[1], 70);
+        // The owner's message rises from the composer under the stage. The
+        // owner only talks to Michael: app notices sent in the owner's name to
+        // the team (closing time, office open) fly nothing (owner, 2026-10-04).
+        if (fromOwner) {
+          if (dest !== 'hub') continue;
+          const [ex, ey] = HUB_TOP;
           const d = `M${COMPOSER[0]},${COMPOSER[1]} C${COMPOSER[0]},${COMPOSER[1] - 160} ${ex},${ey + 140} ${ex},${ey}`;
           add.push({ key: `m${seqRef.current++}`, d, start: COMPOSER, end: floorAt(dest), kind: 'owner', ping: true });
           continue;
@@ -360,13 +364,13 @@ export function useStudioLife({ seatOf, godId, paused, T, posts, accentOf, done,
       {bursts.map((b) => <DoneBurst key={b.key} at={b.at} T={T} />)}
     </>
   );
-  const throwNote = (fromId: string, toId: string, look: 'plane' | 'mail'): boolean => {
+  const throwNote = (fromId: string, toId: string): boolean => {
     const { seatOf: s, paused: p, accentOf: acc } = live.current;
     const a = s.get(fromId)?.pod.grid;
     const b = s.get(toId)?.pod.grid;
     const d = a && b ? flightPath(a, b) : null;
     if (p || !a || !b || !d) return false;
-    launch([{ key: `n${seqRef.current++}`, d, start: floorAt(a), end: floorAt(b), kind: look === 'plane' ? 'note-plane' : 'note-mail', color: acc(fromId), ping: true }]);
+    launch([{ key: `n${seqRef.current++}`, d, start: floorAt(a), end: floorAt(b), kind: 'note-plane', color: acc(fromId), ping: true }]);
     return true;
   };
   return { svg, bubbles, clockRinging, postActive, arriving, throwNote };
@@ -383,7 +387,7 @@ function colorOf(kind: FlightKind, T: SceneTokens, own?: string): string {
     case 'clock': return T.amber;
     case 'inform': return '#9C98B8';
     case 'refuse': return '#4A4660';
-    case 'mail': case 'note-plane': case 'note-mail': return own ?? T.req;
+    case 'mail': case 'note-plane': return own ?? T.req;
     case 'owner': return T.indigo;
     default: return T.req;
   }
