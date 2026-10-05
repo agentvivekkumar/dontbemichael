@@ -7,7 +7,7 @@ by release.
 ## Part 1: Feature highlights
 
 **One line:** An AI office for your small business. Talk to Michael, your office manager, and a
-team of AI employees does the work on your Mac.
+team of AI employees does the work on your computer.
 
 **Short pitch:** Pick your kind of business and your team. Every team member is an AI agent with a
 job, its own folder, its own mailbox and its own memory. Michael hands out the work, keeps the team
@@ -40,7 +40,7 @@ moving, and brings you only the decisions that need you.
 
 ### 3. A mailbox for every job
 - Connect as many mailboxes as your business runs on: Gmail, Google Workspace, iCloud, Yahoo, Zoho
-  or any IMAP mailbox. Passwords stay in your Mac's keychain.
+  or any IMAP mailbox. Passwords stay encrypted on your computer.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
 - Choose Can send or Draft only for each one. A team member can't reach a mailbox you didn't give it.
@@ -59,8 +59,8 @@ moving, and brings you only the decisions that need you.
   looked up, where things live, and the steps for jobs it repeats. A background tidy up merges and
   updates them instead of letting them pile up.
 - Your answers to its questions go straight into its memory, so it doesn't ask again.
-- Company profile and company knowledge (Word, Excel, PowerPoint, PDF, scans) are shared with the
-  whole team, searchable by meaning.
+- Company profile and company knowledge (Word, Excel, PowerPoint, PDF, and scans on a Mac) are
+  shared with the whole team, searchable by meaning.
 
 ### 6. You stay in charge
 - Every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest)
@@ -70,7 +70,8 @@ moving, and brings you only the decisions that need you.
   While anything waits it stays open; when nothing at all waits it gets out of the way and the
   office fills the window.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
-  change it. Enforced by Claude Code's sandbox and checked again by the app.
+  change it. Enforced by Claude Code's sandbox on a Mac. On Windows, the app checks Claude's file
+  tools, but shell commands are not limited yet.
 - House rules for every agent: say where a fact came from, say when it doesn't know, never make up
   people, customers or quotes. A looping agent is steered, then held, then stopped.
 
@@ -86,7 +87,7 @@ moving, and brings you only the decisions that need you.
 ### 8. Built for small business owners
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
   SaaS and consulting, or anything else. Each comes with a suggested team.
-- Runs on your Mac with the Claude plan you already have. Plain words, no developer settings.
+- Runs on your computer with the Claude plan you already have. Plain words, no developer settings.
   A Windows 11 (x64) beta ships with every release.
 
 ## Part 2: Every change, release by release
