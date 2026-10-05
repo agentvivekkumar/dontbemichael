@@ -52,7 +52,9 @@ test('a channel that fails to open blocks every team member from starting', asyn
   const server = new HookServer(hive, () => null, () => ({ notifications: false }));
   t.after(() => { server.stop(); squatter.close(); fs.rmSync(base, { recursive: true, force: true }); });
   server.start();
-  await once(server.server, 'error');
+  // A spawn waits for the channel to settle, so the failure is known before it starts.
+  await server.whenOpen();
+  assert.ok(server.channelError(), 'known as soon as the wait ends');
   await new Promise(setImmediate);
   assert.equal(server.server.listening, false);
   if (win) {
@@ -64,7 +66,7 @@ test('a channel that fails to open blocks every team member from starting', asyn
   }
   assert.doesNotMatch(server.channelError(), /[–—]| - /);
   const main = read('src/main/index.ts');
-  assert.match(main, /const channelError = opts\.hive \? hookServer\.channelError\(\) : null;\n\s+if \(channelError\) return \{ ok: false, error: channelError \};/);
+  assert.match(main, /if \(opts\.hive\) await hookServer\.whenOpen\(\);\n\s+const channelError = opts\.hive \? hookServer\.channelError\(\) : null;\n\s+if \(channelError\) return \{ ok: false, error: channelError \};/);
 });
 
 test('an error once the channel is open is logged but never blocks the team', async (t) => {

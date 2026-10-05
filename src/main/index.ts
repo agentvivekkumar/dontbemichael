@@ -3084,6 +3084,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // A team member never starts without the hook channel (S1,
   // docs/designs/windows-11-installer.md): it would run unwatched, or report to
   // whatever holds the channel's name.
+  if (opts.hive) await hookServer.whenOpen();
   const channelError = opts.hive ? hookServer.channelError() : null;
   if (channelError) return { ok: false, error: channelError };
   // ── cwd INGESTION — expand `~` exactly once, here ───────────────────────────

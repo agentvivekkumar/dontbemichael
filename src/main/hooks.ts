@@ -248,8 +248,20 @@ export class HookServer {
       this.listenError = `The office can't start its team: its private channel on this computer ${inUse ? 'is in use' : 'could not open'} (${code ?? 'error'}). Quit Don't Be Michael and open it again.`;
     });
     server.on('listening', () => { this.listenError = null; });
+    // Settles when the channel opens or fails, so a spawn that races the
+    // first listen waits for the answer instead of slipping past the guard
+    // (Codex adversarial review, 2026-10-05).
+    this.opened = new Promise<void>((resolve) => { server.once('listening', () => resolve()); server.once('error', () => resolve()); });
     server.listen(sock);
   }
+
+  /** Waits, up to `ms`, until the channel has opened or failed. */
+  async whenOpen(ms = 5000): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([this.opened, new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); timer.unref?.(); })]);
+    if (timer) clearTimeout(timer);
+  }
+  private opened: Promise<void> = Promise.resolve();
 
   /** Why agents cannot start, when the hook channel failed to open; else null. */
   channelError(): string | null {

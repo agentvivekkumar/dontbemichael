@@ -938,3 +938,15 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 **Effort:** human M / CC M
 **Priority:** P2
+
+### Trust boundaries Codex raised on Ask me (2026-10-05)
+
+**What:** Codex adversarial pass 2 raised these items. Each one either already exists on main or needs a design decision:
+1. **Question text in Michael's request.** The question is copied verbatim into Michael's `from: human` request, and an agent writes that question. Label it as card text and fold it to one line, or send only the card id plus the owner's answer.
+2. **Who closed the question.** Open or closed is decided by whether a string is present, so a worker that writes tasks.json can set `a` or `dismissedAt` and hide a question. Give answers and withdrawals provenance: the recorded owner answer keys for answers, plus a trusted withdrawal marker.
+3. **The 30-day window.** Owner requests are read from the last 30 days only, so a request open for longer drops out of Michael's list.
+4. **Reply alias.** `openOwnerRequests` closes a request only on a reply addressed `to: "human"`, but the router accepts any Michael alias.
+5. **File swap race.** `fs:openAskFile` checks the file and then opens it by path. The swap window is milliseconds, because the check runs at click time. Open a verified copy or a file handle instead.
+
+**Effort:** human M / CC S
+**Priority:** P2
