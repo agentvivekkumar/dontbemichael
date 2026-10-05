@@ -45,6 +45,10 @@ export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
     <div
       className="cth-titlebar-drag"
       style={{
+        // Its own layer above the stage (50), the right column (60) and the
+        // bottom bar (70), so a tip or menu opening down from the bar is never
+        // painted under the board; dialogs and focus mode (200 up) stay above.
+        position: 'relative', zIndex: 100,
         height: 56, minHeight: 56,
         display: 'flex', alignItems: 'center', gap: 10,
         // The macOS traffic lights sit in the top left of a hiddenInset window.

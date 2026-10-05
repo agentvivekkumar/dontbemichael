@@ -30,13 +30,16 @@ test('Settings and the top bar show a Beta pill with an InfoTip on every build',
   assert.match(pill, /\{t\('settingsHero\.beta'\)\}<\/span>\n\s+<InfoTip label=\{t\('settingsHero\.beta'\)\} text=\{info\} align=\{align\} \/>/);
   // Beside the version in the top bar too (owner, 2026-10-05), its tip pointing to Settings.
   const bar = read('src/renderer/src/shell/TopBar.tsx');
-  assert.match(bar, /<UpdateBadge \/>\n[^\n]*\n\s+<BetaPill info=\{t\('shell\.betaInfo'\)\} align="end" \/>/);
+  const at = (needle) => bar.indexOf(needle);
+  assert.ok(at('<UpdateBadge />') > 0 && at('<UpdateBadge />') < at(`<BetaPill info={t('shell.betaInfo')} align="end" />`) && at(`<BetaPill info={t('shell.betaInfo')} align="end" />`) < at('<CliUpdateBadge />'), 'the pill sits right after the version');
+  // The bar is its own layer, or the tip opens under the Tasks board.
+  assert.match(bar, /className="cth-titlebar-drag"\n\s+style=\{\{[\s\S]*?position: 'relative', zIndex: 100,/);
   assert.match(hero, /onClick=\{open\(reportProblemUrl\(\{ appVersion: __APP_VERSION__, platform: window\.cth\.platform, arch: window\.cth\.arch, osVersion: window\.cth\.osVersion \}\)\)\}/);
   assert.doesNotMatch(hero, /issues\/new`\)/, 'one report link, not a second');
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const h = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).settingsHero;
     const shell = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).shell;
+    // Dashes in these strings are no-dashes.test.cjs's job.
     assert.ok(h.beta && h.betaInfo && shell.betaInfo, loc);
-    assert.doesNotMatch(h.beta + h.betaInfo + shell.betaInfo, /[–—]/, `${loc}: no dashes`);
   }
 });

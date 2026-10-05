@@ -466,7 +466,7 @@ Names in parentheses are today's components that the v2 component replaces or re
 ### 7.1 Top bar
 
 Left to right: lockup (§1.5, 26 px mark); view tabs (§7.2); then, pushed right: clock
-pill (§7.3), version chip (§7.4), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
+pill (§7.3), version chip (§7.4), Beta pill (lemon-light, 10 px caps, with an InfoTip that opens toward the start), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
 `r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
 (§7.5). The bar is a drag region; interactive children are `no-drag`.
 

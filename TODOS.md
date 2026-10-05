@@ -856,7 +856,7 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 5. ~~Set the repository variable `WINDOWS_RELEASE=on`.~~ Done 2026-10-05: the owner chose to ship Windows on every release before the PC check. v0.1.1 got its Windows installer added after release.
 6. After the first clean release that carries Windows, add the Windows (beta) download to the website, and confirm with the owner before that push.
 
-**Why:** Windows ships only on rc tags until these pass (R9, R10). The website push is a production deploy.
+**Why:** Windows ships on every release before the PC check (owner, 2026-10-05); these steps confirm it works. The website push is a production deploy.
 
 **Context:** Deferred from the ship of feat/windows-beta-askme-fixes (2026-10-05). These are post-merge steps from `docs/designs/windows-11-installer.md` (T5, T10, R9, R10, E5).
 
