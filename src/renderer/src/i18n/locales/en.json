@@ -1913,6 +1913,7 @@
     "focus": "Focus mode",
     "exitFocus": "Exit focus mode (Esc)",
     "settings": "Settings",
+    "betaInfo": "An early version. If something looks wrong, use Report a problem in Settings.",
     "briefPlaceholder": "Talk to {{godName}}…",
     "brief": "Talk to {{godName}}",
     "attach": "Attach files",

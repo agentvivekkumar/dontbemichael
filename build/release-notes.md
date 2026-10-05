@@ -1,4 +1,3 @@
-- **Ask me never loses a question:** it stays until you answer or Michael withdraws it.
-- **Open the file a question names,** right from its card.
-- **Your answers go only to Michael,** who routes them.
-- **A Beta pill and Report a problem** in Settings.
+- **Windows 11 (beta)** ships with every release now.
+- **A Beta pill beside the version** in the top bar.
+- **The Beta tip opens above the Tasks board.**

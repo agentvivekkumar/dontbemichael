@@ -466,9 +466,12 @@ Names in parentheses are today's components that the v2 component replaces or re
 ### 7.1 Top bar
 
 Left to right: lockup (§1.5, 26 px mark); view tabs (§7.2); then, pushed right: clock
-pill (§7.3), version chip (§7.4), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
+pill (§7.3), version chip (§7.4), Beta pill (lemon-light, 10 px caps, with an InfoTip that opens toward the start), icon buttons (theme, Settings; focus mode hidden in this build, `SHOW_FOCUS_MODE`; 32 × 32,
 `r-md`, `ink-2` icons, hover fills `card` with a `line` border), and the Needs you button
-(§7.5). The bar is a drag region; interactive children are `no-drag`.
+(§7.5). The bar is a drag region; interactive children are `no-drag`. The Beta pill is its
+own layer (240) above the stage, the right column and the bottom bar, so its tip is never
+drawn under the Tasks board; focus mode, toasts and dialogs stay above it. The bar itself
+has no layer, so the update badge's cards keep competing at 400.
 
 ### 7.2 View tabs (TopBar)
 
@@ -1358,6 +1361,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 |---|---|
 | 2026-10-03 | Floor character: each person is drawn as their character's prop, and each department has a line icon (§3.4, §7.10, §7.14, §7.17); desks carry their person's prop, and the floor has plants and a water cooler (§8.3); the ring holds up to 9 pods, operations and team included (§8.9); banter goes to a partner who would say it (§8.8). The right column shows on the Office view only (§7.6). No pack caption beside Hire (§7.19). Tasks view: a Waiting column that only Michael sets (§7.20, §7.21). Who talks to whom: a time range instead of the last 200 messages, people as their props, no Topics (§7.22). |
 | 2026-10-03 | Tasks view: the dismiss `x` closes a card as Done by the owner's decision ("Closed by owner"), never deletes it; "With Michael", "Michael hasn't moved this" and "Nothing asked" on cards; Task detail's status offers To do, Doing and Done (§7.20, §7.21). |
+| 2026-10-05 | Top bar: the Beta pill also sits beside the version, its InfoTip pointing to Report a problem in Settings. |
 | 2026-10-05 | Settings: a Beta pill (with an InfoTip) beside the version on every build, and Report a problem opens a bug report with the app version and OS filled in (docs/designs/windows-11-installer.md, E4). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |

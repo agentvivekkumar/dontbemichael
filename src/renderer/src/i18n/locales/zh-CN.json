@@ -1913,6 +1913,7 @@
     "focus": "专注模式",
     "exitFocus": "退出专注模式（Esc）",
     "settings": "设置",
+    "betaInfo": "这是早期版本。如果有问题，请使用“设置”中的“反馈问题”。",
     "briefPlaceholder": "和 {{godName}} 说点什么…",
     "brief": "和 {{godName}} 说",
     "attach": "附加文件",
