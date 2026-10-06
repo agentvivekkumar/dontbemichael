@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.1.3] (2026-10-05)
+
+### Fixed
+
+- **The GitHub page offers the Windows beta next to the Mac download.** The platform badge, the download links at the top, What you need and the install steps now cover Windows 11, including what to click when Windows says it protected your PC. Saved passwords are described as encrypted on your computer, which is true on both. The docs also say what is Mac only for now: reading scans and photos, and the sandbox that keeps shell commands inside each team member's folder.
+
 ## [0.1.2] (2026-10-05)
 
 ### Added

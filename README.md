@@ -16,18 +16,18 @@
 
 Pick your kind of business, pick your team, and Michael, your office manager, runs the office
 while you run the business. Every team member is an AI agent with a job, its own folder and its
-own memory, working on your Mac.
+own memory, working on your computer.
 
 <p>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
   <img alt="Status: early release" src="https://img.shields.io/badge/status-early%20release-FFFDF5.svg?style=flat-square&labelColor=1A1320">
-  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-FFFDF5.svg?style=flat-square&labelColor=1A1320">
+  <img alt="Platform: macOS and Windows beta" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20beta-FFFDF5.svg?style=flat-square&labelColor=1A1320">
   <a href="https://dontbemichael.com"><img alt="Website: dontbemichael.com" src="https://img.shields.io/badge/web-dontbemichael.com-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
 </p>
 
 <br>
 
-**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
+**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)** · **[Download for Windows (beta)](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
 
 </div>
 
@@ -39,10 +39,10 @@ own memory, working on your Mac.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.2: a Windows 11 beta with every release, and a Beta pill in the top bar.**
-> Every release now carries a Windows 11 (x64) installer beside the Mac download. The top bar
-> shows Beta beside the version, with a tip that says where to report a problem. In 0.1.1, Ask me
-> stopped losing questions and learned to open the file a question names.
+> **New in 0.1.3: this page offers the Windows beta beside the Mac download.**
+> The install steps now cover Windows 11, and the docs say what works only on a Mac for now:
+> reading scans and photos, and the sandbox that keeps shell commands inside each team member's
+> folder. In 0.1.2, Windows started shipping with every release and the top bar got a Beta pill.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
@@ -67,9 +67,9 @@ customer support, sales, marketing and so on. Michael is the office manager. You
 routes the work, answers the team's questions, and asks you only when something needs your
 decision.
 
-Everything runs on your Mac, on the Claude plan you already have. Each team member has a desk in
-an office you can watch, a pod for each department around Michael's glass office, so you can see
-who is working on what.
+Everything runs on your computer, on the Claude plan you already have. Each team member has a
+desk in an office you can watch, a pod for each department around Michael's glass office, so you
+can see who is working on what.
 
 ## How it differs from Munder Difflin
 
@@ -87,7 +87,7 @@ terminal. That changes almost every decision:
 | **Made for** | Developers running coding agents | Small business owners in any line of work, with no technical background needed |
 | **Michael** | Your clone, routing work between your agents | Your office manager: the only one who assigns work, decides the team's day to day requests, and brings you only the calls that need you |
 | **Setting up** | Start agents in terminals and give them work | Pick your kind of business, get a suggested team, and hire in four steps with a real job and a work style for each; no two teammates do the same work |
-| **Email** | The one Gmail account on your Claude account, shared by every agent | As many mailboxes as the business runs on, one per team member, each set to Can send or Draft only; passwords stay in your Mac's keychain |
+| **Email** | The one Gmail account on your Claude account, shared by every agent | As many mailboxes as the business runs on, one per team member, each set to Can send or Draft only; passwords stay encrypted on your computer |
 | **Access control** | None: every agent can reach every app connected to your Claude account and every tool you set up in Claude Code | You decide exactly which apps the office can use and which team member uses each one; the app enforces it on every call |
 | **Files and data** | Hard to give an agent a workspace of its own: agents work in code project folders, with no way to give each one its own set of files and data | Your business folder becomes the office's filing cabinet, with access that follows its hierarchy. Each team member works in its own folder with the files its job needs, such as product documentation and client lists for Sales, or survey results and user interviews for Marketing, and opens only that folder. Michael, above them, reads every folder and changes none. You organize your own work in the same folders the team uses |
 | **User experience** | Lots of low level details and out of place screens, which make the system hard to use and hard to focus on the right things | A modern office workspace, redesigned from the ground up for business users. Unneeded details and repetition are gone, and there is one clear way to talk to the office, instead of every option piled into an orchestrator panel |
@@ -127,7 +127,7 @@ business runs on, and each team member works from the one that matches its job.
 
 - **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
-  saved, and the password stays in your Mac's keychain, never in a file an agent can read.
+  saved, and the password stays encrypted on your computer, never in a file an agent can read.
 - **Hand it out per team member.** On a team member's Access tab, turn email on, pick its
   mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
@@ -233,7 +233,7 @@ idle teammates trade lines across the office. Click any pod to see that team mem
 Setup asks for your business name, your kind of business, the owner and your headquarters
 address. Contact details, hours and prices are optional and can wait for Settings. Michael then
 shows you around the office and suggests a starter team: you pick who joins and where each one
-works. Setup checks what your Mac already has and offers to install anything missing.
+works. Setup checks what your computer already has and offers to install anything missing.
 
 </td>
 <td width="50%">
@@ -253,7 +253,7 @@ works. Setup checks what your Mac already has and offers to install anything mis
 **Running the office**
 - **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it. Michael gets it too, as work he routes and then closes.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
-- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays in your Mac's keychain. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
+- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays encrypted on your computer. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, Claude connectors, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
@@ -262,11 +262,11 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 **Your business, known to everyone**
 - **Company profile.** Your business name, owner, address, hours, time zone, currency and more, given to every team member. Change it in Settings.
-- **Company knowledge.** Add your documents and policies in Memory & Knowledge: Word, Excel, PowerPoint, PDF, and scans or photos. Every team member can search them by words, and by meaning when MemPalace is installed, so "money back" finds your refund policy.
+- **Company knowledge.** Add your documents and policies in Memory & Knowledge: Word, Excel, PowerPoint, PDF, and on a Mac, scans or photos. Every team member can search them by words, and by meaning when MemPalace is installed, so "money back" finds your refund policy.
 
 **Private folders**
 - Michael works in your business folder, and each team member works in its own folder inside it.
-- A team member opens only its own folder. Michael can read his team's folders but not change them. Claude Code's sandbox and the app both enforce this.
+- A team member opens only its own folder. Michael can read his team's folders but not change them. On a Mac, Claude Code's sandbox and the app both enforce this. On Windows, the app checks Claude's file tools, but shell commands are not limited yet.
 
 **Also**
 - **Updates.** The app tells you when a new version is out and links to the download.
@@ -278,13 +278,15 @@ works. Setup checks what your Mac already has and offers to install anything mis
 
 ### What you need
 
-- A Mac with Apple Silicon or Intel.
+- A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64, beta).
 - [Claude Code](https://claude.com/claude-code), signed in to your Claude plan. A Claude Max plan
   keeps the office running all day; smaller plans reach their usage limit during the day, and the
   office waits until it resets. The app can install Claude Code for you from
   **Settings → Prerequisites**.
 
 ### Install
+
+**On a Mac**
 
 1. Download the `.dmg` from the [latest release](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
 2. Open it and drag **Don't Be Michael** into your Applications folder.
@@ -295,12 +297,19 @@ works. Setup checks what your Mac already has and offers to install anything mis
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-A Windows 11 (x64) beta ships with every release, on the same release page; Linux will follow.
+**On Windows 11 (beta)**
+
+1. Download the file ending in `-win-x64-setup.exe` from the same [latest release](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
+2. Open it. The first time, Windows says **Windows protected your PC**. Click **More info**, then
+   **Run anyway**.
+
+Windows asks because this beta is not signed yet. Windows on ARM PCs is not supported in the
+beta. Linux will follow.
 
 ## Your data
 
-- **It stays on your Mac.** Your team's work, memory and files live in folders on your Mac. The
-  team members themselves run through your own Claude Code and Claude plan.
+- **It stays on your computer.** Your team's work, memory and files live in folders on your
+  computer. The team members themselves run through your own Claude Code and Claude plan.
 - **No usage data.** The app sends nothing about how you use it. See [`TELEMETRY.md`](./TELEMETRY.md).
 
 ## For developers
@@ -313,7 +322,7 @@ it.
 ### Build from source
 
 You need Node.js 18 or newer, npm, and a C/C++ toolchain for `node-pty` (on a Mac:
-`xcode-select --install`).
+`xcode-select --install`; on Windows, [`node-pty`'s prerequisites](https://github.com/microsoft/node-pty#dependencies)).
 
 ```bash
 git clone https://github.com/agentvivekkumar/dontbemichael.git
@@ -327,6 +336,7 @@ npm run typecheck     # main, preload and renderer
 npm run test:focused  # the node:test suite in test/
 npm run build         # production build
 npm run dist:mac      # the Mac installer, in dist/
+npm run dist:win      # the Windows installer, in dist/
 ```
 
 If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
