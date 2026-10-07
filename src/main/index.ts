@@ -14,7 +14,8 @@ import { resolveCommand as resolveCliCommand, isSafeCommandName, userShellPath }
 import { buildPtyEnv } from './ptyEnv';
 import {
   apiKeyShapeOk, checkAnthropicKey, claudeInstallScript, claudeMissingScript, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
-  findClaudeFast, isEngineSetupPty, parseClaudeAuthStatus, readEngineSetupStatus, shouldStartInstall, type EngineSetupStatus
+  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeNoticeCoalescer, parseClaudeAuthStatus, readEngineSetupStatus,
+  shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
 import { setHiddenClaudeAuthEnv } from './hiddenClaude';
 import { initAutoUpdater, abortPendingRestart } from './updater';
@@ -3228,8 +3229,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // NOT double-count a single user attempt — it is the SAME attempt continuing.
   if (!opts.noAutoInstall) analytics.track('agent_spawn_attempted', { provider });
   // ── Missing engine CLI → run its installer visibly (pre-spawn) ───────────────
-  // Every engine but Claude, which is handled just above. If the agent's engine
-  // binary (codex/…) isn't installed, spawning it
+  // Every engine but Claude, which is handled first in the block below. If the
+  // agent's engine binary (codex/…) isn't installed, spawning it
   // just dies with "— process exited (code 1) —" and the user has no idea why.
   // Detect the absent binary BEFORE spawning and, in this SAME terminal, print a
   // banner + RUN the provider's install command so the user can watch it (and
@@ -3253,9 +3254,11 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // The plain `claude` is found without a login shell (a miss there costs a
     // second of frozen windows per agent on a team restore).
     const claudeMissing = bin && claudeProvider && (bin === 'claude' ? !claudePathFast() : !ptyManager.isCommandAvailable(bin));
+    if (claudeProvider && !claudeMissing) claudeBlocked.delete(opts.id);
     if (claudeMissing) {
-      // Michael may run on another engine: the card then speaks for the team.
-      teamNeedsClaude = true;
+      // Remember who could not start, to start exactly those once Claude is
+      // ready; a member (not Michael) makes the card speak for the team.
+      claudeBlocked.set(opts.id, { god: !!opts.hive?.isGod });
       let godName = 'Michael';
       try { godName = hive.registry().agents[hiveGodId()]?.name?.trim() || godName; } catch { /* no hive yet */ }
       const res = ptyManager.spawn(
@@ -5063,47 +5066,58 @@ function claudePathFast(): string | null {
     localAppData: process.env.LOCALAPPDATA
   });
 }
-/** A team member on Claude could not start for want of it this session, so the
- *  step and the Ask me card apply even when Michael runs on another engine. */
-let teamNeedsClaude = false;
-/** Tell the step and Ask me to look again, at most once every 2 s: a team
- *  restore without Claude would otherwise send one per member. */
-let lastEngineNotice = 0;
-function noticeEngineSetup(id: string): void {
-  const now = Date.now();
-  if (now - lastEngineNotice < 2000) return;
-  lastEngineNotice = now;
+/** Terminals that could not start for want of Claude since it was last ready
+ *  (pty id → was it Michael). Once ready, exactly these restart; a member in it
+ *  makes the step and the card apply even when Michael runs on another engine. */
+const claudeBlocked = new Map<string, { god: boolean }>();
+/** Tell the step and Ask me to look again: the first notice at once, any more
+ *  inside 2 s once at its end (a team restore sends one per member). */
+const noticeEngineSetup = makeNoticeCoalescer((id) => {
   try { liveWebContents()?.send('engineSetup:changed', { id, exitCode: null }); } catch { /* window gone */ }
-}
+});
 
 // Hidden checks (hire, focus, standing fit) sign in the same way as the team,
-// with the key approved first so Claude never stops on its question.
+// with the key approved first so Claude never stops on its question; once per
+// key, not on every check (~/.claude.json can run to megabytes).
+let hiddenApprovedKey = '';
 setHiddenClaudeAuthEnv(() => {
   const env = claudeAuthEnv();
-  if (env.ANTHROPIC_API_KEY) { try { approveClaudeApiKey(env.ANTHROPIC_API_KEY); } catch { /* best effort */ } }
+  const key = env.ANTHROPIC_API_KEY;
+  if (key && key !== hiddenApprovedKey) {
+    try { approveClaudeApiKey(key); hiddenApprovedKey = key; } catch { /* best effort */ }
+  }
   return env;
 });
 
+/** The last sign in state read, so a slow or failed read keeps it instead of
+ *  turning a signed out owner into "could not check" (and the team restarting). */
+let lastClaudeAuth: { signedIn: boolean; email?: string } | null = null;
+/** One `claude auth status` at a time: the step, the card and the poll share it. */
+let claudeAuthInFlight: Promise<{ signedIn: boolean; email?: string } | null> | null = null;
 function claudeAuthStatus(path: string): Promise<{ signedIn: boolean; email?: string } | null> {
-  return new Promise((done) => {
+  if (claudeAuthInFlight) return claudeAuthInFlight;
+  claudeAuthInFlight = new Promise<{ signedIn: boolean; email?: string } | null>((done) => {
     try {
       const env = buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath());
-      // An npm install on Windows is a .cmd shim, which Node refuses to start
-      // without cmd.exe (EINVAL); run it through cmd.exe, quoted.
-      const viaCmd = process.platform === 'win32' && /\.(cmd|bat)$/i.test(path);
-      const [file, args] = viaCmd
-        ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `""${path}" auth status --json"`]]
-        : [path, ['auth', 'status', '--json']];
-      execFile(file, args, { timeout: 15_000, env, windowsVerbatimArguments: viaCmd },
-        (_err, stdout) => done(parseClaudeAuthStatus(String(stdout ?? ''))));
-    } catch { done(null); }
-  });
+      const cmd = claudeAuthStatusCommand(process.platform, path, process.env.ComSpec);
+      execFile(cmd.file, cmd.args, { timeout: 15_000, env, windowsVerbatimArguments: cmd.verbatim }, (err, stdout) => {
+        const parsed = parseClaudeAuthStatus(String(stdout ?? ''));
+        if (parsed) { lastClaudeAuth = parsed; done(parsed); return; }
+        // Timed out, killed or failed with nothing to read: keep what we knew.
+        // Printed something that is not the JSON: a Claude without the command.
+        const failed = !!err && !String(stdout ?? '').trim();
+        done(failed ? lastClaudeAuth : null);
+      });
+    } catch { done(lastClaudeAuth); }
+  }).finally(() => { claudeAuthInFlight = null; });
+  return claudeAuthInFlight;
 }
 ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
   const cfg = readConfig();
   const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
   const isClaude = isClaudeProvider(inferAgentProvider('claude', p));
-  return readEngineSetupStatus({
+  const teamNeedsClaude = [...claudeBlocked.values()].some((b) => !b.god);
+  const status = await readEngineSetupStatus({
     isClaude,
     teamNeedsClaude,
     claudePath: isClaude || teamNeedsClaude ? claudePathFast() : null,
@@ -5111,6 +5125,10 @@ ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<Eng
     hasKey: () => integrations.hasSecret(providerKeyRef('anthropic')),
     authStatus: claudeAuthStatus
   });
+  // Ready now: the terminals that could not start. Each leaves the list when it
+  // actually starts on Claude (spawnAgentCore), so every reader sees the same.
+  if (status.applies && !status.needed && claudeBlocked.size) return { ...status, restart: [...claudeBlocked.keys()] };
+  return status;
 });
 // Start the install (or keep the one already running). The step watches the
 // terminal's exit and then reads the status again. On macOS and Linux it runs
@@ -5135,28 +5153,6 @@ ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
   if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
   return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command: claude, args: ['auth', 'login'], cols: 100, rows: 12 }, e.sender);
 });
-/** node's https.request shape over Electron's net, which follows the system
- *  proxy, so the key check reaches Anthropic wherever Claude itself does. */
-const netRequest = ((opts: { host: string; path: string; method: string; timeout?: number; headers?: Record<string, string> },
-  onResponse: (res: { statusCode?: number; resume: () => void }) => void) => {
-  const req = net.request({ method: opts.method, url: `https://${opts.host}${opts.path}` });
-  for (const [k, v] of Object.entries(opts.headers ?? {})) req.setHeader(k, v);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  req.on('response', (res) => {
-    if (timer) clearTimeout(timer);
-    onResponse({ statusCode: res.statusCode, resume: () => { res.on('data', () => undefined); } });
-  });
-  const handle = {
-    on(event: string, cb: (...a: unknown[]) => void) {
-      if (event === 'timeout') timer = setTimeout(() => cb(), opts.timeout ?? 10_000);
-      else if (event === 'error') req.on('error', (err) => { if (timer) clearTimeout(timer); cb(err); });
-      return handle;
-    },
-    end() { req.end(); },
-    destroy() { if (timer) clearTimeout(timer); try { req.abort(); } catch { /* already done */ } }
-  };
-  return handle;
-}) as unknown as typeof httpsRequest;
 // Use an Anthropic API key instead of a Claude account. The key is checked with
 // Anthropic first, so a typo never becomes a team that cannot start; then kept
 // write only in the secret store (the same Anthropic key as Settings, AI
@@ -5164,7 +5160,8 @@ const netRequest = ((opts: { host: string; path: string; method: string; timeout
 ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> => {
   const key = typeof raw === 'string' ? raw.trim() : '';
   if (!apiKeyShapeOk(key)) return { ok: false, error: 'invalid' };
-  const verdict = await checkAnthropicKey(key, netRequest);
+  // Electron's fetch follows the system proxy, so the check works wherever Claude does.
+  const verdict = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
   if (verdict !== 'ok') return { ok: false, error: verdict };
   const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
   if (!saved.ok) return { ok: false, error: 'store' };

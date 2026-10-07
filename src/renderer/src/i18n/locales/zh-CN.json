@@ -2164,7 +2164,7 @@
     "done": "完成",
     "useApiKey": "使用 API 密钥",
     "apiKey": "Anthropic API 密钥",
-    "keyInfo": "Claude Code 将使用此密钥代替 Claude 账户，费用计入你的 Anthropic 账户。在 console.anthropic.com 的 API keys 页面创建密钥。这台电脑上团队的工具都可以使用它，所以请选择设有支出上限的密钥。",
+    "keyInfo": "费用计入你的 Anthropic 账户。这台电脑上团队的工具都可以使用它，所以请选择设有支出上限的密钥。",
     "keySave": "保存密钥",
     "keyChecking": "正在检查…",
     "usingApiKey": "正在使用你的 Anthropic API 密钥",

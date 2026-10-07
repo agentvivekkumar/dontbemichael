@@ -10,7 +10,6 @@
  *
  * Electron free, so the decisions and the scripts are testable without an app.
  */
-import { request as httpsRequest } from 'node:https';
 import { providerPreset } from '../shared/agentProvider';
 import { existsSync } from 'node:fs';
 import { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineSetupStatus } from '../shared/engineSetup';
@@ -35,7 +34,8 @@ export function findClaudeFast(e: {
   const names = win ? ['claude.exe', 'claude.cmd'] : ['claude'];
   const dirs = e.pathEnv.split(win ? ';' : ':').filter(Boolean);
   const known = win
-    ? [`${e.home}\\.local\\bin`, `${e.localAppData ?? ''}\\Programs\\claude`, `${e.appData ?? ''}\\npm`, `${e.home}\\.claude\\local`]
+    // Never build a folder from an unset variable: '\\npm' would be the drive root.
+    ? [`${e.home}\\.local\\bin`, ...(e.localAppData ? [`${e.localAppData}\\Programs\\claude`] : []), ...(e.appData ? [`${e.appData}\\npm`] : []), `${e.home}\\.claude\\local`]
     : [`${e.home}/.local/bin`, `${e.home}/.claude/local`, '/opt/homebrew/bin', '/usr/local/bin', `${e.home}/.volta/bin`];
   for (const dir of [...dirs, ...known]) {
     for (const n of names) {
@@ -149,21 +149,53 @@ export function apiKeyVerdict(statusCode: number): ApiKeyVerdict {
   return statusCode === 401 || statusCode === 403 ? 'rejected' : 'unreachable';
 }
 
-/** Ask Anthropic whether the key works (`GET /v1/models`, 10 s). `request` is
- *  node's https.request; a network error or timeout is 'unreachable'. */
-export function checkAnthropicKey(key: string, request: typeof httpsRequest = httpsRequest): Promise<ApiKeyVerdict> {
-  return new Promise((done) => {
-    try {
-      const req = request({
-        host: 'api.anthropic.com', path: '/v1/models?limit=1', method: 'GET', timeout: 10_000,
-        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
-      }, (res) => {
-        res.resume();
-        done(apiKeyVerdict(res.statusCode ?? 0));
-      });
-      req.on('timeout', () => { req.destroy(); done('unreachable'); });
-      req.on('error', () => done('unreachable'));
-      req.end();
-    } catch { done('unreachable'); }
-  });
+/** The part of `fetch` the key check uses: Electron's `net.fetch` in the app
+ *  (it follows the system proxy), the global `fetch` otherwise. */
+export type KeyCheckFetch = (url: string, init: { method: string; headers: Record<string, string>; signal: AbortSignal }) => Promise<{ status: number }>;
+
+/** Ask Anthropic whether the key works (`GET /v1/models`, 10 s). A network
+ *  error, a timeout or a fetch that throws is 'unreachable'. */
+export async function checkAnthropicKey(key: string, fetchFn: KeyCheckFetch = globalThis.fetch as unknown as KeyCheckFetch, timeoutMs = 10_000): Promise<ApiKeyVerdict> {
+  try {
+    const res = await fetchFn('https://api.anthropic.com/v1/models?limit=1', {
+      method: 'GET',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    return apiKeyVerdict(res.status);
+  } catch {
+    return 'unreachable';
+  }
+}
+
+/** How main runs `claude auth status --json`. An npm install on Windows is a
+ *  .cmd shim, which Node refuses to start without cmd.exe (EINVAL), so it goes
+ *  through cmd.exe, quoted for `/s`. */
+export function claudeAuthStatusCommand(platform: string, path: string, comSpec?: string): { file: string; args: string[]; verbatim: boolean } {
+  if (platform === 'win32' && /\.(cmd|bat)$/i.test(path)) {
+    return { file: comSpec || 'cmd.exe', args: ['/d', '/s', '/c', `""${path}" auth status --json"`], verbatim: true };
+  }
+  return { file: path, args: ['auth', 'status', '--json'], verbatim: false };
+}
+
+/** Coalesce "look again" notices: the first goes out at once, and any that
+ *  arrive inside the window are sent once at its end, never dropped. A team
+ *  restore without Claude would otherwise send one per member. */
+export function makeNoticeCoalescer(send: (id: string) => void, windowMs = 2000,
+  clock: { now: () => number; setTimeout: (fn: () => void, ms: number) => unknown } = { now: Date.now, setTimeout: (fn, ms) => setTimeout(fn, ms) }): (id: string) => void {
+  let last = -Infinity;
+  let pending: string | null = null;
+  let timer = false;
+  return (id) => {
+    const now = clock.now();
+    if (now - last >= windowMs && !timer) { last = now; send(id); return; }
+    pending = id;
+    if (timer) return;
+    timer = true;
+    clock.setTimeout(() => {
+      timer = false;
+      last = clock.now();
+      if (pending !== null) { const p = pending; pending = null; send(p); }
+    }, Math.max(0, windowMs - (now - last)));
+  };
 }

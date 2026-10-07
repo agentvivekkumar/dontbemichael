@@ -935,8 +935,10 @@ export function approveClaudeApiKey(key: string, home: string = homedir()): void
  *  rarely touch files a running `claude` also writes):
  *   1. `~/.claude/settings.json` → `skipDangerousModePermissionPrompt` +
  *      `skipAutoPermissionPrompt` — these gate the bypass-mode warning (global).
- *   2. `~/.claude.json` → `projects[cwd].hasTrustDialogAccepted` — the per-folder
- *      "do you trust the files in this folder?" dialog.
+ *   2. `~/.claude.json`, in one pass: `projects[cwd].hasTrustDialogAccepted` (the
+ *      per-folder "do you trust the files in this folder?" dialog),
+ *      `hasCompletedOnboarding` (the first-run welcome), and with
+ *      `opts.approveKey` the chosen API key in `customApiKeyResponses.approved`.
  *
  *  Each file is an independent best-effort boundary: unsafe existing contents
  *  are preserved without preventing the other file from being handled safely. */

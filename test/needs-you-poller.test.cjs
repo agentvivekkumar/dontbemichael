@@ -109,7 +109,7 @@ test('Get Michael ready counts once while Michael cannot start, reads Claude onc
     out.afterPoll = engine.length;
     changed({ id: 'engine-setup-install', exitCode: 0 });
     out.afterEvent = engine.length;
-    engine[1]({ applies: true, installed: true, signedIn: true, needed: false });
+    engine[1]({ applies: true, installed: true, signedIn: true, needed: false, restart: ['god-pty'] });
     await tick(); await tick();
     out.ready = count();
     out.readyEvents = events.slice();
@@ -117,6 +117,9 @@ test('Get Michael ready counts once while Michael cannot start, reads Claude onc
     out.afterMinute = engine.length;
     now += 540000; poll();
     out.afterTen = engine.length;
+    // Past the settled window, so a throttled read inside readTasks would fire
+    // too if refreshNeedsYou read the engine after it.
+    now += 600001;
     const before = engine.length;
     feed.refreshNeedsYou();
     out.refreshReads = engine.length - before;

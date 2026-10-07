@@ -936,9 +936,13 @@ Full window, no app chrome.
   "Finish signing in in your browser" with Open the browser again and Show what Claude
   says, then Signed in as the email). Beside Sign in, Use an API key (secondary) opens one
   password field in mono with an info icon, Save key and Cancel; then "Using your Anthropic
-  API key". Footer: Back, Set up later (ghost), and Open the
-  office (primary, off until both rows are green). Skipped, Ask me keeps a "Michael can't
-  start yet" card that opens the same rows in a dialog.
+  API key". When sign in cannot be read, the row shows a neutral question tile, "Could not
+  check sign in. Sign in if Claude asks.", Sign in and Use an API key (secondary), and the
+  office may open. Footer: Back, Set up later (ghost), and Open the
+  office (primary, off until Claude Code is installed and the account row is green or could
+  not be checked). Skipped, Ask me keeps a "Michael can't
+  start yet" card ("Some of your team can't start yet" when Michael runs on another engine)
+  that opens the same rows in a dialog.
 - The studio on the right fills with a pod per picked person around Michael's glass pod,
   each with a small name tag and a check on its screen; an unpicked department shows as a
   dashed outline with a "Name, not picked" tag on its back corner, clear of the pods in

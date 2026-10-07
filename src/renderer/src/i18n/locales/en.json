@@ -2164,7 +2164,7 @@
     "done": "Done",
     "useApiKey": "Use an API key",
     "apiKey": "Anthropic API key",
-    "keyInfo": "Claude Code uses this key instead of a Claude account, billed to your Anthropic account. Create one at console.anthropic.com, under API keys. Your team's tools on this computer can use it, so pick a key with a spending limit.",
+    "keyInfo": "Billed to your Anthropic account. Your team's tools on this computer can use it, so pick a key with a spending limit.",
     "keySave": "Save key",
     "keyChecking": "Checking…",
     "usingApiKey": "Using your Anthropic API key",

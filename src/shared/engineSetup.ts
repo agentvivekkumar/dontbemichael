@@ -23,6 +23,9 @@ export interface EngineSetupStatus {
   method?: 'account' | 'apiKey';
   /** Michael cannot start until this is done. */
   needed: boolean;
+  /** Once ready: the terminals that could not start for want of Claude and
+   *  should start now. Only those restart; agents already working keep going. */
+  restart?: string[];
 }
 
 /** Whether Michael can start: installed, and not known to be signed out. */

@@ -8,7 +8,7 @@ export type IconName =
   | 'gear' | 'plus' | 'x' | 'check' | 'arrow-right' | 'pause' | 'play'
   | 'bell' | 'folder' | 'terminal' | 'code' | 'web' | 'mcp' | 'sparkle'
   | 'expand' | 'minimize' | 'clock' | 'mic' | 'ledger' | 'info' | 'sidebar'
-  | 'image' | 'edit' | 'git' | 'file' | 'sheet';
+  | 'image' | 'edit' | 'git' | 'file' | 'sheet' | 'help';
 
 /** Each icon is one or more path `d` strings on a 24 unit grid. */
 const paths: Record<IconName, string[]> = {
@@ -42,7 +42,10 @@ const paths: Record<IconName, string[]> = {
   // A saved document, and a spreadsheet (Lucide file-text and sheet): the file
   // rows on an Ask me card (docs/designs/ask-me-open-file.md).
   file: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M9 13h6', 'M9 17h4'],
-  sheet: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M3 9h18', 'M3 15h18', 'M9 9v12', 'M15 9v12']
+  sheet: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M3 9h18', 'M3 15h18', 'M9 9v12', 'M15 9v12'],
+  // A question in a circle (Lucide circle-help): a state that could not be
+  // checked, distinct from the info icon that opens an explanation.
+  help: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3', 'M12 17h.01']
 };
 
 export interface IconProps {

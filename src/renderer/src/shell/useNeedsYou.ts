@@ -101,8 +101,12 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   // One more while Michael cannot start for want of his engine (get-michael-ready.md).
   if (merged.engineSetup?.applies && merged.engineSetup.needed) feed = { ...feed, count: feed.count + 1 };
   for (const l of [...listeners]) l();
-  if (wasNeeded && merged.engineSetup && !merged.engineSetup.needed && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new Event(ENGINE_READY_EVENT));
+  // Ready after Michael could not start: hand the terminals that could not
+  // start to useHive, which restarts exactly those (agents at work keep going).
+  const restart = merged.engineSetup?.restart ?? [];
+  if (wasNeeded && merged.engineSetup?.applies && !merged.engineSetup.needed && restart.length
+    && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(ENGINE_READY_EVENT, { detail: { restart } }));
   }
 }
 

@@ -599,5 +599,5 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 @keyframes cth-engine-bar-rtl { from { transform: translateX(100%); } to { transform: translateX(-250%); } }
 @media (prefers-reduced-motion: reduce) {
   .cth-engine-spin { animation: none; }
-  .cth-engine-bar > i { animation: none; width: 100%; opacity: .5; }
+  .cth-engine-bar > i, [dir="rtl"] .cth-engine-bar > i { animation: none; width: 100%; opacity: .5; }
 }

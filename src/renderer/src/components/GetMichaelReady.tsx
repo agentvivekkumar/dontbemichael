@@ -102,9 +102,11 @@ export function GetMichaelReady({ provider, onReadyChange }: {
         setInstalling(false);
         setInstallFailed(!s.installed);
       }
-      if (e.id === ENGINE_SIGNIN_PTY && s.signedIn === false) {
+      // The sign in ended: stop waiting on the browser whatever it says, and
+      // say it did not finish only when Claude still reads signed out.
+      if (e.id === ENGINE_SIGNIN_PTY) {
         setBrowser(false);
-        setSignInStuck(true);
+        setSignInStuck(s.signedIn === false);
       }
     });
   }), [read]);
@@ -142,9 +144,9 @@ export function GetMichaelReady({ provider, onReadyChange }: {
 
   const claudeRow = (() => {
     switch (phase) {
-      case 'checking': return <Row icon={<Spinner />} tone="wait" label={t('engineSetup.claude')} status={t('engineSetup.checking')} />;
+      case 'checking': return <Row glyph={<Spinner />} tone="wait" label={t('engineSetup.claude')} status={t('engineSetup.checking')} />;
       case 'installing': return (
-        <Row icon={<Spinner />} tone="wait" label={t('engineSetup.claude')} status={t('engineSetup.installing')}>
+        <Row glyph={<Spinner />} tone="wait" label={t('engineSetup.claude')} status={t('engineSetup.installing')}>
           <div className="cth-engine-bar" aria-hidden><i /></div>
           <div style={actions}>{detailsToggle}</div>
           {terminal}
@@ -198,7 +200,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
         </Row>
       );
       case 'browser': return (
-        <Row icon={<Spinner />} tone="wait" label={t('engineSetup.account')} status={t('engineSetup.inBrowser')}>
+        <Row glyph={<Spinner />} tone="wait" label={t('engineSetup.account')} status={t('engineSetup.inBrowser')}>
           <div style={actions}>
             <PixelButton variant="secondary" size="sm" onClick={() => void signIn()}>{t('engineSetup.openBrowserAgain')}</PixelButton>
             {detailsToggle}
@@ -208,7 +210,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
       );
       // Sign in could not be read: Michael may still start, but no green check.
       case 'unknown': return keyForm ? keyFormRow : (
-        <Row icon="info" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.signInUnknown')}>
+        <Row icon="help" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.signInUnknown')}>
           <div style={actions}>
             <PixelButton variant="secondary" size="sm" onClick={() => void signIn()}>{t('engineSetup.signIn')}</PixelButton>
             <PixelButton variant="secondary" size="sm" onClick={() => setKeyForm(true)}>{t('engineSetup.useApiKey')}</PixelButton>
@@ -248,17 +250,18 @@ const TONES = {
   idle: { background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)' }
 } as const;
 
-function Row({ icon, tone, label, status, info, bad, dim, children }: {
-  icon: IconName | ReactNode; tone: keyof typeof TONES; label: string; status?: string; info?: ReactNode; bad?: boolean; dim?: boolean; children?: ReactNode;
+/** One row: an outline icon from the set, or a custom glyph (the spinner). */
+function Row({ icon, glyph, tone, label, status, info, bad, dim, children }: {
+  icon?: IconName; glyph?: ReactNode; tone: keyof typeof TONES; label: string; status?: string; info?: ReactNode; bad?: boolean; dim?: boolean; children?: ReactNode;
 }) {
   const rtl = useRtl();
-  const glyph = typeof icon === 'string'
-    ? <Icon name={icon as IconName} size={0.875} style={icon === 'arrow-right' && rtl ? { transform: 'scaleX(-1)' } : undefined} />
-    : icon;
+  const shown = icon
+    ? <Icon name={icon} size={0.875} style={icon === 'arrow-right' && rtl ? { transform: 'scaleX(-1)' } : undefined} />
+    : glyph;
   return (
     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 14 }}>
       {/* A waiting row dims its icon only, so its text keeps full contrast. */}
-      <span aria-hidden style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', opacity: dim ? 0.55 : 1, ...TONES[tone] }}>{glyph}</span>
+      <span aria-hidden style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', opacity: dim ? 0.55 : 1, ...TONES[tone] }}>{shown}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: dim ? 'var(--cth-ink-3)' : 'var(--cth-ink)' }}>{label}{info}</div>
         {status && <div role={bad ? 'alert' : undefined} style={{ fontSize: 12, lineHeight: '18px', marginTop: 2, color: bad ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)' }}>{status}</div>}

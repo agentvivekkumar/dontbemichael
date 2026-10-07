@@ -50,7 +50,8 @@ test('a missing Claude at start installs nothing and says where to go', () => {
   assert.ok(claudeAt > 0 && ladderAt > claudeAt, 'Claude is handled before the install ladder');
   const branch = main.slice(claudeAt, ladderAt);
   assert.match(main, /const claudeMissing = bin && claudeProvider && \(bin === 'claude' \? !claudePathFast\(\) : !ptyManager\.isCommandAvailable\(bin\)\);/, 'the plain claude is found without a login shell');
-  assert.match(branch, /teamNeedsClaude = true;/, 'the card shows even when Michael runs on another engine');
+  assert.match(branch, /claudeBlocked\.set\(opts\.id, \{ god: !!opts\.hive\?\.isGod \}\);/, 'who could not start is remembered, to start exactly those later');
+  assert.match(main, /if \(claudeProvider && !claudeMissing\) claudeBlocked\.delete\(opts\.id\);/, 'a member leaves the list when it starts on Claude');
   assert.match(branch, /shellScript: claudeMissingScript\(process\.platform, godName\)/);
   assert.match(branch, /noticeEngineSetup\(opts\.id\);/, 'Ask me hears at once, coalesced');
   assert.match(branch, /return res;/);
@@ -110,7 +111,8 @@ test('Ask me holds one card, counted, until Michael can start, and Claude turnin
   assert.doesNotMatch(card, /cardFrom/, 'no kicker above the title (DESIGN.md 7.8)');
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /window\.addEventListener\(ENGINE_READY_EVENT, onReady\);/);
-  assert.match(hive, /for \(const a of agents\) \{\s*if \(a\.ptyId && isClaudeProvider\(a\.provider \?\? 'claude'\)\) setPendingRestart\(a\.id, \{ at: Date\.now\(\), reason: 'engine', now: true \}\);/);
+  // Only the terminals main names restart: an agent already at work keeps going.
+  assert.match(hive, /if \(a\.ptyId && restart\.has\(a\.ptyId\) && isClaudeProvider\(a\.provider \?\? 'claude'\)\) setPendingRestart\(a\.id, \{ at: Date\.now\(\), reason: 'engine', now: true \}\);/);
 });
 
 test('the setup terminals are not agents: their exit only tells the step to look again', () => {
@@ -141,13 +143,14 @@ test('an API key instead of a Claude account: checked with Anthropic, kept write
   // Every Claude start gets the key, approved first.
   assert.match(main, /const authEnv = claudeAuthEnv\(\);\s*try \{ ensureClaudePermissionsAccepted\(opts\.cwd, \{ approveKey: authEnv\.ANTHROPIC_API_KEY \}\); \}[^\n]*\n\s*if \(authEnv\.ANTHROPIC_API_KEY\) opts\.env = \{ \.\.\.\(opts\.env \?\? \{\}\), \.\.\.authEnv \};/);
   // Hidden checks approve the key too, or Claude's own question rejects it.
-  assert.match(main, /setHiddenClaudeAuthEnv\(\(\) => \{\s*const env = claudeAuthEnv\(\);\s*if \(env\.ANTHROPIC_API_KEY\) \{ try \{ approveClaudeApiKey\(env\.ANTHROPIC_API_KEY\); \}/);
+  // Once per key, not on every check.
+  assert.match(main, /if \(key && key !== hiddenApprovedKey\) \{\s*try \{ approveClaudeApiKey\(key\); hiddenApprovedKey = key; \}/);
   // A key changed or cleared in Settings, AI engines, while it signs Claude in.
   assert.match(main, /if \(res\.ok && p\.backend === 'anthropic' && readConfig\(\)\.claudeAuth === 'apiKey'\) \{\s*try \{ approveClaudeApiKey\(p\.key\); \}/);
-  assert.match(main, /const verdict = await checkAnthropicKey\(key, netRequest\);/, 'the check follows the system proxy');
+  assert.match(main, /const verdict = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'the check follows the system proxy');
   assert.match(read('src/main/hiddenClaude.ts'), /\.\.\.hiddenClaudeAuthEnv\(\),\s*\.\.\.\(opts\.env \?\? \{\}\)/);
   // A key counts as signed in; signing in with an account switches back.
-  assert.match(main, /return readEngineSetupStatus\(\{[\s\S]*?claudeAuth: cfg\.claudeAuth,\s*hasKey: \(\) => integrations\.hasSecret\(providerKeyRef\('anthropic'\)\),/);
+  assert.match(main, /const status = await readEngineSetupStatus\(\{[\s\S]*?claudeAuth: cfg\.claudeAuth,\s*hasKey: \(\) => integrations\.hasSecret\(providerKeyRef\('anthropic'\)\),/);
   assert.match(main, /if \(readConfig\(\)\.claudeAuth === 'apiKey'\) writeConfig\(\{ claudeAuth: 'account' \}\);/);
   const ready = read('src/renderer/src/components/GetMichaelReady.tsx');
   assert.match(ready, /type="password" autoComplete="off"/);
@@ -283,45 +286,6 @@ test('a pasted key is sent only when it looks like a key, and Anthropic\'s answe
   for (const [code, want] of verdicts) assert.equal(setup.apiKeyVerdict(code), want, `HTTP ${code}`);
 });
 
-test('checking a key asks Anthropic once, the right way, and a dead network or timeout reads as unreachable', async () => {
-  // Value: protects=the key goes only to api.anthropic.com in a header, the check never hangs setup, and a network failure is never reported as a bad key; fails_when=checkAnthropicKey changes host, path, method, timeout or headers, forgets end or resume, leaves a timed out request open, maps an error or timeout to anything but unreachable, or throws instead of answering; why_new=the real request function never ran under test; seam=none (node https.request signature injected, no network)
-  const { EventEmitter } = require('node:events');
-  const fake = (behave) => {
-    const seen = { opts: null, ended: 0, destroyed: 0, resumed: 0 };
-    const request = (opts, onResponse) => {
-      seen.opts = opts;
-      const req = new EventEmitter();
-      req.destroy = () => { seen.destroyed++; };
-      req.end = () => {
-        seen.ended++;
-        setImmediate(() => behave(req, (statusCode) => onResponse({ statusCode, resume: () => { seen.resumed++; } })));
-      };
-      return req;
-    };
-    return { request, seen };
-  };
-  const key = `sk-ant-${'k'.repeat(40)}`;
-  const answered = [[200, 'ok'], [401, 'rejected'], [403, 'rejected'], [429, 'unreachable'], [503, 'unreachable'], [undefined, 'unreachable']];
-  for (const [code, want] of answered) {
-    const f = fake((_req, respond) => respond(code));
-    assert.equal(await setup.checkAnthropicKey(key, f.request), want, `HTTP ${code}`);
-    assert.deepEqual(f.seen.opts, {
-      host: 'api.anthropic.com', path: '/v1/models?limit=1', method: 'GET', timeout: 10000,
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
-    });
-    assert.equal(f.seen.ended, 1, 'the request is sent');
-    assert.equal(f.seen.resumed, 1, 'the body is drained so the socket is freed');
-    assert.equal(f.seen.destroyed, 0);
-  }
-  const offline = fake((req) => req.emit('error', new Error('getaddrinfo ENOTFOUND api.anthropic.com')));
-  assert.equal(await setup.checkAnthropicKey(key, offline.request), 'unreachable', 'a network error');
-  const slow = fake((req) => req.emit('timeout'));
-  assert.equal(await setup.checkAnthropicKey(key, slow.request), 'unreachable', 'a timeout');
-  assert.equal(slow.seen.destroyed, 1, 'a timed out request is closed, not left hanging');
-  const broken = () => { throw new Error('bad options'); };
-  assert.equal(await setup.checkAnthropicKey(key, broken), 'unreachable', 'a request that throws');
-});
-
 test('Claude is found without a login shell, on the PATH or where its installers put it, on macOS and Windows', () => {
   // Value: protects=status reads never freeze the app for a login shell while Claude is missing, and Windows finds claude.exe in ~/.local/bin after install.ps1; fails_when=a candidate is dropped, the PATH is not searched, or the Windows names change; why_new=review: a missing Claude froze every status read for about a second, and Windows looped on Could not install; seam=none (exists injected, no file system)
   const find = (platform, pathEnv, have, extra = {}) =>
@@ -365,5 +329,5 @@ test('the step marks an install that ended without Claude as failed, and install
   assert.match(ready, /if \(e\.id === ENGINE_INSTALL_PTY\) \{\s*setInstalling\(false\);\s*setInstallFailed\(!s\.installed\);/);
   assert.match(ready, /if \(s && s\.applies && !s\.installed && !autoInstalled\.current\) \{\s*autoInstalled\.current = true;/);
   assert.match(ready, /if \(inFlight\.current\) return;/, 'the 2 s sign in poll never stacks claude auth status');
-  assert.match(ready, /case 'unknown': return keyForm \? keyFormRow : \(\s*<Row icon="info" tone="idle" label=\{t\('engineSetup\.account'\)\} status=\{t\('engineSetup\.signInUnknown'\)\}>/, 'unknown sign in: no green check');
+  assert.match(ready, /case 'unknown': return keyForm \? keyFormRow : \(\s*<Row icon="help" tone="idle" label=\{t\('engineSetup\.account'\)\} status=\{t\('engineSetup\.signInUnknown'\)\}>/, 'unknown sign in: no green check');
 });

@@ -96,9 +96,12 @@ includes it.
 - The card opens the same rows in a dialog.
 - When Michael runs on another engine but a team member on Claude could not
   start, the card reads "Some of your team can't start yet".
-- Claude turning ready restarts everyone on Claude (`pendingRestart`, reason
-  `engine`, now), however it turned ready: the card, setup, the browser, or an
-  install outside the app. The needs-you feed fires the edge; useHive restarts.
+- Claude turning ready restarts the members whose terminals could not start
+  (`pendingRestart`, reason `engine`, now), however it turned ready: the card,
+  setup, the browser, or an install outside the app. Main names them in the
+  status (`restart`) until each starts; agents already at work are left alone.
+- A slow or failed `claude auth status` keeps the last known sign in, so one
+  bad read never shows a signed out owner as ready.
 - The feed reads the status when a setup terminal ends or an agent can't start,
   and at most once a minute on the 5 s poll.
 

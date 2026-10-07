@@ -1329,6 +1329,23 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, [config?.onboardingComplete]);
 
+  // Claude turned ready after Michael or the team could not start for want of
+  // it (get-michael-ready.md): from the card, setup, a sign in in the browser,
+  // or an install outside the app. The members whose terminals could not start
+  // restart now (main names them); anyone already working is left alone.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const onReady = (e: Event): void => {
+      const restart = new Set(((e as CustomEvent<{ restart?: string[] }>).detail?.restart) ?? []);
+      const { agents, setPendingRestart } = useStore.getState();
+      for (const a of agents) {
+        if (a.ptyId && restart.has(a.ptyId) && isClaudeProvider(a.provider ?? 'claude')) setPendingRestart(a.id, { at: Date.now(), reason: 'engine', now: true });
+      }
+    };
+    window.addEventListener(ENGINE_READY_EVENT, onReady);
+    return () => window.removeEventListener(ENGINE_READY_EVENT, onReady);
+  }, [config?.onboardingComplete]);
+
   // 8) Restart to apply (docs/designs/multi-mailbox.md E2 + E5, and
   //    docs/designs/claude-connectors.md D2). Claude Code picks up the md-mail
   //    tools and its connectors only at start, so turning email on, or changing
@@ -1337,21 +1354,6 @@ export function useHive(config: HarnessConfig | null): void {
   //    After 10 minutes still busy, or when the owner presses Restart now, it
   //    restarts anyway and says so on the floor. Main asks for a connector
   //    restart whenever the agent would now start differently.
-  // Claude turned ready after Michael or the team could not start for want of
-  // it (get-michael-ready.md): from the card, setup, a sign in in the browser,
-  // or an install outside the app. Everyone on Claude restarts now; their
-  // terminals only said what to do, so there is nothing to wait for.
-  useEffect(() => {
-    if (!config?.onboardingComplete) return;
-    const onReady = (): void => {
-      const { agents, setPendingRestart } = useStore.getState();
-      for (const a of agents) {
-        if (a.ptyId && isClaudeProvider(a.provider ?? 'claude')) setPendingRestart(a.id, { at: Date.now(), reason: 'engine', now: true });
-      }
-    };
-    window.addEventListener(ENGINE_READY_EVENT, onReady);
-    return () => window.removeEventListener(ENGINE_READY_EVENT, onReady);
-  }, [config?.onboardingComplete]);
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const queue = (agentId: string): void => {
