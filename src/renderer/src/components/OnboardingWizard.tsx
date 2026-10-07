@@ -508,12 +508,17 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   const studioPicked = step === 'team' ? teamAgents.filter((a) => teamPicked[a.id]) : teamAgents.filter((a) => teamPicked[a.id] ?? true);
   const studioUnpicked = step === 'team' ? teamAgents.filter((a) => !teamPicked[a.id]) : [];
   const toSeat = (a: AgentDefinitionV2) => ({ id: a.id, character: a.character, description: a.role });
+  // The card is centered whenever the studio isn't showing (Business, Details,
+  // Resume, or no team yet) and sits in its column when it is; the move and the
+  // glow follow this one flag (docs/designs/onboarding-centered.md).
+  const hasStudio = (step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions') && teamAgents.length > 0;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto',
-      background: 'radial-gradient(900px 600px at 72% 55%, color-mix(in srgb, var(--cth-card) 90%, transparent) 0%, transparent 70%), var(--cth-bg)',
+      background: 'var(--cth-bg)',
       display: 'flex', flexDirection: 'column'
     }}>
+      <div className={`cth-onb-glow${hasStudio ? ' is-studio' : ''}`} aria-hidden />
       <div className="cth-titlebar-drag" style={{
         flexShrink: 0, height: 72, display: 'flex', alignItems: 'center', gap: 20,
         paddingInlineStart: 88, paddingInlineEnd: 28
@@ -530,8 +535,13 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
       {/* `margin: auto` centers while the card fits and falls back to a normal
           scroll once it doesn't (a centered flex item that overflows is clipped
           at the top and cannot be scrolled to). */}
-      <div style={{ flex: 1, display: 'flex', gap: 32, padding: '8px 28px 28px', alignItems: 'stretch', width: '100%', maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box' }}>
-        <div style={{ width: 560, maxWidth: '100%', flexShrink: 0, margin: step === 'team' ? '0' : 'auto 0' }}>
+      {/* Three tracks: equal side tracks center the card; with the studio the
+          start track closes and the end track holds it. The fr values animate. */}
+      <div className="cth-onb-body" style={{
+        flex: 1, display: 'grid', columnGap: 0, padding: '8px 28px 28px', width: '100%', maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box',
+        gridTemplateColumns: hasStudio ? 'minmax(0, 0fr) minmax(0, 560px) minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 560px) minmax(0, 1fr)'
+      }}>
+        <div style={{ gridColumn: 2, gridRow: 1, minWidth: 0, margin: step === 'team' ? '0' : 'auto 0' }}>
           <div role="region" aria-label={stepTitle} style={{
             background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)',
             // clip, not hidden: hidden would make the card a scroll box and
@@ -1280,8 +1290,8 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
           </div>
           </div>
         </div>
-        {(step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions') && teamAgents.length > 0 && (
-          <div className="cth-onboarding-studio" style={{ flex: 1, minWidth: 0, minHeight: 480, height: 'calc(100vh - 110px)', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
+        {hasStudio && (
+          <div className="cth-onboarding-studio cth-onb-studio-in" style={{ gridColumn: 3, gridRow: 1, minWidth: 0, marginInlineStart: 32, minHeight: 480, height: 'calc(100vh - 110px)', position: 'sticky', top: 0, alignSelf: 'start' }}>
             <OnboardingStudio picked={studioPicked.map(toSeat)} unpicked={studioUnpicked.map(toSeat)} businessName={businessName} />
           </div>
         )}

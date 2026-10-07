@@ -19,6 +19,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 - Approval cards say when an email forwards a message or attaches files.
 - Changing a team member's own mailbox follows the same rule as Send only: Draft only withdraws its waiting emails, and losing the mailbox also revokes its standing approvals there.
+- Setup screens center the card until your office picture appears, then the card glides aside to make room for it.
 
 ### Fixed
 

@@ -566,3 +566,23 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 @media (prefers-reduced-motion: reduce) {
   .cth-dock { animation: none; }
 }
+
+/* Onboarding (docs/designs/onboarding-centered.md): the card is centered while
+   the studio isn't showing and glides 320 ms to its column when it appears; the
+   glow behind the page follows, 50% alone and over the studio after. */
+@property --cth-onb-glow-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+.cth-onb-body { transition: grid-template-columns var(--cth-dur-slow) var(--cth-ease); }
+.cth-onb-glow {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(900px 600px at var(--cth-onb-glow-x) 55%, color-mix(in srgb, var(--cth-card) 90%, transparent) 0%, transparent 70%);
+  transition: --cth-onb-glow-x var(--cth-dur-slow) var(--cth-ease);
+}
+.cth-onb-glow.is-studio { --cth-onb-glow-x: 72%; }
+[dir="rtl"] .cth-onb-glow.is-studio { --cth-onb-glow-x: 28%; }
+/* Opacity only: a finished transform would make the studio the containing block for fixed dialogs. */
+.cth-onb-studio-in { animation: cth-onb-studio-in var(--cth-dur-slow) var(--cth-ease) backwards; }
+@keyframes cth-onb-studio-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .cth-onb-body, .cth-onb-glow { transition: none; }
+  .cth-onb-studio-in { animation: none; }
+}

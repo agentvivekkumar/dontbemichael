@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding centered</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cth-bg: #F7F7FB; --cth-card: #FFFFFF; --cth-card-2: #FAFAFD;
+    --cth-ink: #1E1B2E; --cth-ink-2: #4A4660; --cth-ink-3: #6C6884;
+    --cth-line: #E8E6F2; --cth-line-2: #DAD7EA; --cth-neutral-soft: #F0EFF5;
+    --cth-indigo: #6C5CE7; --cth-indigo-soft: #EEEBFD; --cth-green: #1FB872;
+    --cth-shadow-lg: 0 1px 2px rgba(30,27,46,.05), 0 10px 30px rgba(62,52,140,.10);
+    --cth-dur-slow: 320ms; --cth-ease: cubic-bezier(.2,.7,.2,1);
+    --font: "Sora", -apple-system, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --cth-bg: #14131C; --cth-card: #1F1E2B; --cth-card-2: #24233A;
+      --cth-ink: #ECEAF4; --cth-ink-2: #CFCCDD; --cth-ink-3: #A5A2B8;
+      --cth-line: rgba(255,255,255,.09); --cth-line-2: rgba(255,255,255,.14); --cth-neutral-soft: #2A2938;
+      --cth-indigo: #9D90FF; --cth-indigo-soft: rgba(157,144,255,.16); --cth-green: #34CD8A;
+      --cth-shadow-lg: 0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.40);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--cth-bg); color: var(--cth-ink); font-family: var(--font); font-size: 13px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--cth-line); background: var(--cth-card); }
+  .controls b { font-weight: 600; }
+  .seg { display: inline-flex; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--cth-line-2); overflow: hidden; }
+  .seg button { font: inherit; border: 0; background: transparent; color: var(--cth-ink-2); padding: 6px 10px; min-height: 28px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--cth-ink); color: var(--cth-card); }
+
+  .window { position: relative; isolation: isolate; height: 640px; margin: 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--cth-line); overflow: hidden; display: flex; flex-direction: column; background: var(--cth-bg); }
+  /* The glow sits behind whatever is the main thing: the card while it is
+     alone, the studio once it shows. It moves with the same slide. */
+  .glow { position: absolute; z-index: -1; inset: 0; pointer-events: none; background: radial-gradient(520px 360px at var(--glow-x, 50%) 55%, var(--cth-card) 0%, transparent 70%); transition: --glow-x var(--cth-dur-slow) var(--cth-ease); }
+  .window.studio .glow { --glow-x: 72%; }
+  .window[dir="rtl"].studio .glow { --glow-x: 28%; }
+  @property --glow-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+  .window.snap .glow { transition: none; }
+  @media (prefers-reduced-motion: reduce) { .glow { transition: none; } }
+  .titlebar { height: 56px; display: flex; align-items: center; gap: 16px; padding-inline: 20px; flex-shrink: 0; }
+  .lockup { font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .steps { margin: 0 auto; display: flex; gap: 6px; padding: 4px 8px; border-radius: 999px; background: var(--cth-card); box-shadow: inset 0 0 0 1px var(--cth-line); }
+  .steps span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; box-shadow: inset 0 0 0 1px var(--cth-line-2); color: var(--cth-ink-3); }
+  .steps span.done { background: var(--cth-green); color: #fff; box-shadow: none; }
+  .steps span.cur { background: var(--cth-ink); color: var(--cth-card); box-shadow: none; }
+  .meta { font-size: 11px; color: var(--cth-ink-3); white-space: nowrap; }
+
+  /* The proposal: three tracks. Alone, the side tracks are equal, so the card
+     sits in the middle. With the studio, the start track closes and the end
+     track holds the studio; the fr values animate between the two. */
+  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) 400px minmax(0,1fr); column-gap: 24px; padding: 4px 20px 20px; }
+  .body.studio { grid-template-columns: minmax(0,0fr) 400px minmax(0,1fr); }
+  .body.animate { transition: grid-template-columns var(--cth-dur-slow) var(--cth-ease); }
+  @media (prefers-reduced-motion: reduce) { .body.animate { transition: none; } .studio-pane { transition: none !important; } }
+
+  .card { grid-column: 2; align-self: center; background: var(--cth-card); border-radius: 16px; box-shadow: inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg); overflow: clip; }
+  .card h1 { margin: 0; padding: 16px 16px 4px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+  .card .fields { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .label { font-size: 10px; font-weight: 600; color: var(--cth-ink-2); }
+  .input { height: 26px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--cth-line-2); }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tile { height: 34px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--cth-line); }
+  .tile.on { background: var(--cth-indigo-soft); box-shadow: inset 0 0 0 1px var(--cth-indigo); }
+  .footer { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--cth-line); }
+  .dots { display: flex; gap: 3px; } .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--cth-line-2); } .dots i.cur { background: var(--cth-ink); }
+  .btn { font: inherit; font-size: 12px; font-weight: 600; border: 0; border-radius: 8px; padding: 6px 12px; min-height: 28px; cursor: pointer; }
+  .btn.primary { background: var(--cth-ink); color: var(--cth-card); }
+  .btn.secondary { background: transparent; color: var(--cth-ink); box-shadow: inset 0 0 0 1px var(--cth-line-2); }
+
+  .studio-pane { grid-column: 3; grid-row: 1; min-width: 0; display: grid; place-items: center; opacity: 0; transition: opacity var(--cth-dur-slow) var(--cth-ease); }
+  .body.studio .studio-pane { opacity: 1; }
+  .pods { display: grid; grid-template-columns: repeat(3, 64px); gap: 18px; }
+  .pod { height: 48px; border-radius: 10px; background: var(--cth-card); box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); }
+  .pod.michael { background: var(--cth-indigo-soft); box-shadow: inset 0 0 0 1px var(--cth-indigo); }
+  .note { margin: 0 16px 16px; color: var(--cth-ink-3); font-size: 12px; line-height: 18px; max-width: 760px; }
+  .now { margin: 0 16px; font-size: 12px; color: var(--cth-ink-2); }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <span><b>Step</b></span>
+    <div class="seg" id="stepSeg">
+      <button aria-pressed="true" data-step="1">1 Business</button>
+      <button aria-pressed="false" data-step="2">2 Details</button>
+      <button aria-pressed="false" data-step="3">3 Meet</button>
+    </div>
+    <span><b>Move</b></span>
+    <div class="seg" id="moveSeg">
+      <button aria-pressed="true" data-move="slide">A Slide</button>
+      <button aria-pressed="false" data-move="snap">B Snap</button>
+    </div>
+    <span><b>Direction</b></span>
+    <div class="seg" id="dirSeg">
+      <button aria-pressed="true" data-dir="ltr">English</button>
+      <button aria-pressed="false" data-dir="rtl">Arabic</button>
+    </div>
+  </div>
+  <p class="now" id="now"></p>
+
+  <div class="window" id="win">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="titlebar">
+      <span class="lockup">Don't Be Michael</span>
+      <div class="steps" id="steps"></div>
+      <span class="meta" id="meta"></span>
+    </div>
+    <div class="body animate" id="body">
+      <div class="card" role="region" aria-label="Your business">
+        <h1 id="title">Your business</h1>
+        <div class="fields">
+          <div class="label">Business name</div><div class="input"></div>
+          <div class="label">What kind of business do you run?</div>
+          <div class="tiles"><div class="tile"></div><div class="tile"></div><div class="tile on"></div><div class="tile"></div></div>
+          <div class="label">Street address</div><div class="input"></div>
+        </div>
+        <div class="footer">
+          <div class="dots" id="dots"></div>
+          <div style="display:flex;gap:6px"><button class="btn secondary" id="back">Back</button><button class="btn primary" id="next">Next</button></div>
+        </div>
+      </div>
+      <div class="studio-pane" aria-hidden="true">
+        <div class="pods"><div class="pod"></div><div class="pod michael"></div><div class="pod"></div><div class="pod"></div><div class="pod"></div><div class="pod"></div></div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Steps 1 and 2 have no studio yet, so the card sits in the middle, under the centered step indicator. On step 3 the studio appears: with A the card glides to its column over 320 ms while the studio fades in; with B it jumps there at once. With reduced motion both behave like B. The soft glow behind the page follows: behind the card on steps 1 and 2, behind the studio from step 3, moving with the card. In Arabic the card moves to the right side and the studio fills the left, the same mirror as today.</p>
+
+<script>
+  const titles = { 1: 'Your business', 2: 'Details', 3: 'Meet your office' };
+  let step = 1, move = 'slide';
+  const body = document.getElementById('body');
+  function render() {
+    body.classList.toggle('animate', move === 'slide');
+    body.classList.toggle('studio', step >= 3);
+    const win = document.getElementById('win');
+    win.classList.toggle('studio', step >= 3);
+    win.classList.toggle('snap', move !== 'slide');
+    document.getElementById('title').textContent = titles[step];
+    document.getElementById('meta').textContent = 'Step ' + step + ' of 7';
+    document.getElementById('steps').innerHTML = [1,2,3,4,5,6,7].map(n => '<span class="' + (n < step ? 'done' : n === step ? 'cur' : '') + '">' + (n < step ? '✓' : n) + '</span>').join('');
+    document.getElementById('dots').innerHTML = [1,2,3,4,5,6,7].map(n => '<i class="' + (n === step ? 'cur' : '') + '"></i>').join('');
+    document.getElementById('back').style.visibility = step === 1 ? 'hidden' : 'visible';
+    document.getElementById('now').textContent = step < 3 ? 'No studio on this step: card centered.' : 'Studio showing: card in its column, studio beside it.';
+    for (const b of document.querySelectorAll('#stepSeg button')) b.setAttribute('aria-pressed', String(+b.dataset.step === step));
+    for (const b of document.querySelectorAll('#moveSeg button')) b.setAttribute('aria-pressed', String(b.dataset.move === move));
+  }
+  document.getElementById('stepSeg').onclick = (e) => { const s = e.target.dataset.step; if (s) { step = +s; render(); } };
+  document.getElementById('moveSeg').onclick = (e) => { const m = e.target.dataset.move; if (m) { move = m; render(); } };
+  document.getElementById('dirSeg').onclick = (e) => {
+    const d = e.target.dataset.dir; if (!d) return;
+    document.getElementById('win').dir = d;
+    for (const b of document.querySelectorAll('#dirSeg button')) b.setAttribute('aria-pressed', String(b.dataset.dir === d));
+  };
+  document.getElementById('next').onclick = () => { if (step < 3) { step++; render(); } };
+  document.getElementById('back').onclick = () => { if (step > 1) { step--; render(); } };
+  render();
+</script>
+</body>
+</html>

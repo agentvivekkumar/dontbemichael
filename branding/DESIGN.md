@@ -912,8 +912,12 @@ Full window, no app chrome.
   Meet, Team, Home, Manager, Permissions) in a `card` pill container, each a 22 px circle
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
   number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
-- Body: a 560 px left card with the step's fields; the right side is the studio (§8)
-  reacting to the step. Labels `t-ui` 600 at 12, fields v2 (`cth-input`: Sora, `line-input`
+- Body: a 560 px card with the step's fields. While the studio isn't showing (Business,
+  Details, Resume, or no team yet) the card is centered under the step indicator; once it
+  shows, the card sits at the start edge and the studio (§8) fills the rest, reacting to
+  the step. The card glides there over `--cth-dur-slow` (320 ms) as the studio fades in,
+  and back on Back; reduced motion jumps. The soft glow behind the page follows: behind
+  the card while it is alone, behind the studio after (docs/designs/onboarding-centered.md). Labels `t-ui` 600 at 12, fields v2 (`cth-input`: Sora, `line-input`
   ring, indigo focus ring; the folder path in mono). The Meet step lists what the office does
   as quiet rows in one `line` card, a 26 px neutral icon and a label each, the explanation
   behind an info icon (review, 2026-10-01: it was a grid of tinted tiles, one coral).
@@ -1422,6 +1426,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-05 | Send on approval: mail approval cards on Ask me (§7.8); a third Sending choice and Sends without asking, with Revoke, on the Access tab (§7.12). |
 | 2026-10-06 | Michael's conversation dock above the Talk to Michael composer, whose one count replaces the queue chip (§7.19); Report cards on Ask me and the quiet "Reports: N" pill (§7.5, §7.8). |
 | 2026-10-07 | Access tab, Email: no switch; one row per address used with Inbox and Sending lines, and Add a mailbox with Watch the inbox or Send only (§7.12). Settings, Mailboxes names who else sends from a mailbox (§7.26). |
+| 2026-10-07 | Onboarding: the card is centered while the studio isn't showing and glides to its column when it appears, the background glow following it (§7.25); onboarding reference screens re-shot. |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
