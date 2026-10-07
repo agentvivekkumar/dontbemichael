@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+
+- **Send on approval.** A third Sending choice for each team member: it puts each email on Ask me, where you edit, approve, ask for changes or stop it, and then the team member sends exactly what you approved. New members start on Draft only, and work styles now follow the Sending setting instead of saying team members never send.
+- **Send without asking for one kind of email.** When you keep approving the same kind of email unchanged, the team member can offer to send that kind without asking. You tick it on the card, it shows on their Access tab with Revoke, and every such email is first checked by a separate quick check that sees the email and, for a reply, the message it answers. Anything it can't read in full goes to you.
+- **Michael answers you in the app.** A question you send Michael from the box at the bottom opens a conversation above it: Sent, Michael has it, Waiting on someone, Later than he said (with Nudge), Waiting for you, Answered or Couldn't finish. One count on the box, one notification per answer, and his terminal words show as notes when he answered only there. Scheduled outcomes such as weekly summaries arrive on Ask me as quiet Report cards you clear with Got it.
+- **Send only access to a mailbox someone else watches.** A team member's Email section lists the addresses it uses, each with who watches the inbox and how its email leaves. Add a mailbox asks Watch the inbox or Send only: Sales can send outreach from the CEO's address without reading the CEO's inbox, follow up in the same thread, and its sends show on its Access tab. It pauses while nobody watches that inbox or the mailbox needs attention, and Michael hears once.
+
+### Changed
+
+- Approval cards say when an email forwards a message or attaches files.
+- Changing a team member's own mailbox follows the same rule as Send only: Draft only withdraws its waiting emails, and losing the mailbox also revokes its standing approvals there.
+
+### Fixed
+
+- An approved email can no longer forward or attach mail from a different mailbox.
+- An approved email goes out once, even if two sends overlap or the app stops mid-send, and an email you withdraw while it is being prepared stops before it leaves.
+- Forwarding or attaching from a very large email is refused in plain words instead of freezing the app.
+
 ## [0.1.3] (2026-10-05)
 
 ### Fixed

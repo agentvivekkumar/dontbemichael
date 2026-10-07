@@ -116,6 +116,56 @@
 **Effort:** XS
 **Priority:** P3
 
+## Mail approvals and Michael replies (deferred from ship of feat/mail-approvals-michael-replies, 2026-10-07)
+
+### Never send a plain email twice across a restart
+
+**What:** A small saved send journal, written before each plain send goes to the mail server and checked before any send, so a retry after a crash returns the first result.
+
+**Why:** Codex review (pass 2, P1). Plain Can send emails are kept from going out twice only in memory (MailService.send's send once map and in-flight map), so if the app stops right after the server accepts an email, the agent's retry sends a second copy with a new Message-ID. Approved proposals already avoid this with the saved `sending` state.
+
+**Context:** Owner decision D11 in the ship: the size cap went in, this was deferred. Start in `src/main/mail.ts` (`send`, `sendOnce`); key on the same hash `send` already computes; keep it app private like mail-proposals.json.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Keep the approvals file in memory
+
+**What:** Load mail-proposals.json once, keep it in memory, write through with an atomic rename, and read again only when its time stamp changes.
+
+**Why:** Every approval call reads and parses the whole file several times, and it now also holds up to 500 send records per Send only member.
+
+**Context:** Deferred by the owner (ship D5). `src/main/mailApprovals.ts` `load`/`save`; fire `changed()` only when proposals or standing approvals change.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Rebuild Michael's owner requests from open items only
+
+**What:** Bound the 8 second rebuild of Michael's owner requests to messages newer than the oldest open item, and keep message bodies out of the never evicted cache.
+
+**Why:** Since the fixed floor replaced the 30 day window, the work and the cached bodies grow with all conversation history.
+
+**Context:** Deferred by the owner (ship D5). `src/main/hive.ts` `refreshOwnerRequests` and `ownerMessages`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Authenticate hook events and keep the owner's messages out of the agents' folder
+
+**What:** Give each spawned agent a secret for its hook events and ignore events whose agent id doesn't match, and move the owner's sent messages and dock state (agents/human) out of the hive folder agents can write.
+
+**Why:** Security reviews: an agent can send a fake Stop or SessionStart event naming Michael (his notes fallback now reads only his session start transcript inside Claude's folder, but another agent's own transcript is there too), and agents can write into agents/human.
+
+**Context:** Owner decision D4 in the ship took the two cheap checks and left this with the existing data folder task. Start in `src/main/hooks.ts` (the hook socket) and `src/main/hive.ts` (`ownerSentDir`, `ownerStatePath`).
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** None
+
 ## Update notices (deferred from ship of feat/claude-code-update-notice, 2026-09-30)
 
 ### Translate the update surfaces
@@ -944,9 +994,18 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **What:** Codex adversarial pass 2 raised these items. Each one either already exists on main or needs a design decision:
 1. **Question text in Michael's request.** The question is copied verbatim into Michael's `from: human` request, and an agent writes that question. Label it as card text and fold it to one line, or send only the card id plus the owner's answer.
 2. **Who closed the question.** Open or closed is decided by whether a string is present, so a worker that writes tasks.json can set `a` or `dismissedAt` and hide a question. Give answers and withdrawals provenance: the recorded owner answer keys for answers, plus a trusted withdrawal marker.
-3. **The 30-day window.** Owner requests are read from the last 30 days only, so a request open for longer drops out of Michael's list.
-4. **Reply alias.** `openOwnerRequests` closes a request only on a reply addressed `to: "human"`, but the router accepts any Michael alias.
+3. ~~**The 30-day window.**~~ Done 2026-10-06 (michael-replies.md): a fixed floor replaces the rolling window.
+4. ~~**Reply alias.**~~ Done 2026-10-06 (michael-replies.md): any name that reaches the owner closes a request.
 5. **File swap race.** `fs:openAskFile` checks the file and then opens it by path. The swap window is milliseconds, because the check runs at click time. Open a verified copy or a file handle instead.
 
 **Effort:** human M / CC S
 **Priority:** P2
+
+### Hire wizard offers Send only from an existing mailbox (deferred 2026-10-06)
+
+- **What:** In the hire wizard's mailbox step, also list "Send only from <address> (<owner>)" for roles whose pack card sends mail.
+- **Why:** A new sales hire could send outreach from the owner's address from day one instead of needing a second step on the Access tab.
+- **Pros:** Teaches Send only where it matters; no extra trip to the Access tab.
+- **Cons:** One more choice in an already full wizard step.
+- **Context:** docs/designs/shared-mailboxes.md (E4, owner deferred in the CEO review). Send only grants live on the Access tab first.
+- **Depends on / blocked by:** Send only grants (shared-mailboxes.md accepted scope) shipping first.
