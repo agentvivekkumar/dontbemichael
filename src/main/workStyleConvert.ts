@@ -96,6 +96,8 @@ export interface FocusCheckRequest {
   focus: string;
   workStyle: string;
   others: Array<{ job: string; focus: string }>;
+  /** How the agent's email may leave, from its Sending setting (main fills it). */
+  sending?: string;
 }
 
 /** The renderer's payload, trusted for nothing but short strings. */

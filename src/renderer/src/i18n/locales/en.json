@@ -88,6 +88,9 @@
     "noteAria": "Note for {{name}}"
   },
   "askMe": {
+    "mailFailed": "Couldn't save that. Try again.",
+    "report": "Report",
+    "gotIt": "Got it",
     "fileFiles": "Files in this question",
     "fileOpen": "Open",
     "fileReveal": "Show in Finder",
@@ -129,9 +132,24 @@
     "workStyleUse": "Use the new one",
     "workStyleKeep": "Keep mine",
     "workStyleWhy": {
+      "sendingSetting": "Replies go out as your Sending setting on the Access tab allows: sent, proposed for your approval, or saved as drafts.",
       "pamInboxZero": "Inbox zero: every email gets an outcome and leaves the inbox, and nothing is deleted.",
       "askTeammates": "Asks the teammate who has the answer directly, and the office manager only when they cannot help."
-    }
+    },
+    "mailTitle": "{{name}} wants to send an email",
+    "mailFrom": "From: {{from}}",
+    "mailTo": "To: {{to}}",
+    "mailCc": "Cc: {{cc}}",
+    "mailForwards": "Forwards an email.",
+    "mailAttaches": "Attaches files from other emails: {{count}}",
+    "mailSubject": "Subject",
+    "mailBody": "Message",
+    "mailChanges": "Ask for changes",
+    "mailDecline": "Don't send",
+    "mailNote": "What should change?",
+    "mailSendNote": "Send note",
+    "mailCancel": "Cancel",
+    "mailStanding": "From now on, send emails like this without asking"
   },
   "agentStrip": {
     "notePlaceholder": "One line per bullet…",
@@ -691,7 +709,7 @@
         },
         "guardrails": {
           "label": "You stay in charge",
-          "desc": "Your team asks before sending an email, posting online, or anything that costs money. You decide what they can do on their own."
+          "desc": "Your team asks before posting online or anything that costs money, and sends email only the way you set it. You decide what they can do on their own."
         },
         "hires": {
           "label": "Extra help anytime",
@@ -1827,15 +1845,45 @@
     "gmailIsConnector": "Gmail on your Claude account is under Claude connectors."
   },
   "capabilities": {
+    "addHow": "How {{name}} uses it",
+    "addMailboxBothUsed": "{{name}} already watches one and sends only from one.",
+    "addMailboxNoneLeft": "Connect another in Settings.",
+    "removeWatchedSure": "Remove {{address}}? Send only access for {{names}} pauses until someone watches it.",
+    "addMailboxInfo": "Watch the inbox: {{name}} reads, files and answers its email. Send only: {{name}} writes from the address while its owner keeps the inbox and passes on replies.",
     "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
     "email": "Email",
-    "emailBlurb": "The mailbox {{name}} checks, and whether replies go out or wait as drafts.",
-    "emailOff": "{{name}} doesn't check email.",
-    "canCheck": "{{name}} can check email",
-    "mailbox": "{{name}}'s mailbox",
+    "emailBlurb": "The addresses {{name}} uses, and how email from each one leaves.",
     "sending": "Sending",
     "canSend": "Can send",
     "canSendDesc": "Replies go out straight away.",
+    "sendOnApproval": "Send on approval",
+    "sendOnApprovalDesc": "You approve each email in Ask me, then it goes out.",
+    "standingTitle": "Sends without asking",
+    "recentSends": "Sent from here lately",
+    "recentSend": "{{subject}}, to {{to}}, {{date}}",
+    "cancelAdd": "Cancel",
+    "addIt": "Add",
+    "addSendOnlyTaken": "{{name}} already sends only from {{address}}. One each.",
+    "addSendOnlyNobody": "Nobody watches it yet, so its email waits until someone does.",
+    "addSendOnly": "Send only",
+    "addWatchMoves": "{{from}} watches it now. It moves to {{name}} after you confirm.",
+    "addWatchTaken": "{{name}} already watches {{address}}. One each.",
+    "addWatch": "Watch the inbox",
+    "addMailboxUse": "Add a mailbox",
+    "sendingFrom": "Sending from {{address}}",
+    "inboxNobody": "Nobody watches it. {{name}} sends only.",
+    "inboxSendOnly": "{{holder}} watches it. {{name}} sends only.",
+    "inboxWatches": "{{name}} watches it",
+    "inbox": "Inbox",
+    "removeMailbox": "Remove",
+    "emailNone": "{{name}} doesn't use email yet.",
+    "emailSummaryNone": "None",
+    "emailSummary": "Mailboxes: {{count}}",
+    "sendOnlyPaused": "Paused: {{name}}'s email from here waits until someone watches this inbox.",
+    "alsoSendsFromHere": "Also sends from here: {{names}}",
+    "sendOnlyUse": "{{address}} (send only, {{sending}})",
+    "standingLast": "Sent {{count}} so far, latest: {{subject}}",
+    "standingRevoke": "Revoke",
     "draftOnly": "Draft only",
     "draftOnlyDesc": "Replies wait in that mailbox's Drafts folder for you.",
     "pending": "Email turns on when {{name}} finishes the current step.",
@@ -1847,7 +1895,7 @@
     "schedulesOn": "{{count}} on",
     "schedulesNone": "None",
     "pickMailbox": "Pick a mailbox",
-    "addMailbox": "Add new mailbox",
+    "addMailbox": "Connect another in Settings",
     "heldBy": "{{name}} has this",
     "moveMailbox": "{{from}} checks {{address}}. Move it to {{to}}? {{from}} stops checking email.",
     "moveMailboxFree": "Use {{address}}?",
@@ -1894,6 +1942,7 @@
     "orchestratorEnded": "The orchestrator's terminal ended"
   },
   "shell": {
+    "reports": "Reports: {{count}}",
     "needsYou": "Needs you",
     "nothingNeedsYou": "Nothing needs you",
     "needsYouInfo": "{{godName}} asks you only when he can't settle something himself. Answer here and the work carries on.",
@@ -1926,7 +1975,6 @@
     "dismiss": "Leave {{name}} out",
     "noAgentTitle": "Your office is empty",
     "noAgentBody": "Hire your first team member to get started.",
-    "queued": "Waiting for {{godName}}: {{count}}",
     "send": "Send"
   },
   "studio": {
@@ -2035,5 +2083,43 @@
     "title": "Scheduled jobs",
     "focus": "Focus: {{focus}}",
     "noFocus": "No focus area"
+  },
+  "dock": {
+    "label": "Conversation with {{godName}}",
+    "open": "{{count}} open",
+    "openInfo": "Questions {{godName}} has not answered yet",
+    "close": "Close",
+    "empty": "Ask anything about the office.",
+    "example1": "What's on today?",
+    "example2": "How did last week go?",
+    "earlier": "Earlier",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "nudge": "Nudge",
+    "askAgain": "Ask again",
+    "noReason": "No reason given.",
+    "tryAgain": "Try again",
+    "cancel": "Cancel",
+    "more": "More",
+    "reply": "Reply",
+    "notes": "From {{godName}}'s notes",
+    "replyingTo": "Replying to: {{text}}",
+    "cancelReply": "Stop replying",
+    "notSentNow": "Not sent. Try again.",
+    "countNew": "{{count}} new from {{godName}}",
+    "countWaiting": "{{godName}} is waiting for you",
+    "status": {
+      "sent": "Sent",
+      "finishing": "Sent, {{godName}} is finishing something ({{count}} ahead)",
+      "has-it": "{{godName}} has it",
+      "waitingOn": "Waiting on {{name}}, {{time}}",
+      "waitingUntil": "{{godName}} expects to answer by {{time}}",
+      "late": "Later than he said, {{time}}",
+      "waiting-for-you": "Waiting for you",
+      "answered": "Answered",
+      "couldnt-finish": "Couldn't finish",
+      "withdrawn": "Cancelled",
+      "not-sent": "Not sent"
+    }
   }
 }

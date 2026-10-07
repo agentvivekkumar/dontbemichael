@@ -19,7 +19,8 @@ const readline = require('node:readline');
 
 const BROKER = process.env.MD_BROKER_URL || '';
 const TOKEN = process.env.MD_BROKER_TOKEN || '';
-const CALL_TIMEOUT_MS = 90_000;
+// Longer than the slowest broker call: a standing send's check (60 s) then the send (60 s).
+const CALL_TIMEOUT_MS = 180_000;
 
 const mailbox = { type: 'string', description: 'Mailbox id from list_mailboxes, for example "sales-example-com".' };
 const ref = {
@@ -34,7 +35,7 @@ const compose = {
   cc: { type: 'string' },
   subject: { type: 'string' },
   body: { type: 'string', description: 'Plain text body.' },
-  reply_to: { ...ref, description: 'The message you are replying to (threads the reply).' },
+  reply_to: { ...ref, description: 'The message you are replying to (threads the reply). From a mailbox you send only from, the id is the message_id of one of your own sends there (your_recent_sends in list_mailboxes).' },
   forward: { ...ref, description: 'A message to forward, from this same mailbox.' },
   attach_from: { type: 'array', items: ref, description: 'Messages whose attachments to include, from this same mailbox.' }
 };
@@ -42,7 +43,7 @@ const compose = {
 const TOOLS = [
   {
     name: 'list_mailboxes',
-    description: 'The mailbox the owner has given you (at most one), and whether you can send or only draft. Call this first. These tools search, read, archive (with a label), mark read, mark junk, draft and send. They never delete mail: if you are asked to delete, report it (house rule 6). The mailbox is the app\'s own connection, set up in Settings, Connections, Mailboxes; it is not a Claude connector. If you also have a Claude connector such as Gmail, that is a separate connection with its own tools, possibly to another account. What these tools can and cannot do is built into the app, not a setting the owner can change: report a limit as a gap in the tool, without suggesting a setting.',
+    description: 'The mailbox the owner has given you (at most one), any mailbox you send only from (at most one, marked "send only", with its own sending and how: you can\'t read, search or organize it, and its owner reads the replies), and how your mail goes out: can send, send on approval, or draft only. Call this first and follow its "how". These tools search, read, archive (with a label), mark read, mark junk, draft, propose and send. They never delete mail: if you are asked to delete, report it (house rule 6). The mailbox is the app\'s own connection, set up in Settings, Connections, Mailboxes; it is not a Claude connector. Can send, Send on approval or Draft only is the owner\'s choice for you on your Access tab (Email, Sending), not a limit of the mailbox: name that place when you report it. If you also have a Claude connector such as Gmail, that is a separate connection with its own tools, possibly to another account. Apart from that, what these tools can and cannot do is built into the app, not a setting the owner can change: report a limit as a gap in the tool, without suggesting a setting.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
@@ -90,9 +91,14 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: compose, required: ['mailbox', 'to', 'subject', 'body'] }
   },
   {
+    name: 'propose',
+    description: 'Put an email on Ask me for the owner to approve (Send on approval). Nothing is sent. The owner approves it (maybe after editing it), asks for changes, or chooses not to send it, and you get a message either way. When it is approved, call send with its proposal id. Learn from their edits and notes for next time.',
+    inputSchema: { type: 'object', properties: { ...compose, offer_standing: { type: 'string', description: 'Optional. Only when your memory notes show the owner approving this kind of email unchanged again and again: one narrow plain line naming the kind, for example "order status replies to existing customers, no prices or dates". The owner may tick it to let you send that kind without approval from now on.' } }, required: ['mailbox', 'to', 'subject', 'body'] }
+  },
+  {
     name: 'send',
-    description: 'Send a message from one of your mailboxes. Only works if the owner set you to Can send; otherwise use draft.',
-    inputSchema: { type: 'object', properties: compose, required: ['mailbox', 'to', 'subject', 'body'] }
+    description: 'Send a message from your mailbox. Can send: give the message and it goes out. Send on approval: give only mailbox and proposal, the id of an email the owner approved; the approved version goes out exactly as the owner left it. Or, for a kind the owner let you send without approval, give the full email and its standing id: the app checks it fits, and one that does not goes to the owner on Ask me instead. Draft only: refused, use draft.',
+    inputSchema: { type: 'object', properties: { ...compose, proposal: { type: 'string', description: 'The id propose gave, once the owner approved it.' }, standing: { type: 'string', description: 'A standing approval id from list_mailboxes, for an email of that kind.' } }, required: ['mailbox'] }
   }
 ];
 
@@ -120,7 +126,7 @@ function callBroker(tool, args) {
         resolve({ status: res.statusCode || 500, body });
       });
     });
-    req.on('timeout', () => { req.destroy(); resolve({ status: 504, body: { error: 'The app took too long to answer.' } }); });
+    req.on('timeout', () => { req.destroy(); resolve({ status: 504, body: { error: 'The app took too long to answer. A send may still have gone out: look at your_recent_sends in list_mailboxes or the Sent folder before trying again.' } }); });
     req.on('error', (e) => resolve({ status: 503, body: { error: `Couldn't reach the app: ${e.code || e.message}` } }));
     req.end(payload);
   });
@@ -136,7 +142,7 @@ async function handle(msg) {
       protocolVersion: (params && params.protocolVersion) || '2025-06-18',
       capabilities: { tools: {} },
       serverInfo: { name: 'md-mail', version: '1.0.0' },
-      instructions: 'Mail tools for the mailboxes the owner gave you. Call list_mailboxes first.'
+      instructions: 'Mail tools for the mailboxes the owner gave you, including one you may send only from. Call list_mailboxes first.'
     });
   }
   if (method === 'tools/list') return reply({ tools: TOOLS });

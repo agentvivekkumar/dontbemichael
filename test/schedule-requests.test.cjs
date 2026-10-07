@@ -122,7 +122,7 @@ test('new schedule strings exist in every language', () => {
       'loadError', 'saveFailed', 'sure', 'deleteIt', 'keep', 'addedBy', 'runAria', 'closedGroup', 'closedNote', 'relayHint'],
     askMe: ['scheduleTitle', 'scheduleAdd', 'scheduleUpdate', 'schedulePause', 'scheduleResume', 'scheduleDelete', 'scheduleStale', 'approve', 'decline'],
     agentDetail: ['killConfirmSchedules', 'killConfirmSchedulesPlural'],
-    capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'emailOff', 'canCheck', 'mailbox', 'pickMailbox', 'addMailbox']
+    capabilities: ['schedules', 'schedulesBlurb', 'schedulesOn', 'schedulesNone', 'emailBlurb', 'emailNone', 'pickMailbox', 'addMailbox']
   };
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const d = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`));
@@ -147,7 +147,8 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   const titles = [...main.matchAll(/new Notification\(\{ title: ([^,]+),/g)].map((m) => m[1].trim());
   for (const t of titles) assert.ok(['michaelName()', 'title'].includes(t), `unexpected toast title ${t}`);
   const toasts = [...main.matchAll(/ownerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
-  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()', 'michaelName()'].sort());
+  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()', 'michaelName()', 'michaelName()'].sort());
+  assert.match(main, /toast: \(body\) => ownerToast\(michaelName\(\), body\)/, 'an email to approve is announced by Michael');
   assert.doesNotMatch(main, /constrained`/, 'a constrain no longer toasts');
   assert.match(main, /ownerToast\(michaelName\(\), `I stopped \$\{name\}: \$\{reason\}`\);/);
   assert.match(main, /ownerToast\(michaelName\(\), `\$\{name\}'s schedule change needs you in ASK ME\.`\);/, 'only when Michael passes it on');

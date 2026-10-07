@@ -11,11 +11,12 @@ import { AgentAvatar } from './AgentAvatar';
 import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { type HiveTask, type HumanQA } from './TasksKanban';
 import { compareByNewestAsk } from './askMeOrder';
-import { answerMessages, isAnswered, isWithdrawn, openAskIndexes, raiserOf } from '@shared/askMeRouting';
+import { answerMessages, isAnswered, isReport, isWithdrawn, openAskIndexes, openReportIndexes, raiserOf } from '@shared/askMeRouting';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 import { ScheduleRequestCards } from './ScheduleRequestCards';
 import { WorkStyleUpdateCards } from './WorkStyleUpdateCards';
+import { MailProposalCards } from './MailProposalCards';
 import { AskFileRows } from './AskFileRows';
 import { refreshNeedsYou, updateNeedsYouTasks, useNeedsYou } from '@/shell/useNeedsYou';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -64,7 +65,7 @@ export function AskMeTab() {
   const agents = useStore((s) => s.agents);
   const restorable = useStore((s) => s.restorableAgents);
   // One shared read with the pill, the strip and the chips (D3, eng R4).
-  const { tasks, requests: scheduleRequests, offers } = useNeedsYou();
+  const { tasks, requests: scheduleRequests, offers, proposals } = useNeedsYou();
   const refreshScheduleRequests = refreshNeedsYou;
   // Drafts live in the STORE (keyed by row) — switching tabs unmounts this
   // view, and a half-typed answer must survive the round trip.
@@ -116,9 +117,12 @@ export function AskMeTab() {
   // the board had no comparator at all, so a question's position was an
   // accident of where its card sat in tasks.json. Only this OUTER list is
   // sorted; a card's humanQA history stays chronological (see askMeOrder.ts).
-  const waiting: AskRow[] = tasks
-    .flatMap((t) => openAskIndexes(t.humanQA).map((index) => ({ key: `${t.id}#${index}`, task: t, index, ask: t.humanQA![index] })))
+  // Reports (michael-replies.md, 14A) follow the questions: something to read,
+  // never something blocking.
+  const rowsOf = (pick: typeof openAskIndexes): AskRow[] => tasks
+    .flatMap((t) => pick(t.humanQA).map((index) => ({ key: `${t.id}#${index}`, task: t, index, ask: t.humanQA![index] })))
     .sort((a, b) => compareByNewestAsk(a.ask, b.ask));
+  const waiting: AskRow[] = [...rowsOf(openAskIndexes), ...rowsOf(openReportIndexes)];
   const rowsRef = useRef<AskRow[]>(waiting);
   rowsRef.current = waiting;
   // A card with several open questions has a row for each: their labels add
@@ -192,15 +196,16 @@ export function AskMeTab() {
     <div ref={rootRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '2px 2px 10px', margin: '-2px -2px 0' }}>
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
       <WorkStyleUpdateCards offers={offers} />
+      <MailProposalCards proposals={proposals} refresh={refreshNeedsYou} />
       {/* Nothing left (D4, D8): All clear, one light line, and what was just
           answered. The column closes on the next click outside it. */}
-      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && (
+      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && proposals.length === 0 && (
         <div style={{ padding: '4px 2px 2px' }}>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{translate('shell.allClear')}</div>
           <div style={{ marginTop: 4, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-3)' }}>{translate(`shell.allClearLine${line}`, { godName })}</div>
         </div>
       )}
-      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && answeredHere.map((x) => (
+      {waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && proposals.length === 0 && answeredHere.map((x) => (
         <section key={x.id} aria-label={askTitle(x.title)} style={card}>
           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>{askTitle(x.title)}</div>
           {x.who && <div style={{ marginTop: 6 }}><span style={personChip}><AgentAvatar id={x.whoId} name={x.who} size={16} />{x.who}</span></div>}
@@ -252,6 +257,7 @@ export function AskMeTab() {
                     </span>
                   )}
                   {ago && <span style={{ fontSize: 11, color: 'var(--cth-ink-3)' }}>{ago}</span>}
+                  {isReport(open) && <span style={reportTag}>{translate('askMe.report')}</span>}
                   {!expanded && draft.trim() && <span style={draftTag}>{translate('askMe.draft')}</span>}
                 </div>
                 {/* Folded: the ask itself, in a line or two. */}
@@ -304,6 +310,13 @@ export function AskMeTab() {
                   color: 'var(--cth-ink)', outline: 'none'
                 }}
               />
+              {/* A report is cleared with Got it; nothing goes to Michael (14A). */}
+              {isReport(open) && (
+                <PixelButton variant="secondary" size="sm" disabled={sending === row.key} style={{ height: 34, flexShrink: 0 }}
+                  onClick={() => { void window.cth.ackReport(t.id, row.index).then(() => refreshNeedsYou()); }}>
+                  {translate('askMe.gotIt')}
+                </PixelButton>
+              )}
               <PixelButton
                 variant="primary" size="sm"
                 disabled={!draft.trim() || sending === row.key}
@@ -384,4 +397,9 @@ const personChip: CSSProperties = {
 const quietLink: CSSProperties = {
   padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
   fontFamily: 'var(--cth-font-ui)', fontSize: 11, color: 'var(--cth-ink-3)'
+};
+
+const reportTag: CSSProperties = {
+  fontSize: 11, fontWeight: 600, padding: '1px 8px', borderRadius: 'var(--cth-r-pill)',
+  background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)'
 };

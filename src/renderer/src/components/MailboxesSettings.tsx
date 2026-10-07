@@ -6,7 +6,8 @@ import { InfoTip } from './InfoTip';
 import { AddMailboxDialog } from './AddMailboxDialog';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore } from '@/store/store';
-import { PROVIDER_PRESETS, type MailboxRecord } from '@shared/mailboxes';
+import { PROVIDER_PRESETS, sendersFrom, type MailboxRecord } from '@shared/mailboxes';
+import { SENDING_LABEL_KEY } from './sendingLabels';
 
 /**
  * Settings > Connections > Mailboxes (docs/designs/multi-mailbox.md, design
@@ -58,6 +59,11 @@ export function MailboxesSettings() {
       .filter(([, c]) => c.email?.enabled && c.email.mailboxes?.[0] === mailboxId)
       .map(([id]) => nameOf(id));
   const list = (names: string[]): string => names.join(t('profile.listJoiner'));
+  // Who else sends from a mailbox under Send only (E3), read only: current
+  // members only (on the team or waiting to respawn), never archived ones (3d).
+  const current = (id: string): boolean => agents.some((a) => a.id === id) || useStore.getState().restorableAgents.some((a) => a.id === id);
+  const sendersOf = (mailboxId: string): string[] =>
+    sendersFrom(config.agentCapabilities, mailboxId).filter((x) => current(x.agentId)).map((x) => `${nameOf(x.agentId)} (${t(SENDING_LABEL_KEY[x.sending])})`);
 
   const remove = async (id: string): Promise<void> => {
     setConfirming(null);
@@ -99,6 +105,8 @@ export function MailboxesSettings() {
           <div role="list">
             {mailboxes.map((m) => {
               const users = usersOf(m.id);
+              const senders = sendersOf(m.id);
+              const losing = [...users, ...sendersFrom(config.agentCapabilities, m.id).filter((x) => current(x.agentId)).map((x) => nameOf(x.agentId))];
               const needsYou = m.status === 'needs-attention';
               return (
                 <div key={m.id} role="listitem" style={row}>
@@ -109,10 +117,11 @@ export function MailboxesSettings() {
                       {' · '}
                       {users.length ? t('mailboxes.usedBy', { names: list(users) }) : t('mailboxes.usedByNobody')}
                     </div>
+                    {senders.length > 0 && <div style={hint}>{t('capabilities.alsoSendsFromHere', { names: list(senders) })}</div>}
                     {needsYou && m.statusReason && <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cth-ink-900)' }}>! {m.statusReason}</div>}
                     {confirming === m.id && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 13 }}>{t('mailboxes.sure')}{users.length ? ` ${t('mailboxes.removeAffects', { names: list(users) })}` : ''}</span>
+                        <span style={{ fontSize: 13 }}>{t('mailboxes.sure')}{losing.length ? ` ${t('mailboxes.removeAffects', { names: list(losing) })}` : ''}</span>
                         <MiniButton tone="destructive" autoFocus onClick={() => { void remove(m.id); }}>{t('mailboxes.removeIt')}</MiniButton>
                         <MiniButton onClick={() => { setConfirming(null); refocus(`remove-${m.id}`); }}>{t('mailboxes.keep')}</MiniButton>
                       </div>

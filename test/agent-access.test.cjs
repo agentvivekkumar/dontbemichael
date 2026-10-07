@@ -42,7 +42,7 @@ test('only real grants count: the mailbox still in Settings, connectors on and g
     }
   };
   assert.deepEqual(agentAccessSummary(cfg, 'ryan', false), [
-    { kind: 'mailbox', address: 'hello@example.com', send: false },
+    { kind: 'mailbox', address: 'hello@example.com', sending: 'draft' },
     { kind: 'connector', key: 'Canva' }
   ], 'Gmail is granted but turned off in Settings, so it does not count');
   assert.deepEqual(agentAccessSummary(cfg, 'gone', false), [], 'a mailbox removed in Settings is not usable');

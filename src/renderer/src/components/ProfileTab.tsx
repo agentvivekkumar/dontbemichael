@@ -10,6 +10,7 @@ import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import { useStore, type Agent } from '@/store/store';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { agentAccessSummary, type AccessItem } from '@shared/agentAccess';
+import { SENDING_LABEL_KEY } from './sendingLabels';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { ScheduledJobsList, useScheduledJobs } from './ScheduledJobs';
 
@@ -117,7 +118,8 @@ export function ProfileTab({ agent }: { agent: Agent }) {
     ? agentAccessSummary(config, agent.id, booksDefault === true).filter((i) => i.kind !== 'quickbooks' || booksDefault !== undefined)
     : [];
   const useLabel = (i: AccessItem): string =>
-    i.kind === 'mailbox' ? `${i.address} (${t(i.send ? 'capabilities.canSend' : 'capabilities.draftOnly')})`
+    i.kind === 'mailbox' ? `${i.address} (${t(SENDING_LABEL_KEY[i.sending])})`
+      : i.kind === 'send-only' ? t('capabilities.sendOnlyUse', { address: i.address, sending: t(SENDING_LABEL_KEY[i.sending]) })
       : i.kind === 'quickbooks' ? `QuickBooks (${t(i.changes ? 'capabilities.booksCanChange' : 'capabilities.booksReadOnly')})`
         : i.key;
 

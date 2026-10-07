@@ -3,6 +3,8 @@ import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
+import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
+import type { OwnerDock } from '../shared/ownerRequests';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { HireManifest } from '../shared/hire';
 export type { HireManifest } from '../shared/hire';
@@ -188,9 +190,9 @@ export interface HiveTask {
 }
 
 /** A message the router just delivered, with its resolved recipient ids. Drives
- *  the envelope-handoff animation on the office floor. `needsHuman` is set when
- *  the sender aimed at "human" (now routed to the god proxy) — cosmetic tint
- *  only; there is no approval queue. */
+ *  the envelope-handoff animation on the office floor. `needsHuman` is always
+ *  false since Michael's replies to the owner land in his conversation dock
+ *  (docs/designs/michael-replies.md); kept so older floor code still reads it. */
 export interface HiveRouteEvent {
   id: string;
   from: string;
@@ -244,6 +246,8 @@ export interface PtyExit { exitCode: number; signal?: number | undefined }
 
 /** A recurring schedule; the type lives in shared/missions.ts. */
 export type { ScheduledMission, ScheduleRequest } from '../shared/missions';
+export type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
+export type { OwnerDock, DockItem, DockQuestion, DockReply } from '../shared/ownerRequests';
 
 /** Company knowledge config. Mirrors src/main/config.ts. */
 export interface KnowledgeGraphConfig {
@@ -686,7 +690,7 @@ const api = {
   /** Check a job's focus area against the Work style and the agent's other
    *  jobs (schedule-focus-areas.md, FA3). `checked: false` when it couldn't run. */
   workStyleCheckFocus: (req: {
-    name: string; job: string; focus: string; workStyle: string; others: Array<{ job: string; focus: string }>;
+    agentId?: string; name: string; job: string; focus: string; workStyle: string; others: Array<{ job: string; focus: string }>;
   }): Promise<{ checked: boolean; conflict?: string }> => ipcRenderer.invoke('workStyle:checkFocus', req),
   /** Create each folder if it's missing. Never touches an existing folder's contents. */
   foldersEnsure: (paths: string[]): Promise<Array<
@@ -930,6 +934,10 @@ const api = {
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
     ipcRenderer.invoke('mail:setCapabilities', agentId, caps),
+  /** A member's Send only grant from another member's mailbox, or null to
+   *  remove it (docs/designs/shared-mailboxes.md). */
+  mailSetSendOnly: (agentId: string, grant: { mailbox: string; sending: 'send' | 'approval' | 'draft' } | null): Promise<{ ok: boolean; restartNeeded: boolean }> =>
+    ipcRenderer.invoke('mail:setSendOnly', agentId, grant),
   /** Read the connectors on the owner's Claude account again (a few seconds). */
   connectorsRefresh: (why?: string): Promise<void> => ipcRenderer.invoke('connectors:refresh', why),
   /** Whether a read is running now. */
@@ -1310,6 +1318,42 @@ const api = {
     const listener = (): void => cb();
     ipcRenderer.on('scheduleRequests:updated', listener);
     return () => ipcRenderer.removeListener('scheduleRequests:updated', listener);
+  },
+  /** The owner's conversation with Michael (docs/designs/michael-replies.md). */
+  ownerAsk: (p: { text: string; inReplyTo?: string; conversation?: string }): Promise<{ ok: boolean; id?: string; workOrder?: string }> => ipcRenderer.invoke('owner:ask', p),
+  ownerConversation: (): Promise<OwnerDock> => ipcRenderer.invoke('owner:conversation'),
+  ownerDelivered: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:delivered', id),
+  ownerWithdraw: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:withdraw', id),
+  ownerNotSent: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:notSent', id),
+  ownerRetry: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:retry', id),
+  ownerRead: (ids: string[]): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:read', ids),
+  ownerNudge: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:nudge', id),
+  ownerDockVisible: (on: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('owner:dockVisible', on),
+  onOwnerChanged: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('owner:changed', listener);
+    return () => ipcRenderer.removeListener('owner:changed', listener);
+  },
+  onOwnerOpenDock: (cb: (questionId: string) => void): (() => void) => {
+    const listener = (_e: unknown, id: string): void => cb(id);
+    ipcRenderer.on('owner:openDock', listener);
+    return () => ipcRenderer.removeListener('owner:openDock', listener);
+  },
+  /** "Got it" on a report card (14A). */
+  ackReport: (taskId: string, index: number): Promise<{ ok: boolean }> => ipcRenderer.invoke('hive:ackReport', taskId, index),
+  /** Send on approval: emails waiting for the owner on Ask me, and the owner's decision. */
+  listMailProposals: (): Promise<MailProposal[]> => ipcRenderer.invoke('mailProposals:list'),
+  decideMailProposal: (id: string, decision: ProposalDecision, edit: { subject?: string; body?: string }, note?: string, standing?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('mailProposals:decide', id, decision, edit, note, standing),
+  /** Standing approvals: kinds of email an agent may send without asking. */
+  listMailStanding: (agentId: string): Promise<StandingApproval[]> => ipcRenderer.invoke('mailStanding:list', agentId),
+  /** A Send only member's latest sends from that mailbox, newest first (at most 5). */
+  mailRecentSends: (agentId: string, mailbox: string): Promise<Array<{ to: string; subject: string; sentAt: number }>> => ipcRenderer.invoke('mail:recentSends', agentId, mailbox),
+  revokeMailStanding: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mailStanding:revoke', id),
+  onMailProposalsUpdated: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('mailProposals:updated', listener);
+    return () => ipcRenderer.removeListener('mailProposals:updated', listener);
   },
   /** The owner is closing this agent: pause its schedules and mark it closed. */
   closeAgentByOwner: (id: string): Promise<{ ok: boolean; paused: number }> =>

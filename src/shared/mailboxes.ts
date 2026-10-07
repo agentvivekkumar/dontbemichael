@@ -43,12 +43,51 @@ export interface EmailCapability {
   /** The mailbox id (added in Settings) this agent may use: at most one
    *  (owner, 2026-09-26). Kept a list so older records still read. */
   mailboxes: string[];
-  /** true = Can send; false = Draft only. */
+  /** true = Can send; false = Draft only or Send on approval. Kept in step
+   *  with `sending` so older readers still read it. */
   send: boolean;
+  /** Can send, Send on approval or Draft only (owner, 2026-10-05). Absent on
+   *  older records: read `send` (sendingMode). */
+  sending?: SendingMode;
+}
+
+/** How an agent's mail leaves (docs/designs/send-on-approval.md). */
+export type SendingMode = 'send' | 'approval' | 'draft';
+
+/** A Sending choice from any value: one of the three, else Draft only. */
+export function asSendingMode(v: unknown): SendingMode {
+  return v === 'send' || v === 'approval' || v === 'draft' ? v : 'draft';
+}
+
+/** An agent's Sending choice: `sending`, or for an older record `send`. */
+export function sendingMode(email: Pick<EmailCapability, 'send' | 'sending'> | undefined): SendingMode {
+  const m = email?.sending;
+  if (m === 'send' || m === 'approval' || m === 'draft') return m;
+  return email?.send === true ? 'send' : 'draft';
+}
+
+/** The words for a Sending choice in text agents and Michael read. */
+export function sendingWords(mode: SendingMode): string {
+  return mode === 'send' ? 'can send' : mode === 'approval' ? 'send on approval' : 'draft only';
+}
+
+/**
+ * Send only from a mailbox another member owns (docs/designs/shared-mailboxes.md,
+ * owner 2026-10-06). The member may list, draft, propose and send from it under
+ * its own Sending choice, and never read, search or organize it: the mailbox
+ * keeps one owner, who reads the replies. At most one per member (S1). Kept
+ * beside `email`, not inside it, because every writer of `email` replaces the
+ * whole object.
+ */
+export interface SendOnlyGrant {
+  mailbox: string;
+  sending: SendingMode;
 }
 
 export interface AgentCapabilities {
   email?: EmailCapability;
+  /** Send only from another member's mailbox (SendOnlyGrant). */
+  sendOnly?: SendOnlyGrant;
   /** QuickBooks through the owner's Claude account (shared/quickbooks.ts).
    *  Absent until the owner chooses: the role default applies. */
   quickbooks?: QuickBooksCapability;
@@ -57,7 +96,7 @@ export interface AgentCapabilities {
   connectors?: string[];
 }
 
-export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'send';
+export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'propose' | 'send';
 
 /** Each md-mail tool and the access it needs. The broker and the PreToolUse
  *  hook both check tools against this one map. `organize` (archive, mark read,
@@ -67,7 +106,7 @@ export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'send';
 export const MAIL_TOOL_OPS: Record<string, MailOp> = {
   list_mailboxes: 'list', search: 'read', read: 'read',
   archive: 'organize', mark_read: 'organize', mark_junk: 'organize',
-  draft: 'draft', send: 'send'
+  draft: 'draft', propose: 'propose', send: 'send'
 };
 
 /** Standard mail ports: IMAP over TLS, SMTP over TLS, and SMTP submission
@@ -130,16 +169,90 @@ export interface MailAccessConfig {
 
 export type MailAccessResult = { ok: true } | { ok: false; reason: string };
 
+/** What a call names besides its mailbox, and who is on the team now. */
+export interface MailAccessOptions {
+  /** The call's references: a forward and attachments' source emails (a
+   *  reply under a grant is checked against its own sends in the broker). */
+  refs?: { forward?: boolean; attachFrom?: boolean };
+  /** Whether a member is on the team now (shared-mailboxes.md, EV1). Absent:
+   *  everyone the config names counts, as before. */
+  present?: (agentId: string) => boolean;
+}
+
+/** True when the agent owns this mailbox: Can check email on with it picked. */
+function ownsMailbox(email: EmailCapability | undefined, mailboxId: string | undefined): boolean {
+  return !!mailboxId && !!email?.enabled && email.mailboxes[0] === mailboxId;
+}
+
+/** The member's Send only grant, when it names a connected mailbox the member
+ *  does not own. */
+export function sendOnlyGrant(cfg: MailAccessConfig, agentId: string): SendOnlyGrant | undefined {
+  const c = cfg.agentCapabilities?.[agentId];
+  const g = c?.sendOnly;
+  if (!g || typeof g.mailbox !== 'string' || !g.mailbox) return undefined;
+  if (ownsMailbox(c?.email, g.mailbox)) return undefined;
+  if (!(cfg.mailboxes ?? []).some((m) => m.id === g.mailbox)) return undefined;
+  return { mailbox: g.mailbox, sending: asSendingMode(g.sending) };
+}
+
+/** Whether nobody on the team can read a mailbox now, so a grant on it pauses
+ *  (S3, D10): no current owner (the member with Can check email on and it
+ *  picked), or the mailbox needs attention, since a broken login can stop the
+ *  reading while sending still works (ship D10). */
+export function grantPaused(cfg: MailAccessConfig, mailboxId: string, present?: (agentId: string) => boolean): boolean {
+  if ((cfg.mailboxes ?? []).find((m) => m.id === mailboxId)?.status === 'needs-attention') return true;
+  const holder = mailboxHolder(cfg.agentCapabilities, mailboxId);
+  return !holder || (present ? !present(holder) : false);
+}
+
+/** A mailbox's address, or its id when it is gone. */
+export const mailboxAddress = (cfg: Pick<MailAccessConfig, 'mailboxes'>, mailboxId: string): string =>
+  (cfg.mailboxes ?? []).find((m) => m.id === mailboxId)?.address ?? mailboxId;
+
+/** The rule for a Send only member on its grant's mailbox. */
+function grantAccess(cfg: MailAccessConfig, grant: SendOnlyGrant, op: MailOp, proposal: string | undefined, opts: MailAccessOptions | undefined): MailAccessResult {
+  const address = mailboxAddress(cfg, grant.mailbox);
+  if (op === 'list') return { ok: true };
+  if (op === 'read' || op === 'organize') {
+    return { ok: false, reason: `You send only from ${address}: you can't read, search or organize it. Its owner reads the replies and passes them on through Michael; ask Michael for anything in that inbox.` };
+  }
+  if (opts?.refs?.forward || opts?.refs?.attachFrom) {
+    return { ok: false, reason: `You send only from ${address}, so you can't forward or attach mail from it. Write the email new, or ask Michael to have its owner send it.` };
+  }
+  if (grantPaused(cfg, grant.mailbox, opts?.present)) {
+    return { ok: false, reason: `Nobody reads ${address} right now, so its replies would go unanswered; tell Michael.` };
+  }
+  if ((op === 'send' || op === 'propose') && grant.sending === 'draft') {
+    return { ok: false, reason: `You are Draft only from ${address}, the owner's choice on your Access tab (Email, Also sends from). Save the email as a draft instead, and the owner will send it.` };
+  }
+  if (op === 'send' && grant.sending === 'approval' && !proposal) {
+    return { ok: false, reason: `You send on approval from ${address}, the owner's choice on your Access tab (Email, Also sends from). Use propose to put the email on Ask me; once the owner approves it, send it with its proposal id. A kind the owner let you send without approval goes with its standing id (list_mailboxes lists them).` };
+  }
+  return { ok: true };
+}
+
 /**
  * The one access rule (MB-3, E3). Refuses unless: the agent has "Can check
  * email"; the mailbox is one of its mailboxes and still exists in Settings;
- * and, to send, the agent is not Draft only. Michael follows the same rule.
- * `list` needs only "Can check email": it returns the agent's own mailboxes.
+ * to propose, the agent can send or sends on approval; and to send, the agent
+ * can send, or sends on approval with the id of a proposal the owner approved
+ * or of a standing approval (`proposal`; the broker checks either one itself).
+ * Michael follows the same rule.
+ * `list` needs "Can check email" or a Send only grant: it returns the agent's
+ * own mailbox and the one it sends only from.
+ * A Send only member (sendOnlyGrant) may list, draft, propose and send from the
+ * grant's mailbox under the grant's Sending choice, never read, search,
+ * organize, forward or attach from it, and nothing while nobody reads it.
  * Refusal reasons are read by the agent (and shown on the floor), so they say
  * what happened and what to do.
  */
-export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: string | undefined, op: MailOp): MailAccessResult {
+export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: string | undefined, op: MailOp, proposal?: string, opts?: MailAccessOptions): MailAccessResult {
   const email = cfg.agentCapabilities?.[agentId]?.email;
+  // A Send only grant is checked before the Can check email gate: a member may
+  // hold one with email off (shared-mailboxes.md, item 2).
+  const grant = sendOnlyGrant(cfg, agentId);
+  if (grant && mailboxId === grant.mailbox) return grantAccess(cfg, grant, op, proposal, opts);
+  if (op === 'list' && grant) return { ok: true };
   if (!email?.enabled) {
     return { ok: false, reason: 'The owner has not given you email in your Capabilities. Do not try another way; tell Michael what you need.' };
   }
@@ -151,8 +264,12 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
   if (!(cfg.mailboxes ?? []).some((m) => m.id === mailboxId)) {
     return { ok: false, reason: `The mailbox "${mailboxId}" was removed in Settings.` };
   }
-  if (op === 'send' && !email.send) {
-    return { ok: false, reason: 'You are Draft only: save the reply as a draft instead, and the owner will send it.' };
+  const mode = sendingMode(email);
+  if ((op === 'send' || op === 'propose') && mode === 'draft') {
+    return { ok: false, reason: 'You are Draft only, the owner\'s choice on your Access tab (Email, Sending); the mailbox itself can send. Save the reply as a draft instead, and the owner will send it.' };
+  }
+  if (op === 'send' && mode === 'approval' && !proposal) {
+    return { ok: false, reason: 'You send on approval, the owner\'s choice on your Access tab (Email, Sending). Use propose to put the email on Ask me; once the owner approves it, send it with its proposal id. A kind the owner let you send without approval goes with its standing id (list_mailboxes lists them).' };
   }
   return { ok: true };
 }
@@ -167,8 +284,6 @@ export function agentMailboxes(cfg: MailAccessConfig, agentId: string): string[]
   return email.mailboxes.slice(0, 1).filter((id) => known.has(id));
 }
 
-/** True when the email capability changed from off to on (E2: that needs a
- *  restart, because the md-mail server is attached only at spawn). */
 /**
  * The agent holding a mailbox, other than `except` (one agent per mailbox:
  * owner, 2026-09-27, so no inbox is ever worked twice). An agent holds a
@@ -185,8 +300,24 @@ export function mailboxHolder(
   return undefined;
 }
 
-export function emailJustEnabled(before: AgentCapabilities | undefined, after: AgentCapabilities | undefined): boolean {
-  return !before?.email?.enabled && !!after?.email?.enabled;
+/** Who else sends from a mailbox under a Send only grant, for the owner's
+ *  side and Settings (E3): read only, the grant lives on the sender's tab. */
+export function sendersFrom(caps: { [agentId: string]: AgentCapabilities } | undefined, mailboxId: string): Array<{ agentId: string; sending: SendingMode }> {
+  return Object.entries(caps ?? {})
+    .filter(([, c]) => c?.sendOnly?.mailbox === mailboxId && !ownsMailbox(c.email, mailboxId))
+    .map(([agentId, c]) => ({ agentId, sending: asSendingMode(c.sendOnly!.sending) }));
+}
+
+/** Whether an agent gets the md-mail tools at spawn: it owns a mailbox or holds
+ *  a Send only grant. */
+export function hasMailTools(caps: AgentCapabilities | undefined): boolean {
+  return !!caps?.email?.enabled || !!caps?.sendOnly?.mailbox;
+}
+
+/** True when the mail tools go from not attached to attached: that agent needs
+ *  a restart, because md-mail is attached only at spawn (E2, OV10). */
+export function mailToolsJustAttached(before: AgentCapabilities | undefined, after: AgentCapabilities | undefined): boolean {
+  return !hasMailTools(before) && hasMailTools(after);
 }
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;

@@ -42,6 +42,9 @@ export interface HiddenClaudeOptions {
    *  text other agents wrote (the memory tidy up), so nothing in that text can
    *  make it open files or reach the web. Overrides disallowedTools. */
   noTools?: boolean;
+  /** Setting sources to load (--setting-sources), e.g. "user" so a project's
+   *  settings and hooks in the folder can't change a check. */
+  settingSources?: string;
   /** Directories added via --add-dir (for context gathering). */
   addDirs?: string[];
   /** Hard cap ms before forcing prompt send regardless of boot activity. Default 7000. */
@@ -109,6 +112,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       // these runs have no hook to check a call, so none is loaded at all.
       ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--strict-mcp-config', '--disallowedTools', ...disallowed]),
     ];
+    if (opts.settingSources) args.push('--setting-sources', opts.settingSources);
     for (const d of addDirs) { args.push('--add-dir', d); }
 
     const bootCapMs = opts.bootCapMs ?? 7000;

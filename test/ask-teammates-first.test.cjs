@@ -49,12 +49,13 @@ test('offices that hired them are offered the new text, and only in the packs th
   const cards = new Map();
   for (const n of packs) for (const a of pack(n).agents || []) cards.set(`${n}/${a.id}`, a);
   const offered = (businessType, agents) => workStyleOffers(agents, cards, businessType, { name: 'Sunrise Bakery' }, {}).map((o) => [o.agentId, o.whyKey]);
-  assert.deepEqual(offered('saas-consulting', [{ id: 'kelly', goal: 'old' }]), [['kelly', 'askMe.workStyleWhy.askTeammates']]);
+  assert.deepEqual(offered('saas-consulting', [{ id: 'kelly', goal: 'old' }]), [['kelly', 'askMe.workStyleWhy.sendingSetting']], 'the newest update, whose text holds the older ones');
   assert.deepEqual(offered('retail-shop', [{ id: 'ryan', goal: 'old' }]), [['ryan', 'askMe.workStyleWhy.askTeammates']]);
   assert.deepEqual(offered('home-services', [{ id: 'kelly', goal: 'mine' }]), [], 'her text there did not change');
   assert.deepEqual(offered('saas-consulting', [{ id: 'ryan', goal: 'mine' }]), []);
-  assert.deepEqual(offered('home-services', [{ id: 'pam', goal: 'old' }]), [['pam', 'askMe.workStyleWhy.pamInboxZero']], 'unscoped offers still reach every pack');
+  assert.deepEqual(offered('home-services', [{ id: 'pam', goal: 'old' }]), [['pam', 'askMe.workStyleWhy.sendingSetting']], 'unscoped offers still reach every pack');
   for (const loc of ['en', 'ar', 'zh-CN']) {
     assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).askMe.workStyleWhy.askTeammates, loc);
+    assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).askMe.workStyleWhy.sendingSetting, loc);
   }
 });

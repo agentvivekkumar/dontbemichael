@@ -103,7 +103,12 @@ export function answerMessages(p: {
  * withdrew the first, and a card moved out of Blocked hid its ask; replaying
  * the ledger found six questions lost that way.
  */
-export interface AskEntry { q?: unknown; a?: unknown; dismissedAt?: unknown }
+export interface AskEntry { q?: unknown; a?: unknown; dismissedAt?: unknown; kind?: unknown }
+
+/** A report Michael put on Ask me (docs/designs/michael-replies.md, 14A): an
+ *  outcome to read, not a question. It never turns the pill coral, never needs
+ *  the card Blocked, and "Got it" clears it. */
+export const isReport = (e: AskEntry | null | undefined): boolean => !!e && e.kind === 'report';
 
 /** Whether an ask carries a real answer or a real withdrawal: text, never a
  *  blank or a stray value, so a worker writing " " into tasks.json cannot hide
@@ -112,12 +117,22 @@ const filled = (v: unknown): boolean => typeof v === 'string' && v.trim() !== ''
 export const isAnswered = (e: AskEntry | null | undefined): boolean => !!e && filled(e.a);
 export const isWithdrawn = (e: AskEntry | null | undefined): boolean => !!e && filled(e.dismissedAt);
 
-/** Indexes of the card's open asks, oldest first. */
-export function openAskIndexes(qa: readonly (AskEntry | null | undefined)[] | undefined): number[] {
+/** Indexes of a card's open entries of one kind (asks or reports), oldest first. */
+function openIndexes(qa: readonly (AskEntry | null | undefined)[] | undefined, reports: boolean): number[] {
   if (!Array.isArray(qa)) return [];
   const out: number[] = [];
-  qa.forEach((e, i) => { if (e && typeof e.q === 'string' && !isAnswered(e) && !isWithdrawn(e)) out.push(i); });
+  qa.forEach((e, i) => { if (e && typeof e.q === 'string' && isReport(e) === reports && !isAnswered(e) && !isWithdrawn(e)) out.push(i); });
   return out;
+}
+
+/** Indexes of the card's open asks, oldest first. Reports are not asks. */
+export function openAskIndexes(qa: readonly (AskEntry | null | undefined)[] | undefined): number[] {
+  return openIndexes(qa, false);
+}
+
+/** Indexes of the card's open reports (not yet read with "Got it" or answered). */
+export function openReportIndexes(qa: readonly (AskEntry | null | undefined)[] | undefined): number[] {
+  return openIndexes(qa, true);
 }
 
 /** The renderer's humanQA merged onto the card's list on disk. The renderer

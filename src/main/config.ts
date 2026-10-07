@@ -295,6 +295,10 @@ export interface HarnessConfig {
   /** Owner answers the app recorded from Ask me (shared/ownerRequests.ts
    *  answerKey): the launch catch-up relays only these. */
   ownerAnswerKeys?: string[];
+  /** Legacy: the first build kept the dock's genuine message keys here
+   *  (michael-replies.md, R4). Read once, moved to userData/owner-dock-keys.json,
+   *  then cleared. */
+  ownerDockKeys?: string[];
   /** One-time guard: the knowledge feature was switched on for this install
    *  when it became the company knowledge store (2026-09-25). An owner who
    *  turns it off afterwards keeps it off. */

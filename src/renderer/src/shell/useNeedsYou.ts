@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from 'react';
 import type { ScheduleRequest } from '@shared/missions';
+import type { MailProposal } from '@shared/mailProposals';
 import type { OwnerRequest } from '@shared/ownerRequests';
 import type { WorkStyleOffer } from '@shared/workStyleUpdates';
 import { openQuestion, openQuestions, parseTasks, waitsOnHuman, type HiveTask } from '../components/hiveTasks';
+import { openReportIndexes } from '@shared/askMeRouting';
 
 const POLL_MS = 5000;
 
@@ -26,11 +28,15 @@ export interface NeedsYouFeed {
   ownerRequests: OwnerRequest[];
   /** New default job descriptions offered to the owner (shared/workStyleUpdates.ts). */
   offers: WorkStyleOffer[];
-  /** Open asks, passed-on schedule requests and job description offers. */
+  /** Emails waiting for the owner's approval (send-on-approval.md). */
+  proposals: MailProposal[];
+  /** Open asks, passed-on schedule requests, job description offers and emails to approve. */
   count: number;
+  /** Reports Michael put on Ask me (michael-replies.md, 14A): never coral, never in `count`. */
+  reports: number;
 }
 
-let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], count: 0 };
+let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], proposals: [], count: 0, reports: 0 };
 // The offers need the team and the packs, which this module does not import;
 // the app hands it the reader at start (App.tsx).
 let offersSource: (() => Promise<WorkStyleOffer[]>) | null = null;
@@ -59,17 +65,23 @@ function readOffers(force = true): void {
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
 let offRequests: (() => void) | null = null;
+let offProposals: (() => void) | null = null;
+let proposalReads = 0;
 // A read that started before a newer read or a local change must not land.
 let taskReads = 0;
 let requestReads = 0;
 let ownerReads = 0;
 
-function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers'>>): void {
+function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers' | 'proposals'>>): void {
   // A poll that brings nothing new changes nothing, so nobody re-renders.
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
   const merged = { ...feed, ...next };
-  feed = { ...merged, count: merged.tasks.reduce((n, t) => n + openQuestions(t).length, 0) + merged.requests.length + merged.offers.length };
+  feed = {
+    ...merged,
+    count: merged.tasks.reduce((n, t) => n + openQuestions(t).length, 0) + merged.requests.length + merged.offers.length + merged.proposals.length,
+    reports: merged.tasks.reduce((n, t) => n + openReportIndexes(t.humanQA).length, 0)
+  };
   for (const l of [...listeners]) l();
 }
 
@@ -94,14 +106,23 @@ function readRequests(): void {
     .catch(() => { /* keep the last value */ });
 }
 
+function readProposals(): void {
+  const mine = ++proposalReads;
+  void window.cth.listMailProposals?.()
+    .then((all) => { if (mine === proposalReads) publish({ proposals: Array.isArray(all) ? all : [] }); })
+    .catch(() => { /* keep the last value */ });
+}
+
 /** Listen for changes; the first listener starts the poll, the last stops it. */
 export function subscribeNeedsYou(listener: () => void): () => void {
   listeners.add(listener);
   if (listeners.size === 1) {
     readTasks();
     readRequests();
+    readProposals();
     timer = setInterval(readTasks, POLL_MS);
     offRequests = window.cth.onScheduleRequestsUpdated(readRequests);
+    offProposals = window.cth.onMailProposalsUpdated?.(readProposals) ?? null;
   }
   return () => {
     listeners.delete(listener);
@@ -110,6 +131,8 @@ export function subscribeNeedsYou(listener: () => void): () => void {
       timer = null;
       offRequests?.();
       offRequests = null;
+      offProposals?.();
+      offProposals = null;
     }
   };
 }
@@ -135,6 +158,7 @@ export function getNeedsYouFeed(): NeedsYouFeed {
 export function refreshNeedsYou(): void {
   readTasks();
   readRequests();
+  readProposals();
   readOffers();
 }
 

@@ -160,6 +160,9 @@ export interface QueuedMessage {
    *  `text`. Used by Slack-origin work to carry the autonomy preamble to god's
    *  prompt without polluting the human-readable kanban card title (= raw `text`). */
   instruction?: string;
+  /** An owner question from the dock (michael-replies.md, R6): typed means
+   *  Michael has it; the drain reports delivery and a drop by this id. */
+  ownerRequestId?: string;
   /** User clicked "send now" while floor-wide auto-delivery was paused. Bypasses
    *  ONLY the pause gate in the drain loop — idle/draft/picker safety still hold,
    *  so it delivers the moment the terminal is actually free. */
@@ -372,9 +375,14 @@ interface State {
   /** Park a message for an agent. Returns nothing; the flush loop delivers it.
    *  `meta.instruction`, when set, is what gets typed into the PTY instead of
    *  `text` (UI/card surfaces still show `text`). */
-    enqueueMessage: (agentId: string, text: string, meta?: { slack?: { channel: string; thread_ts: string }; instruction?: string; precondition?: QueuedMessage['precondition']; compactUsed?: number }) => void;
+    enqueueMessage: (agentId: string, text: string, meta?: { slack?: { channel: string; thread_ts: string }; instruction?: string; precondition?: QueuedMessage['precondition']; compactUsed?: number; ownerRequestId?: string }) => void;
   /** Drop a single queued message (user removed it, or it was just delivered). */
   removeQueuedMessage: (agentId: string, messageId: string) => void;
+  /** The conversation dock above the composer (michael-replies.md): open,
+   *  and the owner question to show. */
+  dockOpen: boolean;
+  dockFocus?: string;
+  setDock: (open: boolean, focus?: string) => void;
   /** "Send now" while floor auto-delivery is paused: marks the message manual
    *  (drain bypasses the pause gate for it) and moves it to the queue front. */
   releaseQueuedMessage: (agentId: string, messageId: string) => void;
@@ -1185,6 +1193,9 @@ export const useStore = create<State>((set, get) => ({
   // one careless mutation rewrites the default for everyone.
   orgTrigger: { ...DEFAULT_ORG_TRIGGER },
   setOrgTrigger: (cfg) => set({ orgTrigger: cfg }),
+  dockOpen: false,
+  dockFocus: undefined,
+  setDock: (open, focus) => set({ dockOpen: open, dockFocus: open ? focus : undefined }),
   enqueueMessage: (agentId, text, meta) =>
     set((s) => {
       const trimmed = text.trim();
@@ -1221,7 +1232,8 @@ export const useStore = create<State>((set, get) => ({
         ...(meta?.slack ? { slack: meta.slack } : {}),
         ...(meta?.instruction ? { instruction: meta.instruction } : {}),
         ...(meta?.precondition ? { precondition: meta.precondition } : {}),
-        ...(meta?.compactUsed !== undefined ? { compactUsed: meta.compactUsed } : {})
+        ...(meta?.compactUsed !== undefined ? { compactUsed: meta.compactUsed } : {}),
+        ...(meta?.ownerRequestId ? { ownerRequestId: meta.ownerRequestId } : {})
       };
       const messageQueues = { ...s.messageQueues, [agentId]: [...(s.messageQueues[agentId] ?? []), msg] };
       persistQueues(messageQueues);

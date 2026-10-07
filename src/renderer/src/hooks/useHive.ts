@@ -1035,10 +1035,22 @@ export function useHive(config: HarnessConfig | null): void {
         removeQueuedMessage(srcId, next.id);
         return { sent: false };
       }
+      // Removed while the checks above ran (the owner withdrew a question, or
+      // cleared the queue): never type it.
+      if (!useStore.getState().messageQueues[srcId]?.some((m) => m.id === next.id)) return { sent: false };
       const flightKey = `${srcId}:${next.id}`;
       if (inFlight.has(flightKey)) return { sent: false };
+      // Marked in flight first, in the same step as the check, so a second
+      // flush can't pass while the claim below is on its way.
       inFlight.add(flightKey);
       lastFlush.current[target.id] = now;
+      // An owner question is claimed in main before it is typed (Codex P1):
+      // from then on it is Michael's (and in his every-turn list) even if this
+      // window stops mid-typing, and a withdraw can no longer race it.
+      if (next.ownerRequestId) {
+        const claim = await window.cth.ownerDelivered(next.ownerRequestId).catch(() => ({ ok: false }));
+        if (!claim.ok) { inFlight.delete(flightKey); removeQueuedMessage(srcId, next.id); return { sent: false }; }
+      }
       try {
         const sent = await deliverWithAcknowledgement(
           // `instruction` (when present) is the authoritative text to type into
@@ -1077,6 +1089,8 @@ export function useHive(config: HarnessConfig | null): void {
         if (attempts >= MAX_SEND_ATTEMPTS) {
           delete sendFailures[next.id];
           removeQueuedMessage(srcId, next.id);
+          // An owner question was claimed before typing, so Michael still has it
+          // through his every-turn list of open owner questions.
           console.warn(
             `[queue-drain] dropping message ${next.id} for ${target.id} after ${attempts} failed pty writes ` +
             `("${next.text.slice(0, 80)}${next.text.length > 80 ? '…' : ''}")`

@@ -555,3 +555,14 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
    composer while its message box has focus. */
 .cth-composer { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); }
 .cth-composer:focus-within { box-shadow: inset 0 0 0 2px var(--cth-indigo), var(--cth-shadow-lg); }
+
+/* Michael's conversation dock (docs/designs/michael-replies.md, 21A): slides
+   180 ms up from the composer's top edge; reduced motion snaps. */
+.cth-dock { animation: cth-dock-in 180ms ease-out; }
+@keyframes cth-dock-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cth-dock { animation: none; }
+}

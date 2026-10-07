@@ -1,14 +1,14 @@
-import { useEffect, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore, type QueuedMessage } from '@/store/store';
+import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useMissions } from '@/components/triggers/ScheduleList';
 import { nextRunAt } from '@shared/missions';
 import { isComposingKey } from '@shared/imeGuard';
 import { GrowingTextarea } from '@/components/GrowingTextarea';
 import { attachmentsFromPaste } from '@/components/pasteAttachments';
-
-const EMPTY_QUEUE: QueuedMessage[] = [];
+import { MichaelDock, useOwnerDock } from './MichaelDock';
+import { sendToMichael } from './ownerSend';
 
 /**
  * The v2 bottom bar (branding/DESIGN.md 7.19), floating over the stage: brief
@@ -42,9 +42,17 @@ function TalkToMichael() {
   const godId = god?.id ?? 'god';
   const text = useStore((s) => s.drafts[godId] ?? '');
   const setDraft = useStore((s) => s.setDraft);
-  const enqueueMessage = useStore((s) => s.enqueueMessage);
-  const queue = useStore((s) => s.messageQueues[godId]) ?? EMPTY_QUEUE;
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // The conversation dock (docs/designs/michael-replies.md).
+  const dockOpen = useStore((s) => s.dockOpen);
+  const { dock, refresh } = useOwnerDock(dockOpen);
+  const setDock = useStore((s) => s.setDock);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const [replyTo, setReplyTo] = useState<{ inReplyTo: string; conversation: string; text: string } | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
+  // A notification click opens the dock at its question (12A).
+  useEffect(() => window.cth.onOwnerOpenDock?.((id) => setDock(true, id)), [setDock]);
 
   const add = (incoming: Attachment[]) => setAttachments((prev) => {
     const seen = new Set(prev.map((a) => a.path));
@@ -59,23 +67,33 @@ function TalkToMichael() {
     add(files.map((f) => ({ path: window.cth.pathForFile(f), name: f.name })).filter((a) => a.path));
   };
 
-  const canSend = !!god && (!!text.trim() || attachments.length > 0);
-  const send = () => {
+  const canSend = !!god && !sending && (!!text.trim() || attachments.length > 0);
+  // A known command goes to Michael's terminal; anything else is a question
+  // for the dock, handed to him as its own work order (R3, R6, R7).
+  const send = async () => {
     if (!canSend) return;
-    // Same "Attached files:" convention as MessageQueueComposer, so Michael reads
-    // the files by path.
-    const body = attachments.length
-      ? (text.trim() ? `${text}\n\nAttached files:\n` : 'Attached files:\n') + attachments.map((a) => `- ${a.path} (${a.name})`).join('\n')
-      : text;
-    enqueueMessage(godId, body);
+    setSending(true);
+    setSendFailed(false);
+    const ok = await sendToMichael(godId, text, attachments, replyTo ? { inReplyTo: replyTo.inReplyTo, conversation: replyTo.conversation } : undefined);
+    setSending(false);
+    if (!ok) { setSendFailed(true); return; }
     void window.cth.trackMessageSent('composer');
     setDraft(godId, '');
     setAttachments([]);
+    setReplyTo(null);
+    refresh();
+  };
+  // One number: Michael answered (indigo), or coral while he waits on you (2A, 16A).
+  const waiting = dock.waitingForYou > 0;
+  const count = waiting ? dock.waitingForYou : dock.unread;
+  const openAt = () => {
+    const target = dock.items.find((i) => i.kind === 'owner' && (waiting ? i.status === 'waiting-for-you' : i.unread));
+    setDock(true, target?.id);
   };
   // Enter sends; Shift+Enter starts a new line (the box grows with it).
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposingKey(e)) return;
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); }
   };
 
   return (
@@ -84,6 +102,7 @@ function TalkToMichael() {
       onDrop={onDrop}
       // The ring and its focus state live in global.css (.cth-composer).
       className="cth-composer"
+      ref={composerRef}
       style={{
         pointerEvents: 'auto', position: 'relative',
         // The buttons stay on the bottom row while the message grows upward.
@@ -93,6 +112,9 @@ function TalkToMichael() {
         background: 'var(--cth-card)', borderRadius: 'var(--cth-r-2xl)'
       }}
     >
+      <MichaelDock dock={dock} refresh={refresh} godId={godId} composerRef={composerRef}
+        onFillComposer={(v) => { setDraft(godId, v); composerRef.current?.querySelector('textarea')?.focus(); }}
+        onReply={(target) => { setReplyTo(target); composerRef.current?.querySelector('textarea')?.focus(); }} />
       <button onClick={() => void pick()} aria-label={t('shell.attach')} title={t('shell.attach')} style={{
         width: 34, height: 34, flexShrink: 0, border: 'none', borderRadius: 'var(--cth-r-md)', cursor: 'pointer',
         display: 'grid', placeItems: 'center', background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)'
@@ -102,6 +124,13 @@ function TalkToMichael() {
         </svg>
       </button>
       <div style={{ flex: 1, minWidth: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {replyTo && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--cth-ink-3)' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('dock.replyingTo', { text: `\u2068${replyTo.text}\u2069` })}</span>
+            <button onClick={() => setReplyTo(null)} aria-label={t('dock.cancelReply')} title={t('dock.cancelReply')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--cth-ink-3)', fontSize: 13, width: 28, height: 28, display: 'grid', placeItems: 'center', padding: 0, flexShrink: 0 }}>✕</button>
+          </div>
+        )}
+        {sendFailed && <div role="alert" style={{ fontSize: 11, color: 'var(--cth-ink-2)' }}>{t('dock.notSentNow')}</div>}
         {attachments.length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {attachments.map((a) => (
@@ -122,6 +151,8 @@ function TalkToMichael() {
           onChange={(e) => setDraft(godId, e.target.value)}
           onKeyDown={onKey}
           onPaste={onPaste}
+          // Focusing the composer with replies unread opens the dock (21A).
+          onFocus={() => { if (!dockOpen && (dock.unread > 0 || waiting)) openAt(); }}
           placeholder={t('shell.briefPlaceholder', { godName })}
           aria-label={t('shell.brief', { godName })}
           maxHeight={140}
@@ -132,7 +163,7 @@ function TalkToMichael() {
           }}
         />
       </div>
-      <button onClick={send} disabled={!canSend} style={{
+      <button onClick={() => void send()} disabled={!canSend} style={{
         height: 36, padding: '0 14px', flexShrink: 0, border: 'none', borderRadius: 11,
         display: 'inline-flex', alignItems: 'center', gap: 7, cursor: canSend ? 'pointer' : 'default',
         background: canSend ? 'var(--cth-ink)' : 'var(--cth-neutral-soft)', color: canSend ? 'var(--cth-bg)' : 'var(--cth-ink-3)',
@@ -143,13 +174,22 @@ function TalkToMichael() {
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </button>
-      {queue.length > 0 && (
-        <span style={{
-          position: 'absolute', top: -10, insetInlineEnd: 12, height: 20, padding: '0 8px',
-          display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--cth-r-pill)',
-          background: 'var(--cth-indigo-soft)', color: 'var(--cth-indigo-text)', fontSize: 11, fontWeight: 600,
-          boxShadow: 'var(--cth-shadow-sm)'
-        }}>{t('shell.queued', { count: queue.length, godName })}</span>
+      {count > 0 && (
+        // A 28 px target (DESIGN.md) holding the 20 px count pill.
+        <button
+          onClick={() => (dockOpen ? setDock(false) : openAt())}
+          aria-label={waiting ? t('dock.countWaiting', { godName }) : t('dock.countNew', { count, godName })}
+          style={{
+            position: 'absolute', top: -12, insetInlineEnd: -12, minWidth: 28, height: 28, padding: 0, border: 'none', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent'
+          }}>
+          <span style={{
+            minWidth: 20, height: 20, padding: '0 6px', boxSizing: 'border-box',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--cth-r-pill)',
+            background: waiting ? 'var(--cth-coral-strong)' : 'var(--cth-indigo)', color: waiting ? 'var(--cth-on-coral)' : 'var(--cth-on-indigo)',
+            fontFamily: 'var(--cth-font-mono)', fontSize: 11, fontWeight: 600, boxShadow: '0 0 0 2px var(--cth-card)'
+          }}>{count}</span>
+        </button>
       )}
     </div>
   );

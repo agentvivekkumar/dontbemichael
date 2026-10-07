@@ -34,7 +34,7 @@
 import type { WebContents } from 'electron';
 import type { HiveManager, HiveMessage } from './hive';
 import type { ControlRegistry } from './control';
-import { CLOSING_TIME_REMIND_MS } from '../shared/closingTime';
+import { CLOSING_COMPLETE_RE, CLOSING_TIME_REMIND_MS } from '../shared/closingTime';
 
 export type ClosingTimePhase =
   | 'started' | 'progress' | 'complete' | 'timeout' | 'cancelled';
@@ -67,7 +67,7 @@ export type ClosingTimeActionResult = { ok: true } | { ok: false; error: string 
  *  these by hand, so "Closing Time Ack" must count as well as the canonical
  *  CLOSING-TIME-ACK the brief asks for. */
 const ACK_RE = /CLOSING[-_\s]*TIME[-_\s]*ACK/i;
-const COMPLETE_RE = /CLOSING[-_\s]*TIME[-_\s]*COMPLETE/i;
+const COMPLETE_RE = CLOSING_COMPLETE_RE;
 
 /** How long to wait before surfacing "this is taking long — force quit?".
  *  Compaction or a long tool call can easily hold an ACK for a few minutes. */

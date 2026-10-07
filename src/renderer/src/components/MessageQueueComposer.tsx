@@ -10,6 +10,7 @@ import type { TerminalAutomationBlock } from './terminalAutomation';
 import { freeflowRecorder, useFreeflow } from '@/freeflow/recorder';
 import { useTerminalFontSize } from './terminalFontSize';
 import { isComposingKey } from '@shared/imeGuard';
+import { sendToMichael } from '@/shell/ownerSend';
 import { useRtl } from '@/i18n/useDirection';
 
 const EMPTY_QUEUE: QueuedMessage[] = [];
@@ -78,6 +79,10 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
   // remounts this component, so attachments are cleared on tab switch (drafts
   // persist in the store, attachments deliberately don't carry over).
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // A question to Michael on its way, and whether the last one failed (R3), as
+  // in the bottom bar: no double send, and the owner hears it didn't go.
+  const [godSending, setGodSending] = useState(false);
+  const [godFailed, setGodFailed] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const addAttachments = (incoming: Attachment[]) =>
@@ -118,6 +123,21 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
 
   const queueIt = () => {
     if (!canSend) return;
+    // Michael's own composer: a question goes to the dock like the bottom
+    // bar's (docs/designs/michael-replies.md, R3); a known command still types.
+    if (agent.isGod) {
+      if (godSending) return;
+      setGodSending(true);
+      setGodFailed(false);
+      void sendToMichael(agent.id, text, attachments).then((ok) => {
+        setGodSending(false);
+        if (!ok) { setGodFailed(true); return; }
+        void window.cth.trackMessageSent('composer');
+        setText('');
+        setAttachments([]);
+      });
+      return;
+    }
     // Prepend an "Attached files:" block using the same path-based convention as
     // the Slack inbound path (useHive.ts) so agents Read the files directly.
     const body = attachments.length
@@ -251,7 +271,11 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
         )}
         {queue.length > 1 && (
           <button
-            onClick={() => clearQueue(agent.id)}
+            onClick={() => {
+              // An owner question taken out of the queue reads Not sent, with Try again (7A).
+              for (const m of queue) if (m.ownerRequestId) void window.cth.ownerNotSent(m.ownerRequestId).catch(() => {});
+              clearQueue(agent.id);
+            }}
             title={t('queueComposer.clearAllTitle')}
             style={{
               marginLeft: 'auto', flexShrink: 0, whiteSpace: 'nowrap',
@@ -276,7 +300,10 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
               message={m}
               paused={deliveryPaused}
               onSendNow={() => releaseQueuedMessage(agent.id, m.id)}
-              onRemove={() => removeQueuedMessage(agent.id, m.id)}
+              onRemove={() => {
+                if (m.ownerRequestId) void window.cth.ownerNotSent(m.ownerRequestId).catch(() => {});
+                removeQueuedMessage(agent.id, m.id);
+              }}
             />
           ))}
         </div>
@@ -332,6 +359,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
       {/* Composer — full-width input above a single tidy control bar (cc-ui-polish),
           with file/image attachment chips + paste-to-attach (rich-composer). */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {godFailed && <div role="alert" style={{ fontSize: 11, color: 'var(--cth-ink-2)' }}>{t('dock.notSentNow')}</div>}
         <textarea
           dir={rtl ? 'auto' : undefined}
           className="cth-input"
@@ -374,7 +402,7 @@ export function MessageQueueComposer({ agent }: MessageQueueComposerProps) {
             </span>
           </PixelButton>
           {freeflowEnabled && <FreeFlowButton agentId={agent.id} hasGroqKey={hasGroqKey} />}
-          <PixelButton variant="primary" size="sm" onClick={queueIt} disabled={!canSend}>
+          <PixelButton variant="primary" size="sm" onClick={queueIt} disabled={!canSend || godSending}>
             <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
               {t('commandBar.send')} <Icon name="arrow-right" />
             </span>

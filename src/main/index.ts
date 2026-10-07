@@ -21,7 +21,7 @@ import { terminalLaunches } from './terminalAtFolder';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde, askFileVerdict, askFileRootsFor, resolveAskFileRoots, opensAsFolder, type AskFileAgent } from './fs';
 import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
 import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
-import { answerKey, catchUpRequests } from '../shared/ownerRequests';
+import { answerKey, catchUpRequests, ownerWorkOrder } from '../shared/ownerRequests';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
@@ -77,8 +77,10 @@ import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
-import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, type AddMailboxInput } from './mail';
-import { PROVIDER_PRESETS, secretRefForMailbox } from '../shared/mailboxes';
+import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
+import { MailApprovals } from './mailApprovals';
+import { standingFitCheck } from './standingCheck';
+import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingMode, sendingWords } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -348,6 +350,22 @@ telemetry.onApiError((agentId) => breaker.recordError(agentId));
 // Shared roster on disk — created early so HookServer can re-read standing goals
 // on every UserPromptSubmit (Edit Agent saves land here via persistAgents).
 const roster = new RosterStore(() => readConfig().harnessHome);
+/**
+ * Whether a member is on the team now, for Send only grants
+ * (docs/designs/shared-mailboxes.md, EV1): in the roster's `agents`, or in
+ * `restorable` (the app moves every member there at launch until it respawns
+ * them). Archived (closed by the owner) or deleted counts as gone. The hive
+ * registry's `archived` flag only means "no live terminal", and it keeps
+ * deleted members, so it is not used. With no roster to read, everyone the
+ * config names counts, as before.
+ */
+function memberPresent(agentId: string): boolean {
+  const snap = roster.read();
+  if (!snap) return true;
+  const has = (list: unknown[]): boolean => Array.isArray(list) && list.some((e) => !!e && typeof e === 'object' && (e as { id?: unknown }).id === agentId);
+  return has(snap.agents) || has(snap.restorable);
+}
+
 function standingGoalFromRoster(agentId: string): string | null {
   const snap = roster.read();
   if (!snap || !Array.isArray(snap.agents)) return null;
@@ -397,7 +415,8 @@ const hookServer = new HookServer(
   },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
   companyProfileForAgents,
-  (agentId) => booksReadRoleIds().has(agentId)
+  (agentId) => booksReadRoleIds().has(agentId),
+  memberPresent
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
@@ -532,10 +551,43 @@ function closeMailboxCard(id: string, result: string): void {
   try { hive.patchTask(`mailbox-attention-${id}`, { status: 'done', result }); } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
+/** Send on approval (docs/designs/send-on-approval.md): proposals the owner
+ *  decides on Ask me, kept out of the hive so agents can't change them. */
+const mailApprovals = new MailApprovals({
+  path: join(app.getPath('userData'), 'mail-proposals.json'),
+  send: (msg) => { if (!hive.enabled()) return false; hive.send(msg, 'mail'); return true; },
+  remember: (agentId, line) => { hive.rememberOwnerNote(agentId, line); },
+  // Only Michael notifies the owner (docs/designs/michael-only-notifications.md).
+  toast: (body) => ownerToast(michaelName(), body),
+  agentName: (id) => { try { return hive.registry().agents[id]?.name?.trim() || id; } catch { return id; } },
+  godId: () => hiveGodId(),
+  changed: () => { try { liveWebContents()?.send('mailProposals:updated'); } catch { /* window gone */ } },
+  // The late sweep asks Michael only about emails that can go now (a paused
+  // or ended grant can't).
+  canSend: (agentId, mailbox, proposalId) => memberPresent(agentId) && mailAccess(readConfig(), agentId, mailbox, 'send', proposalId, { present: memberPresent }).ok
+});
+
+/** Does an email fit a standing approval: a separate quick model decides, never the agent. */
+const standingFit = standingFitCheck({
+  // An empty folder only the app writes, never the office folder agents work
+  // in, so no CLAUDE.md or project settings an agent left can sway the check.
+  cwd: () => {
+    const dir = join(app.getPath('userData'), 'standing-check');
+    mkdirSync(dir, { recursive: true });
+    // Trusted up front, as agent folders are at spawn, so the check never
+    // stops on Claude Code's "trust this folder" question.
+    try { ensureClaudePermissionsAccepted(dir); } catch { /* the check fails closed */ }
+    return dir;
+  },
+  command: () => readConfig().defaultCommand ?? 'claude',
+  env: () => memory.env(),
+  log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
+
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
   getSecret: integrations.getSecret,
-  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } } }, agentId, op, body)
+  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent }, agentId, op, body)
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
@@ -548,8 +600,38 @@ const mailAdmin = {
   getConfig: () => readConfig(),
   saveConfig: (patch: Partial<HarnessConfig>) => { writeConfig(patch); },
   setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
-  deleteSecret: (ref: string) => integrations.deleteSecret(ref)
+  deleteSecret: (ref: string) => integrations.deleteSecret(ref),
+  endGrant: (agentId: string, mailbox: string, reason: string) => mailApprovals.endGrant(agentId, mailbox, reason),
+  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); }
 };
+
+/**
+ * Send only grants on a mailbox nobody on the team reads are paused (S3, D10).
+ * Michael hears once, after the pause has lasted PAUSE_NOTICE_MS, so the app's
+ * launch and a hire in flight never set it off (EV1). Runs on the 5 minute sweep.
+ */
+function noticePausedGrants(): void {
+  if (!hive.enabled()) return;
+  const cfg = readConfig();
+  const paused: string[] = [];
+  for (const agentId of Object.keys(cfg.agentCapabilities ?? {})) {
+    const g = sendOnlyGrant(cfg, agentId);
+    // A grant of a member off the team does nothing, so it is nobody's news.
+    if (!g || !memberPresent(agentId)) continue;
+    if (grantPaused(cfg, g.mailbox, memberPresent)) paused.push(`${agentId}\u0000${g.mailbox}`);
+  }
+  for (const key of mailApprovals.pausedDue(paused)) {
+    const [agentId, mailbox] = key.split('\u0000');
+    const address = mailboxAddress(cfg, mailbox);
+    let name = agentId;
+    try { name = hive.registry().agents[agentId]?.name?.trim() || agentId; } catch { /* no hive */ }
+    hive.send({
+      to: hiveGodId(), act: 'inform',
+      subject: `Paused: nobody reads ${address}`,
+      body: `${name} sends only from ${address}, but nobody on the team reads it now, so its replies would go unanswered. ${name}'s email from there is on hold until someone does: the owner can give ${address} to a team member on their Access tab, or remove ${name}'s Send only access there.`
+    }, 'mail');
+  }
+}
 
 /** BYOK backend model-providers whose API keys the non-Claude CLI engines
  *  (OpenCode/Crush/pi/qwen) read from standard env vars. Keys are stored
@@ -3560,7 +3642,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
     const agentId = opts.hive.id;
     const root = hive.root();
-    if (root && readConfig().agentCapabilities?.[agentId]?.email?.enabled) {
+    // A Send only grant alone gets the tools too (shared-mailboxes.md, item 1).
+    if (root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
       try {
         const token = integrationBroker.grant(opts.id, [], agentId);
         const file = join(root, 'agents', agentId, 'md-mail.mcp.json');
@@ -4171,7 +4254,13 @@ ipcMain.handle('mail:remove', (_evt, id: unknown) => {
 });
 ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
-  return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean });
+  return setAgentCapabilities(mailAdmin, agentId, caps as Parameters<typeof setAgentCapabilities>[2]);
+});
+/** A member's Send only grant (docs/designs/shared-mailboxes.md), or null to remove it. */
+ipcMain.handle('mail:setSendOnly', (_evt, agentId: unknown, grant: unknown) => {
+  if (typeof agentId !== 'string') return { ok: false, restartNeeded: false };
+  if (grant !== null && (!grant || typeof grant !== 'object')) return { ok: false, restartNeeded: false };
+  return setSendOnly(mailAdmin, agentId, grant as { mailbox?: unknown; sending?: unknown } | null);
 });
 /** Roles that may use QuickBooks, Read only, before the owner chooses. */
 ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);
@@ -4516,6 +4605,127 @@ ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
 });
 /** The most recorded owner answers kept: far more than any office has open. */
 const OWNER_ANSWER_KEYS_MAX = 2000;
+
+// ─── The owner's conversation with Michael (docs/designs/michael-replies.md) ───
+
+/** Dock keys kept: years of questions at any realistic pace (R4). */
+const OWNER_DOCK_KEYS_MAX = 50_000;
+const dockKey = (m: { id: string; created_at: string; body?: string }): string => answerKey(`owner:${m.id}`, m.created_at, answerDigest('', m.body ?? ''));
+
+/**
+ * The keys of messages the owner really sent from the dock (R4), in their own
+ * app-private file, read once and cached: config.json is re-read many times a
+ * minute, so a list that grows with every question doesn't belong in it
+ * (ship D5). The first build kept them in config.json; they are carried over once.
+ */
+const ownerDockKeysPath = (): string => join(app.getPath('userData'), 'owner-dock-keys.json');
+let ownerDockKeysCache: Set<string> | null = null;
+function saveOwnerDockKeys(list: string[]): boolean {
+  const path = ownerDockKeysPath();
+  try {
+    writeFileSync(`${path}.tmp`, JSON.stringify(list), 'utf8');
+    renameSync(`${path}.tmp`, path);
+    return true;
+  } catch (e) { console.error('[owner] dock keys not saved:', e); return false; }
+}
+function ownerDockKeys(): Set<string> {
+  if (ownerDockKeysCache) return ownerDockKeysCache;
+  let list: string[] = [];
+  try {
+    const v: unknown = JSON.parse(readFileSync(ownerDockKeysPath(), 'utf8'));
+    if (Array.isArray(v)) list = v.filter((k): k is string => typeof k === 'string');
+  } catch { /* none yet */ }
+  const legacy = readConfig().ownerDockKeys;
+  if (Array.isArray(legacy) && legacy.length) {
+    list = [...new Set([...list, ...legacy])].slice(-OWNER_DOCK_KEYS_MAX);
+    // Settings keep their copy until the new file is safely written.
+    if (saveOwnerDockKeys(list)) writeConfig({ ownerDockKeys: undefined });
+  }
+  ownerDockKeysCache = new Set(list);
+  return ownerDockKeysCache;
+}
+function addOwnerDockKey(key: string): boolean {
+  const list = [...ownerDockKeys(), key].slice(-OWNER_DOCK_KEYS_MAX);
+  if (!saveOwnerDockKeys(list)) return false;
+  ownerDockKeysCache = new Set(list);
+  return true;
+}
+/** Whether an owner message is one the owner really sent from the dock. */
+const isOwnerDockMessage = (m: { id: string; created_at: string; body?: string }): boolean =>
+  ownerDockKeys().has(dockKey({ id: m.id, created_at: m.created_at, body: m.body }));
+// Michael's every-turn list of owner questions uses the same check (ship D4).
+hive.setOwnerMessageCheck(isOwnerDockMessage);
+
+/** Whether the dock is on screen and the app in front: then a reply needs no
+ *  notification (12A). */
+let ownerDockVisible = false;
+
+/** One desktop notification titled with Michael's name, opening the dock at
+ *  this question when clicked. */
+function ownerToastOpening(body: string, questionId: string): void {
+  if (!readConfig().notifications) return;
+  try {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({ title: michaelName(), body });
+    n.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+      try { liveWebContents()?.send('owner:openDock', questionId); } catch { /* window gone */ }
+    });
+    n.show();
+  } catch { /* unsupported platform */ }
+}
+
+hive.onOwnerReply((msg) => {
+  try { liveWebContents()?.send('owner:changed'); } catch { /* window gone */ }
+  if (msg.from_notes || !msg.in_reply_to || !['done', 'refuse', 'query'].includes(msg.act)) return;
+  const inFront = ownerDockVisible && !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused();
+  if (inFront || !hive.ownerNotify(msg.in_reply_to, msg.id)) return;
+  const first = (msg.body || msg.subject || '').replace(/\s+/g, ' ').trim();
+  const text = msg.act === 'query' ? `Has a question about: ${first}` : first;
+  ownerToastOpening(text.length > 120 ? `${text.slice(0, 119)}…` : text, msg.in_reply_to);
+});
+
+ipcMain.handle('owner:ask', (_evt, p: unknown) => {
+  const o = (p ?? {}) as { text?: unknown; inReplyTo?: unknown; conversation?: unknown };
+  if (!hive.enabled() || typeof o.text !== 'string' || !o.text.trim()) return { ok: false };
+  const msg = hive.ownerAsk({
+    text: o.text.slice(0, 20_000),
+    ...(typeof o.inReplyTo === 'string' ? { inReplyTo: o.inReplyTo } : {}),
+    ...(typeof o.conversation === 'string' ? { conversation: o.conversation } : {})
+  });
+  if (!msg) return { ok: false };
+  // A question whose genuine mark can't be saved would vanish after a restart:
+  // it is withdrawn and the owner told it didn't send.
+  if (!addOwnerDockKey(dockKey(msg))) { hive.ownerWithdraw(msg.id); return { ok: false }; }
+  return { ok: true, id: msg.id, workOrder: ownerWorkOrder(msg.id, msg.body) };
+});
+ipcMain.handle('owner:conversation', () => hive.ownerConversationView(Date.now(), isOwnerDockMessage));
+ipcMain.handle('owner:delivered', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerDelivered(id) }));
+ipcMain.handle('owner:withdraw', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerWithdraw(id) }));
+ipcMain.handle('owner:notSent', (_evt, id: unknown) => { if (typeof id === 'string') hive.ownerNotSent(id); return { ok: true }; });
+ipcMain.handle('owner:retry', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerRetry(id) }));
+ipcMain.handle('owner:read', (_evt, ids: unknown) => {
+  if (Array.isArray(ids)) hive.ownerRead(ids.filter((x): x is string => typeof x === 'string').slice(0, 500));
+  return { ok: true };
+});
+ipcMain.handle('owner:nudge', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerRemind(id, 'nudge') }));
+ipcMain.handle('owner:dockVisible', (_evt, on: unknown) => { ownerDockVisible = on === true; return { ok: true }; });
+ipcMain.handle('hive:ackReport', (_evt, taskId: unknown, index: unknown) => ({
+  ok: typeof taskId === 'string' && Number.isInteger(index) && hive.ackReport(taskId, index as number)
+}));
+
+/** Late owner questions: Michael is reminded once (6A). */
+function sweepLateOwnerQuestions(now = Date.now()): void {
+  if (!hive.enabled()) return;
+  for (const it of hive.ownerConversationView(now).items) {
+    if (it.kind === 'owner' && it.status === 'late') hive.ownerRemind(it.id, 'late', now);
+  }
+}
+setInterval(() => {
+  try { sweepLateOwnerQuestions(); } catch (e) { console.error('[owner] late sweep failed', e); }
+  // Paused Send only grants reach Michael once (shared-mailboxes.md, EV1).
+  try { noticePausedGrants(); } catch (e) { console.error('[mail] paused grant sweep failed', e); }
+}, 5 * 60_000);
 // The owner's own card changes (card-lifecycle.md section 4): a move, or a
 // close that ends the card as Done by their decision. Cards are never deleted
 // from the UI; Michael is told of each change.
@@ -4710,6 +4920,17 @@ ipcMain.handle('workStyle:checkFocus', async (_evt, payload: unknown) => {
   const req = readFocusCheckRequest(payload);
   if (!req) return { checked: false };
   const cfg = readConfig();
+  // The agent's real Sending setting, read here rather than trusted from the renderer.
+  const agentId = payload && typeof (payload as { agentId?: unknown }).agentId === 'string' ? (payload as { agentId: string }).agentId : '';
+  const email = agentId ? cfg.agentCapabilities?.[agentId]?.email : undefined;
+  if (email?.enabled) req.sending = sendingWords(sendingMode(email));
+  // A Send only grant's Sending, so an outreach job is checked against it (ER7).
+  const grant = agentId ? sendOnlyGrant(cfg, agentId) : undefined;
+  if (grant) {
+    const address = mailboxAddress(cfg, grant.mailbox);
+    const line = `sends only from ${address}: ${sendingWords(grant.sending)}`;
+    req.sending = req.sending ? `${req.sending}; ${line}` : line;
+  }
   return checkFocusArea(req, {
     cwd: cfg.harnessHome ?? app.getPath('home'),
     command: cfg.defaultCommand ?? 'claude',
@@ -5231,6 +5452,22 @@ ipcMain.handle('scheduleRequests:decide', (_evt, id: unknown, approve: unknown):
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   return decideScheduleRequest(id, approve === true);
 });
+
+// ─── IPC: Send on approval (an agent proposed an email, the owner decides) ───
+// A member no longer on the team has no card on Ask me: nobody would send it.
+ipcMain.handle('mailProposals:list', () => mailApprovals.waiting().filter((p) => memberPresent(p.agentId)));
+ipcMain.handle('mailProposals:decide', (_evt, id: unknown, decision: unknown, edit: unknown, note: unknown, standing: unknown) => {
+  if (typeof id !== 'string' || (decision !== 'approve' && decision !== 'changes' && decision !== 'decline')) return { ok: false, error: 'invalid' };
+  const e = (edit && typeof edit === 'object' ? edit : {}) as { subject?: unknown; body?: unknown };
+  return mailApprovals.decide(id, decision, e, note, standing);
+});
+/** A Send only member's latest sends from its grant's mailbox, for its Access tab
+ *  (shared-mailboxes.md, O1b): app private, never in the office log. */
+ipcMain.handle('mail:recentSends', (_evt, agentId: unknown, mailbox: unknown) =>
+  (typeof agentId === 'string' && typeof mailbox === 'string' ? mailApprovals.recentSends(agentId, mailbox, 5).map((r) => ({ to: r.to, subject: r.subject, sentAt: r.sentAt })) : []));
+// Standing approvals: kinds an agent may send without asking, revocable on its Access tab.
+ipcMain.handle('mailStanding:list', (_evt, agentId: unknown) => (typeof agentId === 'string' ? mailApprovals.standing(agentId) : []));
+ipcMain.handle('mailStanding:revoke', (_evt, id: unknown) => (typeof id === 'string' ? mailApprovals.revokeStanding(id) : { ok: false, error: 'invalid' }));
 
 /** The owner closed this agent (not a crash or a restart): pause its schedules
  *  and mark it, so Michael's list shows it as closed (design 6A, eng review R1). */
@@ -6320,6 +6557,8 @@ function bootstrapHiveServices(): void {
   if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
   scheduleSweepTimer = setInterval(() => {
     try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+    // Approved emails not sent within the hour go to Michael (send-on-approval.md).
+    try { mailApprovals.sweep(); } catch (e) { console.error('[mail] approval sweep failed', e); }
   }, 30 * 60 * 1000);
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.

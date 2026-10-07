@@ -34,6 +34,6 @@ test('a reply from Michael to the owner still reaches the log and the floor', as
   assert.ok(!fs.readdirSync(inbox).some((f) => f.includes(reply.id)), 'never delivered back to Michael');
   const env = emitted.find(([c, p]) => c === 'hive:message' && p.id === reply.id);
   assert.ok(env, 'the floor hears of it');
-  assert.equal(env[1].needsHuman, true);
+  assert.equal(env[1].needsHuman, false, 'a reply lands in the dock, never as a coral needs you envelope (michael-replies.md, 17A)');
   assert.ok(hive.logTail(50).some((e) => e.kind === 'message' && e.id === reply.id), 'the office log has it');
 });

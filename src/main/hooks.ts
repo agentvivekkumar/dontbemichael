@@ -12,7 +12,8 @@
  */
 import { createServer, type Server } from 'node:net';
 import { existsSync, realpathSync, rmSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
 import { Notification, type WebContents } from 'electron';
 import { redactSecrets, type HiveManager } from './hive';
 import type { HarnessConfig } from './config';
@@ -25,6 +26,15 @@ import { APP_NAME } from '../shared/appName';
 
 /** The same terminal prompt is relayed to Michael at most once in this window. */
 const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
+
+/** A Claude Code session transcript: a .jsonl file in Claude's own projects
+ *  folder (CLAUDE_CONFIG_DIR when set, as Claude Code uses it), where agents
+ *  don't write. */
+function isClaudeTranscript(path: string): boolean {
+  const projects = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'projects') + sep;
+  const real = resolve(path);
+  return real.startsWith(projects) && real.endsWith('.jsonl');
+}
 
 /** Desktop notification bodies. The title is the agent's name (displayName). */
 export const NOTIFY_FINISHED = 'Finished and ready for the next thing.';
@@ -75,7 +85,8 @@ import { accessLine, agentAccessSummary } from '../shared/agentAccess';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
-import { ownerRequestsContext, stuckCardsContext } from '../shared/ownerRequests';
+import { ownerQuestionsContext, ownerRequestsContext, stuckCardsContext } from '../shared/ownerRequests';
+import { lastAssistantText } from './transcriptText';
 
 /** An MCP tool, or Claude Code's tools for MCP resources. */
 function isMcpCall(tool: string | undefined): boolean {
@@ -144,11 +155,36 @@ export class HookServer {
    *  the list emptying is said once. */
   private ownerRequestsShown = new Map<string, { sessionId: string | null; any: boolean }>();
   private stuckCardsShown = new Map<string, { sessionId: string | null; any: boolean }>();
+  private ownerQuestionsShown = new Map<string, { sessionId: string | null; any: boolean }>();
   /** The idle toast line shown last, so the next one differs, and when. */
   private lastIdleLine: string | null = null;
   private lastIdleAt: number | null = null;
   /** The clock, swappable so tests can step past the idle gap. */
   now: () => number = Date.now;
+
+  /** When Michael's last turn ended, for the notes fallback (R8). Starts at
+   *  launch, so his first turn never files words for an older question. */
+  private lastGodStopAt = this.now();
+  /** The transcript Michael's current session started with (ship D4). */
+  private godSessionTranscript: string | undefined;
+
+  /** R8: after a turn in which Michael was handed an owner question and sent
+   *  no message at all (no reply, nothing to a teammate), file his last words
+   *  for that question once, as "From Michael's notes". */
+  private ownerNotesAtStop(agentId: string, transcript: string | undefined): void {
+    const since = this.lastGodStopAt;
+    this.lastGodStopAt = this.now();
+    if (typeof this.hive.ownerState !== 'function' || !transcript) return;
+    const state = this.hive.ownerState();
+    const handed = this.hive.ownerQuestions()
+      .map((q) => ({ q, at: state.requests[q.id]?.deliveredAt ?? 0 }))
+      .filter((x) => x.at > since && !(state.requests[x.q.id]?.notes ?? []).length)
+      .sort((a, b) => b.at - a.at);
+    const latest = handed[0];
+    if (!latest || this.hive.godSentSince(agentId, latest.at)) return;
+    const words = lastAssistantText(transcript);
+    if (words) this.hive.fileOwnerNotes(latest.q.id, words);
+  }
 
   /** A note shown on every turn while `items` has any, and once, in the same
    *  session, when it empties. */
@@ -189,7 +225,11 @@ export class HookServer {
     private getCompanyProfile?: () => string | null,
     /** Whether an agent's role reads the books (Oscar), which turns QuickBooks
      *  on, Read only, until the owner chooses. Optional so tests can omit it. */
-    private roleReadsBooks?: (agentId: string) => boolean
+    private roleReadsBooks?: (agentId: string) => boolean,
+    /** Whether a member is on the team now (roster agents or restorable), so a
+     *  Send only grant pauses when nobody reads its mailbox (shared-mailboxes.md,
+     *  EV1). Optional so tests can omit it: then the config alone decides. */
+    private memberPresent?: (agentId: string) => boolean
   ) {}
 
   start(): void {
@@ -298,6 +338,10 @@ export class HookServer {
     this.onEvent?.(agentId, event, p.message);
     if (agentId && !subagent && typeof p.transcript_path === 'string' && p.transcript_path) {
       this.transcriptPaths.set(agentId, p.transcript_path);
+      // Michael's notes fallback reads only the transcript his own session
+      // started with, inside Claude's own folder (ship D4): a later event can't
+      // point it at a file an agent wrote.
+      if (event === 'SessionStart' && this.isGod(agentId) && isClaudeTranscript(p.transcript_path)) this.godSessionTranscript = p.transcript_path;
     }
 
     // Status-line payloads carry the session's EXACT context accounting —
@@ -412,6 +456,12 @@ export class HookServer {
       // path bypassed terminal-draft/HITL safety and could spend credits while a
       // user was answering a question. Inbox files remain durable; the renderer
       // wakes the agent later through its guarded idle-only delivery path.
+      // An owner question Michael was handed this turn, with nothing sent
+      // about it: his terminal words go to the owner as notes (R8).
+      if (event === 'Stop' && this.isGod(agentId) && !p.stop_hook_active) {
+        try { this.ownerNotesAtStop(agentId, this.godSessionTranscript); }
+        catch (e) { console.error('[owner notes]', e); }
+      }
       this.notify(agentId, NOTIFY_FINISHED);
       this.emit(agentId, event, p);
       return {};
@@ -486,8 +536,15 @@ export class HookServer {
       const cfg = mcpConfig();
       const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(p.tool_name ?? '');
       const op = mdMail ? MAIL_TOOL_OPS[mdMail[1]] : undefined;
-      const input = (p.tool_input ?? {}) as { mailbox?: unknown };
-      const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op) : { ok: false as const, reason: 'Unknown mail tool.' };
+      const input = (p.tool_input ?? {}) as { mailbox?: unknown; proposal?: unknown; standing?: unknown; forward?: unknown; attach_from?: unknown };
+      // An approved proposal or a standing approval; the broker checks either.
+      const ticket = [input.proposal, input.standing].find((v) => typeof v === 'string' && v.trim());
+      const proposal = typeof ticket === 'string' ? ticket : undefined;
+      // The call's references, so a Send only member's forward or attachment is
+      // refused here too; its reply_to is checked against its own sends in the broker.
+      const named = (v: unknown): boolean => !!v && typeof v === 'object';
+      const refs = { forward: named(input.forward), attachFrom: Array.isArray(input.attach_from) && input.attach_from.some(named) };
+      const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op, proposal, { refs, present: this.memberPresent }) : { ok: false as const, reason: 'Unknown mail tool.' };
       if (!d.ok) {
         this.emitControl(agentId, p.tool_name, d.reason);
         this.emit(agentId, event, p);
@@ -604,7 +661,7 @@ export class HookServer {
       // Each member's real access, read per prompt, so a grant or a new
       // mailbox changes the layout key and the full roster goes out again.
       const cfg = this.getConfig();
-      const r = this.hive.teamRoster((id) => accessLine(agentAccessSummary(cfg, id, this.roleReadsBooks?.(id) ?? false)));
+      const r = this.hive.teamRoster((id) => accessLine(agentAccessSummary(cfg, id, this.roleReadsBooks?.(id) ?? false, this.memberPresent)));
       const sessionId = p.session_id ?? null;
       const last = this.deliveredRosterByAgent.get(agentId!);
       if (r) {
@@ -694,18 +751,24 @@ export class HookServer {
       ? this.everyTurnNote(this.stuckCardsShown, agentId!, p.session_id ?? null, this.hive.stuckCards(),
         stuckCardsContext, 'CARDS TO TIDY (Blocked with nothing asked, or open questions held the wrong way): none now.')
       : null;
+    // Questions the owner asked in the dock that he still owes an answer
+    // (docs/designs/michael-replies.md): every turn until he sends done or refuse.
+    const ownerQuestions = michaelTurn && typeof this.hive.ownerQuestions === 'function'
+      ? this.everyTurnNote(this.ownerQuestionsShown, agentId!, p.session_id ?? null, this.hive.ownerQuestions(),
+        ownerQuestionsContext, 'QUESTIONS FROM THE OWNER IN YOUR CONVERSATION: none open now.')
+      : null;
 
     // Company knowledge turned on or off since this agent was last told.
     const knowledgeNote = (event === 'SessionStart' || event === 'UserPromptSubmit') && agentId && this.getKnowledge
       ? this.hive.knowledgeUpdate(agentId, this.getKnowledge())
       : null;
 
-    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff || ownerRequests || stuckCards) {
+    if (steer || roster || goal || knowledgeNote || profile || memoryIndex || handoff || ownerRequests || ownerQuestions || stuckCards) {
       this.emit(agentId, event, p);
       return {
         hookSpecificOutput: {
           hookEventName: event,
-          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, ownerRequests, stuckCards, steer].filter(Boolean).join('\n\n')
+          additionalContext: [roster, profile, memoryIndex, handoff, goal, knowledgeNote, ownerRequests, ownerQuestions, stuckCards, steer].filter(Boolean).join('\n\n')
         }
       };
     }

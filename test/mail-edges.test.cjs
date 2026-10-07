@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
 const {
-  PROVIDER_PRESETS, guessServers, mailboxIdFor, secretRefForMailbox, mailAccess, agentMailboxes, emailJustEnabled
+  PROVIDER_PRESETS, guessServers, mailboxIdFor, secretRefForMailbox, mailAccess, agentMailboxes, mailToolsJustAttached
 } = loadTs('src/shared/mailboxes.ts');
 const { emailCalendarAllowed } = loadTs('src/shared/mcpCatalog.ts');
 const { MailService, MailError, handleMailRequest, classifyMailError, saveMailbox, removeMailbox, setAgentCapabilities } = loadTs('src/main/mail.ts');
@@ -92,7 +92,7 @@ test('helpers and the access rule edges: server guesses, the Claude account swit
   assert.match(r.reason, /list_mailboxes/);
   assert.equal(mailAccess(cfg, 'off', 'sales', 'read').ok, false, 'switched off keeps the old pick but grants nothing');
   assert.deepEqual(agentMailboxes(cfg, 'off'), []);
-  assert.equal(emailJustEnabled({ email: { enabled: true, mailboxes: [], send: false } }, { email: { enabled: false, mailboxes: [], send: false } }), false, 'turning off never restarts');
+  assert.equal(mailToolsJustAttached({ email: { enabled: true, mailboxes: [], send: false } }, { email: { enabled: false, mailboxes: [], send: false } }), false, 'turning off never restarts');
 });
 
 // ── classifyMailError ───────────────────────────────────────────────────────
@@ -344,7 +344,7 @@ test('setAgentCapabilities: unknown mailboxes are dropped; restart only on first
   const first = setAgentCapabilities(a, 'dwight', { email: { enabled: true, mailboxes: ['ghost'], send: 1 } });
   assert.equal(first.restartNeeded, true);
   // Only a real true counts: the renderer is not trusted with the shape.
-  assert.deepEqual(a.state.cfg.agentCapabilities.dwight.email, { enabled: true, mailboxes: [], send: false });
+  assert.deepEqual(a.state.cfg.agentCapabilities.dwight.email, { enabled: true, mailboxes: [], send: false, sending: 'draft' });
   const again = setAgentCapabilities(a, 'dwight', { email: { enabled: true, mailboxes: ['sales'], send: false } });
   assert.equal(again.restartNeeded, false, 'already on');
   const off = setAgentCapabilities(a, 'dwight', {});
@@ -368,7 +368,7 @@ test('setAgentCapabilities: one agent per mailbox; a move needs confirming and t
   const moved = setAgentCapabilities(a, 'erin', { email: { enabled: true, mailboxes: ['sales'], send: false }, move: true });
   assert.equal(moved.ok, true);
   assert.equal(moved.movedFrom, 'pam');
-  assert.deepEqual(a.state.cfg.agentCapabilities.pam.email, { enabled: false, mailboxes: [], send: false });
+  assert.deepEqual(a.state.cfg.agentCapabilities.pam.email, { enabled: false, mailboxes: [], send: false, sending: 'draft' });
   assert.deepEqual(a.state.cfg.agentCapabilities.erin.email.mailboxes, ['sales']);
 });
 
@@ -389,9 +389,9 @@ test('closeAll logs out every open connection', async () => {
 test('setAgentCapabilities: a malformed payload saves no mailbox instead of throwing', () => {
   const a = admin({ mailboxes: [box('sales', 's@x.com')] });
   assert.doesNotThrow(() => setAgentCapabilities(a, 'dwight', { email: { enabled: true, mailboxes: 'sales', send: true } }));
-  assert.deepEqual(a.state.cfg.agentCapabilities.dwight.email, { enabled: true, mailboxes: [], send: true });
+  assert.deepEqual(a.state.cfg.agentCapabilities.dwight.email, { enabled: true, mailboxes: [], send: true, sending: 'send' });
   setAgentCapabilities(a, 'pam', { email: { enabled: 'yes', mailboxes: [7, 'sales'], send: 'true' } });
-  assert.deepEqual(a.state.cfg.agentCapabilities.pam.email, { enabled: false, mailboxes: ['sales'], send: false });
+  assert.deepEqual(a.state.cfg.agentCapabilities.pam.email, { enabled: false, mailboxes: ['sales'], send: false, sending: 'draft' });
 });
 
 test('saveMailbox: a made up id cannot add a second record for a connected address', async () => {
