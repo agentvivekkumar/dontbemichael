@@ -859,22 +859,25 @@ type ClaudeProjectConfig = Record<string, unknown> & { hasTrustDialogAccepted?: 
 type ClaudeConfig = Record<string, unknown> & { projects?: Record<string, ClaudeProjectConfig> };
 
 /** Read `~/.claude.json`, change it, and write it back only when `change` says
- *  it changed something. A file that is not a JSON object is left alone. */
-function updateClaudeJson(home: string, change: (c: ClaudeConfig) => boolean): void {
+ *  it changed something. A file that is not a JSON object is left alone.
+ *  True when the file now holds the change (written, or already there). */
+function updateClaudeJson(home: string, change: (c: ClaudeConfig) => boolean): boolean {
   const p = join(home, '.claude.json');
   try {
     let c: ClaudeConfig = {};
     if (existsSync(p)) {
       const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
       c = parsed as ClaudeConfig;
     }
     if (change(c)) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
+    return true;
   } catch (error) {
     console.warn(
       `[config] Could not safely update Claude config at ${p}:`,
       error instanceof Error ? error.message : String(error),
     );
+    return false;
   }
 }
 
@@ -921,8 +924,11 @@ function approveClaudeKeyIn(c: ClaudeConfig, key: string): boolean {
   return true;
 }
 
-export function approveClaudeApiKey(key: string, home: string = homedir()): void {
-  updateClaudeJson(home, (c) => approveClaudeKeyIn(c, key));
+/** True when ~/.claude.json now approves the key (a half written file read
+ *  while Claude saves it is false, so the caller tries again later). */
+export function approveClaudeApiKey(key: string, home: string = homedir()): boolean {
+  if (!key.trim()) return false;
+  return updateClaudeJson(home, (c) => approveClaudeKeyIn(c, key));
 }
 
 /** Idempotently pre-accept Claude Code's first-run prompts so agents spawned with

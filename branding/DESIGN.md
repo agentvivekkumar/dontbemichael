@@ -1258,6 +1258,8 @@ anyway" highlighted like Done) as `card` with `shadow-lg` and `r-lg`, beside a `
 - Sizes: 14 (inline in meta), 16 (buttons, rows), 18 (top bar), 20 (empty states).
 - Every icon only button has an `aria-label` and a tooltip.
 - `file` (a document) and `sheet` (a spreadsheet or CSV) mark Ask me file rows (§7.8).
+- `help` (a question in a circle) marks a state that could not be checked (§7.25); `info`
+  opens an InfoTip explanation. Never swap them.
 - `components/Icon.tsx` draws these outline icons; the v1 pixel set is retired (§17, row 6).
 
 ---

@@ -222,3 +222,14 @@ test('approving a blank key, or into an odd file, changes nothing it should not'
   approveClaudeApiKey('k'.repeat(30), home);
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).customApiKeyResponses, { approved: ['a', 'k'.repeat(20)], rejected: [] });
 });
+
+test('approving a key says whether ~/.claude.json now holds it', () => {
+  // Value: protects=a hidden check retries an approval that a half written ~/.claude.json blocked; fails_when=approveClaudeApiKey stops returning false for an unreadable file or true once approved; why_new=review cycle 3; seam=none
+  fs.writeFileSync(projectConfigPath, '{"half": ', 'utf8');
+  const warn = console.warn; console.warn = () => {};
+  try { assert.equal(approveClaudeApiKey('k'.repeat(30), home), false, 'unreadable file: not approved'); } finally { console.warn = warn; }
+  fs.rmSync(projectConfigPath, { force: true });
+  assert.equal(approveClaudeApiKey('k'.repeat(30), home), true, 'written');
+  assert.equal(approveClaudeApiKey('k'.repeat(30), home), true, 'already there');
+  assert.equal(approveClaudeApiKey('   ', home), false, 'a blank key is never approved');
+});

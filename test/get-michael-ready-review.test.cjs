@@ -85,8 +85,10 @@ test('Claude turning ready restarts only the members that could not start, and a
   const main = read('src/main/index.ts');
   assert.match(main, /if \(status\.applies && !status\.needed && claudeBlocked\.size\) return \{ \.\.\.status, restart: \[\.\.\.claudeBlocked\.keys\(\)\] \};/);
   assert.match(main, /const teamNeedsClaude = \[\.\.\.claudeBlocked\.values\(\)\]\.some\(\(b\) => !b\.god\);/, "Michael's own blocked start never makes the card speak for the team");
-  assert.match(main, /const failed = !!err && !String\(stdout \?\? ''\)\.trim\(\);\s*done\(failed \? lastClaudeAuth : null\);/, 'a timed out read keeps the last known sign in');
-  assert.match(main, /if \(claudeAuthInFlight\) return claudeAuthInFlight;/, 'one claude auth status at a time');
+  assert.match(main, /authStatus: \(path\) => claudeAuth\.read\(path\)/, 'status reads through the shared reader');
+  assert.match(main, /if \(isEngineSetupPty\(id\)\) \{\s*\/\/[^\n]*\n\s*claudeAuth\.invalidate\(\);/, 'a finished sign in or install makes the next read fresh');
+  assert.match(main, /if \(signedOutStart\) claudeBlocked\.set\(opts\.id, \{ god: !!opts\.hive\?\.isGod \}\);\s*else if \(!claudeMissing\) claudeBlocked\.delete\(opts\.id\);/, 'a signed out start restarts once signed in; any other start leaves the list');
+  assert.match(main, /try \{ if \(approveClaudeApiKey\(key\)\) hiddenApprovedKey = key; \}/, 'a failed approval is tried again');
   const feed = read('src/renderer/src/shell/useNeedsYou.ts');
   assert.match(feed, /if \(wasNeeded && merged\.engineSetup\?\.applies && !merged\.engineSetup\.needed && restart\.length/, 'no edge for another engine or with nobody to restart');
   assert.match(feed, /new CustomEvent\(ENGINE_READY_EVENT, \{ detail: \{ restart \} \}\)/);
@@ -94,4 +96,32 @@ test('Claude turning ready restarts only the members that could not start, and a
   assert.match(ready, /if \(e\.id === ENGINE_SIGNIN_PTY\) \{\s*setBrowser\(false\);\s*setSignInStuck\(s\.signedIn === false\);/, 'a finished sign in never leaves the step waiting on the browser');
   const pty = read('src/main/pty.ts');
   assert.match(pty, /const resolved = typeof opts\.shellScript === 'string' \? opts\.command : this\.resolveCommand\(opts\.command\)\.path;/, 'a script spawn never looks its command up');
+});
+
+test('the sign in reader: one read at a time, never joins a read from before a sign in ended, keeps the last known state', async () => {
+  // Value: protects=a finished sign in is seen as signed in, overlapping callers share one claude auth status, and a slow read never turns a signed out owner into "could not check"; fails_when=the in-flight slot is never cleared, invalidate stops forcing a fresh read, the last known state is not kept, or non-JSON output stops reading as unknown; why_new=review cycle 3; seam=none (exec and clock injected)
+  let now = 0; const runs = [];
+  const reader = setup.makeClaudeAuthReader((_p, done) => runs.push(done), () => now);
+  const a = reader.read('/c'); const b = reader.read('/c');
+  assert.equal(runs.length, 1, 'two callers, one claude auth status');
+  runs[0](null, '{"loggedIn":false}');
+  assert.deepEqual(await a, { signedIn: false }); assert.deepEqual(await b, { signedIn: false });
+  // A read in flight, then the sign in ends: the next caller gets a fresh read after it.
+  now = 10; const c = reader.read('/c');
+  now = 20; reader.invalidate();
+  const d = reader.read('/c');
+  runs[1](null, '{"loggedIn":false}');
+  assert.deepEqual(await c, { signedIn: false });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(runs.length, 3, 'the read asked for after the sign in did not join the older one');
+  runs[2](null, '{"loggedIn":true,"email":"owner@example.com"}');
+  assert.deepEqual(await d, { signedIn: true, email: 'owner@example.com' });
+  // Timed out with nothing printed: the last known state.
+  now = 30; const e = reader.read('/c'); runs[3](Object.assign(new Error('timeout'), { killed: true }), '');
+  assert.deepEqual(await e, { signedIn: true, email: 'owner@example.com' });
+  // Printed something that is not the JSON: a Claude without the command.
+  now = 40; const f = reader.read('/c'); runs[4](new Error('exit 1'), "error: unknown command 'auth'");
+  assert.equal(await f, null);
+  // The slot clears after each read.
+  now = 50; reader.read('/c'); assert.equal(runs.length, 6);
 });

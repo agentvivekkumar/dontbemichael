@@ -178,9 +178,10 @@ export function claudeAuthStatusCommand(platform: string, path: string, comSpec?
   return { file: path, args: ['auth', 'status', '--json'], verbatim: false };
 }
 
-/** Coalesce "look again" notices: the first goes out at once, and any that
- *  arrive inside the window are sent once at its end, never dropped. A team
- *  restore without Claude would otherwise send one per member. */
+/** Coalesce "look again" notices: the first goes out at once, and the latest
+ *  one inside the window is sent once at its end (the id only says what
+ *  changed; every notice means "read again"). A team restore without Claude
+ *  would otherwise send one per member. */
 export function makeNoticeCoalescer(send: (id: string) => void, windowMs = 2000,
   clock: { now: () => number; setTimeout: (fn: () => void, ms: number) => unknown } = { now: Date.now, setTimeout: (fn, ms) => setTimeout(fn, ms) }): (id: string) => void {
   let last = -Infinity;
@@ -197,5 +198,47 @@ export function makeNoticeCoalescer(send: (id: string) => void, windowMs = 2000,
       last = clock.now();
       if (pending !== null) { const p = pending; pending = null; send(p); }
     }, Math.max(0, windowMs - (now - last)));
+  };
+}
+
+export type ClaudeAuth = { signedIn: boolean; email?: string };
+
+/** Reads `claude auth status` for main: one read at a time (the step, the
+ *  card and the poll share it), a read asked for after a sign in ended never
+ *  joins one that started before it, and a slow or failed read keeps the last
+ *  known state instead of turning a signed out owner into "could not check". */
+export function makeClaudeAuthReader(exec: (path: string, done: (err: unknown, stdout: string) => void) => void, now: () => number = Date.now): {
+  read: (path: string) => Promise<ClaudeAuth | null>;
+  /** A sign in or install just ended: the next read must start after it. */
+  invalidate: () => void;
+  last: () => ClaudeAuth | null;
+} {
+  let last: ClaudeAuth | null = null;
+  let inFlight: { startedAt: number; promise: Promise<ClaudeAuth | null> } | null = null;
+  let staleBefore = -Infinity;
+  const start = (path: string): Promise<ClaudeAuth | null> => {
+    const startedAt = now();
+    const promise = new Promise<ClaudeAuth | null>((done) => {
+      try {
+        exec(path, (err, stdout) => {
+          const parsed = parseClaudeAuthStatus(String(stdout ?? ''));
+          if (parsed) { last = parsed; done(parsed); return; }
+          // Failed with nothing to read (timeout, killed): keep what we knew.
+          // Printed something that is not the JSON: a Claude without the command.
+          done(err && !String(stdout ?? '').trim() ? last : null);
+        });
+      } catch { done(last); }
+    }).finally(() => { if (inFlight?.promise === promise) inFlight = null; });
+    inFlight = { startedAt, promise };
+    return promise;
+  };
+  return {
+    read(path) {
+      if (inFlight && inFlight.startedAt > staleBefore) return inFlight.promise;
+      if (inFlight) return inFlight.promise.then(() => start(path));
+      return start(path);
+    },
+    invalidate() { staleBefore = now(); },
+    last: () => last
   };
 }

@@ -51,7 +51,7 @@ test('a missing Claude at start installs nothing and says where to go', () => {
   const branch = main.slice(claudeAt, ladderAt);
   assert.match(main, /const claudeMissing = bin && claudeProvider && \(bin === 'claude' \? !claudePathFast\(\) : !ptyManager\.isCommandAvailable\(bin\)\);/, 'the plain claude is found without a login shell');
   assert.match(branch, /claudeBlocked\.set\(opts\.id, \{ god: !!opts\.hive\?\.isGod \}\);/, 'who could not start is remembered, to start exactly those later');
-  assert.match(main, /if \(claudeProvider && !claudeMissing\) claudeBlocked\.delete\(opts\.id\);/, 'a member leaves the list when it starts on Claude');
+  assert.match(main, /else if \(!claudeMissing\) claudeBlocked\.delete\(opts\.id\);/, 'a member leaves the list when it starts ready');
   assert.match(branch, /shellScript: claudeMissingScript\(process\.platform, godName\)/);
   assert.match(branch, /noticeEngineSetup\(opts\.id\);/, 'Ask me hears at once, coalesced');
   assert.match(branch, /return res;/);
@@ -118,7 +118,7 @@ test('Ask me holds one card, counted, until Michael can start, and Claude turnin
 test('the setup terminals are not agents: their exit only tells the step to look again', () => {
   const main = read('src/main/index.ts');
   const at = main.indexOf('ptyManager.setExitHandler((id, exitCode, info) => {');
-  const head = main.slice(at, at + 600);
+  const head = main.slice(at, at + 1200);
   assert.match(head, /if \(isEngineSetupPty\(id\)\) \{[\s\S]*?send\('engineSetup:changed'[\s\S]*?return;/);
   assert.equal(setup.isEngineSetupPty('engine-setup-install'), true);
   assert.equal(setup.isEngineSetupPty('engine-setup-signin'), true);
@@ -144,7 +144,7 @@ test('an API key instead of a Claude account: checked with Anthropic, kept write
   assert.match(main, /const authEnv = claudeAuthEnv\(\);\s*try \{ ensureClaudePermissionsAccepted\(opts\.cwd, \{ approveKey: authEnv\.ANTHROPIC_API_KEY \}\); \}[^\n]*\n\s*if \(authEnv\.ANTHROPIC_API_KEY\) opts\.env = \{ \.\.\.\(opts\.env \?\? \{\}\), \.\.\.authEnv \};/);
   // Hidden checks approve the key too, or Claude's own question rejects it.
   // Once per key, not on every check.
-  assert.match(main, /if \(key && key !== hiddenApprovedKey\) \{\s*try \{ approveClaudeApiKey\(key\); hiddenApprovedKey = key; \}/);
+  assert.match(main, /if \(key && key !== hiddenApprovedKey\) \{\s*try \{ if \(approveClaudeApiKey\(key\)\) hiddenApprovedKey = key; \}/);
   // A key changed or cleared in Settings, AI engines, while it signs Claude in.
   assert.match(main, /if \(res\.ok && p\.backend === 'anthropic' && readConfig\(\)\.claudeAuth === 'apiKey'\) \{\s*try \{ approveClaudeApiKey\(p\.key\); \}/);
   assert.match(main, /const verdict = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'the check follows the system proxy');

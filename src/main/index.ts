@@ -14,7 +14,7 @@ import { resolveCommand as resolveCliCommand, isSafeCommandName, userShellPath }
 import { buildPtyEnv } from './ptyEnv';
 import {
   apiKeyShapeOk, checkAnthropicKey, claudeInstallScript, claudeMissingScript, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
-  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeNoticeCoalescer, parseClaudeAuthStatus, readEngineSetupStatus,
+  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
 import { setHiddenClaudeAuthEnv } from './hiddenClaude';
@@ -856,6 +856,8 @@ ptyManager.setExitHandler((id, exitCode, info) => {
   // The Get Michael ready terminals (engineSetup.ts): the step re-reads where
   // Claude stands. They are not agents, so nothing else applies.
   if (isEngineSetupPty(id)) {
+    // The next sign in read starts after this, never joining an older one.
+    claudeAuth.invalidate();
     if (id === ENGINE_INSTALL_PTY) {
       analytics.track('agent_install_finished', { provider: 'claude', rung: 'native', outcome: claudePathFast() ? 'agent_launched' : 'install_failed' });
     }
@@ -3254,7 +3256,14 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // The plain `claude` is found without a login shell (a miss there costs a
     // second of frozen windows per agent on a team restore).
     const claudeMissing = bin && claudeProvider && (bin === 'claude' ? !claudePathFast() : !ptyManager.isCommandAvailable(bin));
-    if (claudeProvider && !claudeMissing) claudeBlocked.delete(opts.id);
+    // A Claude that is there but known signed out (or set to a key that is not
+    // stored) starts on a sign in screen nobody sees: remember it too, so it
+    // restarts once the owner signs in. Any other start leaves the list.
+    const signedOutStart = !claudeMissing && claudeProvider && (readConfig().claudeAuth === 'apiKey'
+      ? !integrations.hasSecret(providerKeyRef('anthropic'))
+      : claudeAuth.last()?.signedIn === false);
+    if (signedOutStart) claudeBlocked.set(opts.id, { god: !!opts.hive?.isGod });
+    else if (!claudeMissing) claudeBlocked.delete(opts.id);
     if (claudeMissing) {
       // Remember who could not start, to start exactly those once Claude is
       // ready; a member (not Michael) makes the card speak for the team.
@@ -5066,9 +5075,10 @@ function claudePathFast(): string | null {
     localAppData: process.env.LOCALAPPDATA
   });
 }
-/** Terminals that could not start for want of Claude since it was last ready
- *  (pty id → was it Michael). Once ready, exactly these restart; a member in it
- *  makes the step and the card apply even when Michael runs on another engine. */
+/** Terminals that could not start for want of Claude, or started signed out
+ *  (pty id → was it Michael). Each stays until that terminal starts ready on
+ *  Claude or on another engine. Once ready, exactly these restart; a member in
+ *  it makes the step and the card apply even when Michael runs on another engine. */
 const claudeBlocked = new Map<string, { god: boolean }>();
 /** Tell the step and Ask me to look again: the first notice at once, any more
  *  inside 2 s once at its end (a team restore sends one per member). */
@@ -5084,34 +5094,19 @@ setHiddenClaudeAuthEnv(() => {
   const env = claudeAuthEnv();
   const key = env.ANTHROPIC_API_KEY;
   if (key && key !== hiddenApprovedKey) {
-    try { approveClaudeApiKey(key); hiddenApprovedKey = key; } catch { /* best effort */ }
+    try { if (approveClaudeApiKey(key)) hiddenApprovedKey = key; } catch { /* best effort */ }
   }
   return env;
 });
 
-/** The last sign in state read, so a slow or failed read keeps it instead of
- *  turning a signed out owner into "could not check" (and the team restarting). */
-let lastClaudeAuth: { signedIn: boolean; email?: string } | null = null;
-/** One `claude auth status` at a time: the step, the card and the poll share it. */
-let claudeAuthInFlight: Promise<{ signedIn: boolean; email?: string } | null> | null = null;
-function claudeAuthStatus(path: string): Promise<{ signedIn: boolean; email?: string } | null> {
-  if (claudeAuthInFlight) return claudeAuthInFlight;
-  claudeAuthInFlight = new Promise<{ signedIn: boolean; email?: string } | null>((done) => {
-    try {
-      const env = buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath());
-      const cmd = claudeAuthStatusCommand(process.platform, path, process.env.ComSpec);
-      execFile(cmd.file, cmd.args, { timeout: 15_000, env, windowsVerbatimArguments: cmd.verbatim }, (err, stdout) => {
-        const parsed = parseClaudeAuthStatus(String(stdout ?? ''));
-        if (parsed) { lastClaudeAuth = parsed; done(parsed); return; }
-        // Timed out, killed or failed with nothing to read: keep what we knew.
-        // Printed something that is not the JSON: a Claude without the command.
-        const failed = !!err && !String(stdout ?? '').trim();
-        done(failed ? lastClaudeAuth : null);
-      });
-    } catch { done(lastClaudeAuth); }
-  }).finally(() => { claudeAuthInFlight = null; });
-  return claudeAuthInFlight;
-}
+/** `claude auth status`, one at a time, never joining a read that started
+ *  before a sign in ended, keeping the last known state on a failed read
+ *  (engineSetup.makeClaudeAuthReader). */
+const claudeAuth = makeClaudeAuthReader((path, done) => {
+  const env = buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath());
+  const cmd = claudeAuthStatusCommand(process.platform, path, process.env.ComSpec);
+  execFile(cmd.file, cmd.args, { timeout: 15_000, env, windowsVerbatimArguments: cmd.verbatim }, (err, stdout) => done(err, String(stdout ?? '')));
+});
 ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
   const cfg = readConfig();
   const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
@@ -5123,7 +5118,7 @@ ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<Eng
     claudePath: isClaude || teamNeedsClaude ? claudePathFast() : null,
     claudeAuth: cfg.claudeAuth,
     hasKey: () => integrations.hasSecret(providerKeyRef('anthropic')),
-    authStatus: claudeAuthStatus
+    authStatus: (path) => claudeAuth.read(path)
   });
   // Ready now: the terminals that could not start. Each leaves the list when it
   // actually starts on Claude (spawnAgentCore), so every reader sees the same.
