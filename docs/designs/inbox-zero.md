@@ -27,7 +27,8 @@ label or mark read, while the seeds told her to label and archive.
   (route, track under Waiting, file, clear) and is archived; urgent mail goes
   to Michael first; each run ends with the inbox empty or holding only mail
   waiting on the owner's decision today, with the count told to Michael.
-  Replies stay drafts for approval, and nothing is deleted. Each pack keeps
+  Replies leave as the Sending setting allows (send-on-approval.md, owner
+  2026-10-05), and nothing is deleted. Each pack keeps
   its routing table and its own duties (calendar, document checklist, catering
   list). No timing in the Work style.
 - **Starter jobs** (`src/shared/starterJobs.ts`): packs give a hire its
