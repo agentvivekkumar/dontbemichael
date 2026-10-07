@@ -2162,6 +2162,19 @@
     "cardNotInstalled": "لم يتم إعداد Claude Code على هذا الكمبيوتر.",
     "cardSignedOut": "لم يتم تسجيل الدخول إلى حسابك في Claude.",
     "cardAction": "جهّز {{godName}}",
-    "done": "تم"
+    "done": "تم",
+    "useApiKey": "استخدم مفتاح API",
+    "apiKey": "مفتاح Anthropic API",
+    "keyWhy": "يستخدم Claude Code هذا المفتاح بدلًا من حساب Claude. تُحتسب التكلفة على حسابك في Anthropic.",
+    "keyInfo": "أنشئ مفتاحًا في console.anthropic.com ضمن API keys. يُحفظ على هذا الكمبيوتر فقط ولن يُعرض مرة أخرى.",
+    "keySave": "احفظ المفتاح",
+    "keyChecking": "جارٍ التحقق…",
+    "usingApiKey": "يتم استخدام مفتاح Anthropic API الخاص بك",
+    "keyError": {
+      "invalid": "لا يبدو هذا مفتاح API. الصق المفتاح كاملًا.",
+      "rejected": "لم تقبل Anthropic هذا المفتاح. تحقّق منه وحاول مرة أخرى.",
+      "unreachable": "تعذّر التحقق من المفتاح. تحقّق من اتصالك بالإنترنت، ثم حاول مرة أخرى.",
+      "store": "تعذّر حفظ المفتاح على هذا الكمبيوتر. حاول مرة أخرى."
+    }
   }
 }

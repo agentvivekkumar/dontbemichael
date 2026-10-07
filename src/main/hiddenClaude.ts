@@ -69,6 +69,13 @@ export interface HiddenClaudeOptions {
   signal?: AbortSignal;
 }
 
+/** How Claude signs in for these checks, set once by the app (index.ts):
+ *  the owner's API key when they chose one in Get Michael ready, else nothing. */
+let hiddenClaudeAuthEnv: () => Record<string, string> = () => ({});
+export function setHiddenClaudeAuthEnv(source: () => Record<string, string>): void {
+  hiddenClaudeAuthEnv = source;
+}
+
 /** How often the live preview is read off the screen. */
 const SCREEN_READ_MS = 300;
 /** The hidden terminal's size, shared by the PTY and the preview's screen. */
@@ -135,6 +142,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
         env: {
           ...process.env,
           PATH: userShellPath(),
+          ...hiddenClaudeAuthEnv(),
           ...(opts.env ?? {}),
           ...(opts.thinking === false ? { MAX_THINKING_TOKENS: '0' } : {}),
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',

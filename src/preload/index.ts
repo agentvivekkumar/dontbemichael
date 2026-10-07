@@ -1003,6 +1003,10 @@ const api = {
   engineSetupInstall: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:install'),
   /** Run `claude auth login` (opens the browser) in the `engine-setup-signin` terminal. */
   engineSetupSignIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:signIn'),
+  /** Use an Anthropic API key instead of a Claude account: checked with
+   *  Anthropic, then kept write only in the secret store. Never read back. */
+  engineSetupUseApiKey: (key: string): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> =>
+    ipcRenderer.invoke('engineSetup:useApiKey', key),
   /** A setup terminal ended, or an agent could not start for want of Claude. */
   onEngineSetupChanged: (cb: (e: { id: string; exitCode: number | null }) => void): (() => void) => {
     const listener = (_e: IpcRendererEvent, info: { id: string; exitCode: number | null }): void => cb(info);

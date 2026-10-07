@@ -106,3 +106,24 @@ test('the setup terminals are not agents: their exit only tells the step to look
   assert.equal(setup.isEngineSetupPty('engine-setup-signin'), true);
   assert.equal(setup.isEngineSetupPty('god'), false);
 });
+
+test('an API key instead of a Claude account: checked with Anthropic, kept write only, handed to every Claude start', () => {
+  // Value: protects=an owner without a Claude plan can still start the office, and a typo never becomes a team that cannot start; fails_when=the key is saved unchecked, comes back over IPC, or never reaches Claude agents or the hidden checks; why_new=owner 2026-10-07; seam=source pin, main has no harness for Electron IPC
+  const main = read('src/main/index.ts');
+  const h = main.slice(main.indexOf("ipcMain.handle('engineSetup:useApiKey'"));
+  const handler = h.slice(0, h.indexOf('});') + 3);
+  assert.ok(handler.indexOf('await checkAnthropicKey(key)') < handler.indexOf("integrations.setSecret(providerKeyRef('anthropic'), key)"), 'checked before it is saved');
+  assert.match(handler, /writeConfig\(\{ claudeAuth: 'apiKey' \}\)/);
+  assert.match(handler, /Promise<\{ ok: boolean; error\?: 'invalid' \| 'rejected' \| 'unreachable' \| 'store' \}>/, 'only a verdict comes back, never the key');
+  assert.match(main, /headers: \{ 'x-api-key': key, 'anthropic-version': '2023-06-01' \}/);
+  // Every Claude start gets the key, approved first.
+  assert.match(main, /const authEnv = claudeAuthEnv\(\);\s*if \(authEnv\.ANTHROPIC_API_KEY\) \{\s*try \{ approveClaudeApiKey\(authEnv\.ANTHROPIC_API_KEY\); \}/);
+  assert.match(main, /setHiddenClaudeAuthEnv\(claudeAuthEnv\);/);
+  assert.match(read('src/main/hiddenClaude.ts'), /\.\.\.hiddenClaudeAuthEnv\(\),\s*\.\.\.\(opts\.env \?\? \{\}\)/);
+  // A key counts as signed in; signing in with an account switches back.
+  assert.match(main, /if \(readConfig\(\)\.claudeAuth === 'apiKey'\) \{\s*const has = integrations\.hasSecret\(providerKeyRef\('anthropic'\)\);/);
+  assert.match(main, /if \(readConfig\(\)\.claudeAuth === 'apiKey'\) writeConfig\(\{ claudeAuth: 'account' \}\);/);
+  const ready = read('src/renderer/src/components/GetMichaelReady.tsx');
+  assert.match(ready, /type="password" autoComplete="off"/);
+  assert.match(ready, /t\('engineSetup\.useApiKey'\)/);
+});

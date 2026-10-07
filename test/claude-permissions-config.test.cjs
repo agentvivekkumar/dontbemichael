@@ -26,7 +26,7 @@ require.cache[electron] = {
   exports: { app: { getPath: () => userData } }
 };
 
-const { ensureClaudePermissionsAccepted } = loadTs('src/main/config.ts');
+const { ensureClaudePermissionsAccepted, approveClaudeApiKey } = loadTs('src/main/config.ts');
 const settingsDir = path.join(home, '.claude');
 const settingsPath = path.join(settingsDir, 'settings.json');
 const projectConfigPath = path.join(home, '.claude.json');
@@ -97,6 +97,7 @@ test('merges required fields into valid configs without losing unrelated data', 
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     numStartups: 7,
+    hasCompletedOnboarding: true,
     projects: {
       [cwd]: {
         allowedTools: ['Read'],
@@ -116,6 +117,7 @@ test('creates minimal config files when they are missing', () => {
     skipAutoPermissionPrompt: true
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   });
 });
@@ -130,6 +132,7 @@ test('a malformed settings file does not prevent safe project trust updates', ()
   assert.equal(fs.readFileSync(settingsPath, 'utf8'), malformedSettings);
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     custom: 'keep',
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   });
 });
@@ -137,6 +140,7 @@ test('a malformed settings file does not prevent safe project trust updates', ()
 test('does not rewrite configs that already contain every required field', () => {
   const settings = '{"skipDangerousModePermissionPrompt":true,"skipAutoPermissionPrompt":true}\n';
   const projectConfig = JSON.stringify({
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   }) + '\n';
   writeSettings(settings);
@@ -168,4 +172,29 @@ test('a folder typed in another letter case is trusted under its real name too',
   const projects = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects;
   assert.equal(projects[fs.realpathSync.native(real)].hasTrustDialogAccepted, true, 'the real name is trusted');
   if (caseInsensitive) assert.equal(projects[typed].hasTrustDialogAccepted, true, 'the typed name stays trusted');
+});
+
+// Get Michael ready (docs/designs/get-michael-ready.md): Claude Code's welcome
+// screen and its "use this API key?" question would wait in an agent's
+// terminal, which the owner never sees.
+test('the welcome screen is marked done, and an owner who already finished it is left alone', () => {
+  // Value: protects=a bare Mac's first agent start does not stop on Claude's text style picker; fails_when=hasCompletedOnboarding is not written, or a finished one is rewritten; why_new=bare Mac report 2026-10-07; seam=real file in a temp home
+  ensureClaudePermissionsAccepted(cwd);
+  assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).hasCompletedOnboarding, true);
+  const done = JSON.stringify({ hasCompletedOnboarding: true, theme: 'dark', projects: { [cwd]: { hasTrustDialogAccepted: true } } });
+  fs.writeFileSync(projectConfigPath, done, 'utf8');
+  ensureClaudePermissionsAccepted(cwd);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), done);
+});
+
+test('an API key the owner chose is approved by its last 20 characters, once, keeping everything else', () => {
+  // Value: protects=a Claude agent started with ANTHROPIC_API_KEY never stops on the approve-this-key question; fails_when=the tail is wrong, duplicated, stays rejected, or other keys are lost; why_new=API key sign in; seam=real file in a temp home
+  const key = 'sk-ant-api03-' + 'x'.repeat(40) + 'ABCDEFGHIJ0123456789';
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ custom: 'keep', customApiKeyResponses: { approved: ['older'], rejected: ['ABCDEFGHIJ0123456789'] } }), 'utf8');
+  approveClaudeApiKey(key, home);
+  approveClaudeApiKey(key, home);
+  const c = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+  assert.equal(c.custom, 'keep');
+  assert.deepEqual(c.customApiKeyResponses, { approved: ['older', 'ABCDEFGHIJ0123456789'], rejected: [] });
+  assert.ok(!JSON.stringify(c).includes(key), 'the whole key is never written');
 });

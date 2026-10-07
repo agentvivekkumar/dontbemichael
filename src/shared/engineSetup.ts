@@ -7,6 +7,8 @@ export interface EngineSetupStatus {
   /** null: installed, but the sign in state could not be read. Never blocks. */
   signedIn: boolean | null;
   email?: string;
+  /** How Claude signs in: the owner's Claude account or an Anthropic API key. */
+  method?: 'account' | 'apiKey';
   /** Michael cannot start until this is done. */
   needed: boolean;
 }

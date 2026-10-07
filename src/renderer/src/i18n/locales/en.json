@@ -2162,6 +2162,19 @@
     "cardNotInstalled": "Claude Code isn't set up on this computer.",
     "cardSignedOut": "Your Claude account isn't signed in.",
     "cardAction": "Get {{godName}} ready",
-    "done": "Done"
+    "done": "Done",
+    "useApiKey": "Use an API key",
+    "apiKey": "Anthropic API key",
+    "keyWhy": "Claude Code uses this key instead of a Claude account. Usage is billed to your Anthropic account.",
+    "keyInfo": "Create a key at console.anthropic.com, under API keys. It is kept on this computer and never shown again.",
+    "keySave": "Save key",
+    "keyChecking": "Checking…",
+    "usingApiKey": "Using your Anthropic API key",
+    "keyError": {
+      "invalid": "That doesn't look like an API key. Paste the whole key.",
+      "rejected": "Anthropic did not accept that key. Check it and try again.",
+      "unreachable": "Could not check the key. Check your internet connection, then try again.",
+      "store": "Could not save the key on this computer. Try again."
+    }
   }
 }

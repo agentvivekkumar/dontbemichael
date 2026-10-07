@@ -16,10 +16,11 @@ import {
   claudeInstallScript, claudeMissingScript, engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
   isEngineSetupPty, parseClaudeAuthStatus, type EngineSetupStatus
 } from './engineSetup';
+import { setHiddenClaudeAuthEnv } from './hiddenClaude';
 import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
-  readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
+  readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted, approveClaudeApiKey,
   modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { terminalLaunches } from './terminalAtFolder';
@@ -650,6 +651,15 @@ const BACKEND_KEY_ENV: Record<string, string> = {
   groq: 'GROQ_API_KEY'
 };
 const providerKeyRef = (backend: string): string => `apikey:${backend}`;
+
+/** Claude's sign in for the team when the owner chose an API key in Get Michael
+ *  ready (docs/designs/get-michael-ready.md): ANTHROPIC_API_KEY from the secret
+ *  store, read main only at start. Empty for a Claude account. */
+function claudeAuthEnv(): Record<string, string> {
+  if (readConfig().claudeAuth !== 'apiKey') return {};
+  const key = integrations.getSecret(providerKeyRef('anthropic'));
+  return key ? { ANTHROPIC_API_KEY: key } : {};
+}
 
 /** A worker worktree that teardown PRESERVED because it held unintegrated work.
  *  Tracked so the GC sweep can reclaim it (+ its scratch dir) once the work lands
@@ -3594,6 +3604,13 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // Claude-only — other CLIs handle their own permission UX.
   if (claudeProvider) {
     try { ensureClaudePermissionsAccepted(opts.cwd); } catch { /* never block spawn */ }
+    // The owner's API key, when they chose one over a Claude account. It is
+    // approved in ~/.claude.json first, so Claude never stops to ask about it.
+    const authEnv = claudeAuthEnv();
+    if (authEnv.ANTHROPIC_API_KEY) {
+      try { approveClaudeApiKey(authEnv.ANTHROPIC_API_KEY); } catch { /* never block spawn */ }
+      opts.env = { ...(opts.env ?? {}), ...authEnv };
+    }
   }
   // Suppress first-run interactive prompts for providers that need it (e.g. Codex
   // directory-trust gate via CODEX_NON_INTERACTIVE). Merges into any env already
@@ -5026,6 +5043,8 @@ ipcMain.handle('skills:reveal', (_evt, path: unknown) => {
  * authoritative and reused rather than re-probed differently here.
  */
 // ─── IPC: Get Michael ready (engineSetup.ts) ────────────────────────────────
+// Hidden checks (hire, focus, standing fit) sign in the same way as the team.
+setHiddenClaudeAuthEnv(claudeAuthEnv);
 // Where Claude stands on this computer, its install and its sign in, each run in
 // a terminal the step can show (Show details). Only Claude is set up here; any
 // other engine reports `applies: false` and keeps its own path.
@@ -5044,10 +5063,15 @@ ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<Eng
   if (!isClaudeProvider(inferAgentProvider('claude', p))) return { applies: false, installed: true, signedIn: null, needed: false };
   const path = ptyManager.commandPath('claude');
   if (!path) return { applies: true, installed: false, signedIn: false, needed: true };
+  // An API key the owner chose signs every Claude agent in; no account needed.
+  if (readConfig().claudeAuth === 'apiKey') {
+    const has = integrations.hasSecret(providerKeyRef('anthropic'));
+    return { applies: true, installed: true, signedIn: has, method: 'apiKey', needed: engineSetupNeeded(true, has) };
+  }
   // A Claude too old to have `auth status` reads as unknown: never blocking.
   const auth = await claudeAuthStatus(path);
   const signedIn = auth ? auth.signedIn : null;
-  return { applies: true, installed: true, signedIn, ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn) };
+  return { applies: true, installed: true, signedIn, method: 'account', ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn) };
 });
 // Start the install (or keep the one already running). The step watches the
 // terminal's exit and then reads the status again.
@@ -5062,8 +5086,44 @@ ipcMain.handle('engineSetup:install', (e): { ok: boolean; error?: string } => {
 // "Open the browser again" works after a closed tab.
 ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
   if (!ptyManager.isCommandAvailable('claude')) return { ok: false, error: 'not installed' };
+  // Signing in with an account means the team uses it, not a key.
+  if (readConfig().claudeAuth === 'apiKey') writeConfig({ claudeAuth: 'account' });
   if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
   return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command: 'claude', args: ['auth', 'login'], cols: 100, rows: 12 }, e.sender);
+});
+
+// Use an Anthropic API key instead of a Claude account. The key is checked with
+// Anthropic first, so a typo never becomes a team that cannot start; then kept
+// write only in the secret store (the same Anthropic key as Settings, AI
+// engines) and approved for Claude Code. It never comes back over IPC.
+function checkAnthropicKey(key: string): Promise<'ok' | 'rejected' | 'unreachable'> {
+  return new Promise((done) => {
+    try {
+      const req = httpsRequest({
+        host: 'api.anthropic.com', path: '/v1/models?limit=1', method: 'GET', timeout: 10_000,
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+      }, (res) => {
+        res.resume();
+        const code = res.statusCode ?? 0;
+        done(code >= 200 && code < 300 ? 'ok' : code === 401 || code === 403 ? 'rejected' : 'unreachable');
+      });
+      req.on('timeout', () => { req.destroy(); done('unreachable'); });
+      req.on('error', () => done('unreachable'));
+      req.end();
+    } catch { done('unreachable'); }
+  });
+}
+ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> => {
+  const key = typeof raw === 'string' ? raw.trim() : '';
+  if (key.length < 20 || key.length > 400 || /\s/.test(key)) return { ok: false, error: 'invalid' };
+  const verdict = await checkAnthropicKey(key);
+  if (verdict !== 'ok') return { ok: false, error: verdict };
+  const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
+  if (!saved.ok) return { ok: false, error: 'store' };
+  writeConfig({ claudeAuth: 'apiKey' });
+  try { approveClaudeApiKey(key); } catch { /* approved again at each start */ }
+  try { liveWebContents()?.send('engineSetup:changed', { id: 'api-key', exitCode: null }); } catch { /* window gone */ }
+  return { ok: true };
 });
 
 ipcMain.handle('tools:status', (): ToolStatus[] => {

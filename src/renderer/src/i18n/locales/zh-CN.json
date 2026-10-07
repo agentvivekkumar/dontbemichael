@@ -2162,6 +2162,19 @@
     "cardNotInstalled": "这台电脑上还没有设置 Claude Code。",
     "cardSignedOut": "你的 Claude 账户尚未登录。",
     "cardAction": "让 {{godName}} 准备就绪",
-    "done": "完成"
+    "done": "完成",
+    "useApiKey": "使用 API 密钥",
+    "apiKey": "Anthropic API 密钥",
+    "keyWhy": "Claude Code 将使用此密钥代替 Claude 账户，费用计入你的 Anthropic 账户。",
+    "keyInfo": "在 console.anthropic.com 的 API keys 页面创建密钥。密钥只保存在这台电脑上，不会再次显示。",
+    "keySave": "保存密钥",
+    "keyChecking": "正在检查…",
+    "usingApiKey": "正在使用你的 Anthropic API 密钥",
+    "keyError": {
+      "invalid": "这看起来不像 API 密钥，请粘贴完整的密钥。",
+      "rejected": "Anthropic 未接受该密钥，请检查后重试。",
+      "unreachable": "无法检查该密钥。请检查网络连接，然后重试。",
+      "store": "无法在这台电脑上保存密钥，请重试。"
+    }
   }
 }

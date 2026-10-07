@@ -934,7 +934,9 @@ Full window, no app chrome.
   (Checking, Installing with a moving `indigo` bar, Installed `green`, or a `coral-text`
   failure line with Try again and Show details) and Your Claude account (Sign in, then
   "Finish signing in in your browser" with Open the browser again and Show what Claude
-  says, then Signed in as the email). Footer: Back, Set up later (ghost), and Open the
+  says, then Signed in as the email). Beside Sign in, Use an API key (secondary) opens one
+  password field in mono with an info icon, Save key and Cancel; then "Using your Anthropic
+  API key". Footer: Back, Set up later (ghost), and Open the
   office (primary, off until both rows are green). Skipped, Ask me keeps a "Michael can't
   start yet" card that opens the same rows in a dialog.
 - The studio on the right fills with a pod per picked person around Michael's glass pod,

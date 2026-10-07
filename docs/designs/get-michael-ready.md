@@ -32,6 +32,7 @@ Onboarding marked Claude "installs on first run" and let the owner through.
 |---|----------|--------|
 | D1 | Where Claude gets installed and signed in | A Ready step at the end of setup; Ask me keeps a card when skipped. Supersedes the 2026-08-07 rule that installs Node first, for Claude |
 | D2 | The step's design | Built as the mockup |
+| D3 | Owner, 2026-10-07: offer an Anthropic API key as well as a Claude account | Use an API key beside Sign in |
 
 ## Behavior
 
@@ -55,6 +56,26 @@ Onboarding marked Claude "installs on first run" and let the owner through.
   (off until both rows are green).
 - **Unreadable sign in state:** when the sign in state can't be read (an old
   Claude without `auth status`), it never blocks.
+
+**API key instead of a Claude account (D3).** Beside Sign in, Use an API key
+opens one password field (an info icon says where to create a key).
+
+- **Save:** sends the key to main once.
+  - Main checks it with Anthropic (`GET /v1/models`, 10 s); a 401 or 403 reads
+    as not accepted, anything else as unreachable.
+  - Only a valid key is kept, write only, in the secret store as
+    `apikey:anthropic` (the same Anthropic key as Settings, AI engines), and
+    `claudeAuth` becomes `apiKey`. The key never comes back over IPC.
+- **Every Claude start** (agents, and the hidden hire, focus and standing
+  checks) gets `ANTHROPIC_API_KEY`. The key is approved first in
+  `~/.claude.json` (`customApiKeyResponses.approved`, the key's last 20
+  characters), so Claude never stops to ask about it.
+- **The row then reads** "Using your Anthropic API key". Signing in with an
+  account later switches `claudeAuth` back.
+
+**Claude's welcome screen.** A fresh Claude Code opens on a text style and sign
+in screen that would also wait in the hidden terminal. `hasCompletedOnboarding`
+is now set in `~/.claude.json` with the folder trust the app already writes.
 
 **Ask me card.** While Michael's engine is Claude and it is missing or signed
 out, Ask me holds a "Michael can't start yet" card, and the needs-you count
@@ -80,4 +101,5 @@ the install ladder unchanged.
 
 - Typecheck clean; full suite green, including `test/get-michael-ready.test.cjs`.
 - Reference shot of the Sign in state rendered from the real component.
-- Not yet run: Claude's installer and `claude auth login` on a bare Mac.
+- An invalid key against Anthropic's API returns 401 (probed 2026-10-07).
+- Not yet run: Claude's installer, `claude auth login` and a real API key start on a bare Mac.

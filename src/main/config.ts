@@ -245,6 +245,11 @@ export interface HarnessConfig {
    *  constant; only its engine is selectable. Default 'claude'. Eligible providers
    *  are those that can receive inbox (claude/codex/antigravity/qwen). */
   godProvider?: AgentProvider;
+  /** How Claude Code signs in for the team (docs/designs/get-michael-ready.md):
+   *  the owner's Claude account (default), or an Anthropic API key kept in the
+   *  secret store under `apikey:anthropic` and handed to each Claude agent as
+   *  ANTHROPIC_API_KEY at start. */
+  claudeAuth?: 'account' | 'apiKey';
   /** The model GOD runs on. Unset falls back to the provider preset's
    *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-5-5'. */
   godModel?: string;
@@ -851,6 +856,56 @@ function ensureClaudeGlobalPermissions(home: string): void {
 }
 
 type ClaudeProjectConfig = Record<string, unknown> & { hasTrustDialogAccepted?: boolean };
+
+/** Read `~/.claude.json`, change it, and write it back only when `change` says
+ *  it changed something. A file that is not a JSON object is left alone. */
+function updateClaudeJson(home: string, change: (c: ClaudeConfig) => boolean): void {
+  const p = join(home, '.claude.json');
+  try {
+    let c: ClaudeConfig = {};
+    if (existsSync(p)) {
+      const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+      c = parsed as ClaudeConfig;
+    }
+    if (change(c)) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
+  } catch (error) {
+    console.warn(
+      `[config] Could not safely update Claude config at ${p}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+/** Claude Code's first run opens on a welcome screen (text style, then sign in)
+ *  that waits in the agent's terminal, which the owner never sees. Sign in now
+ *  happens in Get Michael ready, so the welcome is marked done. Only ever set,
+ *  never cleared, and left alone when already done. */
+function ensureClaudeOnboarded(home: string): void {
+  updateClaudeJson(home, (c) => {
+    if (c.hasCompletedOnboarding === true) return false;
+    c.hasCompletedOnboarding = true;
+    return true;
+  });
+}
+
+/** Claude Code asks, in the agent's terminal, whether to use an
+ *  ANTHROPIC_API_KEY it finds in the environment. The owner already chose that
+ *  key in Get Michael ready, so it is approved up front: Claude Code records
+ *  approvals as the key's last 20 characters. */
+export function approveClaudeApiKey(key: string, home: string = homedir()): void {
+  const tail = key.trim().slice(-20);
+  if (!tail) return;
+  updateClaudeJson(home, (c) => {
+    const r = (c.customApiKeyResponses && typeof c.customApiKeyResponses === 'object' && !Array.isArray(c.customApiKeyResponses)
+      ? c.customApiKeyResponses : {}) as { approved?: unknown; rejected?: unknown };
+    const approved = Array.isArray(r.approved) ? r.approved.filter((x): x is string => typeof x === 'string') : [];
+    const rejected = Array.isArray(r.rejected) ? r.rejected.filter((x): x is string => typeof x === 'string') : [];
+    if (approved.includes(tail) && !rejected.includes(tail)) return false;
+    c.customApiKeyResponses = { ...r, approved: approved.includes(tail) ? approved : [...approved, tail], rejected: rejected.filter((x) => x !== tail) };
+    return true;
+  });
+}
 type ClaudeConfig = Record<string, unknown> & { projects?: Record<string, ClaudeProjectConfig> };
 
 function ensureClaudeProjectTrust(home: string, cwd: string): void {
@@ -905,6 +960,7 @@ export function ensureClaudePermissionsAccepted(cwd?: string): void {
   if (!home) return;
 
   ensureClaudeGlobalPermissions(home);
+  ensureClaudeOnboarded(home);
   if (cwd) {
     ensureClaudeProjectTrust(home, cwd);
   }

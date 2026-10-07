@@ -148,7 +148,10 @@ if (shot === 'home') window.setTimeout(() => window.dispatchEvent(new Event('cth
 // Headless Chrome runs timers on virtual time but CSS animations on real
 // time, so a capture would catch the bubble still popping in: pin it at rest.
 const still = document.createElement('style');
-still.textContent = '.cth-st-quote { animation: none !important; transform: translate(var(--q-x), var(--q-y)); }';
+still.textContent = '.cth-st-quote { animation: none !important; transform: translate(var(--q-x), var(--q-y)); }'
+  // Setup's glide and fade (onboarding-centered.md) settle at once: the team
+  // loads late in the shot's time budget and a still frame must not catch it mid way.
+  + ' .cth-onb-body, .cth-onb-glow { transition: none !important; } .cth-onb-studio-in { animation: none !important; }';
 document.head.appendChild(still);
 
 /** The app window, as App.tsx lays it out (branding/DESIGN.md 5.2). */

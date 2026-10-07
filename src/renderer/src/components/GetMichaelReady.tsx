@@ -34,6 +34,11 @@ export function GetMichaelReady({ provider, onReadyChange }: {
   const [details, setDetails] = useState(false);
   const reads = useRef(0);
   const autoInstalled = useRef(false);
+  // Use an API key instead of a Claude account: the key never comes back.
+  const [keyForm, setKeyForm] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyError, setKeyError] = useState<string | undefined>();
 
   const read = useCallback(async (): Promise<EngineSetupStatus | undefined> => {
     const mine = ++reads.current;
@@ -59,6 +64,23 @@ export function GetMichaelReady({ provider, onReadyChange }: {
     setBrowser(res.ok);
     if (!res.ok) setSignInStuck(true);
   }, []);
+
+  const saveKey = useCallback(async () => {
+    if (!keyDraft.trim() || keyBusy) return;
+    setKeyBusy(true);
+    setKeyError(undefined);
+    const res = await window.cth.engineSetupUseApiKey(keyDraft).catch(() => ({ ok: false as const, error: 'unreachable' as const }));
+    setKeyBusy(false);
+    if (!res.ok) {
+      setKeyError(t(`engineSetup.keyError.${res.error ?? 'unreachable'}`));
+      return;
+    }
+    setKeyDraft('');
+    setKeyForm(false);
+    setBrowser(false);
+    setSignInStuck(false);
+    void read();
+  }, [keyDraft, keyBusy, read, t]);
 
   // First look, then install at once when Claude is missing: the owner already
   // pressed Next to get here, so there is nothing to ask.
@@ -142,9 +164,32 @@ export function GetMichaelReady({ provider, onReadyChange }: {
       case 'installing':
       case 'installFailed':
         return <Row icon="·" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.waitingInstall')} dim />;
-      case 'signin': return (
+      case 'signin': return keyForm ? (
+        <Row icon="→" tone="idle" label={t('engineSetup.apiKey')} status={t('engineSetup.keyWhy')}>
+          <form onSubmit={(e) => { e.preventDefault(); void saveKey(); }} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
+              <label htmlFor="cth-engine-key">{t('engineSetup.apiKey')}</label>
+              <InfoTip text={t('engineSetup.keyInfo')} label={t('engineSetup.apiKey')} />
+            </span>
+            <input id="cth-engine-key" className="cth-input" type="password" autoComplete="off" spellCheck={false} dir="ltr"
+              value={keyDraft} onChange={(e) => { setKeyDraft(e.target.value); setKeyError(undefined); }}
+              placeholder="sk-ant-…" aria-invalid={!!keyError} aria-describedby={keyError ? 'cth-engine-key-error' : undefined}
+              style={keyInput} />
+            {keyError && <div id="cth-engine-key-error" role="alert" style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{keyError}</div>}
+            <div style={{ ...actions, marginTop: 4 }}>
+              <PixelButton variant="primary" size="sm" disabled={keyBusy || !keyDraft.trim()} onClick={() => void saveKey()}>
+                {keyBusy ? t('engineSetup.keyChecking') : t('engineSetup.keySave')}
+              </PixelButton>
+              <PixelButton variant="ghost" size="sm" disabled={keyBusy} onClick={() => { setKeyForm(false); setKeyDraft(''); setKeyError(undefined); }}>{t('common.cancel')}</PixelButton>
+            </div>
+          </form>
+        </Row>
+      ) : (
         <Row icon="→" tone="idle" label={t('engineSetup.account')} status={signInStuck ? t('engineSetup.signInStuck') : t('engineSetup.signInWhy', { godName })} bad={signInStuck}>
-          <div style={actions}><PixelButton variant="primary" size="sm" onClick={() => void signIn()}>{t('engineSetup.signIn')}</PixelButton></div>
+          <div style={actions}>
+            <PixelButton variant="primary" size="sm" onClick={() => void signIn()}>{t('engineSetup.signIn')}</PixelButton>
+            <PixelButton variant="secondary" size="sm" onClick={() => setKeyForm(true)}>{t('engineSetup.useApiKey')}</PixelButton>
+          </div>
         </Row>
       );
       case 'browser': return (
@@ -156,7 +201,9 @@ export function GetMichaelReady({ provider, onReadyChange }: {
           {terminal}
         </Row>
       );
-      default: return (
+      default: return status?.method === 'apiKey' ? (
+        <Row icon="✓" tone="ok" label={t('engineSetup.apiKey')} status={t('engineSetup.usingApiKey')} />
+      ) : (
         <Row icon="✓" tone="ok" label={t('engineSetup.account')}
           status={status?.email ? t('engineSetup.signedInAs', { email: status.email }) : t('engineSetup.signedIn')} />
       );
@@ -206,6 +253,10 @@ function Spinner() {
   return <span className="cth-engine-spin" />;
 }
 
+const keyInput: React.CSSProperties = {
+  width: '100%', height: 32, padding: '0 10px', borderRadius: 'var(--cth-r-md)', boxSizing: 'border-box',
+  fontFamily: 'var(--cth-font-mono)', fontSize: 12.5, color: 'var(--cth-ink)', background: 'var(--cth-card)'
+};
 const actions: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' };
 const linkBtn: React.CSSProperties = {
   minHeight: 28, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
