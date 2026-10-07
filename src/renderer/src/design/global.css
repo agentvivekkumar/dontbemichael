@@ -586,3 +586,16 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
   .cth-onb-body, .cth-onb-glow { transition: none; }
   .cth-onb-studio-in { animation: none; }
 }
+
+/* Get Michael ready (docs/designs/get-michael-ready.md): the install's moving
+   bar and the rows' spinner; reduced motion shows them still. */
+.cth-engine-spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--cth-indigo-soft); border-top-color: var(--cth-indigo); animation: cth-engine-spin 800ms linear infinite; }
+@keyframes cth-engine-spin { to { transform: rotate(360deg); } }
+.cth-engine-bar { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--cth-neutral-soft); overflow: hidden; }
+.cth-engine-bar > i { display: block; width: 40%; height: 100%; border-radius: 2px; background: var(--cth-indigo); animation: cth-engine-bar 1.4s var(--cth-ease) infinite; }
+@keyframes cth-engine-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+[dir="rtl"] .cth-engine-bar > i { animation-direction: reverse; }
+@media (prefers-reduced-motion: reduce) {
+  .cth-engine-spin { animation: none; }
+  .cth-engine-bar > i { animation: none; width: 100%; opacity: .5; }
+}

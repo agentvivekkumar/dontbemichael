@@ -23,6 +23,7 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 
 ### Fixed
 
+- A new owner whose computer had no Claude Code finished setup and then saw nothing happen: the install ran out of sight behind a password prompt and failed silently. Setup now ends on Get Michael ready, which installs Claude Code without a password and signs you in where you can see it. Skip it, and Ask me keeps a card until Michael can start.
 - An approved email can no longer forward or attach mail from a different mailbox.
 - An approved email goes out once, even if two sends overlap or the app stops mid-send, and an email you withdraw while it is being prepared stops before it leaves.
 - Forwarding or attaching from a very large email is refused in plain words instead of freezing the app.

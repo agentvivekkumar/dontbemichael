@@ -225,7 +225,8 @@ test('no Arabic string is left as its English source', () => {
     'askMe.fileKind.markdown',               // file kinds on Ask me file rows are
     'askMe.fileKind.excel',                  // product names (Markdown, Excel,
     'askMe.fileKind.word',                   // Word, PowerPoint)
-    'askMe.fileKind.powerpoint'
+    'askMe.fileKind.powerpoint',
+    'engineSetup.claude'                     // Claude Code, a product name
   ]);
   const e = pathsOf(en), a = pathsOf(ar);
   const untranslated = [];

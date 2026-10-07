@@ -908,8 +908,8 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 
 Full window, no app chrome.
 
-- Header: lockup left; step indicator center: seven labelled steps (Business, Details,
-  Meet, Team, Home, Manager, Permissions) in a `card` pill container, each a 22 px circle
+- Header: lockup left; step indicator center: eight labelled steps (Business, Details,
+  Meet, Team, Home, Manager, Permissions, Ready; seven when Michael's engine is not Claude) in a `card` pill container, each a 22 px circle
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
   number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
 - Body: a 560 px card with the step's fields. While the studio isn't showing (Business,
@@ -929,6 +929,14 @@ Full window, no app chrome.
   "Works in Harbor & Pine/Finance" line with a "change" link. Unchecked rows at 55%.
   Footer: "N picked, M to connect" and Back (secondary), Next (primary). The footer sticks
   to the window's bottom edge, so Next stays in reach on a long step.
+- **Ready step** (Get Michael ready, docs/designs/get-michael-ready.md): heading with an
+  info icon, then two quiet rows in one `line` card, a 26 px tinted icon each: Claude Code
+  (Checking, Installing with a moving `indigo` bar, Installed `green`, or a `coral-text`
+  failure line with Try again and Show details) and Your Claude account (Sign in, then
+  "Finish signing in in your browser" with Open the browser again and Show what Claude
+  says, then Signed in as the email). Footer: Back, Set up later (ghost), and Open the
+  office (primary, off until both rows are green). Skipped, Ask me keeps a "Michael can't
+  start yet" card that opens the same rows in a dialog.
 - The studio on the right fills with a pod per picked person around Michael's glass pod,
   each with a small name tag and a check on its screen; an unpicked department shows as a
   dashed outline with a "Name, not picked" tag on its back corner, clear of the pods in
@@ -1427,6 +1435,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-06 | Michael's conversation dock above the Talk to Michael composer, whose one count replaces the queue chip (§7.19); Report cards on Ask me and the quiet "Reports: N" pill (§7.5, §7.8). |
 | 2026-10-07 | Access tab, Email: no switch; one row per address used with Inbox and Sending lines, and Add a mailbox with Watch the inbox or Send only (§7.12). Settings, Mailboxes names who else sends from a mailbox (§7.26). |
 | 2026-10-07 | Onboarding: the card is centered while the studio isn't showing and glides to its column when it appears, the background glow following it (§7.25); onboarding reference screens re-shot. |
+| 2026-10-07 | Onboarding: a Ready step (Get Michael ready) installs Claude Code and signs the owner in where they can see it; skipped, Ask me keeps a card (§7.25). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
@@ -1480,6 +1489,7 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 | `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
 | `onboarding-business.png` | Onboarding step 1, Your business |
 | `onboarding-meet.png` | Onboarding step 3, Meet your office |
+| `onboarding-ready.png` | Onboarding step 8, Get Michael ready (installed, not signed in) |
 | `kelly-memory.png` | A person selected, Memory tab |
 | `hire.png` | The hire wizard, step 1 (Who) |
 | `settings-autonomy.png` | Settings, Agents (the default model, autonomy and the circuit breaker) |

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, powerMonitor, powerSaveBlocker, screen, shell, Notification } from 'electron';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import {
   rmSync, existsSync, readFileSync, readdirSync, statSync, cpSync, writeFileSync,
   unlinkSync, mkdirSync, renameSync, createWriteStream, copyFileSync, lstatSync,
@@ -10,7 +10,12 @@ import { join, resolve, sep, basename, dirname, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { request as httpsRequest } from 'node:https';
 import { PtyManager, type ProcessLaunch, type SpawnOptions } from './pty';
-import { resolveCommand as resolveCliCommand, isSafeCommandName } from './shellEnv';
+import { resolveCommand as resolveCliCommand, isSafeCommandName, userShellPath } from './shellEnv';
+import { buildPtyEnv } from './ptyEnv';
+import {
+  claudeInstallScript, claudeMissingScript, engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
+  isEngineSetupPty, parseClaudeAuthStatus, type EngineSetupStatus
+} from './engineSetup';
 import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
@@ -836,6 +841,12 @@ function removeWorkerScratch(workerId: string): void {
 // relaunch carries `noAutoInstall`, so the installer can never fire (let alone loop) a
 // second time — a binary that's somehow still missing just spawns and exits normally.
 ptyManager.setExitHandler((id, exitCode, info) => {
+  // The Get Michael ready terminals (engineSetup.ts): the step re-reads where
+  // Claude stands. They are not agents, so nothing else applies.
+  if (isEngineSetupPty(id)) {
+    try { liveWebContents()?.send('engineSetup:changed', { id, exitCode: exitCode ?? null }); } catch { /* window gone */ }
+    return;
+  }
   // Record an ABNORMAL death before teardown — teardownPty drops the
   // pty->agent mapping, so after it runs we can no longer say WHOSE process
   // died. Only abnormal exits are recorded (recordAgentExit returns early on a
@@ -3219,6 +3230,21 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // isn't archived and no worktree is torn down) before the relaunch takes over.
   {
     const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+    // Claude is set up where the owner can see it: the Ready step at the end of
+    // setup, or the Get Michael ready card on Ask me (engineSetup.ts). Its
+    // installer used to run here, in a terminal the owner never sees, behind a
+    // Mac password prompt nobody saw; it failed and nothing said so. Now this
+    // terminal only says what to do, and the card shows on Ask me.
+    if (bin && claudeProvider && !ptyManager.isCommandAvailable(bin)) {
+      const res = ptyManager.spawn(
+        { id: opts.id, cwd: opts.cwd, command: bin, cols: opts.cols, rows: opts.rows, shellScript: claudeMissingScript(process.platform) },
+        owner
+      );
+      if (!opts.noAutoInstall) analytics.track('agent_spawn_failed', { provider, reason: 'cli_missing' });
+      try { liveWebContents()?.send('engineSetup:changed', { id: opts.id, exitCode: null }); } catch { /* window gone */ }
+      syncKeepAwake();
+      return res;
+    }
     if (bin && !opts.noAutoInstall && !ptyManager.isCommandAvailable(bin)) {
       // The installer commands are `npm install -g …`. Probe for npm the same way
       // we probe for the engine CLI, so a no-Node machine gets the node-free rung
@@ -4999,6 +5025,47 @@ ipcMain.handle('skills:reveal', (_evt, path: unknown) => {
  * Finder-launched app) and knows whether the palace is initialised, so it is
  * authoritative and reused rather than re-probed differently here.
  */
+// ─── IPC: Get Michael ready (engineSetup.ts) ────────────────────────────────
+// Where Claude stands on this computer, its install and its sign in, each run in
+// a terminal the step can show (Show details). Only Claude is set up here; any
+// other engine reports `applies: false` and keeps its own path.
+function claudeAuthStatus(path: string): Promise<{ signedIn: boolean; email?: string } | null> {
+  return new Promise((done) => {
+    try {
+      execFile(path, ['auth', 'status', '--json'], {
+        timeout: 15_000,
+        env: buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath())
+      }, (_err, stdout) => done(parseClaudeAuthStatus(String(stdout ?? ''))));
+    } catch { done(null); }
+  });
+}
+ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
+  const p = typeof provider === 'string' && provider ? provider : (readConfig().godProvider ?? 'claude');
+  if (!isClaudeProvider(inferAgentProvider('claude', p))) return { applies: false, installed: true, signedIn: null, needed: false };
+  const path = ptyManager.commandPath('claude');
+  if (!path) return { applies: true, installed: false, signedIn: false, needed: true };
+  // A Claude too old to have `auth status` reads as unknown: never blocking.
+  const auth = await claudeAuthStatus(path);
+  const signedIn = auth ? auth.signedIn : null;
+  return { applies: true, installed: true, signedIn, ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn) };
+});
+// Start the install (or keep the one already running). The step watches the
+// terminal's exit and then reads the status again.
+ipcMain.handle('engineSetup:install', (e): { ok: boolean; error?: string } => {
+  if (ptyManager.list().some((x) => x.id === ENGINE_INSTALL_PTY)) return { ok: true };
+  if (ptyManager.isCommandAvailable('claude')) return { ok: true };
+  const res = ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: 'claude', cols: 100, rows: 12, shellScript: claudeInstallScript(process.platform) }, e.sender);
+  analytics.track('agent_install_started', { provider: 'claude', rung: 'native' });
+  return res;
+});
+// Sign in: `claude auth login` opens the browser. A fresh run each time, so
+// "Open the browser again" works after a closed tab.
+ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
+  if (!ptyManager.isCommandAvailable('claude')) return { ok: false, error: 'not installed' };
+  if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
+  return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command: 'claude', args: ['auth', 'login'], cols: 100, rows: 12 }, e.sender);
+});
+
 ipcMain.handle('tools:status', (): ToolStatus[] => {
   const win = process.platform === 'win32';
   const mem = (() => { try { memory.resetBinCache(); return memory.status(); } catch { return null; } })();

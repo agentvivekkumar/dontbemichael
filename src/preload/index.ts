@@ -6,6 +6,7 @@ import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
 import type { OwnerDock } from '../shared/ownerRequests';
 import type { AgentProvider } from '../shared/agentProvider';
+import type { EngineSetupStatus } from '../shared/engineSetup';
 import type { HireManifest } from '../shared/hire';
 export type { HireManifest } from '../shared/hire';
 import type { IntegrationRecord, IntegrationTemplate } from '../shared/integrations';
@@ -994,6 +995,20 @@ const api = {
   /** Which external tools (uv, mempalace, git, each agent engine) are actually
    *  present on this machine, with a platform-resolved install command each. */
   toolsStatus: (): Promise<ToolStatus[]> => ipcRenderer.invoke('tools:status'),
+  // ─── Get Michael ready (docs/designs/get-michael-ready.md) ────────────────
+  /** Where Claude stands: installed, signed in. `provider` is setup's pick
+   *  before it is saved; otherwise Michael's saved engine. */
+  engineSetupStatus: (provider?: AgentProvider): Promise<EngineSetupStatus> => ipcRenderer.invoke('engineSetup:status', provider),
+  /** Run Claude's standalone installer in the `engine-setup-install` terminal. */
+  engineSetupInstall: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:install'),
+  /** Run `claude auth login` (opens the browser) in the `engine-setup-signin` terminal. */
+  engineSetupSignIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:signIn'),
+  /** A setup terminal ended, or an agent could not start for want of Claude. */
+  onEngineSetupChanged: (cb: (e: { id: string; exitCode: number | null }) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, info: { id: string; exitCode: number | null }): void => cb(info);
+    ipcRenderer.on('engineSetup:changed', listener);
+    return () => ipcRenderer.removeListener('engineSetup:changed', listener);
+  },
   /** Settings hero payload — plan + sponsor, fetched from the repo and cached. */
   heroPayload: (force?: boolean): Promise<{ hero: HeroPayload; fetchedAt: number; stale: boolean }> =>
     ipcRenderer.invoke('hero:payload', force),

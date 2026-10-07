@@ -99,7 +99,17 @@
     "fileRevealLabel": "إظهار {{name}} في Finder",
     "fileRevealWindows": "إظهار في المجلد",
     "fileRevealLabelWindows": "إظهار {{name}} في مجلده",
-    "fileKind": {"markdown": "Markdown", "text": "نص", "csv": "CSV", "excel": "Excel", "word": "Word", "powerpoint": "PowerPoint", "pdf": "PDF", "image": "صورة", "file": "ملف"},
+    "fileKind": {
+      "markdown": "Markdown",
+      "text": "نص",
+      "csv": "CSV",
+      "excel": "Excel",
+      "word": "Word",
+      "powerpoint": "PowerPoint",
+      "pdf": "PDF",
+      "image": "صورة",
+      "file": "ملف"
+    },
     "openDetail": "الخلفية الكاملة لهذا الطلب مع الإجابات السابقة",
     "answerPlaceholder": "إجابتك، أو \"تم\" إن كنت أنجزته بنفسك",
     "sending": "جارٍ الإرسال…",
@@ -829,6 +839,7 @@
       "home": "مكان التطبيق",
       "orchestrator": "مديرك",
       "permissions": "الصلاحيات والاعتمادية",
+      "ready": "جهّز {{godName}}",
       "done": "تم كل شيء"
     },
     "steps": {
@@ -838,7 +849,8 @@
       "team": "الفريق",
       "home": "المكان",
       "orchestrator": "المدير",
-      "permissions": "الصلاحيات"
+      "permissions": "الصلاحيات",
+      "ready": "جاهز"
     },
     "stepOf": "الخطوة {{n}} من {{total}}",
     "stepsLabel": "خطوات الإعداد",
@@ -2121,5 +2133,35 @@
       "withdrawn": "أُلغي",
       "not-sent": "لم يُرسل"
     }
+  },
+  "engineSetup": {
+    "title": "جهّز {{godName}}",
+    "info": "يعمل {{godName}} على Claude Code ضمن خطة Claude الخاصة بك. تثبّته وتسجّل الدخول مرة واحدة على هذا الكمبيوتر.",
+    "claude": "Claude Code",
+    "account": "حسابك في Claude",
+    "checking": "جارٍ التحقق…",
+    "installing": "جارٍ التثبيت. يستغرق ذلك دقيقة تقريبًا.",
+    "installed": "مثبّت",
+    "installFailed": "تعذّر التثبيت. تحقّق من اتصالك بالإنترنت، ثم حاول مرة أخرى.",
+    "tryAgain": "حاول مرة أخرى",
+    "showDetails": "عرض التفاصيل",
+    "hideDetails": "إخفاء التفاصيل",
+    "showClaude": "عرض ما يقوله Claude",
+    "waitingInstall": "في انتظار Claude Code",
+    "signInWhy": "يعمل {{godName}} من خلال خطة Claude الخاصة بك.",
+    "signInStuck": "لم يكتمل تسجيل الدخول. حاول مرة أخرى.",
+    "signIn": "تسجيل الدخول",
+    "inBrowser": "أكمل تسجيل الدخول في المتصفح. تتحدّث هذه الصفحة تلقائيًا.",
+    "openBrowserAgain": "افتح المتصفح مرة أخرى",
+    "signedIn": "تم تسجيل الدخول",
+    "signedInAs": "تم تسجيل الدخول باسم {{email}}",
+    "setUpLater": "الإعداد لاحقًا",
+    "openOffice": "افتح المكتب",
+    "cardFrom": "من التطبيق",
+    "cardTitle": "لا يمكن لـ {{godName}} البدء بعد",
+    "cardNotInstalled": "لم يتم إعداد Claude Code على هذا الكمبيوتر.",
+    "cardSignedOut": "لم يتم تسجيل الدخول إلى حسابك في Claude.",
+    "cardAction": "جهّز {{godName}}",
+    "done": "تم"
   }
 }

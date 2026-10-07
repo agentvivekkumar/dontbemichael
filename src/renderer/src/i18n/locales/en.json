@@ -99,7 +99,17 @@
     "fileRevealLabel": "Show {{name}} in Finder",
     "fileRevealWindows": "Show in folder",
     "fileRevealLabelWindows": "Show {{name}} in its folder",
-    "fileKind": {"markdown": "Markdown", "text": "Text", "csv": "CSV", "excel": "Excel", "word": "Word", "powerpoint": "PowerPoint", "pdf": "PDF", "image": "Image", "file": "File"},
+    "fileKind": {
+      "markdown": "Markdown",
+      "text": "Text",
+      "csv": "CSV",
+      "excel": "Excel",
+      "word": "Word",
+      "powerpoint": "PowerPoint",
+      "pdf": "PDF",
+      "image": "Image",
+      "file": "File"
+    },
     "openDetail": "The full background to this ask, with earlier answers",
     "answerPlaceholder": "Your answer, or done if you handled it",
     "sending": "Sending…",
@@ -829,6 +839,7 @@
       "home": "A home for the app",
       "orchestrator": "Your manager",
       "permissions": "Permissions and reliability",
+      "ready": "Get {{godName}} ready",
       "done": "All set"
     },
     "steps": {
@@ -838,7 +849,8 @@
       "team": "Team",
       "home": "Home",
       "orchestrator": "Manager",
-      "permissions": "Permissions"
+      "permissions": "Permissions",
+      "ready": "Ready"
     },
     "stepOf": "Step {{n}} of {{total}}",
     "stepsLabel": "Setup steps",
@@ -2121,5 +2133,35 @@
       "withdrawn": "Cancelled",
       "not-sent": "Not sent"
     }
+  },
+  "engineSetup": {
+    "title": "Get {{godName}} ready",
+    "info": "{{godName}} runs on Claude Code, on your Claude plan. You install it and sign in once on this computer.",
+    "claude": "Claude Code",
+    "account": "Your Claude account",
+    "checking": "Checking…",
+    "installing": "Installing. This takes about a minute.",
+    "installed": "Installed",
+    "installFailed": "Could not install. Check your internet connection, then try again.",
+    "tryAgain": "Try again",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details",
+    "showClaude": "Show what Claude says",
+    "waitingInstall": "Waiting for Claude Code",
+    "signInWhy": "{{godName}} works through your Claude plan.",
+    "signInStuck": "Sign in did not finish. Try again.",
+    "signIn": "Sign in",
+    "inBrowser": "Finish signing in in your browser. This updates on its own.",
+    "openBrowserAgain": "Open the browser again",
+    "signedIn": "Signed in",
+    "signedInAs": "Signed in as {{email}}",
+    "setUpLater": "Set up later",
+    "openOffice": "Open the office",
+    "cardFrom": "From the app",
+    "cardTitle": "{{godName}} can't start yet",
+    "cardNotInstalled": "Claude Code isn't set up on this computer.",
+    "cardSignedOut": "Your Claude account isn't signed in.",
+    "cardAction": "Get {{godName}} ready",
+    "done": "Done"
   }
 }

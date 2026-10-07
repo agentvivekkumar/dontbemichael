@@ -99,7 +99,17 @@
     "fileRevealLabel": "在访达中显示 {{name}}",
     "fileRevealWindows": "在文件夹中显示",
     "fileRevealLabelWindows": "在所在文件夹中显示 {{name}}",
-    "fileKind": {"markdown": "Markdown", "text": "文本", "csv": "CSV", "excel": "Excel", "word": "Word", "powerpoint": "PowerPoint", "pdf": "PDF", "image": "图片", "file": "文件"},
+    "fileKind": {
+      "markdown": "Markdown",
+      "text": "文本",
+      "csv": "CSV",
+      "excel": "Excel",
+      "word": "Word",
+      "powerpoint": "PowerPoint",
+      "pdf": "PDF",
+      "image": "图片",
+      "file": "文件"
+    },
     "openDetail": "这个问题的完整背景，以及之前的回答",
     "answerPlaceholder": "你的回答，或者如果你已处理，写“完成”",
     "sending": "正在发送…",
@@ -829,6 +839,7 @@
       "home": "应用的位置",
       "orchestrator": "你的经理",
       "permissions": "权限与稳定运行",
+      "ready": "让 {{godName}} 准备就绪",
       "done": "全部完成"
     },
     "steps": {
@@ -838,7 +849,8 @@
       "team": "团队",
       "home": "位置",
       "orchestrator": "经理",
-      "permissions": "权限"
+      "permissions": "权限",
+      "ready": "就绪"
     },
     "stepOf": "第 {{n}} 步，共 {{total}} 步",
     "stepsLabel": "设置步骤",
@@ -2121,5 +2133,35 @@
       "withdrawn": "已取消",
       "not-sent": "未发送"
     }
+  },
+  "engineSetup": {
+    "title": "让 {{godName}} 准备就绪",
+    "info": "{{godName}} 基于 Claude Code 运行，使用你的 Claude 套餐。在这台电脑上只需安装并登录一次。",
+    "claude": "Claude Code",
+    "account": "你的 Claude 账户",
+    "checking": "正在检查…",
+    "installing": "正在安装，大约需要一分钟。",
+    "installed": "已安装",
+    "installFailed": "无法安装。请检查网络连接，然后重试。",
+    "tryAgain": "重试",
+    "showDetails": "显示详情",
+    "hideDetails": "隐藏详情",
+    "showClaude": "查看 Claude 的提示",
+    "waitingInstall": "等待 Claude Code",
+    "signInWhy": "{{godName}} 通过你的 Claude 套餐工作。",
+    "signInStuck": "登录未完成，请重试。",
+    "signIn": "登录",
+    "inBrowser": "请在浏览器中完成登录，此处会自动更新。",
+    "openBrowserAgain": "再次打开浏览器",
+    "signedIn": "已登录",
+    "signedInAs": "已登录为 {{email}}",
+    "setUpLater": "稍后设置",
+    "openOffice": "打开办公室",
+    "cardFrom": "来自应用",
+    "cardTitle": "{{godName}} 还无法启动",
+    "cardNotInstalled": "这台电脑上还没有设置 Claude Code。",
+    "cardSignedOut": "你的 Claude 账户尚未登录。",
+    "cardAction": "让 {{godName}} 准备就绪",
+    "done": "完成"
   }
 }

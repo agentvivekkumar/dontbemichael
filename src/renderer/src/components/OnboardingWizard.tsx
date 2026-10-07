@@ -12,7 +12,8 @@ import { InfoTip } from './InfoTip';
 import { SpritePortrait } from './SpritePortrait';
 import { ProviderLogo } from './ProviderLogo';
 import { modelsForProvider, onboardingEngineChoices, teamDefaultsFromMichael, type AgentProvider, type HarnessConfig } from '@/store/config';
-import { providerPreset } from '@shared/agentProvider';
+import { isClaudeProvider, providerPreset } from '@shared/agentProvider';
+import { GetMichaelReady, GetMichaelReadyInfo } from './GetMichaelReady';
 import {
   classifyEngineAvailability, engineAvailabilityBadge, engineAvailabilityMessage, engineBlocksOnboarding
 } from '@shared/engineAvailability';
@@ -32,10 +33,10 @@ export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
   /** Open on a later step with the first answers filled in. Only for the
    *  reference screens (tools/studio-lab/reference.tsx); the app never sets it. */
-  preview?: { step: 'business' | 'welcome' | 'team'; businessType: string; businessName: string };
+  preview?: { step: 'business' | 'welcome' | 'team' | 'ready'; businessType: string; businessName: string };
 }
 
-type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'done';
+type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'ready' | 'done';
 
 /** The "no pack fits" tile. Not an error path: Michael asks a few questions and
  *  builds from the core pack, so the grid always resolves to something. */
@@ -311,6 +312,12 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   useEffect(() => { void probeEngines(); }, []);
   const selectedEngine = classifyEngineAvailability(engines, godProvider);
   const engineBlocked = engineBlocksOnboarding(selectedEngine);
+  // Get Michael ready (docs/designs/get-michael-ready.md): with Claude, setup
+  // ends on a Ready step that installs it and signs the owner in, where they
+  // can see it. Open the office waits for it; Set up later does not.
+  const withReady = isClaudeProvider(godProvider);
+  const lastStep: Step = withReady ? 'ready' : 'permissions';
+  const [engineReady, setEngineReady] = useState(false);
 
   // Permissions & reliability toggles. These apply IMMEDIATELY on change (their
   // own IPC / OS state) — they are NOT part of finish()'s config write. First-run
@@ -503,15 +510,16 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   // Design v2 onboarding (branding/DESIGN.md 7.25): a full window with the
   // lockup and the step indicator on top, the step's card on the left, and the
   // studio on the right filling with the team as it is picked.
-  const stepIndex = ORDERED_STEPS.indexOf(step as typeof ORDERED_STEPS[number]);
-  const stepTitle = t(`onboarding.stepTitle.${step}`);
+  const steps: readonly Step[] = withReady ? ORDERED_STEPS : ORDERED_STEPS.filter((s) => s !== 'ready');
+  const stepIndex = steps.indexOf(step);
+  const stepTitle = t(`onboarding.stepTitle.${step}`, { godName });
   const studioPicked = step === 'team' ? teamAgents.filter((a) => teamPicked[a.id]) : teamAgents.filter((a) => teamPicked[a.id] ?? true);
   const studioUnpicked = step === 'team' ? teamAgents.filter((a) => !teamPicked[a.id]) : [];
   const toSeat = (a: AgentDefinitionV2) => ({ id: a.id, character: a.character, description: a.role });
   // The card is centered whenever the studio isn't showing (Business, Details,
   // Resume, or no team yet) and sits in its column when it is; the move and the
   // glow follow this one flag (docs/designs/onboarding-centered.md).
-  const hasStudio = (step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions') && teamAgents.length > 0;
+  const hasStudio = (step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions' || step === 'ready') && teamAgents.length > 0;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto',
@@ -525,10 +533,10 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
       }}>
         <img className="cth-lockup-light" src={lockupLight} alt="Don't Be Michael" style={{ height: 24, width: 'auto' }} />
         <img className="cth-lockup-dark" src={lockupDark} alt="Don't Be Michael" style={{ height: 24, width: 'auto' }} />
-        {stepIndex >= 0 && <StepIndicator current={stepIndex} />}
+        {stepIndex >= 0 && <StepIndicator steps={steps} current={stepIndex} />}
         {stepIndex >= 0 && (
           <span style={{ marginInlineStart: 'auto', fontSize: 12, color: 'var(--cth-ink-3)' }}>
-            {t('onboarding.stepOf', { n: stepIndex + 1, total: ORDERED_STEPS.length })}
+            {t('onboarding.stepOf', { n: stepIndex + 1, total: steps.length })}
           </span>
         )}
       </div>
@@ -549,7 +557,10 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
             boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg)', overflow: 'clip'
           }}>
           <div style={{ padding: '22px 22px 4px' }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--cth-ink)' }}>{stepTitle}</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--cth-ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {stepTitle}
+              {step === 'ready' && <GetMichaelReadyInfo />}
+            </h1>
           </div>
           <div style={{ padding: '14px 22px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -1063,6 +1074,8 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
               </>
             )}
 
+            {step === 'ready' && <GetMichaelReady provider={godProvider} onReadyChange={setEngineReady} />}
+
             {step === 'permissions' && (
               <>
                 {/* AUTONOMY — one choice that maps to each engine's flag: autoMode →
@@ -1209,7 +1222,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
               position: 'sticky', bottom: 0, zIndex: 2, margin: '4px -22px -22px', padding: '12px 22px 16px',
               background: 'var(--cth-card)', borderTop: '1px solid var(--cth-line)'
             }}>
-              {step === 'resume' ? <span /> : <Dots step={step} />}
+              {step === 'resume' ? <span /> : <Dots step={step} withReady={withReady} />}
               <div style={{ display: 'flex', gap: 8 }}>
                 {step !== 'business' && step !== 'resume' && (
                   <PixelButton
@@ -1221,7 +1234,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     {t('common.back')}
                   </PixelButton>
                 )}
-                {step !== 'permissions' && step !== 'resume' && (
+                {step !== lastStep && step !== 'resume' && (
                   <PixelButton
                     variant="primary"
                     size="md"
@@ -1280,9 +1293,19 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     {step === 'welcome' ? t('onboarding.team.suggestCta') : t('common.next')}
                   </PixelButton>
                 )}
-                {step === 'permissions' && (
+                {step === 'permissions' && lastStep === 'permissions' && (
                   <PixelButton variant="primary" size="md" onClick={finish} disabled={busy}>
                     {busy ? t('common.saving') : t('common.finish')}
+                  </PixelButton>
+                )}
+                {step === 'ready' && !engineReady && (
+                  <PixelButton variant="ghost" size="md" onClick={finish} disabled={busy}>
+                    {t('engineSetup.setUpLater')}
+                  </PixelButton>
+                )}
+                {step === 'ready' && (
+                  <PixelButton variant="primary" size="md" onClick={finish} disabled={busy || !engineReady}>
+                    {busy ? t('common.saving') : t('engineSetup.openOffice')}
                   </PixelButton>
                 )}
               </div>
@@ -1300,17 +1323,18 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   );
 }
 
-const ORDERED_STEPS = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions'] as const;
+const ORDERED_STEPS = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions', 'ready'] as const;
 
-/** Seven labelled steps: done ones checked, the current one in ink. */
-function StepIndicator({ current }: { current: number }) {
+/** The labelled steps (eight with Claude, whose Ready step sets it up; seven
+ *  otherwise): done ones checked, the current one in ink. */
+function StepIndicator({ steps, current }: { steps: readonly Step[]; current: number }) {
   const { t } = useTranslation();
   return (
     <ol aria-label={t('onboarding.stepsLabel')} style={{
       margin: '0 auto', padding: '6px 10px', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8,
       background: 'var(--cth-card)', borderRadius: 999, boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
     }}>
-      {ORDERED_STEPS.map((key, i) => {
+      {steps.map((key, i) => {
         const done = i < current;
         const now = i === current;
         return (
@@ -1547,11 +1571,11 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
   );
 }
 
-function Dots({ step }: { step: Step }) {
-  const order: Step[] = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions'];
+function Dots({ step, withReady }: { step: Step; withReady: boolean }) {
+  const order: Step[] = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions', 'ready'];
   return (
     <div style={{ display: 'flex', gap: 4 }}>
-      {order.map((s) => (
+      {order.filter((s) => withReady || s !== 'ready').map((s) => (
         <span key={s} style={{
           borderRadius: 'var(--cth-r-md)',
           width: 8, height: 8,
@@ -1575,10 +1599,12 @@ function nextStep(s: Step): Step {
     : s === 'team' ? 'home'
     : s === 'home' ? 'orchestrator'
     : s === 'orchestrator' ? 'permissions'
+    : s === 'permissions' ? 'ready'
     : 'done';
 }
 function prevStep(s: Step): Step {
-  return s === 'permissions' ? 'orchestrator'
+  return s === 'ready' ? 'permissions'
+    : s === 'permissions' ? 'orchestrator'
     : s === 'orchestrator' ? 'home'
     : s === 'home' ? 'team'
     : s === 'team' ? 'welcome'

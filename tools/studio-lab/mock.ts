@@ -46,7 +46,9 @@ w.cth = new Proxy({
   onMissionsUpdated: noop,
   onConfigChanged: noop,
   packsList: async () => ({ packs: [], core: null }),
-  quickbooksRoleDefaults: async () => ['oscar']
+  quickbooksRoleDefaults: async () => ['oscar'],
+  // Claude set up, unless a shot says otherwise (get-michael-ready.md).
+  engineSetupStatus: async () => w.__engine ?? { applies: true, installed: true, signedIn: true, needed: false }
 }, {
   get: (t: Record<string, unknown>, k: string) => (k in t ? t[k]
     : k.startsWith('on') ? ((cb: unknown) => { ((w.__L ??= {})[k] ??= []).push(cb); return () => {}; })
