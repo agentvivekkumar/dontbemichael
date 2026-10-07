@@ -457,6 +457,9 @@ export class PtyManager {
         `${appData}\\npm\\${command}.cmd`,
         `${appData}\\npm\\${command}`,
         `${localAppData}\\Programs\\claude\\${command}.exe`,
+      // Claude's own installer (install.ps1) puts claude.exe here and updates the
+      // user PATH in the registry, which this already running app never sees.
+      `${home}\\.local\\bin\\${command}.exe`,
         `${home}\\.claude\\local\\${command}.cmd`,
         `${home}\\.claude\\local\\${command}`
       ];

@@ -198,3 +198,27 @@ test('an API key the owner chose is approved by its last 20 characters, once, ke
   assert.deepEqual(c.customApiKeyResponses, { approved: ['older', 'ABCDEFGHIJ0123456789'], rejected: [] });
   assert.ok(!JSON.stringify(c).includes(key), 'the whole key is never written');
 });
+
+test('one start writes the welcome, the folder trust and the key approval in a single pass', () => {
+  // Value: protects=a Claude start reads and writes ~/.claude.json (megabytes for a busy owner) once, and approves the key with the rest; fails_when=approveKey is ignored or the three edits split back into separate writes that lose each other; why_new=review performance 2026-10-07; seam=none
+  const key = 'sk-ant-api03-' + 'y'.repeat(40) + 'KLMNOPQRST0123456789';
+  ensureClaudePermissionsAccepted(cwd, { approveKey: key });
+  const c = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+  assert.equal(c.hasCompletedOnboarding, true);
+  assert.equal(c.projects[cwd].hasTrustDialogAccepted, true);
+  assert.deepEqual(c.customApiKeyResponses, { approved: ['KLMNOPQRST0123456789'], rejected: [] });
+});
+
+test('approving a blank key, or into an odd file, changes nothing it should not', () => {
+  // Value: protects=a blank key is never approved and odd Claude config shapes are cleaned or left alone, never corrupted; fails_when=the empty-tail guard goes, non-string entries survive, or a non-object file is rewritten; why_new=review testing specialist; seam=none
+  fs.writeFileSync(projectConfigPath, '[1,2]', 'utf8');
+  approveClaudeApiKey('k'.repeat(30), home);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), '[1,2]');
+  const plain = JSON.stringify({ custom: 'keep' });
+  fs.writeFileSync(projectConfigPath, plain, 'utf8');
+  approveClaudeApiKey('   ', home);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), plain);
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ customApiKeyResponses: { approved: [1, 'a'], rejected: 'no' } }), 'utf8');
+  approveClaudeApiKey('k'.repeat(30), home);
+  assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).customApiKeyResponses, { approved: ['a', 'k'.repeat(20)], rejected: [] });
+});

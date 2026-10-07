@@ -1222,7 +1222,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
               position: 'sticky', bottom: 0, zIndex: 2, margin: '4px -22px -22px', padding: '12px 22px 16px',
               background: 'var(--cth-card)', borderTop: '1px solid var(--cth-line)'
             }}>
-              {step === 'resume' ? <span /> : <Dots step={step} withReady={withReady} />}
+              {step === 'resume' ? <span /> : <Dots step={step} steps={steps} />}
               <div style={{ display: 'flex', gap: 8 }}>
                 {step !== 'business' && step !== 'resume' && (
                   <PixelButton
@@ -1571,11 +1571,10 @@ function ToggleRow({ icon, label, desc, on, tint, edge, onChange }: {
   );
 }
 
-function Dots({ step, withReady }: { step: Step; withReady: boolean }) {
-  const order: Step[] = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions', 'ready'];
+function Dots({ step, steps }: { step: Step; steps: readonly Step[] }) {
   return (
     <div style={{ display: 'flex', gap: 4 }}>
-      {order.filter((s) => withReady || s !== 'ready').map((s) => (
+      {steps.map((s) => (
         <span key={s} style={{
           borderRadius: 'var(--cth-r-md)',
           width: 8, height: 8,

@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import type { AgentProvider } from '@shared/agentProvider';
-import { engineSetupPhase, type EngineSetupStatus } from '@shared/engineSetup';
+import { ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, engineSetupPhase, engineSetupPhaseOpensOffice, type EngineSetupStatus } from '@shared/engineSetup';
+import { useRtl } from '@/i18n/useDirection';
+import { Icon, type IconName } from './Icon';
 import { InfoTip } from './InfoTip';
 import { PixelButton } from './PixelButton';
 import { PtyTerminalView } from './PtyTerminalView';
 
-/** The setup terminals main runs (src/main/engineSetup.ts). */
-const INSTALL_PTY = 'engine-setup-install';
-const SIGNIN_PTY = 'engine-setup-signin';
 /** How often the step looks again while the owner signs in in the browser. */
 const SIGNIN_POLL_MS = 2000;
 
@@ -33,6 +32,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
   const [signInStuck, setSignInStuck] = useState(false);
   const [details, setDetails] = useState(false);
   const reads = useRef(0);
+  const inFlight = useRef(false);
   const autoInstalled = useRef(false);
   // Use an API key instead of a Claude account: the key never comes back.
   const [keyForm, setKeyForm] = useState(false);
@@ -98,32 +98,37 @@ export function GetMichaelReady({ provider, onReadyChange }: {
   useEffect(() => window.cth.onEngineSetupChanged((e) => {
     void read().then((s) => {
       if (!s) return;
-      if (e.id === INSTALL_PTY) {
+      if (e.id === ENGINE_INSTALL_PTY) {
         setInstalling(false);
         setInstallFailed(!s.installed);
       }
-      if (e.id === SIGNIN_PTY && s.signedIn === false) {
+      if (e.id === ENGINE_SIGNIN_PTY && s.signedIn === false) {
         setBrowser(false);
         setSignInStuck(true);
       }
     });
   }), [read]);
 
-  // While the owner signs in in the browser, look every 2 s.
+  // While the owner signs in in the browser, look every 2 s, one look at a
+  // time: each starts `claude auth status`, which can be slow to answer.
   useEffect(() => {
     if (!browser) return;
-    const iv = setInterval(() => { void read(); }, SIGNIN_POLL_MS);
+    const iv = setInterval(() => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      void read().finally(() => { inFlight.current = false; });
+    }, SIGNIN_POLL_MS);
     return () => clearInterval(iv);
   }, [browser, read]);
 
   const phase = engineSetupPhase(status, { installing, installFailed, browser });
-  const ready = phase === 'ready';
+  const ready = engineSetupPhaseOpensOffice(phase);
   useEffect(() => { onReadyChange?.(ready); }, [ready, onReadyChange]);
   // A finished step has nothing to show behind Show details.
   useEffect(() => { if (ready) setDetails(false); }, [ready]);
 
-  const detailsPty = phase === 'installing' || phase === 'installFailed' ? INSTALL_PTY
-    : phase === 'browser' ? SIGNIN_PTY : null;
+  const detailsPty = phase === 'installing' || phase === 'installFailed' ? ENGINE_INSTALL_PTY
+    : phase === 'browser' ? ENGINE_SIGNIN_PTY : null;
   const detailsToggle = detailsPty && (
     <button type="button" onClick={() => setDetails((d) => !d)} style={linkBtn}>
       {details ? t('engineSetup.hideDetails') : (phase === 'browser' ? t('engineSetup.showClaude') : t('engineSetup.showDetails'))}
@@ -146,7 +151,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
         </Row>
       );
       case 'installFailed': return (
-        <Row icon="!" tone="bad" label={t('engineSetup.claude')} status={t('engineSetup.installFailed')} bad>
+        <Row icon="x" tone="bad" label={t('engineSetup.claude')} status={t('engineSetup.installFailed')} bad>
           <div style={actions}>
             <PixelButton variant="primary" size="sm" onClick={() => { setDetails(false); void install(); }}>{t('engineSetup.tryAgain')}</PixelButton>
             {detailsToggle}
@@ -154,38 +159,38 @@ export function GetMichaelReady({ provider, onReadyChange }: {
           {terminal}
         </Row>
       );
-      default: return <Row icon="✓" tone="ok" label={t('engineSetup.claude')} status={t('engineSetup.installed')} />;
+      default: return <Row icon="check" tone="ok" label={t('engineSetup.claude')} status={t('engineSetup.installed')} />;
     }
   })();
+
+  // The API key form, from Sign in or from a sign in that could not be read.
+  const keyFormRow = (
+    <Row icon="arrow-right" tone="idle" label={t('engineSetup.apiKey')} info={<InfoTip text={t('engineSetup.keyInfo')} label={t('engineSetup.apiKey')} />}>
+      <form onSubmit={(e) => { e.preventDefault(); void saveKey(); }} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label htmlFor="cth-engine-key" style={visuallyHidden}>{t('engineSetup.apiKey')}</label>
+        <input id="cth-engine-key" className="cth-input" type="password" autoComplete="off" spellCheck={false} dir="ltr"
+          value={keyDraft} onChange={(e) => { setKeyDraft(e.target.value); setKeyError(undefined); }}
+          placeholder="sk-ant-…" aria-invalid={!!keyError} aria-describedby={keyError ? 'cth-engine-key-error' : undefined}
+          style={keyInput} />
+        {keyError && <div id="cth-engine-key-error" role="alert" style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{keyError}</div>}
+        <div style={{ ...actions, marginTop: 4 }}>
+          <PixelButton variant="primary" size="sm" disabled={keyBusy || !keyDraft.trim()} onClick={() => void saveKey()}>
+            {keyBusy ? t('engineSetup.keyChecking') : t('engineSetup.keySave')}
+          </PixelButton>
+          <PixelButton variant="ghost" size="sm" disabled={keyBusy} onClick={() => { setKeyForm(false); setKeyDraft(''); setKeyError(undefined); }}>{t('common.cancel')}</PixelButton>
+        </div>
+      </form>
+    </Row>
+  );
 
   const accountRow = (() => {
     switch (phase) {
       case 'checking':
       case 'installing':
       case 'installFailed':
-        return <Row icon="·" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.waitingInstall')} dim />;
-      case 'signin': return keyForm ? (
-        <Row icon="→" tone="idle" label={t('engineSetup.apiKey')} status={t('engineSetup.keyWhy')}>
-          <form onSubmit={(e) => { e.preventDefault(); void saveKey(); }} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>
-              <label htmlFor="cth-engine-key">{t('engineSetup.apiKey')}</label>
-              <InfoTip text={t('engineSetup.keyInfo')} label={t('engineSetup.apiKey')} />
-            </span>
-            <input id="cth-engine-key" className="cth-input" type="password" autoComplete="off" spellCheck={false} dir="ltr"
-              value={keyDraft} onChange={(e) => { setKeyDraft(e.target.value); setKeyError(undefined); }}
-              placeholder="sk-ant-…" aria-invalid={!!keyError} aria-describedby={keyError ? 'cth-engine-key-error' : undefined}
-              style={keyInput} />
-            {keyError && <div id="cth-engine-key-error" role="alert" style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{keyError}</div>}
-            <div style={{ ...actions, marginTop: 4 }}>
-              <PixelButton variant="primary" size="sm" disabled={keyBusy || !keyDraft.trim()} onClick={() => void saveKey()}>
-                {keyBusy ? t('engineSetup.keyChecking') : t('engineSetup.keySave')}
-              </PixelButton>
-              <PixelButton variant="ghost" size="sm" disabled={keyBusy} onClick={() => { setKeyForm(false); setKeyDraft(''); setKeyError(undefined); }}>{t('common.cancel')}</PixelButton>
-            </div>
-          </form>
-        </Row>
-      ) : (
-        <Row icon="→" tone="idle" label={t('engineSetup.account')} status={signInStuck ? t('engineSetup.signInStuck') : t('engineSetup.signInWhy', { godName })} bad={signInStuck}>
+        return <Row icon="clock" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.waitingInstall')} dim />;
+      case 'signin': return keyForm ? keyFormRow : (
+        <Row icon="arrow-right" tone="idle" label={t('engineSetup.account')} status={signInStuck ? t('engineSetup.signInStuck') : t('engineSetup.signInWhy', { godName })} bad={signInStuck}>
           <div style={actions}>
             <PixelButton variant="primary" size="sm" onClick={() => void signIn()}>{t('engineSetup.signIn')}</PixelButton>
             <PixelButton variant="secondary" size="sm" onClick={() => setKeyForm(true)}>{t('engineSetup.useApiKey')}</PixelButton>
@@ -201,10 +206,19 @@ export function GetMichaelReady({ provider, onReadyChange }: {
           {terminal}
         </Row>
       );
+      // Sign in could not be read: Michael may still start, but no green check.
+      case 'unknown': return keyForm ? keyFormRow : (
+        <Row icon="info" tone="idle" label={t('engineSetup.account')} status={t('engineSetup.signInUnknown')}>
+          <div style={actions}>
+            <PixelButton variant="secondary" size="sm" onClick={() => void signIn()}>{t('engineSetup.signIn')}</PixelButton>
+            <PixelButton variant="secondary" size="sm" onClick={() => setKeyForm(true)}>{t('engineSetup.useApiKey')}</PixelButton>
+          </div>
+        </Row>
+      );
       default: return status?.method === 'apiKey' ? (
-        <Row icon="✓" tone="ok" label={t('engineSetup.apiKey')} status={t('engineSetup.usingApiKey')} />
+        <Row icon="check" tone="ok" label={t('engineSetup.apiKey')} status={t('engineSetup.usingApiKey')} />
       ) : (
-        <Row icon="✓" tone="ok" label={t('engineSetup.account')}
+        <Row icon="check" tone="ok" label={t('engineSetup.account')}
           status={status?.email ? t('engineSetup.signedInAs', { email: status.email }) : t('engineSetup.signedIn')} />
       );
     }
@@ -234,20 +248,29 @@ const TONES = {
   idle: { background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)' }
 } as const;
 
-function Row({ icon, tone, label, status, bad, dim, children }: {
-  icon: ReactNode; tone: keyof typeof TONES; label: string; status: string; bad?: boolean; dim?: boolean; children?: ReactNode;
+function Row({ icon, tone, label, status, info, bad, dim, children }: {
+  icon: IconName | ReactNode; tone: keyof typeof TONES; label: string; status?: string; info?: ReactNode; bad?: boolean; dim?: boolean; children?: ReactNode;
 }) {
+  const rtl = useRtl();
+  const glyph = typeof icon === 'string'
+    ? <Icon name={icon as IconName} size={0.875} style={icon === 'arrow-right' && rtl ? { transform: 'scaleX(-1)' } : undefined} />
+    : icon;
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 14, opacity: dim ? 0.55 : 1 }}>
-      <span aria-hidden style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', fontSize: 13, ...TONES[tone] }}>{icon}</span>
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 14 }}>
+      {/* A waiting row dims its icon only, so its text keeps full contrast. */}
+      <span aria-hidden style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', opacity: dim ? 0.55 : 1, ...TONES[tone] }}>{glyph}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{label}</div>
-        <div role={bad ? 'alert' : undefined} style={{ fontSize: 12, lineHeight: '18px', marginTop: 2, color: bad ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)' }}>{status}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: dim ? 'var(--cth-ink-3)' : 'var(--cth-ink)' }}>{label}{info}</div>
+        {status && <div role={bad ? 'alert' : undefined} style={{ fontSize: 12, lineHeight: '18px', marginTop: 2, color: bad ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)' }}>{status}</div>}
         {children}
       </div>
     </div>
   );
 }
+
+const visuallyHidden: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0
+};
 
 function Spinner() {
   return <span className="cth-engine-spin" />;

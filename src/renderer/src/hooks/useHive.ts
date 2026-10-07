@@ -23,6 +23,7 @@ import { FIRST_TASK_EDITED_MAX, withoutLegacyFirstTask } from '../../../shared/f
 import { firstTaskSection } from '../../../shared/workStyleText';
 import { splitAgentRole } from '../../../shared/agentRole';
 import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
+import { ENGINE_READY_EVENT } from '@/shell/useNeedsYou';
 import { seedStarterJobs } from '@/shell/seedStarterJobs';
 import { PromptSubmits, confirmSubmit } from '../../../shared/submitConfirm';
 
@@ -1336,6 +1337,21 @@ export function useHive(config: HarnessConfig | null): void {
   //    After 10 minutes still busy, or when the owner presses Restart now, it
   //    restarts anyway and says so on the floor. Main asks for a connector
   //    restart whenever the agent would now start differently.
+  // Claude turned ready after Michael or the team could not start for want of
+  // it (get-michael-ready.md): from the card, setup, a sign in in the browser,
+  // or an install outside the app. Everyone on Claude restarts now; their
+  // terminals only said what to do, so there is nothing to wait for.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const onReady = (): void => {
+      const { agents, setPendingRestart } = useStore.getState();
+      for (const a of agents) {
+        if (a.ptyId && isClaudeProvider(a.provider ?? 'claude')) setPendingRestart(a.id, { at: Date.now(), reason: 'engine', now: true });
+      }
+    };
+    window.addEventListener(ENGINE_READY_EVENT, onReady);
+    return () => window.removeEventListener(ENGINE_READY_EVENT, onReady);
+  }, [config?.onboardingComplete]);
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const queue = (agentId: string): void => {

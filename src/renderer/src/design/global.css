@@ -594,7 +594,9 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-engine-bar { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--cth-neutral-soft); overflow: hidden; }
 .cth-engine-bar > i { display: block; width: 40%; height: 100%; border-radius: 2px; background: var(--cth-indigo); animation: cth-engine-bar 1.4s var(--cth-ease) infinite; }
 @keyframes cth-engine-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-[dir="rtl"] .cth-engine-bar > i { animation-direction: reverse; }
+/* Right to left the bar starts at the right edge: its own sweep, same easing. */
+[dir="rtl"] .cth-engine-bar > i { animation-name: cth-engine-bar-rtl; }
+@keyframes cth-engine-bar-rtl { from { transform: translateX(100%); } to { transform: translateX(-250%); } }
 @media (prefers-reduced-motion: reduce) {
   .cth-engine-spin { animation: none; }
   .cth-engine-bar > i { animation: none; width: 100%; opacity: .5; }

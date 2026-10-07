@@ -2157,7 +2157,6 @@
     "signedInAs": "已登录为 {{email}}",
     "setUpLater": "稍后设置",
     "openOffice": "打开办公室",
-    "cardFrom": "来自应用",
     "cardTitle": "{{godName}} 还无法启动",
     "cardNotInstalled": "这台电脑上还没有设置 Claude Code。",
     "cardSignedOut": "你的 Claude 账户尚未登录。",
@@ -2165,8 +2164,7 @@
     "done": "完成",
     "useApiKey": "使用 API 密钥",
     "apiKey": "Anthropic API 密钥",
-    "keyWhy": "Claude Code 将使用此密钥代替 Claude 账户，费用计入你的 Anthropic 账户。",
-    "keyInfo": "在 console.anthropic.com 的 API keys 页面创建密钥。密钥只保存在这台电脑上，不会再次显示。",
+    "keyInfo": "Claude Code 将使用此密钥代替 Claude 账户，费用计入你的 Anthropic 账户。在 console.anthropic.com 的 API keys 页面创建密钥。这台电脑上团队的工具都可以使用它，所以请选择设有支出上限的密钥。",
     "keySave": "保存密钥",
     "keyChecking": "正在检查…",
     "usingApiKey": "正在使用你的 Anthropic API 密钥",
@@ -2175,6 +2173,8 @@
       "rejected": "Anthropic 未接受该密钥，请检查后重试。",
       "unreachable": "无法检查该密钥。请检查网络连接，然后重试。",
       "store": "无法在这台电脑上保存密钥，请重试。"
-    }
+    },
+    "signInUnknown": "无法检查登录状态。如果 Claude 提示，请登录。",
+    "cardTitleTeam": "你的部分团队成员还无法启动"
   }
 }

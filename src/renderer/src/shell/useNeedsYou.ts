@@ -73,8 +73,13 @@ let offProposals: (() => void) | null = null;
 let offEngine: (() => void) | null = null;
 let engineReads = 0;
 // `claude auth status` starts a process, so the 5 s poll reads the engine at
-// most once a minute; a setup terminal ending, or refreshNeedsYou, reads it at once.
+// most once a minute while Michael cannot start, and every 10 minutes once he
+// can; a setup terminal ending, or refreshNeedsYou, reads it at once.
 const ENGINE_EVERY_MS = 60_000;
+const ENGINE_SETTLED_EVERY_MS = 10 * 60_000;
+/** Fired on window when Claude turns ready after Michael could not start: the
+ *  team restarts however that happened (useHive), not only from the card. */
+export const ENGINE_READY_EVENT = 'cth:engine-ready';
 let engineReadAt = 0;
 let proposalReads = 0;
 // A read that started before a newer read or a local change must not land.
@@ -86,6 +91,7 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   // A poll that brings nothing new changes nothing, so nobody re-renders.
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
+  const wasNeeded = !!(feed.engineSetup?.applies && feed.engineSetup.needed);
   const merged = { ...feed, ...next };
   feed = {
     ...merged,
@@ -95,6 +101,9 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   // One more while Michael cannot start for want of his engine (get-michael-ready.md).
   if (merged.engineSetup?.applies && merged.engineSetup.needed) feed = { ...feed, count: feed.count + 1 };
   for (const l of [...listeners]) l();
+  if (wasNeeded && merged.engineSetup && !merged.engineSetup.needed && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event(ENGINE_READY_EVENT));
+  }
 }
 
 function readTasks(): void {
@@ -120,7 +129,8 @@ function readRequests(): void {
 }
 
 function readEngine(force = true): void {
-  if (!force && Date.now() - engineReadAt < ENGINE_EVERY_MS) return;
+  const every = feed.engineSetup && !(feed.engineSetup.applies && feed.engineSetup.needed) ? ENGINE_SETTLED_EVERY_MS : ENGINE_EVERY_MS;
+  if (!force && Date.now() - engineReadAt < every) return;
   engineReadAt = Date.now();
   const mine = ++engineReads;
   void window.cth.engineSetupStatus?.()
@@ -181,11 +191,13 @@ export function getNeedsYouFeed(): NeedsYouFeed {
 
 /** Read again now: after the owner answers, approves or edits something. */
 export function refreshNeedsYou(): void {
+  // The engine first: readTasks' throttled read then sees it fresh and skips,
+  // so one refresh starts one `claude auth status`, not two.
+  readEngine();
   readTasks();
   readRequests();
   readProposals();
   readOffers();
-  readEngine();
 }
 
 /** Show a local change at once (an answer just saved, a card dismissed); the

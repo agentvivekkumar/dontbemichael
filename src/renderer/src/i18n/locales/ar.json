@@ -2157,7 +2157,6 @@
     "signedInAs": "تم تسجيل الدخول باسم {{email}}",
     "setUpLater": "الإعداد لاحقًا",
     "openOffice": "افتح المكتب",
-    "cardFrom": "من التطبيق",
     "cardTitle": "لا يمكن لـ {{godName}} البدء بعد",
     "cardNotInstalled": "لم يتم إعداد Claude Code على هذا الكمبيوتر.",
     "cardSignedOut": "لم يتم تسجيل الدخول إلى حسابك في Claude.",
@@ -2165,8 +2164,7 @@
     "done": "تم",
     "useApiKey": "استخدم مفتاح API",
     "apiKey": "مفتاح Anthropic API",
-    "keyWhy": "يستخدم Claude Code هذا المفتاح بدلًا من حساب Claude. تُحتسب التكلفة على حسابك في Anthropic.",
-    "keyInfo": "أنشئ مفتاحًا في console.anthropic.com ضمن API keys. يُحفظ على هذا الكمبيوتر فقط ولن يُعرض مرة أخرى.",
+    "keyInfo": "يستخدم Claude Code هذا المفتاح بدلًا من حساب Claude، وتُحتسب التكلفة على حسابك في Anthropic. أنشئ مفتاحًا في console.anthropic.com ضمن API keys. يمكن لأدوات فريقك على هذا الكمبيوتر استخدامه، لذا اختر مفتاحًا بحد إنفاق.",
     "keySave": "احفظ المفتاح",
     "keyChecking": "جارٍ التحقق…",
     "usingApiKey": "يتم استخدام مفتاح Anthropic API الخاص بك",
@@ -2175,6 +2173,8 @@
       "rejected": "لم تقبل Anthropic هذا المفتاح. تحقّق منه وحاول مرة أخرى.",
       "unreachable": "تعذّر التحقق من المفتاح. تحقّق من اتصالك بالإنترنت، ثم حاول مرة أخرى.",
       "store": "تعذّر حفظ المفتاح على هذا الكمبيوتر. حاول مرة أخرى."
-    }
+    },
+    "signInUnknown": "تعذّر التحقق من تسجيل الدخول. سجّل الدخول إذا طلب Claude ذلك.",
+    "cardTitleTeam": "لا يمكن لبعض أعضاء فريقك البدء بعد"
   }
 }

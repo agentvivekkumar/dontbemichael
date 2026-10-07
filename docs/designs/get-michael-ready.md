@@ -55,7 +55,9 @@ Onboarding marked Claude "installs on first run" and let the owner through.
 - **Footer:** Back, Set up later (opens the office anyway), and Open the office
   (off until both rows are green).
 - **Unreadable sign in state:** when the sign in state can't be read (an old
-  Claude without `auth status`), it never blocks.
+  Claude without `auth status`), it never blocks, and it never shows a green
+  check either: the row reads "Could not check sign in" with Sign in and Use an
+  API key.
 
 **API key instead of a Claude account (D3).** Beside Sign in, Use an API key
 opens one password field (an info icon says where to create a key).
@@ -73,6 +75,16 @@ opens one password field (an info icon says where to create a key).
 - **The row then reads** "Using your Anthropic API key". Signing in with an
   account later switches `claudeAuth` back.
 
+**Finding Claude.** The status, the install check and a Claude start look for
+`claude` on the owner's PATH (captured once) and where Claude's installers put
+it, including `%USERPROFILE%\.local\bin\claude.exe` on Windows, without
+launching a login shell: a miss there froze the app for about a second.
+
+**The key and the team's tools (D3).** Claude Code reads the key from its
+environment, so the tools an agent runs can read it too. The key's info icon
+says so and suggests a key with a spending limit. The key check goes through
+Electron's network stack, which follows the system proxy.
+
 **Claude's welcome screen.** A fresh Claude Code opens on a text style and sign
 in screen that would also wait in the hidden terminal. `hasCompletedOnboarding`
 is now set in `~/.claude.json` with the folder trust the app already writes.
@@ -82,7 +94,11 @@ out, Ask me holds a "Michael can't start yet" card, and the needs-you count
 includes it.
 
 - The card opens the same rows in a dialog.
-- Done restarts everyone on Claude: `pendingRestart` with reason `engine`, now.
+- When Michael runs on another engine but a team member on Claude could not
+  start, the card reads "Some of your team can't start yet".
+- Claude turning ready restarts everyone on Claude (`pendingRestart`, reason
+  `engine`, now), however it turned ready: the card, setup, the browser, or an
+  install outside the app. The needs-you feed fires the edge; useHive restarts.
 - The feed reads the status when a setup terminal ends or an agent can't start,
   and at most once a minute on the 5 s poll.
 
