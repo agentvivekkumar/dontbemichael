@@ -239,7 +239,8 @@ test('~/.claude.json is swapped in whole, keeps its permissions, and leaves no t
   fs.writeFileSync(projectConfigPath, JSON.stringify({ custom: 'keep' }), { encoding: 'utf8', mode: 0o600 });
   fs.chmodSync(projectConfigPath, 0o600);
   approveClaudeApiKey('k'.repeat(30), home);
-  assert.equal(fs.statSync(projectConfigPath).mode & 0o777, 0o600, 'owner-only stays owner-only');
+  // Windows has no POSIX permission bits to keep.
+  if (process.platform !== 'win32') assert.equal(fs.statSync(projectConfigPath).mode & 0o777, 0o600, 'owner-only stays owner-only');
   assert.deepEqual(fs.readdirSync(home).filter((f) => f.includes('.dbm-')), [], 'no temp copy left behind');
   assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).custom, 'keep');
   const src = fs.readFileSync(path.join(__dirname, '../src/main/config.ts'), 'utf8');

@@ -32,7 +32,12 @@ test('checking a key asks Anthropic once, the right way, and a dead network or t
   assert.deepEqual(calls[0].init.headers, { 'x-api-key': key, 'anthropic-version': '2023-06-01' });
   assert.ok(calls[0].init.signal instanceof AbortSignal, 'a timeout signal rides along');
   assert.equal(await setup.checkAnthropicKey(key, async () => { throw new TypeError('fetch failed'); }), 'unreachable', 'a network error');
-  const hang = (_url, init) => new Promise((_res, rej) => init.signal.addEventListener('abort', () => rej(init.signal.reason)));
+  // AbortSignal.timeout's timer does not hold the event loop open, so the fake
+  // keeps one ref'd timer of its own until the signal fires.
+  const hang = (_url, init) => new Promise((_res, rej) => {
+    const keep = setTimeout(() => {}, 5000);
+    init.signal.addEventListener('abort', () => { clearTimeout(keep); rej(init.signal.reason); });
+  });
   assert.equal(await setup.checkAnthropicKey(key, hang, 20), 'unreachable', 'a fetch that never answers is cut off');
   const main = read('src/main/index.ts');
   assert.match(main, /const verdict = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'production uses Electron fetch, which follows the system proxy');
