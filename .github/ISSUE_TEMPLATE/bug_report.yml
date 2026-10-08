@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **A screenshot or recording is required.** We get more reports than we can
+        **A screenshot or recording is strongly encouraged.** We get more reports than we can
         reproduce blind, and the ones with a picture get fixed first because they
         are the ones we can actually see. If you can only give us one thing, give
         us the recording.
@@ -32,13 +32,13 @@ body:
     attributes:
       label: Screenshot or screen recording
       description: |
-        **Required.** Drag the file straight into this box and GitHub will upload it.
+        Optional, but very helpful. Drag the file straight into this box and GitHub will upload it.
         A recording beats a still for anything that moves, hangs, or flickers.
         If the bug is invisible on screen, show us the terminal or the log instead —
         but show us something.
       placeholder: Drag an image or video here.
     validations:
-      required: true
+      required: false
   - type: textarea
     id: logs
     attributes:
@@ -89,7 +89,7 @@ body:
       label: Pre-flight
       options:
         - label: I attached a screenshot or recording above.
-          required: true
+          required: false
         - label: I'm on the latest release, or I've said above why I can't be.
           required: true
         - label: I re-ran `npm install` so `node-pty` is rebuilt for the current Electron ABI (source installs only).
