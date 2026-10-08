@@ -85,6 +85,12 @@ environment, so the tools an agent runs can read it too. The key's info icon
 says so and suggests a key with a spending limit. The key check goes through
 Electron's network stack, which follows the system proxy.
 
+**Writing Claude's settings file.** `~/.claude.json` is Claude Code's own file:
+the app writes a copy beside it and swaps it in, and starts again when Claude
+changed it in between. A key whose approval cannot be written is not saved
+(fail closed), and the first account start of a session reads sign in once
+before starting Claude.
+
 **Claude's welcome screen.** A fresh Claude Code opens on a text style and sign
 in screen that would also wait in the hidden terminal. `hasCompletedOnboarding`
 is now set in `~/.claude.json` with the folder trust the app already writes.

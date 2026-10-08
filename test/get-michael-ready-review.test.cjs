@@ -125,3 +125,16 @@ test('the sign in reader: one read at a time, never joins a read from before a s
   // The slot clears after each read.
   now = 50; reader.read('/c'); assert.equal(runs.length, 6);
 });
+
+test('a key Claude would stop to ask about is never saved, the first start checks sign in, and a closed member leaves the list', () => {
+  // Value: protects=setup never reports ready on a key ~/.claude.json does not approve, a fresh launch never starts a signed out team blind, and a member the owner closed never keeps the team card up; fails_when=the key is saved before or without a confirmed approval, the first account start skips the sign in read, or pty:kill stops clearing the blocked entry; why_new=Codex adversarial pass 3; seam=none (source pins, main has no IPC harness)
+  const main = read('src/main/index.ts');
+  const h = main.slice(main.indexOf("ipcMain.handle('engineSetup:useApiKey'"));
+  const handler = h.slice(0, h.indexOf('\n});') + 4);
+  assert.match(handler, /try \{ approved = approveClaudeApiKey\(key\); \} catch \{ approved = false; \}\s*if \(!approved\) return \{ ok: false, error: 'store' \};/);
+  assert.ok(handler.indexOf('approveClaudeApiKey(key)') < handler.indexOf("integrations.setSecret(providerKeyRef('anthropic'), key)"), 'approved before it is saved');
+  assert.ok(handler.indexOf("integrations.setSecret(providerKeyRef('anthropic'), key)") < handler.indexOf("writeConfig({ claudeAuth: 'apiKey' })"), 'saved before the team switches to it');
+  assert.match(main, /readConfig\(\)\.claudeAuth !== 'apiKey' && claudeAuth\.last\(\) === null\) \{\s*const path = claudePathFast\(\);\s*if \(path\) \{ try \{ await claudeAuth\.read\(path\); \}/, 'the first account start reads sign in once');
+  const kill = main.slice(main.indexOf("ipcMain.handle('pty:kill'"));
+  assert.match(kill.slice(0, kill.indexOf('\n});')), /claudeBlocked\.delete\(id\);/, 'a closed member no longer waits on Claude');
+});

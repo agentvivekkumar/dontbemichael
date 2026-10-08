@@ -233,3 +233,15 @@ test('approving a key says whether ~/.claude.json now holds it', () => {
   assert.equal(approveClaudeApiKey('k'.repeat(30), home), true, 'already there');
   assert.equal(approveClaudeApiKey('   ', home), false, 'a blank key is never approved');
 });
+
+test('~/.claude.json is swapped in whole, keeps its permissions, and leaves no temp file', () => {
+  // Value: protects=Claude's own settings file is never left half written by a crash mid write, keeps owner-only permissions, and an edit Claude makes between our read and write is kept; fails_when=the write goes back in place, the mode is dropped, the temp copy is left behind, or the changed-under-us retry goes; why_new=Codex adversarial pass 3; seam=none (real file in a temp home, source pin for the retry)
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ custom: 'keep' }), { encoding: 'utf8', mode: 0o600 });
+  fs.chmodSync(projectConfigPath, 0o600);
+  approveClaudeApiKey('k'.repeat(30), home);
+  assert.equal(fs.statSync(projectConfigPath).mode & 0o777, 0o600, 'owner-only stays owner-only');
+  assert.deepEqual(fs.readdirSync(home).filter((f) => f.includes('.dbm-')), [], 'no temp copy left behind');
+  assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).custom, 'keep');
+  const src = fs.readFileSync(path.join(__dirname, '../src/main/config.ts'), 'utf8');
+  assert.match(src, /if \(stamp\(\) !== before\) \{ rmSync\(tmp, \{ force: true \}\); continue; \}\s*renameSync\(tmp, p\);/, 'changed under us: start again instead of overwriting');
+});

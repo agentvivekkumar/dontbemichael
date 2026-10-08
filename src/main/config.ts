@@ -3,7 +3,7 @@ import type { CompanyProfile } from '../shared/companyProfile';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import { app } from 'electron';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -863,15 +863,30 @@ type ClaudeConfig = Record<string, unknown> & { projects?: Record<string, Claude
  *  True when the file now holds the change (written, or already there). */
 function updateClaudeJson(home: string, change: (c: ClaudeConfig) => boolean): boolean {
   const p = join(home, '.claude.json');
+  // Claude Code writes this file too. Write a copy beside it and swap it in, so
+  // a crash never leaves it half written, and start again (up to three times)
+  // when Claude changed it between our read and our write, so its edit is kept.
+  const stamp = (): string => { try { const st = statSync(p); return `${st.mtimeMs}:${st.size}`; } catch { return 'none'; } };
   try {
-    let c: ClaudeConfig = {};
-    if (existsSync(p)) {
-      const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
-      c = parsed as ClaudeConfig;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const before = stamp();
+      let c: ClaudeConfig = {};
+      let mode = 0o600;
+      if (existsSync(p)) {
+        mode = statSync(p).mode & 0o777;
+        const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+        c = parsed as ClaudeConfig;
+      }
+      if (!change(c)) return true;
+      const tmp = `${p}.dbm-${process.pid}-${attempt}.tmp`;
+      writeFileSync(tmp, JSON.stringify(c, null, 2), { encoding: 'utf8', mode });
+      if (stamp() !== before) { rmSync(tmp, { force: true }); continue; }
+      renameSync(tmp, p);
+      return true;
     }
-    if (change(c)) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
-    return true;
+    console.warn(`[config] Claude config at ${p} kept changing; left it for the next start.`);
+    return false;
   } catch (error) {
     console.warn(
       `[config] Could not safely update Claude config at ${p}:`,

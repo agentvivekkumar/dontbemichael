@@ -3259,6 +3259,12 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // A Claude that is there but known signed out (or set to a key that is not
     // stored) starts on a sign in screen nobody sees: remember it too, so it
     // restarts once the owner signs in. Any other start leaves the list.
+    // Nothing read yet this session (a fresh app launch): read once before the
+    // first account start, so a signed out team is caught, not started blind.
+    if (!claudeMissing && claudeProvider && bin === 'claude' && readConfig().claudeAuth !== 'apiKey' && claudeAuth.last() === null) {
+      const path = claudePathFast();
+      if (path) { try { await claudeAuth.read(path); } catch { /* unknown: start as before */ } }
+    }
     const signedOutStart = !claudeMissing && claudeProvider && (readConfig().claudeAuth === 'apiKey'
       ? !integrations.hasSecret(providerKeyRef('anthropic'))
       : claudeAuth.last()?.signedIn === false);
@@ -3767,6 +3773,8 @@ ipcMain.handle('pty:kill', (_evt, id: string) => {
   // node-pty firing onExit once the child actually dies is a harmless no-op.
   const res = ptyManager.kill(id);
   teardownPty(id);
+  // The owner closed it: it no longer waits on Claude, so no card or restart.
+  claudeBlocked.delete(id);
   return res;
 });
 ipcMain.handle('pty:list', () => ptyManager.list());
@@ -5158,10 +5166,14 @@ ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: 
   // Electron's fetch follows the system proxy, so the check works wherever Claude does.
   const verdict = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
   if (verdict !== 'ok') return { ok: false, error: verdict };
+  // Approved in ~/.claude.json first: a key Claude would stop to ask about is
+  // never saved as ready (fail closed; the owner can try again).
+  let approved = false;
+  try { approved = approveClaudeApiKey(key); } catch { approved = false; }
+  if (!approved) return { ok: false, error: 'store' };
   const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
   if (!saved.ok) return { ok: false, error: 'store' };
   writeConfig({ claudeAuth: 'apiKey' });
-  try { approveClaudeApiKey(key); } catch { /* approved again at each start */ }
   try { liveWebContents()?.send('engineSetup:changed', { id: 'api-key', exitCode: null }); } catch { /* window gone */ }
   return { ok: true };
 });
