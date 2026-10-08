@@ -53,6 +53,7 @@ body:
         - Onboarding / config
         - Updates / releases
         - Design system
+        - User Experience
         - Other
     validations:
       required: true
