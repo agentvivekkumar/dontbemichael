@@ -108,8 +108,9 @@ includes it.
   status (`restart`) until each starts; agents already at work are left alone.
 - A slow or failed `claude auth status` keeps the last known sign in, so one
   bad read never shows a signed out owner as ready.
-- The feed reads the status when a setup terminal ends or an agent can't start,
-  and at most once a minute on the 5 s poll.
+- The feed reads the status when a setup terminal ends, an agent can't start or
+  a key is saved, and otherwise on the 5 s poll at most once a minute while
+  Michael can't start, every 10 minutes once he can.
 
 **At start.** A missing Claude no longer runs an installer in the agent's
 terminal: it prints where to go (Ask me, Get Michael ready). Other engines keep

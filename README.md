@@ -245,7 +245,8 @@ idle teammates trade lines across the office. Click any pod to see that team mem
 Setup asks for your business name, your kind of business, the owner and your headquarters
 address. Contact details, hours and prices are optional and can wait for Settings. Michael then
 shows you around the office and suggests a starter team: you pick who joins and where each one
-works. Setup checks what your computer already has and offers to install anything missing.
+works. The last step, Get Michael ready, installs Claude Code if your computer doesn't have it
+and signs you in where you can see it, or takes an Anthropic API key instead.
 
 </td>
 <td width="50%">
@@ -294,8 +295,10 @@ works. Setup checks what your computer already has and offers to install anythin
 - A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64, beta).
 - [Claude Code](https://claude.com/claude-code), signed in to your Claude plan. A Claude Max plan
   keeps the office running all day; smaller plans reach their usage limit during the day, and the
-  office waits until it resets. The app can install Claude Code for you from
-  **Settings → Prerequisites**.
+  office waits until it resets. No Claude plan? An Anthropic API key works too, billed to your
+  Anthropic account. You don't need to install anything first: setup ends on **Get Michael
+  ready**, which installs Claude Code and signs you in. Skip it, and Needs you keeps a card that
+  opens the same step until Michael can start.
 
 ### Install
 
@@ -322,7 +325,8 @@ beta. Linux will follow.
 ## Your data
 
 - **It stays on your computer.** Your team's work, memory and files live in folders on your
-  computer. The team members themselves run through your own Claude Code and Claude plan.
+  computer. The team members themselves run through your own Claude Code and Claude plan, or
+  your Anthropic API key.
 - **No usage data.** The app sends nothing about how you use it. See [`TELEMETRY.md`](./TELEMETRY.md).
 
 ## For developers
@@ -364,8 +368,9 @@ If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
 
 ### What this build leaves out
 
-Setup offers only Claude Code. The code still carries presets for other agent CLIs (Codex, Gemini,
-Grok, Kimi, Qwen, OpenCode, Crush, pi, Copilot and Cursor), your own API keys and local models,
+Setup offers only Claude Code, signed in with a Claude account or an Anthropic API key. The code
+still carries presets for other agent CLIs (Codex, Gemini, Grok, Kimi, Qwen, OpenCode, Crush, pi,
+Copilot and Cursor), API keys for other providers and local models,
 but this build doesn't offer them. Some developer features are switched off because business
 owners don't use them: git views, the built in code editor, temporary helper agents, voice, and
 opening a Terminal in an agent's folder. Each one has a switch in

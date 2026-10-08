@@ -911,7 +911,7 @@ Full window, no app chrome.
 - Header: lockup left; step indicator center: eight labelled steps (Business, Details,
   Meet, Team, Home, Manager, Permissions, Ready; seven when Michael's engine is not Claude) in a `card` pill container, each a 22 px circle
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
-  number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
+  number) joined by 1 px `line-2` rules; "Step 4 of 8" right, `t-meta`.
 - Body: a 560 px card with the step's fields. While the studio isn't showing (Business,
   Details, Resume, or no team yet) the card is centered under the step indicator; once it
   shows, the card sits at the start edge and the studio (§8) fills the rest, reacting to

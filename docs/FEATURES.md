@@ -96,6 +96,8 @@ moving, and brings you only the decisions that need you.
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your computer with the Claude plan you already have. Plain words, no developer settings.
   A Windows 11 (x64) beta ships with every release.
+- Setup ends on Get Michael ready: it installs Claude Code and signs you in where you can see it,
+  or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
 
@@ -333,3 +335,12 @@ moving, and brings you only the decisions that need you.
 - The mailbox's own team member and Settings, Mailboxes show who else sends from it. Removing the access withdraws its waiting emails and its standing approvals there.
 - Michael's team list says who may send from which address, so outreach goes to the right team member.
 - Approval cards say when an email forwards a message or attaches files, and an approved email can no longer forward mail from another mailbox.
+
+## Get Michael ready (2026-10-07)
+
+- Setup ends on a Ready step when Michael runs on Claude: a missing Claude Code installs with Claude's own installer, with no password, and Sign in opens the browser and notices when you are done. A new owner whose computer had no Claude Code is no longer left on a silent office.
+- No Claude plan? Use an API key beside Sign in. The key is checked with Anthropic and kept on this computer, and every Claude start uses it.
+- Set up later opens the office anyway, and Ask me keeps a "Michael can't start yet" card that opens the same step ("Some of your team can't start yet" when only team members on Claude are stuck).
+- Once Claude is ready, however it got ready, the team members that could not start begin on their own; members already at work keep going.
+- Claude Code is found where its Windows installer puts it, the key check follows your network's proxy, and a sign in that can't be read says so instead of showing a green check.
+- Setup screens center the card until your office picture appears, then the card glides aside to make room for it.

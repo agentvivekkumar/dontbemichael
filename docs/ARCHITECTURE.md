@@ -48,7 +48,11 @@ src/
     hive.ts                  on-disk multi-agent layer (memory, mailboxes, router)
     hooks.ts                 hook server + provider hook shims (`cth-hook`, `agy-hook`)
     memory.ts                semantic memory layer (CLI wrapper, degrade-to-noop)
-    config.ts                harness config persistence + home setup
+    config.ts                harness config persistence + home setup; Claude Code's ~/.claude.json (folder trust,
+                             the first-run welcome, an approved API key), written to a copy and swapped in
+    engineSetup.ts           Get Michael ready: finds Claude without a shell, Claude's standalone install script,
+                             sign in state (`claude auth status`), the Anthropic API key check
+                             (docs/designs/get-michael-ready.md; status types in shared/engineSetup.ts)
     transcript.ts            reads ~/.claude/projects/ JSONL transcripts for real token/cost telemetry
     telemetry.ts             live OTel collector + usage/cost feed for observability
     usage.ts / pricing.ts    UsageProvider seam + per-model cost attribution
@@ -132,6 +136,8 @@ src/
                              read-only list of every enabled job
     AskMeTab,                the Ask me cards on the Needs you board, agents' schedule requests included, and
                              Report cards (cleared with Got it)
+    GetMichaelReady,         setup's Ready step: the Claude Code and Claude account rows, and Use an API key;
+                             EngineSetupCard puts the same rows on Ask me while Michael can't start
     MailProposalCards,       Ask me cards for emails waiting on approval (edit, Approve, Ask for changes, Don't send,
                              and the agent's offer to send that kind without asking); sendingLabels.ts names each
                              Sending choice
