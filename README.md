@@ -39,10 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.3: this page offers the Windows beta beside the Mac download.**
-> The install steps now cover Windows 11, and the docs say what works only on a Mac for now:
-> reading scans and photos, and the sandbox that keeps shell commands inside each team member's
-> folder. In 0.1.2, Windows started shipping with every release and the top bar got a Beta pill.
+> **New in 0.1.4: send on approval, and Michael answers you in the app.**
+> A team member can put each email on Ask me for you to approve, then send exactly what you
+> approved. Questions you send Michael show where they stand until he answers. Setup now ends on
+> Get Michael ready, which installs Claude Code or takes an Anthropic API key. In 0.1.3, this page
+> started offering the Windows beta.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

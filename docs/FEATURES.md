@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.3). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.4). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -100,6 +100,18 @@ moving, and brings you only the decisions that need you.
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.4 (2026-10-07)
+- Send on approval: a third Sending choice puts each email on Ask me, where you edit, approve,
+  ask for changes or stop it. You can let a team member send one kind of email without asking,
+  and revoke that on its Access tab.
+- Michael answers you in the app: each question you send shows Sent, Michael has it, Waiting on
+  someone, Waiting for you, Answered or Couldn't finish. Scheduled reports arrive as Report cards.
+- Send only access to a mailbox someone else watches, with each address's watcher and sending
+  route on the team member's Email section.
+- Setup screens center the card until your office picture appears.
+- Get Michael ready: setup installs Claude Code without a password and signs you in where you can
+  see it, or takes an Anthropic API key. Team members that could not start begin once it is ready.
 
 ### 0.1.3 (2026-10-05)
 - The GitHub page offers the Windows 11 beta beside the Mac download: platform badge, download
