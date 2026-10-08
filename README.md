@@ -39,10 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.3: this page offers the Windows beta beside the Mac download.**
-> The install steps now cover Windows 11, and the docs say what works only on a Mac for now:
-> reading scans and photos, and the sandbox that keeps shell commands inside each team member's
-> folder. In 0.1.2, Windows started shipping with every release and the top bar got a Beta pill.
+> **New in 0.1.4: send on approval, and Michael answers you in the app.**
+> A team member can put each email on Ask me for you to approve, then send exactly what you
+> approved. Questions you send Michael show where they stand until he answers. Setup now ends on
+> Get Michael ready, which installs Claude Code or takes an Anthropic API key. In 0.1.3, this page
+> started offering the Windows beta.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
@@ -87,7 +88,7 @@ terminal. That changes almost every decision:
 | **Made for** | Developers running coding agents | Small business owners in any line of work, with no technical background needed |
 | **Michael** | Your clone, routing work between your agents | Your office manager: the only one who assigns work, decides the team's day to day requests, and brings you only the calls that need you |
 | **Setting up** | Start agents in terminals and give them work | Pick your kind of business, get a suggested team, and hire in four steps with a real job and a work style for each; no two teammates do the same work |
-| **Email** | The one Gmail account on your Claude account, shared by every agent | As many mailboxes as the business runs on, one per team member, each set to Can send or Draft only; passwords stay encrypted on your computer |
+| **Email** | The one Gmail account on your Claude account, shared by every agent | As many mailboxes as the business runs on, one per team member, each set to Can send, Send on approval or Draft only; passwords stay encrypted on your computer |
 | **Access control** | None: every agent can reach every app connected to your Claude account and every tool you set up in Claude Code | You decide exactly which apps the office can use and which team member uses each one; the app enforces it on every call |
 | **Files and data** | Hard to give an agent a workspace of its own: agents work in code project folders, with no way to give each one its own set of files and data | Your business folder becomes the office's filing cabinet, with access that follows its hierarchy. Each team member works in its own folder with the files its job needs, such as product documentation and client lists for Sales, or survey results and user interviews for Marketing, and opens only that folder. Michael, above them, reads every folder and changes none. You organize your own work in the same folders the team uses |
 | **User experience** | Lots of low level details and out of place screens, which make the system hard to use and hard to focus on the right things | A modern office workspace, redesigned from the ground up for business users. Unneeded details and repetition are gone, and there is one clear way to talk to the office, instead of every option piled into an orchestrator panel |
@@ -121,22 +122,34 @@ business runs on, and each team member works from the one that matches its job.
 
 | Team member | Watches | Can it send? |
 |---|---|---|
-| Pam, Executive Admin | ceo@yourbusiness.com | Draft only: replies wait in Drafts for you |
+| Pam, Executive Admin | ceo@yourbusiness.com | Send on approval: you approve each email in Needs you, then Pam sends it |
 | Kelly, Customer Support | support@yourbusiness.com | Can send |
 | Dwight, Sales Director | sales@yourbusiness.com | Can send |
 
 - **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
   saved, and the password stays encrypted on your computer, never in a file an agent can read.
-- **Hand it out per team member.** On a team member's Access tab, turn email on, pick its
-  mailbox, and choose **Can send** or **Draft only**. Nobody gets a mailbox until you give it one,
+- **Hand it out per team member.** On a team member's Access tab, under Email, choose **Add a
+  mailbox**, pick it, choose **Watch the inbox**, and set **Can send**, **Send on approval** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
-- **Each one stays in its lane.** A team member can only read, search, draft and file mail (archive,
-  mark read, mark junk) in the mailbox you gave it, and cannot forward or attach mail from another
-  one. Nothing it does deletes mail.
+- **Let another team member send from it.** Add a mailbox someone else watches and choose
+  **Send only**, with its own Can send, Send on approval or Draft only.
+  Sales can send outreach from the CEO's address without reading the CEO's inbox: replies land
+  with the mailbox's own team member, who passes them on. The mailbox shows who else sends from it.
+- **You choose how mail leaves.** Can send goes out at once. Send on approval puts each email on
+  Needs you, where you can edit it, approve it, ask for changes or stop it; the team member sends
+  what you approved and learns from your edits. Draft only saves replies in the mailbox's Drafts
+  for you to send.
+- **Approve a kind of email once.** When you keep approving the same kind of email unchanged, the
+  team member can offer to send that kind without asking. Tick the offer on the card, and it shows
+  under Sends without asking on its Access tab, with Revoke. A separate quick check reads each such
+  email first, and anything that doesn't fit comes to you.
+- **Each one stays in its lane.** A team member reads, searches, files (archive, mark read, mark
+  junk), drafts and sends only as you allowed, in the mailbox you gave it, and cannot forward or
+  attach mail from another one. Nothing it does deletes mail.
 - **Put it on a clock.** Add a schedule like "Check the support inbox" every hour in the same tab,
-  with a focus area for each run, and the team member sorts new mail, drafts replies and tells
-  Michael what needs you. A new Executive Admin arrives with an Inbox to zero job already set.
+  with a focus area for each run, and the team member sorts new mail, answers it as its Sending
+  setting allows and tells Michael what needs you. A new Executive Admin arrives with an Inbox to zero job already set.
 - **You hear when it breaks.** If a provider stops accepting the password, the mailbox shows
   "needs you" and Michael asks you to fix it once, on the Needs you board.
 
@@ -233,7 +246,8 @@ idle teammates trade lines across the office. Click any pod to see that team mem
 Setup asks for your business name, your kind of business, the owner and your headquarters
 address. Contact details, hours and prices are optional and can wait for Settings. Michael then
 shows you around the office and suggests a starter team: you pick who joins and where each one
-works. Setup checks what your computer already has and offers to install anything missing.
+works. The last step, Get Michael ready, installs Claude Code if your computer doesn't have it
+and signs you in where you can see it, or takes an Anthropic API key instead.
 
 </td>
 <td width="50%">
@@ -252,8 +266,9 @@ works. Setup checks what your computer already has and offers to install anythin
 
 **Running the office**
 - **Needs you.** When the team needs a decision, Michael puts it on the Needs you board. Your answer goes back to whoever asked, and they remember it. Michael gets it too, as work he routes and then closes.
+- **Michael answers in the app.** A question you type in the Talk to Michael box opens a conversation above it. Each question shows where it stands, such as Michael has it, Waiting for you or Answered, and his reply arrives under it, with one count on the box and one notification per answer. Commands such as /clear still go straight to his terminal. Scheduled outcomes, such as a weekly summary, arrive on Needs you as quiet Report cards you clear with Got it.
 - **Schedules.** Each team member's jobs on a clock live in the On a schedule section of its Access tab. Say when and which job ("Follow up on unpaid invoices", every weekday at 9), and the team member does it the way its Work style says. One job can have several "when" lines, like every 2 hours on weekdays plus 2 pm on weekends. A team member can ask for a schedule change; Michael decides it, and asks you on Needs you only when he can't settle it. Michael's Office schedule tab lists every job that is on.
-- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays encrypted on your computer. Then turn email on in a team member's Access tab, pick its one mailbox, and choose Can send or Draft only. Each mailbox has one team member watching it. Outlook is not supported yet.
+- **A mailbox for each team member.** Connect Gmail, Google Workspace, iCloud, Yahoo, Zoho or any other IMAP mailbox with an app password in Settings, Connections, Mailboxes. The password is tested before it is saved and stays encrypted on your computer. Then add it on a team member's Access tab to watch its inbox, and choose Can send, Send on approval or Draft only. Each mailbox has one team member watching it; others can be added to send only from it. Outlook is not supported yet.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, Claude connectors, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
@@ -281,8 +296,10 @@ works. Setup checks what your computer already has and offers to install anythin
 - A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64, beta).
 - [Claude Code](https://claude.com/claude-code), signed in to your Claude plan. A Claude Max plan
   keeps the office running all day; smaller plans reach their usage limit during the day, and the
-  office waits until it resets. The app can install Claude Code for you from
-  **Settings → Prerequisites**.
+  office waits until it resets. No Claude plan? An Anthropic API key works too, billed to your
+  Anthropic account. You don't need to install anything first: setup ends on **Get Michael
+  ready**, which installs Claude Code and signs you in. Skip it, and Needs you keeps a card that
+  opens the same step until Michael can start.
 
 ### Install
 
@@ -309,7 +326,8 @@ beta. Linux will follow.
 ## Your data
 
 - **It stays on your computer.** Your team's work, memory and files live in folders on your
-  computer. The team members themselves run through your own Claude Code and Claude plan.
+  computer. The team members themselves run through your own Claude Code and Claude plan, or
+  your Anthropic API key.
 - **No usage data.** The app sends nothing about how you use it. See [`TELEMETRY.md`](./TELEMETRY.md).
 
 ## For developers
@@ -351,8 +369,9 @@ If `node-pty` fails to load after an Electron upgrade, run `npm install` again.
 
 ### What this build leaves out
 
-Setup offers only Claude Code. The code still carries presets for other agent CLIs (Codex, Gemini,
-Grok, Kimi, Qwen, OpenCode, Crush, pi, Copilot and Cursor), your own API keys and local models,
+Setup offers only Claude Code, signed in with a Claude account or an Anthropic API key. The code
+still carries presets for other agent CLIs (Codex, Gemini, Grok, Kimi, Qwen, OpenCode, Crush, pi,
+Copilot and Cursor), API keys for other providers and local models,
 but this build doesn't offer them. Some developer features are switched off because business
 owners don't use them: git views, the built in code editor, temporary helper agents, voice, and
 opening a Terminal in an agent's folder. Each one has a switch in

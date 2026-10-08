@@ -26,7 +26,7 @@ require.cache[electron] = {
   exports: { app: { getPath: () => userData } }
 };
 
-const { ensureClaudePermissionsAccepted } = loadTs('src/main/config.ts');
+const { ensureClaudePermissionsAccepted, approveClaudeApiKey } = loadTs('src/main/config.ts');
 const settingsDir = path.join(home, '.claude');
 const settingsPath = path.join(settingsDir, 'settings.json');
 const projectConfigPath = path.join(home, '.claude.json');
@@ -97,6 +97,7 @@ test('merges required fields into valid configs without losing unrelated data', 
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     numStartups: 7,
+    hasCompletedOnboarding: true,
     projects: {
       [cwd]: {
         allowedTools: ['Read'],
@@ -116,6 +117,7 @@ test('creates minimal config files when they are missing', () => {
     skipAutoPermissionPrompt: true
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   });
 });
@@ -130,6 +132,7 @@ test('a malformed settings file does not prevent safe project trust updates', ()
   assert.equal(fs.readFileSync(settingsPath, 'utf8'), malformedSettings);
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     custom: 'keep',
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   });
 });
@@ -137,6 +140,7 @@ test('a malformed settings file does not prevent safe project trust updates', ()
 test('does not rewrite configs that already contain every required field', () => {
   const settings = '{"skipDangerousModePermissionPrompt":true,"skipAutoPermissionPrompt":true}\n';
   const projectConfig = JSON.stringify({
+    hasCompletedOnboarding: true,
     projects: { [cwd]: { hasTrustDialogAccepted: true } }
   }) + '\n';
   writeSettings(settings);
@@ -168,4 +172,77 @@ test('a folder typed in another letter case is trusted under its real name too',
   const projects = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects;
   assert.equal(projects[fs.realpathSync.native(real)].hasTrustDialogAccepted, true, 'the real name is trusted');
   if (caseInsensitive) assert.equal(projects[typed].hasTrustDialogAccepted, true, 'the typed name stays trusted');
+});
+
+// Get Michael ready (docs/designs/get-michael-ready.md): Claude Code's welcome
+// screen and its "use this API key?" question would wait in an agent's
+// terminal, which the owner never sees.
+test('the welcome screen is marked done, and an owner who already finished it is left alone', () => {
+  // Value: protects=a bare Mac's first agent start does not stop on Claude's text style picker; fails_when=hasCompletedOnboarding is not written, or a finished one is rewritten; why_new=bare Mac report 2026-10-07; seam=real file in a temp home
+  ensureClaudePermissionsAccepted(cwd);
+  assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).hasCompletedOnboarding, true);
+  const done = JSON.stringify({ hasCompletedOnboarding: true, theme: 'dark', projects: { [cwd]: { hasTrustDialogAccepted: true } } });
+  fs.writeFileSync(projectConfigPath, done, 'utf8');
+  ensureClaudePermissionsAccepted(cwd);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), done);
+});
+
+test('an API key the owner chose is approved by its last 20 characters, once, keeping everything else', () => {
+  // Value: protects=a Claude agent started with ANTHROPIC_API_KEY never stops on the approve-this-key question; fails_when=the tail is wrong, duplicated, stays rejected, or other keys are lost; why_new=API key sign in; seam=real file in a temp home
+  const key = 'sk-ant-api03-' + 'x'.repeat(40) + 'ABCDEFGHIJ0123456789';
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ custom: 'keep', customApiKeyResponses: { approved: ['older'], rejected: ['ABCDEFGHIJ0123456789'] } }), 'utf8');
+  approveClaudeApiKey(key, home);
+  approveClaudeApiKey(key, home);
+  const c = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+  assert.equal(c.custom, 'keep');
+  assert.deepEqual(c.customApiKeyResponses, { approved: ['older', 'ABCDEFGHIJ0123456789'], rejected: [] });
+  assert.ok(!JSON.stringify(c).includes(key), 'the whole key is never written');
+});
+
+test('one start writes the welcome, the folder trust and the key approval in a single pass', () => {
+  // Value: protects=a Claude start reads and writes ~/.claude.json (megabytes for a busy owner) once, and approves the key with the rest; fails_when=approveKey is ignored or the three edits split back into separate writes that lose each other; why_new=review performance 2026-10-07; seam=none
+  const key = 'sk-ant-api03-' + 'y'.repeat(40) + 'KLMNOPQRST0123456789';
+  ensureClaudePermissionsAccepted(cwd, { approveKey: key });
+  const c = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+  assert.equal(c.hasCompletedOnboarding, true);
+  assert.equal(c.projects[cwd].hasTrustDialogAccepted, true);
+  assert.deepEqual(c.customApiKeyResponses, { approved: ['KLMNOPQRST0123456789'], rejected: [] });
+});
+
+test('approving a blank key, or into an odd file, changes nothing it should not', () => {
+  // Value: protects=a blank key is never approved and odd Claude config shapes are cleaned or left alone, never corrupted; fails_when=the empty-tail guard goes, non-string entries survive, or a non-object file is rewritten; why_new=review testing specialist; seam=none
+  fs.writeFileSync(projectConfigPath, '[1,2]', 'utf8');
+  approveClaudeApiKey('k'.repeat(30), home);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), '[1,2]');
+  const plain = JSON.stringify({ custom: 'keep' });
+  fs.writeFileSync(projectConfigPath, plain, 'utf8');
+  approveClaudeApiKey('   ', home);
+  assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), plain);
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ customApiKeyResponses: { approved: [1, 'a'], rejected: 'no' } }), 'utf8');
+  approveClaudeApiKey('k'.repeat(30), home);
+  assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).customApiKeyResponses, { approved: ['a', 'k'.repeat(20)], rejected: [] });
+});
+
+test('approving a key says whether ~/.claude.json now holds it', () => {
+  // Value: protects=a hidden check retries an approval that a half written ~/.claude.json blocked; fails_when=approveClaudeApiKey stops returning false for an unreadable file or true once approved; why_new=review cycle 3; seam=none
+  fs.writeFileSync(projectConfigPath, '{"half": ', 'utf8');
+  const warn = console.warn; console.warn = () => {};
+  try { assert.equal(approveClaudeApiKey('k'.repeat(30), home), false, 'unreadable file: not approved'); } finally { console.warn = warn; }
+  fs.rmSync(projectConfigPath, { force: true });
+  assert.equal(approveClaudeApiKey('k'.repeat(30), home), true, 'written');
+  assert.equal(approveClaudeApiKey('k'.repeat(30), home), true, 'already there');
+  assert.equal(approveClaudeApiKey('   ', home), false, 'a blank key is never approved');
+});
+
+test('~/.claude.json is swapped in whole, keeps its permissions, and leaves no temp file', () => {
+  // Value: protects=Claude's own settings file is never left half written by a crash mid write, keeps owner-only permissions, and an edit Claude makes between our read and write is kept; fails_when=the write goes back in place, the mode is dropped, the temp copy is left behind, or the changed-under-us retry goes; why_new=Codex adversarial pass 3; seam=none (real file in a temp home, source pin for the retry)
+  fs.writeFileSync(projectConfigPath, JSON.stringify({ custom: 'keep' }), { encoding: 'utf8', mode: 0o600 });
+  fs.chmodSync(projectConfigPath, 0o600);
+  approveClaudeApiKey('k'.repeat(30), home);
+  // Windows has no POSIX permission bits to keep.
+  if (process.platform !== 'win32') assert.equal(fs.statSync(projectConfigPath).mode & 0o777, 0o600, 'owner-only stays owner-only');
+  assert.deepEqual(fs.readdirSync(home).filter((f) => f.includes('.dbm-')), [], 'no temp copy left behind');
+  assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).custom, 'keep');
+  const src = fs.readFileSync(path.join(__dirname, '../src/main/config.ts'), 'utf8');
+  assert.match(src, /if \(stamp\(\) !== before\) \{ rmSync\(tmp, \{ force: true \}\); continue; \}\s*renameSync\(tmp, p\);/, 'changed under us: start again instead of overwriting');
 });

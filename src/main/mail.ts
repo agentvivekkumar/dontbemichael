@@ -23,16 +23,26 @@ import { simpleParser } from 'mailparser';
 import {
   MAIL_TOOL_OPS,
   agentMailboxes,
-  emailJustEnabled,
+  asSendingMode,
+  grantPaused,
   isMicrosoftAddress,
   mailboxHolder,
   mailAccess,
+  mailboxAddress,
   mailboxIdFor,
+  mailToolsJustAttached,
   secretRefForMailbox,
+  sendOnlyGrant,
+  sendingMode,
+  sendingWords,
   type MailAccessConfig,
+  type SendingMode,
+  type AgentCapabilities,
+  type SendOnlyGrant,
   type MailboxRecord,
   type MailServer
 } from '../shared/mailboxes';
+import { OWN_SENDS_ONLY, proposalSendProblem, standingProblem, standingTooLong, threadFrom, STANDING_KIND_MAX, type MailProposal, type SendRecord, type StandingApproval, type StandingCheckEmail, type ThreadHeaders } from '../shared/mailProposals';
 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
@@ -42,6 +52,9 @@ const SEARCH_MAX = 50;
 const BODY_MAX_CHARS = 50_000;
 const IDLE_CLOSE_MS = 5 * 60_000;
 const SEND_MEMORY_MS = 10 * 60_000;
+/** The most mail one send may forward or attach from, in all. */
+const REFERENCE_MAX_BYTES = 25 * 1024 * 1024;
+const REFERENCE_TOO_LARGE = 'That email is too large to forward or attach from (over 25 MB in all). Send a new email instead, or ask the owner to forward it.';
 
 export type MailErrorKind = 'auth' | 'provider-blocked' | 'network' | 'not-found' | 'bad-request' | 'refused' | 'unsupported' | 'timeout' | 'unknown';
 
@@ -217,6 +230,9 @@ export interface ComposeInput {
   forward?: MailRef;
   /** Attach the attachments of other messages (same rule). */
   attachFrom?: MailRef[];
+  /** Threading headers from the member's own send record (a reply under a
+   *  Send only grant): set instead of replyTo, so nothing is fetched (E1b). */
+  thread?: ThreadHeaders;
 }
 
 interface OpenBox { client: ImapLike; timer?: ReturnType<typeof setTimeout> }
@@ -227,6 +243,9 @@ export class MailService {
    *  config on every tool call. */
   private readonly lastStatus = new Map<string, 'connected' | 'needs-attention'>();
   private readonly sent = new Map<string, { at: number; result: { messageId: string } }>();
+  /** Sends in progress by the same key, so an identical send that overlaps
+   *  waits for the first and gets its result instead of sending again. */
+  private readonly inFlight = new Map<string, Promise<{ sent: boolean; messageId: string }>>();
   private readonly createImap: NonNullable<MailDeps['createImap']>;
   private readonly createSmtp: NonNullable<MailDeps['createSmtp']>;
 
@@ -467,7 +486,27 @@ export class MailService {
     }, action === 'mark_read' ? 'Marking mail read' : action === 'mark_junk' ? 'Moving mail to junk' : 'Archiving mail');
   }
 
-  private async source(c: ImapLike, uid: string, key: FolderKey = 'inbox'): Promise<Buffer> {
+  /** The threading headers of the message a reply answers, without its body. */
+  private async replyHeaders(id: string, ref: MailRef): Promise<{ messageId?: string; references?: string | string[] }> {
+    const { key, uid } = parseMessageId(ref.id);
+    return this.inFolder(id, MailService.folderOf(key), async (c) => {
+      const m = await c.fetchOne(uid, { uid: true, headers: ['message-id', 'references'] }, { uid: true }).catch(() => null) as { headers?: Buffer | string } | false | null;
+      if (m && m.headers) {
+        const parsed = await simpleParser(Buffer.isBuffer(m.headers) ? m.headers : Buffer.from(String(m.headers)));
+        return { messageId: parsed.messageId, references: parsed.references };
+      }
+      // A server that gives no headers part: read the message itself.
+      const parsed = await simpleParser(await this.source(c, uid, key));
+      return { messageId: parsed.messageId, references: parsed.references };
+    }, 'Fetching the referenced message');
+  }
+
+  private async source(c: ImapLike, uid: string, key: FolderKey = 'inbox', maxBytes?: number): Promise<Buffer> {
+    if (maxBytes) {
+      // Its size first, so a huge message is refused before it is downloaded.
+      const head = await c.fetchOne(uid, { uid: true, size: true }, { uid: true }).catch(() => null) as { size?: number } | false | null;
+      if (head && typeof head.size === 'number' && head.size > maxBytes) throw new MailError('bad-request', REFERENCE_TOO_LARGE);
+    }
     const m = await c.fetchOne(uid, { uid: true, source: true, flags: true }, { uid: true });
     if (!m || !m.source) {
       // A plain number is an inbox id, and mail leaves the inbox when it is
@@ -506,17 +545,29 @@ export class MailService {
    *  sending mailbox only (MB-8 is checked by the caller first). */
   private async compose(id: string, from: string, input: ComposeInput, messageId: string): Promise<Record<string, unknown>> {
     const msg: Record<string, unknown> = { from, to: input.to, cc: input.cc, subject: input.subject, text: input.body, messageId };
+    if (input.thread) {
+      msg.inReplyTo = input.thread.inReplyTo;
+      msg.references = [...input.thread.references];
+    }
     const refs = [input.replyTo, input.forward, ...(input.attachFrom ?? [])].filter(Boolean) as MailRef[];
     if (!refs.length) return msg;
     // Each reference is read from its own folder: a reply to sent or archived
     // mail names it by an id that says where it is.
-    const fetch = (ref: MailRef) => {
+    // Referenced mail is loaded whole, so its size is capped (one email and all
+    // of them together): a huge one is refused in plain words, never freezing the app.
+    let total = 0;
+    const fetch = async (ref: MailRef) => {
       const { key, uid } = parseMessageId(ref.id);
-      return this.inFolder(id, MailService.folderOf(key), (c) => this.source(c, uid, key), 'Fetching the referenced message');
+      const buf = await this.inFolder(id, MailService.folderOf(key), (c) => this.source(c, uid, key, REFERENCE_MAX_BYTES), 'Fetching the referenced message');
+      total += buf.length;
+      if (buf.length > REFERENCE_MAX_BYTES || total > REFERENCE_MAX_BYTES) throw new MailError('bad-request', REFERENCE_TOO_LARGE);
+      return buf;
     };
     const attachments: Array<Record<string, unknown>> = [];
     if (input.replyTo) {
-      const parsed = await simpleParser(await fetch(input.replyTo));
+      // A reply needs only the parent's Message-ID and References, so only its
+      // headers are fetched: no size cap applies, however large the email.
+      const parsed = await this.replyHeaders(id, input.replyTo);
       if (parsed.messageId) {
         msg.inReplyTo = parsed.messageId;
         const prior = Array.isArray(parsed.references) ? parsed.references : parsed.references ? [parsed.references] : [];
@@ -550,18 +601,29 @@ export class MailService {
     return { saved: true, messageId: String(msg.messageId) };
   }
 
-  async send(agentId: string, id: string, input: ComposeInput) {
-    const rec = this.record(id);
+  /** `beforeSmtp` runs once the message is built, just before it goes to the
+   *  server: a reason refuses the send (the owner changed access meanwhile). */
+  async send(agentId: string, id: string, input: ComposeInput, beforeSmtp?: () => string | null): Promise<{ sent: boolean; messageId: string; repeated?: boolean }> {
     // Send once: the same agent sending the same message to the same people from
     // the same mailbox within 10 minutes gets the first result back.
-    const key = createHash('sha256').update(JSON.stringify([agentId, id, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.forward ?? null, input.attachFrom ?? []])).digest('hex');
+    const key = createHash('sha256').update(JSON.stringify([agentId, id, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.forward ?? null, input.attachFrom ?? [], input.thread?.inReplyTo ?? null])).digest('hex');
     const now = Date.now();
     for (const [k, v] of this.sent) if (now - v.at > SEND_MEMORY_MS) this.sent.delete(k);
     const prior = this.sent.get(key);
     if (prior) return { ...prior.result, sent: true, repeated: true };
+    const running = this.inFlight.get(key);
+    if (running) return { ...(await running), repeated: true };
+    const attempt = this.sendOnce(key, now, id, input, beforeSmtp);
+    this.inFlight.set(key, attempt);
+    try { return await attempt; } finally { this.inFlight.delete(key); }
+  }
 
+  private async sendOnce(key: string, now: number, id: string, input: ComposeInput, beforeSmtp?: () => string | null): Promise<{ sent: boolean; messageId: string }> {
+    const rec = this.record(id);
     const messageId = MailService.newMessageId(rec.address);
     const msg = await this.compose(id, rec.address, input, messageId);
+    const stop = beforeSmtp?.();
+    if (stop) throw new MailError('refused', `Not sent. ${stop}`);
     const smtp = this.createSmtp(rec.smtp, rec.address, this.password(id));
     try {
       await withTimeout(smtp.sendMail(msg), SEND_TIMEOUT_MS, 'Sending');
@@ -622,6 +684,50 @@ export class MailService {
 
 export interface MailRequestResult { status: number; body: Record<string, unknown> }
 
+/** Send on approval (shared/mailProposals.ts): main keeps the proposals. */
+export interface ProposalStore {
+  /** Files a proposal for the owner and returns it with its id. */
+  file(p: Omit<MailProposal, 'id' | 'createdAt' | 'state'>): MailProposal;
+  get(id: string): MailProposal | undefined;
+  markSent(id: string, messageId: string): void;
+  /** Recorded before an approved email goes out (throws when it can't be). */
+  markSending(id: string): void;
+  unmarkSending(id: string): void;
+  /** Standing approvals (owner, 2026-10-05): kinds an agent may send without asking. */
+  standing(agentId?: string): StandingApproval[];
+  getStanding(id: string): StandingApproval | undefined;
+  recordStandingSend(id: string, email: { to: string; subject: string }): void;
+  /** Withdraws a proposal the app can't send (shared-mailboxes.md, ER4, OV5). */
+  cancel(match: { id: string } | { agentId: string; mailbox: string }, reason: string): number;
+  /** Sends under a Send only grant (E1b): kept, looked up, listed. */
+  recordSend(rec: SendRecord): void;
+  sendRecord(agentId: string, mailbox: string, messageId: string): SendRecord | undefined;
+  recentSends(agentId: string, mailbox: string, limit?: number): SendRecord[];
+}
+
+/** The separate check that an email fits a standing approval. Null when it
+ *  could not run, which counts as not fitting. */
+export type StandingFitCheck = (kind: string, email: StandingCheckEmail) => Promise<{ fits: true } | { fits: false; reason: string } | null>;
+
+/** What each Sending choice lets the agent do, for list_mailboxes. */
+const SENDING_HOW: Record<SendingMode, string> = {
+  send: 'send goes out at once. You may still propose an email when you want the owner to approve it first.',
+  approval: 'propose puts the email on Ask me for the owner; when they approve it you get a message, then call send with its proposal id. For a kind listed in standing_approvals, call send with the full email and that standing id instead. When your memory notes show the owner approving one kind of email unchanged again and again, offer it with offer_standing on your next proposal.',
+  draft: 'draft saves the email in the mailbox\'s Drafts for the owner to send; send and propose are refused.'
+};
+
+/** Approved proposals being sent right now, so two parallel sends of one card
+ *  never both go out (the send once memory is set only after SMTP answers). */
+const sendingProposals = new Set<string>();
+/** Standing sends being checked or sent right now, by their content. */
+const sendingStanding = new Set<string>();
+/** Approved proposals that went out but could not be marked sent (a failed
+ *  write): a later send repeats the result instead of sending again. */
+const sentUnrecorded = new Map<string, string>();
+
+/** What Send only means, for a grant's list_mailboxes entry. */
+const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send work under its sending; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
+
 function str(v: unknown, max = 5000): string | undefined {
   return typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined;
 }
@@ -639,7 +745,7 @@ function ref(v: unknown): MailRef | undefined {
  */
 export async function handleMailRequest(
   svc: MailService,
-  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void },
+  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean },
   agentId: string,
   op: string,
   body: Record<string, unknown>
@@ -648,41 +754,208 @@ export async function handleMailRequest(
   const mop = MAIL_TOOL_OPS[op];
   if (!mop) return { status: 404, body: { error: `Unknown mail tool "${op}".` } };
   const mailbox = str(body.mailbox, 100);
-  const access = mailAccess(cfg, agentId, mailbox, mop);
+  const proposalId = str(body.proposal, 100);
+  const standingId = op === 'send' && !proposalId ? str(body.standing, 100) : undefined;
+  const attachRefs = Array.isArray(body.attach_from) ? (body.attach_from.map(ref).filter(Boolean) as MailRef[]).slice(0, 10) : undefined;
+  // Send on approval lets a send through with an approved proposal or a
+  // standing approval; the broker checks either one below.
+  const access = mailAccess(cfg, agentId, mailbox, mop, proposalId ?? standingId, {
+    refs: { forward: !!ref(body.forward), attachFrom: !!attachRefs?.length },
+    present: deps.present
+  });
   if (!access.ok) return { status: 403, body: { error: access.reason } };
+  // A Send only grant on the named mailbox (shared-mailboxes.md).
+  const grant = sendOnlyGrant(cfg, agentId);
+  const underGrant = !!grant && !!mailbox && grant.mailbox === mailbox;
 
   if (op === 'list_mailboxes') {
     const recs = cfg.mailboxes ?? [];
     const email = cfg.agentCapabilities?.[agentId]?.email;
+    const own = agentMailboxes(cfg, agentId);
+    // Standing approvals apply only under Send on approval, so they are listed only then.
+    const standingFor = (mid: string, mode: SendingMode) => (mode !== 'approval' ? [] : (deps.proposals?.standing(agentId) ?? []).filter((r) => r.mailbox === mid).map((r) => ({ standing: r.id, kind: r.kind })));
+    const entries: Array<Record<string, unknown>> = own.map((mid) => {
+      const r = recs.find((m) => m.id === mid);
+      return { mailbox: mid, address: r?.address, status: r?.status };
+    });
+    if (grant) {
+      const r = recs.find((m) => m.id === grant.mailbox);
+      entries.push({
+        mailbox: grant.mailbox, address: r?.address, status: r?.status,
+        access: 'send only',
+        ...(grantPaused(cfg, grant.mailbox, deps.present) ? { paused: `Nobody reads ${r?.address ?? grant.mailbox} right now, so nothing goes out from it; tell Michael.` } : {}),
+        sending: sendingWords(grant.sending),
+        how: `${SEND_ONLY_HOW} ${SENDING_HOW[grant.sending]}`,
+        standing_approvals: standingFor(grant.mailbox, grant.sending),
+        // Its own sends from here, for reply_to (its own words, nothing from the mailbox).
+        your_recent_sends: (deps.proposals?.recentSends(agentId, grant.mailbox, 20) ?? []).map((x) => ({ message_id: x.messageId, to: x.to, subject: x.subject, sent_at: new Date(x.sentAt).toISOString() }))
+      });
+    }
     return {
       status: 200,
       body: {
-        mailboxes: agentMailboxes(cfg, agentId).map((mid) => {
-          const r = recs.find((m) => m.id === mid);
-          return { mailbox: mid, address: r?.address, status: r?.status };
-        }),
-        sending: email?.send ? 'can send' : 'draft only',
+        mailboxes: entries,
+        // The member's own mailbox; a grant carries its own sending and how.
+        ...(own.length ? {
+          sending: sendingWords(sendingMode(email)),
+          how: SENDING_HOW[sendingMode(email)],
+          // Kinds the owner let this agent send without asking (send with standing).
+          standing_approvals: standingFor(own[0], sendingMode(email))
+        } : {}),
         // Where this access comes from, so a limit is never blamed on a setting
         // the owner does not have (owner, 2026-10-03).
         source: 'Settings, Connections, Mailboxes (the app\'s own mail connection, not a Claude connector)',
-        folders: 'search looks in the inbox, or in "sent", "archive" (Gmail: All Mail) or a label'
+        // Can send or Draft only is the owner's choice per member, not a limit
+        // of the connection (owner, 2026-10-05).
+        sending_set_in: 'your Access tab, Email, Sending (the owner chooses Can send, Send on approval or Draft only for you; the mailbox connection itself can send)',
+        ...(own.length ? { folders: 'search looks in the inbox, or in "sent", "archive" (Gmail: All Mail) or a label' } : {})
       }
     };
   }
 
   // MB-8: forwards and attachments only by reference, and only from the mailbox
-  // doing the sending. Pasted text is not traceable and is not checked.
+  // doing the sending. Pasted text is not traceable and is not checked. A
+  // proposal is held to it too, or an approved card could send the wrong
+  // email from the sending mailbox (eng review ER4, D1).
   const input: ComposeInput = {
     to: str(body.to, 2000) ?? '', cc: str(body.cc, 2000), subject: str(body.subject, 500) ?? '', body: str(body.body, 200_000) ?? '',
-    replyTo: ref(body.reply_to), forward: ref(body.forward), attachFrom: Array.isArray(body.attach_from) ? (body.attach_from.map(ref).filter(Boolean) as MailRef[]).slice(0, 10) : undefined
+    replyTo: ref(body.reply_to), forward: ref(body.forward), attachFrom: attachRefs
   };
   const refs = [input.replyTo, input.forward, ...(input.attachFrom ?? [])].filter(Boolean) as MailRef[];
   const foreign = refs.find((r) => r.mailbox !== mailbox);
-  if (foreign && (op === 'draft' || op === 'send')) {
+  if (foreign && (op === 'draft' || op === 'send' || op === 'propose')) {
     return { status: 403, body: { error: `You can't forward, attach or reply to mail from "${foreign.mailbox}" while writing from "${mailbox}".` } };
   }
+  // Under a grant a reply names one of the member's own sends; its thread
+  // headers come from that record, and nothing is read from the mailbox. Any
+  // other id gets the same refusal, before any lookup (E1b).
+  if (underGrant && input.replyTo) {
+    const rec = deps.proposals?.sendRecord(agentId, mailbox!, input.replyTo.id);
+    if (!rec) return { status: 403, body: { error: OWN_SENDS_ONLY } };
+    input.thread = threadFrom(rec);
+    input.replyTo = undefined;
+  }
+  // Keeps a send under a grant for later replies; the send stands if this fails.
+  const recordGrantSend = (out: { messageId?: unknown }, email: ComposeInput): void => {
+    if (!underGrant || !out?.messageId) return;
+    try {
+      deps.proposals?.recordSend({ agentId, mailbox: mailbox!, messageId: String(out.messageId), references: email.thread ? [...email.thread.references] : [], to: email.to.slice(0, 2000), subject: email.subject.slice(0, 500), sentAt: Date.now() });
+    } catch (e) { console.error('[mail] send record not kept:', agentId, mailbox, String(out.messageId), e); }
+  };
+  const grantFlag = underGrant ? { grant: true } : {};
 
   try {
+    // Send on approval: the approved version the app kept goes out, never text
+    // from the call, so nothing changes between the owner's yes and the send.
+    if (op === 'send' && proposalId) {
+      if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };
+      const p = deps.proposals.get(proposalId);
+      // Sent in this session but not marked sent: the same result again.
+      const unrecorded = p && p.agentId === agentId ? sentUnrecorded.get(p.id) : undefined;
+      if (unrecorded !== undefined) return { status: 200, body: { sent: true, repeated: true, messageId: unrecorded } };
+      if (p && p.agentId === agentId && sendingProposals.has(p.id)) return { status: 409, body: { error: 'This email is being sent right now. Do not send it again.' } };
+      const problem = proposalSendProblem(p, agentId, mailbox!);
+      if (problem) return { status: 409, body: { error: problem } };
+      if (p!.state === 'sent') return { status: 200, body: { sent: true, repeated: true, messageId: p!.messageId } };
+      // The references stored on the card meet the same rules as a call's
+      // (OV5, ER4): from the sending mailbox only, and none under a grant.
+      const stored = [p!.replyTo, p!.forward, ...(p!.attachFrom ?? [])].filter(Boolean) as MailRef[];
+      const storedForeign = stored.find((r) => r.mailbox !== mailbox);
+      const refused = storedForeign
+        ? `You can't forward, attach or reply to mail from "${storedForeign.mailbox}" while writing from "${mailbox}".`
+        : underGrant && stored.length ? 'You send only from this mailbox, so this email can\'t forward, attach or reply to mail in it.' : null;
+      if (refused) {
+        deps.proposals.cancel({ id: p!.id }, refused);
+        return { status: 403, body: { error: `${refused} The email was withdrawn; write it again without that.` } };
+      }
+      const approved: ComposeInput = { to: p!.to, cc: p!.cc, subject: p!.approved?.subject ?? p!.subject, body: p!.approved?.body ?? p!.body, replyTo: p!.replyTo, forward: p!.forward, attachFrom: p!.attachFrom, thread: p!.thread };
+      // Recorded as sending first: if that can't be saved nothing goes out, and
+      // a restart after the send never sends it again.
+      try { deps.proposals.markSending(p!.id); } catch {
+        return { status: 503, body: { error: 'The app could not record this send, so nothing was sent. Try again in a moment.' } };
+      }
+      sendingProposals.add(p!.id);
+      let out: Awaited<ReturnType<MailService['send']>>;
+      // Checked again once the message is built, just before the server: a
+      // withdraw or an access change while it was being prepared stops it.
+      const stillSendable = (): string | null => {
+        if (deps.proposals!.get(p!.id)?.state !== 'sending') return 'The owner withdrew this email while it was being prepared.';
+        const a = mailAccess(deps.getConfig(), agentId, mailbox, 'send', p!.id, { present: deps.present });
+        return a.ok ? null : a.reason;
+      };
+      try { out = await svc.send(agentId, mailbox!, approved, stillSendable); } catch (e) {
+        try { deps.proposals.unmarkSending(p!.id); } catch { /* stays sending: never resent */ }
+        throw e;
+      } finally { sendingProposals.delete(p!.id); }
+      // The email is out: bookkeeping that fails is logged, never reported as a failed send.
+      try { deps.proposals.markSent(p!.id, String(out.messageId ?? '')); } catch (e) {
+        sentUnrecorded.set(p!.id, String(out.messageId ?? ''));
+        console.error('[mail] mark sent failed:', p!.id, e);
+      }
+      recordGrantSend(out, approved);
+      try { deps.audit?.({ kind: 'mail-sent-approved', agentId, mailbox, proposal: p!.id, ...grantFlag }); } catch { /* the send stands */ }
+      return { status: 200, body: out };
+    }
+    // A standing approval: fixed facts first, then the separate check. An email
+    // that does not plainly fit goes to the owner on Ask me instead, so a
+    // generous reading never sends it.
+    if (op === 'send' && standingId) {
+      if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };
+      const rule = deps.proposals.getStanding(standingId);
+      const problem = standingProblem(rule, agentId, mailbox!, input);
+      if (problem) return { status: 409, body: { error: problem } };
+      if (!input.to || !input.subject || !input.body.trim()) return { status: 400, body: { error: 'send needs "to", "subject" and "body".' } };
+      // The same email sent again while the first is still being checked or sent
+      // waits for nothing and never goes out twice.
+      const sendKey = JSON.stringify([agentId, mailbox, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.thread?.inReplyTo ?? null]);
+      if (sendingStanding.has(sendKey)) return { status: 409, body: { error: 'This email is being sent right now. Do not send it again.' } };
+      sendingStanding.add(sendKey);
+      try {
+        // A reply is checked with the message it answers (ship D8). One under a
+        // grant answers mail its sender can't read, so the owner decides.
+        let answers: StandingCheckEmail['answers'];
+        let unreadable = !!input.thread;
+        if (input.replyTo) {
+          try {
+            const parent = await svc.read(mailbox!, input.replyTo.id);
+            answers = { from: String(parent.from ?? ''), subject: String(parent.subject ?? ''), text: String(parent.text ?? '') };
+            if (parent.truncated) unreadable = true;
+          } catch { unreadable = true; }
+        }
+        const checked: StandingCheckEmail = { to: input.to, cc: input.cc, subject: input.subject, body: input.body, ...(answers ? { answers } : {}) };
+        // An email longer than the check reads never goes out unchecked (fail closed).
+        const tooLong = standingTooLong(checked);
+        const verdict = !tooLong && !unreadable && deps.fitCheck ? await deps.fitCheck(rule!.kind, checked).catch(() => null) : null;
+        // The check can take a minute: the approval, the access and the grant are
+        // checked again before anything leaves, so a revoke in that time holds.
+        const now = deps.getConfig();
+        const still = deps.proposals.getStanding(standingId);
+        const stillProblem = standingProblem(still, agentId, mailbox!, input);
+        const stillAccess = mailAccess(now, agentId, mailbox, 'send', standingId, { present: deps.present });
+        if (stillProblem || !stillAccess.ok) return { status: 409, body: { error: stillProblem ?? (stillAccess.ok ? '' : stillAccess.reason) } };
+        if (!verdict?.fits) {
+          const why = unreadable ? 'It answers an email the check could not read in full, so the owner decides.'
+            : tooLong ? 'It is longer than the check can read, so the owner decides.'
+              : verdict && !verdict.fits ? verdict.reason : 'The check could not confirm it fits.';
+          const p = deps.proposals.file({ agentId, mailbox: mailbox!, to: input.to, cc: input.cc, subject: input.subject, body: input.body, replyTo: input.replyTo, forward: input.forward, attachFrom: input.attachFrom, ...(input.thread ? { thread: input.thread } : {}) });
+          try { deps.audit?.({ kind: 'mail-standing-refused', agentId, mailbox, standing: rule!.id, proposal: p.id }); } catch { /* the filing stands */ }
+          return { status: 200, body: { sent: false, proposal: p.id, state: 'waiting for the owner on Ask me', why: `Not sent under your standing approval: ${why}`, next: 'It is on Ask me now. You will get a message when the owner decides; then send it with this proposal id.' } };
+        }
+        const out = await svc.send(agentId, mailbox!, input, () => {
+          const problemNow = standingProblem(deps.proposals!.getStanding(standingId), agentId, mailbox!, input);
+          const a = mailAccess(deps.getConfig(), agentId, mailbox, 'send', standingId, { present: deps.present });
+          return problemNow ?? (a.ok ? null : a.reason);
+        });
+        // A repeat of an email that already went out is not a new send: nothing
+        // is recorded or logged twice.
+        if (!(out as { repeated?: boolean }).repeated) {
+          try { deps.proposals.recordStandingSend(rule!.id, input); } catch (e) { console.error('[mail] standing send record failed:', rule!.id, e); }
+          recordGrantSend(out, input);
+          try { deps.audit?.({ kind: 'mail-sent-standing', agentId, mailbox, standing: rule!.id, ...grantFlag }); } catch { /* the send stands */ }
+        }
+        return { status: 200, body: out };
+      } finally { sendingStanding.delete(sendKey); }
+    }
     if (op === 'search') {
       return { status: 200, body: await svc.search(mailbox!, {
         text: str(body.text, 200), from: str(body.from, 200), subject: str(body.subject, 200), since: str(body.since, 40),
@@ -715,7 +988,24 @@ export async function handleMailRequest(
     }
     if (!input.to || !input.subject) return { status: 400, body: { error: `${op} needs "to" and "subject".` } };
     if (op === 'draft') return { status: 200, body: await svc.draft(mailbox!, input) };
-    return { status: 200, body: await svc.send(agentId, mailbox!, input) };
+    if (op === 'propose') {
+      if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };
+      if (!input.body.trim()) return { status: 400, body: { error: 'propose needs a "body".' } };
+      const offer = str(body.offer_standing, STANDING_KIND_MAX)?.replace(/\s+/g, ' ').trim();
+      const p = deps.proposals.file({ agentId, mailbox: mailbox!, to: input.to, cc: input.cc, subject: input.subject, body: input.body, replyTo: input.replyTo, forward: input.forward, attachFrom: input.attachFrom, ...(input.thread ? { thread: input.thread } : {}), ...(offer ? { offerStanding: offer } : {}) });
+      return { status: 200, body: { proposal: p.id, state: 'waiting for the owner on Ask me', ...(p.replaces ? { replaced: p.replaces, note: `This replaces your earlier proposal ${p.replaces} for the same email; that id no longer works.` } : {}), next: 'Nothing is sent yet. You will get a message when the owner decides: approved (then call send with this proposal id), changes asked, or not sent. Do not send it another way.' } };
+    }
+    const out = await svc.send(agentId, mailbox!, input, () => {
+      const a = mailAccess(deps.getConfig(), agentId, mailbox, 'send', undefined, { present: deps.present });
+      return a.ok ? null : a.reason;
+    });
+    if (underGrant && !out.repeated) {
+      recordGrantSend(out, input);
+      // Who wrote as another member's address, by id only: the office log is
+      // committed to git and agents read it, so no recipient or subject (D14).
+      try { deps.audit?.({ kind: 'mail-sent', agentId, mailbox, messageId: String(out.messageId ?? ''), grant: true }); } catch { /* the send stands */ }
+    }
+    return { status: 200, body: out };
   } catch (e) {
     const err = classifyMailError(e);
     const status = err.kind === 'not-found' ? 404 : err.kind === 'bad-request' ? 400 : err.kind === 'timeout' ? 504 : 502;
@@ -730,6 +1020,11 @@ export interface MailAdminDeps {
   saveConfig(patch: { mailboxes?: MailboxRecord[]; agentCapabilities?: MailAccessConfig['agentCapabilities'] }): void;
   setSecret(ref: string, value: string): { ok: boolean; error?: string };
   deleteSecret(ref: string): void;
+  /** A Send only grant ended: withdraw its emails, revoke its standing
+   *  approvals (D13). Optional so tests can leave it out. */
+  endGrant?(agentId: string, mailbox: string, reason: string): void;
+  /** Withdraw an agent's waiting and approved emails from a mailbox. */
+  cancelFor?(agentId: string, mailbox: string, reason: string): void;
 }
 
 export interface AddMailboxInput {
@@ -780,26 +1075,44 @@ export function removeMailbox(svc: MailService, admin: MailAdminDeps, id: string
   const cfg = admin.getConfig();
   const affected: string[] = [];
   const caps = { ...(cfg.agentCapabilities ?? {}) };
+  const address = mailboxAddress(cfg, id);
+  const ended: string[] = [];
+  // Its owner loses it too: the same rule as a grant (ship D3). Read before
+  // the save below changes the record.
   for (const [agentId, c] of Object.entries(caps)) {
+    if (c.email?.enabled && c.email.mailboxes[0] === id) ended.push(agentId);
+  }
+  for (const [agentId, c] of Object.entries(caps)) {
+    // A removed mailbox drops its Send only grants (3b).
+    if (c.sendOnly?.mailbox === id) {
+      const { sendOnly: _gone, ...rest } = caps[agentId];
+      caps[agentId] = rest;
+      if (!ended.includes(agentId)) ended.push(agentId);
+      if (!affected.includes(agentId)) affected.push(agentId);
+    }
     if (c.email?.mailboxes.includes(id)) {
       // Only the first listed mailbox is ever in use (one per agent), so an
       // older record listing two must not fall through to the second one.
-      if (c.email.mailboxes[0] === id) affected.push(agentId);
-      caps[agentId] = { ...c, email: { ...c.email, mailboxes: c.email.mailboxes.slice(0, 1).filter((m) => m !== id) } };
+      if (c.email.mailboxes[0] === id && !affected.includes(agentId)) affected.push(agentId);
+      caps[agentId] = { ...caps[agentId], email: { ...c.email, mailboxes: c.email.mailboxes.slice(0, 1).filter((m) => m !== id) } };
     }
   }
   admin.saveConfig({ mailboxes: (cfg.mailboxes ?? []).filter((m) => m.id !== id), agentCapabilities: caps });
+  for (const agentId of ended) {
+    try { admin.endGrant?.(agentId, id, `${address} was removed in Settings.`); } catch (e) { console.error('[mail] end grant:', e); }
+  }
   admin.deleteSecret(secretRefForMailbox(id));
   svc.close(id);
   return { ok: true, affected };
 }
 
 /** Save one agent's Capabilities. Unknown mailbox ids are dropped. Returns
- *  whether email just turned on (E2: that agent needs a restart to get md-mail). */
+ *  whether the mail tools just became attached (email on or a Send only grant;
+ *  E2: that agent needs a restart to get md-mail). */
 export function setAgentCapabilities(
   admin: MailAdminDeps,
   agentId: string,
-  next: { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean }
+  next: { email?: { enabled: boolean; mailboxes: string[]; send: boolean; sending?: SendingMode }; move?: boolean }
 ): { ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string } {
   const cfg = admin.getConfig();
   const known = new Set((cfg.mailboxes ?? []).map((m) => m.id));
@@ -807,8 +1120,10 @@ export function setAgentCapabilities(
   // The renderer is not trusted with the shape: anything that is not a list of
   // strings becomes no mailbox.
   const picked = Array.isArray(next.email?.mailboxes) ? next.email.mailboxes.filter((m): m is string => typeof m === 'string') : [];
-  const email = next.email
-    ? { enabled: next.email.enabled === true, mailboxes: picked.filter((m) => known.has(m)).slice(0, 1), send: next.email.send === true }
+  // Sending is one of three; `send` is kept in step for older readers.
+  const sending = next.email ? sendingMode(next.email) : undefined;
+  const email = next.email && sending
+    ? { enabled: next.email.enabled === true, mailboxes: picked.filter((m) => known.has(m)).slice(0, 1), send: sending === 'send', sending }
     : undefined;
   // One agent per mailbox (owner, 2026-09-27). Giving a held mailbox to another
   // agent is refused unless the owner confirmed the move, which turns the
@@ -822,10 +1137,69 @@ export function setAgentCapabilities(
     const holder = mailboxHolder(caps, email.mailboxes[0], agentId);
     if (holder && next.move !== true) return { ok: false, restartNeeded: false, heldBy: holder };
     if (holder) {
-      caps[holder] = { ...caps[holder], email: { enabled: false, mailboxes: [], send: false } };
+      caps[holder] = { ...caps[holder], email: { enabled: false, mailboxes: [], send: false, sending: 'draft' } };
       movedFrom = holder;
     }
   }
-  admin.saveConfig({ agentCapabilities: { ...caps, [agentId]: { ...(before ?? {}), email } } });
-  return { ok: true, restartNeeded: emailJustEnabled(before, email ? { email } : undefined), ...(movedFrom ? { movedFrom } : {}) };
+  const after: AgentCapabilities = { ...(before ?? {}), email };
+  // Owning the mailbox it sent only from covers the grant: the grant goes,
+  // and its proposals and standing approvals stay, keyed by agent and mailbox (EV8).
+  if (after.sendOnly && email?.enabled && email.mailboxes[0] === after.sendOnly.mailbox) delete after.sendOnly;
+  admin.saveConfig({ agentCapabilities: { ...caps, [agentId]: after } });
+  // Its own mailbox follows the Send only rule (owner, 2026-10-07, ship D3):
+  // losing the mailbox withdraws its emails from there and revokes its standing
+  // approvals; Draft only withdraws its emails.
+  const address = (m: string): string => mailboxAddress(cfg, m);
+  const ownedBefore = before?.email?.enabled ? before.email.mailboxes[0] : undefined;
+  const ownedAfter = email?.enabled ? email.mailboxes[0] : undefined;
+  // Each cleanup on its own, so one failing never skips the other.
+  try {
+    if (movedFrom && email?.mailboxes[0]) admin.endGrant?.(movedFrom, email.mailboxes[0], `The owner gave ${address(email.mailboxes[0])} to another team member.`);
+  } catch (e) { console.error('[mail] mailbox move:', e); }
+  try {
+    if (ownedBefore && ownedBefore !== ownedAfter) {
+      admin.endGrant?.(agentId, ownedBefore, ownedAfter ? `The owner gave you ${address(ownedAfter)} instead of ${address(ownedBefore)}.` : `The owner turned your email from ${address(ownedBefore)} off.`);
+    } else if (ownedBefore && ownedBefore === ownedAfter && sending === 'draft' && sendingMode(before!.email) !== 'draft') {
+      admin.cancelFor?.(agentId, ownedBefore, `The owner set you to Draft only from ${address(ownedBefore)}.`);
+    }
+  } catch (e) { console.error('[mail] mailbox change:', e); }
+  return { ok: true, restartNeeded: mailToolsJustAttached(before, after), ...(movedFrom ? { movedFrom } : {}) };
+}
+
+/**
+ * Save one member's Send only grant (shared-mailboxes.md), or clear it with
+ * null. The mailbox must be connected and not the member's own; Sending is one
+ * of three, Draft only when unsure. Removing the grant withdraws its emails and
+ * revokes its standing approvals (D13); switching it to Draft only withdraws
+ * its emails. Returns whether the member needs a restart to get the mail tools.
+ */
+export function setSendOnly(
+  admin: MailAdminDeps,
+  agentId: string,
+  next: { mailbox?: unknown; sending?: unknown } | null
+): { ok: boolean; restartNeeded: boolean } {
+  const cfg = admin.getConfig();
+  const before = cfg.agentCapabilities?.[agentId];
+  const prior = before?.sendOnly;
+  let grant: SendOnlyGrant | undefined;
+  if (next) {
+    const mailbox = typeof next.mailbox === 'string' ? next.mailbox : '';
+    const known = (cfg.mailboxes ?? []).some((m) => m.id === mailbox);
+    const own = !!before?.email?.enabled && before.email.mailboxes[0] === mailbox;
+    if (!known || own) return { ok: false, restartNeeded: false };
+    const sending: SendingMode = asSendingMode(next.sending);
+    grant = { mailbox, sending };
+  }
+  const after: AgentCapabilities = { ...(before ?? {}) };
+  if (grant) after.sendOnly = grant; else delete after.sendOnly;
+  admin.saveConfig({ agentCapabilities: { ...(cfg.agentCapabilities ?? {}), [agentId]: after } });
+  const address = (m: string): string => mailboxAddress(cfg, m);
+  try {
+    if (prior?.mailbox && prior.mailbox !== grant?.mailbox) {
+      admin.endGrant?.(agentId, prior.mailbox, `The owner removed your Send only access to ${address(prior.mailbox)}.`);
+    } else if (prior && grant && grant.sending === 'draft' && asSendingMode(prior.sending) !== 'draft') {
+      admin.cancelFor?.(agentId, grant.mailbox, `The owner set you to Draft only from ${address(grant.mailbox)}.`);
+    }
+  } catch (e) { console.error('[mail] grant change:', e); }
+  return { ok: true, restartNeeded: mailToolsJustAttached(before, after) };
 }

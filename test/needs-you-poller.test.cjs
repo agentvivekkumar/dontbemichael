@@ -90,6 +90,68 @@ test('one poll for every reader: the first listener starts it, the last stops it
   assert.deepEqual(r.afterAll, [1, 1], 'stopped with the last reader');
 });
 
+test('Get Michael ready counts once while Michael cannot start, reads Claude once a minute then every 10 once ready, at once when main says it changed, and fires the ready edge once', () => {
+  // Value: protects=the pill counts the Ask me engine card exactly while it shows, and the 5 s poll never starts a `claude auth status` process every tick; fails_when=a ready or non Claude engine still adds 1, the poll reads the engine every 5 s, a setup terminal ending is not read at once, an older read lands over a newer one, or the last reader leaves the engine listener on; why_new=the existing check only pins the count line's text, nothing runs the read cadence or the stale guard; seam=none
+  const r = runFeed(`
+    let now = 1000000; Date.now = () => now;
+    let poll; globalThis.setInterval = (fn) => { poll = fn; return 1; };
+    const engine = []; let changed; let offEngine = 0;
+    window.cth.engineSetupStatus = () => new Promise((resolve) => engine.push(resolve));
+    window.cth.onEngineSetupChanged = (cb) => { changed = cb; return () => { offEngine++; }; };
+    const count = () => feed.getNeedsYouFeed().count;
+    const events = []; window.dispatchEvent = (e) => { events.push(e.type); return true; };
+    const off = feed.subscribeNeedsYou(() => {});
+    out.first = engine.length;
+    engine[0]({ applies: true, installed: false, signedIn: false, needed: true });
+    await tick(); await tick();
+    out.needed = count();
+    now += 5000; poll();
+    out.afterPoll = engine.length;
+    changed({ id: 'engine-setup-install', exitCode: 0 });
+    out.afterEvent = engine.length;
+    engine[1]({ applies: true, installed: true, signedIn: true, needed: false, restart: ['god-pty'] });
+    await tick(); await tick();
+    out.ready = count();
+    out.readyEvents = events.slice();
+    now += 60000; poll();
+    out.afterMinute = engine.length;
+    now += 540000; poll();
+    out.afterTen = engine.length;
+    // Past the settled window, so a throttled read inside readTasks would fire
+    // too if refreshNeedsYou read the engine after it.
+    now += 600001;
+    const before = engine.length;
+    feed.refreshNeedsYou();
+    out.refreshReads = engine.length - before;
+    const newest = engine.length - 1;
+    engine[newest]({ applies: true, installed: true, signedIn: true, needed: false });
+    await tick(); await tick();
+    engine[2]({ applies: true, installed: true, signedIn: false, needed: true });
+    await tick(); await tick();
+    out.stale = count();
+    changed({ id: 'api-key', exitCode: null });
+    engine[engine.length - 1]({ applies: false, installed: true, signedIn: null, needed: false });
+    await tick(); await tick();
+    out.otherEngine = [count(), feed.getNeedsYouFeed().engineSetup.applies];
+    out.allEvents = events.slice();
+    off();
+    out.offEngine = offEngine;
+  `);
+  assert.equal(r.first, 1, 'the first reader reads the engine once');
+  assert.equal(r.needed, 1, 'Claude missing: one thing needs the owner');
+  assert.equal(r.afterPoll, 1, 'the 5 s poll does not read the engine again within the minute');
+  assert.equal(r.afterEvent, 2, 'a setup terminal ending reads it at once');
+  assert.equal(r.ready, 0, 'ready: the card and its count are gone');
+  assert.deepEqual(r.readyEvents, ['cth:engine-ready'], 'turning ready after Michael could not start tells the team to restart, once');
+  assert.equal(r.afterMinute, 2, 'once ready, the poll does not start claude auth status every minute');
+  assert.equal(r.afterTen, 3, 'once ready, it looks again every 10 minutes');
+  assert.equal(r.refreshReads, 1, 'one refresh starts one claude auth status, not two');
+  assert.equal(r.stale, 0, 'an older read that says signed out never lands over a newer ready one');
+  assert.deepEqual(r.otherEngine, [0, false], 'an engine this step does not set up never counts');
+  assert.deepEqual(r.allEvents, ['cth:engine-ready'], 'a stale signed out read or another engine never fires the ready edge again');
+  assert.equal(r.offEngine, 1, 'the last reader stops listening for engine changes');
+});
+
 const feedTs = loadTs('src/renderer/src/shell/useNeedsYou.ts');
 
 test('the pill: blank while unknown, a quiet label at zero, coral above zero (D2, D3)', () => {

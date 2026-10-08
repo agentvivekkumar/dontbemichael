@@ -48,7 +48,11 @@ src/
     hive.ts                  on-disk multi-agent layer (memory, mailboxes, router)
     hooks.ts                 hook server + provider hook shims (`cth-hook`, `agy-hook`)
     memory.ts                semantic memory layer (CLI wrapper, degrade-to-noop)
-    config.ts                harness config persistence + home setup
+    config.ts                harness config persistence + home setup; Claude Code's ~/.claude.json (folder trust,
+                             the first-run welcome, an approved API key), written to a copy and swapped in
+    engineSetup.ts           Get Michael ready: finds Claude without a shell, Claude's standalone install script,
+                             sign in state (`claude auth status`), the Anthropic API key check
+                             (docs/designs/get-michael-ready.md; status types in shared/engineSetup.ts)
     transcript.ts            reads ~/.claude/projects/ JSONL transcripts for real token/cost telemetry
     telemetry.ts             live OTel collector + usage/cost feed for observability
     usage.ts / pricing.ts    UsageProvider seam + per-model cost attribution
@@ -59,6 +63,11 @@ src/
     shellEnv.ts              resolve PATH and shell env for child processes
     mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
     integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
+    mailApprovals.ts         Send on approval's store (mail-proposals.json in the app's data folder): emails waiting on
+                             Ask me, the owner's decisions, standing approvals, Send only send records and pauses
+                             (docs/designs/send-on-approval.md, shared-mailboxes.md; the rules are in shared/mailProposals.ts)
+    standingCheck.ts         the separate quick check (hidden Claude, no tools) that an email fits a standing approval;
+                             anything it can't read counts as no, so the email goes to the owner
     integrations.ts          the secret store: every saved password and key in one safeStorage-encrypted file
                              (integration-secrets.json in userData, 0600); refuses to save over a file it can't read
     atomicFile.ts            crash-safe file write (temp file, fsync, rename); the secret store's writer
@@ -84,7 +93,8 @@ src/
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
     officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles, business profile, team plan
     agentDefinition.ts       each agent's levels and outward capabilities
-    mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule)
+    mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule,
+                             Send only grants from another member's mailbox included: shared-mailboxes.md)
     quickbooks.ts            QuickBooks through the owner's Claude account: which connector tools count, read vs change,
                              and quickbooksAccess (the hook's rule: the QuickBooks row's switch in Claude connectors,
                              off by default, then per agent;
@@ -103,9 +113,12 @@ src/
     agentProfile.ts          splits an agent's role line into the parts its Profile tab shows
     messageView.ts           the Messages tab as a day-grouped history, office notices counted on one line
     askMeRouting.ts          where an owner's Ask me answer goes: the agent that raised the question, and
-                             Michael as a request to route the follow up
+                             Michael as a request to route the follow up; Report cards are entries of kind report
     ownerRequests.ts         Michael's open requests from the owner, Blocked cards with nothing asked, the launch
-                             catch-up and "hasn't moved this" in office hours (docs/designs/card-lifecycle.md)
+                             catch-up and "hasn't moved this" in office hours (docs/designs/card-lifecycle.md), and
+                             the owner's questions in Michael's conversation dock (docs/designs/michael-replies.md)
+    mailProposals.ts         Send on approval's rules: proposals and their states, what an approved send may carry,
+                             standing approvals and the fit check's prompt, threading from a Send only member's own sends
     starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
     firstTask.ts             a hire's first task card and Michael's request to hand it out (docs/designs/first-task-card.md);
                              legacyFirstTasks.ts holds the old First task texts the one-time cleanup matches
@@ -121,9 +134,16 @@ src/
     CommandCenterPanel,      Michael's control surface (Profile/Access/Work/Office schedule/Memory/Advanced tabs, plus
                              History once a webhook exists; Advanced holds Monitor and Activity). Office schedule is a
                              read-only list of every enabled job
-    AskMeTab,                the Ask me cards on the Needs you board, agents' schedule requests included
-    CapabilitiesTab,         every agent's Access tab (Michael included): the Email section (on/off switch,
-                             one mailbox, Can send / Draft only), the Claude connectors card (a switch per
+    AskMeTab,                the Ask me cards on the Needs you board, agents' schedule requests included, and
+                             Report cards (cleared with Got it)
+    GetMichaelReady,         setup's Ready step: the Claude Code and Claude account rows, and Use an API key;
+                             EngineSetupCard puts the same rows on Ask me while Michael can't start
+    MailProposalCards,       Ask me cards for emails waiting on approval (edit, Approve, Ask for changes, Don't send,
+                             and the agent's offer to send that kind without asking); sendingLabels.ts names each
+                             Sending choice
+    CapabilitiesTab,         every agent's Access tab (Michael included): the Email section (the addresses
+                             it uses: the one inbox it watches and the one it sends only from, each with
+                             Can send / Send on approval / Draft only, and Add a mailbox), the Claude connectors card (a switch per
                              connector the owner turned on; QuickBooks keeps Read only / Can make changes)
                              and the On a schedule section
     MailboxesSettings,       Settings > Connections > Mailboxes and AddMailboxDialog
@@ -150,13 +170,15 @@ src/
     TasksKanban,             dependency-aware kanban board (the Tasks view); the owner closes a card as Done,
                              never deletes it (hiveTasks.ts holds the card types and parser)
     ThreadsPanel,            hive message conversation viewer (Messages tab)
-    MessageQueueComposer,    park messages for a busy agent
+    MessageQueueComposer,    park messages for a busy agent; on Michael's panel a question goes to his dock (shell/ownerSend.ts)
     scene/studio/            the office studio: isometric SVG stage, pods, Michael's office, life layer (branding/DESIGN.md 8)
     scene/office/            the cast, the idle lines, and each character's prop and department icon (props.tsx,
                              PersonAvatar)
     shell/                   top bar (view tabs: Office, Tasks, Who talks to whom), bottom bar, Needs you board,
                              panel chrome, dialogs; releaseBindings.ts gives a leaving hire's work back to teammates,
-                             typedFirstTask.ts sends a First task the owner typed to Michael as a card
+                             typedFirstTask.ts sends a First task the owner typed to Michael as a card,
+                             MichaelDock.tsx is Michael's conversation dock above the Talk to Michael box, and
+                             ownerSend.ts files a question for it (a known slash command still types into his terminal)
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
     assets/                  fonts (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)

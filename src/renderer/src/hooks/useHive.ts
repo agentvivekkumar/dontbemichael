@@ -23,6 +23,7 @@ import { FIRST_TASK_EDITED_MAX, withoutLegacyFirstTask } from '../../../shared/f
 import { firstTaskSection } from '../../../shared/workStyleText';
 import { splitAgentRole } from '../../../shared/agentRole';
 import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
+import { ENGINE_READY_EVENT } from '@/shell/useNeedsYou';
 import { seedStarterJobs } from '@/shell/seedStarterJobs';
 import { PromptSubmits, confirmSubmit } from '../../../shared/submitConfirm';
 
@@ -1035,10 +1036,22 @@ export function useHive(config: HarnessConfig | null): void {
         removeQueuedMessage(srcId, next.id);
         return { sent: false };
       }
+      // Removed while the checks above ran (the owner withdrew a question, or
+      // cleared the queue): never type it.
+      if (!useStore.getState().messageQueues[srcId]?.some((m) => m.id === next.id)) return { sent: false };
       const flightKey = `${srcId}:${next.id}`;
       if (inFlight.has(flightKey)) return { sent: false };
+      // Marked in flight first, in the same step as the check, so a second
+      // flush can't pass while the claim below is on its way.
       inFlight.add(flightKey);
       lastFlush.current[target.id] = now;
+      // An owner question is claimed in main before it is typed (Codex P1):
+      // from then on it is Michael's (and in his every-turn list) even if this
+      // window stops mid-typing, and a withdraw can no longer race it.
+      if (next.ownerRequestId) {
+        const claim = await window.cth.ownerDelivered(next.ownerRequestId).catch(() => ({ ok: false }));
+        if (!claim.ok) { inFlight.delete(flightKey); removeQueuedMessage(srcId, next.id); return { sent: false }; }
+      }
       try {
         const sent = await deliverWithAcknowledgement(
           // `instruction` (when present) is the authoritative text to type into
@@ -1077,6 +1090,8 @@ export function useHive(config: HarnessConfig | null): void {
         if (attempts >= MAX_SEND_ATTEMPTS) {
           delete sendFailures[next.id];
           removeQueuedMessage(srcId, next.id);
+          // An owner question was claimed before typing, so Michael still has it
+          // through his every-turn list of open owner questions.
           console.warn(
             `[queue-drain] dropping message ${next.id} for ${target.id} after ${attempts} failed pty writes ` +
             `("${next.text.slice(0, 80)}${next.text.length > 80 ? '…' : ''}")`
@@ -1314,6 +1329,23 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, [config?.onboardingComplete]);
 
+  // Claude turned ready after Michael or the team could not start for want of
+  // it (get-michael-ready.md): from the card, setup, a sign in in the browser,
+  // or an install outside the app. The members whose terminals could not start
+  // restart now (main names them); anyone already working is left alone.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const onReady = (e: Event): void => {
+      const restart = new Set(((e as CustomEvent<{ restart?: string[] }>).detail?.restart) ?? []);
+      const { agents, setPendingRestart } = useStore.getState();
+      for (const a of agents) {
+        if (a.ptyId && restart.has(a.ptyId) && isClaudeProvider(a.provider ?? 'claude')) setPendingRestart(a.id, { at: Date.now(), reason: 'engine', now: true });
+      }
+    };
+    window.addEventListener(ENGINE_READY_EVENT, onReady);
+    return () => window.removeEventListener(ENGINE_READY_EVENT, onReady);
+  }, [config?.onboardingComplete]);
+
   // 8) Restart to apply (docs/designs/multi-mailbox.md E2 + E5, and
   //    docs/designs/claude-connectors.md D2). Claude Code picks up the md-mail
   //    tools and its connectors only at start, so turning email on, or changing
@@ -1337,7 +1369,7 @@ export function useHive(config: HarnessConfig | null): void {
     const CEILING_MS = 10 * 60_000;
     const POLL_MS = 5_000;
     const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
-    const WHY = { email: 'turn on email', connectors: 'apply its connectors' } as const;
+    const WHY = { email: 'turn on email', connectors: 'apply its connectors', engine: 'start on Claude Code' } as const;
     const inFlight = new Set<string>();
     const tick = (): void => {
       const { pendingRestart, agents, setPendingRestart, updateAgent } = useStore.getState();

@@ -507,7 +507,9 @@ text "Nothing needs you", no dot, and it is a plain label, not a button. While t
 still unknown at launch it is the same quiet pill with no text, never a false "Nothing needs
 you". The coral pill shows the Needs you board (never closes it, since a waiting ask keeps the
 column open) and moves focus to the first card's reply field; a screen reader hears "Michael needs you: N" once each time
-the count rises (docs/designs/needs-you-empty-state.md).
+the count rises (docs/designs/needs-you-empty-state.md). With only Report cards waiting
+(§7.8) it stays quiet: the same pill reads "Reports: N" in `ink-2` and is a button that
+opens the board.
 
 ### 7.6 Right column
 
@@ -603,6 +605,18 @@ stands on its own.
   shows the same rows under each question, all checked at once, with no hairline under
   the last row when an answer follows.
 - Optional secondary actions Michael attached (for a broken mailbox: "Open Mailboxes").
+- **Mail approval cards** (MailProposalCards, docs/designs/send-on-approval.md): "{name}
+  wants to send an email" with the avatar; From, To and Cc as `t-meta` lines; editable
+  Subject and Message fields (`.cth-input`); one quiet line when it forwards an email or
+  attaches files from other emails; the agent's offer as an unticked "From now on, send
+  emails like this without asking" checkbox when it made one, whose kind becomes an
+  editable field once ticked; buttons Don't send, Ask for changes (a
+  required note) and Approve (primary).
+- **Report cards** (docs/designs/michael-replies.md, 14A): a scheduled outcome, such as
+  the weekly money summary, is a card with a "Report" tag (`neutral-soft`, `ink-2`) after
+  the questions. Same frame, file rows and reply; a secondary "Got it" clears it and sends
+  Michael nothing. Reports never turn the Needs you pill coral or hold the column open:
+  with only reports waiting the quiet pill reads "Reports: N" and opens the board.
 
 ### 7.9 Schedule request card (ScheduleRequestCards)
 
@@ -641,7 +655,7 @@ enforced today:
 
 | Group | Controls |
 |---|---|
-| Email | Switch. When on: Mailbox select (mono value), Sending segmented control [Draft only, Can send] |
+| Email | No switch (owner, 2026-10-07): the header chip says "Mailboxes: N" or "None". One row per address the member uses (mono address, Remove): an **Inbox** line, green dot "{name} watches it" or grey dot "{holder} watches it. {name} sends only." ("Nobody watches it. {name} sends only." when no one does), and a **Sending** segmented control [Can send, Send on approval, Draft only] with the meanings behind an info icon. Under the watched inbox: "Also sends from here: ..." (`ink-3`); removing it while others send from it asks first and names them. Under each row: "Sends without asking" (standing approvals, each with Revoke) and, for Send only, "Sent from here lately" (up to five). A paused Send only row shows an `amber-soft` note. **Add a mailbox** (link) opens a `card-2` panel: a mailbox select, then radio rows [Watch the inbox, Send only]; a choice that can't be made is greyed with its reason, never hidden; Add and Cancel (`docs/designs/shared-mailboxes.md`) |
 | Claude connectors | One row and switch per connector the owner turned on in Settings, A to Z; "2 of 4" in the header. QuickBooks keeps radio rows [Read only, Can make changes] under its row, and an `ink-3` "on for bookkeeping roles" while the role default holds. None on: one `ink-3` line with a link to Settings. A pending restart shows under the groups with Restart now (`docs/designs/claude-connectors.md`) |
 | Files | Read only row: lock icon, "Own folder only", the folder name, "Open folder" link |
 | On a schedule | "+ Add" link. Rows (owner, 2026-10-01, three quiet lines): switch; the job name (14 px) with the next run on the right; the when line (14 px, `ink-2`); then the status line (last run, and who added it only when it was not the owner) in `t-meta` `ink-3` |
@@ -768,8 +782,23 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
   beside it stay put. Enter sends, Shift+Enter starts a new line (owner, 2026-10-01). It
   keeps at least 300 px, so the placeholder never wraps. A pasted screenshot or Finder files attach, as on Michael's Work tab. Focus rings the
   whole composer in `indigo`.
-  Queued messages show as a count chip on the composer; the full queue opens
-  above it.
+  A question to Michael opens the **conversation dock** above it
+  (docs/designs/michael-replies.md): 400 px, up to 430 px tall (never taller than the room
+  under the top bar), `card`, `r-2xl`, `line-2` ring, `shadow-lg`. Header: 26 px avatar,
+  Michael's name, "N open" in `ink-3` with an info tip, close ✕. The owner's messages sit
+  right in `neutral-soft` bubbles with one live status line under each (a 6 px dot plus
+  words on §3.5 meanings: Sent and Waiting on X `ink-3`, Michael has it `blue`, Answered
+  `green`, Later than he said `amber` with Nudge, Waiting for you `coral-text`, Couldn't
+  finish `ink-2` with Ask again). Michael's replies sit left on `card` with a `line` ring,
+  markdown at 12.5 / 18, first sentence bold, 4 lines then More, files as §7.8 rows;
+  terminal notes are muted (`card-2`, "From Michael's notes"); a refusal with no reason
+  reads "No reason given". Bubble tails and the quote bar use logical corners and edges,
+  so they mirror in Arabic. Empty: one line and two example chips. The dock slides 180 ms
+  up from the composer and snaps under reduced motion. One count on the composer replaces
+  the queue chip: mono 11 px on `indigo` (`on-indigo` text) for unread replies,
+  `coral-strong` (`on-coral` text) while Michael waits on the owner. The dock
+  opens only on the owner's action and closes on ✕, Esc, or a floor click with nothing
+  typed. A known slash command still types straight into Michael's terminal.
 - **Next job chip**: calendar icon, "Next:" `ink-2`, mono time 600, job and person.
   `card`, `line`, `r-lg`, 40 px tall. Click opens Office schedule.
 - **Hire**, pushed right: secondary "Hire" with a plus (opens the hire wizard). No pack
@@ -879,12 +908,16 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 
 Full window, no app chrome.
 
-- Header: lockup left; step indicator center: seven labelled steps (Business, Details,
-  Meet, Team, Home, Manager, Permissions) in a `card` pill container, each a 22 px circle
+- Header: lockup left; step indicator center: eight labelled steps (Business, Details,
+  Meet, Team, Home, Manager, Permissions, Ready; seven when Michael's engine is not Claude) in a `card` pill container, each a 22 px circle
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
-  number) joined by 1 px `line-2` rules; "Step 4 of 7" right, `t-meta`.
-- Body: a 560 px left card with the step's fields; the right side is the studio (§8)
-  reacting to the step. Labels `t-ui` 600 at 12, fields v2 (`cth-input`: Sora, `line-input`
+  number) joined by 1 px `line-2` rules; "Step 4 of 8" right, `t-meta`.
+- Body: a 560 px card with the step's fields. While the studio isn't showing (Business,
+  Details, Resume, or no team yet) the card is centered under the step indicator; once it
+  shows, the card sits at the start edge and the studio (§8) fills the rest, reacting to
+  the step. The card glides there over `--cth-dur-slow` (320 ms) as the studio fades in,
+  and back on Back; reduced motion jumps. The soft glow behind the page follows: behind
+  the card while it is alone, behind the studio after (docs/designs/onboarding-centered.md). Labels `t-ui` 600 at 12, fields v2 (`cth-input`: Sora, `line-input`
   ring, indigo focus ring; the folder path in mono). The Meet step lists what the office does
   as quiet rows in one `line` card, a 26 px neutral icon and a label each, the explanation
   behind an info icon (review, 2026-10-01: it was a grid of tinted tiles, one coral).
@@ -896,6 +929,20 @@ Full window, no app chrome.
   "Works in Harbor & Pine/Finance" line with a "change" link. Unchecked rows at 55%.
   Footer: "N picked, M to connect" and Back (secondary), Next (primary). The footer sticks
   to the window's bottom edge, so Next stays in reach on a long step.
+- **Ready step** (Get Michael ready, docs/designs/get-michael-ready.md): heading with an
+  info icon, then two quiet rows in one `line` card, a 26 px tinted icon each: Claude Code
+  (Checking, Installing with a moving `indigo` bar, Installed `green`, or a `coral-text`
+  failure line with Try again and Show details) and Your Claude account (Sign in, then
+  "Finish signing in in your browser" with Open the browser again and Show what Claude
+  says, then Signed in as the email). Beside Sign in, Use an API key (secondary) opens one
+  password field in mono with an info icon, Save key and Cancel; then "Using your Anthropic
+  API key". When sign in cannot be read, the row shows a neutral question tile, "Could not
+  check sign in. Sign in if Claude asks.", Sign in and Use an API key (secondary), and the
+  office may open. Footer: Back, Set up later (ghost), and Open the
+  office (primary, off until Claude Code is installed and the account row is green or could
+  not be checked). Skipped, Ask me keeps a "Michael can't
+  start yet" card ("Some of your team can't start yet" when Michael runs on another engine)
+  that opens the same rows in a dialog.
 - The studio on the right fills with a pod per picked person around Michael's glass pod,
   each with a small name tag and a check on its screen; an unpicked department shows as a
   dashed outline with a "Name, not picked" tag on its back corner, clear of the pods in
@@ -923,7 +970,8 @@ many mailboxes never mean a long scroll. One header line: the `Disclosure` caret
 count ("14 mailboxes", "none yet"), the coral "N needs you" when one is broken, an info icon with
 the intro, and Add a mailbox. It starts closed and opens by itself when a mailbox needs you;
 broken mailboxes sort first, then A to Z. Gmail on the owner's Claude account is not a row here;
-the info icon says it is under Claude connectors.
+the info icon says it is under Claude connectors. A mailbox other team members send only from
+shows "Also sends from here: ..." under its row, and removing it names them too.
 
 **Claude connectors** (Settings, Connections, first; `docs/designs/claude-connectors.md`, owner
 2026-10-02) folds the same way: caret, title, "8 connectors, 3 on", an info icon, Refresh. It
@@ -1210,6 +1258,8 @@ anyway" highlighted like Done) as `card` with `shadow-lg` and `r-lg`, beside a `
 - Sizes: 14 (inline in meta), 16 (buttons, rows), 18 (top bar), 20 (empty states).
 - Every icon only button has an `aria-label` and a tooltip.
 - `file` (a document) and `sheet` (a spreadsheet or CSV) mark Ask me file rows (§7.8).
+- `help` (a question in a circle) marks a state that could not be checked (§7.25); `info`
+  opens an InfoTip explanation. Never swap them.
 - `components/Icon.tsx` draws these outline icons; the v1 pixel set is retired (§17, row 6).
 
 ---
@@ -1389,6 +1439,11 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-05 | Web: platform switch, Beta tag and install dialog drawings for the download page (§9.8 to §9.10). |
 | 2026-10-05 | Top bar: the Beta pill also sits beside the version, its InfoTip pointing to Report a problem in Settings. |
 | 2026-10-05 | Settings: a Beta pill (with an InfoTip) beside the version on every build, and Report a problem opens a bug report with the app version and OS filled in (docs/designs/windows-11-installer.md, E4). |
+| 2026-10-05 | Send on approval: mail approval cards on Ask me (§7.8); a third Sending choice and Sends without asking, with Revoke, on the Access tab (§7.12). |
+| 2026-10-06 | Michael's conversation dock above the Talk to Michael composer, whose one count replaces the queue chip (§7.19); Report cards on Ask me and the quiet "Reports: N" pill (§7.5, §7.8). |
+| 2026-10-07 | Access tab, Email: no switch; one row per address used with Inbox and Sending lines, and Add a mailbox with Watch the inbox or Send only (§7.12). Settings, Mailboxes names who else sends from a mailbox (§7.26). |
+| 2026-10-07 | Onboarding: the card is centered while the studio isn't showing and glides to its column when it appears, the background glow following it (§7.25); onboarding reference screens re-shot. |
+| 2026-10-07 | Onboarding: a Ready step (Get Michael ready) installs Claude Code and signs the owner in where they can see it; skipped, Ask me keeps a card (§7.25). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
@@ -1442,6 +1497,7 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 | `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
 | `onboarding-business.png` | Onboarding step 1, Your business |
 | `onboarding-meet.png` | Onboarding step 3, Meet your office |
+| `onboarding-ready.png` | Onboarding step 8, Get Michael ready (installed, not signed in) |
 | `kelly-memory.png` | A person selected, Memory tab |
 | `hire.png` | The hire wizard, step 1 (Who) |
 | `settings-autonomy.png` | Settings, Agents (the default model, autonomy and the circuit breaker) |

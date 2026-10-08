@@ -235,7 +235,7 @@ function MenuItem({ children, onClick }: { children: ReactNode; onClick: () => v
 export function NeedsYouButton() {
   const { t } = useTranslation();
   const godName = useResolvedGodName();
-  const { status, count } = useNeedsYou();
+  const { status, count, reports } = useNeedsYou();
   const state = pillState(status, count);
   // The coral pill shows the board and puts focus in the first reply field
   // (D10). While anything waits the board cannot be closed, so it never
@@ -266,6 +266,10 @@ export function NeedsYouButton() {
   }
   // Nothing waits: a plain label, not a button (D2).
   if (state === 'quiet') {
+    // Only reports waiting: a quiet pill that opens the board, never coral (14A).
+    if (reports > 0) {
+      return <>{live}<button onClick={openBoard} className="cth-titlebar-nodrag" style={{ ...quietPill, border: 'none', fontFamily: 'var(--cth-font-ui)', cursor: 'pointer', color: 'var(--cth-ink-2)' }}>{t('shell.reports', { count: reports })}</button></>;
+    }
     return <>{live}<span className="cth-titlebar-nodrag" style={quietPill}>{t('shell.nothingNeedsYou')}</span></>;
   }
   return (<>{live}

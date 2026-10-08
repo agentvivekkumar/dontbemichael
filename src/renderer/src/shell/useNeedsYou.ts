@@ -1,8 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import type { ScheduleRequest } from '@shared/missions';
+import type { MailProposal } from '@shared/mailProposals';
 import type { OwnerRequest } from '@shared/ownerRequests';
 import type { WorkStyleOffer } from '@shared/workStyleUpdates';
+import type { EngineSetupStatus } from '@shared/engineSetup';
 import { openQuestion, openQuestions, parseTasks, waitsOnHuman, type HiveTask } from '../components/hiveTasks';
+import { openReportIndexes } from '@shared/askMeRouting';
 
 const POLL_MS = 5000;
 
@@ -26,11 +29,18 @@ export interface NeedsYouFeed {
   ownerRequests: OwnerRequest[];
   /** New default job descriptions offered to the owner (shared/workStyleUpdates.ts). */
   offers: WorkStyleOffer[];
-  /** Open asks, passed-on schedule requests and job description offers. */
+  /** Emails waiting for the owner's approval (send-on-approval.md). */
+  proposals: MailProposal[];
+  /** Where Michael's engine stands (get-michael-ready.md); null until read. */
+  engineSetup: EngineSetupStatus | null;
+  /** Open asks, passed-on schedule requests, job description offers, emails to
+   *  approve, and one for an engine Michael cannot start on. */
   count: number;
+  /** Reports Michael put on Ask me (michael-replies.md, 14A): never coral, never in `count`. */
+  reports: number;
 }
 
-let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], count: 0 };
+let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], proposals: [], engineSetup: null, count: 0, reports: 0 };
 // The offers need the team and the packs, which this module does not import;
 // the app hands it the reader at start (App.tsx).
 let offersSource: (() => Promise<WorkStyleOffer[]>) | null = null;
@@ -59,18 +69,45 @@ function readOffers(force = true): void {
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
 let offRequests: (() => void) | null = null;
+let offProposals: (() => void) | null = null;
+let offEngine: (() => void) | null = null;
+let engineReads = 0;
+// `claude auth status` starts a process, so the 5 s poll reads the engine at
+// most once a minute while Michael cannot start, and every 10 minutes once he
+// can; a setup terminal ending, or refreshNeedsYou, reads it at once.
+const ENGINE_EVERY_MS = 60_000;
+const ENGINE_SETTLED_EVERY_MS = 10 * 60_000;
+/** Fired on window when Claude turns ready after Michael could not start: the
+ *  team restarts however that happened (useHive), not only from the card. */
+export const ENGINE_READY_EVENT = 'cth:engine-ready';
+let engineReadAt = 0;
+let proposalReads = 0;
 // A read that started before a newer read or a local change must not land.
 let taskReads = 0;
 let requestReads = 0;
 let ownerReads = 0;
 
-function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers'>>): void {
+function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers' | 'proposals' | 'engineSetup'>>): void {
   // A poll that brings nothing new changes nothing, so nobody re-renders.
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
+  const wasNeeded = !!(feed.engineSetup?.applies && feed.engineSetup.needed);
   const merged = { ...feed, ...next };
-  feed = { ...merged, count: merged.tasks.reduce((n, t) => n + openQuestions(t).length, 0) + merged.requests.length + merged.offers.length };
+  feed = {
+    ...merged,
+    count: merged.tasks.reduce((n, t) => n + openQuestions(t).length, 0) + merged.requests.length + merged.offers.length + merged.proposals.length,
+    reports: merged.tasks.reduce((n, t) => n + openReportIndexes(t.humanQA).length, 0)
+  };
+  // One more while Michael cannot start for want of his engine (get-michael-ready.md).
+  if (merged.engineSetup?.applies && merged.engineSetup.needed) feed = { ...feed, count: feed.count + 1 };
   for (const l of [...listeners]) l();
+  // Ready after Michael could not start: hand the terminals that could not
+  // start to useHive, which restarts exactly those (agents at work keep going).
+  const restart = merged.engineSetup?.restart ?? [];
+  if (wasNeeded && merged.engineSetup?.applies && !merged.engineSetup.needed && restart.length
+    && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(ENGINE_READY_EVENT, { detail: { restart } }));
+  }
 }
 
 function readTasks(): void {
@@ -85,6 +122,7 @@ function readTasks(): void {
     .then((open) => { if (ownerMine === ownerReads) publish({ ownerRequests: Array.isArray(open) ? open : [] }); })
     .catch(() => { /* keep the last value */ });
   readOffers(false);
+  readEngine(false);
 }
 
 function readRequests(): void {
@@ -94,14 +132,34 @@ function readRequests(): void {
     .catch(() => { /* keep the last value */ });
 }
 
+function readEngine(force = true): void {
+  const every = feed.engineSetup && !(feed.engineSetup.applies && feed.engineSetup.needed) ? ENGINE_SETTLED_EVERY_MS : ENGINE_EVERY_MS;
+  if (!force && Date.now() - engineReadAt < every) return;
+  engineReadAt = Date.now();
+  const mine = ++engineReads;
+  void window.cth.engineSetupStatus?.()
+    .then((s) => { if (mine === engineReads) publish({ engineSetup: s ?? null }); })
+    .catch(() => { /* keep the last value */ });
+}
+
+function readProposals(): void {
+  const mine = ++proposalReads;
+  void window.cth.listMailProposals?.()
+    .then((all) => { if (mine === proposalReads) publish({ proposals: Array.isArray(all) ? all : [] }); })
+    .catch(() => { /* keep the last value */ });
+}
+
 /** Listen for changes; the first listener starts the poll, the last stops it. */
 export function subscribeNeedsYou(listener: () => void): () => void {
   listeners.add(listener);
   if (listeners.size === 1) {
     readTasks();
     readRequests();
+    readProposals();
     timer = setInterval(readTasks, POLL_MS);
     offRequests = window.cth.onScheduleRequestsUpdated(readRequests);
+    offProposals = window.cth.onMailProposalsUpdated?.(readProposals) ?? null;
+    offEngine = window.cth.onEngineSetupChanged?.(() => readEngine()) ?? null;
   }
   return () => {
     listeners.delete(listener);
@@ -110,6 +168,10 @@ export function subscribeNeedsYou(listener: () => void): () => void {
       timer = null;
       offRequests?.();
       offRequests = null;
+      offProposals?.();
+      offProposals = null;
+      offEngine?.();
+      offEngine = null;
     }
   };
 }
@@ -133,8 +195,12 @@ export function getNeedsYouFeed(): NeedsYouFeed {
 
 /** Read again now: after the owner answers, approves or edits something. */
 export function refreshNeedsYou(): void {
+  // The engine first: readTasks' throttled read then sees it fresh and skips,
+  // so one refresh starts one `claude auth status`, not two.
+  readEngine();
   readTasks();
   readRequests();
+  readProposals();
   readOffers();
 }
 

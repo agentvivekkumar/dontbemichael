@@ -93,6 +93,8 @@ export function useSaveOp(): {
 /** Who a focus area is checked for (FA3): the agent's name, its Work style and
  *  its other jobs' focus areas. */
 interface FocusOwner {
+  /** The agent, so the check reads its Sending setting (send-on-approval.md). */
+  agentId?: string;
   name: string;
   workStyle: string;
   /** Every job the agent has, to check against all but the one being saved. */
@@ -116,7 +118,7 @@ function useFocusCheck(owner: FocusOwner): {
     setChecking(true);
     try {
       const others = owner.jobs.filter((m) => m.id !== missionId && m.focus).map((m) => ({ job: m.label, focus: m.focus! }));
-      const res = await window.cth.workStyleCheckFocus({ name: owner.name, job, focus, workStyle: owner.workStyle, others });
+      const res = await window.cth.workStyleCheckFocus({ agentId: owner.agentId, name: owner.name, job, focus, workStyle: owner.workStyle, others });
       if (res.conflict) { setConflict(res.conflict); return false; }
       return true;
     } catch {
@@ -547,7 +549,7 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   // A focus area is checked against this agent's Work style and its other
   // jobs on save (FA3).
   const agent = agents.find((a) => a.id === agentId);
-  const focusOwner: FocusOwner = { name: agentName, workStyle: agent ? effectiveWorkStyle(agent) : '', jobs: mine };
+  const focusOwner: FocusOwner = { agentId, name: agentName, workStyle: agent ? effectiveWorkStyle(agent) : '', jobs: mine };
 
   return (
     <div>

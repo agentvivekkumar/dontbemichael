@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get Michael ready</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cth-bg: #F7F7FB; --cth-card: #FFFFFF; --cth-card-2: #FAFAFD;
+    --cth-ink: #1E1B2E; --cth-ink-2: #4A4660; --cth-ink-3: #6C6884;
+    --cth-line: #E8E6F2; --cth-line-2: #DAD7EA; --cth-neutral-soft: #F0EFF5;
+    --cth-indigo: #6C5CE7; --cth-indigo-soft: #EEEBFD; --cth-indigo-text: #4338CA;
+    --cth-green: #1FB872; --cth-green-soft: #E3F7EC; --cth-green-text: #157D4D;
+    --cth-coral: #E8604C; --cth-coral-soft: #FDECE8; --cth-coral-text: #B8412F;
+    --cth-shadow-lg: 0 1px 2px rgba(30,27,46,.05), 0 10px 30px rgba(62,52,140,.10);
+    --font: "Sora", -apple-system, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --cth-bg: #14131C; --cth-card: #1F1E2B; --cth-card-2: #24233A;
+      --cth-ink: #ECEAF4; --cth-ink-2: #CFCCDD; --cth-ink-3: #A5A2B8;
+      --cth-line: rgba(255,255,255,.09); --cth-line-2: rgba(255,255,255,.14); --cth-neutral-soft: #2A2938;
+      --cth-indigo: #9D90FF; --cth-indigo-soft: rgba(157,144,255,.16); --cth-indigo-text: #A99FFF;
+      --cth-green: #34CD8A; --cth-green-soft: rgba(52,205,138,.14); --cth-green-text: #34CD8A;
+      --cth-coral: #FF8A75; --cth-coral-soft: rgba(255,138,117,.14); --cth-coral-text: #FF9C8A;
+      --cth-shadow-lg: 0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.40);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--cth-bg); color: var(--cth-ink); font-family: var(--font); font-size: 13px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 16px; background: var(--cth-card); border-bottom: 1px solid var(--cth-line); }
+  .controls b { font-weight: 600; }
+  .seg { display: inline-flex; flex-wrap: wrap; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--cth-line-2); overflow: hidden; }
+  .seg button { font: inherit; font-size: 12px; border: 0; background: transparent; color: var(--cth-ink-2); padding: 6px 10px; min-height: 28px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--cth-ink); color: var(--cth-card); }
+
+  .stage { display: flex; justify-content: center; padding: 32px 16px 48px; }
+  .steps { display: flex; justify-content: center; gap: 6px; padding: 16px 16px 0; flex-wrap: wrap; }
+  .steps span { font-size: 11px; color: var(--cth-ink-3); display: inline-flex; align-items: center; gap: 4px; }
+  .steps i { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-style: normal; font-size: 10px; box-shadow: inset 0 0 0 1px var(--cth-line-2); }
+  .steps .done i { background: var(--cth-green); color: #fff; box-shadow: none; }
+  .steps .cur { color: var(--cth-ink); font-weight: 600; }
+  .steps .cur i { background: var(--cth-ink); color: var(--cth-card); box-shadow: none; }
+
+  .card { width: 560px; max-width: 100%; background: var(--cth-card); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--cth-line), var(--cth-shadow-lg); overflow: clip; }
+  .card h1 { margin: 0; padding: 22px 22px 4px; font-size: 22px; font-weight: 600; letter-spacing: -.03em; display: flex; align-items: center; gap: 8px; }
+  .info { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--cth-line-2); color: var(--cth-ink-3); font-size: 10px; display: inline-grid; place-items: center; cursor: help; font-weight: 600; }
+  .sub { padding: 6px 22px 0; color: var(--cth-ink-2); line-height: 20px; }
+  .rows { margin: 16px 22px 22px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--cth-line); }
+  .row { display: flex; gap: 12px; align-items: flex-start; padding: 14px; }
+  .row + .row { border-top: 1px solid var(--cth-line); }
+  .icon { width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: grid; place-items: center; background: var(--cth-neutral-soft); color: var(--cth-ink-2); font-size: 13px; }
+  .icon.ok { background: var(--cth-green-soft); color: var(--cth-green-text); }
+  .icon.bad { background: var(--cth-coral-soft); color: var(--cth-coral-text); }
+  .icon.wait { background: var(--cth-indigo-soft); color: var(--cth-indigo-text); }
+  .main { flex: 1; min-width: 0; }
+  .label { font-size: 13px; font-weight: 600; }
+  .status { font-size: 12px; color: var(--cth-ink-3); line-height: 18px; margin-top: 2px; }
+  .status.bad { color: var(--cth-coral-text); }
+  .row.dim { opacity: .55; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn { font: inherit; font-size: 12px; font-weight: 600; border: 0; border-radius: 8px; padding: 6px 12px; min-height: 28px; cursor: pointer; }
+  .btn.primary { background: var(--cth-ink); color: var(--cth-card); }
+  .btn.secondary { background: transparent; color: var(--cth-ink); box-shadow: inset 0 0 0 1px var(--cth-line-2); }
+  .btn[disabled] { opacity: .4; cursor: default; }
+  .link { font: inherit; font-size: 12px; background: none; border: 0; padding: 0; color: var(--cth-ink-2); text-decoration: underline; cursor: pointer; min-height: 28px; }
+  .bar { height: 4px; border-radius: 2px; background: var(--cth-neutral-soft); margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 40%; background: var(--cth-indigo); border-radius: 2px; animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; opacity: .5; } }
+  .term { margin-top: 10px; border-radius: 8px; background: #1E1B2E; color: #CFCCDD; font-family: var(--mono); font-size: 11px; line-height: 16px; padding: 8px 10px; white-space: pre-wrap; max-height: 112px; overflow: auto; }
+  .footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 22px; border-top: 1px solid var(--cth-line); gap: 8px; }
+  .footer .right { display: flex; gap: 8px; align-items: center; }
+
+  .askme { width: 560px; max-width: 100%; background: var(--cth-card); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); padding: 14px 16px; }
+  .askme .who { font-size: 11px; color: var(--cth-ink-3); }
+  .askme .title { font-weight: 600; margin: 4px 0 2px; }
+  .note { max-width: 760px; margin: 0 auto 32px; padding: 0 16px; color: var(--cth-ink-3); font-size: 12px; line-height: 18px; }
+  .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--cth-indigo-soft); border-top-color: var(--cth-indigo); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <b>State</b>
+    <div class="seg" id="seg">
+      <button data-s="checking" aria-pressed="true">Checking</button>
+      <button data-s="installing" aria-pressed="false">Installing</button>
+      <button data-s="installFailed" aria-pressed="false">Install failed</button>
+      <button data-s="signin" aria-pressed="false">Sign in</button>
+      <button data-s="browser" aria-pressed="false">In the browser</button>
+      <button data-s="ready" aria-pressed="false">Ready</button>
+      <button data-s="askme" aria-pressed="false">Later: Ask me card</button>
+    </div>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="stage" id="stage"></div>
+  <p class="note">The last setup step. It checks Claude Code and your Claude account the moment it opens. A missing Claude installs on its own with Claude's standalone installer: no Node, no Mac password. Sign in opens the browser; "Show what Claude says" reveals the live sign in window for the rare case it asks you to paste a code. Open the office stays off until both rows are green. Set up later opens the office anyway, and Ask me then holds a card that reopens this same panel until Michael can start.</p>
+
+<script>
+  const s = (k) => document.getElementById(k);
+  const labels = ['Business','Details','Meet','Team','Home','Manager','Permissions','Ready'];
+  s('steps').innerHTML = labels.map((l,i) => i < 7 ? `<span class="done"><i>✓</i>${l}</span>` : `<span class="cur"><i>8</i>${l}</span>`).join('<span>—</span>');
+
+  const row = (icon, cls, label, status, extra = '', dim = false, bad = false) =>
+    `<div class="row${dim ? ' dim' : ''}"><span class="icon ${cls}">${icon}</span><div class="main"><div class="label">${label}</div><div class="status${bad ? ' bad' : ''}">${status}</div>${extra}</div></div>`;
+
+  const views = {
+    checking: [row('<span class="spin"></span>','wait','Claude Code','Checking…'), row('·','','Your Claude account','Waiting for Claude Code','',true)],
+    installing: [row('<span class="spin"></span>','wait','Claude Code','Installing. This takes about a minute.','<div class="bar"><i></i></div>'), row('·','','Your Claude account','Waiting for Claude Code','',true)],
+    installFailed: [row('!','bad','Claude Code','Could not install. Check your internet connection, then try again.','<div class="actions"><button class="btn primary">Try again</button><button class="link">Show details</button></div>',false,true), row('·','','Your Claude account','Waiting for Claude Code','',true)],
+    signin: [row('✓','ok','Claude Code','Installed'), row('→','','Your Claude account','Michael works through your Claude plan.','<div class="actions"><button class="btn primary">Sign in</button></div>')],
+    browser: [row('✓','ok','Claude Code','Installed'), row('<span class="spin"></span>','wait','Your Claude account','Finish signing in in your browser. This page updates on its own.','<div class="actions"><button class="btn secondary">Open the browser again</button><button class="link" onclick="this.closest(\'.main\').querySelector(\'.term\').hidden^=1">Show what Claude says</button></div><div class="term" hidden>Opening browser to sign in…\nIf the browser didn\'t open, visit:\nhttps://claude.ai/oauth/authorize?…\n\nPaste code here if prompted &gt; ▍</div>')],
+    ready: [row('✓','ok','Claude Code','Installed'), row('✓','ok','Your Claude account','Signed in as owner@example.com')]
+  };
+
+  function render(state) {
+    for (const b of document.querySelectorAll('#seg button')) b.setAttribute('aria-pressed', String(b.dataset.s === state));
+    if (state === 'askme') {
+      s('stage').innerHTML = `<div class="askme"><div class="who">From the app</div><div class="title">Michael can't start yet</div><div class="status">Claude Code isn't set up on this Mac.</div><div class="actions"><button class="btn primary">Get Michael ready</button></div></div>`;
+      return;
+    }
+    const ready = state === 'ready';
+    s('stage').innerHTML = `<div class="card" role="region" aria-label="Get Michael ready">
+      <h1>Get Michael ready <span class="info" title="Michael runs on Claude Code, on your Claude plan. Installing it and signing in happens once on this Mac.">i</span></h1>
+      <div class="rows">${views[state].join('')}</div>
+      <div class="footer"><button class="btn secondary">Back</button>
+        <div class="right">${ready ? '' : '<button class="link">Set up later</button>'}<button class="btn primary"${ready ? '' : ' disabled'}>Open the office</button></div></div>
+    </div>`;
+  }
+  s('seg').onclick = (e) => { if (e.target.dataset.s) render(e.target.dataset.s); };
+  render('checking');
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@
  *   ?shot=onboarding-team         Setup, the Team step
  *   ?shot=onboarding-business     Setup, step 1 (your business)
  *   ?shot=onboarding-meet         Setup, the Meet step (Michael shows you around)
+ *   ?shot=onboarding-ready        Setup, the Ready step (Claude installed, not signed in)
  *   ?shot=kelly-memory            Kelly's panel, Memory tab
  *   ?shot=hire                    The hire wizard over the office
  *   ?shot=settings-autonomy       Settings, Agents
@@ -122,7 +123,9 @@ const SHOTS: Record<string, Record<string, unknown>> = {
   hire: {},
   'settings-autonomy': {}
 };
-const ONBOARDING: Record<string, 'business' | 'welcome' | 'team'> = { 'onboarding-team': 'team', 'onboarding-business': 'business', 'onboarding-meet': 'welcome' };
+const ONBOARDING: Record<string, 'business' | 'welcome' | 'team' | 'ready'> = { 'onboarding-team': 'team', 'onboarding-business': 'business', 'onboarding-meet': 'welcome', 'onboarding-ready': 'ready' };
+// The Ready step on a computer where Claude is installed but not signed in yet.
+if (shot === 'onboarding-ready') (window as unknown as Record<string, unknown>).__engine = { applies: true, installed: true, signedIn: false, needed: true };
 
 useStore.setState({
   agents: roster().map((a) =>
@@ -145,7 +148,10 @@ if (shot === 'home') window.setTimeout(() => window.dispatchEvent(new Event('cth
 // Headless Chrome runs timers on virtual time but CSS animations on real
 // time, so a capture would catch the bubble still popping in: pin it at rest.
 const still = document.createElement('style');
-still.textContent = '.cth-st-quote { animation: none !important; transform: translate(var(--q-x), var(--q-y)); }';
+still.textContent = '.cth-st-quote { animation: none !important; transform: translate(var(--q-x), var(--q-y)); }'
+  // Setup's glide and fade (onboarding-centered.md) settle at once: the team
+  // loads late in the shot's time budget and a still frame must not catch it mid way.
+  + ' .cth-onb-body, .cth-onb-glow { transition: none !important; } .cth-onb-studio-in { animation: none !important; }';
 document.head.appendChild(still);
 
 /** The app window, as App.tsx lays it out (branding/DESIGN.md 5.2). */

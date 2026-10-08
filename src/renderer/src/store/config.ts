@@ -108,6 +108,8 @@ export interface HarnessConfig {
   /** Which provider+model powers the GOD orchestrator ("Michael"). Default
    *  'claude' / 'claude-opus-5-5'. Mirrors src/main/config.ts. */
   godProvider?: AgentProvider;
+  /** How Claude Code signs in: the owner's Claude account, or an Anthropic API key (mirrors src/main/config.ts). */
+  claudeAuth?: 'account' | 'apiKey';
   godModel?: string;
   /** Per-server consent for the default MCP bundle, keyed by catalog id (mirrors
    *  src/main/config.ts; seeded from MCP_CATALOG). */

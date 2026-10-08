@@ -18,6 +18,7 @@
  *
  * Everything here runs in the Electron main process.
  */
+import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
 } from '../shared/memoryIndex';
@@ -46,7 +47,12 @@ import { cardConversation, openAskIndexes } from '../shared/askMeRouting';
 import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
-import { answersWithoutRequest, asksToTidy, blockedWithNothingAsked, openOwnerRequests, ownerChangeNote, type CardLike, type MessageLike, type OwnerCardChange, type OwnerRequest, type StuckCard } from '../shared/ownerRequests';
+import {
+  answersWithoutRequest, asksToTidy, blockedWithNothingAsked, closesOwnerQuestion, openOwnerQuestions, openOwnerRequests, ownerChangeNote, ownerConversation,
+  ownerDock, ownerQuestionOf, OWNER_ALIASES, OWNER_NUDGE_EVERY_MS, OWNER_REQUESTS_FLOOR, unmatchedReplyNote,
+  type CardLike, type MessageLike, type OpenOwnerQuestion, type OwnerCardChange, type OwnerDock, type OwnerDockState, type OwnerRequest,
+  type OwnerRequestFlags, type StuckCard, type ThreadMessage
+} from '../shared/ownerRequests';
 import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, MCP_RESOURCE_TOOLS, type SpawnConnectorPlan } from '../shared/claudeConnectors';
 import { MAX_HOOK_FRAME_BYTES } from '../shared/hookEvents';
@@ -97,6 +103,13 @@ export interface HiveMessage {
   requires_reply: boolean;
   needs_human: boolean;
   created_at: string;
+  /** A holding reply to the owner: when Michael expects to answer (ISO time).
+   *  docs/designs/michael-replies.md, 6A. */
+  expect_by?: string;
+  /** A holding reply to the owner: who the work waits on ("Oscar"). */
+  waiting_on?: string;
+  /** Michael's terminal words, filed by the app for the owner (R8). */
+  from_notes?: boolean;
 }
 
 /** One hive message reshaped for the voice read-layer (`hive:messages`): the
@@ -310,14 +323,18 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     '## Schedule requests',
     'You manage the office, so you decide the team\'s schedule requests. Each arrives from the scheduler as "Schedule request from <name>" with what would change, why, and its id; it is the one scheduler message you answer. Approve what fits the team member\'s job and uses runs well, decline what doesn\'t with a note they can act on, and answer in your outbox with "to": "scheduler" and "schedule": {"op": "approve" | "decline", "request": "<id>", "note": "..."}. Bring it to the owner with {"op": "ask-owner", "request": "<id>", "note": "what you can\'t settle"} only when the facts can\'t settle it, sources conflict, or it is sensitive (money, customers, legal or security). {"op": "pending"} lists what is waiting. Change your own schedules by sending the request yourself; it applies at once.',
     '',
+    '## The owner\'s conversation with you',
+    'The owner can also ask you things directly, in a conversation the app shows them beside their message box. Each question reaches you typed, with its id. Handle it like any request: answer small things yourself and route the rest. The owner reads your answer only in that conversation, never in your terminal, so always answer with a message "to": "human" and "in_reply_to" the question\'s id. Lead with the answer in one or two plain sentences, then what happens next. Name files by their full path so the owner can open them; never paste a report. Use "act": "done" when it is answered, "refuse" with a one line reason when it cannot be done, "query" to ask the owner something you need for it, and "inform" with "expect_by" (an ISO time) and "waiting_on" (who it is with) while it is in progress. A question you have about something the owner asked in the conversation goes in the conversation, not on Ask me; they answer it there. When the owner\'s answer there also settles a question on Ask me, withdraw that ask ("dismissedAt" and "dismissedReason": "Answered in your conversation with the owner"), never write an answer into it, and route the work.',
+    '',
     '## Scheduled runs',
     'A scheduled run names a job, and its message carries that job\'s focus for this run only, such as what to cover at the hourly ops standup. A scheduled run needs no reply, so do not answer it.',
+    'When a scheduled job produces something the owner should see, such as the weekly money summary, put it on Ask me as a report: a card with "status": "done" and the team member as assignee, holding one humanQA entry {"kind": "report", "q": "<one bold line with the result, then the full paths of its files>", "askedAt": "<time>", "raisedBy": "<id>"}. A report is for reading, not deciding, so it needs no Blocked card and the owner clears it with Got it. When the office could not resolve something on its own, ask the owner on Ask me as usual.',
     '',
     '## Staying cheap',
     'The owner pays for every message each agent reads and writes. Keep hand-offs short, and when you wake to nothing that needs you, end your turn without writing.',
     '',
     '## Files',
-    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To send one, write a JSON file to your outbox (${p.outbox}) with "to" (the id in brackets on the roster, or "human" for the owner at closing time), "act" (request, inform or done; only request expects a reply), "subject" and "body". Cards live in tasks.json beside board.md in ${p.hiveRoot}; to ask the owner, set a card to "blocked" and add {"q": "...", "askedAt": "<time>", "raisedBy": "<id or god>"} to its humanQA list, keeping earlier entries. The hive folder holds only messages, notes and boards, so save documents in your own folder.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
+    `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To send one, write a JSON file to your outbox (${p.outbox}) with "to" (the id in brackets on the roster, or "human" for the owner: answers in their conversation, and closing time), "act" (request, inform, query, done or refuse; request and query expect a reply), "subject" and "body". Cards live in tasks.json beside board.md in ${p.hiveRoot}; to ask the owner, set a card to "blocked" and add {"q": "...", "askedAt": "<time>", "raisedBy": "<id or god>"} to its humanQA list, keeping earlier entries. The hive folder holds only messages, notes and boards, so save documents in your own folder.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
   ].join('\n');
 }
 
@@ -331,7 +348,7 @@ export function teamMemberInstructions(name: string, role: string, michael: stri
   return [
     `You are ${name}, the ${role} on the team at ${where(b)}. ${michael} is the office manager: he gives you work and is your only link to the owner. Anything you need from the owner, such as an approval, an answer or a file, goes to ${michael}, who puts it on the owner's Ask me board.`,
     '',
-    'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else.',
+    'Do what was asked, at the scope asked. If a request looks mistaken, say so in one sentence and carry on. Finish the whole task; if part is blocked, do the rest and say plainly what is missing and why. Anything hard to undo, public, or costing money is the owner\'s call, so send it to ' + michael + ' for approval first; go ahead with everything else. Email is the exception: the owner set how your mail leaves (your Sending setting, which list_mailboxes reports), so follow it.',
     '',
     `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
     '',
@@ -557,6 +574,9 @@ function repairLiteralLineBreaksInJsonStrings(raw: string): { text: string; chan
 
   return { text, changed };
 }
+
+/** How far ahead of now a reply's own time may move the read mark (clock skew). */
+const OWNER_READ_SKEW_MS = 5 * 60 * 1000;
 
 export class HiveManager {
   /**
@@ -869,7 +889,9 @@ export class HiveManager {
     // can include tokens, paths and prompt fragments, and the hive repo is
     // committed on every change — a secret written there would be permanent.
     // log.jsonl gets the structured, non-sensitive fields; the dump stays local.
-    const want = ['fleet.json', 'hooks.sock', 'cost-ledger.jsonl', 'crashes/', '.DS_Store'];
+    // agents/human/ holds the owner's own messages to Michael and the dock's
+    // state (michael-replies.md): private to the owner, never committed.
+    const want = ['fleet.json', 'hooks.sock', 'cost-ledger.jsonl', 'crashes/', '.DS_Store', 'agents/human/'];
     let lines: string[] = [];
     if (existsSync(gitignore)) { try { lines = readFileSync(gitignore, 'utf8').split('\n'); } catch { lines = []; } }
     const missing = want.filter((w) => !lines.includes(w));
@@ -1895,7 +1917,11 @@ export class HiveManager {
       hops: typeof partial.hops === 'number' ? partial.hops : 0,
       requires_reply: partial.requires_reply ?? ['request', 'query', 'propose'].includes(act),
       needs_human: partial.needs_human ?? false,
-      created_at: partial.created_at ?? new Date().toISOString()
+      created_at: partial.created_at ?? new Date().toISOString(),
+      // Owner conversation fields (michael-replies.md): kept only when well formed.
+      ...(typeof partial.expect_by === 'string' && Number.isFinite(Date.parse(partial.expect_by)) ? { expect_by: partial.expect_by } : {}),
+      ...(typeof partial.waiting_on === 'string' && partial.waiting_on.trim() ? { waiting_on: partial.waiting_on.trim().slice(0, 60) } : {}),
+      ...(partial.from_notes === true ? { from_notes: true } : {})
     };
   }
 
@@ -1958,9 +1984,10 @@ export class HiveManager {
       }, 'system'), msg.from);
       msg = rerouteToMichael(msg, reg.agents, godId);
     }
-    // The scheduler and heartbeat send; they don't read. A reply to one is
-    // dropped quietly instead of bouncing back to Michael as undeliverable.
-    if (msg.to === 'scheduler' || msg.to === 'heartbeat') {
+    // The scheduler, the heartbeat and the mail app send; they don't read. A
+    // reply to one is dropped quietly instead of bouncing back to Michael as
+    // undeliverable (an approval's "send it now" would otherwise bounce).
+    if (msg.to === 'scheduler' || msg.to === 'heartbeat' || msg.to === 'mail') {
       this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: msg.from, to: msg.to, id: msg.id });
       return;
     }
@@ -1971,8 +1998,23 @@ export class HiveManager {
     // back to him, because the targets below drop the sender ("human" resolves
     // to Michael). An early return here once hid every such reply from the
     // floor and the office log, and from closing time (2026-10-03).
-    if (msg.from === godId && resolveTo(msg.to) === godId && msg.in_reply_to) {
+    // An owner question asked in the dock (michael-replies.md) closes only on
+    // done or refuse: a holding reply or a question back keeps it open.
+    const toOwner = msg.from === godId && resolveTo(msg.to) === godId;
+    if (toOwner && msg.in_reply_to && (!this.isOwnerQuestion(msg.in_reply_to) || closesOwnerQuestion(msg.act))) {
       this.appendLog({ kind: 'owner-request-closed', id: msg.id, in_reply_to: msg.in_reply_to });
+    }
+    // Michael's reply to a dock question: the app may notify the owner.
+    if (toOwner && msg.in_reply_to && this.isOwnerQuestion(msg.in_reply_to)) {
+      try { this.ownerReplyListener?.(msg); } catch { /* notification is best-effort */ }
+    }
+    // A message to the owner that names no question is not shown anywhere, so
+    // Michael is told to send it again with the id (R2). Closing time's
+    // complete message (any spelling closing time accepts) and replies to Ask
+    // me cards are untouched.
+    if (toOwner && !msg.in_reply_to && !CLOSING_COMPLETE_RE.test(msg.subject ?? '') && this.ownerQuestionsCache.length) {
+      this.appendLog({ kind: 'owner-reply-unmatched', id: msg.id });
+      this.deliver(this.normalize({ to: godId, act: 'inform', ...unmatchedReplyNote(this.ownerQuestionsCache) }, 'system'), godId);
     }
     const targets = msg.to === 'broadcast'
       // The roster for fan-out is the ACTIVE registry: skip the send-only prep
@@ -2070,9 +2112,9 @@ export class HiveManager {
       act: msg.act,
       subject: msg.subject,
       targets,
-      // Coral-tints the floor envelope for a message the agent flagged for the
-      // human (now routed to the god proxy). Cosmetic only — no queue behind it.
-      needsHuman: msg.to === 'human'
+      // Michael's messages to the owner land in the dock (michael-replies.md),
+      // never as a coral "needs you" envelope with nothing on the board.
+      needsHuman: false
     });
   }
 
@@ -2153,6 +2195,9 @@ export class HiveManager {
     if (!existsSync(agentsDir)) return 0;
     let routed = 0;
     for (const id of readdirSync(agentsDir)) {
+      // agents/human is the owner's folder, written only by the app; a file an
+      // agent drops in its outbox would reach Michael as the owner's own words.
+      if (id === 'human') { this.rejectOwnerOutbox(join(agentsDir, id, 'outbox')); continue; }
       const outbox = join(agentsDir, id, 'outbox');
       if (!existsSync(outbox)) continue;
       for (const f of readdirSync(outbox)) {
@@ -2408,6 +2453,22 @@ export class HiveManager {
     } catch { return false; }
   }
 
+  /**
+   * A line from the owner for an agent's memory notes, already worded (Send on
+   * approval: an edit, a note, or "do not send"; shared/mailProposals.ts).
+   * False when the agent isn't one of this office's.
+   */
+  rememberOwnerNote(id: string, line: string): boolean {
+    if (!/^[\w-]+$/.test(id) || !this.root()) return false;
+    const dir = this.agentDir(id);
+    if (!existsSync(dir)) return false;
+    try {
+      mkdirSync(join(dir, 'memory'), { recursive: true });
+      appendFileSync(join(dir, 'memory', 'inbox.md'), line.endsWith('\n') ? line : `${line}\n`, 'utf8');
+      return true;
+    } catch { return false; }
+  }
+
   // — clearing a conversation safely (src/shared/safeClear.ts) —
 
   /** Task cards assigned to an agent that aren't done. */
@@ -2433,19 +2494,29 @@ export class HiveManager {
   private ownerRequestsCache: OwnerRequest[] = [];
   /** Blocked cards with nothing asked, as of the last refresh. */
   private stuckCardsCache: StuckCard[] = [];
+  /** Owner questions from the dock Michael still owes (michael-replies.md). */
+  private ownerQuestionsCache: OpenOwnerQuestion[] = [];
+  /** Whether an owner message is one the owner really sent (the dock's check,
+   *  set by main), so a forged file never reaches Michael as theirs (ship D4). */
+  private ownerMessageCheck: (m: ThreadMessage) => boolean = () => true;
+  setOwnerMessageCheck(check: (m: ThreadMessage) => boolean): void { this.ownerMessageCheck = check; }
 
   /**
    * Recompute Michael's open requests from the owner
    * (docs/designs/card-lifecycle.md): owner answers he has not closed with a
-   * reply. Run on the fleet tick so a prompt never scans folders; reads only
-   * the last 30 days of his mail.
+   * reply. Run on the fleet tick so a prompt never scans folders; reads his
+   * mail from OWNER_REQUESTS_FLOOR on.
    */
-  refreshOwnerRequests(now = Date.now()): OwnerRequest[] {
+  refreshOwnerRequests(): OwnerRequest[] {
     if (!this.root()) return (this.ownerRequestsCache = []);
     const dir = this.agentDir(this.registry().godId ?? 'god');
-    const since = new Date(now - 30 * 24 * 60 * 60_000).toISOString();
+    // A fixed floor, not a rolling window, so an open request never ages out
+    // (TODOS.md; michael-replies.md); requests settled before it stay settled.
+    const since = OWNER_REQUESTS_FLOOR;
     const toMichael = [...this.ownerMessages(join(dir, 'inbox'), since), ...this.ownerMessages(join(dir, 'inbox', '.done'), since)];
     const fromMichael = [...this.ownerMessages(join(dir, 'outbox'), since), ...this.ownerMessages(join(dir, 'outbox', '.sent'), since)];
+    const aliases = this.ownerAliases();
+    this.ownerQuestionsCache = openOwnerQuestions(toMichael, fromMichael, aliases, this.ownerMessageCheck);
     const raw = this.tasks() as { tasks?: unknown };
     const tasks = Array.isArray(raw?.tasks) ? (raw.tasks as CardLike[]) : [];
     // A card that has ended (Done, or closed by the owner) needs no routing,
@@ -2454,7 +2525,7 @@ export class HiveManager {
     // owner's close is timed (closedAt; a card keeps no other update time), so
     // a request on a card Michael or the app marked Done is taken as settled.
     const closedAt = new Map(tasks.filter((t) => t?.status === 'done').map((t) => [t.id, (t as { closedAt?: unknown }).closedAt]));
-    this.ownerRequestsCache = openOwnerRequests(toMichael, fromMichael).filter((r) => {
+    this.ownerRequestsCache = openOwnerRequests(toMichael, fromMichael, aliases).filter((r) => {
       if (!closedAt.has(r.taskId)) return true;
       const at = closedAt.get(r.taskId);
       return typeof at === 'string' && r.createdAt > at;
@@ -2486,6 +2557,16 @@ export class HiveManager {
           // it in memory; the archived copy keeps the raw file): use its time.
           const at = typeof raw.created_at === 'string' && raw.created_at ? raw.created_at : new Date(statSync(p).mtimeMs).toISOString();
           m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to };
+          // The owner's conversation needs the words (michael-replies.md); other
+          // mail keeps only its envelope in memory.
+          const ownerSide = raw.from === 'human' || OWNER_ALIASES.has(String(raw.to ?? '').toLowerCase()) || !!ownerQuestionOf(raw.conversation);
+          if (ownerSide) {
+            const t = m as ThreadMessage;
+            if (typeof raw.body === 'string') t.body = raw.body;
+            if (typeof raw.expect_by === 'string') t.expect_by = raw.expect_by;
+            if (typeof raw.waiting_on === 'string') t.waiting_on = raw.waiting_on;
+            if (raw.from_notes === true) t.from_notes = true;
+          }
         } catch { m = null; }
         // A file still being written is read again next time.
         if (m || Date.now() - (statSync(p).mtimeMs || 0) > HiveManager.OUTBOX_WRITE_GRACE_MS) this.messageCache.set(p, m);
@@ -2497,6 +2578,254 @@ export class HiveManager {
 
   ownerRequests(): OwnerRequest[] {
     return this.ownerRequestsCache;
+  }
+
+  ownerQuestions(): OpenOwnerQuestion[] {
+    return this.ownerQuestionsCache;
+  }
+
+  /** Names that reach the owner, Michael's display name included. */
+  private ownerAliases(): Set<string> {
+    const reg = this.registry();
+    return new Set([...OWNER_ALIASES, resolveGodName(reg.agents[reg.godId ?? 'god']?.name).toLowerCase()]);
+  }
+
+  // — the owner's conversation with Michael (docs/designs/michael-replies.md) —
+  // The owner's sent mail and the dock's own facts live in agents/human/,
+  // written only by the app: R4 and R5 of the engineering review.
+
+  private ownerSentDir(): string { return join(this.agentDir('human'), 'outbox', '.sent'); }
+  /** Moves any message file found in the owner's outbox aside, unrouted. */
+  private rejectOwnerOutbox(outbox: string): void {
+    try {
+      if (!existsSync(outbox)) return;
+      const stray = readdirSync(outbox).filter((f) => f.endsWith('.json'));
+      if (!stray.length) return;
+      const rejected = join(outbox, '.rejected');
+      mkdirSync(rejected, { recursive: true });
+      for (const f of stray) {
+        renameSync(join(outbox, f), join(rejected, f));
+        this.appendLog({ kind: 'drop', reason: 'owner-outbox-not-routed', file: f });
+      }
+    } catch { /* best-effort */ }
+  }
+
+  /** Whether an id is a question the owner asked in the dock. */
+  private isOwnerQuestion(id: string): boolean {
+    return /^[\w.-]+$/.test(id) && !!this.root() && existsSync(join(this.ownerSentDir(), `${id}.json`));
+  }
+  private ownerStatePath(): string { return join(this.agentDir('human'), 'state.json'); }
+
+  /** The dock's facts. An unreadable file is rebuilt as everything read and
+   *  already notified, so a bad file never repeats a notification (R5). */
+  ownerState(): OwnerDockState {
+    const path = this.ownerStatePath();
+    if (!existsSync(path)) return { requests: {} };
+    try {
+      const v = JSON.parse(readFileSync(path, 'utf8')) as OwnerDockState;
+      if (v && typeof v === 'object' && v.requests && typeof v.requests === 'object') return v;
+    } catch { /* rebuilt below */ }
+    const now = Date.now();
+    const dock = this.ownerDockRaw({ requests: {} }, now);
+    const requests: Record<string, OwnerRequestFlags> = {};
+    const godDone = join(this.agentDir(this.registry().godId ?? 'god'), 'inbox', '.done');
+    for (const it of dock.items) {
+      // One not handed to Michael can't be told apart from a withdrawn one:
+      // it reads Not sent, with Try again, never as live traffic (Codex P2).
+      if (it.kind === 'owner') requests[it.id] = { readAt: now, notified: [], ...(existsSync(join(godDone, `${it.id}.json`)) ? { deliveredAt: now } : { notSentAt: now }) };
+    }
+    for (const it of dock.items) if (it.kind === 'michael' && requests[it.replyTo]) requests[it.replyTo].notified!.push(it.id);
+    const rebuilt = { requests };
+    try { this.writeOwnerState(rebuilt); } catch { /* read only use */ }
+    return rebuilt;
+  }
+
+  private writeOwnerState(state: OwnerDockState): void {
+    mkdirSync(join(this.agentDir('human')), { recursive: true });
+    this.atomicWriteJson(this.ownerStatePath(), state);
+  }
+
+  /** Change one request's facts. */
+  private ownerFlags(id: string, change: (f: OwnerRequestFlags) => OwnerRequestFlags): OwnerRequestFlags {
+    const state = this.ownerState();
+    const next = change({ ...(state.requests[id] ?? {}) });
+    state.requests[id] = next;
+    this.writeOwnerState(state);
+    return next;
+  }
+
+  /**
+   * A question the owner asked in the dock (R1, R4, R6): filed as the owner's
+   * sent mail now; the renderer hands it to Michael as a work order and calls
+   * ownerDelivered when it is typed. A reply to Michael's question carries its
+   * id in `inReplyTo` and stays in that conversation.
+   */
+  ownerAsk(input: { text: string; inReplyTo?: string; conversation?: string }): HiveMessage | null {
+    const root = this.root();
+    const text = String(input.text ?? '').trim();
+    if (!root || !text) return null;
+    const godId = this.registry().godId ?? 'god';
+    const id = `${stamp()}-${shortRand()}`;
+    const msg = this.normalize({
+      id, to: godId, act: 'request', requires_reply: true,
+      conversation: input.conversation && ownerQuestionOf(input.conversation) ? input.conversation : ownerConversation(id),
+      in_reply_to: input.inReplyTo ?? null,
+      subject: text.replace(/\s+/g, ' ').slice(0, 120), body: text
+    }, 'human');
+    mkdirSync(this.ownerSentDir(), { recursive: true });
+    this.atomicWriteJson(join(this.ownerSentDir(), `${id}.json`), msg);
+    this.ownerFlags(id, (f) => f);
+    return msg;
+  }
+
+  /** The work order was typed into Michael's terminal: he has it (R6). His copy
+   *  is filed as handled, so it is in his open questions from now on. */
+  ownerDelivered(id: string): boolean {
+    const path = join(this.ownerSentDir(), `${id}.json`);
+    if (!/^[\w.-]+$/.test(id) || !existsSync(path)) return false;
+    // A question the owner withdrew while it waited to be typed is never
+    // handed to Michael (the drain can race the withdraw).
+    const flags = this.ownerState().requests[id];
+    if (flags?.withdrawnAt) return false;
+    // Claimed once, before it is typed (Codex P1): a second claim is a no-op.
+    if (flags?.deliveredAt) return true;
+    const msg = this.readJson<HiveMessage | null>(path, null);
+    if (!msg) return false;
+    const godId = this.registry().godId ?? 'god';
+    const done = join(this.agentDir(godId), 'inbox', '.done');
+    mkdirSync(done, { recursive: true });
+    this.atomicWriteJson(join(done, `${id}.json`), msg);
+    this.ownerFlags(id, (f) => ({ ...f, deliveredAt: f.deliveredAt ?? Date.now(), notSentAt: undefined }));
+    // The log is committed with the office: the owner's words stay out of it.
+    this.appendLog({ kind: 'message', from: 'human', to: godId, act: msg.act, subject: 'Owner question', id: msg.id, delivered: [godId] });
+    this.emitMessage(msg, [godId]);
+    try { this.routedObserver?.(msg, [godId]); } catch { /* observer error */ }
+    this.refreshOwnerRequests();
+    this.commit(`hive: owner question ${id}`);
+    return true;
+  }
+
+  /** Cancel before Michael has it; refused once he does (R3, R6). */
+  ownerWithdraw(id: string): boolean {
+    const f = this.ownerState().requests[id];
+    if (!f || f.deliveredAt) return false;
+    this.ownerFlags(id, (x) => ({ ...x, withdrawnAt: Date.now() }));
+    return true;
+  }
+
+  /** The queue gave up typing it (7A): "Not sent", with Try again. */
+  ownerNotSent(id: string): void {
+    this.ownerFlags(id, (f) => (f.deliveredAt ? f : { ...f, notSentAt: Date.now() }));
+  }
+
+  /** Try again after Not sent: back to Sent. */
+  ownerRetry(id: string): boolean {
+    const f = this.ownerState().requests[id];
+    if (!f?.notSentAt || f.deliveredAt) return false;
+    this.ownerFlags(id, (x) => ({ ...x, notSentAt: undefined }));
+    return true;
+  }
+
+  /** The owner saw these questions' replies in the open dock (2A). */
+  ownerRead(ids: string[], at = Date.now()): void {
+    const state = this.ownerState();
+    // Read through the newest reply, even one stamped in the future, so a
+    // clock that runs ahead never keeps a reply unread (and re-read) forever.
+    const newest = new Map<string, number>();
+    for (const it of this.ownerConversationView(at).items) {
+      if (it.kind !== 'michael') continue;
+      const ts = Date.parse(it.at) || 0;
+      if (ts > (newest.get(it.replyTo) ?? 0)) newest.set(it.replyTo, ts);
+    }
+    let changed = false;
+    for (const id of ids) {
+      if (!state.requests[id]) continue;
+      // Never past now plus a little skew, so a reply stamped hours ahead can't
+      // hide the real replies that follow it.
+      const readAt = Math.max(at, Math.min(newest.get(id) ?? 0, at + OWNER_READ_SKEW_MS));
+      if ((state.requests[id].readAt ?? 0) < readAt) { state.requests[id] = { ...state.requests[id], readAt }; changed = true; }
+    }
+    if (changed) this.writeOwnerState(state);
+  }
+
+  /** Records a notification for a reply; false when it already went out (12A). */
+  ownerNotify(requestId: string, replyId: string): boolean {
+    const f = this.ownerState().requests[requestId];
+    if (!f || (f.notified ?? []).includes(replyId)) return false;
+    this.ownerFlags(requestId, (x) => ({ ...x, notified: [...(x.notified ?? []), replyId].slice(-50) }));
+    return true;
+  }
+
+  private ownerDockRaw(state: OwnerDockState, now: number, verified?: (m: ThreadMessage) => boolean): OwnerDock {
+    const godDir = this.agentDir(this.registry().godId ?? 'god');
+    const ownerSent = this.ownerMessages(this.ownerSentDir()) as ThreadMessage[];
+    const fromMichael = [...this.ownerMessages(join(godDir, 'outbox')), ...this.ownerMessages(join(godDir, 'outbox', '.sent'))] as ThreadMessage[];
+    return ownerDock(ownerSent, fromMichael, state, now, verified, this.ownerAliases());
+  }
+
+  /** The owner's conversation with Michael, for the dock. */
+  ownerConversationView(now = Date.now(), verified?: (m: ThreadMessage) => boolean): OwnerDock {
+    if (!this.root()) return { items: [], open: 0, unread: 0, waitingForYou: 0 };
+    return this.ownerDockRaw(this.ownerState(), now, verified);
+  }
+
+  /** Remind Michael about one question (6A): Nudge, or the late sweep. At most
+   *  once an hour for Nudge; once per question for the sweep. */
+  ownerRemind(id: string, kind: 'nudge' | 'late', now = Date.now()): boolean {
+    const f = this.ownerState().requests[id];
+    if (!f?.deliveredAt || f.withdrawnAt) return false;
+    if (kind === 'nudge' && now - (f.nudgedAt ?? 0) < OWNER_NUDGE_EVERY_MS) return false;
+    if (kind === 'late' && f.remindedAt) return false;
+    const q = this.ownerQuestionsCache.find((x) => x.id === id);
+    if (!q) return false;
+    const godId = this.registry().godId ?? 'god';
+    this.deliver(this.normalize({
+      to: godId, act: 'inform',
+      subject: kind === 'nudge' ? 'The owner nudged you about a question' : 'An owner question is later than you said',
+      body: `${kind === 'nudge' ? 'The owner asked again about' : 'The owner is still waiting on'} id ${id}: ${q.text.replace(/\s+/g, ' ').slice(0, 200)}\nAnswer it with a message "to": "human" and "in_reply_to": "${id}" (done, refuse, query, or inform with a new expect_by).`
+    }, 'system'), godId);
+    this.ownerFlags(id, (x) => (kind === 'nudge' ? { ...x, nudgedAt: now } : { ...x, remindedAt: now }));
+    return true;
+  }
+
+  /** Whether this agent sent any message since `ms`: one still waiting in its
+   *  outbox, or one routed and filed in outbox/.sent (R8). */
+  godSentSince(agentId: string, ms: number): boolean {
+    const dir = this.agentDir(agentId);
+    try { if (readdirSync(join(dir, 'outbox')).some((f) => f.endsWith('.json'))) return true; } catch { /* no outbox */ }
+    const sinceIso = new Date(ms).toISOString();
+    return this.ownerMessages(join(dir, 'outbox', '.sent'), sinceIso).some((m) => !(m as ThreadMessage).from_notes);
+  }
+
+  /** "Got it" on a report card (14A): the app clears it; nothing goes to
+   *  Michael. Only an open report entry can be cleared this way. */
+  ackReport(taskId: string, index: number): boolean {
+    const ledger = this.tasks() as { tasks?: Array<{ id: string; humanQA?: Array<Record<string, unknown>> }> };
+    const card = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === taskId);
+    const e = card?.humanQA?.[index];
+    if (!e || e.kind !== 'report' || (typeof e.a === 'string' && e.a.trim()) || (typeof e.dismissedAt === 'string' && e.dismissedAt.trim())) return false;
+    const humanQA = card!.humanQA!.map((x, i) => (i === index ? { ...x, dismissedAt: new Date().toISOString(), dismissedReason: 'Got it', dismissedBy: 'owner' } : x));
+    return this.patchTask(taskId, { humanQA } as never);
+  }
+
+  /** Main is told of each reply Michael sends to an owner question, for the
+   *  one notification per final reply (12A). */
+  private ownerReplyListener: ((msg: HiveMessage) => void) | null = null;
+  onOwnerReply(cb: ((msg: HiveMessage) => void) | null): void { this.ownerReplyListener = cb; }
+
+  /** Michael's terminal words for a question his turn sent nothing about
+   *  (R8), filed once as his message and recorded so only these show. */
+  fileOwnerNotes(id: string, text: string): boolean {
+    const words = String(text ?? '').trim();
+    const f = this.ownerState().requests[id];
+    if (!words || !f?.deliveredAt || (f.notes ?? []).length) return false;
+    const godId = this.registry().godId ?? 'god';
+    const msg = this.normalize({ to: 'human', act: 'inform', in_reply_to: id, conversation: ownerConversation(id), subject: "From Michael's notes", body: words.slice(0, 4000), from_notes: true }, godId);
+    const sent = join(this.agentDir(godId), 'outbox', '.sent');
+    mkdirSync(sent, { recursive: true });
+    this.atomicWriteJson(join(sent, `${msg.id}.json`), msg);
+    this.ownerFlags(id, (x) => ({ ...x, notes: [...(x.notes ?? []), msg.id] }));
+    return true;
   }
 
   stuckCards(): StuckCard[] {
@@ -3641,6 +3970,10 @@ export class HiveManager {
     try {
       for (const id of readdirSync(agentsDir)) ensureMineIgnore(join(agentsDir, id));
     } catch { /* best-effort */ }
+    // The owner's messages and dock state, committed before agents/human/ was
+    // ignored, leave the index (the files stay on disk).
+    const owner = this.git(['ls-files', '--', 'agents/human'], root);
+    if (owner.ok && owner.out.trim()) this.git(['rm', '-r', '--cached', '-q', '--ignore-unmatch', '--', 'agents/human'], root);
     // Probe before mutating: `rm --cached` on a clean repo would still rewrite
     // the index on every launch, and this runs inside the commit retry path.
     const tracked = this.git(['ls-files', '--', 'agents/*/.codex'], root);

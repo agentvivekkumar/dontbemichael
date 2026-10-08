@@ -3,7 +3,7 @@ import type { CompanyProfile } from '../shared/companyProfile';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import { app } from 'electron';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -245,6 +245,11 @@ export interface HarnessConfig {
    *  constant; only its engine is selectable. Default 'claude'. Eligible providers
    *  are those that can receive inbox (claude/codex/antigravity/qwen). */
   godProvider?: AgentProvider;
+  /** How Claude Code signs in for the team (docs/designs/get-michael-ready.md):
+   *  the owner's Claude account (default), or an Anthropic API key kept in the
+   *  secret store under `apikey:anthropic` and handed to each Claude agent as
+   *  ANTHROPIC_API_KEY at start. */
+  claudeAuth?: 'account' | 'apiKey';
   /** The model GOD runs on. Unset falls back to the provider preset's
    *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-5-5'. */
   godModel?: string;
@@ -295,6 +300,10 @@ export interface HarnessConfig {
   /** Owner answers the app recorded from Ask me (shared/ownerRequests.ts
    *  answerKey): the launch catch-up relays only these. */
   ownerAnswerKeys?: string[];
+  /** Legacy: the first build kept the dock's genuine message keys here
+   *  (michael-replies.md, R4). Read once, moved to userData/owner-dock-keys.json,
+   *  then cleared. */
+  ownerDockKeys?: string[];
   /** One-time guard: the knowledge feature was switched on for this install
    *  when it became the company knowledge store (2026-09-25). An owner who
    *  turns it off afterwards keeps it off. */
@@ -849,35 +858,92 @@ function ensureClaudeGlobalPermissions(home: string): void {
 type ClaudeProjectConfig = Record<string, unknown> & { hasTrustDialogAccepted?: boolean };
 type ClaudeConfig = Record<string, unknown> & { projects?: Record<string, ClaudeProjectConfig> };
 
-function ensureClaudeProjectTrust(home: string, cwd: string): void {
+/** Read `~/.claude.json`, change it, and write it back only when `change` says
+ *  it changed something. A file that is not a JSON object is left alone.
+ *  True when the file now holds the change (written, or already there). */
+function updateClaudeJson(home: string, change: (c: ClaudeConfig) => boolean): boolean {
   const p = join(home, '.claude.json');
+  // Claude Code writes this file too. Write a copy beside it and swap it in, so
+  // a crash never leaves it half written, and start again (up to three times)
+  // when Claude changed it between our read and our write, so its edit is kept.
+  const stamp = (): string => { try { const st = statSync(p); return `${st.mtimeMs}:${st.size}`; } catch { return 'none'; } };
   try {
-    let c: ClaudeConfig = {};
-    if (existsSync(p)) {
-      const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-      c = parsed as ClaudeConfig;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const before = stamp();
+      let c: ClaudeConfig = {};
+      let mode = 0o600;
+      if (existsSync(p)) {
+        mode = statSync(p).mode & 0o777;
+        const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+        c = parsed as ClaudeConfig;
+      }
+      if (!change(c)) return true;
+      const tmp = `${p}.dbm-${process.pid}-${attempt}.tmp`;
+      writeFileSync(tmp, JSON.stringify(c, null, 2), { encoding: 'utf8', mode });
+      if (stamp() !== before) { rmSync(tmp, { force: true }); continue; }
+      renameSync(tmp, p);
+      return true;
     }
-    // Claude Code looks the folder up by its real name on disk. On a Mac a
-    // folder typed as "SunRiseBakery" opens "SunriseBakery" too, but only the real name
-    // counts as trusted, so trust that as well; otherwise the agent stops on
-    // the trust question (seen live 2026-09-25).
-    let real = cwd;
-    try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
-    let changed = false;
-    for (const key of new Set([cwd, real])) {
-      if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
-      c.projects = c.projects ?? {};
-      c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
-      changed = true;
-    }
-    if (changed) writeFileSync(p, JSON.stringify(c, null, 2), 'utf8');
+    console.warn(`[config] Claude config at ${p} kept changing; left it for the next start.`);
+    return false;
   } catch (error) {
     console.warn(
       `[config] Could not safely update Claude config at ${p}:`,
       error instanceof Error ? error.message : String(error),
     );
+    return false;
   }
+}
+
+/** Claude Code's first run opens on a welcome screen (text style, then sign in)
+ *  that waits in the agent's terminal, which the owner never sees. Sign in now
+ *  happens in Get Michael ready, so the welcome is marked done. Only ever set,
+ *  never cleared, and left alone when already done. */
+function markClaudeOnboarded(c: ClaudeConfig): boolean {
+  if (c.hasCompletedOnboarding === true) return false;
+  c.hasCompletedOnboarding = true;
+  return true;
+}
+
+/** Claude Code looks a folder up by its real name on disk. On a Mac a folder
+ *  typed as "SunRiseBakery" opens "SunriseBakery" too, but only the real name
+ *  counts as trusted, so trust that as well; otherwise the agent stops on the
+ *  trust question (seen live 2026-09-25). */
+function trustClaudeFolder(c: ClaudeConfig, cwd: string): boolean {
+  let real = cwd;
+  try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
+  let changed = false;
+  for (const key of new Set([cwd, real])) {
+    if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
+    c.projects = c.projects ?? {};
+    c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
+    changed = true;
+  }
+  return changed;
+}
+
+/** Claude Code asks, in the agent's terminal, whether to use an
+ *  ANTHROPIC_API_KEY it finds in the environment. The owner already chose that
+ *  key in Get Michael ready, so it is approved up front: Claude Code records
+ *  approvals as the key's last 20 characters. */
+function approveClaudeKeyIn(c: ClaudeConfig, key: string): boolean {
+  const tail = key.trim().slice(-20);
+  if (!tail) return false;
+  const r = (c.customApiKeyResponses && typeof c.customApiKeyResponses === 'object' && !Array.isArray(c.customApiKeyResponses)
+    ? c.customApiKeyResponses : {}) as { approved?: unknown; rejected?: unknown };
+  const approved = Array.isArray(r.approved) ? r.approved.filter((x): x is string => typeof x === 'string') : [];
+  const rejected = Array.isArray(r.rejected) ? r.rejected.filter((x): x is string => typeof x === 'string') : [];
+  if (approved.includes(tail) && !rejected.includes(tail)) return false;
+  c.customApiKeyResponses = { ...r, approved: approved.includes(tail) ? approved : [...approved, tail], rejected: rejected.filter((x) => x !== tail) };
+  return true;
+}
+
+/** True when ~/.claude.json now approves the key (a half written file read
+ *  while Claude saves it is false, so the caller tries again later). */
+export function approveClaudeApiKey(key: string, home: string = homedir()): boolean {
+  if (!key.trim()) return false;
+  return updateClaudeJson(home, (c) => approveClaudeKeyIn(c, key));
 }
 
 /** Idempotently pre-accept Claude Code's first-run prompts so agents spawned with
@@ -890,18 +956,25 @@ function ensureClaudeProjectTrust(home: string, cwd: string): void {
  *  rarely touch files a running `claude` also writes):
  *   1. `~/.claude/settings.json` → `skipDangerousModePermissionPrompt` +
  *      `skipAutoPermissionPrompt` — these gate the bypass-mode warning (global).
- *   2. `~/.claude.json` → `projects[cwd].hasTrustDialogAccepted` — the per-folder
- *      "do you trust the files in this folder?" dialog.
+ *   2. `~/.claude.json`, in one pass: `projects[cwd].hasTrustDialogAccepted` (the
+ *      per-folder "do you trust the files in this folder?" dialog),
+ *      `hasCompletedOnboarding` (the first-run welcome), and with
+ *      `opts.approveKey` the chosen API key in `customApiKeyResponses.approved`.
  *
  *  Each file is an independent best-effort boundary: unsafe existing contents
  *  are preserved without preventing the other file from being handled safely. */
-export function ensureClaudePermissionsAccepted(cwd?: string): void {
+export function ensureClaudePermissionsAccepted(cwd?: string, opts: { approveKey?: string } = {}): void {
   let home: string;
   try { home = homedir(); } catch { return; }
   if (!home) return;
 
   ensureClaudeGlobalPermissions(home);
-  if (cwd) {
-    ensureClaudeProjectTrust(home, cwd);
-  }
+  // One read and at most one write of ~/.claude.json per start: it holds every
+  // project's history and runs to megabytes for a busy owner.
+  updateClaudeJson(home, (c) => {
+    let changed = markClaudeOnboarded(c);
+    if (cwd && trustClaudeFolder(c, cwd)) changed = true;
+    if (opts.approveKey && approveClaudeKeyIn(c, opts.approveKey)) changed = true;
+    return changed;
+  });
 }

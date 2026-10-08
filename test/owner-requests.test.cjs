@@ -156,7 +156,7 @@ test('the Tasks view reads open owner requests from the shared feed and badges t
   // Value: protects=the badge comes from the same cached read as everything else and never lands on Ask me; fails_when=the feed stops reading owner requests, counts them as needing the owner, or the card loses its badge; why_new=new UI wiring (T5); seam=source pin, the renderer has no DOM test harness
   const feed = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/shell/useNeedsYou.ts'), 'utf8');
   assert.match(feed, /window\.cth\.hiveOwnerRequests\?\.\(\)/);
-  assert.match(feed, /count: merged\.tasks\.reduce\(\(n, t\) => n \+ openQuestions\(t\)\.length, 0\) \+ merged\.requests\.length \+ merged\.offers\.length \};/, 'they wait on Michael, not the owner');
+  assert.match(feed, /count: merged\.tasks\.reduce\(\(n, t\) => n \+ openQuestions\(t\)\.length, 0\) \+ merged\.requests\.length \+ merged\.offers\.length \+ merged\.proposals\.length,/, 'they wait on Michael, not the owner');
   const kanban = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/TasksKanban.tsx'), 'utf8');
   assert.match(kanban, /michaelCardState\(r\.createdAt, now, office\.days, office\.work\)/);
   assert.match(kanban, /pack\?\.officeHours\?\.days/);
@@ -299,4 +299,26 @@ test('Michael withdraws a question on a card the owner moved, and never moves th
   assert.match(ctx, /If the owner moved it, the card is done, or the question no longer matters, withdraw the question/);
   assert.match(ctx, /Never move a card the owner moved\./);
   assert.doesNotMatch(ctx, /[\u2013\u2014]/);
+});
+
+test('an open owner request never ages out, and Michael closing it under his own name counts', async (t) => {
+  // Value: protects=an owner answer stays Michael's open work however long it waits, and a reply addressed "Michael" or "michael" still closes it (TODOS.md, michael-replies.md); fails_when=refreshOwnerRequests goes back to a rolling 30 day window, or only "human" closes a request; why_new=the fixed floor and the aliases had no test; seam=none
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-owner-floor-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true });
+  const sentDir = path.join(home, 'hive', 'agents', 'god', 'outbox', '.sent');
+  fs.mkdirSync(sentDir, { recursive: true });
+  const ask = (card) => hive.send({ to: 'god', act: 'request', subject: `OWNER ANSWER on card ${card}`, body: 'x', conversation: `card:${card}`, created_at: '2026-09-10T09:00:00.000Z' }, 'human');
+  const a = ask('t1');
+  const b = ask('t2');
+  const c = ask('t3');
+  const months = Date.parse('2027-03-01T00:00:00.000Z');
+  assert.deepEqual(hive.refreshOwnerRequests(months).map((r) => r.taskId).sort(), ['t1', 't2', 't3'], 'still open months later');
+  for (const [to, q] of [['Michael', a], ['michael', b]]) {
+    const reply = hive.send({ to, act: 'done', subject: 'Routed', body: 'Handed on.', in_reply_to: q.id }, 'god');
+    fs.writeFileSync(path.join(sentDir, `${reply.id}.json`), JSON.stringify(reply));
+  }
+  assert.deepEqual(hive.refreshOwnerRequests(months).map((r) => r.taskId), ['t3']);
+  assert.ok(c.id);
 });

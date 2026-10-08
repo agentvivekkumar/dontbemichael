@@ -555,3 +555,49 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
    composer while its message box has focus. */
 .cth-composer { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-lg); }
 .cth-composer:focus-within { box-shadow: inset 0 0 0 2px var(--cth-indigo), var(--cth-shadow-lg); }
+
+/* Michael's conversation dock (docs/designs/michael-replies.md, 21A): slides
+   180 ms up from the composer's top edge; reduced motion snaps. */
+.cth-dock { animation: cth-dock-in 180ms ease-out; }
+@keyframes cth-dock-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cth-dock { animation: none; }
+}
+
+/* Onboarding (docs/designs/onboarding-centered.md): the card is centered while
+   the studio isn't showing and glides 320 ms to its column when it appears; the
+   glow behind the page follows, 50% alone and over the studio after. */
+@property --cth-onb-glow-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+.cth-onb-body { transition: grid-template-columns var(--cth-dur-slow) var(--cth-ease); }
+.cth-onb-glow {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(900px 600px at var(--cth-onb-glow-x) 55%, color-mix(in srgb, var(--cth-card) 90%, transparent) 0%, transparent 70%);
+  transition: --cth-onb-glow-x var(--cth-dur-slow) var(--cth-ease);
+}
+.cth-onb-glow.is-studio { --cth-onb-glow-x: 72%; }
+[dir="rtl"] .cth-onb-glow.is-studio { --cth-onb-glow-x: 28%; }
+/* Opacity only: a finished transform would make the studio the containing block for fixed dialogs. */
+.cth-onb-studio-in { animation: cth-onb-studio-in var(--cth-dur-slow) var(--cth-ease) backwards; }
+@keyframes cth-onb-studio-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .cth-onb-body, .cth-onb-glow { transition: none; }
+  .cth-onb-studio-in { animation: none; }
+}
+
+/* Get Michael ready (docs/designs/get-michael-ready.md): the install's moving
+   bar and the rows' spinner; reduced motion shows them still. */
+.cth-engine-spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--cth-indigo-soft); border-top-color: var(--cth-indigo); animation: cth-engine-spin 800ms linear infinite; }
+@keyframes cth-engine-spin { to { transform: rotate(360deg); } }
+.cth-engine-bar { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--cth-neutral-soft); overflow: hidden; }
+.cth-engine-bar > i { display: block; width: 40%; height: 100%; border-radius: 2px; background: var(--cth-indigo); animation: cth-engine-bar 1.4s var(--cth-ease) infinite; }
+@keyframes cth-engine-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+/* Right to left the bar starts at the right edge: its own sweep, same easing. */
+[dir="rtl"] .cth-engine-bar > i { animation-name: cth-engine-bar-rtl; }
+@keyframes cth-engine-bar-rtl { from { transform: translateX(100%); } to { transform: translateX(-250%); } }
+@media (prefers-reduced-motion: reduce) {
+  .cth-engine-spin { animation: none; }
+  .cth-engine-bar > i, [dir="rtl"] .cth-engine-bar > i { animation: none; width: 100%; opacity: .5; }
+}

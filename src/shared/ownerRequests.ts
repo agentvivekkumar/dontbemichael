@@ -23,6 +23,15 @@ export interface MessageLike {
 /** Most cards listed in one context block; the rest are counted. */
 const LIST_MAX = 20;
 
+/** Names a message to the owner may use (the router sends them all to
+ *  Michael, the owner's proxy). Callers add Michael's display name. */
+export const OWNER_ALIASES: ReadonlySet<string> = new Set(['human', 'god', 'michael']);
+
+/** Owner requests read from this date on (owner, 2026-10-06): it replaces the
+ *  rolling 30 day window, so an open request never drops out of Michael's list
+ *  (TODOS.md), while requests settled before it stay settled. */
+export const OWNER_REQUESTS_FLOOR = '2026-09-06T00:00:00.000Z';
+
 export interface OwnerRequest {
   id: string;
   taskId: string;
@@ -38,10 +47,11 @@ export interface OwnerRequest {
  * and a second answer must not hide the first. A reply settles the card's
  * requests up to it. Oldest first.
  */
-export function openOwnerRequests(toMichael: MessageLike[], fromMichael: MessageLike[]): OwnerRequest[] {
+export function openOwnerRequests(toMichael: MessageLike[], fromMichael: MessageLike[], ownerAliases: ReadonlySet<string> = OWNER_ALIASES): OwnerRequest[] {
   // Only his reply to the owner closes it; a hand-off to a teammate in the
-  // same thread is routing, not the closure.
-  const replied = new Set(fromMichael.filter((m) => (m.to ?? '').toLowerCase() === 'human').map((m) => m.in_reply_to).filter((id): id is string => !!id));
+  // same thread is routing, not the closure. Any name that reaches the owner
+  // counts (TODOS.md reply alias).
+  const replied = new Set(fromMichael.filter((m) => ownerAliases.has((m.to ?? '').toLowerCase())).map((m) => m.in_reply_to).filter((id): id is string => !!id));
   const byCard = new Map<string, MessageLike[]>();
   const seen = new Set<string>();
   for (const m of toMichael) {
@@ -299,4 +309,265 @@ export function stuckCardsContext(stuck: StuckCard[]): string | null {
     ].join('\n'));
   }
   return parts.join('\n\n');
+}
+
+
+// ── Michael answers the owner where they asked (docs/designs/michael-replies.md) ──
+
+/** The conversation tag on every message in one owner question's thread. */
+const OWNER_CONV_PREFIX = 'owner:';
+/** A question the owner asked Michael in the dock opens this conversation. */
+export const ownerConversation = (id: string): string => `${OWNER_CONV_PREFIX}${id}`;
+
+/** The question a conversation belongs to, if it is an owner conversation. */
+export function ownerQuestionOf(conversation: string | undefined): string | undefined {
+  return conversation?.startsWith(OWNER_CONV_PREFIX) ? conversation.slice(OWNER_CONV_PREFIX.length) || undefined : undefined;
+}
+
+/** A hive message as the dock reads it. */
+export interface ThreadMessage extends MessageLike {
+  body?: string;
+  /** When Michael expects to answer (a holding reply). */
+  expect_by?: string;
+  /** Who the work waits on, for "Waiting on Oscar". */
+  waiting_on?: string;
+  /** Michael's terminal words filed by the app (R8). */
+  from_notes?: boolean;
+}
+
+/** What the app remembers about each owner request (R5), in
+ *  agents/human/state.json. Times are epoch ms. */
+export interface OwnerRequestFlags {
+  /** Typed into Michael's terminal: he has it (R6). */
+  deliveredAt?: number;
+  withdrawnAt?: number;
+  notSentAt?: number;
+  /** The owner saw replies up to this time in the open dock. */
+  readAt?: number;
+  /** Reply ids a desktop notification went out for (never twice, 12A). */
+  notified?: string[];
+  remindedAt?: number;
+  nudgedAt?: number;
+  /** Notes the app filed from Michael's terminal (R8). */
+  notes?: string[];
+}
+
+export interface OwnerDockState { requests: Record<string, OwnerRequestFlags> }
+
+/** Only these close an owner question: an answer or a reasoned refusal.
+ *  A holding reply, a question back or filed notes never do. */
+export const closesOwnerQuestion = (act: string | undefined): boolean => act === 'done' || act === 'refuse';
+
+/** Past this long with no time given, Michael is later than he said (6A). */
+export const OWNER_LATE_DEFAULT_MS = 2 * 3_600_000;
+
+/** How often Nudge may remind Michael about one request (6A). */
+export const OWNER_NUDGE_EVERY_MS = 3_600_000;
+
+export type OwnerQuestionStatus =
+  | 'sent' | 'has-it' | 'waiting' | 'late' | 'waiting-for-you' | 'answered' | 'couldnt-finish' | 'withdrawn' | 'not-sent';
+
+export interface DockQuestion {
+  kind: 'owner';
+  id: string;
+  conversation: string;
+  text: string;
+  at: string;
+  status: OwnerQuestionStatus;
+  /** "Waiting on Oscar" when the holding reply named someone. */
+  waitingOn?: string;
+  /** When Michael said he would answer, or the default late time. */
+  dueAt?: number;
+  /** The question of Michael's this message answers, if any. */
+  answers?: string;
+  /** Not yet seen in the open dock. */
+  unread: boolean;
+}
+
+export interface DockReply {
+  kind: 'michael';
+  id: string;
+  /** The owner message it replies to. */
+  replyTo: string;
+  act: string;
+  text: string;
+  at: string;
+  notes: boolean;
+}
+
+export type DockItem = DockQuestion | DockReply;
+
+export interface OwnerDock {
+  items: DockItem[];
+  /** Questions Michael has not closed. */
+  open: number;
+  /** Replies not yet seen in the open dock. */
+  unread: number;
+  /** Questions where Michael is waiting on the owner. */
+  waitingForYou: number;
+}
+
+const tsOf = (iso: string | undefined): number => {
+  const t = Date.parse(iso ?? '');
+  return Number.isFinite(t) ? t : 0;
+};
+
+/**
+ * When each owner conversation was last closed (owner:<id>): a `done` or
+ * `refuse` to any question in it closes every question in it asked up to that
+ * reply, so the owner's answer to Michael's question back never stays open on
+ * its own after Michael finished the thread.
+ */
+function conversationsClosed(questions: ThreadMessage[], replies: ThreadMessage[], ownerAliases: ReadonlySet<string>): Map<string, { at: number; act: string }> {
+  const convOf = new Map(questions.map((q) => [q.id, q.conversation ?? ownerConversation(q.id)]));
+  const out = new Map<string, { at: number; act: string }>();
+  for (const r of replies) {
+    if (!r.in_reply_to || r.from_notes || !closesOwnerQuestion(r.act) || !ownerAliases.has((r.to ?? '').toLowerCase())) continue;
+    const conv = convOf.get(r.in_reply_to);
+    if (conv && (out.get(conv)?.at ?? 0) < tsOf(r.created_at)) out.set(conv, { at: tsOf(r.created_at), act: r.act });
+  }
+  return out;
+}
+
+/**
+ * The owner's conversation with Michael, for the dock. `ownerSent` is the
+ * owner's sent mail (agents/human/outbox/.sent, filed by the app at send);
+ * `fromMichael` his outbox history; `verified` keeps only owner messages the
+ * app recorded (answer keys), so a message an agent forged is never shown as
+ * the owner's. A reply counts only when it names an owner message by
+ * `in_reply_to`; notes count only when the app filed them (`flags.notes`).
+ */
+export function ownerDock(
+  ownerSent: ThreadMessage[],
+  fromMichael: ThreadMessage[],
+  state: OwnerDockState,
+  now: number,
+  verified: (m: ThreadMessage) => boolean = () => true,
+  ownerAliases: ReadonlySet<string> = OWNER_ALIASES
+): OwnerDock {
+  const owner = ownerSent.filter((m) => m.from === 'human' && ownerQuestionOf(m.conversation) && verified(m));
+  const ownerIds = new Set(owner.map((m) => m.id));
+  const notesIds = new Set(Object.values(state.requests ?? {}).flatMap((f) => f?.notes ?? []));
+  const replies = fromMichael.filter((m) =>
+    ownerAliases.has((m.to ?? '').toLowerCase()) && m.in_reply_to && ownerIds.has(m.in_reply_to)
+    && (!m.from_notes || notesIds.has(m.id)));
+  const byQuestion = new Map<string, ThreadMessage[]>();
+  for (const r of replies) byQuestion.set(r.in_reply_to!, [...(byQuestion.get(r.in_reply_to!) ?? []), r]);
+  // A question back is answered when the owner replies to it.
+  const answeredQueries = new Set(owner.map((m) => m.in_reply_to).filter((x): x is string => !!x));
+  const threadClosed = conversationsClosed(owner, replies, ownerAliases);
+
+  const items: DockItem[] = [];
+  let open = 0;
+  let unread = 0;
+  let waitingForYou = 0;
+  for (const q of owner) {
+    const flags = state.requests?.[q.id] ?? {};
+    const mine = (byQuestion.get(q.id) ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const real = mine.filter((r) => !r.from_notes);
+    const last = real[real.length - 1];
+    let status: OwnerQuestionStatus;
+    let waitingOn: string | undefined;
+    let dueAt: number | undefined;
+    if (flags.withdrawnAt) status = 'withdrawn';
+    else if (flags.notSentAt && !flags.deliveredAt) status = 'not-sent';
+    else if (last && closesOwnerQuestion(last.act)) status = last.act === 'refuse' ? 'couldnt-finish' : 'answered';
+    else if ((threadClosed.get(q.conversation ?? ownerConversation(q.id))?.at ?? 0) >= tsOf(q.created_at)) {
+      status = threadClosed.get(q.conversation ?? ownerConversation(q.id))!.act === 'refuse' ? 'couldnt-finish' : 'answered';
+    }
+    else if (last?.act === 'query' && !answeredQueries.has(last.id)) status = 'waiting-for-you';
+    else if (!flags.deliveredAt) status = 'sent';
+    else {
+      const holding = [...real].reverse().find((r) => r.act === 'inform');
+      waitingOn = holding?.waiting_on?.trim() || undefined;
+      dueAt = tsOf(holding?.expect_by) || flags.deliveredAt + OWNER_LATE_DEFAULT_MS;
+      status = now > dueAt ? 'late' : holding ? 'waiting' : 'has-it';
+    }
+    const closed = status === 'answered' || status === 'couldnt-finish' || status === 'withdrawn';
+    if (!closed) open++;
+    if (status === 'waiting-for-you') waitingForYou++;
+    const seen = flags.readAt ?? 0;
+    const newer = mine.filter((r) => tsOf(r.created_at) > seen).length;
+    unread += newer;
+    items.push({
+      kind: 'owner', id: q.id, conversation: q.conversation ?? ownerConversation(q.id), text: q.body ?? q.subject ?? '', at: q.created_at,
+      status, ...(waitingOn ? { waitingOn } : {}), ...(dueAt ? { dueAt } : {}),
+      ...(q.in_reply_to ? { answers: q.in_reply_to } : {}), unread: newer > 0
+    });
+    for (const r of mine) items.push({ kind: 'michael', id: r.id, replyTo: q.id, act: r.act, text: r.body ?? r.subject ?? '', at: r.created_at, notes: !!r.from_notes });
+  }
+  items.sort((a, b) => a.at.localeCompare(b.at));
+  return { items, open, unread, waitingForYou };
+}
+
+/** An owner question Michael still owes a reply, for his context. */
+export interface OpenOwnerQuestion { id: string; text: string; createdAt: string }
+
+/**
+ * Questions the owner asked in the dock that Michael has been handed and not
+ * closed with `done` or `refuse`: they stay in his context each turn.
+ * `toMichael` holds his copies (filed in inbox/.done when typed, R6).
+ */
+export function openOwnerQuestions(
+  toMichael: ThreadMessage[],
+  fromMichael: ThreadMessage[],
+  ownerAliases: ReadonlySet<string> = OWNER_ALIASES,
+  /** Only messages the owner really sent (the dock's check), so a file an agent
+   *  drops in Michael's inbox never reaches him as the owner's question (ship D4). */
+  verified: (m: ThreadMessage) => boolean = () => true
+): OpenOwnerQuestion[] {
+  const questions = toMichael.filter((m) => m.from === 'human' && ownerQuestionOf(m.conversation) && verified(m));
+  const closed = new Set(fromMichael
+    .filter((m) => ownerAliases.has((m.to ?? '').toLowerCase()) && closesOwnerQuestion(m.act) && !m.from_notes)
+    .map((m) => m.in_reply_to).filter((x): x is string => !!x));
+  const threadClosed = conversationsClosed(questions, fromMichael, ownerAliases);
+  const seen = new Set<string>();
+  const out: OpenOwnerQuestion[] = [];
+  for (const m of questions) {
+    if (seen.has(m.id) || closed.has(m.id)) continue;
+    if ((threadClosed.get(m.conversation ?? ownerConversation(m.id))?.at ?? 0) >= tsOf(m.created_at)) continue;
+    seen.add(m.id);
+    out.push({ id: m.id, text: m.body ?? m.subject ?? '', createdAt: m.created_at });
+  }
+  return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** How those questions read in Michael's context each turn. Null when none. */
+export function ownerQuestionsContext(open: OpenOwnerQuestion[]): string | null {
+  if (!open.length) return null;
+  return [
+    'QUESTIONS FROM THE OWNER IN YOUR CONVERSATION. Each is waiting for your answer in the owner\'s conversation with you. Route the work as you would any request, then answer the owner: a message "to": "human" with "in_reply_to" the id. Use "act": "done" with the answer, "refuse" with a one line reason when it cannot be done, "query" to ask the owner something about it, or "inform" with "expect_by" (a time) and "waiting_on" (who) while it is in progress. They stay here until you send done or refuse.',
+    ...open.slice(0, LIST_MAX).map((q) => `- id ${cardText(q.id, 60)}: ${cardText(q.text)}`),
+    ...(open.length > LIST_MAX ? [`- and ${open.length - LIST_MAX} more`] : [])
+  ].join('\n');
+}
+
+/** The system note when Michael writes to the owner without naming the
+ *  question (R2). */
+export function unmatchedReplyNote(open: OpenOwnerQuestion[]): { subject: string; body: string } {
+  return {
+    subject: 'Which question does this answer?',
+    body: [
+      'Your message to the owner names no question, so it was not shown in their conversation. Send it again with "in_reply_to" set to the id it answers:',
+      ...open.slice(0, LIST_MAX).map((q) => `- id ${cardText(q.id, 60)}: ${cardText(q.text)}`)
+    ].join('\n')
+  };
+}
+
+/** The work order typed into Michael's terminal for one owner question (R6). */
+export function ownerWorkOrder(id: string, text: string): string {
+  return `The owner asks you (id ${id}): ${text}\n\nAnswer in the owner's conversation: a message "to": "human" with "in_reply_to": "${id}" (act done, refuse with a reason, query, or inform with expect_by and waiting_on while it is in progress).`;
+}
+
+/** Where a composer message goes (R3, R7): a slash command in the engine's
+ *  list goes straight to the terminal; anything else is an owner question. */
+export function ownerComposeTarget(text: string, commands: ReadonlySet<string>): 'terminal' | 'question' {
+  const first = text.trim().split(/\s+/)[0] ?? '';
+  return first.startsWith('/') && commands.has(first.toLowerCase()) ? 'terminal' : 'question';
+}
+
+/** The "Attached files:" block both composers use. */
+export function withAttachments(text: string, attachments: Array<{ path: string; name: string }>): string {
+  if (!attachments.length) return text;
+  return (text.trim() ? `${text}\n\nAttached files:\n` : 'Attached files:\n') + attachments.map((a) => `- ${a.path} (${a.name})`).join('\n');
 }

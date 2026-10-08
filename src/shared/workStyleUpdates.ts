@@ -22,7 +22,12 @@ export interface WorkStyleUpdate {
   whyKey: string;
 }
 
+/** Newest first: a card is offered the first update that matches it, and the
+ *  newest text already holds the older changes. */
 export const WORK_STYLE_UPDATES: readonly WorkStyleUpdate[] = [
+  // Replies leave as the Sending setting allows, never "always a draft" (owner, 2026-10-05).
+  { key: 'pam-sending-2026-10', cardId: 'pam', whyKey: 'askMe.workStyleWhy.sendingSetting' },
+  { key: 'kelly-sending-2026-10', cardId: 'kelly', packs: ['saas-consulting'], whyKey: 'askMe.workStyleWhy.sendingSetting' },
   { key: 'pam-inbox-zero-2026-10', cardId: 'pam', whyKey: 'askMe.workStyleWhy.pamInboxZero' },
   // Facts come from the teammate who has them, Michael only when they can't help (owner, 2026-10-03).
   { key: 'kelly-ask-teammates-2026-10', cardId: 'kelly', packs: ['saas-consulting'], whyKey: 'askMe.workStyleWhy.askTeammates' },

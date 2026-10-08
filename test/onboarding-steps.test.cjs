@@ -17,7 +17,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const wizard = fs.readFileSync(path.join(root, 'src/renderer/src/components/OnboardingWizard.tsx'), 'utf8');
-const orderMatch = wizard.match(/const order: Step\[\] = \[([^\]]+)\]/);
+const orderMatch = wizard.match(/const ORDERED_STEPS = \[([^\]]+)\]/);
 const ORDER = orderMatch ? [...orderMatch[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]) : [];
 
 const STEP_RE = {
@@ -27,7 +27,7 @@ const STEP_RE = {
 };
 
 test('the wizard step order can be read from the component', () => {
-  assert.ok(ORDER.length >= 2, 'could not find `const order: Step[]` in OnboardingWizard.tsx');
+  assert.ok(ORDER.length >= 2, 'could not find `const ORDERED_STEPS` in OnboardingWizard.tsx');
 });
 
 // The step indicator shows "Step N of M" (onboarding.stepOf) beside a title

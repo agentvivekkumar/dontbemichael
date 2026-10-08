@@ -95,7 +95,7 @@ test('every pack\'s Executive Admin works to inbox zero, and her Work style name
     assert.match(ws, /Delete nothing: archiving keeps every email findable/, n);
     assert.doesNotMatch(ws, /\bevery (morning|evening|day|hour|\d)|each (morning|evening)|\bhourly\b|\bdaily\b|\b\d{1,2}(:\d{2})? ?(am|pm)\b|\bat \d{1,2}:\d{2}/i, `${n}: frequency belongs to the schedule`);
     assert.match(pam.summary, /inbox at zero/, n);
-    assert.deepEqual(pam.wontDo, ['Reply on your behalf without asking', 'Delete any email']);
+    assert.deepEqual(pam.wontDo, ['Delete any email'], 'how replies leave is the Sending setting, never a fixed rule');
     const jobs = (pack(n).starterMissions || []).filter((j) => j.agentId === 'pam');
     assert.deepEqual(jobs[0], { agentId: 'pam', title: 'Inbox to zero', schedule: 'every 2h during office hours', focus: 'Bring the inbox to zero: give every new message its outcome, bring back the Waiting items you noted as due today, and tell Michael what is left and why. If you have no email tools yet, from Mailboxes or a Claude connector such as Gmail, stop without messaging anyone.' }, n);
   }

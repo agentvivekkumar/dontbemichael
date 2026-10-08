@@ -5,3 +5,6 @@
 
 /** One Remind per agent per this long; the dialog shows "reminded" as long. */
 export const CLOSING_TIME_REMIND_MS = 30_000;
+
+/** Michael's closing time complete message, in any spelling closing time accepts. */
+export const CLOSING_COMPLETE_RE = /CLOSING[-_\s]*TIME[-_\s]*COMPLETE/i;

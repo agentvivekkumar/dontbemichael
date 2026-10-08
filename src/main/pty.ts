@@ -457,6 +457,9 @@ export class PtyManager {
         `${appData}\\npm\\${command}.cmd`,
         `${appData}\\npm\\${command}`,
         `${localAppData}\\Programs\\claude\\${command}.exe`,
+      // Claude's own installer (install.ps1) puts claude.exe here and updates the
+      // user PATH in the registry, which this already running app never sees.
+      `${home}\\.local\\bin\\${command}.exe`,
         `${home}\\.claude\\local\\${command}.cmd`,
         `${home}\\.claude\\local\\${command}`
       ];
@@ -552,7 +555,9 @@ export class PtyManager {
     if (!existsSync(opts.cwd)) {
       return { ok: false, error: `cwd does not exist: ${opts.cwd}` };
     }
-    const resolved = this.resolveCommand(opts.command).path;
+    // A shell script never runs `command` (it is only recorded for display), so
+    // it is not looked up: a miss costs a login shell or `where` per spawn.
+    const resolved = typeof opts.shellScript === 'string' ? opts.command : this.resolveCommand(opts.command).path;
     try {
       // Build a user-shell PATH so child can resolve subprocess deps. Cached
       // for the session (shellEnv.userShellPath, fenced against rc-file noise) —

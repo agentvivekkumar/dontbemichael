@@ -1,5 +1,5 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, powerMonitor, powerSaveBlocker, screen, shell, Notification } from 'electron';
-import { spawn } from 'node:child_process';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, powerMonitor, powerSaveBlocker, screen, shell, Notification } from 'electron';
+import { execFile, spawn } from 'node:child_process';
 import {
   rmSync, existsSync, readFileSync, readdirSync, statSync, cpSync, writeFileSync,
   unlinkSync, mkdirSync, renameSync, createWriteStream, copyFileSync, lstatSync,
@@ -10,18 +10,25 @@ import { join, resolve, sep, basename, dirname, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { request as httpsRequest } from 'node:https';
 import { PtyManager, type ProcessLaunch, type SpawnOptions } from './pty';
-import { resolveCommand as resolveCliCommand, isSafeCommandName } from './shellEnv';
+import { resolveCommand as resolveCliCommand, isSafeCommandName, userShellPath } from './shellEnv';
+import { buildPtyEnv } from './ptyEnv';
+import {
+  apiKeyShapeOk, checkAnthropicKey, claudeInstallScript, claudeMissingScript, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
+  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
+  shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
+} from './engineSetup';
+import { setHiddenClaudeAuthEnv } from './hiddenClaude';
 import { initAutoUpdater, abortPendingRestart } from './updater';
 import { RealtimeFloorWatcher } from './realtimeFloorWatcher';
 import {
-  readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted,
+  readConfig, writeConfig, setAgentTokenCap, resetConfig, onConfigWritten, ensureHarnessHome, ensureClaudePermissionsAccepted, approveClaudeApiKey,
   modelForRole, OPS_STANDUP_MISSION, OPS_STANDUP_BUILT_IN_BODIES, OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES, HEARTBEAT_MISSION, COMPACT_MAINTENANCE_MISSION, type HarnessConfig, type ScheduledMission
 } from './config';
 import { terminalLaunches } from './terminalAtFolder';
 import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTilde, askFileVerdict, askFileRootsFor, resolveAskFileRoots, opensAsFolder, type AskFileAgent } from './fs';
 import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
 import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
-import { answerKey, catchUpRequests } from '../shared/ownerRequests';
+import { answerKey, catchUpRequests, ownerWorkOrder } from '../shared/ownerRequests';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
@@ -77,8 +84,10 @@ import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
-import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, type AddMailboxInput } from './mail';
-import { PROVIDER_PRESETS, secretRefForMailbox } from '../shared/mailboxes';
+import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
+import { MailApprovals } from './mailApprovals';
+import { standingFitCheck } from './standingCheck';
+import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingMode, sendingWords } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -348,6 +357,22 @@ telemetry.onApiError((agentId) => breaker.recordError(agentId));
 // Shared roster on disk — created early so HookServer can re-read standing goals
 // on every UserPromptSubmit (Edit Agent saves land here via persistAgents).
 const roster = new RosterStore(() => readConfig().harnessHome);
+/**
+ * Whether a member is on the team now, for Send only grants
+ * (docs/designs/shared-mailboxes.md, EV1): in the roster's `agents`, or in
+ * `restorable` (the app moves every member there at launch until it respawns
+ * them). Archived (closed by the owner) or deleted counts as gone. The hive
+ * registry's `archived` flag only means "no live terminal", and it keeps
+ * deleted members, so it is not used. With no roster to read, everyone the
+ * config names counts, as before.
+ */
+function memberPresent(agentId: string): boolean {
+  const snap = roster.read();
+  if (!snap) return true;
+  const has = (list: unknown[]): boolean => Array.isArray(list) && list.some((e) => !!e && typeof e === 'object' && (e as { id?: unknown }).id === agentId);
+  return has(snap.agents) || has(snap.restorable);
+}
+
 function standingGoalFromRoster(agentId: string): string | null {
   const snap = roster.read();
   if (!snap || !Array.isArray(snap.agents)) return null;
@@ -397,7 +422,8 @@ const hookServer = new HookServer(
   },
   () => ({ ...knowledge.agentAccess(), meaning: meaningSearch() }),
   companyProfileForAgents,
-  (agentId) => booksReadRoleIds().has(agentId)
+  (agentId) => booksReadRoleIds().has(agentId),
+  memberPresent
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
@@ -532,10 +558,43 @@ function closeMailboxCard(id: string, result: string): void {
   try { hive.patchTask(`mailbox-attention-${id}`, { status: 'done', result }); } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
+/** Send on approval (docs/designs/send-on-approval.md): proposals the owner
+ *  decides on Ask me, kept out of the hive so agents can't change them. */
+const mailApprovals = new MailApprovals({
+  path: join(app.getPath('userData'), 'mail-proposals.json'),
+  send: (msg) => { if (!hive.enabled()) return false; hive.send(msg, 'mail'); return true; },
+  remember: (agentId, line) => { hive.rememberOwnerNote(agentId, line); },
+  // Only Michael notifies the owner (docs/designs/michael-only-notifications.md).
+  toast: (body) => ownerToast(michaelName(), body),
+  agentName: (id) => { try { return hive.registry().agents[id]?.name?.trim() || id; } catch { return id; } },
+  godId: () => hiveGodId(),
+  changed: () => { try { liveWebContents()?.send('mailProposals:updated'); } catch { /* window gone */ } },
+  // The late sweep asks Michael only about emails that can go now (a paused
+  // or ended grant can't).
+  canSend: (agentId, mailbox, proposalId) => memberPresent(agentId) && mailAccess(readConfig(), agentId, mailbox, 'send', proposalId, { present: memberPresent }).ok
+});
+
+/** Does an email fit a standing approval: a separate quick model decides, never the agent. */
+const standingFit = standingFitCheck({
+  // An empty folder only the app writes, never the office folder agents work
+  // in, so no CLAUDE.md or project settings an agent left can sway the check.
+  cwd: () => {
+    const dir = join(app.getPath('userData'), 'standing-check');
+    mkdirSync(dir, { recursive: true });
+    // Trusted up front, as agent folders are at spawn, so the check never
+    // stops on Claude Code's "trust this folder" question.
+    try { ensureClaudePermissionsAccepted(dir); } catch { /* the check fails closed */ }
+    return dir;
+  },
+  command: () => readConfig().defaultCommand ?? 'claude',
+  env: () => memory.env(),
+  log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
+
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
   getSecret: integrations.getSecret,
-  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } } }, agentId, op, body)
+  mail: (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent }, agentId, op, body)
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
@@ -548,8 +607,38 @@ const mailAdmin = {
   getConfig: () => readConfig(),
   saveConfig: (patch: Partial<HarnessConfig>) => { writeConfig(patch); },
   setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
-  deleteSecret: (ref: string) => integrations.deleteSecret(ref)
+  deleteSecret: (ref: string) => integrations.deleteSecret(ref),
+  endGrant: (agentId: string, mailbox: string, reason: string) => mailApprovals.endGrant(agentId, mailbox, reason),
+  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); }
 };
+
+/**
+ * Send only grants on a mailbox nobody on the team reads are paused (S3, D10).
+ * Michael hears once, after the pause has lasted PAUSE_NOTICE_MS, so the app's
+ * launch and a hire in flight never set it off (EV1). Runs on the 5 minute sweep.
+ */
+function noticePausedGrants(): void {
+  if (!hive.enabled()) return;
+  const cfg = readConfig();
+  const paused: string[] = [];
+  for (const agentId of Object.keys(cfg.agentCapabilities ?? {})) {
+    const g = sendOnlyGrant(cfg, agentId);
+    // A grant of a member off the team does nothing, so it is nobody's news.
+    if (!g || !memberPresent(agentId)) continue;
+    if (grantPaused(cfg, g.mailbox, memberPresent)) paused.push(`${agentId}\u0000${g.mailbox}`);
+  }
+  for (const key of mailApprovals.pausedDue(paused)) {
+    const [agentId, mailbox] = key.split('\u0000');
+    const address = mailboxAddress(cfg, mailbox);
+    let name = agentId;
+    try { name = hive.registry().agents[agentId]?.name?.trim() || agentId; } catch { /* no hive */ }
+    hive.send({
+      to: hiveGodId(), act: 'inform',
+      subject: `Paused: nobody reads ${address}`,
+      body: `${name} sends only from ${address}, but nobody on the team reads it now, so its replies would go unanswered. ${name}'s email from there is on hold until someone does: the owner can give ${address} to a team member on their Access tab, or remove ${name}'s Send only access there.`
+    }, 'mail');
+  }
+}
 
 /** BYOK backend model-providers whose API keys the non-Claude CLI engines
  *  (OpenCode/Crush/pi/qwen) read from standard env vars. Keys are stored
@@ -563,6 +652,15 @@ const BACKEND_KEY_ENV: Record<string, string> = {
   groq: 'GROQ_API_KEY'
 };
 const providerKeyRef = (backend: string): string => `apikey:${backend}`;
+
+/** Claude's sign in for the team when the owner chose an API key in Get Michael
+ *  ready (docs/designs/get-michael-ready.md): ANTHROPIC_API_KEY from the secret
+ *  store, read main only at start. Empty for a Claude account. */
+function claudeAuthEnv(): Record<string, string> {
+  if (readConfig().claudeAuth !== 'apiKey') return {};
+  const key = integrations.getSecret(providerKeyRef('anthropic'));
+  return key ? { ANTHROPIC_API_KEY: key } : {};
+}
 
 /** A worker worktree that teardown PRESERVED because it held unintegrated work.
  *  Tracked so the GC sweep can reclaim it (+ its scratch dir) once the work lands
@@ -750,10 +848,22 @@ function removeWorkerScratch(workerId: string): void {
 // A natural PTY exit must run the same teardown as an explicit kill — EXCEPT when
 // the PTY was the missing-CLI installer: a clean exit there means the engine CLI was
 // just installed, so auto restart-and-continue by re-running the SAME spawn into the
-// SAME pty/window (no user click). Provider-agnostic. Idempotent by construction: the
+// SAME pty/window (no user click). Every engine but Claude, which Get Michael ready
+// installs where the owner can see it (engineSetup.ts). Idempotent by construction: the
 // relaunch carries `noAutoInstall`, so the installer can never fire (let alone loop) a
 // second time — a binary that's somehow still missing just spawns and exits normally.
 ptyManager.setExitHandler((id, exitCode, info) => {
+  // The Get Michael ready terminals (engineSetup.ts): the step re-reads where
+  // Claude stands. They are not agents, so nothing else applies.
+  if (isEngineSetupPty(id)) {
+    // The next sign in read starts after this, never joining an older one.
+    claudeAuth.invalidate();
+    if (id === ENGINE_INSTALL_PTY) {
+      analytics.track('agent_install_finished', { provider: 'claude', rung: 'native', outcome: claudePathFast() ? 'agent_launched' : 'install_failed' });
+    }
+    try { liveWebContents()?.send('engineSetup:changed', { id, exitCode: exitCode ?? null }); } catch { /* window gone */ }
+    return;
+  }
   // Record an ABNORMAL death before teardown — teardownPty drops the
   // pty->agent mapping, so after it runs we can no longer say WHOSE process
   // died. Only abnormal exits are recorded (recordAgentExit returns early on a
@@ -3121,7 +3231,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // NOT double-count a single user attempt — it is the SAME attempt continuing.
   if (!opts.noAutoInstall) analytics.track('agent_spawn_attempted', { provider });
   // ── Missing engine CLI → run its installer visibly (pre-spawn) ───────────────
-  // If the agent's engine binary (claude/codex/…) isn't installed, spawning it
+  // Every engine but Claude, which is handled first in the block below. If the
+  // agent's engine binary (codex/…) isn't installed, spawning it
   // just dies with "— process exited (code 1) —" and the user has no idea why.
   // Detect the absent binary BEFORE spawning and, in this SAME terminal, print a
   // banner + RUN the provider's install command so the user can watch it (and
@@ -3137,6 +3248,43 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // isn't archived and no worktree is torn down) before the relaunch takes over.
   {
     const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+    // Claude is set up where the owner can see it: the Ready step at the end of
+    // setup, or the Get Michael ready card on Ask me (engineSetup.ts). Its
+    // installer used to run here, in a terminal the owner never sees, behind a
+    // Mac password prompt nobody saw; it failed and nothing said so. Now this
+    // terminal only says what to do, and the card shows on Ask me.
+    // The plain `claude` is found without a login shell (a miss there costs a
+    // second of frozen windows per agent on a team restore).
+    const claudeMissing = bin && claudeProvider && (bin === 'claude' ? !claudePathFast() : !ptyManager.isCommandAvailable(bin));
+    // A Claude that is there but known signed out (or set to a key that is not
+    // stored) starts on a sign in screen nobody sees: remember it too, so it
+    // restarts once the owner signs in. Any other start leaves the list.
+    // Nothing read yet this session (a fresh app launch): read once before the
+    // first account start, so a signed out team is caught, not started blind.
+    if (!claudeMissing && claudeProvider && bin === 'claude' && readConfig().claudeAuth !== 'apiKey' && claudeAuth.last() === null) {
+      const path = claudePathFast();
+      if (path) { try { await claudeAuth.read(path); } catch { /* unknown: start as before */ } }
+    }
+    const signedOutStart = !claudeMissing && claudeProvider && (readConfig().claudeAuth === 'apiKey'
+      ? !integrations.hasSecret(providerKeyRef('anthropic'))
+      : claudeAuth.last()?.signedIn === false);
+    if (signedOutStart) claudeBlocked.set(opts.id, { god: !!opts.hive?.isGod });
+    else if (!claudeMissing) claudeBlocked.delete(opts.id);
+    if (claudeMissing) {
+      // Remember who could not start, to start exactly those once Claude is
+      // ready; a member (not Michael) makes the card speak for the team.
+      claudeBlocked.set(opts.id, { god: !!opts.hive?.isGod });
+      let godName = 'Michael';
+      try { godName = hive.registry().agents[hiveGodId()]?.name?.trim() || godName; } catch { /* no hive yet */ }
+      const res = ptyManager.spawn(
+        { id: opts.id, cwd: opts.cwd, command: bin, cols: opts.cols, rows: opts.rows, shellScript: claudeMissingScript(process.platform, godName) },
+        owner
+      );
+      if (!opts.noAutoInstall) analytics.track('agent_spawn_failed', { provider, reason: 'cli_missing' });
+      noticeEngineSetup(opts.id);
+      syncKeepAwake();
+      return res;
+    }
     if (bin && !opts.noAutoInstall && !ptyManager.isCommandAvailable(bin)) {
       // The installer commands are `npm install -g …`. Probe for npm the same way
       // we probe for the engine CLI, so a no-Node machine gets the node-free rung
@@ -3485,7 +3633,11 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // interactive prompt it can't answer and exit code 1. Best-effort, never blocks.
   // Claude-only — other CLIs handle their own permission UX.
   if (claudeProvider) {
-    try { ensureClaudePermissionsAccepted(opts.cwd); } catch { /* never block spawn */ }
+    // The owner's API key, when they chose one over a Claude account. It is
+    // approved in ~/.claude.json in the same pass, so Claude never stops to ask.
+    const authEnv = claudeAuthEnv();
+    try { ensureClaudePermissionsAccepted(opts.cwd, { approveKey: authEnv.ANTHROPIC_API_KEY }); } catch { /* never block spawn */ }
+    if (authEnv.ANTHROPIC_API_KEY) opts.env = { ...(opts.env ?? {}), ...authEnv };
   }
   // Suppress first-run interactive prompts for providers that need it (e.g. Codex
   // directory-trust gate via CODEX_NON_INTERACTIVE). Merges into any env already
@@ -3560,7 +3712,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
     const agentId = opts.hive.id;
     const root = hive.root();
-    if (root && readConfig().agentCapabilities?.[agentId]?.email?.enabled) {
+    // A Send only grant alone gets the tools too (shared-mailboxes.md, item 1).
+    if (root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
       try {
         const token = integrationBroker.grant(opts.id, [], agentId);
         const file = join(root, 'agents', agentId, 'md-mail.mcp.json');
@@ -3620,6 +3773,8 @@ ipcMain.handle('pty:kill', (_evt, id: string) => {
   // node-pty firing onExit once the child actually dies is a harmless no-op.
   const res = ptyManager.kill(id);
   teardownPty(id);
+  // The owner closed it: it no longer waits on Claude, so no card or restart.
+  claudeBlocked.delete(id);
   return res;
 });
 ipcMain.handle('pty:list', () => ptyManager.list());
@@ -3735,13 +3890,24 @@ ipcMain.handle('providerKey:set', (_evt, payload: unknown) => {
   const p = (payload ?? {}) as { backend?: unknown; key?: unknown };
   if (typeof p.backend !== 'string' || !(p.backend in BACKEND_KEY_ENV)) return { ok: false, error: 'unknown backend' };
   if (typeof p.key !== 'string' || !p.key) return { ok: false, error: 'key required' };
-  return integrations.setSecret(providerKeyRef(p.backend), p.key);
+  const res = integrations.setSecret(providerKeyRef(p.backend), p.key);
+  // The same Anthropic key signs Claude in when the owner chose one in Get
+  // Michael ready: approve the new one and let the step and the card look again.
+  if (res.ok && p.backend === 'anthropic' && readConfig().claudeAuth === 'apiKey') {
+    try { approveClaudeApiKey(p.key); } catch { /* approved again at each start */ }
+    noticeEngineSetup('api-key');
+  }
+  return res;
 });
 ipcMain.handle('providerKey:has', (_evt, backend: unknown) =>
   typeof backend === 'string' ? integrations.hasSecret(providerKeyRef(backend)) : false);
 ipcMain.handle('providerKey:clear', (_evt, backend: unknown) => {
   if (typeof backend !== 'string' || !(backend in BACKEND_KEY_ENV)) return { ok: false, error: 'unknown backend' };
-  try { integrations.deleteSecret(providerKeyRef(backend)); return { ok: true }; }
+  try {
+    integrations.deleteSecret(providerKeyRef(backend));
+    if (backend === 'anthropic' && readConfig().claudeAuth === 'apiKey') noticeEngineSetup('api-key');
+    return { ok: true };
+  }
   catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 });
 // Probe an integration's reachability through the broker's own auth path (admin-only;
@@ -4171,7 +4337,13 @@ ipcMain.handle('mail:remove', (_evt, id: unknown) => {
 });
 ipcMain.handle('mail:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
-  return setAgentCapabilities(mailAdmin, agentId, caps as { email?: { enabled: boolean; mailboxes: string[]; send: boolean }; move?: boolean });
+  return setAgentCapabilities(mailAdmin, agentId, caps as Parameters<typeof setAgentCapabilities>[2]);
+});
+/** A member's Send only grant (docs/designs/shared-mailboxes.md), or null to remove it. */
+ipcMain.handle('mail:setSendOnly', (_evt, agentId: unknown, grant: unknown) => {
+  if (typeof agentId !== 'string') return { ok: false, restartNeeded: false };
+  if (grant !== null && (!grant || typeof grant !== 'object')) return { ok: false, restartNeeded: false };
+  return setSendOnly(mailAdmin, agentId, grant as { mailbox?: unknown; sending?: unknown } | null);
 });
 /** Roles that may use QuickBooks, Read only, before the owner chooses. */
 ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);
@@ -4516,6 +4688,127 @@ ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
 });
 /** The most recorded owner answers kept: far more than any office has open. */
 const OWNER_ANSWER_KEYS_MAX = 2000;
+
+// ─── The owner's conversation with Michael (docs/designs/michael-replies.md) ───
+
+/** Dock keys kept: years of questions at any realistic pace (R4). */
+const OWNER_DOCK_KEYS_MAX = 50_000;
+const dockKey = (m: { id: string; created_at: string; body?: string }): string => answerKey(`owner:${m.id}`, m.created_at, answerDigest('', m.body ?? ''));
+
+/**
+ * The keys of messages the owner really sent from the dock (R4), in their own
+ * app-private file, read once and cached: config.json is re-read many times a
+ * minute, so a list that grows with every question doesn't belong in it
+ * (ship D5). The first build kept them in config.json; they are carried over once.
+ */
+const ownerDockKeysPath = (): string => join(app.getPath('userData'), 'owner-dock-keys.json');
+let ownerDockKeysCache: Set<string> | null = null;
+function saveOwnerDockKeys(list: string[]): boolean {
+  const path = ownerDockKeysPath();
+  try {
+    writeFileSync(`${path}.tmp`, JSON.stringify(list), 'utf8');
+    renameSync(`${path}.tmp`, path);
+    return true;
+  } catch (e) { console.error('[owner] dock keys not saved:', e); return false; }
+}
+function ownerDockKeys(): Set<string> {
+  if (ownerDockKeysCache) return ownerDockKeysCache;
+  let list: string[] = [];
+  try {
+    const v: unknown = JSON.parse(readFileSync(ownerDockKeysPath(), 'utf8'));
+    if (Array.isArray(v)) list = v.filter((k): k is string => typeof k === 'string');
+  } catch { /* none yet */ }
+  const legacy = readConfig().ownerDockKeys;
+  if (Array.isArray(legacy) && legacy.length) {
+    list = [...new Set([...list, ...legacy])].slice(-OWNER_DOCK_KEYS_MAX);
+    // Settings keep their copy until the new file is safely written.
+    if (saveOwnerDockKeys(list)) writeConfig({ ownerDockKeys: undefined });
+  }
+  ownerDockKeysCache = new Set(list);
+  return ownerDockKeysCache;
+}
+function addOwnerDockKey(key: string): boolean {
+  const list = [...ownerDockKeys(), key].slice(-OWNER_DOCK_KEYS_MAX);
+  if (!saveOwnerDockKeys(list)) return false;
+  ownerDockKeysCache = new Set(list);
+  return true;
+}
+/** Whether an owner message is one the owner really sent from the dock. */
+const isOwnerDockMessage = (m: { id: string; created_at: string; body?: string }): boolean =>
+  ownerDockKeys().has(dockKey({ id: m.id, created_at: m.created_at, body: m.body }));
+// Michael's every-turn list of owner questions uses the same check (ship D4).
+hive.setOwnerMessageCheck(isOwnerDockMessage);
+
+/** Whether the dock is on screen and the app in front: then a reply needs no
+ *  notification (12A). */
+let ownerDockVisible = false;
+
+/** One desktop notification titled with Michael's name, opening the dock at
+ *  this question when clicked. */
+function ownerToastOpening(body: string, questionId: string): void {
+  if (!readConfig().notifications) return;
+  try {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({ title: michaelName(), body });
+    n.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+      try { liveWebContents()?.send('owner:openDock', questionId); } catch { /* window gone */ }
+    });
+    n.show();
+  } catch { /* unsupported platform */ }
+}
+
+hive.onOwnerReply((msg) => {
+  try { liveWebContents()?.send('owner:changed'); } catch { /* window gone */ }
+  if (msg.from_notes || !msg.in_reply_to || !['done', 'refuse', 'query'].includes(msg.act)) return;
+  const inFront = ownerDockVisible && !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused();
+  if (inFront || !hive.ownerNotify(msg.in_reply_to, msg.id)) return;
+  const first = (msg.body || msg.subject || '').replace(/\s+/g, ' ').trim();
+  const text = msg.act === 'query' ? `Has a question about: ${first}` : first;
+  ownerToastOpening(text.length > 120 ? `${text.slice(0, 119)}…` : text, msg.in_reply_to);
+});
+
+ipcMain.handle('owner:ask', (_evt, p: unknown) => {
+  const o = (p ?? {}) as { text?: unknown; inReplyTo?: unknown; conversation?: unknown };
+  if (!hive.enabled() || typeof o.text !== 'string' || !o.text.trim()) return { ok: false };
+  const msg = hive.ownerAsk({
+    text: o.text.slice(0, 20_000),
+    ...(typeof o.inReplyTo === 'string' ? { inReplyTo: o.inReplyTo } : {}),
+    ...(typeof o.conversation === 'string' ? { conversation: o.conversation } : {})
+  });
+  if (!msg) return { ok: false };
+  // A question whose genuine mark can't be saved would vanish after a restart:
+  // it is withdrawn and the owner told it didn't send.
+  if (!addOwnerDockKey(dockKey(msg))) { hive.ownerWithdraw(msg.id); return { ok: false }; }
+  return { ok: true, id: msg.id, workOrder: ownerWorkOrder(msg.id, msg.body) };
+});
+ipcMain.handle('owner:conversation', () => hive.ownerConversationView(Date.now(), isOwnerDockMessage));
+ipcMain.handle('owner:delivered', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerDelivered(id) }));
+ipcMain.handle('owner:withdraw', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerWithdraw(id) }));
+ipcMain.handle('owner:notSent', (_evt, id: unknown) => { if (typeof id === 'string') hive.ownerNotSent(id); return { ok: true }; });
+ipcMain.handle('owner:retry', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerRetry(id) }));
+ipcMain.handle('owner:read', (_evt, ids: unknown) => {
+  if (Array.isArray(ids)) hive.ownerRead(ids.filter((x): x is string => typeof x === 'string').slice(0, 500));
+  return { ok: true };
+});
+ipcMain.handle('owner:nudge', (_evt, id: unknown) => ({ ok: typeof id === 'string' && hive.ownerRemind(id, 'nudge') }));
+ipcMain.handle('owner:dockVisible', (_evt, on: unknown) => { ownerDockVisible = on === true; return { ok: true }; });
+ipcMain.handle('hive:ackReport', (_evt, taskId: unknown, index: unknown) => ({
+  ok: typeof taskId === 'string' && Number.isInteger(index) && hive.ackReport(taskId, index as number)
+}));
+
+/** Late owner questions: Michael is reminded once (6A). */
+function sweepLateOwnerQuestions(now = Date.now()): void {
+  if (!hive.enabled()) return;
+  for (const it of hive.ownerConversationView(now).items) {
+    if (it.kind === 'owner' && it.status === 'late') hive.ownerRemind(it.id, 'late', now);
+  }
+}
+setInterval(() => {
+  try { sweepLateOwnerQuestions(); } catch (e) { console.error('[owner] late sweep failed', e); }
+  // Paused Send only grants reach Michael once (shared-mailboxes.md, EV1).
+  try { noticePausedGrants(); } catch (e) { console.error('[mail] paused grant sweep failed', e); }
+}, 5 * 60_000);
 // The owner's own card changes (card-lifecycle.md section 4): a move, or a
 // close that ends the card as Done by their decision. Cards are never deleted
 // from the UI; Michael is told of each change.
@@ -4710,6 +5003,17 @@ ipcMain.handle('workStyle:checkFocus', async (_evt, payload: unknown) => {
   const req = readFocusCheckRequest(payload);
   if (!req) return { checked: false };
   const cfg = readConfig();
+  // The agent's real Sending setting, read here rather than trusted from the renderer.
+  const agentId = payload && typeof (payload as { agentId?: unknown }).agentId === 'string' ? (payload as { agentId: string }).agentId : '';
+  const email = agentId ? cfg.agentCapabilities?.[agentId]?.email : undefined;
+  if (email?.enabled) req.sending = sendingWords(sendingMode(email));
+  // A Send only grant's Sending, so an outreach job is checked against it (ER7).
+  const grant = agentId ? sendOnlyGrant(cfg, agentId) : undefined;
+  if (grant) {
+    const address = mailboxAddress(cfg, grant.mailbox);
+    const line = `sends only from ${address}: ${sendingWords(grant.sending)}`;
+    req.sending = req.sending ? `${req.sending}; ${line}` : line;
+  }
   return checkFocusArea(req, {
     cwd: cfg.harnessHome ?? app.getPath('home'),
     command: cfg.defaultCommand ?? 'claude',
@@ -4760,6 +5064,117 @@ ipcMain.handle('skills:reveal', (_evt, path: unknown) => {
     || (readConfig().registeredRepos ?? []).some((c) => target.startsWith(resolve(c) + sep));
   if (!inRoot) return { ok: false, error: 'outside a managed skills directory' };
   shell.showItemInFolder(target);
+  return { ok: true };
+});
+
+// ─── IPC: Get Michael ready (engineSetup.ts) ────────────────────────────────
+// Where Claude stands on this computer, its install and its sign in, each run in
+// a terminal the step can show (Show details). Only Claude is set up here; any
+// other engine keeps its own path.
+
+/** `claude` without a login shell: the user's captured PATH plus the places
+ *  Claude's installers use (engineSetup.findClaudeFast). */
+function claudePathFast(): string | null {
+  return findClaudeFast({
+    platform: process.platform,
+    pathEnv: process.platform === 'win32' ? (process.env.PATH || '') : userShellPath(),
+    home: homedir(),
+    appData: process.env.APPDATA,
+    localAppData: process.env.LOCALAPPDATA
+  });
+}
+/** Terminals that could not start for want of Claude, or started signed out
+ *  (pty id → was it Michael). Each stays until that terminal starts ready on
+ *  Claude or on another engine. Once ready, exactly these restart; a member in
+ *  it makes the step and the card apply even when Michael runs on another engine. */
+const claudeBlocked = new Map<string, { god: boolean }>();
+/** Tell the step and Ask me to look again: the first notice at once, any more
+ *  inside 2 s once at its end (a team restore sends one per member). */
+const noticeEngineSetup = makeNoticeCoalescer((id) => {
+  try { liveWebContents()?.send('engineSetup:changed', { id, exitCode: null }); } catch { /* window gone */ }
+});
+
+// Hidden checks (hire, focus, standing fit) sign in the same way as the team,
+// with the key approved first so Claude never stops on its question; once per
+// key, not on every check (~/.claude.json can run to megabytes).
+let hiddenApprovedKey = '';
+setHiddenClaudeAuthEnv(() => {
+  const env = claudeAuthEnv();
+  const key = env.ANTHROPIC_API_KEY;
+  if (key && key !== hiddenApprovedKey) {
+    try { if (approveClaudeApiKey(key)) hiddenApprovedKey = key; } catch { /* best effort */ }
+  }
+  return env;
+});
+
+/** `claude auth status`, one at a time, never joining a read that started
+ *  before a sign in ended, keeping the last known state on a failed read
+ *  (engineSetup.makeClaudeAuthReader). */
+const claudeAuth = makeClaudeAuthReader((path, done) => {
+  const env = buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath());
+  const cmd = claudeAuthStatusCommand(process.platform, path, process.env.ComSpec);
+  execFile(cmd.file, cmd.args, { timeout: 15_000, env, windowsVerbatimArguments: cmd.verbatim }, (err, stdout) => done(err, String(stdout ?? '')));
+});
+ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
+  const cfg = readConfig();
+  const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
+  const isClaude = isClaudeProvider(inferAgentProvider('claude', p));
+  const teamNeedsClaude = [...claudeBlocked.values()].some((b) => !b.god);
+  const status = await readEngineSetupStatus({
+    isClaude,
+    teamNeedsClaude,
+    claudePath: isClaude || teamNeedsClaude ? claudePathFast() : null,
+    claudeAuth: cfg.claudeAuth,
+    hasKey: () => integrations.hasSecret(providerKeyRef('anthropic')),
+    authStatus: (path) => claudeAuth.read(path)
+  });
+  // Ready now: the terminals that could not start. Each leaves the list when it
+  // actually starts on Claude (spawnAgentCore), so every reader sees the same.
+  if (status.applies && !status.needed && claudeBlocked.size) return { ...status, restart: [...claudeBlocked.keys()] };
+  return status;
+});
+// Start the install (or keep the one already running). The step watches the
+// terminal's exit and then reads the status again. On macOS and Linux it runs
+// under /bin/sh, not the owner's shell: the script is POSIX, and fish is not.
+ipcMain.handle('engineSetup:install', (e): { ok: boolean; error?: string } => {
+  if (!shouldStartInstall({ installRunning: ptyManager.list().some((x) => x.id === ENGINE_INSTALL_PTY), installed: !!claudePathFast() })) return { ok: true };
+  const script = claudeInstallScript(process.platform);
+  const res = process.platform === 'win32'
+    ? ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: 'claude', cols: 100, rows: 12, shellScript: script }, e.sender)
+    : ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: '/bin/sh', args: ['-c', script], cols: 100, rows: 12 }, e.sender);
+  if (res.ok) analytics.track('agent_install_started', { provider: 'claude', rung: 'native' });
+  else analytics.track('agent_spawn_failed', { provider: 'claude', reason: spawnFailReason(res.error) });
+  return res;
+});
+// Sign in: `claude auth login` opens the browser. A fresh run each time, so
+// "Open the browser again" works after a closed tab.
+ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
+  const claude = claudePathFast();
+  if (!claude) return { ok: false, error: 'not installed' };
+  // Signing in with an account means the team uses it, not a key.
+  if (readConfig().claudeAuth === 'apiKey') writeConfig({ claudeAuth: 'account' });
+  if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
+  return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command: claude, args: ['auth', 'login'], cols: 100, rows: 12 }, e.sender);
+});
+// Use an Anthropic API key instead of a Claude account. The key is checked with
+// Anthropic first, so a typo never becomes a team that cannot start; then kept
+// write only in the secret store (the same Anthropic key as Settings, AI
+// engines) and approved for Claude Code. It never comes back over IPC.
+ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> => {
+  const key = typeof raw === 'string' ? raw.trim() : '';
+  if (!apiKeyShapeOk(key)) return { ok: false, error: 'invalid' };
+  // Electron's fetch follows the system proxy, so the check works wherever Claude does.
+  const verdict = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
+  if (verdict !== 'ok') return { ok: false, error: verdict };
+  // Approved in ~/.claude.json first: a key Claude would stop to ask about is
+  // never saved as ready (fail closed; the owner can try again).
+  let approved = false;
+  try { approved = approveClaudeApiKey(key); } catch { approved = false; }
+  if (!approved) return { ok: false, error: 'store' };
+  const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
+  if (!saved.ok) return { ok: false, error: 'store' };
+  writeConfig({ claudeAuth: 'apiKey' });
+  try { liveWebContents()?.send('engineSetup:changed', { id: 'api-key', exitCode: null }); } catch { /* window gone */ }
   return { ok: true };
 });
 
@@ -5231,6 +5646,22 @@ ipcMain.handle('scheduleRequests:decide', (_evt, id: unknown, approve: unknown):
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   return decideScheduleRequest(id, approve === true);
 });
+
+// ─── IPC: Send on approval (an agent proposed an email, the owner decides) ───
+// A member no longer on the team has no card on Ask me: nobody would send it.
+ipcMain.handle('mailProposals:list', () => mailApprovals.waiting().filter((p) => memberPresent(p.agentId)));
+ipcMain.handle('mailProposals:decide', (_evt, id: unknown, decision: unknown, edit: unknown, note: unknown, standing: unknown) => {
+  if (typeof id !== 'string' || (decision !== 'approve' && decision !== 'changes' && decision !== 'decline')) return { ok: false, error: 'invalid' };
+  const e = (edit && typeof edit === 'object' ? edit : {}) as { subject?: unknown; body?: unknown };
+  return mailApprovals.decide(id, decision, e, note, standing);
+});
+/** A Send only member's latest sends from its grant's mailbox, for its Access tab
+ *  (shared-mailboxes.md, O1b): app private, never in the office log. */
+ipcMain.handle('mail:recentSends', (_evt, agentId: unknown, mailbox: unknown) =>
+  (typeof agentId === 'string' && typeof mailbox === 'string' ? mailApprovals.recentSends(agentId, mailbox, 5).map((r) => ({ to: r.to, subject: r.subject, sentAt: r.sentAt })) : []));
+// Standing approvals: kinds an agent may send without asking, revocable on its Access tab.
+ipcMain.handle('mailStanding:list', (_evt, agentId: unknown) => (typeof agentId === 'string' ? mailApprovals.standing(agentId) : []));
+ipcMain.handle('mailStanding:revoke', (_evt, id: unknown) => (typeof id === 'string' ? mailApprovals.revokeStanding(id) : { ok: false, error: 'invalid' }));
 
 /** The owner closed this agent (not a crash or a restart): pause its schedules
  *  and mark it, so Michael's list shows it as closed (design 6A, eng review R1). */
@@ -6320,6 +6751,8 @@ function bootstrapHiveServices(): void {
   if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
   scheduleSweepTimer = setInterval(() => {
     try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+    // Approved emails not sent within the hour go to Michael (send-on-approval.md).
+    try { mailApprovals.sweep(); } catch (e) { console.error('[mail] approval sweep failed', e); }
   }, 30 * 60 * 1000);
   // Tell the hive what it is running inside, BEFORE anything spawns: the prompt
   // builder reads this, so an agent spawned earlier would never learn it.

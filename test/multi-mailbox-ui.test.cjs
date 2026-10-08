@@ -37,30 +37,41 @@ test('Claude connectors lead Connections, then Mailboxes; Gmail on the Claude ac
   assert.match(read('src/renderer/src/components/McpDefaultsSettings.tsx'), /e\.id !== 'email-calendar'/);
 });
 
-test('Draft only is chosen the first time email is turned on (6A); Sending is a radio group (7A)', () => {
+test('Email is a list of the mailboxes a member uses; watching starts Draft only (6A); Sending is a radio group (7A)', () => {
   const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
-  // Turning email on never picks a mailbox, and turning it off clears the pick (owner, 2026-09-26).
-  assert.match(cap, /void save\(\{ enabled: true, mailboxes: \[\], send: false \}\);/);
-  assert.match(cap, /if \(email\.enabled\) \{ void save\(\{ enabled: false, mailboxes: \[\], send: false \}\); return; \}/);
+  // Owner, 2026-10-07: no on/off switch. Each address the member uses is a row
+  // with its Inbox (who watches it) and its Sending; Add a mailbox asks Watch
+  // the inbox or Send only. Watching never starts beyond Draft only.
+  assert.match(cap, /void save\(\{ enabled: true, mailboxes: \[id\], send: false, sending: 'draft' \}, !!mailboxHolder\(config\.agentCapabilities, id, agent\.id\)\);/);
+  assert.match(cap, /const stopWatching = \(\): void => \{ void save\(\{ enabled: false, mailboxes: \[\], send: false, sending: 'draft' \}\); \};/);
+  assert.match(cap, /void saveGrant\(\{ mailbox: addId, sending: 'draft' \}\)/, 'Send only starts Draft only too');
   assert.doesNotMatch(cap, /mailboxes\[0\]\?\.id/);
   assert.match(cap, /role="radiogroup"/);
   assert.match(cap, /ArrowUp/);
-  // One mailbox per agent (owner, 2026-09-26): picked from radio rows, no per-mailbox switch.
-  // The mailbox is picked from a list, with a prompt until one is chosen (owner, 2026-09-26).
-  assert.match(cap, /<Select label=\{t\('capabilities\.mailbox', \{ name \}\)\} value=\{current \?\? ''\}/);
-  assert.match(cap, /\{!current && <option value="">\{t\('capabilities\.pickMailbox'\)\}<\/option>\}/);
+  assert.match(cap, /t\('capabilities\.inboxWatches', \{ name \}\)/);
+  assert.match(cap, /t\('capabilities\.inboxSendOnly', \{ holder: nameOf\(grantHolder\), name \}\)/);
+  // Picked from a list, with a prompt until one is chosen; a choice that can't be made is greyed with its reason.
+  assert.match(cap, /<option value="">\{t\('capabilities\.pickMailbox'\)\}<\/option>/);
+  assert.match(cap, /value: 'watch', label: t\('capabilities\.addWatch'\), disabled: !canWatch,/);
+  assert.match(cap, /value: 'send', label: t\('capabilities\.addSendOnly'\), disabled: !canSendOnly,/);
+  assert.match(cap, /aria-disabled="true"/);
   assert.match(cap, /mailboxes\.length === 0 \? \(/, 'no mailbox set up: the Settings link instead');
   assert.match(cap, /<button type="button" onClick=\{openSettings\} style=\{\{ \.\.\.link, marginInlineStart: 'auto' \}\}>\{t\('capabilities\.addMailbox'\)\}<\/button>/, 'add new mailbox beside the list');
-  // The on/off switch sits in the Email header; nothing else in the section says on (owner, 2026-09-26).
-  // Claude connectors have one switch per row instead (design D4).
-  assert.equal((cap.match(/<Toggle /g) || []).length, 2, 'the Email switch and the connector row switch');
-  assert.match(cap, /action=\{<Toggle on=\{email\.enabled\}/);
+  // No switch in the Email header now; Claude connectors keep one switch per row (design D4).
+  assert.equal((cap.match(/<Toggle /g) || []).length, 1, 'the connector row switch only');
+  assert.doesNotMatch(cap, /action=\{<Toggle on=\{email\.enabled\}/);
   assert.doesNotMatch(cap, /PROVIDER_PRESETS/, 'no service name under the address');
-  assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /\{action !== undefined && <div/, 'the switch sits beside the fold button, not inside it');
+  for (const loc of ['en', 'zh-CN', 'ar']) {
+    const c = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).capabilities;
+    for (const k of ['emailSummary', 'emailSummaryNone', 'emailNone', 'removeMailbox', 'inbox', 'inboxWatches', 'inboxSendOnly', 'inboxNobody', 'sendingFrom', 'addMailboxUse', 'addMailboxInfo', 'removeWatchedSure', 'addWatch', 'addWatchTaken', 'addWatchMoves', 'addSendOnly', 'addSendOnlyNobody', 'addSendOnlyTaken', 'addIt', 'cancelAdd']) {
+      assert.equal(typeof c[k], 'string', `${loc}: capabilities.${k}`);
+      assert.doesNotMatch(c[k], /[–—]| - /, `${loc}: capabilities.${k} has a dash`);
+    }
+  }
 });
 
 test('removing a used mailbox names who loses it (8A)', () => {
-  assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /t\('mailboxes\.removeAffects', \{ names: list\(users\) \}\)/);
+  assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /t\('mailboxes\.removeAffects', \{ names: list\(losing\) \}\)/);
 });
 
 test('no Ask me card announces per-member email (owner, 2026-09-26)', () => {
@@ -81,7 +92,7 @@ test('restart on enable waits for idle, with a 10 minute ceiling (E2, E5)', () =
   // Only a running agent is queued; turning email off clears a queued email restart.
   const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
   assert.match(cap, /if \(res\.restartNeeded && agent\.ptyId\) useStore\.getState\(\)\.setPendingRestart\(agent\.id, \{ at: Date\.now\(\), reason: 'email' \}\);/);
-  assert.match(cap, /if \(!next\.enabled && pending\?\.reason === 'email'\) useStore\.getState\(\)\.setPendingRestart\(agent\.id, undefined\);/);
+  assert.match(cap, /if \(!next\.enabled && !grant && pending\?\.reason === 'email'\) useStore\.getState\(\)\.setPendingRestart\(agent\.id, undefined\);/);
   assert.match(read('src/renderer/src/store/store.ts'), /next\[agentId\] = prev \? \{ \.\.\.entry, at: prev\.at, reason: prev\.reason === 'connectors' \? 'connectors' : entry\.reason \} : entry;/);
   // Add mailbox: nothing is saved until main tests the login; a thrown IPC is a plain failure, not a crash.
   const dlg = read('src/renderer/src/components/AddMailboxDialog.tsx');
@@ -100,7 +111,7 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
   const at = main.indexOf("opts.args = [...(opts.args ?? []), '--mcp-config', file];");
   assert.ok(at > 0);
   assert.ok(at < main.indexOf('const res = ptyManager.spawn(opts, owner);', at), 'right before the spawn');
-  assert.match(main, /readConfig\(\)\.agentCapabilities\?\.\[agentId\]\?\.email\?\.enabled/);
+  assert.match(main, /hasMailTools\(readConfig\(\)\.agentCapabilities\?\.\[agentId\]\)/, 'own mailbox or a Send only grant');
   assert.match(read('electron-builder.yml'), /from: resources\/md-mail-mcp\.cjs/);
 });
 

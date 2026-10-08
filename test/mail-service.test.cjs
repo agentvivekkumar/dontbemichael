@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { mailAccess, agentMailboxes, emailJustEnabled, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
+const { mailAccess, agentMailboxes, mailToolsJustAttached, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
 const { MailService, handleMailRequest, classifyMailError, setAgentCapabilities } = loadTs('src/main/mail.ts');
 
 const server = { host: 'h', port: 993, secure: true };
@@ -99,8 +99,8 @@ test('one mailbox per agent: only the first counts, and a save keeps one (owner,
 });
 
 test('helpers: first enable, ids, Microsoft addresses', () => {
-  assert.equal(emailJustEnabled(undefined, { email: { enabled: true, mailboxes: [], send: false } }), true);
-  assert.equal(emailJustEnabled({ email: { enabled: true, mailboxes: [], send: false } }, { email: { enabled: true, mailboxes: ['a'], send: false } }), false);
+  assert.equal(mailToolsJustAttached(undefined, { email: { enabled: true, mailboxes: [], send: false } }), true);
+  assert.equal(mailToolsJustAttached({ email: { enabled: true, mailboxes: [], send: false } }, { email: { enabled: true, mailboxes: ['a'], send: false } }), false);
   assert.equal(mailboxIdFor('Sales@Example.com'), 'sales-example-com');
   assert.equal(mailboxIdFor('sales@example.com', ['sales-example-com']), 'sales-example-com-2');
   assert.equal(isMicrosoftAddress('a@outlook.com'), true);

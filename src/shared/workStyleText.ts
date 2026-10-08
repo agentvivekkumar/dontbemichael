@@ -254,7 +254,7 @@ export function cleanAnswer(text: string): string {
  * A focus may narrow or direct the work; it may not widen duties or approvals,
  * or contradict another job's focus.
  */
-export function focusCheckPrompt(p: { name: string; workStyle: string; focus: string; job: string; others: Array<{ job: string; focus: string }> }): string {
+export function focusCheckPrompt(p: { name: string; workStyle: string; focus: string; job: string; others: Array<{ job: string; focus: string }>; sending?: string }): string {
   return [
     `${p.name} is an AI team member at a small business. The owner is adding a focus area to one of ${p.name}'s scheduled jobs: what ${p.name} concentrates on each time that job runs.`,
     `A focus area may narrow or direct the work within ${p.name}'s work style. It conflicts when it asks for something the work style rules out or keeps for the owner's approval, when it adds duties or permissions the work style does not give, or when it contradicts another job's focus area.`,
@@ -263,6 +263,9 @@ export function focusCheckPrompt(p: { name: string; workStyle: string; focus: st
     '--- WORK STYLE ---',
     p.workStyle.trim() || '(none written yet)',
     '',
+    // The owner's Sending setting decides email, whatever the work style says
+    // (owner, 2026-10-05), so a focus that sends as it allows is no conflict.
+    ...(p.sending ? [`--- HOW ${p.name.toUpperCase()}'S EMAIL LEAVES (the owner's Sending setting; it outranks the work style on email) ---`, p.sending, ''] : []),
     '--- OTHER JOBS\' FOCUS AREAS ---',
     p.others.length ? p.others.map((o) => `${o.job}: ${o.focus}`).join('\n') : '(none)',
     '',

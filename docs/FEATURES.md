@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.3). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.4). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -25,6 +25,9 @@ moving, and brings you only the decisions that need you.
   waits on, and a card ends only as Done.
 - A question stays on Ask me until you answer it or Michael withdraws it, and your answer goes only
   to Michael. When a question names a file saved in the office, open it right from the card.
+- Ask Michael anything from the Talk to Michael box: he answers in a conversation that opens above
+  it, and each question shows where it stands until it is answered. Scheduled outcomes, such as a
+  weekly summary, arrive on Ask me as quiet Report cards you clear with Got it.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
 ### 2. Hire the right person in four steps
@@ -43,7 +46,11 @@ moving, and brings you only the decisions that need you.
   or any IMAP mailbox. Passwords stay encrypted on your computer.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
-- Choose Can send or Draft only for each one. A team member can't reach a mailbox you didn't give it.
+- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. A team member can't reach a mailbox you didn't give it.
+- When you keep approving the same kind of email unchanged, the team member can offer to send that
+  kind without asking. You tick it on the card and can revoke it on its Access tab; a separate quick
+  check reads each such email first, and anything that doesn't fit comes to you.
+- Let one more team member send from a mailbox without reading it (Send only), with its own Sending choice: Sales sends outreach from the CEO's address while the Admin keeps that inbox.
 - The Executive Admin keeps the inbox at zero: every email is routed, tracked, filed or cleared and
   leaves the inbox. Archiving, marking read and marking junk never delete anything.
 
@@ -89,8 +96,22 @@ moving, and brings you only the decisions that need you.
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your computer with the Claude plan you already have. Plain words, no developer settings.
   A Windows 11 (x64) beta ships with every release.
+- Setup ends on Get Michael ready: it installs Claude Code and signs you in where you can see it,
+  or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.4 (2026-10-07)
+- Send on approval: a third Sending choice puts each email on Ask me, where you edit, approve,
+  ask for changes or stop it. You can let a team member send one kind of email without asking,
+  and revoke that on its Access tab.
+- Michael answers you in the app: each question you send shows Sent, Michael has it, Waiting on
+  someone, Waiting for you, Answered or Couldn't finish. Scheduled reports arrive as Report cards.
+- Send only access to a mailbox someone else watches, with each address's watcher and sending
+  route on the team member's Email section.
+- Setup screens center the card until your office picture appears.
+- Get Michael ready: setup installs Claude Code without a password and signs you in where you can
+  see it, or takes an Anthropic API key. Team members that could not start begin once it is ready.
 
 ### 0.1.3 (2026-10-05)
 - The GitHub page offers the Windows 11 beta beside the Mac download: platform badge, download
@@ -302,3 +323,36 @@ moving, and brings you only the decisions that need you.
 - First release: set up by kind of business with Office Packs, a folder for every team member,
   real documents in Memory & Knowledge, Office, Tasks and Graph views, Michael asking when no one
   fits, and a floor built for owners in English, Chinese and Arabic.
+
+## Send on approval (2026-10-05)
+
+- A third Sending choice on a team member's Access tab, Send on approval: each email waits on Ask me with From, To, Subject and Message. Edit it, then Approve, Ask for changes with a note, or Don't send; the team member sends exactly the version you approved, which the app keeps.
+- New team members start on Draft only. Work styles follow the Sending setting instead of saying team members never send.
+- When you keep approving the same kind of email unchanged, the team member can offer to send that kind without asking. Tick the offer on the card (you can narrow its words first); it shows under Sends without asking on the Access tab, with Revoke. A separate quick check reads each such email, and for a reply the message it answers, before it goes; anything that doesn't fit, or that it can't read in full, comes to you.
+- An approved email goes out once, even if two sends overlap or the app stops mid send, and one withdrawn while it is being prepared stops before it leaves.
+
+## Michael answers in the app (2026-10-06)
+
+- Every question you send Michael from the Talk to Michael box is tracked: it goes to him like an Ask me answer, typed with its own id when he is free, and he answers it in a conversation that opens above the box. Your message shows Sent, Michael has it, Waiting on someone, Later than he said (with Nudge), Waiting for you, Answered or Couldn't finish.
+- His answer comes first, files as rows to open; long answers fold to four lines with More. One count on the box: indigo for new replies, coral while he waits on you. One desktop notification per final answer or question, never for "still working on it".
+- Commands such as /clear and /compact still go straight to his terminal.
+- Scheduled outcomes, such as the weekly money summary, arrive on Ask me as quiet Report cards you clear with Got it; they never turn Needs you coral.
+
+## Send only from another team member's mailbox (2026-10-07)
+
+- A team member's Email section is now the list of addresses it uses. Each shows who watches its inbox and how email from it leaves. Add a mailbox asks Watch the inbox (one each) or Send only (one each), and greys a choice it can't make, with the reason.
+- Send only lets a team member send from a mailbox another team member watches, with its own Can send, Send on approval or Draft only (Draft only first).
+- A Send only team member can draft, propose and send from that address, and can't read, search, file, forward or attach from it. Its follow ups stay in the same thread, built from its own sent emails only.
+- While nobody on the team watches that mailbox, the team member's email from there waits, the tab says Paused, and Michael hears once.
+- The mailbox's own team member and Settings, Mailboxes show who else sends from it. Removing the access withdraws its waiting emails and its standing approvals there.
+- Michael's team list says who may send from which address, so outreach goes to the right team member.
+- Approval cards say when an email forwards a message or attaches files, and an approved email can no longer forward mail from another mailbox.
+
+## Get Michael ready (2026-10-07)
+
+- Setup ends on a Ready step when Michael runs on Claude: a missing Claude Code installs with Claude's own installer, with no password, and Sign in opens the browser and notices when you are done. A new owner whose computer had no Claude Code is no longer left on a silent office.
+- No Claude plan? Use an API key beside Sign in. The key is checked with Anthropic and kept on this computer, and every Claude start uses it.
+- Set up later opens the office anyway, and Ask me keeps a "Michael can't start yet" card that opens the same step ("Some of your team can't start yet" when only team members on Claude are stuck).
+- Once Claude is ready, however it got ready, the team members that could not start begin on their own; members already at work keep going.
+- Claude Code is found where its Windows installer puts it, the key check follows your network's proxy, and a sign in that can't be read says so instead of showing a green check.
+- Setup screens center the card until your office picture appears, then the card glides aside to make room for it.

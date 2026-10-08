@@ -79,7 +79,7 @@ test('every open ask holds its agent open for safe clear, and the owner closing 
 
 test('Ask me shows a row per open question, and the card history and rules agree', () => {
   const tab = read('src/renderer/src/components/AskMeTab.tsx');
-  assert.match(tab, /openAskIndexes\(t\.humanQA\)\.map\(\(index\) => \(\{ key: `\$\{t\.id\}#\$\{index\}`/);
+  assert.match(tab, /pick\(t\.humanQA\)\.map\(\(index\) => \(\{ key: `\$\{t\.id\}#\$\{index\}`/);
   assert.match(tab, /i === index && e\.q === open\.q && !isAnswered\(e\) && !isWithdrawn\(e\)/, 'an answer lands on its own question only');
   const kanban = read('src/renderer/src/components/TasksKanban.tsx');
   assert.match(kanban, /const open = !isAnswered\(e\) && !isWithdrawn\(e\);/);

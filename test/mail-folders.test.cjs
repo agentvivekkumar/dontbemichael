@@ -144,6 +144,21 @@ test('the tools say where mailbox access comes from, so a limit is not blamed on
   assert.match(read('src/main/hive.ts'), /offer the owner a setting or a fix only when a tool result or your instructions name it/);
 });
 
+test('Draft only is named as the member\'s Access tab, never as a limit of the mailbox connection', async () => {
+  // Value: protects=a team member never tells the owner the mailbox connection blocks sending; fails_when=the list result, the refusal, the tool text or the roster stop naming Access, Email, Sending; why_new=Kelly told the owner Pam's draft only lived in Settings, Connections, Mailboxes, which has no such switch; seam=none
+  const { call } = setup();
+  const list = await call('list_mailboxes', {});
+  assert.match(list.body.sending_set_in, /^your Access tab, Email, Sending \(the owner chooses Can send, Send on approval or Draft only for you; the mailbox connection itself can send\)$/);
+  const { mailAccess } = loadTs('src/shared/mailboxes.ts');
+  const cfg = { mailboxes: [{ id: 'office' }], agentCapabilities: { pam: { email: { enabled: true, mailboxes: ['office'], send: false } } } };
+  const refused = mailAccess(cfg, 'pam', 'office', 'send');
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /on your Access tab \(Email, Sending\); the mailbox itself can send/);
+  assert.match(read('resources/md-mail-mcp.cjs'), /Can send, Send on approval or Draft only is the owner\\'s choice for you on your Access tab \(Email, Sending\), not a limit of the mailbox/);
+  const { accessLine } = loadTs('src/shared/agentAccess.ts');
+  assert.doesNotMatch(accessLine([{ kind: 'mailbox', address: 'office@x.com', sending: 'draft' }]), /Mailboxes; draft only\)/);
+});
+
 /**
  * An office may give a team member the app's own mailbox, a Claude connector
  * such as Gmail, or both (owner, 2026-10-03), so nothing may assume one.
@@ -151,11 +166,11 @@ test('the tools say where mailbox access comes from, so a limit is not blamed on
 test('Michael sees each member\'s mail access and its Settings screen, whichever kind it is', async (t) => {
   // Value: protects=Michael names the right screen for Mailboxes, Claude connectors or both; fails_when=one kind is missing from the roster, a change does not resend it, or the hook stops passing access; why_new=the roster said nothing about access, so Michael guessed; seam=source pin for the hook wiring
   const { accessLine } = loadTs('src/shared/agentAccess.ts');
-  const mailbox = { kind: 'mailbox', address: 'office@x.com', send: false };
+  const mailbox = { kind: 'mailbox', address: 'office@x.com', sending: 'draft' };
   const gmail = { kind: 'connector', key: 'Gmail' };
-  assert.equal(accessLine([mailbox]), 'mailbox office@x.com (Settings, Connections, Mailboxes; draft only)');
+  assert.equal(accessLine([mailbox]), 'mailbox office@x.com (connected in Settings, Connections, Mailboxes; draft only, set on their Access tab, Email, Sending)');
   assert.equal(accessLine([gmail]), 'Claude connectors Gmail (Settings, Connections, Claude connectors)');
-  assert.equal(accessLine([mailbox, gmail, { kind: 'quickbooks', changes: false }]), 'mailbox office@x.com (Settings, Connections, Mailboxes; draft only); Claude connectors Gmail, QuickBooks read only (Settings, Connections, Claude connectors)');
+  assert.equal(accessLine([mailbox, gmail, { kind: 'quickbooks', changes: false }]), 'mailbox office@x.com (connected in Settings, Connections, Mailboxes; draft only, set on their Access tab, Email, Sending); Claude connectors Gmail, QuickBooks read only (Settings, Connections, Claude connectors)');
   assert.equal(accessLine([]), null);
 
   const os = require('node:os');
@@ -171,13 +186,13 @@ test('Michael sees each member\'s mail access and its Settings screen, whichever
   ] }));
   const access = { pam: accessLine([mailbox, gmail]), kelly: accessLine([gmail]), oscar: null };
   const r = hive.teamRoster((id) => access[id]);
-  assert.match(r.full, /- Pam \(pam\), Executive Admin; uses: mailbox office@x\.com \(Settings, Connections, Mailboxes; draft only\); Claude connectors Gmail \(Settings, Connections, Claude connectors\)/);
+  assert.match(r.full, /- Pam \(pam\), Executive Admin; uses: mailbox office@x\.com \(connected in Settings, Connections, Mailboxes; draft only, set on their Access tab, Email, Sending\); Claude connectors Gmail \(Settings, Connections, Claude connectors\)/);
   assert.match(r.full, /- Kelly \(kelly\), Support; uses: Claude connectors Gmail \(Settings, Connections, Claude connectors\)/);
   assert.match(r.full, /- Oscar \(oscar\), Finance; uses: no mail or connectors/);
   access.oscar = accessLine([mailbox]);
   assert.notEqual(hive.teamRoster((id) => access[id]).layoutKey, r.layoutKey, 'a new grant resends the full roster');
   assert.doesNotMatch(hive.teamRoster().full, /uses:/, 'without access the roster reads as before');
-  assert.match(read('src/main/hooks.ts'), /this\.hive\.teamRoster\(\(id\) => accessLine\(agentAccessSummary\(cfg, id, this\.roleReadsBooks\?\.\(id\) \?\? false\)\)\)/);
+  assert.match(read('src/main/hooks.ts'), /this\.hive\.teamRoster\(\(id\) => accessLine\(agentAccessSummary\(cfg, id, this\.roleReadsBooks\?\.\(id\) \?\? false, this\.memberPresent\)\)\)/);
 });
 
 test('nothing the team reads assumes one kind of mail', () => {

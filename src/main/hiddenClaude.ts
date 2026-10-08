@@ -42,6 +42,9 @@ export interface HiddenClaudeOptions {
    *  text other agents wrote (the memory tidy up), so nothing in that text can
    *  make it open files or reach the web. Overrides disallowedTools. */
   noTools?: boolean;
+  /** Setting sources to load (--setting-sources), e.g. "user" so a project's
+   *  settings and hooks in the folder can't change a check. */
+  settingSources?: string;
   /** Directories added via --add-dir (for context gathering). */
   addDirs?: string[];
   /** Hard cap ms before forcing prompt send regardless of boot activity. Default 7000. */
@@ -64,6 +67,13 @@ export interface HiddenClaudeOptions {
   onScreenText?: (text: string) => void;
   /** Stops the call: the session is killed and the result is 'cancelled'. */
   signal?: AbortSignal;
+}
+
+/** How Claude signs in for these checks, set once by the app (index.ts):
+ *  the owner's API key when they chose one in Get Michael ready, else nothing. */
+let hiddenClaudeAuthEnv: () => Record<string, string> = () => ({});
+export function setHiddenClaudeAuthEnv(source: () => Record<string, string>): void {
+  hiddenClaudeAuthEnv = source;
 }
 
 /** How often the live preview is read off the screen. */
@@ -109,6 +119,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       // these runs have no hook to check a call, so none is loaded at all.
       ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--strict-mcp-config', '--disallowedTools', ...disallowed]),
     ];
+    if (opts.settingSources) args.push('--setting-sources', opts.settingSources);
     for (const d of addDirs) { args.push('--add-dir', d); }
 
     const bootCapMs = opts.bootCapMs ?? 7000;
@@ -131,6 +142,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
         env: {
           ...process.env,
           PATH: userShellPath(),
+          ...hiddenClaudeAuthEnv(),
           ...(opts.env ?? {}),
           ...(opts.thinking === false ? { MAX_THINKING_TOKENS: '0' } : {}),
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
