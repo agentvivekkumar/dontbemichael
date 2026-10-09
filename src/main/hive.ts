@@ -1445,6 +1445,15 @@ export class HiveManager {
     return this.registry().agents[agentId]?.sessionId;
   }
 
+  /** A Codex agent's private CODEX_HOME (see installCodexHooks), where its
+   *  rollout transcripts live; null for other engines or no hive. */
+  codexHome(agentId: string): string | null {
+    if (!this.root()) return null;
+    const agent = this.registry().agents[agentId];
+    if (agent?.provider !== 'codex') return null;
+    return join(this.agentDir(agentId), '.codex');
+  }
+
   /** Claude Code settings that route every relevant hook through the shim, plus
    *  (W3) the default MCP bundle merged into this PER-SESSION settings file. cwd
    *  scopes the filesystem/git servers; cfg (the consent map) gates which servers
