@@ -181,8 +181,8 @@ test('a folder typed in another letter case is trusted under its real name too',
 
 test('on Windows a folder is trusted under the key Claude Code looks up, with forward slashes', () => {
   // Value: protects=a Windows agent starts instead of stopping on "Quick safety check: Is this a project you trust?" and exiting code 1 (owner 2026-10-09, office folder under OneDrive); fails_when=the trust key keeps backslashes on Windows, or Mac and Linux paths are changed; why_new=Claude Code 2.1.295 normalizePathForConfigKey turns \\ into / on Windows and reads only that key; seam=platform injected for the key, real file write on the Windows runner
-  assert.equal(claudeProjectKey(String.raw`C:\Users\hello\OneDrive\Documents\MIT`, 'win32'), 'C:/Users/hello/OneDrive/Documents/MIT');
-  assert.equal(claudeProjectKey('C:/Users/hello/Office', 'win32'), 'C:/Users/hello/Office', 'already forward');
+  assert.equal(claudeProjectKey(String.raw`C:\Users\Ann\OneDrive\Documents\Office`, 'win32'), 'C:/Users/Ann/OneDrive/Documents/Office');
+  assert.equal(claudeProjectKey('C:/Users/Ann/Office', 'win32'), 'C:/Users/Ann/Office', 'already forward');
   assert.equal(claudeProjectKey('/Users/ann/Office', 'darwin'), '/Users/ann/Office');
   assert.equal(claudeProjectKey(String.raw`/odd\name`, 'linux'), String.raw`/odd\name`, 'a backslash is a real character outside Windows');
   ensureClaudePermissionsAccepted(cwd);
