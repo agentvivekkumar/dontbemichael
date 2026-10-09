@@ -5160,12 +5160,12 @@ ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
 // Anthropic first, so a typo never becomes a team that cannot start; then kept
 // write only in the secret store (the same Anthropic key as Settings, AI
 // engines) and approved for Claude Code. It never comes back over IPC.
-ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> => {
+ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> => {
   const key = typeof raw === 'string' ? raw.trim() : '';
   if (!apiKeyShapeOk(key)) return { ok: false, error: 'invalid' };
   // Electron's fetch follows the system proxy, so the check works wherever Claude does.
-  const verdict = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
-  if (verdict !== 'ok') return { ok: false, error: verdict };
+  const { verdict, reason } = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
+  if (verdict !== 'ok') return { ok: false, error: verdict, ...(reason ? { reason } : {}) };
   // Approved in ~/.claude.json first: a key Claude would stop to ask about is
   // never saved as ready (fail closed; the owner can try again).
   let approved = false;

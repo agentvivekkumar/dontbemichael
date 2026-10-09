@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.4). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.5). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -100,6 +100,14 @@ moving, and brings you only the decisions that need you.
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.5 (2026-10-09)
+- Windows offices start: the app trusts your office folder the way Claude Code looks it up on
+  Windows, so team members no longer stop at a hidden trust question and quit.
+- Cards that wait on a customer or teammate move to Waiting, back to Doing when they answer, and
+  Michael chases them until then. Offices on the old standup text get the new one at launch.
+- Get Michael ready says why an API key was not accepted: a key made outside a workspace,
+  Anthropic's own reason, Anthropic busy, or a real network or proxy problem.
 
 ### 0.1.4 (2026-10-07)
 - Send on approval: a third Sending choice puts each email on Ask me, where you edit, approve,
