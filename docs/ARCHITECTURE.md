@@ -49,7 +49,8 @@ src/
     hooks.ts                 hook server + provider hook shims (`cth-hook`, `agy-hook`)
     memory.ts                semantic memory layer (CLI wrapper, degrade-to-noop)
     config.ts                harness config persistence + home setup; Claude Code's ~/.claude.json (folder trust,
-                             the first-run welcome, an approved API key), written to a copy and swapped in
+                             the first-run welcome, an approved API key), written to a copy and swapped in;
+                             folder trust is keyed as Claude Code looks it up (forward slashes on Windows, claudeProjectKey)
     engineSetup.ts           Get Michael ready: finds Claude without a shell, Claude's standalone install script,
                              sign in state (`claude auth status`), the Anthropic API key check
                              (docs/designs/get-michael-ready.md; status types in shared/engineSetup.ts)

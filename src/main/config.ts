@@ -925,6 +925,14 @@ function markClaudeOnboarded(c: ClaudeConfig): boolean {
   return true;
 }
 
+/** The key Claude Code files a folder under in ~/.claude.json "projects". On
+ *  Windows it turns backslashes into forward slashes ("C:/Users/Ann/Office")
+ *  and looks only that up, so a folder trusted as "C:\Users\Ann\Office" still
+ *  stops the agent on the trust question and it exits (seen live 2026-10-09). */
+export function claudeProjectKey(folder: string, platform: string = process.platform): string {
+  return platform === 'win32' ? folder.replaceAll('\\', '/') : folder;
+}
+
 /** Claude Code looks a folder up by its real name on disk. On a Mac a folder
  *  typed as "SunRiseBakery" opens "SunriseBakery" too, but only the real name
  *  counts as trusted, so trust that as well; otherwise the agent stops on the
@@ -933,7 +941,9 @@ function trustClaudeFolder(c: ClaudeConfig, cwd: string): boolean {
   let real = cwd;
   try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
   let changed = false;
-  for (const key of new Set([cwd, real])) {
+  // The folder as typed and as Claude Code files it: an older Claude that still
+  // looks the raw Windows path up keeps working too.
+  for (const key of new Set([cwd, real].flatMap((p) => [p, claudeProjectKey(p)]))) {
     if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
     c.projects = c.projects ?? {};
     c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
@@ -975,7 +985,8 @@ export function approveClaudeApiKey(key: string, home: string = homedir()): bool
  *  rarely touch files a running `claude` also writes):
  *   1. `~/.claude/settings.json` → `skipDangerousModePermissionPrompt` +
  *      `skipAutoPermissionPrompt` — these gate the bypass-mode warning (global).
- *   2. `~/.claude.json`, in one pass: `projects[cwd].hasTrustDialogAccepted` (the
+ *   2. `~/.claude.json`, in one pass: `projects[claudeProjectKey(cwd)].hasTrustDialogAccepted`
+ *      (forward slashes on Windows, plus the folder as typed and its real name on disk; the
  *      per-folder "do you trust the files in this folder?" dialog),
  *      `hasCompletedOnboarding` (the first-run welcome), and with
  *      `opts.approveKey` the chosen API key in `customApiKeyResponses.approved`.
