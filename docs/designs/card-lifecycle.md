@@ -141,8 +141,8 @@ asked and replies from outside the office. Closing the request was not enough;
 nothing made Blocked mean anything.
 
 - A card is Blocked only while its question for the owner is open on Ask me. A
-  card waiting on someone outside the office, or on a team member, is Doing,
-  with who it waits on in its notes. Michael's instructions say so, and that a
+  card waiting on someone outside the office, or on a team member, is Waiting
+  (since 2026-10-04), with who it waits on in waitingOn. Michael's instructions say so, and that a
   closed owner request leaves its card in one of these states.
 - "Blocked cards with nothing asked" (Blocked, no open ask, no open owner
   request) is computed from tasks.json on the fleet tick and shown in
@@ -173,8 +173,12 @@ member" in Doing, so Doing could not tell work in progress from work on hold.
   IPC and voice do not offer it, because it needs who the card waits on.
 - A Waiting card is nobody's work right now: it is not counted as Doing on
   Michael's board on the floor, nor as busy on the team roster.
-- No migration (no outside offices yet): Michael moves cards to Waiting under
-  the new rule as he works them.
+- The hourly standup's focus moves each Doing card held on someone to Waiting,
+  and a Waiting card back to Doing once they answer; until then Michael chases
+  them. Until 2026-10-09 the built-in focus still said such a card goes to
+  Doing, so no card ever reached Waiting. An office still on that focus, word
+  for word, gets the current one at launch; a focus the owner wrote stays as it
+  is.
 
 ### 9. Questions held the wrong way (2026-10-04)
 

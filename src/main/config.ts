@@ -36,15 +36,34 @@ export type { ScheduledMission } from '../shared/missions';
  *  section 6): what Michael concentrates on in each standup run. */
 export const OPS_STANDUP_FOCUS =
   'First close your open requests from the owner: route each answer and reply done to it. ' +
-  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
-  'or move it to doing with who it waits on, or to done. ' +
-  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'Then fix each blocked card with nothing asked: ask its question on Ask me, ' +
+  'move it to waiting naming who in waitingOn, or to done. ' +
+  'Check the floor in fleet.json: who is doing what, whether each member still runs, ' +
   'whether in-flight cards are on track, and whether any card has nobody on it. ' +
-  'Re-engage anyone stalled and keep the board accurate.';
+  'A doing card held on someone outside the office or a teammate goes to waiting, naming who in waitingOn; ' +
+  'a waiting card returns to doing when they answer; else chase them. ' +
+  'Re-engage anyone stalled and keep the board right.';
 
 /** Standup focus texts the app shipped before. An office still carrying one
  *  word for word gets the current one at launch; the owner's own text stays. */
 export const OPS_STANDUP_BUILT_IN_FOCUSES: readonly string[] = [
+  // 2026-10-09 dev builds only: Waiting without the step that brings a card
+  // back to doing, so an office that ran one still gets the current text.
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+  'or move it to waiting with who it waits on in waitingOn, or to done. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+  'Move every doing card that waits on someone outside the office or a teammate to waiting, naming who in waitingOn. ' +
+  'Re-engage anyone stalled and keep the board accurate.',
+  // 2026-10-03, before the Waiting column: it sent a card held on someone to
+  // doing, so every hour it undid the Waiting rule and no card ever reached it.
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+  'or move it to doing with who it waits on, or to done. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+  'Re-engage anyone stalled and keep the board accurate.',
   // 2026-10-02, before blocked cards with nothing asked were listed.
   'First close your open requests from the owner: route each answer and reply done to it. ' +
   'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
