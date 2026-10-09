@@ -27,8 +27,10 @@ test.after(() => fs.rmSync(userData, { recursive: true, force: true }));
 test('consecutive agent caps survive an interleaved config update', () => {
   writeConfig({ agentTokenCaps: { existing: 50 } });
 
+  // An absolute path on this platform: the config resolves what it stores.
+  const repo = path.resolve('/workspace/project');
   setAgentTokenCap('jim', 100);
-  writeConfig({ registeredRepos: ['/workspace/project'] });
+  writeConfig({ registeredRepos: [repo] });
   setAgentTokenCap('pam', 200);
 
   const config = readConfig();
@@ -37,7 +39,7 @@ test('consecutive agent caps survive an interleaved config update', () => {
     jim: 100,
     pam: 200
   });
-  assert.deepEqual(config.registeredRepos, ['/workspace/project']);
+  assert.deepEqual(config.registeredRepos, [repo]);
 });
 
 test('setting and clearing caps use the latest persisted map', () => {
