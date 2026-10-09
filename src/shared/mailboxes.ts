@@ -155,6 +155,17 @@ export function isMicrosoftAddress(address: string): boolean {
   return /@(outlook|hotmail|live|msn)\.[a-z.]+$/i.test(address.trim());
 }
 
+/** One MX exchange pointing at Microsoft 365 (issue 39: custom domains). */
+export function isMicrosoftMxExchange(exchange: string): boolean {
+  return /\.mail\.protection\.outlook\.com\.?$/i.test(exchange.trim());
+}
+
+/** True when any MX exchange points at Microsoft 365. Pure so tests run
+ *  without a network (issue 39). */
+export function mxPointsToMicrosoft(exchanges: string[]): boolean {
+  return exchanges.some(isMicrosoftMxExchange);
+}
+
 /** "Other" guesses (design review 10A): mail.<domain> for both servers. */
 export function guessServers(address: string): { imap: MailServer; smtp: MailServer } {
   const domain = address.split('@')[1]?.trim().toLowerCase() || 'example.com';
