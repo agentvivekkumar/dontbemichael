@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
+const { posixOnly } = require('./platform.cjs');
 
 const {
   codexRemoteAliasPath,
@@ -13,7 +14,7 @@ const {
   CODEX_REMOTE_SOCKET_RELATIVE
 } = loadTs('src/shared/codexRemote.ts');
 
-test('Codex remote uses a short stable per-agent home alias', () => {
+test('Codex remote uses a short stable per-agent home alias', posixOnly('a Unix socket endpoint; Codex remote is off on Windows (enableCodexRemoteForSpawn)'), () => {
   const first = codexRemoteAliasPath('/very/long/hive/agent/.codex', 'dev-1', '/tmp');
   const again = codexRemoteAliasPath('/very/long/hive/agent/.codex', 'dev-1', '/tmp');
   const other = codexRemoteAliasPath('/very/long/hive/agent/.codex', 'dev-2', '/tmp');

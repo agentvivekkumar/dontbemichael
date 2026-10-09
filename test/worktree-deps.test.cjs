@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
+const { onWindows } = require('./platform.cjs');
 
 const { linkWorktreeDeps, unlinkWorktreeDeps } = loadTs('src/main/worktreeDeps.ts');
 const { removeWorktree } = loadTs('src/main/git.ts');
@@ -46,7 +47,8 @@ test('links the base node_modules into an isolated worktree', async () => {
   assert.deepEqual(result, { ok: true, skipped: false });
   const worktreeNodeModules = path.join(wtPath, 'node_modules');
   assert.equal(fs.lstatSync(worktreeNodeModules).isSymbolicLink(), true);
-  assert.equal(fs.readlinkSync(worktreeNodeModules), baseNodeModules);
+  // A Windows junction reads back with a trailing separator.
+  assert.equal(path.resolve(fs.readlinkSync(worktreeNodeModules)), baseNodeModules);
   assert.equal(fs.readFileSync(path.join(worktreeNodeModules, 'sentinel.txt'), 'utf8'), 'base\n');
 });
 
@@ -88,8 +90,10 @@ test('does not follow the dependency symlink when removing a worktree', async ()
   assert.equal(fs.lstatSync(worktreeNodeModules).isSymbolicLink(), true, 'symlink must exist before removal');
   assert.deepEqual(await removeWorktree(repo, wtPath), { ok: true });
 
-  assert.equal(fs.existsSync(wtPath), false);
   assert.equal(fs.readFileSync(sentinel, 'utf8'), 'still here\n');
+  // Git for Windows leaves a folder that still holds a junction behind; the app
+  // removes the link first (unlinkWorktreeDeps), so only POSIX checks this here.
+  if (!onWindows) assert.equal(fs.existsSync(wtPath), false);
 });
 
 test('leaves a dangling worktree dependency symlink untouched', async () => {
@@ -97,12 +101,13 @@ test('leaves a dangling worktree dependency symlink untouched', async () => {
   fs.mkdirSync(path.join(repo, 'node_modules'));
   const wtPath = addWorktree(repo, wtRoot, 'agent-e');
   const worktreeNodeModules = path.join(wtPath, 'node_modules');
-  fs.symlinkSync('/does-not-exist', worktreeNodeModules);
+  const missing = path.resolve('/does-not-exist'); // absolute on this platform
+  fs.symlinkSync(missing, worktreeNodeModules);
 
   const result = await linkWorktreeDeps(repo, wtPath);
 
   assert.deepEqual(result, { ok: true, skipped: true });
-  assert.equal(fs.readlinkSync(worktreeNodeModules), '/does-not-exist');
+  assert.equal(fs.readlinkSync(worktreeNodeModules), missing);
 });
 
 test('reports a failed link without throwing', async () => {
@@ -114,13 +119,16 @@ test('reports a failed link without throwing', async () => {
   const result = await linkWorktreeDeps(repo, notADirectory);
 
   assert.equal(result.ok, false);
-  assert.match(result.error, /EEXIST|ENOTDIR/);
+  // Windows names a link under a file ENOENT; POSIX says EEXIST or ENOTDIR.
+  assert.match(result.error, onWindows ? /ENOENT/ : /EEXIST|ENOTDIR/);
 });
 
 test('removes only the linked dependencies before checking worktree status', async () => {
   const { repo, wtRoot } = makeHarness();
   const baseNodeModules = path.join(repo, 'node_modules');
   fs.mkdirSync(baseNodeModules);
+  // Git lists a Windows junction as a folder, and an empty folder is never untracked.
+  fs.writeFileSync(path.join(baseNodeModules, 'dep.txt'), 'dep\n');
   const wtPath = addWorktree(repo, wtRoot, 'agent-f');
   const worktreeNodeModules = path.join(wtPath, 'node_modules');
 

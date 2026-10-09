@@ -37,7 +37,8 @@ test('only code spans with a known file ending are files; money, emails and doma
 
 test('main opens only allowlisted documents inside the roots, judged on the canonical path', async (t) => {
   // Value: protects=an agent named path opens only a safe document inside the office folders; fails_when=safeResolve, the canonical extension check or the allowlist is dropped; why_new=no code opened agent paths before; seam=none
-  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-askfiles-')));
+  // .native, like main: on Windows it spells the temp folder out in full, not as RUNNER~1.
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-askfiles-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const office = path.join(base, 'office');
   const team = path.join(office, 'Marketing');
@@ -88,23 +89,24 @@ test('main opens only allowlisted documents inside the roots, judged on the cano
 
 test('files are looked for in the office, then the raiser, the assignee and the rest of the team', () => {
   // Value: protects=Open looks in the right folders first and never in Michael's or his assistant's; fails_when=root order, the unknown id filter or the god and assistant rule changes; why_new=roots moved into a pure helper; seam=none
+  const P = (p) => path.resolve(p); // an absolute path on this platform
   const agents = {
-    michael: { cwd: '/w/hive', isGod: true },
-    helper: { cwd: '/w/assistant', isAssistant: true },
-    ada: { cwd: '/w/office/Sales' },
-    ben: { cwd: '/w/office/Marketing' },
-    cy: { cwd: '/w/office/Ops' },
-    twin: { cwd: '/w/office/Sales' },
+    michael: { cwd: P('/w/hive'), isGod: true },
+    helper: { cwd: P('/w/assistant'), isAssistant: true },
+    ada: { cwd: P('/w/office/Sales') },
+    ben: { cwd: P('/w/office/Marketing') },
+    cy: { cwd: P('/w/office/Ops') },
+    twin: { cwd: P('/w/office/Sales') },
     blank: { cwd: '  ' }
   };
-  assert.deepEqual(askFileRootsFor('/w/office', agents, { raisedBy: 'cy', assignee: 'ben' }),
-    ['/w/office', '/w/office/Ops', '/w/office/Marketing', '/w/office/Sales'], 'office, raiser, assignee, then the others, each once');
-  assert.deepEqual(askFileRootsFor('/w/office', agents, { raisedBy: 'nobody', assignee: 42 }),
-    ['/w/office', '/w/office/Sales', '/w/office/Marketing', '/w/office/Ops'], 'unknown ids are dropped');
-  assert.deepEqual(askFileRootsFor('/w/office', agents, { raisedBy: 'michael', assignee: 'helper' }),
-    ['/w/office', '/w/office/Sales', '/w/office/Marketing', '/w/office/Ops'], 'Michael and his assistant never add a folder');
-  assert.deepEqual(askFileRootsFor(undefined, { ada: { cwd: '/w/office' }, ben: { cwd: '/w/office' } }, null), ['/w/office']);
-  assert.deepEqual(askFileRootsFor('/w/office', {}, undefined), ['/w/office']);
+  assert.deepEqual(askFileRootsFor(P('/w/office'), agents, { raisedBy: 'cy', assignee: 'ben' }),
+    [P('/w/office'), P('/w/office/Ops'), P('/w/office/Marketing'), P('/w/office/Sales')], 'office, raiser, assignee, then the others, each once');
+  assert.deepEqual(askFileRootsFor(P('/w/office'), agents, { raisedBy: 'nobody', assignee: 42 }),
+    [P('/w/office'), P('/w/office/Sales'), P('/w/office/Marketing'), P('/w/office/Ops')], 'unknown ids are dropped');
+  assert.deepEqual(askFileRootsFor(P('/w/office'), agents, { raisedBy: 'michael', assignee: 'helper' }),
+    [P('/w/office'), P('/w/office/Sales'), P('/w/office/Marketing'), P('/w/office/Ops')], 'Michael and his assistant never add a folder');
+  assert.deepEqual(askFileRootsFor(undefined, { ada: { cwd: P('/w/office') }, ben: { cwd: P('/w/office') } }, null), [P('/w/office')]);
+  assert.deepEqual(askFileRootsFor(P('/w/office'), {}, undefined), [P('/w/office')]);
 });
 
 test('revealing a directory never opens an app bundle, and the IPC re-checks before opening', () => {
