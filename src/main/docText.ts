@@ -33,6 +33,10 @@ export type DocExtraction =
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 /** Per zip entry, uncompressed. A zip bomb declares a tiny file that inflates hugely. */
 const MAX_ENTRY_BYTES = 50 * 1024 * 1024;
+/** All entries we read, uncompressed, and how many of them. Many entries can
+ *  each pass the per entry cap and still exhaust the main process together. */
+const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+const MAX_ENTRIES = 5000;
 
 const WORD = new Set(['docx', 'docm', 'dotx', 'dotm']);
 const SLIDES = new Set(['pptx', 'pptm', 'ppsx', 'potx']);
@@ -99,18 +103,32 @@ type OoxmlReader = (files: Record<string, Uint8Array>) => string;
 
 function fromOoxml(srcPath: string, kind: 'docx' | 'pptx' | 'xlsx', read: OoxmlReader): DocExtraction {
   let files: Record<string, Uint8Array>;
+  let total = 0;
+  let count = 0;
+  let tooBig = false;
   try {
     files = unzipSync(new Uint8Array(readFileSync(srcPath)), {
       // Only the XML we read — never the embedded images or media — and never
       // an entry that would inflate past the guard. `.rels` too: Excel's map
       // from sheet name to sheet file is `xl/_rels/workbook.xml.rels`, and
       // without it no sheet is found and every workbook reads as empty.
-      filter: (f) => /\.(xml|rels)$/.test(f.name) && f.originalSize <= MAX_ENTRY_BYTES
+      // fflate inflates each accepted entry as it goes, so once the totals are
+      // past their caps, nothing more is accepted and the file is refused below.
+      filter: (f) => {
+        if (tooBig || !/\.(xml|rels)$/.test(f.name) || f.originalSize > MAX_ENTRY_BYTES) return false;
+        total += f.originalSize;
+        count += 1;
+        if (total > MAX_TOTAL_BYTES || count > MAX_ENTRIES) tooBig = true;
+        return !tooBig;
+      }
     });
   } catch {
     // A password-protected Office file is not a zip at all (it's an encrypted
     // compound file), so this is what that case looks like too.
     return { kind: 'unreadable', reason: 'This file is protected by a password or damaged. Remove the password (or save it again) and add it again.' };
+  }
+  if (tooBig) {
+    return { kind: 'unreadable', reason: 'This file unpacks to more than 200 MB or has too many parts, which is too big to read.' };
   }
 
   const text = tidy(read(files));

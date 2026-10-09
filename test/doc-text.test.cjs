@@ -197,6 +197,35 @@ test('a password-protected (not-a-zip) Office file is refused, not indexed as by
   assert.match(r.reason, /protected by a password or damaged/);
 });
 
+// A zip bomb lies in its central directory: each entry declares a size under
+// the per entry cap, and together they inflate far past what the main process
+// can hold. Patch the declared uncompressed size of every entry to `size`.
+const declareSizes = (p, size) => {
+  const buf = fs.readFileSync(p);
+  for (let i = 0; i + 46 <= buf.length; i++) {
+    if (buf.readUInt32LE(i) === 0x02014b50) buf.writeUInt32LE(size, i + 24);
+  }
+  fs.writeFileSync(p, buf);
+  return p;
+};
+
+test('an Office file whose parts together unpack past the total cap is refused', async () => {
+  const parts = {};
+  for (let i = 1; i <= 4; i++) parts[`word/part${i}.xml`] = '<x/>';
+  const p = declareSizes(docx('bomb.docx', [para(run('Opening hours'))], parts), 45 * 1024 * 1024);
+  const r = await extractDocumentText(p);
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /too big to read/);
+});
+
+test('an Office file with too many parts is refused', async () => {
+  const parts = {};
+  for (let i = 0; i < 5001; i++) parts[`customXml/item${i}.xml`] = '<x/>';
+  const r = await extractDocumentText(docx('many.docx', [para(run('Opening hours'))], parts));
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /too big to read/);
+});
+
 test('an unknown binary file is refused rather than read as text', async () => {
   const r = await extractDocumentText(write('thing.bin', Buffer.from([1, 2, 0, 3, 4])));
   assert.equal(r.kind, 'unreadable');
