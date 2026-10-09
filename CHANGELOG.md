@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Fixed
+
+- **Windows offices start.** On Windows every team member stopped at a hidden "do you trust this folder?" question and quit, so the office sat silent. The app now trusts your office folder the way Claude Code looks it up on Windows, so Michael and the team start on their own.
+- **Cards that wait on someone move to Waiting.** Michael's hourly standup still told him to keep a card that waits on a customer or a teammate in Doing, so no card ever reached the Waiting column and those team members looked busy. He now moves such a card to Waiting with who it waits on, moves it back to Doing when they answer, and chases them until then. Offices on the old standup text get the new one at launch; standup text you wrote yourself is kept.
+- **Clear reasons when an API key is not accepted.** Get Michael ready said "Check your internet connection" for every answer it did not expect. A key made for your whole Anthropic organization instead of inside a workspace now says to use a key from a workspace, any other refusal shows Anthropic's own reason, a rate limit or outage says Anthropic is busy, and only a real network or proxy problem asks you to check your connection.
+
 ## [0.1.4] (2026-10-07)
 
 ### Added
