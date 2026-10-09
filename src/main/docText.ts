@@ -33,6 +33,9 @@ export type DocExtraction =
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 /** Per zip entry, uncompressed. A zip bomb declares a tiny file that inflates hugely. */
 const MAX_ENTRY_BYTES = 50 * 1024 * 1024;
+/** Across every entry we would inflate. Many entries just under the per entry guard add up. */
+const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+const MAX_ENTRIES = 5000;
 
 const WORD = new Set(['docx', 'docm', 'dotx', 'dotm']);
 const SLIDES = new Set(['pptx', 'pptm', 'ppsx', 'potx']);
@@ -100,13 +103,29 @@ type OoxmlReader = (files: Record<string, Uint8Array>) => string;
 function fromOoxml(srcPath: string, kind: 'docx' | 'pptx' | 'xlsx', read: OoxmlReader): DocExtraction {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(readFileSync(srcPath)), {
-      // Only the XML we read — never the embedded images or media — and never
-      // an entry that would inflate past the guard. `.rels` too: Excel's map
-      // from sheet name to sheet file is `xl/_rels/workbook.xml.rels`, and
-      // without it no sheet is found and every workbook reads as empty.
-      filter: (f) => /\.(xml|rels)$/.test(f.name) && f.originalSize <= MAX_ENTRY_BYTES
+    const zip = new Uint8Array(readFileSync(srcPath));
+    // Only the XML we read — never the embedded images or media — and never
+    // an entry that would inflate past the guard. `.rels` too: Excel's map
+    // from sheet name to sheet file is `xl/_rels/workbook.xml.rels`, and
+    // without it no sheet is found and every workbook reads as empty.
+    const wanted = (f: { name: string; originalSize: number }) =>
+      /\.(xml|rels)$/.test(f.name) && f.originalSize <= MAX_ENTRY_BYTES;
+
+    // Add up what the wanted entries declare before inflating any of them: a
+    // filter that returns false reads the zip's directory and nothing else.
+    let entries = 0;
+    let bytes = 0;
+    unzipSync(zip, {
+      filter: (f) => {
+        if (wanted(f)) { entries += 1; bytes += f.originalSize; }
+        return false;
+      }
     });
+    if (entries > MAX_ENTRIES || bytes > MAX_TOTAL_BYTES) {
+      return { kind: 'unreadable', reason: 'This file holds more than the app can read. Split it into smaller files and add those instead.' };
+    }
+
+    files = unzipSync(zip, { filter: wanted });
   } catch {
     // A password-protected Office file is not a zip at all (it's an encrypted
     // compound file), so this is what that case looks like too.

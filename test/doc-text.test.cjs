@@ -197,6 +197,34 @@ test('a password-protected (not-a-zip) Office file is refused, not indexed as by
   assert.match(r.reason, /protected by a password or damaged/);
 });
 
+test('an Office file whose entries add up past the total guard is refused before any is inflated', async () => {
+  // Each entry is under the per entry guard, so only the total catches it.
+  const part = new Uint8Array(45 * 1024 * 1024);
+  const files = { 'word/document.xml': strToU8(`<w:document ${W}><w:body>${para(run('Hello'))}</w:body></w:document>`) };
+  for (let i = 0; i < 5; i++) files[`word/header${i}.xml`] = part;
+  const r = await extractDocumentText(write('bomb.docx', Buffer.from(zipSync(files, { level: 1 }))));
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /holds more than the app can read/);
+});
+
+test('an Office file with too many entries is refused', async () => {
+  const files = { 'word/document.xml': `<w:document ${W}><w:body>${para(run('Hello'))}</w:body></w:document>` };
+  for (let i = 0; i < 5000; i++) files[`word/header${i}.xml`] = '';
+  const r = await extractDocumentText(zip('crowded.docx', files));
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /holds more than the app can read/);
+});
+
+test('large media inside an Office file does not count toward the total guard', async () => {
+  // Images are never inflated, so a photo heavy document still reads.
+  const photo = new Uint8Array(45 * 1024 * 1024);
+  const files = { 'word/document.xml': strToU8(`<w:document ${W}><w:body>${para(run('Menu for spring'))}</w:body></w:document>`) };
+  for (let i = 0; i < 5; i++) files[`word/media/image${i}.png`] = photo;
+  const r = await extractDocumentText(write('photos.docx', Buffer.from(zipSync(files, { level: 1 }))));
+  assert.equal(r.kind, 'text');
+  assert.equal(r.text, 'Menu for spring');
+});
+
 test('an unknown binary file is refused rather than read as text', async () => {
   const r = await extractDocumentText(write('thing.bin', Buffer.from([1, 2, 0, 3, 4])));
   assert.equal(r.kind, 'unreadable');
