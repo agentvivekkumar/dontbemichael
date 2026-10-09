@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.4: send on approval, and Michael answers you in the app.**
-> A team member can put each email on Ask me for you to approve, then send exactly what you
-> approved. Questions you send Michael show where they stand until he answers. Setup now ends on
-> Get Michael ready, which installs Claude Code or takes an Anthropic API key. In 0.1.3, this page
-> started offering the Windows beta.
+> **New in 0.1.5: Windows offices start, and the Waiting column works.**
+> On Windows, team members no longer stop at a hidden folder trust question. Cards that wait on a
+> customer or teammate move to Waiting and back to Doing when they answer. The API key form says
+> why a key was not accepted. In 0.1.4, team members could send email on your approval and
+> Michael started answering you in the app.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
