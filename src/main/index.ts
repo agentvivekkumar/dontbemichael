@@ -523,7 +523,8 @@ const liveWorkers = new Map<string, WorkerRec>();
 const mailService = new MailService({
   getConfig: () => readConfig(),
   getPassword: (id) => integrations.getSecret(secretRefForMailbox(id)),
-  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason)
+  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason),
+  journalPath: join(app.getPath('userData'), 'mail-send-journal.json')
 });
 
 /** MB-7: a mailbox that stops accepting its password is marked "needs you" in
@@ -2972,6 +2973,12 @@ function createWindow(): BrowserWindow {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (e, url) => {
+    if (isDev && process.env.ELECTRON_RENDERER_URL && url.startsWith(process.env.ELECTRON_RENDERER_URL)) return;
+    e.preventDefault();
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
   });
 
   // Close interception when live PTYs exist. The red-X destroys the window;

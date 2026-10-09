@@ -183,9 +183,15 @@ export function folderToolTarget(tool: string, input: unknown, cwd: string | und
     const pattern = str('pattern');
     const cut = pattern ? pattern.search(/[*?[{]/) : -1;
     const prefix = pattern ? (cut === -1 ? pattern : pattern.slice(0, cut)) : '';
-    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') ? join(p, prefix) : prefix;
+    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') && !prefix.startsWith('~\\') ? join(p, prefix) : prefix;
   }
   if (!p) return null;
-  if (p.startsWith('~/') && typeof process !== 'undefined' && process.env.HOME) p = resolve(process.env.HOME, p.slice(2));
+  if (typeof process !== 'undefined') {
+    const home = process.env.HOME || process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null);
+    if (home) {
+      if (p === '~') p = home;
+      else if (p.startsWith('~/') || p.startsWith('~\\')) p = resolve(home, p.slice(2));
+    }
+  }
   return isAbsolute(p) ? resolve(p) : cwd ? resolve(cwd, p) : null;
 }

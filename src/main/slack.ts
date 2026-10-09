@@ -158,6 +158,7 @@ export class SlackWebhookServer {
       // tunnelmole runs in the background; there is no close handle to wire here.
       return { ok: true, url };
     } catch (e) {
+      this.stop();
       // Surface the tunnel failure rather than silently returning ok:true with no url.
       return { ok: false, error: `tunnel unavailable: ${errMsg(e)}` };
     }
