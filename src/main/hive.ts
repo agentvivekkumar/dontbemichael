@@ -62,6 +62,10 @@ import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { OFFICE_ROLES } from '../shared/officeRoles';
 import { APP_NAME } from '../shared/appName';
 import { isPeerAssignment, rerouteToMichael, hopDropNotice } from '../shared/handoffRule';
+import {
+  legacyOwnerSentDir, legacyOwnerStatePath, pluginsDisabledForSession,
+  privateOwnerSentDir, privateOwnerStatePath
+} from '../shared/agentPrivatePaths';
 import { sleepSync } from './atomicFile';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
@@ -850,6 +854,9 @@ export class HiveManager {
     const root = this.root();
     if (!root) return;
     mkdirSync(join(root, 'agents'), { recursive: true });
+    // #63: owner dock mail and state leave agents/human so no agent can write
+    // them as owner text. Idempotent; a fresh office has nothing to move.
+    this.migrateOwnerPrivate();
 
     // Refreshed each bootstrap, like COMMANDS.md just below. It used to be
     // written only when absent, which meant a hive created once never saw a
@@ -1489,6 +1496,11 @@ export class HiveManager {
       hooks: [{ type: 'command', command: cmd, ...(process.platform === 'win32' ? { shell } : {}) }]
     });
     const mcpServers = this.buildDefaultMcpServers(cwd, cfg);
+    // #63 / TODOS: MCP servers from plugins are already blocked (--strict-mcp-config
+    // / ENABLE_CLAUDEAI_MCP_SERVERS). Plugin skills, hooks and agent definitions
+    // still load from the owner's ~/.claude; turn each enabled plugin off in this
+    // session's settings only (never writes the owner's file).
+    const disabledPlugins = this.ownerPluginsOffForSession();
     return {
       // Match the TUI's truecolor palette to the harness terminal theme —
       // PER SESSION, so the user's global Claude theme (their own terminals
@@ -1507,6 +1519,7 @@ export class HiveManager {
       // Claude merges this additively. Omitted entirely when empty so a settings
       // file with no enabled servers is unchanged from before.
       ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+      ...(Object.keys(disabledPlugins).length ? { enabledPlugins: disabledPlugins } : {}),
       // The status line gets the session status JSON after every response —
       // including context_window.{total_input_tokens,context_window_size},
       // the only clean programmatic source for the session's REAL context
@@ -1567,6 +1580,22 @@ export class HiveManager {
         PostCompact: [entry()]
       }
     };
+  }
+
+  /** Owner plugins to turn off for one agent session (#63). Reads ~/.claude only. */
+  private ownerPluginsOffForSession(): Record<string, false> {
+    const out: Record<string, false> = {};
+    for (const p of [
+      join(homedir(), '.claude', 'settings.json'),
+      join(homedir(), '.claude', 'settings.local.json')
+    ]) {
+      try {
+        if (!existsSync(p)) continue;
+        const raw = JSON.parse(readFileSync(p, 'utf8')) as { enabledPlugins?: unknown };
+        Object.assign(out, pluginsDisabledForSession(raw.enabledPlugins));
+      } catch { /* leave owner's file alone on a bad parse */ }
+    }
+    return out;
   }
 
   /**
@@ -2636,10 +2665,14 @@ export class HiveManager {
   }
 
   // — the owner's conversation with Michael (docs/designs/michael-replies.md) —
-  // The owner's sent mail and the dock's own facts live in agents/human/,
-  // written only by the app: R4 and R5 of the engineering review.
+  // Under <harnessHome>/private/owner/ (#63), written only by the app: R4 and R5
+  // of the engineering review. agents/human/ is no longer the home for these.
 
-  private ownerSentDir(): string { return join(this.agentDir('human'), 'outbox', '.sent'); }
+  private ownerSentDir(): string {
+    const home = this.getHome();
+    if (!home) throw new Error('no harnessHome');
+    return privateOwnerSentDir(home);
+  }
   /** Moves any message file found in the owner's outbox aside, unrouted. */
   private rejectOwnerOutbox(outbox: string): void {
     try {
@@ -2659,7 +2692,42 @@ export class HiveManager {
   private isOwnerQuestion(id: string): boolean {
     return /^[\w.-]+$/.test(id) && !!this.root() && existsSync(join(this.ownerSentDir(), `${id}.json`));
   }
-  private ownerStatePath(): string { return join(this.agentDir('human'), 'state.json'); }
+  private ownerStatePath(): string {
+    const home = this.getHome();
+    if (!home) throw new Error('no harnessHome');
+    return privateOwnerStatePath(home);
+  }
+
+  /**
+   * One-time move of owner dock files out of `hive/agents/human/` (#63). Safe
+   * to call on every ensureHive: skips when the private copy already exists or
+   * the legacy path is empty.
+   */
+  private migrateOwnerPrivate(): void {
+    const home = this.getHome();
+    const root = this.root();
+    if (!home || !root) return;
+    const moveTree = (from: string, to: string): void => {
+      if (!existsSync(from)) return;
+      if (existsSync(to)) {
+        // Private copy already won; drop the legacy leftover so agents cannot
+        // keep writing into the old agents/human path.
+        try { rmSync(from, { recursive: true, force: true }); } catch { /* best-effort */ }
+        return;
+      }
+      try {
+        mkdirSync(dirname(to), { recursive: true });
+        renameSync(from, to);
+      } catch {
+        try {
+          cpSync(from, to, { recursive: true });
+          rmSync(from, { recursive: true, force: true });
+        } catch (e) { console.error('[hive] migrate owner private:', e); }
+      }
+    };
+    moveTree(legacyOwnerSentDir(root), privateOwnerSentDir(home));
+    moveTree(legacyOwnerStatePath(root), privateOwnerStatePath(home));
+  }
 
   /** The dock's facts. An unreadable file is rebuilt as everything read and
    *  already notified, so a bad file never repeats a notification (R5). */
@@ -2686,7 +2754,7 @@ export class HiveManager {
   }
 
   private writeOwnerState(state: OwnerDockState): void {
-    mkdirSync(join(this.agentDir('human')), { recursive: true });
+    mkdirSync(dirname(this.ownerStatePath()), { recursive: true });
     this.atomicWriteJson(this.ownerStatePath(), state);
   }
 

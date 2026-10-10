@@ -21,6 +21,7 @@ require.cache[electron] = {
 const { HiveManager } = loadTs('src/main/hive.ts');
 const R = loadTs('src/shared/ownerRequests.ts');
 const A = loadTs('src/shared/askMeRouting.ts');
+const { privateOwnerSentDir, privateOwnerStatePath } = loadTs('src/shared/agentPrivatePaths.ts');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 async function office(t) {
@@ -106,11 +107,11 @@ test('only a known slash command goes to the terminal; paths and words become qu
 
 test('ask, hand over, reply: the hive files each side and the router keeps replies honest', async (t) => {
   // Value: protects=the owner question reaches Michael's open list only when typed, replies land in the dock, unmatched replies bounce once, closing time is untouched; fails_when=filing, closure or the R2 note regress; why_new=new hive paths; seam=none
-  const { hive, godDir, emitted } = await office(t);
+  const { hive, home, godDir, emitted } = await office(t);
   const q = hive.ownerAsk({ text: 'What happened to the weekly financial summary?' });
   assert.equal(q.from, 'human');
   assert.equal(q.conversation, `owner:${q.id}`);
-  assert.ok(fs.existsSync(path.join(path.dirname(godDir), 'human', 'outbox', '.sent', `${q.id}.json`)), 'the owner\'s sent mail');
+  assert.ok(fs.existsSync(path.join(privateOwnerSentDir(home), `${q.id}.json`)), 'the owner\'s sent mail under private/owner (#63)');
   assert.equal(hive.ownerQuestions().length, 0, 'not in his list before it is typed');
   assert.equal(hive.ownerWithdraw(q.id), true);
   const q2 = hive.ownerAsk({ text: 'Chase the Northwind invoice' });
@@ -171,7 +172,9 @@ test('a bad state file never repeats a notification', async (t) => {
   const q = hive.ownerAsk({ text: 'Q' });
   hive.ownerDelivered(q.id);
   const r = { id: michaelSays(hive, godDir, { to: 'human', act: 'done', in_reply_to: q.id, subject: 'A', body: 'A.' }) };
-  fs.writeFileSync(path.join(home, 'hive', 'agents', 'human', 'state.json'), '{ not json');
+  const statePath = privateOwnerStatePath(home);
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, '{ not json');
   assert.equal(hive.ownerNotify(q.id, r.id), false);
   assert.equal(hive.ownerConversationView().unread, 0);
 });
