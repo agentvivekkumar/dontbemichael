@@ -326,10 +326,12 @@ async function removeLegacyFirstTasks(config: HarnessConfig): Promise<void> {
  * Each member is spawned exactly as the hire dialog spawns an agent — same
  * engine command, same hive provisioning — but inside its own folder and with
  * its pack's job description as its standing goal. `businessTeamStarted` stops
- * a second run. Which members start, and in which folder, is teamMemberStart's
- * call (teamPlan.ts): the floor decides, and a member the registry knows but the
- * floor lost comes back in the folder it really works in. A member that fails to
- * start is skipped rather than blocking the rest.
+ * a second run, and is set only once every member has started. Which members
+ * start, and in which folder, is teamMemberStart's call (teamPlan.ts): the floor
+ * decides, and a member the registry knows but the floor lost comes back in the
+ * folder it really works in. A member that fails to start is skipped rather than
+ * blocking the rest, and is tried again on the next launch; the members that did
+ * start are on the floor by then, so they are not started twice.
  */
 async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   const team = config.businessTeam ?? [];
@@ -365,6 +367,7 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   const castName = (c?: string): OfficeCharacterName =>
     OFFICE_CAST.some((m) => m.name === c) ? (c as OfficeCharacterName) : DEFAULT_CHARACTER;
 
+  let allStarted = true;
   for (const [index, member] of team.entries()) {
     const def = defs.get(member.agentId);
     if (!def) continue;
@@ -391,6 +394,7 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
     });
     if (!res.ok) {
       console.warn(`[team] ${name} did not start: ${res.error ?? 'unknown error'}`);
+      allStarted = false;
       continue;
     }
     const folder = res.cwd || workFolder;
@@ -426,7 +430,7 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
       if (!reg?.agents?.[id]) await window.cth.hiveFirstTask(`${cardPack.businessType}/${id}`, id, name).catch(() => undefined);
     }
   }
-  await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
+  if (allStarted) await window.cth.updateConfig({ businessTeamStarted: true }).catch(() => undefined);
 }
 
 /**

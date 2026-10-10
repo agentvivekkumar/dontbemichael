@@ -10,7 +10,8 @@
  * The rules, each of which fails quietly if lost:
  *  - it runs once: `businessTeamStarted` stops a second run, and a member the
  *    registry already has is skipped, so a crash midway never doubles a card;
- *  - one member failing to start does not stop the rest;
+ *  - one member failing to start does not stop the rest, and the team is not
+ *    marked started, so the next launch tries that member again;
  *  - the cards appear without taking the focus off Michael;
  *  - Michael works in the Office folder on a business install, and in the
  *    harness folder on an older one, exactly as before.
@@ -32,13 +33,16 @@ test('the onboarding team starts once, each member in its folder, and Michael ke
   // A member the floor already holds is not started twice; one the registry
   // knows but the floor lost comes back (office-record.test.cjs).
   assert.match(fn, /const decision = teamMemberStart\(id, member\.folder, floorIds,[^\n]*\);\s*if \(!decision\.start\) continue;/, 'a member already on the floor is not started twice');
-  assert.match(fn, /if \(!res\.ok\) \{[\s\S]{0,120}continue;\s*\}/, 'a failed start skips that member only');
+  assert.match(fn, /if \(!res\.ok\) \{[\s\S]{0,120}allStarted = false;\s*continue;\s*\}/, 'a failed start skips that member only, and marks the run incomplete');
   assert.match(fn, /cwd: workFolder,[\s\S]{0,200}hive: \{ id, name, provider, cwd: workFolder, role \}/, 'spawned inside its own folder');
   assert.match(fn, /goal: teamMemberGoal\(def, \{ name: config\.businessName, city: config\.businessCity \}\)/);
   assert.match(fn, /\}, \{ select: false \}\);/, 'the card appears without taking the focus');
   assert.match(fn, /\.find\(\(p\) => p\.businessType === config\.businessType\) \?\? byTeam \?\? core;/, '"Something else" starts from the core pack');
   assert.match(fn, /\(coverage\(p\) > coverage\(best\) \? p : best\), core\);/, 'core wins ties, so a team picked from core stays on core');
-  assert.match(fn, /await window\.cth\.updateConfig\(\{ businessTeamStarted: true \}\)/);
+  assert.match(fn, /let allStarted = true;\s*for \(const \[index, member\] of team\.entries\(\)\)/);
+  // Marked started only when every member started, so a member that failed its
+  // first start is tried again on the next launch (TODOS, Onboarding).
+  assert.match(fn, /if \(allStarted\) await window\.cth\.updateConfig\(\{ businessTeamStarted: true \}\)/, 'a failed member is retried next launch');
 
   // Michael: asked for in the business folder when there is one, the harness
   // folder otherwise; the floor records wherever main actually started him.
