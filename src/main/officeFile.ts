@@ -167,7 +167,8 @@ export function folderLayoutFor(businessFolder: string | undefined, folders: str
     if (teamFolders.some((t) => fold(t) === fold(f))) continue;
     teamFolders.push(f);
   }
-  return { business, teamFolders };
+  // The app's private folder (issue #63), whatever the layout: nobody opens it.
+  return { business, teamFolders, ...(app ? { appPrivate: join(app, 'private') } : {}) };
 }
 
 /** The deepest folder that contains every path's parent, or undefined. */

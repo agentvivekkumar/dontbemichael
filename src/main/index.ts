@@ -127,7 +127,7 @@ import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
-import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
+import { folderPolicy, type AgentFolderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
 import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
 import { scheduledRunBody } from '../shared/scheduleMessage';
@@ -759,13 +759,13 @@ function teardownPty(id: string): void {
   const wasWorker = liveWorkers.has(id);
   const agentId = ptyToAgent.get(id);
   // 0) Drop the md-mail MCP file that holds this agent's broker token (#63),
-  //    then revoke the token. File first so a sibling cannot read a live path
-  //    after revoke races a slow delete.
+  //    then revoke this id's broker capability (if any). File first so a sibling
+  //    cannot read a live path after revoke races a slow delete. Idempotent +
+  //    harmless for a non-worker PTY; ensures a dead worker's token can never
+  //    reach an integration.
   try { removeMdMailMcp(agentId ?? id); } catch { /* best-effort */ }
-  // 1) Revoke this id's broker capability (if any). Idempotent + harmless for a
-  //    non-worker PTY; ensures a dead worker's token can never reach an integration.
   try { integrationBroker.revoke(id); } catch { /* best-effort */ }
-  // 2) Archive the agent — retained + flagged; only live-PTY agents are active.
+  // 1) Archive the agent — retained + flagged; only live-PTY agents are active.
   if (ptyCli.delete(id)) void refreshCliUpdate();
   connectorPlans.delete(id);
   if (agentId) {
@@ -783,7 +783,7 @@ function teardownPty(id: string): void {
       try { hive.setArchived(agentId, true); } catch (e) { console.error('[hive] setArchived failed:', e); }
     }
   }
-  // 3) Remove the isolated worktree, if any. Non-blocking; errors are logged.
+  // 2) Remove the isolated worktree, if any. Non-blocking; errors are logged.
   const wtPath = worktreePaths.get(id);
   if (wtPath) {
     const origCwd = worktreeOrigins.get(id) ?? wtPath;
@@ -2077,6 +2077,16 @@ function migrateBusinessFolder(): void {
 /** Every team member's folder and Michael's, for the access rules
  *  (folderAccess.ts): the folders picked at setup plus every hired agent's,
  *  archived ones included (their files are still theirs). */
+/** An office without a business folder keeps no team folders apart, and its
+ *  shell commands are not held to the sandbox, as before; only the app's
+ *  private folder is closed to every agent (issue #63). */
+function privateOnlyFolderPolicy(isGod: boolean, cwd: string): AgentFolderPolicy | undefined {
+  const home = readConfig().harnessHome;
+  if (!home) return undefined;
+  const layout = folderLayoutFor(undefined, [], expandTilde(home));
+  return { ...folderPolicy({ isGod, cwd }, layout, process.platform !== 'linux'), sandboxOnly: false };
+}
+
 function businessFolderLayout(businessFolder: string): FolderLayout {
   const cfg = readConfig();
   const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
@@ -3508,7 +3518,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
               businessFolderLayout(businessFolder),
               process.platform !== 'linux'
             )
-            : undefined,
+            : privateOnlyFolderPolicy(!!opts.hive.isGod, opts.cwd),
           docTextCliPath: docTextCliPath(),
           connectors: connectorPlan?.plan
         }

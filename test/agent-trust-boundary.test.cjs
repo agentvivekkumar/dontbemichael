@@ -58,3 +58,32 @@ test('agent session settings turn the owner\'s enabled plugins off', () => {
   assert.match(hive, /enabledPlugins: disabledPlugins/);
   assert.match(hive, /pluginsDisabledForSession\(raw\.enabledPlugins\)/);
 });
+
+test('no agent reads or changes the app private folder, with or without a business folder', () => {
+  // Value: protects=a sibling cannot read a running agent's live mail token under private/; fails_when=private/ drops out of the folder policy or the hook decision; why_new=moving the token alone left it readable; seam=none
+  const loadTs = require('./load-ts.cjs');
+  const { folderPolicy, folderDecision } = loadTs('src/shared/folderAccess.ts');
+  const P = (p) => path.resolve(p);
+  const priv = P('/w/home/private');
+  const token = path.join(priv, 'agent-mcp', 'ada', 'md-mail.mcp.json');
+  const withBiz = { business: P('/w/Biz'), teamFolders: [P('/w/Biz/Sales'), P('/w/Biz/Ops')], appPrivate: priv };
+  const bare = { teamFolders: [], appPrivate: priv };
+  for (const layout of [withBiz, bare]) {
+    for (const agent of [{ isGod: false, cwd: P('/w/Biz/Ops') }, { isGod: true, cwd: P('/w/Biz') }]) {
+      const pol = folderPolicy(agent, layout, true);
+      assert.ok(pol.sandbox.denyRead.includes(priv), 'shell reads');
+      assert.ok(pol.sandbox.denyWrite.includes(priv), 'shell writes');
+      assert.ok(pol.deny.some((r) => r.startsWith('Read(') && r.includes('/w/home/private')), 'Read tool');
+      assert.ok(pol.deny.some((r) => r.startsWith('Edit(') && r.includes('/w/home/private')), 'Edit tool');
+      for (const tool of ['Read', 'Grep', 'Write', 'Edit']) {
+        assert.equal(folderDecision(agent, layout, tool, token, true).deny, true, `${tool} ${agent.isGod ? 'Michael' : 'team member'}`);
+      }
+    }
+  }
+  assert.equal(folderDecision({ isGod: false, cwd: P('/w/Biz/Ops') }, bare, 'Read', P('/w/Biz/Ops/notes.md'), true).deny, false, 'own folder still opens');
+  const main = read('src/main/index.ts');
+  assert.match(main, /: privateOnlyFolderPolicy\(!!opts\.hive\.isGod, opts\.cwd\),/, 'an office without a business folder still closes private/');
+  assert.match(main, /return \{ \.\.\.folderPolicy\(\{ isGod, cwd \}, layout, process\.platform !== 'linux'\), sandboxOnly: false \};/, 'and keeps its shell rules as before');
+  assert.match(read('src/main/officeFile.ts'), /appPrivate: join\(app, 'private'\)/);
+  assert.match(read('src/main/hooks.ts'), /const layout = folderLayoutFor\(cfg\.businessFolder, folders, home\);/);
+});

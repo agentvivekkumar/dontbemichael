@@ -80,6 +80,7 @@ export function isTerminalPrompt(p: { notification_type?: string; message?: stri
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, folderDecision, folderToolTarget } from '../shared/folderAccess';
 import { folderLayoutFor } from './officeFile';
+import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
 import { accessLine, agentAccessSummary } from '../shared/agentAccess';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
@@ -869,17 +870,22 @@ export class HookServer {
    *  without a business folder (older installs) have no rules to apply. */
   private folderCheck(agentId: string, tool: string, input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
     const cfg = this.getConfig();
-    if (!cfg.businessFolder) return { deny: false };
+    // Without a business folder there are no team folders to keep apart, but
+    // the app's private folder is still nobody's to open (issue #63).
+    const home = cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined;
+    if (!cfg.businessFolder && !home) return { deny: false };
     const target = folderToolTarget(tool, input, cwd);
     if (!target) return { deny: false };
     const reg = this.hive.registry();
     const me = reg.agents[agentId];
     if (!me?.cwd || me.isAssistant) return { deny: false };
-    const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
-    for (const a of Object.values(reg.agents)) {
-      if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+    const folders = cfg.businessFolder ? (cfg.businessTeam ?? []).map((m) => m.folder) : [];
+    if (cfg.businessFolder) {
+      for (const a of Object.values(reg.agents)) {
+        if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+      }
     }
-    const layout = folderLayoutFor(cfg.businessFolder, folders, cfg.harnessHome ?? undefined);
+    const layout = folderLayoutFor(cfg.businessFolder, folders, home);
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
     const agent = { isGod: !!me.isGod, cwd: me.cwd };
     const ci = process.platform !== 'linux';

@@ -34,6 +34,10 @@ export interface FolderLayout {
   business?: string;
   /** Every team member's working folder (never Michael's), each once. */
   teamFolders: string[];
+  /** The app's own private folder (`<harnessHome>/private`, issue #63): agents'
+   *  mail tokens and the owner's sent questions. No agent, Michael included,
+   *  opens or changes it. */
+  appPrivate?: string;
 }
 
 export interface AgentFolderPolicy {
@@ -63,6 +67,13 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
   const policy: AgentFolderPolicy = { sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [], sandboxOnly: !agent.isGod };
+  // Nobody opens the app's private folder: a sibling's live mail token sits
+  // there while it runs (#63). Claude's CLI still reads its own --mcp-config.
+  if (layout.appPrivate) {
+    policy.sandbox.denyRead.push(layout.appPrivate);
+    policy.sandbox.denyWrite.push(layout.appPrivate);
+    policy.deny.push(rule('Read', layout.appPrivate), rule('Edit', layout.appPrivate));
+  }
 
   if (agent.isGod) {
     // Read everything; change nothing that belongs to a team member.
@@ -107,6 +118,10 @@ export function folderDecision(
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
   const teamFolder = teamFoldersOf(layout, same).find((f) => inside(f, target));
+
+  if (layout.appPrivate && inside(layout.appPrivate, target)) {
+    return { deny: true, reason: 'That folder is the app\'s own and holds private settings. Nobody on the team opens it.' };
+  }
 
   if (agent.isGod) {
     if (writes && teamFolder && !inside(teamFolder, agent.cwd)) {
