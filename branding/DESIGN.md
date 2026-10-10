@@ -641,6 +641,8 @@ Decline.
 
 Underline tabs: `t-ui` 500 `ink-3`, active `ink` 600 with a 2 px `ink` underline, 16 px
 gaps, a 1 px `line` rule under the row. Arrow keys, Home and End move focus; RTL mirrors.
+When the labels overflow a narrow panel the row scrolls sideways with no scrollbar: the
+mouse wheel moves it, and each edge with tabs hidden past it fades out over 28 px.
 
 - Person: **Profile, Access, Messages, Memory, Work**. Traces, Git and IDE stay behind
   their build flags and append after Work when on.
@@ -1479,6 +1481,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-07 | Onboarding: the card is centered while the studio isn't showing and glides to its column when it appears, the background glow following it (§7.25); onboarding reference screens re-shot. |
 | 2026-10-07 | Onboarding: a Ready step (Get Michael ready) installs Claude Code and signs the owner in where they can see it; skipped, Ask me keeps a card (§7.25). |
 | 2026-10-09 | Web, Windows first class: the platform switch drops the Beta tag (§9.8, §9.9 retired for web); the Windows note is a lead line plus bullets; the home page gets the Sending switch with the mail approval card (§9.11), the setup inset (§9.12) and six "Everything else" tiles (§9.5); the social card says "on your computer" (§9.7). |
+| 2026-10-10 | Panel tabs: the mouse wheel scrolls an overflowing tab row sideways, and an edge fades while tabs are hidden past it (§7.11). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |

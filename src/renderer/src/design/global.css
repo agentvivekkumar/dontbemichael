@@ -42,7 +42,8 @@ input, textarea, [contenteditable='true'] {
 
 /* Command Center tab bar scrolls horizontally when it overflows a narrow
    sidebar; hide the scrollbar (overlay on mac, hidden elsewhere) — scroll with
-   trackpad / Shift+wheel, like a browser tab strip. */
+   trackpad or the mouse wheel (PanelTabs turns it sideways), and an edge fades
+   while tabs are hidden past it. */
 .cth-tabbar { scrollbar-width: none; -ms-overflow-style: none; }
 .cth-tabbar::-webkit-scrollbar { height: 0; display: none; }
 
