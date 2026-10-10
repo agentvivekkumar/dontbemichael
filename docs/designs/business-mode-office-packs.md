@@ -526,6 +526,7 @@ From /plan-eng-review on 2026-09-15, scope: all three phases. Each decision was 
   - **First mailbox:** the owner's existing Claude connector, for **reading and triage only** (Pam). The Connector Center labels it "Connected through your Claude account".
   - **Sending, and every additional mailbox:** product-owned connectors through the broker (Decision 2), one record per account, per-agent grants. Per provider:
     - **Microsoft:** app ID embedded in official builds, injected at build time exactly like `POSTHOG_KEY` (`electron.vite.config.ts:15-19`, `release.yml:56`), never committed.
+      - **Superseded by MB-0** (`docs/designs/multi-mailbox.md`, owner, 2026-09-26): the open source app owns no central OAuth app, so builds embed no Microsoft app ID. Microsoft 365, like Google Workspace, will sign in through an app the business registers itself, with a guided setup in the product.
     - **Google:** the owner's own client through an in-product wizard, until Google's verification team answers in writing whether an embedded desktop client is acceptable.
     - **Meta and other secret-requiring providers:** the owner's own app. Until one exists, Ryan stays in draft mode.
     - **Every provider** also accepts a pasted client ID, so forks and self-builds work.
