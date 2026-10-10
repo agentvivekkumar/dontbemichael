@@ -1214,6 +1214,13 @@ paragraphs, an optional mono eyebrow. Vignettes sit on `card` with `r-2xl` and
 
 Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
 
+The home page's "Everything else" list is six tiles: three across at 980 px and up, two
+across from 481 to 979 px, one column at 480 px and under (owner, 2026-10-09). A tile is an
+`ink` 20 px icon on a 36 px `neutral-soft` square, a `w-h3` title and one or two lines in
+`ink-2`. The Ask Michael tile adds decorative status pills (§7.13 colors: Sent idle, Michael
+has it working, Waiting on someone `amber-soft` with `amber-text`, Answered done), hidden
+from screen readers; its text carries the meaning.
+
 ### 9.6 Footer
 
 `chrome` ground, lockup, link columns (`w-small`), Discord, GitHub, FAQ, legal line.
@@ -1225,21 +1232,22 @@ Same as the app (§6, §7.13): `card`, `line`, `r-xl`, `shadow-md`.
 
 ### 9.8 Platform switch (download page)
 
-Two native buttons in a group labelled "Your computer" ("Mac", "Windows 11" plus the Beta
-tag), `aria-pressed` on the chosen one, the same pattern as the setup picker. Pill track
+Two native buttons in a group labelled "Your computer" ("Mac", "Windows 11"; owner,
+2026-10-09: Windows is billed as Mac's equal, so no Beta tag), `aria-pressed` on the chosen one, the same pattern as the setup picker. Pill track
 `neutral-soft` with an inset `line`, padding 4; the chosen segment is `card` with
 `shadow-sm` and a `line` ring; labels `w-small` 600, icon 16 px, 44 px tall, `indigo` focus
 ring. Preset from the visitor's OS, overridden by `#mac` or `#windows`. Without JS the
 switch is hidden and both platform panels show, Mac first. Under 480 px it spans the column
-in two equal halves (`minmax(0, 1fr)` columns); under 420 px it drops its icons, and under
-360 px the Beta tag too. Without JS each platform's steps get a visible "Install on a Mac" or
+in two equal halves (`minmax(0, 1fr)` columns); under 420 px it drops its icons. Without JS each platform's steps get a visible "Install on a Mac" or
 "Install on Windows" heading.
 
 ### 9.9 Beta tag (web)
 
-The app's Beta pill (§7.4, top bar): `amber-soft` fill (`lemon-light`), `ink` text, 10 px
-600 caps at `.06em`, `r-pill`, padding 1 × 8. It labels Windows next to the platform name.
-The note that explains the beta is a `card-2` panel with an inset `line`, never amber.
+Retired on the web (owner, 2026-10-09): Mac and Windows get equal billing, and the app as a
+whole stays pre 1.0 in the footer's legal line. The Windows panel on /download keeps an
+"On Windows, for now:" note for what still differs: a `card-2` panel with an inset `line`,
+never amber, a bold lead line and one short bullet per difference (owner, 2026-10-09: one
+fact per line so the shell commands caveat is not buried).
 
 ### 9.10 Install dialog drawings
 
@@ -1247,6 +1255,32 @@ Drawn, not screenshotted: the macOS "Not Opened" sheet and the Windows SmartScre
 ("Windows protected your PC", one `ink-3` line, "More info" ringed in `indigo`, then "Run
 anyway" highlighted like Done) as `card` with `shadow-lg` and `r-lg`, beside a `card-2`
 "This is normal" panel. Under 640 px the drawing stacks under the panel.
+
+### 9.11 Sending switch (web)
+
+At the end of the home page's story, under the heading "You choose what goes out.": the
+app's Sending control (§7.12) drawn as a real switch. Three native buttons in a group
+labelled "How Kelly sends", in the app's order [Can send, Send on approval, Draft only],
+Send on approval pressed by default, styled as the platform switch (§9.8). Each choice shows
+one card beside it: Can send the sent reply (§9.5 message card, "Sent"); Send on approval
+the mail approval card (§7.8: "Kelly wants to send an email", From and To as `t-meta`
+lines, Subject and Message as field boxes that are not focusable, then Don't send and Ask
+for changes as secondary buttons and Approve as the primary, right aligned); Draft only the
+reply with a "Draft" tag and "Saved in support@ Drafts". A line under the switch says what
+the chosen setting does (`aria-live="polite"`). Addresses use the story's form ("support@",
+"Northwind Cafe"), never an invented domain. Without JS the switch is hidden, the approval
+card shows and all three choices are listed in text. Two columns (5:7) at 980 px and up,
+stacked below; under 480 px the switch is three equal columns whose labels may wrap to two
+lines, and the card's buttons wrap at 44 px tall.
+
+### 9.12 Setup inset (web)
+
+Under the home page's two setup cards, a quiet inset for setup's last step (§7.25 Ready
+step): `card-2` fill, inset `line`, `r-xl`, no shadow, padding 16 × 20. Michael's avatar,
+"Then Michael gets ready" (600, 14/20), two inline items with 16 px icons ("Claude Code,
+installed for you if it's missing" and "Sign in with your Claude plan, or an Anthropic API
+key"), and an `ink-3` line under them. No buttons: nothing in it can be clicked. One row at
+980 px and up; under that the text stacks beside the avatar.
 
 ---
 
@@ -1444,6 +1478,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-07 | Access tab, Email: no switch; one row per address used with Inbox and Sending lines, and Add a mailbox with Watch the inbox or Send only (§7.12). Settings, Mailboxes names who else sends from a mailbox (§7.26). |
 | 2026-10-07 | Onboarding: the card is centered while the studio isn't showing and glides to its column when it appears, the background glow following it (§7.25); onboarding reference screens re-shot. |
 | 2026-10-07 | Onboarding: a Ready step (Get Michael ready) installs Claude Code and signs the owner in where they can see it; skipped, Ask me keeps a card (§7.25). |
+| 2026-10-09 | Web, Windows first class: the platform switch drops the Beta tag (§9.8, §9.9 retired for web); the Windows note is a lead line plus bullets; the home page gets the Sending switch with the mail approval card (§9.11), the setup inset (§9.12) and six "Everything else" tiles (§9.5); the social card says "on your computer" (§9.7). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
