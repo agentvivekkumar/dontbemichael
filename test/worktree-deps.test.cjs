@@ -35,6 +35,12 @@ function addWorktree(repo, wtRoot, name) {
   return wtPath;
 }
 
+function parentAlias(repo, wtRoot) {
+  const alias = path.join(wtRoot, 'parent alias');
+  fs.symlinkSync(path.dirname(repo), alias, onWindows ? 'junction' : 'dir');
+  return alias;
+}
+
 test('links the base node_modules into an isolated worktree', async () => {
   const { repo, wtRoot } = makeHarness();
   const baseNodeModules = path.join(repo, 'node_modules');
@@ -183,6 +189,50 @@ test('removes dependencies safely when the worktree argument is relative to cwd'
   assert.deepEqual(await removeWorktree(repo, path.relative(repo, wtPath)), { ok: true });
   assert.equal(fs.readFileSync(path.join(deps, 'must-survive.txt'), 'utf8'), 'base dependencies\n');
   assert.equal(fs.existsSync(wtPath), false);
+});
+
+test('removes a registered worktree through an aliased parent directory', async () => {
+  const { repo, wtRoot } = makeHarness();
+  const deps = path.join(repo, 'node_modules');
+  fs.mkdirSync(deps);
+  fs.writeFileSync(path.join(deps, 'must-survive.txt'), 'base dependencies\n');
+  const wtPath = addWorktree(repo, wtRoot, 'aliased');
+  assert.deepEqual(await linkWorktreeDeps(repo, wtPath), { ok: true, skipped: false });
+  const alias = parentAlias(repo, wtRoot);
+  const aliasedRepo = path.join(alias, path.basename(repo));
+  const aliasedWorktree = path.join(alias, path.basename(wtRoot), path.basename(wtPath));
+
+  assert.deepEqual(await removeWorktree(aliasedRepo, aliasedWorktree), { ok: true });
+  assert.equal(fs.existsSync(wtPath), false);
+  assert.equal(fs.readFileSync(path.join(deps, 'must-survive.txt'), 'utf8'), 'base dependencies\n');
+  assert.equal(git(repo, 'worktree', 'list', '--porcelain').includes('agent/aliased'), false);
+});
+
+test('recognizes a locked worktree through an aliased parent directory', async () => {
+  const { repo, wtRoot } = makeHarness();
+  fs.mkdirSync(path.join(repo, 'node_modules'));
+  const wtPath = addWorktree(repo, wtRoot, 'aliased-locked');
+  assert.deepEqual(await linkWorktreeDeps(repo, wtPath), { ok: true, skipped: false });
+  git(repo, 'worktree', 'lock', wtPath);
+  const alias = parentAlias(repo, wtRoot);
+  const aliasedWorktree = path.join(alias, path.basename(wtRoot), path.basename(wtPath));
+
+  assert.deepEqual(await removeWorktree(repo, aliasedWorktree), { ok: false, error: 'worktree is locked' });
+  assert.equal(fs.lstatSync(path.join(wtPath, 'node_modules')).isSymbolicLink(), true);
+});
+
+test('refuses the main checkout through an aliased parent directory', async () => {
+  const { repo, wtRoot } = makeHarness();
+  const deps = path.join(wtRoot, 'shared dependencies');
+  fs.mkdirSync(deps);
+  fs.writeFileSync(path.join(deps, 'must-survive.txt'), 'shared dependencies\n');
+  const link = path.join(repo, 'node_modules');
+  fs.symlinkSync(deps, link, onWindows ? 'junction' : 'dir');
+  const alias = parentAlias(repo, wtRoot);
+
+  assert.equal((await removeWorktree(repo, path.join(alias, path.basename(repo)))).ok, false);
+  assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
+  assert.equal(fs.readFileSync(path.join(deps, 'must-survive.txt'), 'utf8'), 'shared dependencies\n');
 });
 
 test('leaves a dangling worktree dependency symlink untouched', async () => {
