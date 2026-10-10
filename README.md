@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.5: Windows offices start, and the Waiting column works.**
-> On Windows, team members no longer stop at a hidden folder trust question. Cards that wait on a
-> customer or teammate move to Waiting and back to Doing when they answer. The API key form says
-> why a key was not accepted. In 0.1.4, team members could send email on your approval and
-> Michael started answering you in the app.
+> **New in 0.1.6: Can send means no approval cards, and Windows offices work without Git.**
+> A team member on Can send now sends without asking, and moving one there hands its waiting emails
+> back. On Windows PCs without Git for Windows, team members report their work and run commands
+> again, and the terminal refits when its text size changes. In 0.1.5, Windows offices started and
+> the Waiting column began to work.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

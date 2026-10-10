@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.5). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.6). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -100,6 +100,17 @@ moving, and brings you only the decisions that need you.
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.6 (2026-10-09)
+- Can send means no approval cards: a team member on Can send sends without asking, and moving one
+  there hands its waiting emails back, unless nobody on the team reads the inbox it sends from.
+  Every Sending change tells the team member and goes into its notes.
+- Windows offices without Git for Windows: Claude Code runs team members' hooks in PowerShell
+  there, and the app now writes them for that shell, so team members report their work again.
+- Team members on Windows can run commands again; their file tools still stay out of other
+  folders.
+- The terminal refits when its text size changes on its own, and logs its sizes when it still runs
+  past its box.
 
 ### 0.1.5 (2026-10-09)
 - Windows offices start: the app trusts your office folder the way Claude Code looks it up on
