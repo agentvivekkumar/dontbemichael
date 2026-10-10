@@ -1100,6 +1100,7 @@
     "prompt": "Prompt",
     "promptPlaceholder": "Sent word for word on every run.",
     "fired": "fired {{time}}",
+    "skipped": "Skipped: nothing to do, {{time}}",
     "notFired": "not yet fired",
     "next": "next {{time}}",
     "beat": "♥ beat",

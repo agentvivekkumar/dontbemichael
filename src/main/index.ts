@@ -34,8 +34,8 @@ import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
   migrateMissions, clampIntervals, buildScheduleRequest, applyScheduleRequest, missionsFor, fileScheduleRequest, foldScheduleRequests,
-  requestSummary, whenWords, cleanFocus, scheduledJobsBlock,
-  type ScheduleRequest
+  requestSummary, whenWords, cleanFocus, scheduledJobsBlock, standupShouldRun,
+  type ScheduleRequest, type StandupFloorInputs
 } from '../shared/missions';
 import { MICHAEL_WORK_STYLE } from '../shared/michaelWorkStyle';
 import {
@@ -989,16 +989,55 @@ function syncMissions(): void {
         // A 'compact' maintenance mission carries no dispatch (firePayload is
         // null), so only the stamp below happens.
         const payload = firePayload(m);
+        const stamp = Date.now();
+        const current = readConfig().missions ?? [];
+        const row = current.find((x) => x.id === m.id) ?? m;
+        // Built-in standup: skip a quiet floor so idle hours do not burn Opus (#55).
+        if (payload && hive.enabled() && m.id === OPS_STANDUP_MISSION.id) {
+          const decision = standupShouldRun({
+            inputs: gatherStandupFloorInputs(),
+            now: stamp,
+            lastDispatchedAt: row.lastDispatchedAt
+          });
+          if (decision.action === 'skip') {
+            writeConfig({
+              missions: current.map((x) => x.id === m.id ? {
+                ...x,
+                lastFiredAt: stamp,
+                lastSkippedAt: stamp,
+                standupInputFingerprint: decision.fingerprint
+              } : x)
+            });
+            try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
+            return;
+          }
+          hive.send({ to: payload.to, act: 'inform', subject: payload.subject, body: payload.body }, 'scheduler');
+          writeConfig({
+            missions: current.map((x) => {
+              if (x.id !== m.id) return x;
+              const next: ScheduledMission = {
+                ...x,
+                lastFiredAt: stamp,
+                lastDispatchedAt: stamp,
+                standupInputFingerprint: decision.fingerprint
+              };
+              delete next.lastSkippedAt;
+              return next;
+            })
+          });
+          try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
+          return;
+        }
         if (payload && hive.enabled()) {
           hive.send({ to: payload.to, act: 'inform', subject: payload.subject, body: payload.body }, 'scheduler');
         }
         // No compaction here: that is Claude Code's own auto compact now, with its
         // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
-        const current = readConfig().missions ?? [];
-        const next = current.map((x) =>
-          x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x
-        );
-        writeConfig({ missions: next });
+        writeConfig({
+          missions: current.map((x) =>
+            x.id === m.id ? { ...x, lastFiredAt: stamp } : x
+          )
+        });
         // Let the SCHEDULES panel refresh its "last fired" without a reload (#2.3).
         try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
       } catch (e) {
@@ -1178,14 +1217,61 @@ function standupOnOfficeOpen(): void {
   if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
   standupFiredThisLaunch = true;
   try {
+    // Always send on office open (#55): the skip path is for the hourly timer only.
+    const stamp = Date.now();
+    const inputs = gatherStandupFloorInputs();
+    const decision = standupShouldRun({ inputs, now: stamp, force: 'office-open' });
     hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body, m.focus) }, 'scheduler');
-    const next = (readConfig().missions ?? []).map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x));
+    const next = (readConfig().missions ?? []).map((x) => {
+      if (x.id !== m.id) return x;
+      const row: ScheduledMission = {
+        ...x,
+        lastFiredAt: stamp,
+        lastDispatchedAt: stamp,
+        standupInputFingerprint: decision.fingerprint
+      };
+      delete row.lastSkippedAt;
+      return row;
+    });
     writeConfig({ missions: next });
     try { liveWebContents()?.send('missions:updated'); } catch { /* window gone */ }
     syncMissions();
   } catch (e) {
     console.error('[scheduler] standup on open', e);
   }
+}
+
+/** Floor snapshot for the standup skip check (#55). Refreshes owner request and
+ *  stuck-card caches first so the decision is not a beat behind. */
+function gatherStandupFloorInputs(): StandupFloorInputs {
+  try { hive.refreshOwnerRequests(); } catch { /* best-effort */ }
+  let tasks: StandupFloorInputs['tasks'] = [];
+  try {
+    const raw = hive.tasks() as { tasks?: StandupFloorInputs['tasks'] };
+    tasks = Array.isArray(raw?.tasks) ? raw.tasks : [];
+  } catch { tasks = []; }
+  let liveAgentIds: string[] = [];
+  try {
+    const reg = hive.registry();
+    liveAgentIds = Object.entries(reg.agents)
+      .filter(([, a]) => !a.archived)
+      .map(([id]) => id);
+  } catch { liveAgentIds = []; }
+  let fleetAgents: StandupFloorInputs['fleetAgents'] = [];
+  try {
+    const root = hive.root();
+    if (root && existsSync(join(root, 'fleet.json'))) {
+      const snap = JSON.parse(readFileSync(join(root, 'fleet.json'), 'utf8')) as { agents?: StandupFloorInputs['fleetAgents'] };
+      fleetAgents = Array.isArray(snap.agents) ? snap.agents : [];
+    }
+  } catch { fleetAgents = []; }
+  return {
+    ownerRequestIds: hive.ownerRequests().map((r) => r.id),
+    stuckCardIds: hive.stuckCards().map((c) => c.id),
+    tasks,
+    liveAgentIds,
+    fleetAgents
+  };
 }
 
 /** One-time: schedules move to per-agent ownership. Every "everyone" row becomes

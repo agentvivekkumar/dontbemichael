@@ -1100,6 +1100,7 @@
     "prompt": "提示词",
     "promptPlaceholder": "每次运行逐字发送。",
     "fired": "{{time}} 前触发",
+    "skipped": "已跳过：没有要做的事，{{time}}",
     "notFired": "尚未触发",
     "next": "下次 {{time}}",
     "beat": "♥ 心跳",

@@ -1100,6 +1100,7 @@
     "prompt": "الموجّه",
     "promptPlaceholder": "يُرسَل حرفيًا في كل تشغيل.",
     "fired": "عمل {{time}}",
+    "skipped": "تخطى: لا شيء للقيام به، {{time}}",
     "notFired": "لم يعمل بعد",
     "next": "التالي {{time}}",
     "beat": "♥ نبضة",

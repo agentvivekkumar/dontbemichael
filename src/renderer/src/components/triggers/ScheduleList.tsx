@@ -288,8 +288,15 @@ function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowPr
   // Beside the name: when it runs next, or that it is paused.
   const next = !mission.enabled ? t('schedulesSection.paused')
     : nextAt !== null ? t('schedulesSection.next', { time: relTime(now - nextAt, i18n.language) }) : '';
+  const skipped = !!(mission.lastSkippedAt && mission.lastSkippedAt >= (mission.lastFiredAt ?? 0));
   const sub = [
-    mission.enabled ? (mission.lastFiredAt ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) }) : t('schedulesSection.notFired')) : null,
+    mission.enabled
+      ? (skipped
+        ? t('schedulesSection.skipped', { time: relTime(now - (mission.lastSkippedAt ?? now), i18n.language) })
+        : mission.lastFiredAt
+          ? t('schedulesSection.fired', { time: relTime(now - mission.lastFiredAt, i18n.language) })
+          : t('schedulesSection.notFired'))
+      : null,
     creator
   ].filter(Boolean).join(', ');
 

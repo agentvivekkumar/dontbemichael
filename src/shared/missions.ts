@@ -42,6 +42,14 @@ export interface ScheduledMission {
   enabled: boolean;
   autoCompact?: boolean;
   lastFiredAt?: number;
+  /** When the built-in standup last sent a real message (#55). Skips do not
+   *  update this; the 4 hour safety floor keys off it. */
+  lastDispatchedAt?: number;
+  /** When the built-in standup last skipped because the floor was quiet (#55).
+   *  Cleared on a real send. The Schedules panel prefers this over fired. */
+  lastSkippedAt?: number;
+  /** Last floor fingerprint the standup evaluated (#55). */
+  standupInputFingerprint?: string;
   kind?: 'dispatch' | 'heartbeat' | 'compact';
   quietThresholdMs?: number;
   /** Who added it: `'owner'`, or the id of the agent whose request the owner
@@ -52,6 +60,33 @@ export interface ScheduledMission {
   /** Who approved the request that set it: 'michael' or 'owner'. */
   approvedBy?: 'michael' | 'owner';
 }
+
+/** Skip idle hourly standups after this long without a real send (#55). */
+export const STANDUP_SAFETY_MS = 4 * 3_600_000;
+
+/** A non-god agent with no usage for this long counts as stalled on the floor. */
+export const STANDUP_STALL_SEC = 30 * 60;
+
+/** Floor inputs the standup skip check reads (mirrors OPS_STANDUP_FOCUS). */
+export interface StandupFloorInputs {
+  ownerRequestIds: string[];
+  stuckCardIds: string[];
+  tasks: Array<{ id: string; status?: string; assignee?: string; waitingOn?: string }>;
+  /** Live agent ids from the registry (non-archived), for "assignee is gone". */
+  liveAgentIds: string[];
+  fleetAgents: Array<{
+    id: string;
+    isGod?: boolean;
+    breaker?: string;
+    lastActiveSecAgo?: number | null;
+    inboxBacklog?: number;
+    onHold?: boolean;
+  }>;
+}
+
+export type StandupDecision =
+  | { action: 'fire'; reason: 'work' | 'safety-floor' | 'office-open'; fingerprint: string }
+  | { action: 'skip'; fingerprint: string };
 
 export const OWNER = 'owner';
 
@@ -195,6 +230,74 @@ export function firePayload(m: ScheduledMission): { to: string; subject: string;
   };
 }
 
+/* ──────────────────── idle standup skip (#55) ──────────────────── */
+
+const sorted = (ids: string[]): string[] => [...ids].filter(Boolean).sort();
+
+/** Stable fingerprint of what the standup would act on. */
+export function standupInputFingerprint(inputs: StandupFloorInputs): string {
+  const live = new Set(inputs.liveAgentIds);
+  const attention = inputs.tasks
+    .filter((t) => t && (t.status === 'doing' || t.status === 'waiting' || t.status === 'blocked'))
+    .map((t) => {
+      const gone = t.assignee && !live.has(t.assignee) ? 'gone' : (t.assignee || 'none');
+      return `${t.id}:${t.status}:${gone}:${t.waitingOn ?? ''}`;
+    })
+    .sort();
+  const fleet = inputs.fleetAgents
+    .filter((a) => a && !a.isGod)
+    .map((a) => {
+      const stalled = typeof a.lastActiveSecAgo === 'number' && a.lastActiveSecAgo >= STANDUP_STALL_SEC ? 1 : 0;
+      const breaker = a.breaker && a.breaker !== 'healthy' ? a.breaker : '';
+      return `${a.id}:b${breaker}:i${a.inboxBacklog ?? 0}:h${a.onHold ? 1 : 0}:s${stalled}`;
+    })
+    .sort();
+  return JSON.stringify({
+    r: sorted(inputs.ownerRequestIds),
+    s: sorted(inputs.stuckCardIds),
+    t: attention,
+    f: fleet
+  });
+}
+
+/** True when any standup focus item has something to act on. */
+export function standupHasWork(inputs: StandupFloorInputs): boolean {
+  if (inputs.ownerRequestIds.length > 0) return true;
+  if (inputs.stuckCardIds.length > 0) return true;
+  const live = new Set(inputs.liveAgentIds);
+  for (const t of inputs.tasks) {
+    if (!t || (t.status !== 'doing' && t.status !== 'waiting' && t.status !== 'blocked')) continue;
+    if (!t.assignee || !live.has(t.assignee)) return true;
+  }
+  for (const a of inputs.fleetAgents) {
+    if (!a || a.isGod) continue;
+    if (a.onHold) return true;
+    if ((a.inboxBacklog ?? 0) > 0) return true;
+    if (a.breaker && a.breaker !== 'healthy') return true;
+    if (typeof a.lastActiveSecAgo === 'number' && a.lastActiveSecAgo >= STANDUP_STALL_SEC) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether the built-in hourly standup should send (#55). Pure: callers pass
+ * `now` and floor inputs. Office open always fires; a quiet floor skips unless
+ * four hours have passed since the last real send.
+ */
+export function standupShouldRun(opts: {
+  inputs: StandupFloorInputs;
+  now: number;
+  lastDispatchedAt?: number;
+  force?: 'office-open';
+}): StandupDecision {
+  const fingerprint = standupInputFingerprint(opts.inputs);
+  if (opts.force === 'office-open') return { action: 'fire', reason: 'office-open', fingerprint };
+  if (standupHasWork(opts.inputs)) return { action: 'fire', reason: 'work', fingerprint };
+  const since = opts.now - (opts.lastDispatchedAt ?? 0);
+  if (since >= STANDUP_SAFETY_MS) return { action: 'fire', reason: 'safety-floor', fingerprint };
+  return { action: 'skip', fingerprint };
+}
+
 /* ──────────────────────────── one-schedule edits ──────────────────────────── */
 // Each operation names the one schedule it changes and is applied by main to the
 // list it reads at that moment, so a screen opened earlier can never delete a
@@ -206,11 +309,22 @@ export function upsertMission(list: ScheduledMission[], incoming: ScheduledMissi
   const prev = list.find((m) => m.id === incoming.id);
   if (!prev) return [...list, { ...incoming, createdBy: incoming.createdBy ?? OWNER }];
   const lastFiredAt = Math.max(incoming.lastFiredAt ?? 0, prev.lastFiredAt ?? 0) || undefined;
-  const merged: ScheduledMission = { ...incoming, lastFiredAt, createdBy: prev.createdBy ?? incoming.createdBy ?? OWNER };
+  const lastDispatchedAt = Math.max(incoming.lastDispatchedAt ?? 0, prev.lastDispatchedAt ?? 0) || undefined;
+  const lastSkippedAt = Math.max(incoming.lastSkippedAt ?? 0, prev.lastSkippedAt ?? 0) || undefined;
+  const merged: ScheduledMission = {
+    ...incoming,
+    lastFiredAt,
+    lastDispatchedAt,
+    lastSkippedAt,
+    standupInputFingerprint: incoming.standupInputFingerprint ?? prev.standupInputFingerprint,
+    createdBy: prev.createdBy ?? incoming.createdBy ?? OWNER
+  };
   // An explicit `weekly: undefined` is the switch back to interval mode, and
   // an absent or undefined `times` drops the extra lines.
   if (!('weekly' in incoming) || incoming.weekly === undefined) delete merged.weekly;
   if (!('times' in incoming) || incoming.times === undefined) delete merged.times;
+  if (!lastDispatchedAt) delete merged.lastDispatchedAt;
+  if (!lastSkippedAt) delete merged.lastSkippedAt;
   return list.map((m) => (m.id === incoming.id ? merged : m));
 }
 
