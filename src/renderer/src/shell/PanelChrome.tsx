@@ -149,6 +149,7 @@ export function PanelTabs<K extends string>({ tabs, current, onChange }: {
   // Which physical edges have tabs hidden past them. scrollLeft runs 0 to
   // negative in RTL, so the distance from the start is its absolute value.
   const [hidden, setHidden] = useState({ left: false, right: false });
+  const tabKeys = tabs.map((tab) => tab.key).join(' ');
   useEffect(() => {
     const el = stripRef.current;
     if (!el) return;
@@ -171,14 +172,17 @@ export function PanelTabs<K extends string>({ tabs, current, onChange }: {
     measure();
     el.addEventListener('scroll', measure, { passive: true });
     el.addEventListener('wheel', onWheel, { passive: false });
+    // Watch each tab too: a language switch or the font loading changes the
+    // labels' widths without resizing the row itself.
     const ro = new ResizeObserver(measure);
     ro.observe(el);
+    for (const tab of el.children) ro.observe(tab);
     return () => {
       el.removeEventListener('scroll', measure);
       el.removeEventListener('wheel', onWheel);
       ro.disconnect();
     };
-  }, [rtl, tabs.length]);
+  }, [rtl, tabKeys]);
   const fade = hidden.left || hidden.right
     ? `linear-gradient(to right, ${hidden.left ? 'transparent, #000 28px' : '#000'}, ${hidden.right ? '#000 calc(100% - 28px), transparent' : '#000'})`
     : undefined;
