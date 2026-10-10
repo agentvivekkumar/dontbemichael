@@ -112,6 +112,7 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
   assert.ok(at > 0);
   assert.ok(at < main.indexOf('const res = ptyManager.spawn(opts, owner);', at), 'right before the spawn');
   assert.match(main, /hasMailTools\(readConfig\(\)\.agentCapabilities\?\.\[agentId\]\)/, 'own mailbox or a Send only grant');
+  assert.match(main, /mdMailMcpPath\(home, agentId\)/, 'token file under harnessHome/private (#63)');
   assert.match(read('electron-builder.yml'), /from: resources\/md-mail-mcp\.cjs/);
 });
 

@@ -29,6 +29,9 @@ import { listDir, readFileText, readFileBinary, writeFileText, statAbs, expandTi
 import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } from '../shared/askMeRouting';
 import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
 import { answerKey, catchUpRequests, ownerWorkOrder } from '../shared/ownerRequests';
+import {
+  agentMcpDir, legacyMdMailMcpPath, mdMailMcpPath, privateRoot
+} from '../shared/agentPrivatePaths';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
@@ -124,7 +127,7 @@ import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, syncOfficeRecord } from './officeFile';
-import { folderPolicy, type FolderLayout } from '../shared/folderAccess';
+import { folderPolicy, type AgentFolderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
 import { cleanCompanyProfile, companyProfileContext } from '../shared/companyProfile';
 import { scheduledRunBody } from '../shared/scheduleMessage';
@@ -606,6 +609,51 @@ function mdMailScriptPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'md-mail-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-mail-mcp.cjs');
 }
 
+/** Delete this agent's md-mail MCP file from the private dir and the legacy
+ *  hive path (#63). Best-effort; missing files are fine. */
+function removeMdMailMcp(agentId: string | undefined): void {
+  if (!agentId || !/^[\w.-]+$/.test(agentId)) return;
+  const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
+  const root = hive.root();
+  if (home) {
+    try { unlinkSync(mdMailMcpPath(home, agentId)); } catch { /* gone */ }
+    try { rmSync(agentMcpDir(home, agentId), { recursive: true, force: true }); } catch { /* gone */ }
+  }
+  if (root) {
+    try { unlinkSync(legacyMdMailMcpPath(root, agentId)); } catch { /* gone */ }
+  }
+}
+
+/**
+ * Drop private/agent-mcp folders for agents that have no live PTY (#63 orphan
+ * sweep). A crash can leave a token file behind after revoke; startup clears it.
+ */
+function sweepOrphanAgentMcp(): void {
+  const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
+  if (!home) return;
+  const root = join(privateRoot(home), 'agent-mcp');
+  if (!existsSync(root)) return;
+  const live = new Set<string>();
+  for (const aid of ptyToAgent.values()) live.add(aid);
+  try {
+    for (const id of readdirSync(root)) {
+      if (live.has(id)) continue;
+      try { rmSync(join(root, id), { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
+  } catch (e) { console.error('[mail] orphan agent-mcp sweep:', e); }
+  // Legacy leftovers under hive/agents/<id>/md-mail.mcp.json
+  const hiveRoot = hive.root();
+  if (!hiveRoot) return;
+  try {
+    const agents = join(hiveRoot, 'agents');
+    if (!existsSync(agents)) return;
+    for (const id of readdirSync(agents)) {
+      if (live.has(id)) continue;
+      try { unlinkSync(legacyMdMailMcpPath(hiveRoot, id)); } catch { /* none */ }
+    }
+  } catch { /* best-effort */ }
+}
+
 const mailAdmin = {
   getConfig: () => readConfig(),
   saveConfig: (patch: Partial<HarnessConfig>) => { writeConfig(patch); },
@@ -709,13 +757,17 @@ function teardownPty(id: string): void {
   // (workers card via the hive:agentSpawned broadcast in processSpawnRequest).
   // pty id == worker id == agent id for workers.
   const wasWorker = liveWorkers.has(id);
-  // 0) Revoke this id's broker capability (if any). Idempotent + harmless for a
-  //    non-worker PTY; ensures a dead worker's token can never reach an integration.
+  const agentId = ptyToAgent.get(id);
+  // 0) Drop the md-mail MCP file that holds this agent's broker token (#63),
+  //    then revoke this id's broker capability (if any). File first so a sibling
+  //    cannot read a live path after revoke races a slow delete. Idempotent +
+  //    harmless for a non-worker PTY; ensures a dead worker's token can never
+  //    reach an integration.
+  try { removeMdMailMcp(agentId ?? id); } catch { /* best-effort */ }
   try { integrationBroker.revoke(id); } catch { /* best-effort */ }
   // 1) Archive the agent — retained + flagged; only live-PTY agents are active.
   if (ptyCli.delete(id)) void refreshCliUpdate();
   connectorPlans.delete(id);
-  const agentId = ptyToAgent.get(id);
   if (agentId) {
     ptyToAgent.delete(id);
     // Drop watchdog state so a dead agent can't get nudged or leak its grace.
@@ -2025,6 +2077,16 @@ function migrateBusinessFolder(): void {
 /** Every team member's folder and Michael's, for the access rules
  *  (folderAccess.ts): the folders picked at setup plus every hired agent's,
  *  archived ones included (their files are still theirs). */
+/** An office without a business folder keeps no team folders apart, and its
+ *  shell commands are not held to the sandbox, as before; only the app's
+ *  private folder is closed to every agent (issue #63). */
+function privateOnlyFolderPolicy(isGod: boolean, cwd: string): AgentFolderPolicy | undefined {
+  const home = readConfig().harnessHome;
+  if (!home) return undefined;
+  const layout = folderLayoutFor(undefined, [], expandTilde(home));
+  return { ...folderPolicy({ isGod, cwd }, layout, process.platform !== 'linux'), sandboxOnly: false };
+}
+
 function businessFolderLayout(businessFolder: string): FolderLayout {
   const cfg = readConfig();
   const folders = (cfg.businessTeam ?? []).map((m) => m.folder);
@@ -3456,7 +3518,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
               businessFolderLayout(businessFolder),
               process.platform !== 'linux'
             )
-            : undefined,
+            : privateOnlyFolderPolicy(!!opts.hive.isGod, opts.cwd),
           docTextCliPath: docTextCliPath(),
           connectors: connectorPlan?.plan
         }
@@ -3727,14 +3789,18 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // takes several values, so it must stay the last argument.
   if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
     const agentId = opts.hive.id;
+    const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
     const root = hive.root();
     // A Send only grant alone gets the tools too (shared-mailboxes.md, item 1).
-    if (root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
+    if (home && root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
       try {
+        // Fresh token every spawn (#63 rotate on respawn); old path under agents/
+        // is removed so siblings cannot read a leftover broker token.
         const token = integrationBroker.grant(opts.id, [], agentId);
-        const file = join(root, 'agents', agentId, 'md-mail.mcp.json');
+        const file = mdMailMcpPath(home, agentId);
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, JSON.stringify({ mcpServers: { 'md-mail': { command: hive.nodeCommand(), args: [mdMailScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } } } }, null, 2), { mode: 0o600 });
+        try { unlinkSync(legacyMdMailMcpPath(root, agentId)); } catch { /* none left */ }
         opts.args = [...(opts.args ?? []), '--mcp-config', file];
       } catch (e) { console.error('[mail] md-mail config:', e); }
     }
@@ -6780,6 +6846,7 @@ function bootstrapHiveServices(): void {
   hive.setBusinessOffice(!!(readConfig().businessFolder || readConfig().officeFolder));
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
+  try { sweepOrphanAgentMcp(); } catch (e) { console.error('[mail] orphan agent-mcp sweep failed', e); }
   // Read the Claude account's connectors in the background (D11).
   void refreshClaudeConnectors('start');
   // Waiting schedule requests reach Michael, and ones he leaves undecided
