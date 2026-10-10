@@ -156,3 +156,11 @@ test('quitting starts closing time on the floor, with no dialog (owner, 2026-09-
     for (const k of ['title', 'starting', 'left', 'leftPlural', 'hideWho', 'confirmForce', 'keepClosing', 'tryAgain']) assert.ok(d.closingBar[k], `${loc}: closingBar.${k}`);
   }
 });
+
+test('the list that takes focus from code shows the focus ring to the keyboard, inside its scrolling panel', () => {
+  // Value: protects=a keyboard user sees where focus went after Remind or a refused Close without them; fails_when=the list hides its outline again (an inline outline beats the global :focus-visible ring) or the ring is drawn outside the scrolling panel that would clip it; why_new=no test above looks at focus styling; seam=none
+  const list = read('src/renderer/src/components/ClosingTimeBar.tsx').match(/<div ref=\{listRef\}[^\n]*/)[0];
+  assert.match(list, /className="cth-closing-list"/);
+  assert.doesNotMatch(list, /outline/, 'an inline outline would hide the ring from the keyboard');
+  assert.match(read('src/renderer/src/design/global.css'), /\.cth-closing-list:focus-visible \{ outline-offset: -2px; \}/);
+});
