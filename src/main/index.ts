@@ -87,7 +87,7 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
 import { standingFitCheck } from './standingCheck';
-import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingMode, sendingWords } from '../shared/mailboxes';
+import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -609,7 +609,9 @@ const mailAdmin = {
   setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
   deleteSecret: (ref: string) => integrations.deleteSecret(ref),
   endGrant: (agentId: string, mailbox: string, reason: string) => mailApprovals.endGrant(agentId, mailbox, reason),
-  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); }
+  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); },
+  sendingChanged: (agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean) => mailApprovals.sendingChanged(agentId, mailbox, address, sending, handBack),
+  present: memberPresent
 };
 
 /**
@@ -6748,6 +6750,13 @@ function bootstrapHiveServices(): void {
   // Waiting schedule requests reach Michael, and ones he leaves undecided
   // reach the owner (sweepScheduleRequests).
   try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+  // Can send puts nothing on Ask me: cards filed before that rule go back to
+  // their member with a notice that replaces an old note to propose.
+  try {
+    const cfg = readConfig();
+    // Only where the member can send now: a paused grant keeps its cards on Ask me.
+    mailApprovals.handBackCanSend((agentId, mailbox) => (memberPresent(agentId) && sendingFor(cfg, agentId, mailbox) === 'send' && mailAccess(cfg, agentId, mailbox, 'send', undefined, { present: memberPresent }).ok ? mailboxAddress(cfg, mailbox) : null));
+  } catch (e) { console.error('[mail] Can send hand back failed', e); }
   if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
   scheduleSweepTimer = setInterval(() => {
     try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }

@@ -15,7 +15,7 @@ const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
-const { mailAccess, sendOnlyGrant, grantPaused, hasMailTools, mailToolsJustAttached, sendersFrom } = loadTs('src/shared/mailboxes.ts');
+const { mailAccess, mailboxAddress, sendOnlyGrant, sendingFor, grantPaused, hasMailTools, mailToolsJustAttached, sendersFrom } = loadTs('src/shared/mailboxes.ts');
 const { OWN_SENDS_ONLY, addSendRecord, SEND_RECORDS_KEPT, proposalSendProblem } = loadTs('src/shared/mailProposals.ts');
 const { MailService, handleMailRequest, setAgentCapabilities, setSendOnly, removeMailbox } = loadTs('src/main/mail.ts');
 const { MailApprovals, PAUSE_NOTICE_MS } = loadTs('src/main/mailApprovals.ts');
@@ -91,15 +91,18 @@ function setup(t, cfg = office(), opts = {}) {
     setSecret: () => ({ ok: true }),
     deleteSecret() {},
     endGrant: (a, m, r) => approvals.endGrant(a, m, r),
-    cancelFor: (a, m, r) => approvals.cancel({ agentId: a, mailbox: m }, r)
+    cancelFor: (a, m, r) => approvals.cancel({ agentId: a, mailbox: m }, r),
+    sendingChanged: (a, m, addr, s, hb) => approvals.sendingChanged(a, m, addr, s, hb),
+    present
   };
   return { cfg, state, out, approvals, call, admin, svc, dir, tick: (ms) => { clock += ms; } };
 }
 
-test('the access table: a Send only member lists, drafts, proposes and sends, and never reads or organizes', () => {
+test('the access table: a Send only member lists, drafts and sends, and never reads or organizes', () => {
   // Value: protects=a grantee never reads the owner's mailbox; fails_when=the grant branch lets a read op through or comes after the email gate; why_new=mail-edges covers owners only; seam=none
   const cfg = office('send');
-  for (const op of ['list', 'draft', 'propose', 'send']) assert.equal(mailAccess(cfg, 'dwight', 'ceo', op).ok, true, op);
+  for (const op of ['list', 'draft', 'send']) assert.equal(mailAccess(cfg, 'dwight', 'ceo', op).ok, true, op);
+  assert.match(mailAccess(cfg, 'dwight', 'ceo', 'propose').reason, /You can send from ceo@x\.com without approval/);
   for (const op of ['read', 'organize']) {
     const r = mailAccess(cfg, 'dwight', 'ceo', op);
     assert.equal(r.ok, false, op);
@@ -259,6 +262,12 @@ test('list_mailboxes shows the grant with its own sending, standing approvals an
   const b = await both.call('dwight', 'list_mailboxes', {});
   assert.deepEqual(b.body.mailboxes.map((m) => m.mailbox), ['sales', 'ceo']);
   assert.equal(b.body.sending, 'can send');
+  // Value: protects=a Can send member is told propose is refused where it learns how it sends (owner, 2026-10-09); fails_when=the Can send how or the propose tool text goes back to inviting a proposal, so the member proposes and is refused every time; why_new=only the refusal itself was tested; seam=none
+  for (const how of [b.body.how, b.body.mailboxes[1].how]) {
+    assert.match(how, /propose is refused: nothing goes on Ask me/);
+    assert.doesNotMatch(how, /may still propose/);
+  }
+  assert.match(read('resources/md-mail-mcp.cjs'), /name: 'propose',\n\s+description: 'Put an email on Ask me for the owner to approve \(Send on approval only; Can send and Draft only refuse it\)\./);
 });
 
 test('send on approval under a grant: the thread is kept on the card and the approved email threads', async (t) => {
@@ -496,17 +505,20 @@ test('moving a grant to another mailbox ends the old one; a card from before the
   approvals.decide(p, 'approve', {}, '', 'Intro emails');
   const keep = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'c@d.com', subject: 'Two', body: 'b' })).body.proposal;
 
-  // Send on approval to Can send on the same mailbox withdraws nothing.
+  // Send on approval to Can send on the same mailbox: the approved card and
+  // the standing approval stay; the waiting one is handed back.
   assert.equal(setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' }).ok, true);
-  assert.equal(approvals.get(keep).state, 'waiting');
+  assert.equal(approvals.get(p).state, 'approved');
+  assert.equal(approvals.get(keep).state, 'cancelled');
   assert.equal(approvals.standing('dwight').length, 1);
+  const keep2 = approvals.file({ agentId: 'dwight', mailbox: 'ceo', to: 'c@d.com', subject: 'Two', body: 'b' }).id;
 
   out.messages.length = 0;
   assert.equal(setSendOnly(admin, 'dwight', { mailbox: 'support', sending: 'approval' }).ok, true);
   assert.deepEqual(cfg.agentCapabilities.dwight.sendOnly, { mailbox: 'support', sending: 'approval' });
   assert.equal(approvals.get(p).state, 'cancelled');
-  assert.equal(approvals.get(keep).state, 'cancelled');
-  assert.match(approvals.get(keep).cancelReason, /removed your Send only access to ceo@x\.com/);
+  assert.equal(approvals.get(keep2).state, 'cancelled');
+  assert.match(approvals.get(keep2).cancelReason, /removed your Send only access to ceo@x\.com/);
   assert.equal(approvals.standing('dwight').length, 0, 'the standing approval on ceo@ is revoked, not moved');
   assert.ok(out.messages.some((m) => m.to === 'dwight' && /revoked/.test(m.subject)));
 
@@ -605,4 +617,223 @@ test('a member\'s own mailbox follows the same rule: Draft only withdraws, losin
   removeMailbox({ close() {} }, admin, 'ceo');
   assert.equal(approvals.get(kp).state, 'cancelled');
   assert.match(approvals.get(kp).cancelReason, /ceo@x\.com was removed in Settings/);
+});
+
+test('Can send puts nothing on Ask me: switching to it hands back waiting cards, tells the member and overrides an old note to propose', async (t) => {
+  // Value: protects=a member the owner moved to Can send stops filing Ask me cards even when its memory says to propose (owner, 2026-10-09: Dwight kept raising cards on Can send); fails_when=propose or a standing send files a card on Can send, a switch to Can send leaves waiting cards on Ask me, or the member is not told and its memory not updated; why_new=a switch to Can send did nothing and propose stayed open on it; seam=none
+  const { call, approvals, admin, cfg, out, svc } = setup(t, office('approval'));
+  const sent = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'Batch 1', body: 'b', offer_standing: 'Follow ups' })).body.proposal;
+  approvals.decide(sent, 'approve', {}, '', 'Follow ups');
+  const rule = approvals.standing('dwight')[0];
+  const waiting = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'lead@client.com', subject: 'Batch 2', body: 'b' })).body.proposal;
+  assert.equal(approvals.waiting().length, 1);
+  out.messages.length = 0; out.memory.length = 0;
+
+  assert.equal(setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' }).ok, true);
+  assert.equal(approvals.waiting().length, 0, 'off Ask me');
+  assert.equal(approvals.get(waiting).state, 'cancelled');
+  assert.match(approvals.get(waiting).cancelReason, /Can send from ceo@x\.com, so it is yours to send/);
+  assert.equal(approvals.get(sent).state, 'approved', 'an approved card can still go by its id');
+  const msg = out.messages.find((m) => m.to === 'dwight');
+  assert.equal(msg.subject, 'Sending changed');
+  assert.match(msg.body, /to Can send\. Send each email yourself with send; propose is refused and nothing goes on Ask me\./);
+  assert.match(msg.body, /replaces any memory note about how you send from there/);
+  assert.match(msg.body, /"Batch 2" to lead@client\.com \(mp_/);
+  assert.equal(out.messages.filter((m) => m.to === 'dwight').length, 1, 'one message');
+  assert.equal(out.memory.length, 1);
+  assert.match(out.memory[0][1], /your Sending from ceo@x\.com is Can send\. .*replaces any earlier note about how you send from there/);
+
+  // An old note to propose no longer reaches Ask me, and neither does an old standing id.
+  const ask = await call('dwight', 'propose', { mailbox: 'ceo', to: 'x@y.com', subject: 'Batch 3', body: 'b' });
+  assert.equal(ask.status, 403);
+  assert.match(ask.body.error, /Send the email yourself with send; nothing goes on Ask me/);
+  // A fit check that says no would have filed a card under Send on approval.
+  const brokerCall = (op, body) => handleMailRequest(svc, { getConfig: () => cfg, proposals: approvals, fitCheck: async () => ({ fits: false, reason: 'no' }) }, 'dwight', op, body);
+  const viaStanding = await brokerCall('send', { mailbox: 'ceo', to: 'x@y.com', subject: 'Batch 3', body: 'b', standing: rule.id });
+  assert.equal(viaStanding.status, 200);
+  assert.equal(viaStanding.body.sent, true);
+  assert.equal(approvals.waiting().length, 0, 'nothing filed for the owner');
+  const direct = await call('dwight', 'send', { mailbox: 'ceo', to: 'z@y.com', subject: 'Batch 4', body: 'b' });
+  assert.equal(direct.status, 200);
+
+  // Back to Send on approval: told and noted, nothing withdrawn.
+  out.messages.length = 0; out.memory.length = 0;
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'approval' });
+  assert.equal(approvals.get(sent).state, 'approved');
+  assert.match(out.messages.find((m) => m.to === 'dwight').body, /to Send on approval\. Propose each email/);
+  assert.doesNotMatch(out.messages.find((m) => m.to === 'dwight').body, /were waiting on Ask me/);
+  assert.match(out.memory[0][1], /is Send on approval\./);
+  assert.match(out.memory[0][1], /still goes with its standing id/, 'the note keeps standing approvals in force');
+  // The same Sending again is no change: nothing is said.
+  out.messages.length = 0;
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'approval' });
+  assert.equal(out.messages.length, 0);
+
+  // A member's own mailbox follows the same rule.
+  const pw = (await call('pam', 'propose', { mailbox: 'ceo', to: 'q@r.com', subject: 'Own', body: 'b' })).body.proposal;
+  setAgentCapabilities(admin, 'pam', { email: { enabled: true, mailboxes: ['ceo'], send: true, sending: 'send' } });
+  assert.equal(approvals.get(pw).state, 'cancelled');
+  assert.ok(out.messages.some((m) => m.to === 'pam' && m.subject === 'Sending changed' && /"Own" to q@r\.com/.test(m.body)));
+  assert.equal((await call('pam', 'propose', { mailbox: 'ceo', to: 'q@r.com', subject: 'Own', body: 'b' })).status, 403);
+  // Saving the same Sending again, or an older record with only send: true, is no change.
+  out.messages.length = 0; out.memory.length = 0;
+  setAgentCapabilities(admin, 'pam', { email: { enabled: true, mailboxes: ['ceo'], send: true, sending: 'send' } });
+  setAgentCapabilities(admin, 'pam', { email: { enabled: true, mailboxes: ['ceo'], send: true } });
+  assert.equal(out.messages.filter((m) => m.to === 'pam').length, 0, 'the same Sending saved again says nothing');
+  assert.equal(out.memory.length, 0);
+
+  // Wired in the app, and every new line the member reads has no dash.
+  assert.match(read('src/main/index.ts'), /sendingChanged: \(agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean\) => mailApprovals\.sendingChanged\(agentId, mailbox, address, sending, handBack\)/);
+  for (const text of [msg.body, out.memory.map((m) => m[1]).join(''), ask.body.error, approvals.get(waiting).cancelReason]) assert.doesNotMatch(text, /[–—]| - /);
+});
+
+test('at launch, cards waiting from a member already on Can send go back to it once, with the notice', async (t) => {
+  // Value: protects=an office switched to Can send before this rule (Dwight: six cards and a memory note to propose) gets the same hand back as a switch, with no data patch; fails_when=the launch sweep is dropped, hands back cards of a member on Send on approval, or repeats; why_new=the switch hook never fires for a member already on Can send; seam=none
+  const { call, approvals, cfg, out } = setup(t, office('approval'));
+  const d1 = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'One', body: 'b' })).body.proposal;
+  const d2 = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'c@d.com', subject: 'Two', body: 'b' })).body.proposal;
+  const p1 = (await call('pam', 'propose', { mailbox: 'ceo', to: 'e@f.com', subject: 'Three', body: 'b' })).body.proposal;
+  // The owner moved Dwight to Can send on a build without the switch notice.
+  cfg.agentCapabilities.dwight.sendOnly.sending = 'send';
+  out.messages.length = 0; out.memory.length = 0;
+  const canSend = (a, m) => (sendingFor(cfg, a, m) === 'send' ? mailboxAddress(cfg, m) : null);
+  assert.equal(approvals.handBackCanSend(canSend), 1);
+  assert.equal(approvals.get(d1).state, 'cancelled');
+  assert.equal(approvals.get(d2).state, 'cancelled');
+  assert.equal(approvals.get(p1).state, 'waiting', 'Send on approval keeps its card');
+  const told = out.messages.filter((m) => m.to === 'dwight');
+  assert.equal(told.length, 1, 'one message for both cards');
+  assert.match(told[0].body, /"One" to a@b\.com[\s\S]*"Two" to c@d\.com/);
+  assert.equal(out.memory.filter(([id]) => id === 'dwight').length, 1);
+  assert.equal(approvals.handBackCanSend(canSend), 0, 'nothing twice');
+  assert.equal(sendingFor(cfg, 'dwight', 'sales'), 'send', 'its own mailbox');
+  assert.equal(sendingFor(cfg, 'dwight', 'support'), null, 'a mailbox it does not keep');
+  const main = read('src/main/index.ts');
+  assert.match(main, /const cfg = readConfig\(\);\n[^\n]*\n\s+mailApprovals\.handBackCanSend\(\(agentId, mailbox\) => \(memberPresent\(agentId\) && sendingFor\(cfg, agentId, mailbox\) === 'send' && mailAccess\(cfg, agentId, mailbox, 'send', undefined, \{ present: memberPresent \}\)\.ok \? mailboxAddress\(cfg, mailbox\) : null\)\);/, 'only where the member can send now, with the same presence check as the approval sweep');
+});
+
+test('a switch to Draft only withdraws, then tells the member its new Sending and notes it', async (t) => {
+  // Value: protects=a member set to Draft only gets the Sending changed notice and memory note that replace an old note to send or propose (owner, 2026-10-09); fails_when=the Draft only branch skips sendingChanged, it runs before the withdraw, or the note names the wrong mode; why_new=the new Can send test covers send and approval only; seam=none
+  const { call, approvals, admin, out } = setup(t, office('approval'));
+  const w = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'Draft me', body: 'b' })).body.proposal;
+  out.messages.length = 0; out.memory.length = 0;
+  assert.equal(setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'draft' }).ok, true);
+  assert.equal(approvals.get(w).state, 'cancelled');
+  assert.match(approvals.get(w).cancelReason, /Draft only from ceo@x\.com/, 'withdrawn by the Draft only cancel, not the Can send hand back');
+  const told = out.messages.filter((m) => m.to === 'dwight');
+  assert.equal(told.length, 2, 'the withdraw notice, then the Sending notice');
+  assert.equal(told[1].subject, 'Sending changed');
+  assert.match(told[1].body, /to Draft only\. Save each email as a draft for the owner to send; send and propose are refused\./);
+  assert.doesNotMatch(told[1].body, /were waiting on Ask me/, 'nothing handed back to send');
+  assert.equal(out.memory.length, 1);
+  assert.match(out.memory[0][1], /your Sending from ceo@x\.com is Draft only\. Save each email as a draft/);
+
+  // A member's own mailbox follows the same rule.
+  out.messages.length = 0; out.memory.length = 0;
+  setAgentCapabilities(admin, 'pam', { email: { enabled: true, mailboxes: ['ceo'], send: false, sending: 'draft' } });
+  assert.ok(out.messages.some((m) => m.to === 'pam' && m.subject === 'Sending changed' && /to Draft only\./.test(m.body)));
+  assert.match(out.memory.find(([id]) => id === 'pam')[1], /is Draft only\./);
+});
+
+test('after a switch to Can send, an email the owner already approved still goes out by its id, as approved', async (t) => {
+  // Value: protects=the promise in the Sending notice that approved cards stay and send by their id on Can send (owner, 2026-10-09); fails_when=the proposal id branch is skipped on Can send like the standing id, so the call's own text goes out or the send is refused; why_new=the Can send test checks the card stays approved but never sends it; seam=none
+  const { call, approvals, admin, state } = setup(t, office('approval'));
+  const p = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'Draft subject', body: 'first' })).body.proposal;
+  approvals.decide(p, 'approve', { subject: 'Owner subject', body: 'owner body' }, '');
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' });
+  assert.equal(approvals.get(p).state, 'approved');
+  const r = await call('dwight', 'send', { mailbox: 'ceo', proposal: p, to: 'other@b.com', subject: 'Agent subject', body: 'agent body' });
+  assert.equal(r.status, 200);
+  assert.equal(state.sends.length, 1);
+  assert.equal(state.sends[0].subject, 'Owner subject', 'the approved version, never the call\'s text');
+  assert.equal(state.sends[0].to, 'a@b.com');
+  assert.equal(approvals.get(p).state, 'sent');
+});
+
+test('a standing send whose check is still running when the owner picks Can send goes out, and nothing lands on Ask me', async (t) => {
+  // Value: protects=Can send puts nothing on Ask me even when the switch lands during a standing send's fit check (owner, 2026-10-09); fails_when=the filing after a failed check ignores the member's current Sending; why_new=QA probe 002 reproduced a waiting card for a Can send member; seam=none
+  const { approvals, admin, cfg, out, svc, state } = setup(t, office('approval'));
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const call = (agent, op, body) => handleMailRequest(svc, { getConfig: () => cfg, proposals: approvals, present: () => true, audit: (e) => out.audit.push(e), fitCheck: async () => { await gate; return { fits: false, reason: 'not this kind' }; } }, agent, op, body);
+  const p = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'Intro', body: 'b', offer_standing: 'Intros' })).body.proposal;
+  approvals.decide(p, 'approve', {}, '', 'Intros');
+  const rule = approvals.standing('dwight')[0];
+  const sends = state.sends.length;
+  const pending = call('dwight', 'send', { mailbox: 'ceo', to: 'new@client.com', subject: 'Hello', body: 'Hi', standing: rule.id });
+  await new Promise((r) => setTimeout(r, 10));
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' });
+  release();
+  const res = await pending;
+  assert.equal(res.status, 200);
+  assert.equal(res.body.proposal, undefined, 'no card was filed');
+  assert.equal(approvals.waiting().filter((x) => x.agentId === 'dwight').length, 0, 'nothing on Ask me');
+  assert.equal(state.sends.length, sends + 1, 'it went out');
+  assert.equal(approvals.getStanding(rule.id).sends.length, 0, 'not counted as a standing send');
+  assert.ok(out.audit.some((e) => e.kind === 'mail-sent' && e.grant === true), 'logged as a grant send');
+
+  // Still on Send on approval, a failed check files the card as before.
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'approval' });
+  const p2 = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'c@d.com', subject: 'Intro 2', body: 'b', offer_standing: 'Intros two' })).body.proposal;
+  approvals.decide(p2, 'approve', {}, '', 'Intros two');
+  const rule2 = approvals.standing('dwight').find((r) => r.kind === 'Intros two');
+  const held = await call('dwight', 'send', { mailbox: 'ceo', to: 'x@y.com', subject: 'Held', body: 'Hi', standing: rule2.id });
+  assert.equal(held.body.sent, false);
+  assert.equal(approvals.get(held.body.proposal).state, 'waiting');
+});
+
+test('a paused grant moved to Can send keeps its waiting emails on Ask me, at the switch and at launch', async (t) => {
+  // Value: protects=an email is never taken off Ask me for a member that cannot send it, so its text is not stranded (Codex adversarial review, 2026-10-09); fails_when=sendingChanged or the launch hand back ignores a paused grant; why_new=hand back keyed only off the Sending mode; seam=none
+  const { call, approvals, admin, cfg, out } = setup(t, office('approval'));
+  const w = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'lead@client.com', subject: 'Held', body: 'b' })).body.proposal;
+  // Nobody reads ceo@ any more, so Dwight's grant there is paused.
+  cfg.agentCapabilities.pam.email = { enabled: false, mailboxes: [], send: false, sending: 'draft' };
+  out.messages.length = 0;
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' });
+  assert.equal(approvals.get(w).state, 'waiting', 'still on Ask me');
+  const told = out.messages.find((m) => m.to === 'dwight');
+  assert.equal(told.subject, 'Sending changed', 'still told about the change');
+  assert.doesNotMatch(told.body, /were waiting on Ask me/, 'nothing handed back');
+  const canSendNow = (a, m) => (sendingFor(cfg, a, m) === 'send' && mailAccess(cfg, a, m, 'send').ok ? mailboxAddress(cfg, m) : null);
+  assert.equal(approvals.handBackCanSend(canSendNow), 0, 'launch keeps it too');
+  assert.equal(approvals.get(w).state, 'waiting');
+  // Once someone reads ceo@ again, the next launch hands it back.
+  cfg.agentCapabilities.pam.email = { enabled: true, mailboxes: ['ceo'], send: false, sending: 'approval' };
+  assert.equal(approvals.handBackCanSend(canSendNow), 1);
+  assert.equal(approvals.get(w).state, 'cancelled');
+});
+
+test('a standing send whose approval is revoked while its check runs still goes out once the owner picks Can send', async (t) => {
+  // Value: protects=on Can send a standing id is ignored for the whole send, so a revoke during the check can't refuse it (Codex adversarial review, 2026-10-09); fails_when=the standing re-check runs before the Can send check; why_new=the pass 1 race fix only covered a failed check; seam=none
+  const { approvals, admin, cfg, out, svc, state } = setup(t, office('approval'));
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const call = (agent, op, body) => handleMailRequest(svc, { getConfig: () => cfg, proposals: approvals, present: () => true, audit: (e) => out.audit.push(e), fitCheck: async () => { await gate; return { fits: true }; } }, agent, op, body);
+  const p = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'a@b.com', subject: 'Intro', body: 'b', offer_standing: 'Intros' })).body.proposal;
+  approvals.decide(p, 'approve', {}, '', 'Intros');
+  const rule = approvals.standing('dwight')[0];
+  const sends = state.sends.length;
+  const pending = call('dwight', 'send', { mailbox: 'ceo', to: 'new@client.com', subject: 'Hello', body: 'Hi', standing: rule.id });
+  await new Promise((r) => setTimeout(r, 10));
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' });
+  assert.deepEqual(approvals.revokeStanding(rule.id), { ok: true });
+  release();
+  const res = await pending;
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(state.sends.length, sends + 1, 'it went out');
+});
+
+test('a grant whose mailbox reader left the team counts as paused: moving it to Can send keeps its cards on Ask me', async (t) => {
+  // Value: protects=a waiting email stays on Ask me when nobody on the team reads the mailbox the member sends from (Codex adversarial review pass 2, 2026-10-09); fails_when=the hand back checks the config only and not who is on the roster; why_new=the paused check ignored presence; seam=none
+  let pamHere = true;
+  const { call, approvals, admin, cfg } = setup(t, office('approval'), { present: (id) => id !== 'pam' || pamHere });
+  const w = (await call('dwight', 'propose', { mailbox: 'ceo', to: 'lead@client.com', subject: 'Held', body: 'b' })).body.proposal;
+  pamHere = false; // Pam, who reads ceo@, was archived
+  setSendOnly(admin, 'dwight', { mailbox: 'ceo', sending: 'send' });
+  assert.equal(approvals.get(w).state, 'waiting', 'still on Ask me');
+  const present = (id) => id !== 'pam' || pamHere;
+  const canSendNow = (a, m) => (present(a) && sendingFor(cfg, a, m) === 'send' && mailAccess(cfg, a, m, 'send', undefined, { present }).ok ? mailboxAddress(cfg, m) : null);
+  assert.equal(approvals.handBackCanSend(canSendNow), 0, 'launch keeps it too');
+  pamHere = true;
+  assert.equal(approvals.handBackCanSend(canSendNow), 1, 'handed back once she is back');
 });
