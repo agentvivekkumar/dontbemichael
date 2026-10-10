@@ -36,6 +36,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
+const { onWindows, posixOnly } = require('./platform.cjs');
 
 const electron = require.resolve('electron');
 require.cache[electron] = {
@@ -61,6 +62,11 @@ const under = (dir, p) => {
   return x === d || x.startsWith(d.endsWith('/') ? d : `${d}/`);
 };
 const anyUnder = (dirs, p) => dirs.some((d) => under(d, p));
+
+// Claude Code has no shell sandbox on Windows, so the app does not ask for
+// sandbox only there (hive.ts) and nothing fences a shell command. The file
+// tool rules, the hook and the connector gate still hold, and are checked.
+const SHELL_FENCED = !onWindows;
 
 /** The folder in a Claude permission rule: `Read(//Users/a/Biz/Admin/**)` → `/Users/a/Biz/Admin`. */
 function ruleDir(rule, tool) {
@@ -190,12 +196,12 @@ test('office privacy conformance: folders, shell writes and connectors hold for 
       for (const peer of peersOf(id)) {
         const f = file(ownOf(peer));
         assert.ok(!view.toolsMayRead(f), `${who}file tools must not read ${rel(f)}`);
-        assert.ok(!view.shellMayRead(f), `${who}the shell must not read ${rel(f)}`);
+        if (SHELL_FENCED) assert.ok(!view.shellMayRead(f), `${who}the shell must not read ${rel(f)}`);
         assert.ok(!view.toolsMayWrite(f), `${who}file tools must not change ${rel(f)}`);
       }
       // Michael's own files cannot be a static file tool rule (it would hide the
       // folders inside his), so the shell sandbox holds them here and the hook below.
-      for (const f of [michaelsFile, unownedFile]) assert.ok(!view.shellMayRead(f), `${who}the shell must not read ${rel(f)}`);
+      if (SHELL_FENCED) for (const f of [michaelsFile, unownedFile]) assert.ok(!view.shellMayRead(f), `${who}the shell must not read ${rel(f)}`);
       const own = file(ownOf(id));
       assert.ok(view.toolsMayRead(own) && view.toolsMayWrite(own) && view.shellMayRead(own), `${who}its own folder stays open`);
 
@@ -228,7 +234,7 @@ test('office privacy conformance: folders, shell writes and connectors hold for 
     assert.ok(!denied(await o.hook('god', 'Write', { file_path: michaelsFile, content: 'x' })), 'michael: his own folder stays his');
   });
 
-  await t.test('2. a shell command cannot write outside the agent\'s own folder', () => {
+  await t.test('2. a shell command cannot write outside the agent\'s own folder', posixOnly('Claude Code has no shell sandbox on Windows'), () => {
     for (const id of team) {
       const { view } = o.spawned[id];
       const who = `${id}: `;
