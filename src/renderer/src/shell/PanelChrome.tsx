@@ -121,7 +121,8 @@ function PencilGlyph() {
  * Underline tabs (DESIGN.md 7.11), with the ARIA tabs keyboard model: arrows
  * move between tabs (mirrored in RTL), Home and End jump to the ends, and only
  * the selected tab is in the Tab order. Scrolls sideways when the panel is too
- * narrow for every label.
+ * narrow for every label: the mouse wheel moves the row, and an edge fades out
+ * while tabs are hidden past it, since the scrollbar itself is hidden.
  */
 export function PanelTabs<K extends string>({ tabs, current, onChange }: {
   tabs: { key: K; label: string }[]; current: K; onChange: (k: K) => void;
@@ -145,29 +146,68 @@ export function PanelTabs<K extends string>({ tabs, current, onChange }: {
   useEffect(() => {
     stripRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [current]);
+  // Which physical edges have tabs hidden past them. scrollLeft runs 0 to
+  // negative in RTL, so the distance from the start is its absolute value.
+  const [hidden, setHidden] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const measure = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const fromStart = Math.abs(el.scrollLeft);
+      const start = max > 1 && fromStart > 1;
+      const end = max > 1 && fromStart < max - 1;
+      const next = rtl ? { left: end, right: start } : { left: start, right: end };
+      setHidden((was) => (was.left === next.left && was.right === next.right ? was : next));
+    };
+    // A plain mouse wheel only scrolls vertically; turn it sideways while the
+    // row overflows. Native and not passive, so preventDefault holds.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      if (el.scrollWidth - el.clientWidth <= 1) return;
+      e.preventDefault();
+      el.scrollLeft += rtl ? -e.deltaY : e.deltaY;
+    };
+    measure();
+    el.addEventListener('scroll', measure, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', measure);
+      el.removeEventListener('wheel', onWheel);
+      ro.disconnect();
+    };
+  }, [rtl, tabs.length]);
+  const fade = hidden.left || hidden.right
+    ? `linear-gradient(to right, ${hidden.left ? 'transparent, #000 28px' : '#000'}, ${hidden.right ? '#000 calc(100% - 28px), transparent' : '#000'})`
+    : undefined;
   return (
-    <div ref={stripRef} role="tablist" onKeyDown={onKeyDown} className="cth-tabbar" style={{
-      display: 'flex', gap: 16, padding: '0 14px', flexShrink: 0, overflowX: 'auto',
-      boxShadow: 'inset 0 -1px 0 var(--cth-line)'
-    }}>
-      {tabs.map((tab) => {
-        const active = current === tab.key;
-        return (
-          <button
-            key={tab.key}
-            role="tab"
-            aria-selected={active}
-            tabIndex={active ? 0 : -1}
-            onClick={() => onChange(tab.key)}
-            style={{
-              flexShrink: 0, height: 36, padding: '0 1px', border: 'none', cursor: 'pointer', background: 'transparent',
-              boxShadow: active ? 'inset 0 -2px 0 var(--cth-ink)' : 'none',
-              fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap',
-              color: active ? 'var(--cth-ink)' : 'var(--cth-ink-3)'
-            }}
-          >{tab.label}</button>
-        );
-      })}
+    // The rule under the row sits on this wrapper so the edge fade never cuts it.
+    <div style={{ flexShrink: 0, boxShadow: 'inset 0 -1px 0 var(--cth-line)' }}>
+      <div ref={stripRef} role="tablist" onKeyDown={onKeyDown} className="cth-tabbar" style={{
+        display: 'flex', gap: 16, padding: '0 14px', overflowX: 'auto',
+        maskImage: fade, WebkitMaskImage: fade
+      }}>
+        {tabs.map((tab) => {
+          const active = current === tab.key;
+          return (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={active}
+              tabIndex={active ? 0 : -1}
+              onClick={() => onChange(tab.key)}
+              style={{
+                flexShrink: 0, height: 36, padding: '0 1px', border: 'none', cursor: 'pointer', background: 'transparent',
+                boxShadow: active ? 'inset 0 -2px 0 var(--cth-ink)' : 'none',
+                fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap',
+                color: active ? 'var(--cth-ink)' : 'var(--cth-ink-3)'
+              }}
+            >{tab.label}</button>
+          );
+        })}
+      </div>
     </div>
   );
 }
