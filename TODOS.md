@@ -673,7 +673,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Context:** In order of impact:
 1. The team always starts on the default engine: `startBusinessTeam` uses `inferAgentProvider(config.defaultCommand)` (`src/renderer/src/hooks/useHive.ts:310`), which is `claude` (`src/main/config.ts:449`), because setup saves `godProvider` but not `defaultCommand`. Ephemeral workers fall back the same way (`src/main/workerLaunch.ts:31`).
 2. No cost or token data: the telemetry env is added only for Claude (`src/main/hive.ts:951`); the transcript fallback reads `~/.claude/projects` (`src/main/transcript.ts:44`); `src/main/pricing.ts` knows only Claude models. Cost views, caps, token caps and the context gauge are empty.
-3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`), and bundled skills only into `.claude/skills` (`src/main/hive.ts:733`).
+3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`). Bundled skills now reach Codex and Gemini through workspace `.agents/skills` (`src/main/bundledSkills.ts`); other engines still need native discovery wiring.
 4. Gemini and Antigravity get no extra writable directories (`--add-dir` exists for Codex only, `src/main/hive.ts:859`), so hive file writes may be refused.
 5. Antigravity agents never get their standing goal, and an Antigravity Michael never gets the roster (no SessionStart/UserPromptSubmit event).
 6. The memory tidy up runs a hidden Claude session (`src/main/memoryTidy.ts`, through `hiddenClaude.ts`); without Claude it does nothing.
