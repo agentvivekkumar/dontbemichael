@@ -21,13 +21,13 @@ own memory, working on your computer.
 <p>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
   <img alt="Status: early release" src="https://img.shields.io/badge/status-early%20release-FFFDF5.svg?style=flat-square&labelColor=1A1320">
-  <img alt="Platform: macOS and Windows beta" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20beta-FFFDF5.svg?style=flat-square&labelColor=1A1320">
+  <img alt="Platform: macOS and Windows 11" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%2011-FFFDF5.svg?style=flat-square&labelColor=1A1320">
   <a href="https://dontbemichael.com"><img alt="Website: dontbemichael.com" src="https://img.shields.io/badge/web-dontbemichael.com-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
 </p>
 
 <br>
 
-**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)** · **[Download for Windows (beta)](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
+**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)** · **[Download for Windows](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
 
 </div>
 
@@ -293,7 +293,7 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 
 ### What you need
 
-- A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64, beta).
+- A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64).
 - [Claude Code](https://claude.com/claude-code), signed in to your Claude plan. A Claude Max plan
   keeps the office running all day; smaller plans reach their usage limit during the day, and the
   office waits until it resets. No Claude plan? An Anthropic API key works too, billed to your
@@ -314,14 +314,15 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-**On Windows 11 (beta)**
+**On Windows 11**
 
 1. Download the file ending in `-win-x64-setup.exe` from the same [latest release](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
 2. Open it. The first time, Windows says **Windows protected your PC**. Click **More info**, then
    **Run anyway**.
 
-Windows asks because this beta is not signed yet. Windows on ARM PCs is not supported in the
-beta. Linux will follow.
+You only do step 2 once. Windows asks because this build is not yet signed with a Microsoft
+certificate. It runs on Windows 11 PCs with x64 processors; ARM PCs aren't supported. Linux will
+follow.
 
 ## Your data
 
