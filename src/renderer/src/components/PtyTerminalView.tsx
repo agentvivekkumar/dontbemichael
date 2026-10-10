@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { Icon } from './Icon';
-import { acquireTerminal, attachTerminal, detachTerminal, reflowTerminal, setTerminalInputLocked } from './terminalPool';
+import { acquireTerminal, attachTerminal, detachTerminal, onCellSizeChange, reflowTerminal, screenOverflowPx, setTerminalInputLocked } from './terminalPool';
 import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
@@ -170,6 +170,7 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
     // even when the initial rAF/timeout fits no-op (terminal mounted under an
     // inactive tab whose host has no size yet).
     let initialFitDone = false;
+    let lastOverflowCheck = 0;
     const tryFit = (scrollToEnd = false) => {
       // Never fit while the host has no real size. Fitting a 0×0 host makes
       // xterm propose a tiny grid and resize the pty to it, so the boot banner
@@ -189,6 +190,21 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
         }
         entry.term.refresh(0, Math.max(0, entry.term.rows - 1));
         initialFitDone = true;
+        // A fit that still leaves the screen past its box is the Windows
+        // overflow; log its sizes once a minute so the next report names it.
+        // The measure forces a layout, so it runs at most once a minute.
+        let over = 0;
+        if (Date.now() - lastOverflowCheck > 60_000) {
+          lastOverflowCheck = Date.now();
+          over = screenOverflowPx(entry);
+        }
+        if (over > 1) {
+          window.cth.logTerminalOverflow?.({
+            overflowPx: over, rows: entry.term.rows, cols: entry.term.cols,
+            hostHeight: container.clientHeight, dpr: window.devicePixelRatio,
+            fontSize: entry.term.options.fontSize ?? 0
+          });
+        }
       } catch { /* host may not be sized yet */ }
       if (scrollToEnd) {
         try {
@@ -243,6 +259,10 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
     // (so a user who scrolled up to read history isn't yanked back down).
     const ro = new ResizeObserver(() => tryFit(!initialFitDone));
     ro.observe(container);
+    // The cell can change size with the host unchanged (font load, display
+    // scale, renderer swap), so refit then too. The refit's own resize fires
+    // this once more and settles: the grid is already right.
+    const offCellSize = onCellSizeChange(entry, () => requestAnimationFrame(() => tryFit(false)));
     const onWinResize = () => tryFit(false);
     window.addEventListener('resize', onWinResize);
 
@@ -266,6 +286,7 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
     return () => {
       retries.forEach(clearTimeout);
       ro.disconnect();
+      offCellSize();
       window.removeEventListener('resize', onWinResize);
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);

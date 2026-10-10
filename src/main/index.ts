@@ -87,6 +87,7 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
 import { standingFitCheck } from './standingCheck';
+import { terminalOverflowEvent } from '../shared/terminalOverflow';
 import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
@@ -3763,6 +3764,21 @@ ipcMain.handle('pty:write', (_evt, id: string, data: string) => {
 ipcMain.handle('pty:resize', (_evt, id: string, cols: number, rows: number) => {
   if (typeof id !== 'string' || typeof cols !== 'number' || typeof rows !== 'number') return { ok: false, error: 'invalid args' };
   return ptyManager.resize(id, cols, rows);
+});
+// A terminal still drawn past its box after a fit (Windows report, 2026-10-09).
+// Numbers and the platform only, so the office log names the case next time.
+let lastTerminalOverflowLog = 0;
+const loggedOverflowSizes = new Set<string>();
+ipcMain.on('terminal:overflow', (_evt, info: unknown) => {
+  // At most one line a minute for the whole app, and each terminal size once a
+  // session: the log is committed with the office.
+  if (Date.now() - lastTerminalOverflowLog < 60_000) return;
+  const event = terminalOverflowEvent(info, process.platform);
+  const size = event ? [event.rows, event.cols, event.dpr, event.fontSize].join('/') : '';
+  if (!event || loggedOverflowSizes.has(size) || loggedOverflowSizes.size >= 20) return;
+  loggedOverflowSizes.add(size);
+  lastTerminalOverflowLog = Date.now();
+  if (event) { try { hive.appendLog(event); } catch { /* best-effort */ } }
 });
 ipcMain.handle('pty:redraw', (_evt, id: string) => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
