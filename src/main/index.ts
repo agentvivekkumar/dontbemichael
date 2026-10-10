@@ -525,7 +525,8 @@ const liveWorkers = new Map<string, WorkerRec>();
 const mailService = new MailService({
   getConfig: () => readConfig(),
   getPassword: (id) => integrations.getSecret(secretRefForMailbox(id)),
-  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason)
+  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason),
+  journalPath: join(app.getPath('userData'), 'mail-send-journal.json')
 });
 
 /** MB-7: a mailbox that stops accepting its password is marked "needs you" in

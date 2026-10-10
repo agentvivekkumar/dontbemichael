@@ -16,10 +16,12 @@
  * local test servers (eng review E4).
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { simpleParser } from 'mailparser';
+import { writeFileAtomic } from './atomicFile';
 import {
   MAIL_TOOL_OPS,
   agentMailboxes,
@@ -167,6 +169,10 @@ export interface MailDeps {
   createImap?(server: MailServer, user: string, pass: string): ImapLike;
   createSmtp?(server: MailServer, user: string, pass: string): SmtpLike;
   log?(line: string): void;
+  /** Where the sends of the last SEND_MEMORY_MS are kept on disk, so a repeat
+   *  after a restart still gets the first result back instead of a second email.
+   *  Without it the record lives in memory only. */
+  journalPath?: string;
 }
 
 function defaultImap(server: MailServer, user: string, pass: string): ImapLike {
@@ -253,6 +259,42 @@ export class MailService {
   constructor(private readonly deps: MailDeps) {
     this.createImap = deps.createImap ?? defaultImap;
     this.createSmtp = deps.createSmtp ?? defaultSmtp;
+    this.loadJournal();
+  }
+
+  /** Reload the recent sends a previous run recorded, dropping any too old to count. */
+  private loadJournal(): void {
+    if (!this.deps.journalPath) return;
+    try {
+      if (!existsSync(this.deps.journalPath)) return;
+      const raw = JSON.parse(readFileSync(this.deps.journalPath, 'utf8'));
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const now = Date.now();
+        for (const [k, v] of Object.entries(raw as Record<string, { at?: number; messageId?: string }>)) {
+          if (v && typeof v.at === 'number' && typeof v.messageId === 'string') {
+            if (now - v.at <= SEND_MEMORY_MS) {
+              this.sent.set(k, { at: v.at, result: { messageId: v.messageId } });
+            }
+          }
+        }
+      }
+    } catch { /* best-effort */ }
+  }
+
+  private saveJournal(): void {
+    if (!this.deps.journalPath) return;
+    try {
+      const data: Record<string, { at: number; messageId: string }> = {};
+      for (const [k, v] of this.sent) {
+        data[k] = { at: v.at, messageId: v.result.messageId };
+      }
+      writeFileAtomic(this.deps.journalPath, JSON.stringify(data, null, 2), 0o600);
+    } catch { /* best-effort */ }
+  }
+
+  private recordSent(key: string, at: number, messageId: string): void {
+    this.sent.set(key, { at, result: { messageId } });
+    this.saveJournal();
   }
 
   private record(id: string): MailboxRecord {
@@ -609,7 +651,14 @@ export class MailService {
     // the same mailbox within 10 minutes gets the first result back.
     const key = createHash('sha256').update(JSON.stringify([agentId, id, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.forward ?? null, input.attachFrom ?? [], input.thread?.inReplyTo ?? null])).digest('hex');
     const now = Date.now();
-    for (const [k, v] of this.sent) if (now - v.at > SEND_MEMORY_MS) this.sent.delete(k);
+    let pruned = false;
+    for (const [k, v] of this.sent) {
+      if (now - v.at > SEND_MEMORY_MS) {
+        this.sent.delete(k);
+        pruned = true;
+      }
+    }
+    if (pruned) this.saveJournal();
     const prior = this.sent.get(key);
     if (prior) return { ...prior.result, sent: true, repeated: true };
     const running = this.inFlight.get(key);
@@ -633,13 +682,13 @@ export class MailService {
       if (err.kind === 'timeout' || err.kind === 'network') {
         // The server may have accepted it before the line dropped: look in Sent.
         const found = await this.inSent(id, messageId).catch(() => false);
-        if (found) { this.sent.set(key, { at: now, result: { messageId } }); return { sent: true, messageId }; }
+        if (found) { this.recordSent(key, now, messageId); return { sent: true, messageId }; }
       }
       this.note(id, err);
       throw new MailError(err.kind, `Not sent. ${err.message}`);
     } finally { smtp.close?.(); }
     this.note(id);
-    this.sent.set(key, { at: now, result: { messageId } });
+    this.recordSent(key, now, messageId);
     // Gmail files sent mail itself; other services need the copy appended.
     if (rec.provider !== 'gmail' && rec.provider !== 'google-workspace') {
       const raw = await MailService.build(msg).catch(() => null);
