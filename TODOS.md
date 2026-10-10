@@ -612,18 +612,6 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ## Documents and security (review items skipped for v0.0.1)
 
-### Refuse a "move" onto a folder that already holds an office, in main
-
-**What:** `config:changeHome` in `src/main/index.ts` refuses mode `move` when the target has `hive/registry.json`.
-
-**Why:** Only the Settings screen prevents copying one office over another today. Owner skipped this at ship review 2026-09-24.
-
-**Context:** Reuse `homeFolderStatus` from `src/main/homeFolder.ts`.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
 ### Parse documents off the main thread
 
 **What:** Run PDF and OOXML extraction in a worker thread or utility process, with a time and page limit.
