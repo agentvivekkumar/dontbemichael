@@ -74,7 +74,7 @@ can see who is working on what.
 
 ## How it differs from Munder Difflin
 
-Don't Be Michael started as a fork of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
+Don't Be Michael grew out of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
 and it keeps that project's core: every team member is a real Claude Code process in its own
 terminal, and the team coordinates through the hive, a folder of plain files. What was built on
 top is a different product for a different person.
@@ -388,12 +388,12 @@ idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 ## License
 
 The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). The original
-copyright notice of the project this is forked from is kept in `LICENSE`, as the MIT license
-requires.
+copyright notice of Munder Difflin, the project this grew out of, is kept in `LICENSE`, as the
+MIT license requires.
 
 *Don't Be Michael* is not affiliated with NBC, *The Office*, or Dunder Mifflin.
 
 ## Acknowledgements
 
-- [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors, the open-source project this product is forked from.
+- [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors, the open-source project this product grew out of.
 - [xterm.js](https://xtermjs.org/) · [node-pty](https://github.com/microsoft/node-pty) · [electron-vite](https://electron-vite.org/) · [CodeMirror](https://codemirror.net/) for the libraries this is built on.
