@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.6: Can send means no approval cards, and Windows offices work without Git.**
-> A team member on Can send now sends without asking, and moving one there hands its waiting emails
-> back. On Windows PCs without Git for Windows, team members report their work and run commands
-> again, and the terminal refits when its text size changes. In 0.1.5, Windows offices started and
-> the Waiting column began to work.
+> **New in 0.1.7: a clear Microsoft 365 message, and safer large files.**
+> A mailbox on your own domain that runs on Microsoft 365 now says it cannot be connected yet,
+> instead of a misleading error. A Word, Excel or PowerPoint file too big to read is refused before
+> it can use up memory, an email is no longer sent twice after a restart, and web links open in your
+> browser. In 0.1.6, Can send stopped putting emails on Ask me.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

@@ -224,6 +224,53 @@ test('Settings test: Outlook is refused before any connection', async () => {
   assert.deepEqual(await svc.test({ address: 'sales@x.com', imap: server, smtp: server }, 'app-pass'), { ok: true });
 });
 
+test('send journal persists deduplication IDs to journalPath across service instances', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mail-journal-test-'));
+  const journalPath = path.join(tmpDir, 'journal.json');
+
+  try {
+    const config = cfg();
+    const sends1 = [];
+    const deps1 = {
+      getConfig: () => config,
+      getPassword: () => 'app-pass',
+      markStatus: () => {},
+      createImap: () => fakeImap({ folders: { INBOX: [], Drafts: [], Sent: [] } }),
+      createSmtp: () => ({ async sendMail(m) { sends1.push(m); return { messageId: '<msg-101>' }; }, async verify() {}, close() {} }),
+      journalPath
+    };
+    const svc1 = new MailService(deps1);
+    const msg = { mailbox: 'sales', to: 'customer@buyer.com', subject: 'Quote', body: 'Quote details' };
+
+    const res1 = await handleMailRequest(svc1, deps1, 'dwight', 'send', msg);
+    assert.equal(res1.status, 200);
+    assert.equal(sends1.length, 1);
+    assert.ok(fs.existsSync(journalPath), 'journal file was written');
+
+    // Simulate app restart with a new MailService instance reading from journalPath
+    const sends2 = [];
+    const deps2 = {
+      getConfig: () => config,
+      getPassword: () => 'app-pass',
+      markStatus: () => {},
+      createImap: () => fakeImap({ folders: { INBOX: [], Drafts: [], Sent: [] } }),
+      createSmtp: () => ({ async sendMail(m) { sends2.push(m); return { messageId: '<msg-102>' }; }, async verify() {}, close() {} }),
+      journalPath
+    };
+    const svc2 = new MailService(deps2);
+
+    const res2 = await handleMailRequest(svc2, deps2, 'dwight', 'send', msg);
+    assert.equal(res2.status, 200);
+    assert.equal(res2.body.repeated, true);
+    assert.equal(sends2.length, 0, 'did not send again across restart');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('Settings test: a custom domain on Microsoft 365 gets the same message (issue 39)', async () => {
   const { svc, state } = setup({ resolveMx: async () => [{ exchange: 'github-com.mail.protection.outlook.com', priority: 0 }] });
   const r = await svc.test({ address: 'test@github.com', imap: server, smtp: server }, 'x');

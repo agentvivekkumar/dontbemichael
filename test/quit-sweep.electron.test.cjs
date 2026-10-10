@@ -46,10 +46,18 @@ assert.strictEqual(typeof electronBin, 'string', 'expected electron package to e
 const fixture = path.join(__dirname, 'fixtures', 'quit-sweep-main.cjs');
 const pidFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'quit-sweep-')), 'pids.json');
 
-function isAlive(pid) {
+/** The image name of a live `pid` ("powershell.exe"), or null once it is gone. */
+function liveImage(pid) {
   const out = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], { encoding: 'utf8' });
-  return out.includes(`"${pid}"`);
+  const row = out.split(/\r?\n/).find((line) => line.includes(`"${pid}"`));
+  return row ? row.slice(1, row.indexOf('"', 1)) : null;
 }
+
+// taskkill /F asks Windows to end each process, and on a busy CI runner one can
+// take longer than half a second to leave the process list. The leak this test
+// guards is a tree that NEVER dies (the 4s sweep never ran), so a process gets
+// this long to go before it counts as leaked.
+const REAP_GRACE_MS = 5_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -83,14 +91,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     assert.strictEqual(exitCode, 0, `electron exited ${exitCode}; output:\n${output}`);
     assert.ok(recorded.pids.length >= 2, `expected root+descendant, saw: ${recorded.pids.join(',')}`);
 
-    await sleep(500); // let the OS finish reaping what taskkill force-killed
-    const survivors = recorded.pids.filter(isAlive);
+    // Let the OS finish reaping what taskkill force-killed, up to the grace.
+    const deadline = Date.now() + REAP_GRACE_MS;
+    let survivors;
+    do {
+      await sleep(250);
+      survivors = recorded.pids.map((pid) => ({ pid, image: liveImage(pid) })).filter((p) => p.image);
+    } while (survivors.length && Date.now() < deadline);
     if (survivors.length) {
       // Clean up the leak before failing, so a red run doesn't strand processes.
-      for (const pid of survivors) {
-        try { execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { timeout: 10_000 }); } catch { /* gone */ }
+      for (const { pid } of survivors) {
+        try { execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { timeout: 10_000, stdio: 'ignore' }); } catch { /* gone */ }
       }
-      assert.fail(`process tree survived Electron quit — leaked PIDs: ${survivors.join(',')} of ${recorded.pids.join(',')}`);
+      const named = survivors.map((p) => `${p.pid} (${p.image})`).join(', ');
+      assert.fail(`process tree survived Electron quit for ${REAP_GRACE_MS / 1000}s — leaked: ${named} of ${recorded.pids.join(',')}`);
     }
     console.log(`  ok  quit sweep reaped the whole tree inside Electron (pids: ${recorded.pids.join(',')})`);
   } catch (e) {

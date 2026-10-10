@@ -97,6 +97,10 @@ test('the path a file tool touches', () => {
   assert.equal(folderToolTarget('Grep', { pattern: 'x', path: path.join(B, 'Admin') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
   assert.equal(folderToolTarget('Glob', { pattern: path.join(B, 'Admin', '**', '*.md') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
   assert.equal(folderToolTarget('Grep', { pattern: 'x' }, path.join(B, 'Finance')), null, 'no path: its own folder');
+  const home = process.env.HOME || process.env.USERPROFILE;
+  assert.equal(folderToolTarget('Read', { file_path: '~/test.txt' }, path.join(B, 'Finance')), path.resolve(home, 'test.txt'));
+  assert.equal(folderToolTarget('Read', { file_path: '~\\test.txt' }, path.join(B, 'Finance')), path.resolve(home, 'test.txt'));
+  assert.equal(folderToolTarget('Read', { file_path: '~' }, path.join(B, 'Finance')), home);
 });
 
 test('the layout drops folders that are not a team member\'s own place', () => {

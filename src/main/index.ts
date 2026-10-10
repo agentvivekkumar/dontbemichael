@@ -525,7 +525,8 @@ const liveWorkers = new Map<string, WorkerRec>();
 const mailService = new MailService({
   getConfig: () => readConfig(),
   getPassword: (id) => integrations.getSecret(secretRefForMailbox(id)),
-  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason)
+  markStatus: (id, status, reason) => markMailboxStatus(id, status, reason),
+  journalPath: join(app.getPath('userData'), 'mail-send-journal.json')
 });
 
 /** MB-7: a mailbox that stops accepting its password is marked "needs you" in
@@ -2298,8 +2299,8 @@ async function startSlackServer(): Promise<{ ok: boolean; url?: string; error?: 
     }
   });
   const res = await slackServer.start();
-  // ok:false means we never bound the port → drop the instance. ok:true with no
-  // url just means the tunnel is unavailable; the local handler is still live.
+  // ok:false means the port is not bound (never bound, or closed again after the
+  // tunnel failed) → drop the instance.
   if (!res.ok) { slackServer = null; return res; }
   if (res.url) lastSlackUrl = res.url;
   // Bring up the loopback reply endpoint (token-gated, never tunneled) and drop
@@ -2976,6 +2977,17 @@ function createWindow(): BrowserWindow {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // A link or a dropped file must never replace the app with another page: a
+  // web link opens in the browser instead, under the same http(s) rule as above.
+  // Reloading the app's own page (App.tsx does after a harness home change) and
+  // the dev server's pages still go through.
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.split('#')[0] === win.webContents.getURL().split('#')[0]) return;
+    if (isDev && process.env.ELECTRON_RENDERER_URL && url.startsWith(process.env.ELECTRON_RENDERER_URL)) return;
+    e.preventDefault();
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
   });
 
   // Close interception when live PTYs exist. The red-X destroys the window;

@@ -100,7 +100,7 @@ untested while the office grows on macOS only.
 | R3 x64 only (owner) | electron-builder.yml builds x64 | x64 only | none | approved | D10 answer A: x64; release notes say ARM Windows PCs are not supported in the beta |
 | R4 test machine (owner) | x64 needed; Apple Silicon VMs run ARM Windows | physical x64 Windows 11 PC | none | approved | D11 answer B: a physical x64 Windows 11 PC the owner or someone they trust has |
 | R5 signing provider (owner) | new keys must be in hardware or a cloud vault | decide at sign up | none | approved | D12 answer C: no signing wiring now; E1 waits in TODOS.md until a service is chosen; Windows beta ships unsigned |
-| R6 Mac test job in CI (owner) | spec review: ci.yml runs no tests | Windows only | none | approved | D13 answer B: add only the windows-latest test job |
+| R6 Mac test job in CI (owner) | spec review: ci.yml runs no tests | Windows only | none | approved | D13 answer B: add only the windows-latest test job. Superseded 2026-10-09 (owner): ci.yml runs a macOS test job too |
 | R7 rc builds update (owner) | updateState.ts:86 isNewer ignores -rc.N; check-release-links.cjs:37,:49 | prerelease aware | none | approved | D14 answer A: isNewer orders X.Y.Z-rc.1 < X.Y.Z-rc.2 < X.Y.Z, other callers (updateState.ts:58, updater.ts:232) checked, tests pin each case and a refused downgrade; check-release-links learns -rc.N |
 | R8 red Windows leg on a clean tag (owner) | R1; updater.ts:430/445 installerUrl for win32 | ship without Windows | none | approved | D15 answer B: release notes drop the Windows row for that version, the website keeps the last good Windows link, and a missing latest.yml is treated as no update |
 | R9 Windows CI job gate (owner) | ci.yml build job is continue-on-error | required after clean up | none | approved | D16 answer A: advisory during the first POSIX triage, then required to merge, within this plan |
@@ -139,7 +139,7 @@ Mode: SELECTIVE EXPANSION (D2 answer A, 2026-10-04). Approved: A1, E1 to E5, R1 
    scripts; never `--ignore-scripts`) and the test suite through a small cross-platform
    runner (`tools/run-tests.cjs` lists `test/*.test.cjs`; Node 20 has no `--test` glob
    and cmd.exe does not expand `*`). The first run's POSIX-only failures are triaged:
-   fix, or skip on win32 with a one-line reason. No Mac test job (R6); `test:focused` switches to the same runner on every platform.
+   fix, or skip on win32 with a one-line reason. No Mac test job (R6, superseded 2026-10-09: ci.yml now runs one); `test:focused` switches to the same runner on every platform.
    The Windows job (`test-windows`) is advisory during the first triage; once it is
    green, the owner adds it as a required check in branch protection (a repository
    setting, owner approved), per R9.

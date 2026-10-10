@@ -612,18 +612,6 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ## Documents and security (review items skipped for v0.0.1)
 
-### Cap the total size of an Office file's zip entries
-
-**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
-
-**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
-
-**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
 ### Refuse a "move" onto a folder that already holds an office, in main
 
 **What:** `config:changeHome` in `src/main/index.ts` refuses mode `move` when the target has `hive/registry.json`.
@@ -754,6 +742,19 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Cap the total size of an Office file's zip entries
+
+**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
+
+**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
+
+**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+**Completed:** 0.1.7 (2026-10-09). Before inflating anything, `fromOoxml` adds up the declared sizes of the XML parts it would read and refuses the file past 200 MB or 5,000 parts; media still never counts (agentvivekkumar/dontbemichael#58).
 
 ### Decide the Git for Windows check
 
@@ -915,7 +916,7 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 1. Push an rc tag (vX.Y.Z-rc.1).
 2. ~~Read the first "Tests (Windows)" CI run and fix each POSIX-only test, or skip it on win32 with a reason.~~ Done 2026-10-09: tests are platform scoped (`test/platform.cjs`, CONTRIBUTING.md). Text files check out with LF (`.gitattributes`), Windows test path assumptions were made portable, and Mac or POSIX only tests skip on Windows with a reason.
 3. Run the rc.1 and rc.2 checklist on the clean x64 Windows 11 PC: install through SmartScreen, onboard, hire, task, mail archive search, schedule, rc.1 updates to rc.2, a user name with a space and an accent, an office folder in OneDrive, and agent start time under Defender. Also check that rc.2 is offered the clean release.
-4. Once it is green, remove `continue-on-error: true` from the `test-windows` job and make "Tests (Windows)" a required check.
+4. ~~Once it is green, remove `continue-on-error: true` from the `test-windows` job~~ Done 2026-10-09 (ci.yml now also runs "Tests (macOS)", and every job blocks). Still open: make the CI jobs required checks in the "protect main" ruleset (owner, a repository setting).
 5. ~~Set the repository variable `WINDOWS_RELEASE=on`.~~ Done 2026-10-05: the owner chose to ship Windows on every release before the PC check. v0.1.1 got its Windows installer added after release.
 6. After the first clean release that carries Windows, add the Windows (beta) download to the website, and confirm with the owner before that push.
 
