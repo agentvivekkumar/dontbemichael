@@ -51,17 +51,6 @@
 **Effort:** S
 **Priority:** P1
 
-### Log every mail call
-
-**What:** One broker log line per md-mail call: agent, mailbox, operation, result and duration.
-
-**Why:** Plan Section 8. Today there is no record of which agent used which mailbox. `MailDeps.log` exists in `src/main/mail.ts` and is never called.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
-
-**Effort:** S
-**Priority:** P1
-
 ### Say "cannot check email" beside a schedule
 
 **What:** When a schedule's agent has email off, show a short note on that schedule ("Pam cannot check email") in the On a schedule section and the office schedule.

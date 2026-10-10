@@ -815,14 +815,37 @@ function ref(v: unknown): MailRef | undefined {
   return typeof o.mailbox === 'string' && (typeof o.id === 'string' || typeof o.id === 'number') ? { mailbox: o.mailbox, id: String(o.id) } : undefined;
 }
 
+type MailRequestDeps = Pick<MailDeps, 'getConfig' | 'log'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean };
+
 /**
  * One md-mail tool call, already authenticated by the broker token (so `agentId`
  * is trusted). Checks `mailAccess` for the op, MB-8 for references, then runs it.
  * Never throws: every outcome is a status and a JSON body the MCP server relays.
+ *
+ * Each call writes one line to `deps.log` (multi-mailbox.md §8): agent, mailbox,
+ * operation, result and duration. Ids only, never a recipient, subject or body.
  */
 export async function handleMailRequest(
   svc: MailService,
-  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean },
+  deps: MailRequestDeps,
+  agentId: string,
+  op: string,
+  body: Record<string, unknown>
+): Promise<MailRequestResult> {
+  const started = Date.now();
+  const res = await runMailRequest(svc, deps, agentId, op, body);
+  try {
+    // The mailbox and op come from the agent: keep them to one plain token each.
+    const mailbox = (str(body.mailbox, 100) ?? '-').replace(/[^\w.@-]/g, '?');
+    const kind = typeof res.body.kind === 'string' ? ` ${res.body.kind}` : '';
+    deps.log?.(`[mail] ${agentId} ${mailbox} ${Object.prototype.hasOwnProperty.call(MAIL_TOOL_OPS, op) ? op : 'unknown'} ${res.status}${kind} ${Date.now() - started}ms`);
+  } catch { /* the call stands */ }
+  return res;
+}
+
+async function runMailRequest(
+  svc: MailService,
+  deps: MailRequestDeps,
   agentId: string,
   op: string,
   body: Record<string, unknown>
