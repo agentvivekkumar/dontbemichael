@@ -612,18 +612,6 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ## Documents and security (review items skipped for v0.0.1)
 
-### Cap the total size of an Office file's zip entries
-
-**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
-
-**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
-
-**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
 ### Refuse a "move" onto a folder that already holds an office, in main
 
 **What:** `config:changeHome` in `src/main/index.ts` refuses mode `move` when the target has `hive/registry.json`.
@@ -754,6 +742,19 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Cap the total size of an Office file's zip entries
+
+**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
+
+**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
+
+**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+**Completed:** 0.1.7 (2026-10-09). Before inflating anything, `fromOoxml` adds up the declared sizes of the XML parts it would read and refuses the file past 200 MB or 5,000 parts; media still never counts (agentvivekkumar/dontbemichael#58).
 
 ### Decide the Git for Windows check
 
