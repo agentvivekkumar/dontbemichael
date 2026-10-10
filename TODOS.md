@@ -755,6 +755,19 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ## Completed
 
+### Decide the Git for Windows check
+
+**What:** On the clean PC, install Claude Code and start one session. If it needs Git Bash, add a Git for Windows check to onboarding (E3).
+
+**Why:** If Git Bash is missing, a Windows beta user would get stuck at their first agent start.
+
+**Context:** E3 in `docs/designs/windows-11-installer.md` depends on that smoke test, which has not run yet.
+
+**Effort:** human S / CC S
+**Priority:** P1
+**Depends on / blocked by:** the PC smoke test.
+**Completed:** 0.1.6 (2026-10-09). A Windows office without Git for Windows runs Claude Code, which then runs hooks in PowerShell; the app now writes hooks for that shell (`src/main/hookShell.ts`), so no Git for Windows step is needed in onboarding.
+
 ### Clean up a "Not for" clause when its teammate leaves
 
 **What:** When a hire is bound to a mailbox or topic, overlapping teammates' routing lines gain "Not for <scope>; that goes to <Name>." If that teammate is later renamed or removed, rewrite or drop the clause.
@@ -913,18 +926,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** human M / CC S
 **Priority:** P1
 **Depends on / blocked by:** this branch merged; the physical PC.
-
-### Decide the Git for Windows check
-
-**What:** On the clean PC, install Claude Code and start one session. If it needs Git Bash, add a Git for Windows check to onboarding (E3).
-
-**Why:** If Git Bash is missing, a Windows beta user would get stuck at their first agent start.
-
-**Context:** E3 in `docs/designs/windows-11-installer.md` depends on that smoke test, which has not run yet.
-
-**Effort:** human S / CC S
-**Priority:** P1
-**Depends on / blocked by:** the PC smoke test.
 
 ## Ask me (deferred from ship of feat/windows-beta-askme-fixes, 2026-10-05)
 
