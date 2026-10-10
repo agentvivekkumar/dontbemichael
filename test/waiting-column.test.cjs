@@ -118,6 +118,18 @@ test('the renderer can patch a card only with Ask me answers; a move goes throug
   const handler = src.slice(src.indexOf("ipcMain.handle('hive:patchTask'"), src.indexOf("ipcMain.handle('hive:moveTask'"));
   assert.match(handler, /if \(Object\.keys\(patch\)\.some\(\(k\) => k !== 'humanQA'\)\) return \{ ok: false, error: 'only Ask me answers can be patched' \};/);
   assert.ok(handler.indexOf("k !== 'humanQA'") < handler.indexOf('hive.patchTask('), 'refused before anything is written');
-  const callers = require('node:child_process').execSync("grep -rn 'hivePatchTask(' src/renderer || true", { cwd: require('node:path').resolve(__dirname, '..') }).toString().trim().split('\n').filter(Boolean);
+  const callers = [];
+  function collectCallers(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) collectCallers(file);
+      else if (entry.isFile()) {
+        for (const [index, line] of fs.readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
+          if (line.includes('hivePatchTask(')) callers.push(`${file}:${index + 1}:${line}`);
+        }
+      }
+    }
+  }
+  collectCallers(path.resolve(__dirname, '..', 'src', 'renderer'));
   for (const c of callers) assert.match(c, /hivePatchTask\([^,]+, \{ humanQA: [^}]+\}\)/, c);
 });
