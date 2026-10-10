@@ -35,7 +35,8 @@ const BAR = {
   'can resume a session after a restart': (p) =>
     p.resumeFlag || p.resumeSubcommand ? '' : 'no resumeFlag or resumeSubcommand',
   'can run unattended': (p) => (p.autoModeFlag ? '' : 'no autoModeFlag'),
-  'takes a model': (p) => (p.supportsModel && p.modelFlag ? '' : 'supportsModel without a modelFlag'),
+  'takes a model': (p) =>
+    !p.supportsModel ? 'supportsModel is false' : p.modelFlag ? '' : 'supportsModel without a modelFlag',
   'can be installed when missing': (p) => (p.installCommand ? '' : 'no installCommand')
 };
 
@@ -63,4 +64,10 @@ test('the readiness bar rejects a preset that cannot resume or receive mail', ()
   const preset = { ...ap.providerPreset('codex'), resumeFlag: undefined, resumeSubcommand: undefined, canReceiveInbox: false };
   const failed = Object.entries(BAR).filter(([, check]) => check(preset)).map(([name]) => name);
   assert.deepEqual(failed, ['can receive inbox mail', 'can resume a session after a restart']);
+});
+
+test('the model check names why it failed', () => {
+  const codex = ap.providerPreset('codex');
+  assert.equal(BAR['takes a model']({ ...codex, supportsModel: false }), 'supportsModel is false');
+  assert.equal(BAR['takes a model']({ ...codex, modelFlag: undefined }), 'supportsModel without a modelFlag');
 });
