@@ -84,15 +84,6 @@
 **Effort:** S
 **Priority:** P1
 
-### Note the Microsoft plan change in the office packs doc
-
-**What:** Update Decision 8 in `docs/designs/business-mode-office-packs.md` to say MB-0 replaced the Microsoft app id in builds.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
-
-**Effort:** XS
-**Priority:** P1
-
 ### Read one email without downloading its attachments
 
 **What:** `MailService.read` fetches the whole message, attachments included, before trimming the text to 50K. Fetch the body structure plus the text part only, and take attachment names and sizes from the structure.
