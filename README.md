@@ -272,7 +272,7 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, Claude connectors, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
-- **Webhooks.** Send a webhook and Michael picks it up. Slack is switched off in this build (see `SHOW_SLACK` in `src/shared/buildFeatures.ts`).
+- **Webhooks.** Another app sends a webhook (set it up in Settings, Connections) and Michael picks it up; the sender can check on the work and get its result.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.
 
 **Your business, known to everyone**
