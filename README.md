@@ -43,7 +43,7 @@ own memory, working on your computer.
 > A mailbox on your own domain that runs on Microsoft 365 now says it cannot be connected yet,
 > instead of a misleading error. A Word, Excel or PowerPoint file too big to read is refused before
 > it can use up memory, an email is no longer sent twice after a restart, and web links open in your
-> browser. In 0.1.6, Can send stopped putting emails on Ask me.
+> browser. In 0.1.6, In version 0.1.6, the 'Can Send' feature stopped routing emails to the 'Ask me' section.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
