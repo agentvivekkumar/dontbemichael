@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.4: send on approval, and Michael answers you in the app.**
-> A team member can put each email on Ask me for you to approve, then send exactly what you
-> approved. Questions you send Michael show where they stand until he answers. Setup now ends on
-> Get Michael ready, which installs Claude Code or takes an Anthropic API key. In 0.1.3, this page
-> started offering the Windows beta.
+> **New in 0.1.6: Can send means no approval cards, and Windows offices work without Git.**
+> A team member on Can send now sends without asking, and moving one there hands its waiting emails
+> back. On Windows PCs without Git for Windows, team members report their work and run commands
+> again, and the terminal refits when its text size changes. In 0.1.5, Windows offices started and
+> the Waiting column began to work.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

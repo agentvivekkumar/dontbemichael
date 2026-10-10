@@ -96,7 +96,13 @@ required.
 1. **Keep the type-checker green:** `npm run typecheck` (runs both the node and
    web TS projects).
 2. **Run the tests:** `npm run test:focused`. If you changed behaviour, add a
-   test for it — a bug fix with no test is a bug fix that comes back.
+   test for it — a bug fix with no test is a bug fix that comes back. The suite
+   also runs on Windows in CI. A test runs only on the platforms its behaviour
+   exists on: skip a Mac or POSIX only test on Windows (and a Windows only test
+   elsewhere) with `posixOnly`, `windowsOnly` or `macOnly` from
+   `test/platform.cjs`, always with a reason. Build paths with `path.join` or
+   `path.resolve` instead of POSIX literals, so the test runs everywhere, and
+   never skip a test to hide a real Windows bug.
 3. **Confirm a production build works:** `npm run build`.
 4. **Match the aesthetic.** Any new UI **must** derive from the design tokens in
    [`branding/DESIGN.md`](./branding/DESIGN.md) / `src/renderer/src/design/tokens.ts` — no ad-hoc

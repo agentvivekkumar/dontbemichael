@@ -225,6 +225,9 @@ function grantAccess(cfg: MailAccessConfig, grant: SendOnlyGrant, op: MailOp, pr
   if ((op === 'send' || op === 'propose') && grant.sending === 'draft') {
     return { ok: false, reason: `You are Draft only from ${address}, the owner's choice on your Access tab (Email, Also sends from). Save the email as a draft instead, and the owner will send it.` };
   }
+  if (op === 'propose' && grant.sending === 'send') {
+    return { ok: false, reason: `You can send from ${address} without approval, the owner's choice on your Access tab (Email, Also sends from). Send the email yourself with send; nothing goes on Ask me. This holds over any memory note that says to propose or wait for the owner's approval.` };
+  }
   if (op === 'send' && grant.sending === 'approval' && !proposal) {
     return { ok: false, reason: `You send on approval from ${address}, the owner's choice on your Access tab (Email, Also sends from). Use propose to put the email on Ask me; once the owner approves it, send it with its proposal id. A kind the owner let you send without approval goes with its standing id (list_mailboxes lists them).` };
   }
@@ -234,7 +237,8 @@ function grantAccess(cfg: MailAccessConfig, grant: SendOnlyGrant, op: MailOp, pr
 /**
  * The one access rule (MB-3, E3). Refuses unless: the agent has "Can check
  * email"; the mailbox is one of its mailboxes and still exists in Settings;
- * to propose, the agent can send or sends on approval; and to send, the agent
+ * to propose, the agent sends on approval (Can send sends itself and puts
+ * nothing on Ask me, owner 2026-10-09); and to send, the agent
  * can send, or sends on approval with the id of a proposal the owner approved
  * or of a standing approval (`proposal`; the broker checks either one itself).
  * Michael follows the same rule.
@@ -268,10 +272,22 @@ export function mailAccess(cfg: MailAccessConfig, agentId: string, mailboxId: st
   if ((op === 'send' || op === 'propose') && mode === 'draft') {
     return { ok: false, reason: 'You are Draft only, the owner\'s choice on your Access tab (Email, Sending); the mailbox itself can send. Save the reply as a draft instead, and the owner will send it.' };
   }
+  if (op === 'propose' && mode === 'send') {
+    return { ok: false, reason: 'You can send without approval, the owner\'s choice on your Access tab (Email, Sending). Send the email yourself with send; nothing goes on Ask me. This holds over any memory note that says to propose or wait for the owner\'s approval.' };
+  }
   if (op === 'send' && mode === 'approval' && !proposal) {
     return { ok: false, reason: 'You send on approval, the owner\'s choice on your Access tab (Email, Sending). Use propose to put the email on Ask me; once the owner approves it, send it with its proposal id. A kind the owner let you send without approval goes with its standing id (list_mailboxes lists them).' };
   }
   return { ok: true };
+}
+
+/** How an agent sends from a mailbox it keeps: its Send only grant there, or
+ *  its own mailbox's Sending. Null when it keeps no such mailbox. */
+export function sendingFor(cfg: MailAccessConfig, agentId: string, mailboxId: string): SendingMode | null {
+  const grant = sendOnlyGrant(cfg, agentId);
+  if (grant && grant.mailbox === mailboxId) return grant.sending;
+  const email = cfg.agentCapabilities?.[agentId]?.email;
+  return email?.enabled && email.mailboxes[0] === mailboxId ? sendingMode(email) : null;
 }
 
 /** The mailbox an agent may use, as a list of at most one (list_mailboxes).

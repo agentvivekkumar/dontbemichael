@@ -140,31 +140,92 @@ export function apiKeyShapeOk(key: string): boolean {
   return key.length >= 20 && key.length <= 400 && !/\s/.test(key);
 }
 
-export type ApiKeyVerdict = 'ok' | 'rejected' | 'unreachable';
+export type ApiKeyVerdict = 'ok' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable';
 
-/** Anthropic's answer to the key: 2xx accepted, 401 or 403 not accepted,
- *  anything else (rate limit, outage) says nothing about the key. */
+/** Anthropic's answer to the key, by HTTP status: 2xx accepted, 401 or 403
+ *  not accepted, an HTTP 408, 429 or 5xx busy (says nothing about the key),
+ *  any other 4xx refused for a reason Anthropic gives. A redirect or anything
+ *  else is unreachable. */
 export function apiKeyVerdict(statusCode: number): ApiKeyVerdict {
   if (statusCode >= 200 && statusCode < 300) return 'ok';
-  return statusCode === 401 || statusCode === 403 ? 'rejected' : 'unreachable';
+  if (statusCode === 401 || statusCode === 403) return 'rejected';
+  if (statusCode === 408 || statusCode === 429 || statusCode >= 500) return 'busy';
+  return statusCode >= 400 ? 'refused' : 'unreachable';
 }
 
 /** The part of `fetch` the key check uses: Electron's `net.fetch` in the app
  *  (it follows the system proxy), the global `fetch` otherwise. */
-export type KeyCheckFetch = (url: string, init: { method: string; headers: Record<string, string>; signal: AbortSignal }) => Promise<{ status: number }>;
+export type KeyCheckFetch = (url: string, init: { method: string; headers: Record<string, string>; signal: AbortSignal }) => Promise<KeyCheckReply>;
+type KeyCheckReply = { status: number; body?: ReadableStream<Uint8Array> | null; json?: () => Promise<unknown> };
 
-/** Ask Anthropic whether the key works (`GET /v1/models`, 10 s). A network
- *  error, a timeout or a fetch that throws is 'unreachable'. */
-export async function checkAnthropicKey(key: string, fetchFn: KeyCheckFetch = globalThis.fetch as unknown as KeyCheckFetch, timeoutMs = 10_000): Promise<ApiKeyVerdict> {
+/** Anthropic's error replies are a few hundred bytes. A bigger body is a proxy's
+ *  page: it is never read past this, so it cannot flood the main process. */
+const ERROR_BODY_MAX = 16 * 1024;
+
+/** The error body as JSON, read up to ERROR_BODY_MAX (undefined past it). */
+async function errorBody(res: KeyCheckReply): Promise<unknown> {
+  const stream = res.body;
+  if (!stream || typeof stream.getReader !== 'function') return res.json?.();
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > ERROR_BODY_MAX) return undefined;
+      chunks.push(value);
+    }
+  } finally {
+    reader.cancel().catch(() => { /* already closed */ });
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+/** Anthropic's reason for a key made for the whole organization, not inside a
+ *  workspace (a 400, seen on Windows 2026-10-09). */
+const UNSCOPED_KEY_REASON = /not scoped to a workspace/i;
+
+/** Anthropic's own reason from an error body (`{"error":{"message":...}}`),
+ *  one line, or undefined when the body has none. */
+async function anthropicReason(res: KeyCheckReply): Promise<string | undefined> {
+  try {
+    const body = await errorBody(res) as { error?: { message?: unknown } } | undefined;
+    const msg = body?.error?.message;
+    return typeof msg === 'string' && msg.trim() ? msg.replace(/\s+/g, ' ').trim().slice(0, 300) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Ask Anthropic whether the key works (`GET /v1/models`). A network error,
+ *  no answer within timeoutMs (10 s), or a refused or busy status (a 4xx other
+ *  than 401 or 403, a 408, 429 or 5xx) with no Anthropic message is
+ *  'unreachable'; a refusal carries Anthropic's reason so the owner sees what
+ *  to change. */
+export async function checkAnthropicKey(key: string, fetchFn: KeyCheckFetch = globalThis.fetch as unknown as KeyCheckFetch, timeoutMs = 10_000): Promise<{ verdict: ApiKeyVerdict; reason?: string }> {
   try {
     const res = await fetchFn('https://api.anthropic.com/v1/models?limit=1', {
       method: 'GET',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       signal: AbortSignal.timeout(timeoutMs)
     });
-    return apiKeyVerdict(res.status);
+    const verdict = apiKeyVerdict(res.status);
+    if (verdict !== 'refused' && verdict !== 'busy') return { verdict };
+    const reason = await anthropicReason(res);
+    // Anthropic always answers an error with a message. A 4xx or 5xx without
+    // one came from something in between (a proxy's 407, 502 or block page),
+    // so it is the network, not the key or Anthropic.
+    if (!reason) return { verdict: 'unreachable' };
+    if (verdict === 'busy') return { verdict };
+    // The refusal seen in the field gets a short message in the owner's
+    // language; if Anthropic rewords it, the case falls back to refused with
+    // Anthropic's own words, which is safe.
+    if (UNSCOPED_KEY_REASON.test(reason)) return { verdict: 'workspace' };
+    return { verdict, reason };
   } catch {
-    return 'unreachable';
+    return { verdict: 'unreachable' };
   }
 }
 

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.4). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.6). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -46,7 +46,7 @@ moving, and brings you only the decisions that need you.
   or any IMAP mailbox. Passwords stay encrypted on your computer.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
-- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. A team member can't reach a mailbox you didn't give it.
+- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. Can send never puts an email on Needs you, and moving a team member to it hands back the emails still waiting there, unless it sends only from a mailbox nobody on the team watches right now. A team member can't reach a mailbox you didn't give it.
 - When you keep approving the same kind of email unchanged, the team member can offer to send that
   kind without asking. You tick it on the card and can revoke it on its Access tab; a separate quick
   check reads each such email first, and anything that doesn't fit comes to you.
@@ -100,6 +100,25 @@ moving, and brings you only the decisions that need you.
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.6 (2026-10-09)
+- Can send means no approval cards: a team member on Can send sends without asking, and moving one
+  there hands its waiting emails back, unless nobody on the team reads the inbox it sends from.
+  Every Sending change tells the team member and goes into its notes.
+- Windows offices without Git for Windows: Claude Code runs team members' hooks in PowerShell
+  there, and the app now writes them for that shell, so team members report their work again.
+- Team members on Windows can run commands again; their file tools still stay out of other
+  folders.
+- The terminal refits when its text size changes on its own, and logs its sizes when it still runs
+  past its box.
+
+### 0.1.5 (2026-10-09)
+- Windows offices start: the app trusts your office folder the way Claude Code looks it up on
+  Windows, so team members no longer stop at a hidden trust question and quit.
+- Cards that wait on a customer or teammate move to Waiting, back to Doing when they answer, and
+  Michael chases them until then. Offices on the old standup text get the new one at launch.
+- Get Michael ready says why an API key was not accepted: a key made outside a workspace,
+  Anthropic's own reason, Anthropic busy, or a real network or proxy problem.
 
 ### 0.1.4 (2026-10-07)
 - Send on approval: a third Sending choice puts each email on Ask me, where you edit, approve,
