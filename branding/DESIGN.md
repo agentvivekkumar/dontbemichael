@@ -44,9 +44,9 @@ Michael can't settle comes to you.
 
 ### 1.2 Why v2
 
-The app was forked from Munder Difflin, and v1 kept its shape: a pixel office floor in
+The app grew out of Munder Difflin, and v1 kept its shape: a pixel office floor in
 the middle, a strip of agent cards along the bottom, a Command Center on the right, and
-pixel type and arcade color throughout. People read the fork as a copy. v2 keeps what is
+pixel type and arcade color throughout. People read v1 as a copy. v2 keeps what is
 ours (the name, the Struck M, Michael, the cast, the delegation idea, the business
 features) and replaces everything that was shared: the floor, the layout, the pixel UI
 and the arcade palette.
