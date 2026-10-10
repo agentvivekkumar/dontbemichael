@@ -2033,7 +2033,14 @@
   },
   "workTab": {
     "live": "مباشر",
-    "focus": "تركيز"
+    "focus": "تركيز",
+    "exitFocus": "الخروج من وضع التركيز (Esc)",
+    "zoomOut": "تصغير ({{mod}} مع علامة الناقص)",
+    "zoomOutLabel": "تصغير",
+    "zoomIn": "تكبير ({{mod}} مع علامة الزائد)",
+    "zoomInLabel": "تكبير",
+    "zoomReset": "إعادة ضبط التكبير ({{mod}} مع 0)",
+    "zoomResetLabel": "إعادة ضبط التكبير"
   },
   "quit": {
     "killing": "جارٍ الخروج…",
