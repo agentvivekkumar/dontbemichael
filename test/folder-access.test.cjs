@@ -127,7 +127,30 @@ test('a Claude agent\'s settings file carries the folder rules', async () => {
   assert.deepEqual(settings.sandbox.filesystem.allowRead, [path.join(B, 'Finance')]);
   assert.ok(settings.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))));
   assert.ok(Array.isArray(settings.permissions.additionalDirectories), 'the write allowances are still there');
-  assert.equal(settings.sandbox.allowUnsandboxedCommands, false, 'no shell command runs outside the sandbox');
+  // Windows has no Claude Code sandbox, so the lock is left off there (owner, 2026-10-09).
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, process.platform === 'win32' ? undefined : false, 'no shell command runs outside the sandbox');
+});
+
+test('on Windows a team member keeps its shell: no sandbox only lock, the file tool deny rules stay', async (t) => {
+  // Value: protects=Windows team members can run commands (inbox clearing, knowledge search, Word and Excel) while Read and Edit stay held (owner, 2026-10-09); fails_when=the lock is written on Windows, where Claude Code then blocks every command ("Shell command execution is blocked by policy"), or the deny rules or other platforms change with it; why_new=Pam and Dwight were blocked on every command on a Windows office; seam=process.platform
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-folder-win-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const real = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  let inj;
+  try {
+    inj = await new HiveManager(() => home).ensureAgent(
+      { id: 'oscar', name: 'Oscar', provider: 'claude', cwd: oscar.cwd },
+      { folderPolicy: folderPolicy(oscar, layout, true) }
+    );
+  } finally {
+    Object.defineProperty(process, 'platform', real);
+  }
+  const settings = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8'));
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, undefined, 'commands may run where there is no sandbox');
+  assert.equal(settings.sandbox.enabled, true, 'a sandbox still applies wherever Claude Code has one');
+  assert.ok(settings.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))), 'the file tools stay held');
+  assert.equal(folderPolicy(oscar, layout, true).sandboxOnly, true, 'the policy itself is unchanged');
 });
 
 test('a name starting with two dots is inside its folder; a relative Glob is judged by its folder', () => {

@@ -1520,11 +1520,16 @@ export class HiveManager {
       // denyRead/denyWrite (with allowRead re-opening an agent's own folder and
       // the Office inside Michael's) hold shell commands, and permission deny
       // rules hold the file tools. Deny rules apply in auto mode too.
+      //
+      // Not on Windows: Claude Code has no sandbox there, so "sandboxed only"
+      // refused every shell command ("Shell command execution is blocked by
+      // policy") and team members could not clear their inbox or read files.
+      // There the deny rules still hold the file tools (owner, 2026-10-09).
       ...(writableDirs.length
         ? {
             sandbox: {
               enabled: true,
-              ...(folders?.sandboxOnly ? { allowUnsandboxedCommands: false } : {}),
+              ...(folders?.sandboxOnly && process.platform !== 'win32' ? { allowUnsandboxedCommands: false } : {}),
               filesystem: {
                 allowWrite: writableDirs,
                 ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),
