@@ -19,7 +19,7 @@
 import { app, safeStorage } from 'electron';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { writeFileAtomic } from './atomicFile';
+import { sweepStaleTemps, writeFileAtomic } from './atomicFile';
 import {
   type IntegrationRecord,
   validateIntegrationRecord,
@@ -82,8 +82,14 @@ export function listRecordsRedacted(): Array<Omit<IntegrationRecord, 'secretRef'
 
 // ─── Secret store (encrypted at rest) ────────────────────────────────────────
 
+let tempsSwept = false;
+
 function secretsPath(): string {
-  return join(app.getPath('userData'), 'integration-secrets.json');
+  const p = join(app.getPath('userData'), 'integration-secrets.json');
+  // A crash inside a write leaves an encrypted temp file nothing reads; clear
+  // those once per run, on first use.
+  if (!tempsSwept) { tempsSwept = true; sweepStaleTemps(p); }
+  return p;
 }
 
 function readSecretBlob(): Record<string, string> {

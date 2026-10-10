@@ -188,15 +188,6 @@
 
 ## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
 
-### Sweep leftover secrets temp files
-
-**What:** On first secret-store access, remove `integration-secrets.json.*.tmp` older than a minute.
-
-**Why:** A crash inside the write window leaves a 0600 ciphertext temp file that nothing reads.
-
-**Effort:** S
-**Priority:** P4
-
 ### Say when deleting a secret did nothing
 
 **What:** `deleteSecret` stays lenient on an unreadable file (right for callers without error handling), but callers report success while the old ciphertext stays.
