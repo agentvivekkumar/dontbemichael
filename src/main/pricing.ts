@@ -28,6 +28,13 @@ const OPUS: ModelPrice = { inputPerM: 15, outputPerM: 75, cacheReadPerM: 1.5, ca
 const SONNET: ModelPrice = { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3, cacheWritePerM: 3.75 };
 const HAIKU: ModelPrice = { inputPerM: 0.8, outputPerM: 4, cacheReadPerM: 0.08, cacheWritePerM: 1.0 };
 
+// OpenAI list prices for the GPT-5 family Codex runs on. OpenAI bills no cache
+// writes, and a cached input token costs a tenth of a fresh one. Newer point
+// releases (gpt-5.x, gpt-5-codex) are priced as their family until listed here.
+const GPT5: ModelPrice = { inputPerM: 1.25, outputPerM: 10, cacheReadPerM: 0.125, cacheWritePerM: 0 };
+const GPT5_MINI: ModelPrice = { inputPerM: 0.25, outputPerM: 2, cacheReadPerM: 0.025, cacheWritePerM: 0 };
+const GPT5_NANO: ModelPrice = { inputPerM: 0.05, outputPerM: 0.4, cacheReadPerM: 0.005, cacheWritePerM: 0 };
+
 /** When the model id is unknown, assume Sonnet (the historical default). */
 const DEFAULT_PRICE: ModelPrice = SONNET;
 
@@ -47,6 +54,11 @@ export function priceFor(model: string | undefined | null): ModelPrice {
   if (m.includes('opus')) return OPUS;
   if (m.includes('haiku')) return HAIKU;
   if (m.includes('sonnet')) return SONNET;
+  if (m.startsWith('gpt-') || m.includes('codex')) {
+    if (m.includes('nano')) return GPT5_NANO;
+    if (m.includes('mini')) return GPT5_MINI;
+    return GPT5;
+  }
   return DEFAULT_PRICE;
 }
 

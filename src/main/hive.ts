@@ -1450,6 +1450,15 @@ export class HiveManager {
     return this.registry().agents[agentId]?.sessionId;
   }
 
+  /** A Codex agent's private CODEX_HOME (see installCodexHooks), where its
+   *  rollout transcripts live; null for other engines or no hive. */
+  codexHome(agentId: string): string | null {
+    if (!this.root()) return null;
+    const agent = this.registry().agents[agentId];
+    if (agent?.provider !== 'codex') return null;
+    return join(this.agentDir(agentId), '.codex');
+  }
+
   /** Claude Code settings that route every relevant hook through the shim, plus
    *  (W3) the default MCP bundle merged into this PER-SESSION settings file. cwd
    *  scopes the filesystem/git servers; cfg (the consent map) gates which servers
@@ -1892,7 +1901,7 @@ export class HiveManager {
       ? 'SLACK REPLIES: When composing a Slack reply (or writing the `result` field of a Slack-origin kanban card), you MUST: (1) directly address what the user asked — never a bare "done"; (2) include the relevant specifics, outcome, and details; (3) format for Slack mrkdwn — open with a short *bold* headline, use bullet points for multiple items, wrap code/paths in `backtick` blocks, keep it concise (no walls of text). When finishing a Slack-origin task, always write a complete, user-facing, well-formatted `result` on the kanban card — the system posts it verbatim to Slack as the done reply.'
       : `SLACK REPLIES: If god dispatches you a task that came from Slack, it will include an exact \`"${hiveNode}" "<helper>" --channel … --thread … --text "…"\` reply command — when you finish, run it VERBATIM to post your result back to that thread yourself. The reply must be SUBSTANTIVE Slack mrkdwn (a short *bold* headline + the actual outcome/specifics/links), NEVER a bare "done".`;
     return [
-      `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of Claude agents.`,
+      `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of AI agents.`,
       `Your private workspace is ${dir}. The shared hive is ${root}. Full protocol: ${inRoot('PROTOCOL.md')}.`,
       '',
       HOUSE_RULES,
@@ -4109,7 +4118,7 @@ human rather than retry. Route work to an agent already on the floor first eithe
 
 const PROTOCOL_MD = `# Hive protocol
 
-You are one of several Claude agents sharing this hive. Coordination is entirely
+You are one of several AI agents sharing this hive. Coordination is entirely
 file-based; the harness (main process) is the only thing that runs git and the
 only thing that moves messages between agents.
 
