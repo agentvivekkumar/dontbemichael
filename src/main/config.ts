@@ -227,6 +227,9 @@ export interface HarnessConfig {
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Team members that failed their first start, tried again (and only they)
+   *  on each later launch until they start. */
+  businessTeamRetry?: string[];
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
