@@ -8,7 +8,7 @@ Mode: Startup
 
 ## Problem Statement
 
-Dont Be Michael (forked from Munder Difflin) runs an office of AI agents on the owner's machine. Today it is a developer tool. Onboarding asks for a harness folder, a CLI engine and model ID, and git repos. The Add Agent form edits raw spawn commands, working directories and worktrees. The workspace shows terminals, a Monaco IDE and git panels. A non-technical owner can't get past setup, and the "non-technical" persona only changes the wording (`OnboardingWizard.tsx`, `descPlain` copy keys).
+Dont Be Michael (which grew out of Munder Difflin) runs an office of AI agents on the owner's machine. Today it is a developer tool. Onboarding asks for a harness folder, a CLI engine and model ID, and git repos. The Add Agent form edits raw spawn commands, working directories and worktrees. The workspace shows terminals, a Monaco IDE and git panels. A non-technical owner can't get past setup, and the "non-technical" persona only changes the wording (`OnboardingWizard.tsx`, `descPlain` copy keys).
 
 The fork keeps Claude Code as the hidden engine and keeps the hive (mailboxes, router, ledger, breaker, memory, schedules). It replaces everything the owner sees with a business-first flow: pick a business type, pick a starter team of specialized agents, connect the accounts those agents need inside the product, and run the office from the desktop app.
 
