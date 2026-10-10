@@ -1160,7 +1160,7 @@ export async function saveMailbox(svc: MailService, admin: MailAdminDeps, preset
 
   const id = fixing ? fixing.id : mailboxIdFor(address, existing.map((m) => m.id));
   const stored = admin.setSecret(secretRefForMailbox(id), password);
-  if (!stored.ok) return { ok: false, kind: 'unknown', reason: stored.error ?? "Couldn't store the password securely on this Mac." };
+  if (!stored.ok) return { ok: false, kind: 'unknown', reason: stored.error ?? "Couldn't store the password securely on this computer." };
   const now = Date.now();
   const prior = existing.find((m) => m.id === id);
   const record: MailboxRecord = { id, address, provider: input.provider, imap, smtp, status: 'connected', createdAt: prior?.createdAt ?? now, updatedAt: now };

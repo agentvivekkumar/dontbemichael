@@ -831,7 +831,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   <span>
                     <Trans i18nKey="onboarding.orchestrator.cliAgent" components={{ strong: <span style={{ color: 'var(--cth-ink-900)' }} /> }}>
                       <strong>Claude Code</strong>, made by Anthropic, is the AI that powers
-                      your office. It runs right here on this Mac. <strong>Your manager</strong> is
+                      your office. It runs right here on this computer. <strong>Your manager</strong> is
                       always on and runs your whole office. We recommend Opus 5.5, the newest model.
                     </Trans>
                   </span>
