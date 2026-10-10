@@ -2298,8 +2298,8 @@ async function startSlackServer(): Promise<{ ok: boolean; url?: string; error?: 
     }
   });
   const res = await slackServer.start();
-  // ok:false means we never bound the port → drop the instance. ok:true with no
-  // url just means the tunnel is unavailable; the local handler is still live.
+  // ok:false means the port is not bound (never bound, or closed again after the
+  // tunnel failed) → drop the instance.
   if (!res.ok) { slackServer = null; return res; }
   if (res.url) lastSlackUrl = res.url;
   // Bring up the loopback reply endpoint (token-gated, never tunneled) and drop
