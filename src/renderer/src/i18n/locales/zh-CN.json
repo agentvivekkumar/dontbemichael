@@ -2033,7 +2033,14 @@
   },
   "workTab": {
     "live": "实时",
-    "focus": "专注"
+    "focus": "专注",
+    "exitFocus": "退出专注模式（Esc）",
+    "zoomOut": "缩小（{{mod}} 和减号）",
+    "zoomOutLabel": "缩小",
+    "zoomIn": "放大（{{mod}} 和加号）",
+    "zoomInLabel": "放大",
+    "zoomReset": "重置缩放（{{mod}} 和 0）",
+    "zoomResetLabel": "重置缩放"
   },
   "quit": {
     "killing": "正在退出…",

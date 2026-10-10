@@ -2033,7 +2033,14 @@
   },
   "workTab": {
     "live": "Live",
-    "focus": "Focus"
+    "focus": "Focus",
+    "exitFocus": "Exit focus mode (Esc)",
+    "zoomOut": "Zoom out ({{mod}} and minus)",
+    "zoomOutLabel": "Zoom out",
+    "zoomIn": "Zoom in ({{mod}} and plus)",
+    "zoomInLabel": "Zoom in",
+    "zoomReset": "Reset zoom ({{mod}} and 0)",
+    "zoomResetLabel": "Reset zoom"
   },
   "quit": {
     "killing": "Quitting…",
