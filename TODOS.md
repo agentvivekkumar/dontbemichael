@@ -311,15 +311,6 @@
 **Effort:** S
 **Priority:** P3
 
-### Visible focus when the list takes focus
-
-**What:** The row list's focus fallback (`tabIndex={-1}`, no outline) is invisible, including after Michael's Remind.
-
-**Why:** Keyboard users lose their place after an action.
-
-**Effort:** S
-**Priority:** P3
-
 ### Tests for the focus fallback and a post-tool row
 
 **What:** Add tests for the listRef focus fallback and a describeRow case after PostToolUse; fix the stale `actionAt` docstring.

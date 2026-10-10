@@ -545,6 +545,10 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 /* Focus moves to the Needs you heading from code: no ring for a mouse, one for the keyboard. */
 .cth-needs-heading:focus { outline: none; }
 .cth-needs-heading:focus-visible { outline: 2px solid var(--cth-indigo); outline-offset: 4px; border-radius: 6px; }
+/* Focus lands on the closing time list from code when the row it was on is gone:
+   the global ring shows for the keyboard only, drawn inside because the panel
+   around the list scrolls and would clip an outer ring. */
+.cth-closing-list:focus-visible { outline-offset: -2px; }
 .cth-askme-card:not(.is-open):hover { box-shadow: inset 0 0 0 1px var(--cth-line-2), var(--cth-shadow-md) !important; }
 .cth-askme-card:hover .cth-askme-chevron, .cth-askme-chevron:hover { background: var(--cth-neutral-soft); color: var(--cth-ink) !important; }
 .cth-askme-q p:first-child { margin-top: 0; }

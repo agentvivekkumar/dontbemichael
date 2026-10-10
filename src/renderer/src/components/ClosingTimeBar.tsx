@@ -227,7 +227,7 @@ function ClosingTimeRows({ closing }: { closing: ClosingTimeState }) {
   // Michael's terminal ended: nobody can finish the close (review, owner 2026-09-29).
   const godGone = closing.godLive === false;
   return (
-    <div ref={listRef} tabIndex={-1} role="list" aria-label={t('closingTime.listLabel')} style={{ outline: 'none', maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div ref={listRef} className="cth-closing-list" tabIndex={-1} role="list" aria-label={t('closingTime.listLabel')} style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       {waiting.map((id) => {
         const d = doing(byId(id));
         return (
