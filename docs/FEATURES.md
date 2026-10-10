@@ -95,7 +95,7 @@ moving, and brings you only the decisions that need you.
 - Setup by kind of business: restaurant and food, retail, professional services, home services,
   SaaS and consulting, or anything else. Each comes with a suggested team.
 - Runs on your computer with the Claude plan you already have. Plain words, no developer settings.
-  A Windows 11 (x64) beta ships with every release.
+  A Windows 11 (x64) build ships with every release.
 - Setup ends on Get Michael ready: it installs Claude Code and signs you in where you can see it,
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
