@@ -147,3 +147,17 @@ test('an irreparable poison file does not block a valid file in the same pass', 
   assert.equal(fs.existsSync(path.join(outbox, '.sent', 'b-good.json')), true);
   assert.equal(eventsFor(hive, 'a-poison.json')[0].reason, 'malformed-json');
 });
+
+test('a name already in .sent is archived beside it, not over it, and not routed again', async (t) => {
+  const { hive, outbox } = await floor(t);
+  fs.writeFileSync(path.join(outbox, '.sent', 'repeat.json'), '{"old":true}');
+  writeOutbox(outbox, 'repeat.json', JSON.stringify({ to: 'god', act: 'inform', body: 'routed cleanly' }));
+
+  assert.equal(hive.routeOnce(), 1);
+  assert.equal(fs.existsSync(path.join(outbox, 'repeat.json')), false, 'source removed from outbox');
+  assert.equal(hive.inbox('god-1').length, 1);
+  assert.equal(hive.inbox('god-1')[0].body, 'routed cleanly');
+  assert.equal(fs.readFileSync(path.join(outbox, '.sent', 'repeat.json'), 'utf8'), '{"old":true}', 'prior sent message retained in archive');
+  assert.ok(fs.readdirSync(path.join(outbox, '.sent')).some((n) => n.endsWith('-repeat.json')), 'the new one is archived under a unique name');
+  assert.equal(hive.routeOnce(), 0);
+});

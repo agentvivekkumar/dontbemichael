@@ -286,6 +286,9 @@ export interface HarnessConfig {
   businessTeam?: Array<{ agentId: string; folder: string }>;
   /** Set once the onboarding team has been started, so it is started once. */
   businessTeamStarted?: boolean;
+  /** Team members that failed their first start, tried again (and only they)
+   *  on each later launch until they start. */
+  businessTeamRetry?: string[];
   /** Set once existing team members got today's Role description and Work
    *  style (the one-time rewrite, 2026-09-25). */
   instructionsRewritten?: boolean;
@@ -709,6 +712,9 @@ const api = {
     ipcRenderer.invoke('pty:resize', id, cols, rows),
   redrawPty: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('pty:redraw', id),
+  /** A terminal still drawn past its box after a fit: sizes only, to the office log. */
+  logTerminalOverflow: (info: Record<string, number | string>): void =>
+    ipcRenderer.send('terminal:overflow', info),
   killPty: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('pty:kill', id),
   listPtys: (): Promise<Array<{
@@ -1005,7 +1011,7 @@ const api = {
   engineSetupSignIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:signIn'),
   /** Use an Anthropic API key instead of a Claude account: checked with
    *  Anthropic, then kept write only in the secret store. Never read back. */
-  engineSetupUseApiKey: (key: string): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> =>
+  engineSetupUseApiKey: (key: string): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> =>
     ipcRenderer.invoke('engineSetup:useApiKey', key),
   /** A setup terminal ended, or an agent could not start for want of Claude. */
   onEngineSetupChanged: (cb: (e: { id: string; exitCode: number | null }) => void): (() => void) => {

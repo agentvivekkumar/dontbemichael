@@ -124,7 +124,9 @@ export function isUsableTeamFolder(folder: string, home = homedir()): boolean {
   };
   const f = real(folder);
   const h = real(home);
-  if (f === resolve(sep) || f === h) return false;
+  // A disk root is its own parent. Comparing with resolve(sep) missed it on
+  // Windows, where `f` is lowercased and the root is not ("c:\" vs "C:\").
+  if (dirname(f) === f || f === h) return false;
   for (const kept of ['.ssh', '.claude', '.config', '.gnupg', 'Library']) {
     const k = join(h, fold(kept));
     if (f === k || f.startsWith(k + sep)) return false;
@@ -165,7 +167,8 @@ export function folderLayoutFor(businessFolder: string | undefined, folders: str
     if (teamFolders.some((t) => fold(t) === fold(f))) continue;
     teamFolders.push(f);
   }
-  return { business, teamFolders };
+  // The app's private folder (issue #63), whatever the layout: nobody opens it.
+  return { business, teamFolders, ...(app ? { appPrivate: join(app, 'private') } : {}) };
 }
 
 /** The deepest folder that contains every path's parent, or undefined. */

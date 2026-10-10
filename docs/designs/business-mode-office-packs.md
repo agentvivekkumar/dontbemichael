@@ -8,9 +8,9 @@ Mode: Startup
 
 ## Problem Statement
 
-Dont Be Michael (forked from Munder Difflin) runs an office of AI agents on the owner's machine. Today it is a developer tool. Onboarding asks for a harness folder, a CLI engine and model ID, and git repos. The Add Agent form edits raw spawn commands, working directories and worktrees. The workspace shows terminals, a Monaco IDE and git panels. A non-technical owner can't get past setup, and the "non-technical" persona only changes the wording (`OnboardingWizard.tsx`, `descPlain` copy keys).
+Dont Be Michael (which grew out of Munder Difflin) runs an office of AI agents on the owner's machine. Today it is a developer tool. Onboarding asks for a harness folder, a CLI engine and model ID, and git repos. The Add Agent form edits raw spawn commands, working directories and worktrees. The workspace shows terminals, a Monaco IDE and git panels. A non-technical owner can't get past setup, and the "non-technical" persona only changes the wording (`OnboardingWizard.tsx`, `descPlain` copy keys).
 
-The fork keeps Claude Code as the hidden engine and keeps the hive (mailboxes, router, ledger, breaker, memory, schedules). It replaces everything the owner sees with a business-first flow: pick a business type, pick a starter team of specialized agents, connect the accounts those agents need inside the product, and run the office from the desktop app.
+The app keeps Claude Code as the hidden engine and keeps the hive (mailboxes, router, ledger, breaker, memory, schedules). It replaces everything the owner sees with a business-first flow: pick a business type, pick a starter team of specialized agents, connect the accounts those agents need inside the product, and run the office from the desktop app.
 
 Business model: the app stays open source (MIT). A separate Pro plan (support, training, consulting, dedicated support) is sold on the website and is not built into the app.
 
@@ -526,6 +526,7 @@ From /plan-eng-review on 2026-09-15, scope: all three phases. Each decision was 
   - **First mailbox:** the owner's existing Claude connector, for **reading and triage only** (Pam). The Connector Center labels it "Connected through your Claude account".
   - **Sending, and every additional mailbox:** product-owned connectors through the broker (Decision 2), one record per account, per-agent grants. Per provider:
     - **Microsoft:** app ID embedded in official builds, injected at build time exactly like `POSTHOG_KEY` (`electron.vite.config.ts:15-19`, `release.yml:56`), never committed.
+      - **Superseded by MB-0** (`docs/designs/multi-mailbox.md`, owner, 2026-09-26): the open source app owns no central OAuth app, so builds embed no Microsoft app ID. Microsoft 365, like Google Workspace, will sign in through an app the business registers itself, with a guided setup in the product.
     - **Google:** the owner's own client through an in-product wizard, until Google's verification team answers in writing whether an embedded desktop client is acceptable.
     - **Meta and other secret-requiring providers:** the owner's own app. Until one exists, Ryan stays in draft mode.
     - **Every provider** also accepts a pasted client ID, so forks and self-builds work.
@@ -646,7 +647,7 @@ This supersedes Decision 3's separate `approvals/<id>.json` store. The queue alr
 - **Finding:** removing the mode flag (Decision 16) leaves the developer surfaces without a home: terminal panes (`App.tsx:512`), the Monaco IDE and git panels (`App.tsx:513`, `ide/`, `components/git/`), the CI and GitHub view, the skills browser, the raw spawn command, cwd and worktree fields in `AddAgentModal.tsx:736-874`, and the Prerequisites list in Settings.
 - **Decision:**
   - These screens move behind an **explicit unlock** in Settings (or a keyboard shortcut). They never appear in onboarding or on any normal path an owner can reach.
-  - The code stays in the fork, so debugging a member's office is still possible and upstream changes to those areas can still be merged.
+  - The code stays in the app, so debugging a member's office is still possible and changes from Munder Difflin to those areas can still be merged.
   - The leak test asserts that no developer term (`terminal`, `worktree`, `git`, `repo`, `CLI`, a model id) appears anywhere reachable without the unlock.
 - **Tests:** normal navigation leak test; the unlock reveals the advanced area and survives a restart only if the owner re-enters it.
 
@@ -1205,7 +1206,7 @@ From the owner working through onboarding on 2026-09-22/23, after research into 
 - Name everywhere people see it: menu, window, packaged app, installers (`Dont-Be-Michael-…`), macOS permission prompts, on screen text. Bundle id `io.github.agentvivekkumar.dontbemichael`. The data folder is `dontbemichael`, pinned before the rename so a later rename never moves it. It was `munder-difflin` in 0.0.1; the owner chose a clean folder over carrying that data forward (2026-09-24).
 - Updates, the Settings hero payload, the model list and every GitHub link use `agentvivekkumar/dontbemichael`. The URL scheme is `dontbemichael://`, so the upstream website's hire links no longer open this app.
 - Removed: upstream's Pro announcement, Founders' Wall offer, Discord links, blog links, funding page, and its maintainer's security email.
-- Kept on purpose: README credit for the fork, CHANGELOG / CONTRIBUTORS history, and internal ids (hire file format `munder-difflin/hire@1`, pipe names, user agents). `test/no-upstream.test.cjs` scans the app, build and GitHub config.
+- Kept on purpose: README credit for Munder Difflin, CHANGELOG / CONTRIBUTORS history, and internal ids (hire file format `munder-difflin/hire@1`, pipe names, user agents). `test/no-upstream.test.cjs` scans the app, build and GitHub config.
 
 **Superseded:** Decision 28 said screens 1 and 2 carry dots but no step number, because the total isn't known until the team is picked. At the owner's request every screen now shows "Step N of 6", and `test/onboarding-steps.test.cjs` keeps the numbers in sync with the flow. The total will change again when the pick-your-team screen lands.
 

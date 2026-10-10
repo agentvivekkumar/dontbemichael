@@ -5,5 +5,24 @@
     "The contributor's identity is read from the GitHub API, not stored here.",
     "Check that every commit is in main (git merge-base --is-ancestor <sha> origin/main) before adding it; CONTRIBUTORS.md states this publicly."
   ],
-  "landed_without_merged_badge": []
+  "landed_without_merged_badge": [
+    {
+      "pr": 49,
+      "commits": [
+        "474487a4",
+        "77e4c4a7",
+        "30ae83b6",
+        "54a421ff",
+        "9c001fe7"
+      ],
+      "note": "Five of its six changes landed through #69, one commit each with a Co-authored-by trailer."
+    },
+    {
+      "pr": 60,
+      "commits": [
+        "04c1697b"
+      ],
+      "note": "Its declared size test helper landed through #69; the fix itself duplicated #58, which landed first."
+    }
+  ]
 }

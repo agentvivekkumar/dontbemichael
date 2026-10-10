@@ -16,7 +16,8 @@
     "search": "search",
     "tokens": "tokens",
     "restarting": "restarting…",
-    "add": "add"
+    "add": "add",
+    "clear": "Clear"
   },
   "commandBar": {
     "free": "free",
@@ -250,10 +251,10 @@
     "general": {
       "homeFolder": "Office folder",
       "homeFolderDesc": "Where your office keeps its own files: your team's memory, tasks and history.",
-      "otherOffices": "Other offices on this Mac",
+      "otherOffices": "Other offices on this computer",
       "openOffice": "Open",
       "environment": "Environment",
-      "keepAwake": "Keep Mac awake while agents run",
+      "keepAwake": "Keep your computer awake while agents run",
       "keepAwakeDesc": "Blocks display sleep so schedules and terminals keep firing on time. Costs battery, so it's best on AC.",
       "simpleMode": "Explain things simply",
       "simpleModeDesc": "Agents brief you in plain language instead of engineering shorthand.",
@@ -320,7 +321,7 @@
       "docsAdded": "Documents added: {{count}}",
       "errUnknown": "something went wrong reading it",
       "errNotFound": "the file is no longer there",
-      "errNoPermission": "this Mac did not allow reading it",
+      "errNoPermission": "this computer did not allow reading it",
       "errIsFolder": "that is a folder, not a file"
     },
     "connections": {
@@ -688,7 +689,7 @@
   "onboarding": {
     "resume": {
       "headline": "We found your office",
-      "desc": "This Mac already has an office in {{folder}}: {{business}}, with {{count}} team members. Continue with it to keep your team, their folders, their memory and their work.",
+      "desc": "This computer already has an office in {{folder}}: {{business}}, with {{count}} team members. Continue with it to keep your team, their folders, their memory and their work.",
       "foldersHead": "Your team works in these folders:",
       "folderInUse": "This folder already holds an office. Pick an empty folder for a new one.",
       "folderCheckFailed": "Couldn't check this folder. Try again, or pick another place.",
@@ -745,7 +746,7 @@
     },
     "orchestrator": {
       "desc": "{{godName}} is your office manager. He reads your requests, breaks them into tasks, and hands them to the right team member. He runs the floor; you own the business. He runs on Claude Code. Pick which Claude model he uses.",
-      "cliAgent": "<strong>Claude Code</strong>, made by Anthropic, is the AI that powers your office. It runs right here on this Mac. <strong>Your manager</strong> is always on and runs your whole office. We recommend Opus 5.5, the newest model.",
+      "cliAgent": "<strong>Claude Code</strong>, made by Anthropic, is the AI that powers your office. It runs right here on this computer. <strong>Your manager</strong> is always on and runs your whole office. We recommend Opus 5.5, the newest model.",
       "recommended": "Recommended",
       "workersOnly": "Workers only",
       "workersOnlyHint": "Can't drain hive mail yet, so it can't run your office. Still available when hiring workers.",
@@ -2171,6 +2172,9 @@
     "keyError": {
       "invalid": "That doesn't look like an API key. Paste the whole key.",
       "rejected": "Anthropic did not accept that key. Check it and try again.",
+      "refused": "Anthropic did not accept that key: {{reason}}",
+      "workspace": "Use a key made inside a workspace at console.anthropic.com.",
+      "busy": "Anthropic is busy right now. Try again in a minute.",
       "unreachable": "Could not check the key. Check your internet connection, then try again.",
       "store": "Could not save the key on this computer. Try again."
     },

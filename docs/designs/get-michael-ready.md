@@ -63,8 +63,13 @@ Onboarding marked Claude "installs on first run" and let the owner through.
 opens one password field (an info icon says where to create a key).
 
 - **Save:** sends the key to main once.
-  - Main checks it with Anthropic (`GET /v1/models`, 10 s); a 401 or 403 reads
-    as not accepted, anything else as unreachable.
+  - Main checks it with Anthropic (`GET /v1/models`, 10 s): 2xx is ok; a 401
+    or 403 reads as not accepted; a 408, 429 or 5xx with Anthropic's message
+    as busy; any other 4xx with Anthropic's message as refused, shown with that
+    reason; no answer, a timeout, or a 4xx or 5xx with no Anthropic message (a
+    proxy's 407, 502 or block page) as unreachable. A key made for the whole
+    organization, not inside a workspace, is a 400 that gets its own short
+    translated message (seen on Windows 2026-10-09).
   - Only a valid key is kept, write only, in the secret store as
     `apikey:anthropic` (the same Anthropic key as Settings, AI engines), and
     `claudeAuth` becomes `apiKey`. The key never comes back over IPC.

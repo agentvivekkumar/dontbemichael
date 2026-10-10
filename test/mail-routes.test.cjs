@@ -10,7 +10,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const http = require('node:http');
-const { spawn } = require('node:child_process');
+const { execFile, spawn } = require('node:child_process');
+const { promisify } = require('node:util');
 const loadTs = require('./load-ts.cjs');
 
 const { IntegrationBroker } = loadTs('src/main/integrationBroker.ts');
@@ -30,6 +31,59 @@ function request(base, token, method, route, body) {
     req.end(payload);
   });
 }
+
+test('broker rejects malformed integration ids and keeps serving authenticated mail', { timeout: 15_000 }, async () => {
+  // Run the real loopback server in a child: an uncaught URIError must fail this
+  // regression without terminating the test runner or leaving a hung request.
+  const source = String.raw`
+    const assert = require('node:assert/strict');
+    const { IntegrationBroker } = require(process.argv[1])('src/main/integrationBroker.ts');
+    let recordCalls = 0;
+    let secretCalls = 0;
+    let mailCalls = 0;
+    const broker = new IntegrationBroker({
+      getRecord: () => { recordCalls++; return undefined; },
+      getSecret: () => { secretCalls++; return undefined; },
+      mail: async (agentId, op, body) => {
+        assert.equal(agentId, 'dwight');
+        assert.equal(op, 'list_mailboxes');
+        assert.deepEqual(body, {});
+        mailCalls++;
+        return { status: 200, body: { mailboxes: [] } };
+      }
+    });
+    (async () => {
+      const started = await broker.start();
+      assert.equal(started.ok, true);
+      const token = broker.grant('pty-dwight', [], 'dwight');
+      const headers = { 'x-md-broker-token': token };
+      try {
+        for (const id of ['%', '%ZZ', '%FF', '%E0%A4']) {
+          const res = await fetch(broker.url() + '/i/' + id + '/probe', { headers });
+          assert.equal(res.status, 400, id);
+          const body = await res.json();
+          assert.equal(body.code, 'bad_request');
+          assert.match(body.error, /integration id/i);
+        }
+        const unauthorized = await fetch(broker.url() + '/i/%/probe');
+        assert.equal(unauthorized.status, 401, 'authentication still runs first');
+        await unauthorized.arrayBuffer();
+        const forbidden = await fetch(broker.url() + '/i/known-api/probe', { headers });
+        assert.equal(forbidden.status, 403, 'a valid id still needs an integration grant');
+        await forbidden.arrayBuffer();
+        const healthy = await fetch(broker.url() + '/mail/list_mailboxes', {
+          method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}'
+        });
+        assert.equal(healthy.status, 200);
+        assert.deepEqual(await healthy.json(), { mailboxes: [] });
+        assert.equal(mailCalls, 1);
+        assert.equal(recordCalls, 0);
+        assert.equal(secretCalls, 0);
+      } finally { broker.stop(); }
+    })().catch((err) => { console.error(err); process.exitCode = 1; });
+  `;
+  await promisify(execFile)(process.execPath, ['-e', source, require.resolve('./load-ts.cjs')], { timeout: 10_000 });
+});
 
 test('broker mail route: refuses what it cannot serve, maps a thrown handler to 500, and speaks for the agent', { timeout: 15_000 }, async (t) => {
   const calls = [];

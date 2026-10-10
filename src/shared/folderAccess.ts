@@ -14,8 +14,10 @@
  *
  * One pure module feeds both layers that enforce this:
  *  - `folderPolicy` becomes the Claude Code settings for a spawn: the OS
- *    sandbox (which covers shell commands, even in auto mode) plus permission
- *    deny rules (which cover Claude's own file tools).
+ *    sandbox (which covers shell commands, even in auto mode, on a Mac and
+ *    Linux; Claude Code has no sandbox on Windows, so shell commands are not
+ *    limited there, owner 2026-10-09) plus permission deny rules (which cover
+ *    Claude's own file tools on every platform).
  *  - `folderDecision` is asked by the PreToolUse hook on every file tool call,
  *    so it sees folders created after the agent started, and it covers Michael's
  *    own top-level files, which a static rule can't express without also hiding
@@ -32,6 +34,10 @@ export interface FolderLayout {
   business?: string;
   /** Every team member's working folder (never Michael's), each once. */
   teamFolders: string[];
+  /** The app's own private folder (`<harnessHome>/private`, issue #63): agents'
+   *  mail tokens and the owner's sent questions. No agent, Michael included,
+   *  opens or changes it. */
+  appPrivate?: string;
 }
 
 export interface AgentFolderPolicy {
@@ -61,6 +67,13 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
   const policy: AgentFolderPolicy = { sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [], sandboxOnly: !agent.isGod };
+  // Nobody opens the app's private folder: a sibling's live mail token sits
+  // there while it runs (#63). Claude's CLI still reads its own --mcp-config.
+  if (layout.appPrivate) {
+    policy.sandbox.denyRead.push(layout.appPrivate);
+    policy.sandbox.denyWrite.push(layout.appPrivate);
+    policy.deny.push(rule('Read', layout.appPrivate), rule('Edit', layout.appPrivate));
+  }
 
   if (agent.isGod) {
     // Read everything; change nothing that belongs to a team member.
@@ -105,6 +118,10 @@ export function folderDecision(
   const same = sameFn(caseInsensitive);
   const inside = insideFn(caseInsensitive);
   const teamFolder = teamFoldersOf(layout, same).find((f) => inside(f, target));
+
+  if (layout.appPrivate && inside(layout.appPrivate, target)) {
+    return { deny: true, reason: 'That folder is the app\'s own and holds private settings. Nobody on the team opens it.' };
+  }
 
   if (agent.isGod) {
     if (writes && teamFolder && !inside(teamFolder, agent.cwd)) {
@@ -183,9 +200,15 @@ export function folderToolTarget(tool: string, input: unknown, cwd: string | und
     const pattern = str('pattern');
     const cut = pattern ? pattern.search(/[*?[{]/) : -1;
     const prefix = pattern ? (cut === -1 ? pattern : pattern.slice(0, cut)) : '';
-    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') ? join(p, prefix) : prefix;
+    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') && !prefix.startsWith('~\\') ? join(p, prefix) : prefix;
   }
   if (!p) return null;
-  if (p.startsWith('~/') && typeof process !== 'undefined' && process.env.HOME) p = resolve(process.env.HOME, p.slice(2));
+  if (typeof process !== 'undefined') {
+    const home = process.env.HOME || process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null);
+    if (home) {
+      if (p === '~') p = home;
+      else if (p.startsWith('~/') || p.startsWith('~\\')) p = resolve(home, p.slice(2));
+    }
+  }
   return isAbsolute(p) ? resolve(p) : cwd ? resolve(cwd, p) : null;
 }

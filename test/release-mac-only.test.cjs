@@ -39,7 +39,7 @@ test('RELEASE.md advertises the Mac DMG, and Windows only inside its strippable 
   const win = (md.match(/<!-- windows -->([\s\S]*?)<!-- \/windows -->/) ?? [])[1] ?? '';
   assert.match(win, /`Dont-Be-Michael-[^`]+-win-x64-setup\.exe`\]\(https:\/\/github\.com\/agentvivekkumar\/dontbemichael\/releases\/download\/v/, 'tag pinned');
   assert.match(win, /More info\*\*, then \*\*Run anyway/);
-  assert.match(win, /ARM PCs is not supported in the beta/);
+  assert.match(win, /ARM PCs aren't supported/);
 });
 
 test('the afterSign hook seals an unsigned Mac app ad hoc, and only then', () => {

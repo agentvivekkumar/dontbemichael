@@ -18,6 +18,7 @@
  *
  * Everything here runs in the Electron main process.
  */
+import { hookShell, shellCommand, type HookShell } from './hookShell';
 import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
@@ -61,6 +62,10 @@ import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
 import { OFFICE_ROLES } from '../shared/officeRoles';
 import { APP_NAME } from '../shared/appName';
 import { isPeerAssignment, rerouteToMichael, hopDropNotice } from '../shared/handoffRule';
+import {
+  legacyOwnerSentDir, legacyOwnerStatePath, pluginsDisabledForSession,
+  privateOwnerSentDir, privateOwnerStatePath
+} from '../shared/agentPrivatePaths';
 import { sleepSync } from './atomicFile';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
@@ -849,6 +854,9 @@ export class HiveManager {
     const root = this.root();
     if (!root) return;
     mkdirSync(join(root, 'agents'), { recursive: true });
+    // #63: owner dock mail and state leave agents/human so no agent can write
+    // them as owner text. Idempotent; a fresh office has nothing to move.
+    this.migrateOwnerPrivate();
 
     // Refreshed each bootstrap, like COMMANDS.md just below. It used to be
     // written only when absent, which meant a hive created once never saw a
@@ -1123,6 +1131,7 @@ export class HiveManager {
             if (desc.shim === 'agy') this.installAgyHooks();
             else if (desc.shim === 'codex') {
               env.CODEX_HOME = this.installCodexHooks(dir, meta.id);
+              if (opts.skillsDir) this.copyBundledSkills(opts.skillsDir, join(env.CODEX_HOME, 'skills'));
               // Codex refuses to run hooks from a config dir without persisted
               // "hook trust" (normally an interactive gate). Our hooks.json is
               // hive-authored inside an isolated CODEX_HOME, so we bypass that gate
@@ -1256,8 +1265,12 @@ export class HiveManager {
     const stripConnectors = !opts.connectors || opts.connectors.strip || !settingsWritten;
     if (sock && shim) {
       env.HIVE_SOCK = sock;
+      // The shell Claude Code runs the hooks and status line in (hookShell.ts).
+      // A Git Bash the app found is pinned, so Claude Code picks the same one.
+      const shell = hookShell();
+      if (shell.gitBash) env.CLAUDE_CODE_GIT_BASH_PATH = shell.gitBash;
       const settingsPath = join(dir, 'settings.json');
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? []));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell));
       args.push('--settings', settingsPath);
     }
     if (stripConnectors) {
@@ -1445,6 +1458,15 @@ export class HiveManager {
     return this.registry().agents[agentId]?.sessionId;
   }
 
+  /** A Codex agent's private CODEX_HOME (see installCodexHooks), where its
+   *  rollout transcripts live; null for other engines or no hive. */
+  codexHome(agentId: string): string | null {
+    if (!this.root()) return null;
+    const agent = this.registry().agents[agentId];
+    if (agent?.provider !== 'codex') return null;
+    return join(this.agentDir(agentId), '.codex');
+  }
+
   /** Claude Code settings that route every relevant hook through the shim, plus
    *  (W3) the default MCP bundle merged into this PER-SESSION settings file. cwd
    *  scopes the filesystem/git servers; cfg (the consent map) gates which servers
@@ -1461,15 +1483,24 @@ export class HiveManager {
     return Array.from(new Set(out));
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = []): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash'): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
-    // these through `sh -c` with a stripped PATH, where `node` is often absent.
-    const cmd = this.nodeRun(shim);
+    // these through a shell with a stripped PATH, where `node` is often absent.
+    // On Windows that shell is PowerShell when there is no Git Bash, which can't
+    // parse two quoted paths in a row, so the command is written for the shell
+    // and the hook names it (hookShell.ts).
+    const node = this.nodeCommand();
+    const cmd = shellCommand(shell, node, shim);
     const entry = (matcher?: string) => ({
       ...(matcher ? { matcher } : {}),
-      hooks: [{ type: 'command', command: cmd }]
+      hooks: [{ type: 'command', command: cmd, ...(process.platform === 'win32' ? { shell } : {}) }]
     });
     const mcpServers = this.buildDefaultMcpServers(cwd, cfg);
+    // #63 / TODOS: MCP servers from plugins are already blocked (--strict-mcp-config
+    // / ENABLE_CLAUDEAI_MCP_SERVERS). Plugin skills, hooks and agent definitions
+    // still load from the owner's ~/.claude; turn each enabled plugin off in this
+    // session's settings only (never writes the owner's file).
+    const disabledPlugins = this.ownerPluginsOffForSession();
     return {
       // Match the TUI's truecolor palette to the harness terminal theme —
       // PER SESSION, so the user's global Claude theme (their own terminals
@@ -1488,12 +1519,15 @@ export class HiveManager {
       // Claude merges this additively. Omitted entirely when empty so a settings
       // file with no enabled servers is unchanged from before.
       ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+      ...(Object.keys(disabledPlugins).length ? { enabledPlugins: disabledPlugins } : {}),
       // The status line gets the session status JSON after every response —
       // including context_window.{total_input_tokens,context_window_size},
       // the only clean programmatic source for the session's REAL context
       // window. The shim prints a compact in-terminal gauge and forwards the
       // payload to the harness (agent-card context gauge, exact limit).
-      statusLine: { type: 'command', command: `${cmd} --status`, padding: 0 },
+      // No `shell` field here: Claude Code runs it in its default shell, which
+      // the pinned Git Bash (or its absence) makes the same as `shell`.
+      statusLine: { type: 'command', command: shellCommand(shell, node, shim, '--status'), padding: 0 },
       // Native OS sandbox for Bash subprocesses (macOS Seatbelt / Linux bubblewrap).
       // Auto mode spawns with `--permission-mode bypassPermissions`, which only
       // silences PROMPTS; the sandbox is a separate, opt-in layer that was never
@@ -1509,11 +1543,16 @@ export class HiveManager {
       // denyRead/denyWrite (with allowRead re-opening an agent's own folder and
       // the Office inside Michael's) hold shell commands, and permission deny
       // rules hold the file tools. Deny rules apply in auto mode too.
+      //
+      // Not on Windows: Claude Code has no sandbox there, so "sandboxed only"
+      // refused every shell command ("Shell command execution is blocked by
+      // policy") and team members could not clear their inbox or read files.
+      // There the deny rules still hold the file tools (owner, 2026-10-09).
       ...(writableDirs.length
         ? {
             sandbox: {
               enabled: true,
-              ...(folders?.sandboxOnly ? { allowUnsandboxedCommands: false } : {}),
+              ...(folders?.sandboxOnly && process.platform !== 'win32' ? { allowUnsandboxedCommands: false } : {}),
               filesystem: {
                 allowWrite: writableDirs,
                 ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),
@@ -1541,6 +1580,22 @@ export class HiveManager {
         PostCompact: [entry()]
       }
     };
+  }
+
+  /** Owner plugins to turn off for one agent session (#63). Reads ~/.claude only. */
+  private ownerPluginsOffForSession(): Record<string, false> {
+    const out: Record<string, false> = {};
+    for (const p of [
+      join(homedir(), '.claude', 'settings.json'),
+      join(homedir(), '.claude', 'settings.local.json')
+    ]) {
+      try {
+        if (!existsSync(p)) continue;
+        const raw = JSON.parse(readFileSync(p, 'utf8')) as { enabledPlugins?: unknown };
+        Object.assign(out, pluginsDisabledForSession(raw.enabledPlugins));
+      } catch { /* leave owner's file alone on a bad parse */ }
+    }
+    return out;
   }
 
   /**
@@ -1876,7 +1931,7 @@ export class HiveManager {
       ? 'SLACK REPLIES: When composing a Slack reply (or writing the `result` field of a Slack-origin kanban card), you MUST: (1) directly address what the user asked — never a bare "done"; (2) include the relevant specifics, outcome, and details; (3) format for Slack mrkdwn — open with a short *bold* headline, use bullet points for multiple items, wrap code/paths in `backtick` blocks, keep it concise (no walls of text). When finishing a Slack-origin task, always write a complete, user-facing, well-formatted `result` on the kanban card — the system posts it verbatim to Slack as the done reply.'
       : `SLACK REPLIES: If god dispatches you a task that came from Slack, it will include an exact \`"${hiveNode}" "<helper>" --channel … --thread … --text "…"\` reply command — when you finish, run it VERBATIM to post your result back to that thread yourself. The reply must be SUBSTANTIVE Slack mrkdwn (a short *bold* headline + the actual outcome/specifics/links), NEVER a bare "done".`;
     return [
-      `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of Claude agents.`,
+      `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of AI agents.`,
       `Your private workspace is ${dir}. The shared hive is ${root}. Full protocol: ${inRoot('PROTOCOL.md')}.`,
       '',
       HOUSE_RULES,
@@ -2170,11 +2225,30 @@ export class HiveManager {
    *  that keeps writing broken files is not woken into a loop. */
   static readonly QUARANTINE_NOTICE_GAP_MS = 10 * 60_000;
 
+  /** Move an outbox file into its .sent archive. A name already archived gets a
+   *  unique prefix instead of replacing the earlier message (rename overwrites),
+   *  and a file that cannot be moved at all is removed, so it is never routed
+   *  again on the next tick. */
+  private archiveOutboxFile(fromPath: string, destDir: string, f: string): void {
+    const dest = join(destDir, f);
+    try {
+      if (!existsSync(dest)) {
+        renameSync(fromPath, dest);
+        return;
+      }
+    } catch { /* fall through to a unique name */ }
+    try {
+      renameSync(fromPath, join(destDir, `${Date.now()}-${randomBytes(4).toString('hex')}-${f}`));
+    } catch {
+      try { rmSync(fromPath, { force: true }); } catch { /* best effort */ }
+    }
+  }
+
   /** Set an unreadable outbox file aside and tell its sender, who otherwise
    *  believes it was delivered. */
   private quarantine(id: string, outbox: string, f: string): void {
     this.appendLog({ kind: 'drop', reason: 'malformed-json', from: id, file: f });
-    try { renameSync(join(outbox, f), join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+    this.archiveOutboxFile(join(outbox, f), join(outbox, '.sent'), `bad-${f}`);
     const last = this.quarantineNoticeAt.get(id) ?? 0;
     if (Date.now() - last < HiveManager.QUARANTINE_NOTICE_GAP_MS) return;
     this.quarantineNoticeAt.set(id, Date.now());
@@ -2250,7 +2324,7 @@ export class HiveManager {
             }
             this.appendLog({ kind: 'schedule-request', from: id, id: msg.id });
             this.routeMessage(this.normalize({ to: id, act: 'inform', subject: 'Schedule request', body: reply }, 'scheduler'));
-            renameSync(full, join(outbox, '.sent', f));
+            this.archiveOutboxFile(full, join(outbox, '.sent'), f);
             routed++;
             continue;
           }
@@ -2258,11 +2332,11 @@ export class HiveManager {
           // Repaired text replaces the original in place, then one rename
           // archives it, so a failed step can never deliver it twice.
           if (repairedText !== null) writeFileSync(full, repairedText);
-          renameSync(full, join(outbox, '.sent', f)); // archive, don't reprocess
+          this.archiveOutboxFile(full, join(outbox, '.sent'), f); // archive, don't reprocess
           routed++;
         } catch {
           // malformed file — quarantine so we don't spin on it
-          try { renameSync(full, join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+          this.archiveOutboxFile(full, join(outbox, '.sent'), `bad-${f}`);
         }
       }
     }
@@ -2591,10 +2665,14 @@ export class HiveManager {
   }
 
   // — the owner's conversation with Michael (docs/designs/michael-replies.md) —
-  // The owner's sent mail and the dock's own facts live in agents/human/,
-  // written only by the app: R4 and R5 of the engineering review.
+  // Under <harnessHome>/private/owner/ (#63), written only by the app: R4 and R5
+  // of the engineering review. agents/human/ is no longer the home for these.
 
-  private ownerSentDir(): string { return join(this.agentDir('human'), 'outbox', '.sent'); }
+  private ownerSentDir(): string {
+    const home = this.getHome();
+    if (!home) throw new Error('no harnessHome');
+    return privateOwnerSentDir(home);
+  }
   /** Moves any message file found in the owner's outbox aside, unrouted. */
   private rejectOwnerOutbox(outbox: string): void {
     try {
@@ -2614,7 +2692,42 @@ export class HiveManager {
   private isOwnerQuestion(id: string): boolean {
     return /^[\w.-]+$/.test(id) && !!this.root() && existsSync(join(this.ownerSentDir(), `${id}.json`));
   }
-  private ownerStatePath(): string { return join(this.agentDir('human'), 'state.json'); }
+  private ownerStatePath(): string {
+    const home = this.getHome();
+    if (!home) throw new Error('no harnessHome');
+    return privateOwnerStatePath(home);
+  }
+
+  /**
+   * One-time move of owner dock files out of `hive/agents/human/` (#63). Safe
+   * to call on every ensureHive: skips when the private copy already exists or
+   * the legacy path is empty.
+   */
+  private migrateOwnerPrivate(): void {
+    const home = this.getHome();
+    const root = this.root();
+    if (!home || !root) return;
+    const moveTree = (from: string, to: string): void => {
+      if (!existsSync(from)) return;
+      if (existsSync(to)) {
+        // Private copy already won; drop the legacy leftover so agents cannot
+        // keep writing into the old agents/human path.
+        try { rmSync(from, { recursive: true, force: true }); } catch { /* best-effort */ }
+        return;
+      }
+      try {
+        mkdirSync(dirname(to), { recursive: true });
+        renameSync(from, to);
+      } catch {
+        try {
+          cpSync(from, to, { recursive: true });
+          rmSync(from, { recursive: true, force: true });
+        } catch (e) { console.error('[hive] migrate owner private:', e); }
+      }
+    };
+    moveTree(legacyOwnerSentDir(root), privateOwnerSentDir(home));
+    moveTree(legacyOwnerStatePath(root), privateOwnerStatePath(home));
+  }
 
   /** The dock's facts. An unreadable file is rebuilt as everything read and
    *  already notified, so a bad file never repeats a notification (R5). */
@@ -2641,7 +2754,7 @@ export class HiveManager {
   }
 
   private writeOwnerState(state: OwnerDockState): void {
-    mkdirSync(join(this.agentDir('human')), { recursive: true });
+    mkdirSync(dirname(this.ownerStatePath()), { recursive: true });
     this.atomicWriteJson(this.ownerStatePath(), state);
   }
 
@@ -4093,7 +4206,7 @@ human rather than retry. Route work to an agent already on the floor first eithe
 
 const PROTOCOL_MD = `# Hive protocol
 
-You are one of several Claude agents sharing this hive. Coordination is entirely
+You are one of several AI agents sharing this hive. Coordination is entirely
 file-based; the harness (main process) is the only thing that runs git and the
 only thing that moves messages between agents.
 

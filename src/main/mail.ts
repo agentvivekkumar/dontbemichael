@@ -16,16 +16,20 @@
  * local test servers (eng review E4).
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolveMx } from 'node:dns/promises';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { simpleParser } from 'mailparser';
+import { writeFileAtomic } from './atomicFile';
 import {
   MAIL_TOOL_OPS,
   agentMailboxes,
   asSendingMode,
   grantPaused,
   isMicrosoftAddress,
+  mxPointsToMicrosoft,
   mailboxHolder,
   mailAccess,
   mailboxAddress,
@@ -33,6 +37,7 @@ import {
   mailToolsJustAttached,
   secretRefForMailbox,
   sendOnlyGrant,
+  sendingFor,
   sendingMode,
   sendingWords,
   type MailAccessConfig,
@@ -47,6 +52,7 @@ import { OWN_SENDS_ONLY, proposalSendProblem, standingProblem, standingTooLong, 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
 const SEND_TIMEOUT_MS = 60_000;
+const MX_LOOKUP_TIMEOUT_MS = 5_000;
 const SEARCH_DEFAULT = 20;
 const SEARCH_MAX = 50;
 const BODY_MAX_CHARS = 50_000;
@@ -165,7 +171,13 @@ export interface MailDeps {
   markStatus(mailboxId: string, status: 'connected' | 'needs-attention', reason?: string): void;
   createImap?(server: MailServer, user: string, pass: string): ImapLike;
   createSmtp?(server: MailServer, user: string, pass: string): SmtpLike;
+  /** MX lookup for the Microsoft 365 check (issue 39). Injected so tests run offline. */
+  resolveMx?(domain: string): Promise<Array<{ exchange: string }>>;
   log?(line: string): void;
+  /** Where the sends of the last SEND_MEMORY_MS are kept on disk, so a repeat
+   *  after a restart still gets the first result back instead of a second email.
+   *  Without it the record lives in memory only. */
+  journalPath?: string;
 }
 
 function defaultImap(server: MailServer, user: string, pass: string): ImapLike {
@@ -248,10 +260,48 @@ export class MailService {
   private readonly inFlight = new Map<string, Promise<{ sent: boolean; messageId: string }>>();
   private readonly createImap: NonNullable<MailDeps['createImap']>;
   private readonly createSmtp: NonNullable<MailDeps['createSmtp']>;
+  private readonly resolveMx: NonNullable<MailDeps['resolveMx']>;
 
   constructor(private readonly deps: MailDeps) {
     this.createImap = deps.createImap ?? defaultImap;
     this.createSmtp = deps.createSmtp ?? defaultSmtp;
+    this.resolveMx = deps.resolveMx ?? resolveMx;
+    this.loadJournal();
+  }
+
+  /** Reload the recent sends a previous run recorded, dropping any too old to count. */
+  private loadJournal(): void {
+    if (!this.deps.journalPath) return;
+    try {
+      if (!existsSync(this.deps.journalPath)) return;
+      const raw = JSON.parse(readFileSync(this.deps.journalPath, 'utf8'));
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const now = Date.now();
+        for (const [k, v] of Object.entries(raw as Record<string, { at?: number; messageId?: string }>)) {
+          if (v && typeof v.at === 'number' && typeof v.messageId === 'string') {
+            if (now - v.at <= SEND_MEMORY_MS) {
+              this.sent.set(k, { at: v.at, result: { messageId: v.messageId } });
+            }
+          }
+        }
+      }
+    } catch { /* best-effort */ }
+  }
+
+  private saveJournal(): void {
+    if (!this.deps.journalPath) return;
+    try {
+      const data: Record<string, { at: number; messageId: string }> = {};
+      for (const [k, v] of this.sent) {
+        data[k] = { at: v.at, messageId: v.result.messageId };
+      }
+      writeFileAtomic(this.deps.journalPath, JSON.stringify(data, null, 2), 0o600);
+    } catch { /* best-effort */ }
+  }
+
+  private recordSent(key: string, at: number, messageId: string): void {
+    this.sent.set(key, { at, result: { messageId } });
+    this.saveJournal();
   }
 
   private record(id: string): MailboxRecord {
@@ -608,7 +658,14 @@ export class MailService {
     // the same mailbox within 10 minutes gets the first result back.
     const key = createHash('sha256').update(JSON.stringify([agentId, id, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.forward ?? null, input.attachFrom ?? [], input.thread?.inReplyTo ?? null])).digest('hex');
     const now = Date.now();
-    for (const [k, v] of this.sent) if (now - v.at > SEND_MEMORY_MS) this.sent.delete(k);
+    let pruned = false;
+    for (const [k, v] of this.sent) {
+      if (now - v.at > SEND_MEMORY_MS) {
+        this.sent.delete(k);
+        pruned = true;
+      }
+    }
+    if (pruned) this.saveJournal();
     const prior = this.sent.get(key);
     if (prior) return { ...prior.result, sent: true, repeated: true };
     const running = this.inFlight.get(key);
@@ -632,13 +689,13 @@ export class MailService {
       if (err.kind === 'timeout' || err.kind === 'network') {
         // The server may have accepted it before the line dropped: look in Sent.
         const found = await this.inSent(id, messageId).catch(() => false);
-        if (found) { this.sent.set(key, { at: now, result: { messageId } }); return { sent: true, messageId }; }
+        if (found) { this.recordSent(key, now, messageId); return { sent: true, messageId }; }
       }
       this.note(id, err);
       throw new MailError(err.kind, `Not sent. ${err.message}`);
     } finally { smtp.close?.(); }
     this.note(id);
-    this.sent.set(key, { at: now, result: { messageId } });
+    this.recordSent(key, now, messageId);
     // Gmail files sent mail itself; other services need the copy appended.
     if (rec.provider !== 'gmail' && rec.provider !== 'google-workspace') {
       const raw = await MailService.build(msg).catch(() => null);
@@ -654,10 +711,29 @@ export class MailService {
     }, 'Checking Sent');
   }
 
+  /** True when the address domain MX records point at Microsoft 365 (issue 39).
+   *  Fail open: any lookup problem returns false so a working mailbox is never
+   *  blocked by DNS. Businesses behind a mail filter keep their old behaviour. */
+  private async domainUsesMicrosoft365(address: string): Promise<boolean> {
+    const domain = address.split('@')[1]?.trim().toLowerCase();
+    if (!domain) return false;
+    try {
+      const records = await withTimeout(this.resolveMx(domain), MX_LOOKUP_TIMEOUT_MS, 'Looking up the mail server');
+      return mxPointsToMicrosoft((records ?? []).map((r) => r.exchange));
+    } catch { return false; }
+  }
+
   /** Settings "Test and save": log in to IMAP and SMTP with the given password
    *  before anything is stored. */
   async test(rec: Pick<MailboxRecord, 'address' | 'imap' | 'smtp'>, password: string): Promise<{ ok: true } | { ok: false; kind: MailErrorKind; reason: string }> {
     if (isMicrosoftAddress(rec.address)) {
+      return { ok: false, kind: 'unsupported', reason: 'Outlook and Microsoft 365 mailboxes stopped accepting app passwords, so they cannot be connected yet.' };
+    }
+    // Issue 39: most small businesses on Microsoft 365 use their own domain,
+    // so the address check never fires. Look at the domain MX records. Any
+    // lookup failure falls through to the normal IMAP test, so a working
+    // mailbox is never blocked by DNS.
+    if (await this.domainUsesMicrosoft365(rec.address)) {
       return { ok: false, kind: 'unsupported', reason: 'Outlook and Microsoft 365 mailboxes stopped accepting app passwords, so they cannot be connected yet.' };
     }
     const client = this.createImap(rec.imap, rec.address, password);
@@ -709,9 +785,10 @@ export interface ProposalStore {
  *  could not run, which counts as not fitting. */
 export type StandingFitCheck = (kind: string, email: StandingCheckEmail) => Promise<{ fits: true } | { fits: false; reason: string } | null>;
 
-/** What each Sending choice lets the agent do, for list_mailboxes. */
+/** What each Sending choice lets the agent do, for list_mailboxes. The Sending
+ *  changed notice says the same in shared/mailProposals.ts SENDING_CHANGE; change both. */
 const SENDING_HOW: Record<SendingMode, string> = {
-  send: 'send goes out at once. You may still propose an email when you want the owner to approve it first.',
+  send: 'send goes out at once. propose is refused: nothing goes on Ask me, so you decide, and you ask Michael when you are unsure about an email.',
   approval: 'propose puts the email on Ask me for the owner; when they approve it you get a message, then call send with its proposal id. For a kind listed in standing_approvals, call send with the full email and that standing id instead. When your memory notes show the owner approving one kind of email unchanged again and again, offer it with offer_standing on your next proposal.',
   draft: 'draft saves the email in the mailbox\'s Drafts for the owner to send; send and propose are refused.'
 };
@@ -726,7 +803,7 @@ const sendingStanding = new Set<string>();
 const sentUnrecorded = new Map<string, string>();
 
 /** What Send only means, for a grant's list_mailboxes entry. */
-const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send work under its sending; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
+const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send follow its sending, below; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
 
 function str(v: unknown, max = 5000): string | undefined {
   return typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined;
@@ -738,14 +815,37 @@ function ref(v: unknown): MailRef | undefined {
   return typeof o.mailbox === 'string' && (typeof o.id === 'string' || typeof o.id === 'number') ? { mailbox: o.mailbox, id: String(o.id) } : undefined;
 }
 
+type MailRequestDeps = Pick<MailDeps, 'getConfig' | 'log'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean };
+
 /**
  * One md-mail tool call, already authenticated by the broker token (so `agentId`
  * is trusted). Checks `mailAccess` for the op, MB-8 for references, then runs it.
  * Never throws: every outcome is a status and a JSON body the MCP server relays.
+ *
+ * Each call writes one line to `deps.log` (multi-mailbox.md §8): agent, mailbox,
+ * operation, result and duration. Ids only, never a recipient, subject or body.
  */
 export async function handleMailRequest(
   svc: MailService,
-  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean },
+  deps: MailRequestDeps,
+  agentId: string,
+  op: string,
+  body: Record<string, unknown>
+): Promise<MailRequestResult> {
+  const started = Date.now();
+  const res = await runMailRequest(svc, deps, agentId, op, body);
+  try {
+    // The mailbox and op come from the agent: keep them to one plain token each.
+    const mailbox = (str(body.mailbox, 100) ?? '-').replace(/[^\w.@-]/g, '?');
+    const kind = typeof res.body.kind === 'string' ? ` ${res.body.kind}` : '';
+    deps.log?.(`[mail] ${agentId} ${mailbox} ${Object.prototype.hasOwnProperty.call(MAIL_TOOL_OPS, op) ? op : 'unknown'} ${res.status}${kind} ${Date.now() - started}ms`);
+  } catch { /* the call stands */ }
+  return res;
+}
+
+async function runMailRequest(
+  svc: MailService,
+  deps: MailRequestDeps,
   agentId: string,
   op: string,
   body: Record<string, unknown>
@@ -767,6 +867,9 @@ export async function handleMailRequest(
   // A Send only grant on the named mailbox (shared-mailboxes.md).
   const grant = sendOnlyGrant(cfg, agentId);
   const underGrant = !!grant && !!mailbox && grant.mailbox === mailbox;
+  // Can send puts nothing on Ask me (owner, 2026-10-09): a standing id from an
+  // older memory note is ignored and the email goes out as any other send.
+  const canSend = !!mailbox && sendingFor(cfg, agentId, mailbox) === 'send';
 
   if (op === 'list_mailboxes') {
     const recs = cfg.mailboxes ?? [];
@@ -899,7 +1002,7 @@ export async function handleMailRequest(
     // A standing approval: fixed facts first, then the separate check. An email
     // that does not plainly fit goes to the owner on Ask me instead, so a
     // generous reading never sends it.
-    if (op === 'send' && standingId) {
+    if (op === 'send' && standingId && !canSend) {
       if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };
       const rule = deps.proposals.getStanding(standingId);
       const problem = standingProblem(rule, agentId, mailbox!, input);
@@ -929,6 +1032,20 @@ export async function handleMailRequest(
         // The check can take a minute: the approval, the access and the grant are
         // checked again before anything leaves, so a revoke in that time holds.
         const now = deps.getConfig();
+        if (sendingFor(now, agentId, mailbox!) === 'send') {
+          // Switched to Can send while the check ran: the standing approval no
+          // longer applies and nothing goes on Ask me (owner, 2026-10-09), so
+          // the email goes out as any other send, whatever the check said.
+          const out = await svc.send(agentId, mailbox!, input, () => {
+            const a = mailAccess(deps.getConfig(), agentId, mailbox, 'send', undefined, { present: deps.present });
+            return a.ok ? null : a.reason;
+          });
+          if (underGrant && !(out as { repeated?: boolean }).repeated) {
+            recordGrantSend(out, input);
+            try { deps.audit?.({ kind: 'mail-sent', agentId, mailbox, messageId: String(out.messageId ?? ''), grant: true }); } catch { /* the send stands */ }
+          }
+          return { status: 200, body: out };
+        }
         const still = deps.proposals.getStanding(standingId);
         const stillProblem = standingProblem(still, agentId, mailbox!, input);
         const stillAccess = mailAccess(now, agentId, mailbox, 'send', standingId, { present: deps.present });
@@ -1025,6 +1142,11 @@ export interface MailAdminDeps {
   endGrant?(agentId: string, mailbox: string, reason: string): void;
   /** Withdraw an agent's waiting and approved emails from a mailbox. */
   cancelFor?(agentId: string, mailbox: string, reason: string): void;
+  /** The owner changed an agent's Sending on a mailbox it keeps: tell it,
+   *  note it in its memory, and on Can send hand back its waiting emails. */
+  sendingChanged?(agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean): void;
+  /** Whether a team member is on the roster, for a grant's pause. Absent: assumed. */
+  present?(agentId: string): boolean;
 }
 
 export interface AddMailboxInput {
@@ -1061,7 +1183,7 @@ export async function saveMailbox(svc: MailService, admin: MailAdminDeps, preset
 
   const id = fixing ? fixing.id : mailboxIdFor(address, existing.map((m) => m.id));
   const stored = admin.setSecret(secretRefForMailbox(id), password);
-  if (!stored.ok) return { ok: false, kind: 'unknown', reason: stored.error ?? "Couldn't store the password securely on this Mac." };
+  if (!stored.ok) return { ok: false, kind: 'unknown', reason: stored.error ?? "Couldn't store the password securely on this computer." };
   const now = Date.now();
   const prior = existing.find((m) => m.id === id);
   const record: MailboxRecord = { id, address, provider: input.provider, imap, smtp, status: 'connected', createdAt: prior?.createdAt ?? now, updatedAt: now };
@@ -1159,8 +1281,9 @@ export function setAgentCapabilities(
   try {
     if (ownedBefore && ownedBefore !== ownedAfter) {
       admin.endGrant?.(agentId, ownedBefore, ownedAfter ? `The owner gave you ${address(ownedAfter)} instead of ${address(ownedBefore)}.` : `The owner turned your email from ${address(ownedBefore)} off.`);
-    } else if (ownedBefore && ownedBefore === ownedAfter && sending === 'draft' && sendingMode(before!.email) !== 'draft') {
-      admin.cancelFor?.(agentId, ownedBefore, `The owner set you to Draft only from ${address(ownedBefore)}.`);
+    } else if (ownedBefore && ownedBefore === ownedAfter && sending && sending !== sendingMode(before!.email)) {
+      if (sending === 'draft') admin.cancelFor?.(agentId, ownedBefore, `The owner set you to Draft only from ${address(ownedBefore)}.`);
+      admin.sendingChanged?.(agentId, ownedBefore, address(ownedBefore), sending, true);
     }
   } catch (e) { console.error('[mail] mailbox change:', e); }
   return { ok: true, restartNeeded: mailToolsJustAttached(before, after), ...(movedFrom ? { movedFrom } : {}) };
@@ -1197,8 +1320,11 @@ export function setSendOnly(
   try {
     if (prior?.mailbox && prior.mailbox !== grant?.mailbox) {
       admin.endGrant?.(agentId, prior.mailbox, `The owner removed your Send only access to ${address(prior.mailbox)}.`);
-    } else if (prior && grant && grant.sending === 'draft' && asSendingMode(prior.sending) !== 'draft') {
-      admin.cancelFor?.(agentId, grant.mailbox, `The owner set you to Draft only from ${address(grant.mailbox)}.`);
+    } else if (prior && grant && grant.sending !== asSendingMode(prior.sending)) {
+      if (grant.sending === 'draft') admin.cancelFor?.(agentId, grant.mailbox, `The owner set you to Draft only from ${address(grant.mailbox)}.`);
+      // A paused grant can't send, so its waiting emails stay on Ask me (Codex
+      // review): handing them back would strand them.
+      admin.sendingChanged?.(agentId, grant.mailbox, address(grant.mailbox), grant.sending, !grantPaused(admin.getConfig(), grant.mailbox, admin.present));
     }
   } catch (e) { console.error('[mail] grant change:', e); }
   return { ok: true, restartNeeded: mailToolsJustAttached(before, after) };

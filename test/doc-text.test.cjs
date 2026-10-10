@@ -197,6 +197,50 @@ test('a password-protected (not-a-zip) Office file is refused, not indexed as by
   assert.match(r.reason, /protected by a password or damaged/);
 });
 
+// A zip bomb lies in its central directory: each entry declares a size under
+// the per entry guard, and together they inflate far past what the main process
+// can hold. The guards read only the declared sizes, so patching them is enough
+// and no test has to build hundreds of MB. Patches each central directory
+// record whose name passes `only`.
+const declareSizes = (p, size, only = () => true) => {
+  const buf = fs.readFileSync(p);
+  for (let i = 0; i + 46 <= buf.length; i++) {
+    if (buf.readUInt32LE(i) !== 0x02014b50) continue;
+    const name = buf.toString('utf8', i + 46, i + 46 + buf.readUInt16LE(i + 28));
+    if (only(name)) buf.writeUInt32LE(size, i + 24);
+  }
+  fs.writeFileSync(p, buf);
+  return p;
+};
+
+test('an Office file whose entries add up past the total guard is refused before any is inflated', async () => {
+  // Each entry is under the per entry guard, so only the total catches it.
+  const parts = {};
+  for (let i = 0; i < 5; i++) parts[`word/header${i}.xml`] = '<x/>';
+  const p = declareSizes(docx('bomb.docx', [para(run('Hello'))], parts), 45 * 1024 * 1024, (n) => n.startsWith('word/header'));
+  const r = await extractDocumentText(p);
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /holds more than the app can read/);
+});
+
+test('an Office file with too many entries is refused', async () => {
+  const files = { 'word/document.xml': `<w:document ${W}><w:body>${para(run('Hello'))}</w:body></w:document>` };
+  for (let i = 0; i < 5000; i++) files[`word/header${i}.xml`] = '';
+  const r = await extractDocumentText(zip('crowded.docx', files));
+  assert.equal(r.kind, 'unreadable');
+  assert.match(r.reason, /holds more than the app can read/);
+});
+
+test('large media inside an Office file does not count toward the total guard', async () => {
+  // Images are never inflated, so a photo heavy document still reads.
+  const photos = {};
+  for (let i = 0; i < 5; i++) photos[`word/media/image${i}.png`] = 'png';
+  const p = declareSizes(docx('photos.docx', [para(run('Menu for spring'))], photos), 45 * 1024 * 1024, (n) => n.startsWith('word/media/'));
+  const r = await extractDocumentText(p);
+  assert.equal(r.kind, 'text');
+  assert.equal(r.text, 'Menu for spring');
+});
+
 test('an unknown binary file is refused rather than read as text', async () => {
   const r = await extractDocumentText(write('thing.bin', Buffer.from([1, 2, 0, 3, 4])));
   assert.equal(r.kind, 'unreadable');

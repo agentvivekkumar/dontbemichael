@@ -23,25 +23,85 @@ test('checking a key asks Anthropic once, the right way, and a dead network or t
   // Value: protects=the key goes only to api.anthropic.com in a header, the check never hangs setup, and a network failure is never reported as a bad key; fails_when=checkAnthropicKey changes the URL, method or headers, drops the timeout signal, or maps an error or timeout to anything but unreachable; why_new=the check now runs on Electron's fetch, which production uses; seam=none (fetch injected, no network)
   const key = 'sk-ant-api03-' + 'q'.repeat(40);
   const calls = [];
-  const answer = (status) => async (url, init) => { calls.push({ url, init }); return { status }; };
-  for (const [status, want] of [[200, 'ok'], [401, 'rejected'], [403, 'rejected'], [429, 'unreachable'], [503, 'unreachable']]) {
-    assert.equal(await setup.checkAnthropicKey(key, answer(status)), want, `HTTP ${status}`);
+  // Anthropic's error replies carry an error message; a busy reply without one
+  // is a proxy in between (checked in the refusal test below).
+  const answer = (status) => async (url, init) => { calls.push({ url, init }); return { status, json: async () => ({ error: { message: 'From Anthropic.' } }) }; };
+  for (const [status, want] of [[200, 'ok'], [401, 'rejected'], [403, 'rejected'], [429, 'busy'], [503, 'busy'], [529, 'busy']]) {
+    assert.deepEqual(await setup.checkAnthropicKey(key, answer(status)), { verdict: want }, `HTTP ${status}`);
   }
   assert.equal(calls[0].url, 'https://api.anthropic.com/v1/models?limit=1');
   assert.equal(calls[0].init.method, 'GET');
   assert.deepEqual(calls[0].init.headers, { 'x-api-key': key, 'anthropic-version': '2023-06-01' });
   assert.ok(calls[0].init.signal instanceof AbortSignal, 'a timeout signal rides along');
-  assert.equal(await setup.checkAnthropicKey(key, async () => { throw new TypeError('fetch failed'); }), 'unreachable', 'a network error');
+  assert.deepEqual(await setup.checkAnthropicKey(key, async () => { throw new TypeError('fetch failed'); }), { verdict: 'unreachable' }, 'a network error');
   // AbortSignal.timeout's timer does not hold the event loop open, so the fake
   // keeps one ref'd timer of its own until the signal fires.
   const hang = (_url, init) => new Promise((_res, rej) => {
     const keep = setTimeout(() => {}, 5000);
     init.signal.addEventListener('abort', () => { clearTimeout(keep); rej(init.signal.reason); });
   });
-  assert.equal(await setup.checkAnthropicKey(key, hang, 20), 'unreachable', 'a fetch that never answers is cut off');
+  assert.deepEqual(await setup.checkAnthropicKey(key, hang, 20), { verdict: 'unreachable' }, 'a fetch that never answers is cut off');
   const main = read('src/main/index.ts');
-  assert.match(main, /const verdict = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'production uses Electron fetch, which follows the system proxy');
+  assert.match(main, /const \{ verdict, reason \} = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'production uses Electron fetch, which follows the system proxy');
   assert.doesNotMatch(main, /const netRequest =/, 'no hand-made request adapter');
+});
+
+test('a key Anthropic refuses for a reason shows that reason, not a network error', async () => {
+  // Value: protects=an owner whose key is not scoped to a workspace (Windows, 2026-10-09: HTTP 400, shown as "Check your internet connection") sees what to change; fails_when=a 400 maps to unreachable again, the reason is dropped, or a body without a message breaks the check; why_new=owner bug report; seam=none (fetch injected, no network)
+  const key = 'sk-ant-api03-' + 'q'.repeat(40);
+  const workspace = 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.';
+  const reply = (status, body) => async () => ({ status, json: async () => body });
+  assert.deepEqual(await setup.checkAnthropicKey(key, reply(400, { type: 'error', error: { type: 'invalid_request_error', message: workspace }, request_id: null })),
+    { verdict: 'workspace' }, 'the field case gets its own short message in the owner\'s language (owner 2026-10-09)');
+  assert.deepEqual(await setup.checkAnthropicKey(key, reply(400, { error: { message: 'Your organization is disabled.' } })),
+    { verdict: 'refused', reason: 'Your organization is disabled.' }, 'any other refusal keeps Anthropic\'s own reason');
+  // Anthropic always sends a message; a 4xx without one came from a proxy or
+  // block page in between, so it is the network, never "did not accept that key".
+  assert.deepEqual(await setup.checkAnthropicKey(key, reply(404, { nothing: 'here' })), { verdict: 'unreachable' }, 'no Anthropic message');
+  assert.deepEqual(await setup.checkAnthropicKey(key, async () => ({ status: 400, json: async () => { throw new SyntaxError('not json'); } })), { verdict: 'unreachable' }, 'a body that is not JSON, like a proxy page');
+  for (const message of ['', '   \n ', 42, null]) {
+    assert.deepEqual(await setup.checkAnthropicKey(key, reply(400, { error: { message } })), { verdict: 'unreachable' }, `a blank or non text message ${JSON.stringify(message)}`);
+  }
+  // So every refusal names a reason, and the form never shows a bare "{{reason}}".
+  for (const status of [400, 402, 404, 405, 407, 409, 413, 422, 499]) {
+    assert.deepEqual(await setup.checkAnthropicKey(key, async () => ({ status })), { verdict: 'unreachable' }, `HTTP ${status} with no body, like a proxy's 407`);
+    const r = await setup.checkAnthropicKey(key, reply(status, { error: { message: 'Something Anthropic said.' } }));
+    assert.deepEqual(r, { verdict: 'refused', reason: 'Something Anthropic said.' }, `HTTP ${status} from Anthropic`);
+  }
+  // Real Response bodies: Anthropic's small envelope is read; a proxy's page past
+  // 16 KB is never read to the end (Codex adversarial review 2026-10-09).
+  const envelope = JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'Your organization is disabled.' } });
+  assert.deepEqual(await setup.checkAnthropicKey(key, async () => new Response(envelope, { status: 400 })), { verdict: 'refused', reason: 'Your organization is disabled.' });
+  assert.deepEqual(await setup.checkAnthropicKey(key, async () => new Response('x'.repeat(100_000), { status: 502 })), { verdict: 'unreachable' }, 'a big proxy page');
+  let pulled = 0;
+  const endless = new ReadableStream({ pull(c) { pulled++; c.enqueue(new Uint8Array(8192)); } });
+  assert.deepEqual(await setup.checkAnthropicKey(key, async () => new Response(endless, { status: 503 })), { verdict: 'unreachable' }, 'an endless body');
+  assert.ok(pulled < 10, `stopped after about 16 KB, pulled ${pulled} chunks`);
+  // A proxy's 408, 502, 503 or 504 with no Anthropic message is the network, not "Anthropic is busy".
+  for (const status of [408, 502, 503, 504]) {
+    assert.deepEqual(await setup.checkAnthropicKey(key, async () => ({ status })), { verdict: 'unreachable' }, `HTTP ${status} with no body`);
+  }
+  assert.ok(JSON.parse(read('src/renderer/src/i18n/locales/ar.json')).engineSetup.keyError.refused.includes('\u2068{{reason}}\u2069'), 'Arabic isolates the English reason so its punctuation stays in place');
+  assert.deepEqual(await setup.checkAnthropicKey(key, reply(400, { error: { message: '  two\n lines  ' } })), { verdict: 'refused', reason: 'two lines' });
+  for (const l of ['en', 'zh-CN', 'ar']) {
+    const w = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`)).engineSetup.keyError.workspace;
+    assert.match(w, /console\.anthropic\.com/, `${l}: says where to make the key`);
+    if (l === 'ar') assert.ok(w.includes('\u2068console.anthropic.com\u2069'), 'Arabic isolates the domain, as keyInfo does');
+    assert.ok(w.length <= 80, `${l}: short`);
+    if (l === 'en') assert.ok(w.split(/\s+/).length < 12, 'system feedback stays under 12 words (DESIGN.md)');
+    assert.doesNotMatch(w, /[\u2013\u2014]| - /, `${l}: no dashes`);
+  }
+  assert.equal((await setup.checkAnthropicKey(key, reply(400, { error: { message: 'x'.repeat(900) } }))).reason.length, 300, 'a long reason is cut');
+  assert.deepEqual(await setup.checkAnthropicKey(key, reply(401, { error: { message: 'invalid x-api-key' } })), { verdict: 'rejected' }, 'a wrong key keeps its own message');
+  // Value: protects=the reason reaches the Get Michael ready step over IPC; fails_when=the useApiKey handler returns only the verdict and drops reason; why_new=the lines above run checkAnthropicKey alone and the handler pins cover only its call; seam=source pin, main has no IPC harness
+  assert.match(read('src/main/index.ts'), /if \(verdict !== 'ok'\) return \{ ok: false, error: verdict, \.\.\.\(reason \? \{ reason \} : \{\}\) \};/);
+  const ready = read('src/renderer/src/components/GetMichaelReady.tsx');
+  assert.match(ready, /res\.error === 'refused' && 'reason' in res && res\.reason\s*\? t\('engineSetup\.keyError\.refused', \{ reason: res\.reason \}\)/);
+  for (const l of ['en', 'zh-CN', 'ar']) {
+    const k = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`)).engineSetup.keyError;
+    assert.match(k.refused, /\{\{reason\}\}/, l);
+    assert.doesNotMatch(k.refused + k.busy, /[\u2013\u2014]| - /, `${l}: no dashes`);
+  }
 });
 
 test('auth status on Windows goes through cmd.exe for a .cmd shim, quoted for paths with spaces', () => {

@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.1.7] (2026-10-09)
+
+### Fixed
+
+- **Microsoft 365 mailboxes on your own domain get the right message.** Testing a mailbox like info@yourbusiness.com that runs on Microsoft 365 said the mail server could not be reached or the password was wrong, so owners kept retrying something that cannot work yet. The test now looks up where the domain's mail goes, and a Microsoft 365 domain gets the same "Outlook and Microsoft 365 mailboxes stopped accepting app passwords" message as an @outlook.com address. If the lookup fails, the test carries on as before, so a working mailbox is never blocked.
+- **A large Word, Excel or PowerPoint file can no longer take the office down.** Each part of such a file was capped, but not all of them together, so a file with many large parts could use up the app's memory and stop every team member. A file whose text parts add up to more than 200 MB, or that has more than 5,000 of them, is now refused before anything is unpacked, with a plain reason. Photos inside a document do not count, so a picture heavy document still reads.
+- **An email is not sent twice after a restart.** The app remembers each email a team member sent for 10 minutes, so the same email asked for again gets the first result back. That memory now survives quitting and reopening the app.
+- **The app window stays on the app.** A clicked link or a file dropped on the window could replace the whole office with that page. Web links now open in your browser.
+- **Slack can be retried after its tunnel fails.** When the public tunnel could not open, the Slack listener kept its port, so every later try failed until the app was restarted. It now lets the port go.
+- **Team messages are kept when two share a file name.** Sorting a sent message away could overwrite an earlier one with the same name and lose it from the thread history, and a message that could not be moved was delivered again every few seconds. Both are fixed.
+- **Folder rules on Windows understand `~`.** A path starting with `~` was judged against the team member's own folder instead of the home folder on Windows.
+
+### Added
+
+- **Codex usage and cost.** Groundwork for a second engine: a Codex team member's tokens and cost now reach the token caps, cost caps and cost views, and GPT models are priced as OpenAI models. Codex is not offered as an engine yet.
+
+## [0.1.6] (2026-10-09)
+
+### Fixed
+
+- **Windows offices without Git for Windows.** On those computers Claude Code runs team members' hooks in PowerShell, which could not read the command the app wrote, so every hook failed with "Unexpected token" in the terminal and Michael and the team never reported what they were doing. The app now writes each hook and the status line for the shell Claude Code will use there.
+- **Team members on Windows can run commands.** Claude Code has no sandbox on Windows, and the app told it that team members' commands must run sandboxed, so every command a team member tried was blocked by policy: they could not clear handled messages, search company knowledge or read Word and Excel files. On Windows that rule is now left off. The rules that keep each team member's file tools out of other folders stay, and Mac and Linux are unchanged.
+- **Terminal stays inside its box.** On a Windows office a team member's terminal drew its last row past its frame, over the Queue box. The terminal now refits whenever its character cells change size on their own, such as after a font loads, a display scale change or a renderer swap. If a fit still leaves it past its box, the sizes go to the office log so the cause can be pinned down.
+- **Can send means no approval cards.** A team member you moved from Send on approval to Can send kept putting emails on Ask me, because its notes still said to propose them and the app never told it the setting changed. Can send now sends without asking: the team member can no longer put an email on Ask me, and an old standing approval no longer routes one there. Changing a team member's Sending tells them and adds the new rule to their notes. Moving them to Can send hands their waiting emails back to send themselves; while nobody on the team reads the inbox they send from, or that inbox needs attention, those emails stay on Ask me instead. Offices that switched before this fix get the same hand back at launch.
+
+## [0.1.5] (2026-10-09)
+
+### Fixed
+
+- **Windows offices start.** On Windows every team member stopped at a hidden "do you trust this folder?" question and quit, so the office sat silent. The app now trusts your office folder the way Claude Code looks it up on Windows, so Michael and the team start on their own.
+- **Cards that wait on someone move to Waiting.** Michael's hourly standup still told him to keep a card that waits on a customer or a teammate in Doing, so no card ever reached the Waiting column and those team members looked busy. He now moves such a card to Waiting with who it waits on, moves it back to Doing when they answer, and chases them until then. Offices on the old standup text get the new one at launch; standup text you wrote yourself is kept.
+- **Clear reasons when an API key is not accepted.** Get Michael ready said "Check your internet connection" for every answer it did not expect. A key made for your whole Anthropic organization instead of inside a workspace now says to use a key from a workspace, any other refusal shows Anthropic's own reason, a rate limit or outage says Anthropic is busy, and only a real network or proxy problem asks you to check your connection.
+
 ## [0.1.4] (2026-10-07)
 
 ### Added

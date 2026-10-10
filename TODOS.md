@@ -51,17 +51,6 @@
 **Effort:** S
 **Priority:** P1
 
-### Log every mail call
-
-**What:** One broker log line per md-mail call: agent, mailbox, operation, result and duration.
-
-**Why:** Plan Section 8. Today there is no record of which agent used which mailbox. `MailDeps.log` exists in `src/main/mail.ts` and is never called.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
-
-**Effort:** S
-**Priority:** P1
-
 ### Say "cannot check email" beside a schedule
 
 **What:** When a schedule's agent has email off, show a short note on that schedule ("Pam cannot check email") in the On a schedule section and the office schedule.
@@ -84,15 +73,6 @@
 **Effort:** S
 **Priority:** P1
 
-### Note the Microsoft plan change in the office packs doc
-
-**What:** Update Decision 8 in `docs/designs/business-mode-office-packs.md` to say MB-0 replaced the Microsoft app id in builds.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
-
-**Effort:** XS
-**Priority:** P1
-
 ### Read one email without downloading its attachments
 
 **What:** `MailService.read` fetches the whole message, attachments included, before trimming the text to 50K. Fetch the body structure plus the text part only, and take attachment names and sizes from the structure.
@@ -108,13 +88,6 @@
 
 **Effort:** S
 **Priority:** P2
-
-### Close a stale "needs you" card after an edit race
-
-**What:** In `mail:save` (`src/main/index.ts`), close the mailbox's Ask me card whenever a fix succeeds, not only when the mailbox was needs-attention before the login test. A failure during the test can open the card and leave it open.
-
-**Effort:** XS
-**Priority:** P3
 
 ## Mail approvals and Michael replies (deferred from ship of feat/mail-approvals-michael-replies, 2026-10-07)
 
@@ -187,15 +160,6 @@
 **Priority:** P4
 
 ## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)
-
-### Sweep leftover secrets temp files
-
-**What:** On first secret-store access, remove `integration-secrets.json.*.tmp` older than a minute.
-
-**Why:** A crash inside the write window leaves a 0600 ciphertext temp file that nothing reads.
-
-**Effort:** S
-**Priority:** P4
 
 ### Say when deleting a secret did nothing
 
@@ -316,15 +280,6 @@
 **What:** Track detail per tool call so one call's PostToolUse does not clear another's.
 
 **Why:** With parallel calls, the row goes blank while a call is still running.
-
-**Effort:** S
-**Priority:** P3
-
-### Visible focus when the list takes focus
-
-**What:** The row list's focus fallback (`tabIndex={-1}`, no outline) is invisible, including after Michael's Remind.
-
-**Why:** Keyboard users lose their place after an action.
 
 **Effort:** S
 **Priority:** P3
@@ -612,30 +567,6 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ## Documents and security (review items skipped for v0.0.1)
 
-### Cap the total size of an Office file's zip entries
-
-**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
-
-**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
-
-**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
-### Refuse a "move" onto a folder that already holds an office, in main
-
-**What:** `config:changeHome` in `src/main/index.ts` refuses mode `move` when the target has `hive/registry.json`.
-
-**Why:** Only the Settings screen prevents copying one office over another today. Owner skipped this at ship review 2026-09-24.
-
-**Context:** Reuse `homeFolderStatus` from `src/main/homeFolder.ts`.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
 ### Parse documents off the main thread
 
 **What:** Run PDF and OOXML extraction in a worker thread or utility process, with a time and page limit.
@@ -671,13 +602,13 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Why:** An audit on 2026-09-24 found that the code for Codex, Gemini CLI and Antigravity exists, but none is ready for an office without Claude. Only Codex has live history (hooks, idle, messaging and resume were debugged on real workers). Every picker and voice hiring now offer only `BUILD_ENGINES`, so nothing half-working can be chosen until this is done.
 
 **Context:** In order of impact:
-1. The team always starts on the default engine: `startBusinessTeam` uses `inferAgentProvider(config.defaultCommand)` (`src/renderer/src/hooks/useHive.ts:310`), which is `claude` (`src/main/config.ts:449`), because setup saves `godProvider` but not `defaultCommand`. Ephemeral workers fall back the same way (`src/main/workerLaunch.ts:31`).
-2. No cost or token data: the telemetry env is added only for Claude (`src/main/hive.ts:951`); the transcript fallback reads `~/.claude/projects` (`src/main/transcript.ts:44`); `src/main/pricing.ts` knows only Claude models. Cost views, caps, token caps and the context gauge are empty.
-3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`), and bundled skills only into `.claude/skills` (`src/main/hive.ts:733`).
+1. ~~The team always starts on the default engine.~~ Done 2026-09-26: setup now writes `defaultCommand` from Michael's engine (`teamDefaultsFromMichael`, `test/team-engine-from-michael.test.cjs`).
+2. Cost and token data: Codex is done. The telemetry fallback reads a Codex agent's rollout in its CODEX_HOME (`src/main/codexUsage.ts`, `hive.codexHome`), and `src/main/pricing.ts` prices GPT-5 models. Still open: Gemini and the other engines (no usage source yet), the context gauge for Codex (`readContextTokens` reads only the default engine's transcripts), and the lifetime cost ledger, which only records live OTel samples.
+3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`). Codex now gets bundled skills in its private `CODEX_HOME/skills`; other engines still need native skill discovery.
 4. Gemini and Antigravity get no extra writable directories (`--add-dir` exists for Codex only, `src/main/hive.ts:859`), so hive file writes may be refused.
 5. Antigravity agents never get their standing goal, and an Antigravity Michael never gets the roster (no SessionStart/UserPromptSubmit event).
 6. The memory tidy up runs a hidden Claude session (`src/main/memoryTidy.ts`, through `hiddenClaude.ts`); without Claude it does nothing.
-7. Michael's prompts are written for Claude ("hive of Claude agents", `src/main/hive.ts:1519`; `INITIAL_GOD_PROMPT` in `src/renderer/src/hooks/useHive.ts:77`).
+7. Michael's first prompt is still written for one engine (`INITIAL_GOD_PROMPT` in `src/renderer/src/hooks/useHive.ts:77`). The spawn prompt and PROTOCOL.md now say "AI agents".
 8. No permission-prompt detection for these engines (no Notification event), which matters only with auto mode off.
 A live end-to-end run is required before adding an engine: Gemini has never been run for real, and Codex needs an OpenAI account with credits.
 
@@ -754,6 +685,32 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Cap the total size of an Office file's zip entries
+
+**What:** In `src/main/docText.ts` (unzip filter, ~line 108) cap total uncompressed bytes and entry count, not only each entry.
+
+**Why:** A crafted .docx/.xlsx/.pptx can declare many large entries and exhaust memory in the main process, taking every agent down. Owner skipped this at ship review 2026-09-24.
+
+**Context:** Count accepted entries and sum `originalSize` in the filter; reject past e.g. 200 MB / 5,000 entries.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+**Completed:** 0.1.7 (2026-10-09). Before inflating anything, `fromOoxml` adds up the declared sizes of the XML parts it would read and refuses the file past 200 MB or 5,000 parts; media still never counts (agentvivekkumar/dontbemichael#58).
+
+### Decide the Git for Windows check
+
+**What:** On the clean PC, install Claude Code and start one session. If it needs Git Bash, add a Git for Windows check to onboarding (E3).
+
+**Why:** If Git Bash is missing, a Windows beta user would get stuck at their first agent start.
+
+**Context:** E3 in `docs/designs/windows-11-installer.md` depends on that smoke test, which has not run yet.
+
+**Effort:** human S / CC S
+**Priority:** P1
+**Depends on / blocked by:** the PC smoke test.
+**Completed:** 0.1.6 (2026-10-09). A Windows office without Git for Windows runs Claude Code, which then runs hooks in PowerShell; the app now writes hooks for that shell (`src/main/hookShell.ts`), so no Git for Windows step is needed in onboarding.
 
 ### Clean up a "Not for" clause when its teammate leaves
 
@@ -900,9 +857,9 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 **What:** In order:
 1. Push an rc tag (vX.Y.Z-rc.1).
-2. Read the first "Tests (Windows)" CI run and fix each POSIX-only test, or skip it on win32 with a reason.
+2. ~~Read the first "Tests (Windows)" CI run and fix each POSIX-only test, or skip it on win32 with a reason.~~ Done 2026-10-09: tests are platform scoped (`test/platform.cjs`, CONTRIBUTING.md). Text files check out with LF (`.gitattributes`), Windows test path assumptions were made portable, and Mac or POSIX only tests skip on Windows with a reason.
 3. Run the rc.1 and rc.2 checklist on the clean x64 Windows 11 PC: install through SmartScreen, onboard, hire, task, mail archive search, schedule, rc.1 updates to rc.2, a user name with a space and an accent, an office folder in OneDrive, and agent start time under Defender. Also check that rc.2 is offered the clean release.
-4. Once it is green, remove `continue-on-error: true` from the `test-windows` job and make "Tests (Windows)" a required check.
+4. ~~Once it is green, remove `continue-on-error: true` from the `test-windows` job~~ Done 2026-10-09 (ci.yml now also runs "Tests (macOS)", and every job blocks). Done 2026-10-10: Typecheck, Build, Tests (macOS) and Tests (Windows) are required checks on main in the "protect main" ruleset, and admins can bypass them only by merging a pull request.
 5. ~~Set the repository variable `WINDOWS_RELEASE=on`.~~ Done 2026-10-05: the owner chose to ship Windows on every release before the PC check. v0.1.1 got its Windows installer added after release.
 6. After the first clean release that carries Windows, add the Windows (beta) download to the website, and confirm with the owner before that push.
 
@@ -913,18 +870,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** human M / CC S
 **Priority:** P1
 **Depends on / blocked by:** this branch merged; the physical PC.
-
-### Decide the Git for Windows check
-
-**What:** On the clean PC, install Claude Code and start one session. If it needs Git Bash, add a Git for Windows check to onboarding (E3).
-
-**Why:** If Git Bash is missing, a Windows beta user would get stuck at their first agent start.
-
-**Context:** E3 in `docs/designs/windows-11-installer.md` depends on that smoke test, which has not run yet.
-
-**Effort:** human S / CC S
-**Priority:** P1
-**Depends on / blocked by:** the PC smoke test.
 
 ## Ask me (deferred from ship of feat/windows-beta-askme-fixes, 2026-10-05)
 

@@ -56,6 +56,30 @@ test('Michael is told: waiting names who, doing means working now, and back to d
   assert.match(read('src/shared/ownerRequests.ts'), /move it to "waiting" and name who in "waitingOn"/);
 });
 
+test('the hourly standup sends a card held on someone to Waiting, and an office on the old focus gets the new one', () => {
+  // Value: protects=cards held on a customer or teammate reach Waiting (owner 2026-10-08: GreenWorld nudge sent, card still in Doing; no card had ever been set to Waiting); fails_when=the standup focus tells Michael to move such a card to doing, or offices keep the 2026-10-03 focus; why_new=the standup focus was missed when the Waiting column shipped; seam=none
+  const { OPS_STANDUP_FOCUS, OPS_STANDUP_BUILT_IN_FOCUSES } = loadTs('src/main/config.ts');
+  assert.doesNotMatch(OPS_STANDUP_FOCUS, /move it to doing with who it waits on/);
+  assert.match(OPS_STANDUP_FOCUS, /move it to waiting naming who in waitingOn, or to done\./);
+  assert.match(OPS_STANDUP_FOCUS, /A doing card held on someone outside the office or a teammate goes to waiting, naming who in waitingOn;/);
+  assert.match(OPS_STANDUP_FOCUS, /a waiting card returns to doing when they answer; else chase them\./, 'Waiting cards are reviewed, and chasing never moves one back to doing');
+  const { FOCUS_MAX } = loadTs('src/shared/missions.ts');
+  assert.ok(OPS_STANDUP_FOCUS.length <= FOCUS_MAX, `the focus fits the ${FOCUS_MAX} character limit the schedule editor keeps`);
+  assert.ok(OPS_STANDUP_BUILT_IN_FOCUSES.some((f) => /Move every doing card that waits on someone/.test(f)), 'an office on the 2026-10-09 dev text gets the current one');
+  assert.doesNotMatch(OPS_STANDUP_FOCUS, /[–—]| - /, 'no dashes');
+  const old = OPS_STANDUP_BUILT_IN_FOCUSES.find((f) => /move it to doing with who it waits on, or to done\./.test(f));
+  assert.ok(old, 'the 2026-10-03 focus is replaced at launch');
+  // Value: protects=an office still on the 2026-10-03 standup focus migrates at launch; fails_when=the kept old text is edited in any way (a wording or dash sweep), since launch matches it word for word; why_new=the line above finds it by one phrase only; seam=none
+  assert.equal(old,
+    'First close your open requests from the owner: route each answer and reply done to it. ' +
+    'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+    'or move it to doing with who it waits on, or to done. ' +
+    'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+    'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+    'Re-engage anyone stalled and keep the board accurate.', 'the text 0.1.4 shipped, word for word');
+  assert.ok(!OPS_STANDUP_BUILT_IN_FOCUSES.includes(OPS_STANDUP_FOCUS), 'the current focus is never migrated away');
+});
+
 test('a waiting card is nobody\'s work right now: not Doing on the floor, not busy on the roster', () => {
   const stage = read('src/renderer/src/scene/studio/StudioStage.tsx');
   assert.match(stage, /if \(t\.status !== 'waiting'\) board\[t\.status\]\+\+;/);
@@ -94,6 +118,18 @@ test('the renderer can patch a card only with Ask me answers; a move goes throug
   const handler = src.slice(src.indexOf("ipcMain.handle('hive:patchTask'"), src.indexOf("ipcMain.handle('hive:moveTask'"));
   assert.match(handler, /if \(Object\.keys\(patch\)\.some\(\(k\) => k !== 'humanQA'\)\) return \{ ok: false, error: 'only Ask me answers can be patched' \};/);
   assert.ok(handler.indexOf("k !== 'humanQA'") < handler.indexOf('hive.patchTask('), 'refused before anything is written');
-  const callers = require('node:child_process').execSync("grep -rn 'hivePatchTask(' src/renderer || true", { cwd: require('node:path').resolve(__dirname, '..') }).toString().trim().split('\n').filter(Boolean);
+  const callers = [];
+  function collectCallers(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) collectCallers(file);
+      else if (entry.isFile()) {
+        for (const [index, line] of fs.readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
+          if (line.includes('hivePatchTask(')) callers.push(`${file}:${index + 1}:${line}`);
+        }
+      }
+    }
+  }
+  collectCallers(path.resolve(__dirname, '..', 'src', 'renderer'));
   for (const c of callers) assert.match(c, /hivePatchTask\([^,]+, \{ humanQA: [^}]+\}\)/, c);
 });

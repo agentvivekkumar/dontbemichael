@@ -38,12 +38,24 @@ require.cache[electron] = {
   }
 };
 const { setSecret, getSecret, hasSecret, deleteSecret } = loadTs('src/main/integrations.ts');
-const { writeFileAtomic } = loadTs('src/main/atomicFile.ts');
+const { writeFileAtomic, sweepStaleTemps } = loadTs('src/main/atomicFile.ts');
 const scratch = [userData];
 test.after(() => { for (const d of scratch) fs.rmSync(d, { recursive: true, force: true }); });
 
 const secretsFile = path.join(userData, 'integration-secrets.json');
 const leftovers = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'));
+
+// A temp file a crash left before the rename, an hour old; the store clears it on first use.
+const crashLeftover = path.join(userData, 'integration-secrets.json.0123456789ab.tmp');
+fs.writeFileSync(crashLeftover, 'ciphertext');
+const anHourAgo = new Date(Date.now() - 3600_000);
+fs.utimesSync(crashLeftover, anHourAgo, anHourAgo);
+
+test('a temp file a crash left behind is removed the first time the store is used', () => {
+  // Value: protects=an encrypted temp file nothing reads doesn't sit in userData forever; fails_when=the store never sweeps; why_new=TODOS "Sweep leftover secrets temp files"; seam=none
+  assert.equal(hasSecret('mail:nobody'), false);
+  assert.equal(fs.existsSync(crashLeftover), false);
+});
 
 test('mail, engine key and integration secrets all round-trip, and are stored encrypted', () => {
   assert.deepEqual(setSecret('mail:sales', 'app-password-1'), { ok: true });
@@ -179,6 +191,30 @@ test('a temp name that is somehow taken is left alone', () => {
   const taken = { ...realOps(), openSync: () => { const e = new Error('EEXIST'); e.code = 'EEXIST'; throw e; }, rmSync: () => { removed++; } };
   assert.throws(() => writeFileAtomic(file, 'x', 0o600, taken), /EEXIST/);
   assert.equal(removed, 0);
+});
+
+test('the sweep removes only old temp files of this target', () => {
+  // Value: protects=a write in progress and other files survive the sweep; fails_when=the age or name check is dropped; why_new=TODOS "Sweep leftover secrets temp files"; seam=now
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md atomic sweep '));
+  t_cleanup(dir);
+  const file = path.join(dir, 'secrets.json');
+  const now = Date.now();
+  const make = (name, ageMs) => {
+    const p = path.join(dir, name);
+    fs.writeFileSync(p, 'x');
+    const t = new Date(now - ageMs);
+    fs.utimesSync(p, t, t);
+    return p;
+  };
+  const stale = make('secrets.json.0123456789ab.tmp', 120_000);
+  const fresh = make('secrets.json.ba9876543210.tmp', 1_000);
+  const other = make('other.json.0123456789ab.tmp', 120_000);
+  const lookalike = make('secrets.json.backup.tmp', 120_000);
+  const target = make('secrets.json', 120_000);
+  sweepStaleTemps(file, 60_000, now);
+  assert.equal(fs.existsSync(stale), false);
+  for (const kept of [fresh, other, lookalike, target]) assert.ok(fs.existsSync(kept), kept);
+  sweepStaleTemps(path.join(dir, 'missing', 'secrets.json'));
 });
 
 function realOps() {

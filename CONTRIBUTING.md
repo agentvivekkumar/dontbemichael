@@ -17,7 +17,7 @@ much cheaper than finding out in review.
 - **Keep the change scoped to one clear improvement, fix, or refactor.** A fix
   plus a rename plus a refactor is three pull requests, and all three merge
   faster than the one.
-- **Releases ship for Mac with a Windows 11 beta, and the code runs on macOS,
+- **Releases ship for Mac and Windows 11, and the code runs on macOS,
   Windows and Linux.** Every change has to keep working on all three unless it sits
   behind an explicit runtime platform check, so Linux can ship later. Most
   of our cross-platform bugs are paths: use `path.join` and the Node path
@@ -57,7 +57,7 @@ much cheaper than finding out in review.
 
 - **macOS, Windows, or Linux** to build and run from source. Releases on the
   [releases page](https://github.com/agentvivekkumar/dontbemichael/releases/latest)
-  are for Mac plus a Windows 11 (x64) beta, and are not signed yet.
+  are for Mac and Windows 11 (x64), and are not signed yet.
   Cross-platform smoke-testing and fixes are very welcome (see
   [Good first areas](#good-first-areas)).
 - **Node.js 18+** and npm.
@@ -96,7 +96,13 @@ required.
 1. **Keep the type-checker green:** `npm run typecheck` (runs both the node and
    web TS projects).
 2. **Run the tests:** `npm run test:focused`. If you changed behaviour, add a
-   test for it — a bug fix with no test is a bug fix that comes back.
+   test for it — a bug fix with no test is a bug fix that comes back. The suite
+   also runs on Windows in CI. A test runs only on the platforms its behaviour
+   exists on: skip a Mac or POSIX only test on Windows (and a Windows only test
+   elsewhere) with `posixOnly`, `windowsOnly` or `macOnly` from
+   `test/platform.cjs`, always with a reason. Build paths with `path.join` or
+   `path.resolve` instead of POSIX literals, so the test runs everywhere, and
+   never skip a test to hide a real Windows bug.
 3. **Confirm a production build works:** `npm run build`.
 4. **Match the aesthetic.** Any new UI **must** derive from the design tokens in
    [`branding/DESIGN.md`](./branding/DESIGN.md) / `src/renderer/src/design/tokens.ts` — no ad-hoc
@@ -160,7 +166,7 @@ the module by module layout, and the design system.
   `src/renderer/src/store/mockEvents.ts` runs only in demo mode or when no agent
   is live. More events could show on the floor.
 - The add-agent flow and config drawer.
-- Cross-platform smoke-testing. Windows ships as a beta and Linux doesn't ship yet, and
+- Cross-platform smoke-testing. Windows ships with every release and Linux doesn't ship yet, and
   real-world coverage (WSL2, various distros, uncommon shells) is thin.
 
 ## Commit & PR conventions

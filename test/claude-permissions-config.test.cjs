@@ -26,7 +26,11 @@ require.cache[electron] = {
   exports: { app: { getPath: () => userData } }
 };
 
-const { ensureClaudePermissionsAccepted, approveClaudeApiKey } = loadTs('src/main/config.ts');
+const { ensureClaudePermissionsAccepted, approveClaudeApiKey, claudeProjectKey } = loadTs('src/main/config.ts');
+// Every key a trusted folder is filed under: as typed, and as Claude Code
+// files it (forward slashes on Windows; the same key elsewhere).
+const trustKeys = (p) => [...new Set([p, claudeProjectKey(p)])];
+const trusted = (p) => Object.fromEntries(trustKeys(p).map((k) => [k, { hasTrustDialogAccepted: true }]));
 const settingsDir = path.join(home, '.claude');
 const settingsPath = path.join(settingsDir, 'settings.json');
 const projectConfigPath = path.join(home, '.claude.json');
@@ -82,7 +86,7 @@ test('merges required fields into valid configs without losing unrelated data', 
   fs.writeFileSync(projectConfigPath, JSON.stringify({
     numStartups: 7,
     projects: {
-      [cwd]: { allowedTools: ['Read'], custom: 'keep' },
+      [claudeProjectKey(cwd)]: { allowedTools: ['Read'], custom: 'keep' },
       '/another/project': { hasTrustDialogAccepted: false }
     }
   }, null, 2));
@@ -99,7 +103,8 @@ test('merges required fields into valid configs without losing unrelated data', 
     numStartups: 7,
     hasCompletedOnboarding: true,
     projects: {
-      [cwd]: {
+      ...trusted(cwd),
+      [claudeProjectKey(cwd)]: {
         allowedTools: ['Read'],
         custom: 'keep',
         hasTrustDialogAccepted: true
@@ -118,7 +123,7 @@ test('creates minimal config files when they are missing', () => {
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     hasCompletedOnboarding: true,
-    projects: { [cwd]: { hasTrustDialogAccepted: true } }
+    projects: trusted(cwd)
   });
 });
 
@@ -133,7 +138,7 @@ test('a malformed settings file does not prevent safe project trust updates', ()
   assert.deepEqual(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')), {
     custom: 'keep',
     hasCompletedOnboarding: true,
-    projects: { [cwd]: { hasTrustDialogAccepted: true } }
+    projects: trusted(cwd)
   });
 });
 
@@ -141,7 +146,7 @@ test('does not rewrite configs that already contain every required field', () =>
   const settings = '{"skipDangerousModePermissionPrompt":true,"skipAutoPermissionPrompt":true}\n';
   const projectConfig = JSON.stringify({
     hasCompletedOnboarding: true,
-    projects: { [cwd]: { hasTrustDialogAccepted: true } }
+    projects: trusted(cwd)
   }) + '\n';
   writeSettings(settings);
   fs.writeFileSync(projectConfigPath, projectConfig, 'utf8');
@@ -170,8 +175,35 @@ test('a folder typed in another letter case is trusted under its real name too',
   const caseInsensitive = fs.existsSync(typed);
   ensureClaudePermissionsAccepted(caseInsensitive ? typed : real);
   const projects = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects;
-  assert.equal(projects[fs.realpathSync.native(real)].hasTrustDialogAccepted, true, 'the real name is trusted');
-  if (caseInsensitive) assert.equal(projects[typed].hasTrustDialogAccepted, true, 'the typed name stays trusted');
+  assert.equal(projects[claudeProjectKey(fs.realpathSync.native(real))].hasTrustDialogAccepted, true, 'the real name is trusted');
+  if (caseInsensitive) assert.equal(projects[claudeProjectKey(typed)].hasTrustDialogAccepted, true, 'the typed name stays trusted');
+});
+
+test('on Windows a folder is trusted under the key Claude Code looks up, with forward slashes', () => {
+  // Value: protects=a Windows agent starts instead of stopping on "Quick safety check: Is this a project you trust?" and exiting code 1 (owner 2026-10-09, office folder under OneDrive); fails_when=the trust key keeps backslashes on Windows, or Mac and Linux paths are changed; why_new=Claude Code 2.1.295 normalizePathForConfigKey turns \\ into / on Windows and reads only that key; seam=platform injected for the key, real file write on the Windows runner
+  assert.equal(claudeProjectKey(String.raw`C:\Users\Ann\OneDrive\Documents\Office`, 'win32'), 'C:/Users/Ann/OneDrive/Documents/Office');
+  assert.equal(claudeProjectKey('C:/Users/Ann/Office', 'win32'), 'C:/Users/Ann/Office', 'already forward');
+  assert.equal(claudeProjectKey('/Users/ann/Office', 'darwin'), '/Users/ann/Office');
+  assert.equal(claudeProjectKey(String.raw`/odd\name`, 'linux'), String.raw`/odd\name`, 'a backslash is a real character outside Windows');
+  ensureClaudePermissionsAccepted(cwd);
+  const keys = Object.keys(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects);
+  if (process.platform === 'win32') {
+    assert.ok(keys.includes(cwd.replaceAll('\\', '/')), JSON.stringify(keys));
+    assert.ok(keys.includes(cwd), 'the folder as typed too, for an older Claude');
+  } else {
+    assert.ok(keys.includes(cwd));
+  }
+  // Value: protects=the trust write itself uses the Windows key, checked on every runner; fails_when=trustClaudeFolder stops passing its folders through claudeProjectKey; why_new=the write above is only checked for slashes on the Windows runner, which is advisory in CI; seam=none (process.platform overridden in this test only)
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
+  try {
+    resetConfigs();
+    ensureClaudePermissionsAccepted(String.raw`C:\Users\Ann\Office`);
+  } finally {
+    Object.defineProperty(process, 'platform', platform);
+  }
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).projects).sort(), [String.raw`C:\Users\Ann\Office`, 'C:/Users/Ann/Office'].sort(),
+    'the key Claude Code reads, plus the folder as typed for an older Claude');
 });
 
 // Get Michael ready (docs/designs/get-michael-ready.md): Claude Code's welcome
@@ -181,7 +213,7 @@ test('the welcome screen is marked done, and an owner who already finished it is
   // Value: protects=a bare Mac's first agent start does not stop on Claude's text style picker; fails_when=hasCompletedOnboarding is not written, or a finished one is rewritten; why_new=bare Mac report 2026-10-07; seam=real file in a temp home
   ensureClaudePermissionsAccepted(cwd);
   assert.equal(JSON.parse(fs.readFileSync(projectConfigPath, 'utf8')).hasCompletedOnboarding, true);
-  const done = JSON.stringify({ hasCompletedOnboarding: true, theme: 'dark', projects: { [cwd]: { hasTrustDialogAccepted: true } } });
+  const done = JSON.stringify({ hasCompletedOnboarding: true, theme: 'dark', projects: trusted(cwd) });
   fs.writeFileSync(projectConfigPath, done, 'utf8');
   ensureClaudePermissionsAccepted(cwd);
   assert.equal(fs.readFileSync(projectConfigPath, 'utf8'), done);
@@ -205,7 +237,7 @@ test('one start writes the welcome, the folder trust and the key approval in a s
   ensureClaudePermissionsAccepted(cwd, { approveKey: key });
   const c = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
   assert.equal(c.hasCompletedOnboarding, true);
-  assert.equal(c.projects[cwd].hasTrustDialogAccepted, true);
+  assert.equal(c.projects[claudeProjectKey(cwd)].hasTrustDialogAccepted, true);
   assert.deepEqual(c.customApiKeyResponses, { approved: ['KLMNOPQRST0123456789'], rejected: [] });
 });
 

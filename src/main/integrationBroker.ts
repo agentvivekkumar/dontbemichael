@@ -202,7 +202,12 @@ export class IntegrationBroker {
     // 3) Parse /i/<integrationId>/<path...>.
     const m = /^\/i\/([^/?#]+)(?:\/([^?#]*))?(\?[^#]*)?$/.exec(rawUrl);
     if (!m) return IntegrationBroker.sendError(res, 404, 'not_found', 'expected /i/<integrationId>/<path>');
-    const integrationId = decodeURIComponent(m[1]);
+    let integrationId: string;
+    try {
+      integrationId = decodeURIComponent(m[1]);
+    } catch {
+      return IntegrationBroker.sendError(res, 400, 'bad_request', 'invalid integration id encoding');
+    }
     const path = m[2] ?? '';
     const query = m[3] ?? '';
 

@@ -132,7 +132,7 @@ test('an API key instead of a Claude account: checked with Anthropic, kept write
   const handler = h.slice(0, h.indexOf('});') + 3);
   assert.ok(handler.indexOf('await checkAnthropicKey(key') < handler.indexOf("integrations.setSecret(providerKeyRef('anthropic'), key)"), 'checked before it is saved');
   assert.match(handler, /writeConfig\(\{ claudeAuth: 'apiKey' \}\)/);
-  assert.match(handler, /Promise<\{ ok: boolean; error\?: 'invalid' \| 'rejected' \| 'unreachable' \| 'store' \}>/, 'only a verdict comes back, never the key');
+  assert.match(handler, /Promise<\{ ok: boolean; error\?: 'invalid' \| 'rejected' \| 'refused' \| 'workspace' \| 'busy' \| 'unreachable' \| 'store'; reason\?: string \}>/, 'only a verdict and Anthropic\'s reason come back, never the key');
   // The check itself lives in engineSetup.ts, where its own tests run it.
   assert.match(main, /import \{[^}]*\bcheckAnthropicKey\b[^}]*\} from '\.\/engineSetup';/);
   // Value: protects=an owner on a Claude account is never billed to an Anthropic key kept for Settings, AI engines; fails_when=claudeAuthEnv hands over the stored key without claudeAuth being apiKey, or a pasted key with spaces or a stub is sent to Anthropic; why_new=only the save order and the spawn call were pinned; seam=none (source pin, main has no IPC harness)
@@ -147,7 +147,7 @@ test('an API key instead of a Claude account: checked with Anthropic, kept write
   assert.match(main, /if \(key && key !== hiddenApprovedKey\) \{\s*try \{ if \(approveClaudeApiKey\(key\)\) hiddenApprovedKey = key; \}/);
   // A key changed or cleared in Settings, AI engines, while it signs Claude in.
   assert.match(main, /if \(res\.ok && p\.backend === 'anthropic' && readConfig\(\)\.claudeAuth === 'apiKey'\) \{\s*try \{ approveClaudeApiKey\(p\.key\); \}/);
-  assert.match(main, /const verdict = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'the check follows the system proxy');
+  assert.match(main, /const \{ verdict, reason \} = await checkAnthropicKey\(key, net\.fetch as unknown as KeyCheckFetch\);/, 'the check follows the system proxy');
   assert.match(read('src/main/hiddenClaude.ts'), /\.\.\.hiddenClaudeAuthEnv\(\),\s*\.\.\.\(opts\.env \?\? \{\}\)/);
   // A key counts as signed in; signing in with an account switches back.
   assert.match(main, /const status = await readEngineSetupStatus\(\{[\s\S]*?claudeAuth: cfg\.claudeAuth,\s*hasKey: \(\) => integrations\.hasSecret\(providerKeyRef\('anthropic'\)\),/);
@@ -216,7 +216,7 @@ test('main, the bridge and the step agree on the setup channels, terminal names 
   assert.equal(setup.ENGINE_SIGNIN_PTY, shared.ENGINE_SIGNIN_PTY);
   assert.match(ready, /import \{ ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,[^}]*\} from '@shared\/engineSetup';/, 'the step watches the terminals main runs');
   assert.doesNotMatch(ready, /'engine-setup-/, 'no second copy of a terminal name');
-  const union = main.match(/ipcMain\.handle\('engineSetup:useApiKey'[^\n]*error\?: ([^}]+) \}>/);
+  const union = main.match(/ipcMain\.handle\('engineSetup:useApiKey'[^\n]*error\?: ([^;}]+)[;}]/);
   assert.ok(union, 'the useApiKey verdict type can be read');
   const codes = [...union[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
   assert.match(ready, /t\(`engineSetup\.keyError\.\$\{res\.error \?\? 'unreachable'\}`\)/);
@@ -270,7 +270,7 @@ test('the install starts once: a second ask while one runs, or after Claude is t
   for (const [s, want] of table) assert.equal(setup.shouldStartInstall(s), want, JSON.stringify(s));
 });
 
-test('a pasted key is sent only when it looks like a key, and Anthropic\'s answer maps to ok, rejected or unreachable', () => {
+test('a pasted key is sent only when it looks like a key, and Anthropic\'s answer maps to ok, rejected, refused, busy or unreachable', () => {
   // Value: protects=a stub, a paragraph or a key with a stray space or newline never leaves the computer, and an outage or rate limit is never shown as a wrong key; fails_when=apiKeyShapeOk moves its 20 or 400 bounds or lets whitespace through, or apiKeyVerdict treats a non 2xx as ok or anything but 401 and 403 as rejected; why_new=the shape check and verdict were only pinned as call sites in main; seam=none
   const k = (n) => 'k'.repeat(n);
   const shapes = [
@@ -280,8 +280,8 @@ test('a pasted key is sent only when it looks like a key, and Anthropic\'s answe
   for (const [key, want] of shapes) assert.equal(setup.apiKeyShapeOk(key), want, `length ${key.length}: ${JSON.stringify(key.slice(-3))}`);
   const verdicts = [
     [200, 'ok'], [204, 'ok'], [299, 'ok'], [199, 'unreachable'], [300, 'unreachable'],
-    [401, 'rejected'], [403, 'rejected'], [400, 'unreachable'], [404, 'unreachable'],
-    [429, 'unreachable'], [500, 'unreachable'], [529, 'unreachable'], [0, 'unreachable']
+    [401, 'rejected'], [403, 'rejected'], [400, 'refused'], [404, 'refused'], [499, 'refused'],
+    [408, 'busy'], [429, 'busy'], [500, 'busy'], [529, 'busy'], [0, 'unreachable']
   ];
   for (const [code, want] of verdicts) assert.equal(setup.apiKeyVerdict(code), want, `HTTP ${code}`);
 });

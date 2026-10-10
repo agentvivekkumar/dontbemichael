@@ -63,7 +63,8 @@ function setup(over = {}) {
       async sendMail(m) { if (state.smtpError) throw state.smtpError; state.sends.push(m); return { messageId: m.messageId }; },
       async verify() { if (state.verifyError) throw state.verifyError; },
       close() { state.smtpCloses = (state.smtpCloses ?? 0) + 1; }
-    })
+    }),
+    log: over.log
   };
   const svc = new MailService(deps);
   return { state, svc, config, call: (agent, op, body) => handleMailRequest(svc, deps, agent, op, body) };
@@ -131,6 +132,21 @@ test('mail route: unknown tool 404, missing id or subject 400, numeric id reads,
   assert.equal(missing.status, 404);
   assert.equal(missing.body.kind, 'not-found');
   }
+});
+
+test('mail route: one log line per call with agent, mailbox, tool, result and time, never the email itself', async () => {
+  const lines = [];
+  const { call } = setup({ log: (line) => lines.push(line) });
+  await call('dwight', 'search', { mailbox: 'sales' });
+  await call('dwight', 'read', { mailbox: 'sales', id: '999' });
+  await call('dwight', 'draft', { mailbox: 'sales', to: 'client@private.com', subject: 'Private offer', body: 'x' });
+  await call('dwight', 'delete_all', { mailbox: 'sales\n[mail] forged' });
+  assert.equal(lines.length, 4, 'one line per call, refusals included');
+  assert.match(lines[0], /^\[mail\] dwight sales search 200 \d+ms$/);
+  assert.match(lines[1], /^\[mail\] dwight sales read 404 not-found \d+ms$/);
+  assert.match(lines[2], /^\[mail\] dwight sales draft 200 \d+ms$/);
+  assert.doesNotMatch(lines.join('\n'), /client@private|Private offer/, 'no recipient or subject');
+  assert.match(lines[3], /^\[mail\] dwight sales\?\?mail\?\?forged unknown 404 \d+ms$/, 'what the agent names stays on one line');
 });
 
 test('search pages newest first, caps the page size, and ignores a bad date', async () => {

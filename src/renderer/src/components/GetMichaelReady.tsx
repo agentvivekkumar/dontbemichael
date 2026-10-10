@@ -72,7 +72,10 @@ export function GetMichaelReady({ provider, onReadyChange }: {
     const res = await window.cth.engineSetupUseApiKey(keyDraft).catch(() => ({ ok: false as const, error: 'unreachable' as const }));
     setKeyBusy(false);
     if (!res.ok) {
-      setKeyError(t(`engineSetup.keyError.${res.error ?? 'unreachable'}`));
+      // A refusal shows Anthropic's own reason (a workspace key has its own message).
+      setKeyError(res.error === 'refused' && 'reason' in res && res.reason
+        ? t('engineSetup.keyError.refused', { reason: res.reason })
+        : t(`engineSetup.keyError.${res.error ?? 'unreachable'}`));
       return;
     }
     setKeyDraft('');
@@ -174,7 +177,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
           value={keyDraft} onChange={(e) => { setKeyDraft(e.target.value); setKeyError(undefined); }}
           placeholder="sk-ant-…" aria-invalid={!!keyError} aria-describedby={keyError ? 'cth-engine-key-error' : undefined}
           style={keyInput} />
-        {keyError && <div id="cth-engine-key-error" role="alert" style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)' }}>{keyError}</div>}
+        {keyError && <div id="cth-engine-key-error" role="alert" style={{ fontSize: 12, lineHeight: '18px', color: 'var(--cth-coral-text)', overflowWrap: 'anywhere' }}>{keyError}</div>}
         <div style={{ ...actions, marginTop: 4 }}>
           <PixelButton variant="primary" size="sm" disabled={keyBusy || !keyDraft.trim()} onClick={() => void saveKey()}>
             {keyBusy ? t('engineSetup.keyChecking') : t('engineSetup.keySave')}

@@ -6,11 +6,13 @@ name: Update contributors
 # graph keys on the commit author email and silently drops anyone whose git
 # email is not attached to their GitHub account.
 #
-# main requires status checks, so a push from Actions is rejected (GH006). A
-# changed list goes to the bot/contributors branch and one pull request, which
-# later runs refresh in place. Pull requests opened by Actions do not trigger
-# other workflows, so the required checks never report on it: a maintainer
-# reviews the diff and merges it as admin.
+# A changed list goes to the bot/contributors branch and one pull request,
+# which later runs refresh in place, rather than straight to main: main
+# requires status checks (the "protect main" ruleset), so a push from Actions
+# is rejected (GH006). Pull requests opened by Actions do not trigger other
+# workflows, so CI never reports on it: a maintainer reviews the diff and
+# merges it as admin (`gh pr merge --admin --merge`); the ruleset lets admins
+# bypass the checks only through a pull request merge.
 on:
   pull_request_target:
     types: [closed]

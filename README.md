@@ -21,13 +21,13 @@ own memory, working on your computer.
 <p>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
   <img alt="Status: early release" src="https://img.shields.io/badge/status-early%20release-FFFDF5.svg?style=flat-square&labelColor=1A1320">
-  <img alt="Platform: macOS and Windows beta" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20beta-FFFDF5.svg?style=flat-square&labelColor=1A1320">
+  <img alt="Platform: macOS and Windows 11" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%2011-FFFDF5.svg?style=flat-square&labelColor=1A1320">
   <a href="https://dontbemichael.com"><img alt="Website: dontbemichael.com" src="https://img.shields.io/badge/web-dontbemichael.com-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
 </p>
 
 <br>
 
-**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)** · **[Download for Windows (beta)](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
+**[Download for Mac](https://github.com/agentvivekkumar/dontbemichael/releases/latest)** · **[Download for Windows](https://github.com/agentvivekkumar/dontbemichael/releases/latest)**
 
 </div>
 
@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.4: send on approval, and Michael answers you in the app.**
-> A team member can put each email on Ask me for you to approve, then send exactly what you
-> approved. Questions you send Michael show where they stand until he answers. Setup now ends on
-> Get Michael ready, which installs Claude Code or takes an Anthropic API key. In 0.1.3, this page
-> started offering the Windows beta.
+> **New in 0.1.7: a clear Microsoft 365 message, and safer large files.**
+> A mailbox on your own domain that runs on Microsoft 365 now says it cannot be connected yet,
+> instead of a misleading error. A Word, Excel or PowerPoint file too big to read is refused before
+> it can use up memory, an email is no longer sent twice after a restart, and web links open in your
+> browser. In 0.1.6, Can send stopped putting emails on Ask me.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents
@@ -74,7 +74,7 @@ can see who is working on what.
 
 ## How it differs from Munder Difflin
 
-Don't Be Michael started as a fork of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
+Don't Be Michael grew out of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
 and it keeps that project's core: every team member is a real Claude Code process in its own
 terminal, and the team coordinates through the hive, a folder of plain files. What was built on
 top is a different product for a different person.
@@ -95,7 +95,7 @@ terminal. That changes almost every decision:
 | **Cost and data** | Free, with a paid Pro plan; anonymous usage stats | Free, no paid plan, no usage data sent |
 
 If you write code and want a team of coding agents, Munder Difflin is the better fit. If you run a
-business and want the work done without watching terminals, this is.
+business and want the work done without watching terminals, this is the better fit.
 
 ## Your team
 
@@ -272,7 +272,7 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 - **Claude connectors.** Settings, Connections, Claude connectors lists every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest), read from Claude by itself. Each is off until you turn it on; then give it to the team members who need it on their Access tab. QuickBooks keeps Read only or Can make changes, and Oscar starts on and Read only. Your own Claude Code servers, plugin servers included, never reach the team.
 - **Every team member's panel.** Profile first (the job, its folder and the instructions it works from), then Access (email, Claude connectors, and schedules), Messages as a day by day history, Memory as readable notes, and Work, its session live.
 - **Office, Tasks, Who talks to whom.** Tabs in the top bar switch between the office, the whole task board, and who talks to whom.
-- **Slack and webhooks.** Message a Slack channel or send a webhook, and Michael picks it up and replies in the thread.
+- **Webhooks.** Another app sends a webhook (set it up in Settings, Connections) and Michael picks it up; the sender can check on the work and get its result.
 - **A fresh start without losing work.** A team member that has sat idle with a long conversation writes a handoff of anything unfinished, then starts fresh. You can bring the old conversation back.
 
 **Your business, known to everyone**
@@ -293,7 +293,7 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 
 ### What you need
 
-- A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64, beta).
+- A Mac with Apple Silicon or Intel, or a Windows 11 PC (x64).
 - [Claude Code](https://claude.com/claude-code), signed in to your Claude plan. A Claude Max plan
   keeps the office running all day; smaller plans reach their usage limit during the day, and the
   office waits until it resets. No Claude plan? An Anthropic API key works too, billed to your
@@ -314,14 +314,15 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
 Developer ID. Setup takes it from there.
 
-**On Windows 11 (beta)**
+**On Windows 11**
 
 1. Download the file ending in `-win-x64-setup.exe` from the same [latest release](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
 2. Open it. The first time, Windows says **Windows protected your PC**. Click **More info**, then
    **Run anyway**.
 
-Windows asks because this beta is not signed yet. Windows on ARM PCs is not supported in the
-beta. Linux will follow.
+You only do step 2 once. Windows asks because this build is not yet signed with a Microsoft
+certificate. It runs on Windows 11 PCs with x64 processors; ARM PCs aren't supported. Linux will
+follow.
 
 ## Your data
 
@@ -387,12 +388,12 @@ idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 ## License
 
 The **source code** is licensed under the **MIT License**. See [`LICENSE`](./LICENSE). The original
-copyright notice of the project this is forked from is kept in `LICENSE`, as the MIT license
-requires.
+copyright notice of Munder Difflin, the project this grew out of, is kept in `LICENSE`, as the
+MIT license requires.
 
 *Don't Be Michael* is not affiliated with NBC, *The Office*, or Dunder Mifflin.
 
 ## Acknowledgements
 
-- [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors, the open-source project this product is forked from.
+- [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin) by Chaitanya Giri and its contributors, the open-source project this product grew out of.
 - [xterm.js](https://xtermjs.org/) · [node-pty](https://github.com/microsoft/node-pty) · [electron-vite](https://electron-vite.org/) · [CodeMirror](https://codemirror.net/) for the libraries this is built on.

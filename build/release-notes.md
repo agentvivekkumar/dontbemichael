@@ -1,4 +1,4 @@
-- **Send on approval:** you approve an email, then it goes out.
-- **Michael answers you in the app,** with a status on every question.
-- **Send only access** to a mailbox someone else watches.
-- **Get Michael ready** installs Claude Code and signs you in, or takes an API key.
+- **Microsoft 365 on your own domain:** a clear message.
+- **Large Office files** are refused, not unpacked.
+- **No repeat emails** after a restart.
+- **Web links** open in your browser.
