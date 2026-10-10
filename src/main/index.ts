@@ -87,7 +87,8 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
 import { standingFitCheck } from './standingCheck';
-import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingMode, sendingWords } from '../shared/mailboxes';
+import { terminalOverflowEvent } from '../shared/terminalOverflow';
+import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -610,7 +611,9 @@ const mailAdmin = {
   setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
   deleteSecret: (ref: string) => integrations.deleteSecret(ref),
   endGrant: (agentId: string, mailbox: string, reason: string) => mailApprovals.endGrant(agentId, mailbox, reason),
-  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); }
+  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); },
+  sendingChanged: (agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean) => mailApprovals.sendingChanged(agentId, mailbox, address, sending, handBack),
+  present: memberPresent
 };
 
 /**
@@ -3763,6 +3766,21 @@ ipcMain.handle('pty:resize', (_evt, id: string, cols: number, rows: number) => {
   if (typeof id !== 'string' || typeof cols !== 'number' || typeof rows !== 'number') return { ok: false, error: 'invalid args' };
   return ptyManager.resize(id, cols, rows);
 });
+// A terminal still drawn past its box after a fit (Windows report, 2026-10-09).
+// Numbers and the platform only, so the office log names the case next time.
+let lastTerminalOverflowLog = 0;
+const loggedOverflowSizes = new Set<string>();
+ipcMain.on('terminal:overflow', (_evt, info: unknown) => {
+  // At most one line a minute for the whole app, and each terminal size once a
+  // session: the log is committed with the office.
+  if (Date.now() - lastTerminalOverflowLog < 60_000) return;
+  const event = terminalOverflowEvent(info, process.platform);
+  const size = event ? [event.rows, event.cols, event.dpr, event.fontSize].join('/') : '';
+  if (!event || loggedOverflowSizes.has(size) || loggedOverflowSizes.size >= 20) return;
+  loggedOverflowSizes.add(size);
+  lastTerminalOverflowLog = Date.now();
+  if (event) { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
 ipcMain.handle('pty:redraw', (_evt, id: string) => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   return ptyManager.redraw(id);
@@ -5161,12 +5179,12 @@ ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
 // Anthropic first, so a typo never becomes a team that cannot start; then kept
 // write only in the secret store (the same Anthropic key as Settings, AI
 // engines) and approved for Claude Code. It never comes back over IPC.
-ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'unreachable' | 'store' }> => {
+ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> => {
   const key = typeof raw === 'string' ? raw.trim() : '';
   if (!apiKeyShapeOk(key)) return { ok: false, error: 'invalid' };
   // Electron's fetch follows the system proxy, so the check works wherever Claude does.
-  const verdict = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
-  if (verdict !== 'ok') return { ok: false, error: verdict };
+  const { verdict, reason } = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
+  if (verdict !== 'ok') return { ok: false, error: verdict, ...(reason ? { reason } : {}) };
   // Approved in ~/.claude.json first: a key Claude would stop to ask about is
   // never saved as ready (fail closed; the owner can try again).
   let approved = false;
@@ -6749,6 +6767,13 @@ function bootstrapHiveServices(): void {
   // Waiting schedule requests reach Michael, and ones he leaves undecided
   // reach the owner (sweepScheduleRequests).
   try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+  // Can send puts nothing on Ask me: cards filed before that rule go back to
+  // their member with a notice that replaces an old note to propose.
+  try {
+    const cfg = readConfig();
+    // Only where the member can send now: a paused grant keeps its cards on Ask me.
+    mailApprovals.handBackCanSend((agentId, mailbox) => (memberPresent(agentId) && sendingFor(cfg, agentId, mailbox) === 'send' && mailAccess(cfg, agentId, mailbox, 'send', undefined, { present: memberPresent }).ok ? mailboxAddress(cfg, mailbox) : null));
+  } catch (e) { console.error('[mail] Can send hand back failed', e); }
   if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
   scheduleSweepTimer = setInterval(() => {
     try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }

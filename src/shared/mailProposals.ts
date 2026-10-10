@@ -9,6 +9,7 @@
  *
  * Pure: no fs, no electron. Main stores the list and sends the messages.
  */
+import type { SendingMode } from './mailboxes';
 
 export interface ProposalRef { mailbox: string; id: string }
 
@@ -266,6 +267,37 @@ export function proposalSendProblem(p: MailProposal | undefined, agentId: string
   if (p.state === 'cancelled') return `This email was withdrawn: ${p.cancelReason ?? 'it can no longer be sent'}. Do not send it another way.`;
   if (p.state === 'sending') return 'This email may already have gone out: the app stopped while sending it. Look in the mailbox\'s Sent folder; do not send it again.';
   return 'This email cannot be sent. Propose it again.';
+}
+
+/** What each Sending choice means, in the words the agent is told and keeps.
+ *  list_mailboxes says the same per mode in mail.ts SENDING_HOW; change both. */
+const SENDING_CHANGE: Record<SendingMode, string> = {
+  send: 'Send each email yourself with send; propose is refused and nothing goes on Ask me.',
+  approval: 'Propose each email; it goes out only after the owner approves it on Ask me, then you send it with its proposal id. A kind the owner let you send without approval still goes with its standing id (list_mailboxes lists them).',
+  draft: 'Save each email as a draft for the owner to send; send and propose are refused.'
+};
+const SENDING_NAME: Record<SendingMode, string> = { send: 'Can send', approval: 'Send on approval', draft: 'Draft only' };
+
+/**
+ * The owner changed an agent's Sending on a mailbox it keeps (owner,
+ * 2026-10-09): a member moved to Can send kept filing Ask me cards because its
+ * memory notes still said to propose. The note replaces those; the message
+ * hands back the emails that were waiting, which Can send takes off Ask me.
+ */
+export function sendingMemoryLine(address: string, sending: SendingMode, today: string): string {
+  return `- From the owner (${today}): your Sending from ${address} is ${SENDING_NAME[sending]}. ${SENDING_CHANGE[sending]} This replaces any earlier note about how you send from there.\n`;
+}
+
+export function sendingChangeMessage(address: string, sending: SendingMode, handedBack: MailProposal[]): { act: 'inform'; subject: string; body: string } {
+  const lines = handedBack.map((p) => `"${p.subject.slice(0, 80)}" to ${p.to.slice(0, 120)} (${p.id})`).join('\n');
+  return {
+    act: 'inform',
+    subject: 'Sending changed',
+    body: [
+      `The owner set your Sending from ${address} to ${SENDING_NAME[sending]}. ${SENDING_CHANGE[sending]} This replaces any memory note about how you send from there, and it is in your memory notes.`,
+      ...(handedBack.length ? [`These emails were waiting on Ask me. They are off it now and were not sent. If one is still right, write it again and send it yourself:\n${lines}`] : [])
+    ].join('\n')
+  };
 }
 
 /** The memory note for a standing approval granted or revoked. */

@@ -124,7 +124,9 @@ export function isUsableTeamFolder(folder: string, home = homedir()): boolean {
   };
   const f = real(folder);
   const h = real(home);
-  if (f === resolve(sep) || f === h) return false;
+  // A disk root is its own parent. Comparing with resolve(sep) missed it on
+  // Windows, where `f` is lowercased and the root is not ("c:\" vs "C:\").
+  if (dirname(f) === f || f === h) return false;
   for (const kept of ['.ssh', '.claude', '.config', '.gnupg', 'Library']) {
     const k = join(h, fold(kept));
     if (f === k || f.startsWith(k + sep)) return false;

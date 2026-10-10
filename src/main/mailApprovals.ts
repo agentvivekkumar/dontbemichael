@@ -14,6 +14,8 @@ import {
   fileProposal,
   memoryLine,
   pruneProposals,
+  sendingChangeMessage,
+  sendingMemoryLine,
   standingMemoryLine,
   waitingProposals,
   STANDING_KIND_MAX,
@@ -23,6 +25,7 @@ import {
   type SendRecord,
   type StandingApproval
 } from '../shared/mailProposals';
+import type { SendingMode } from '../shared/mailboxes';
 import type { ProposalStore } from './mail';
 
 export interface MailApprovalDeps {
@@ -126,22 +129,62 @@ export class MailApprovals implements ProposalStore {
   /** Withdraws waiting and approved proposals: one id, or every one of an
    *  agent's from a mailbox. The agent hears once, with the reason. */
   cancel(match: { id: string } | { agentId: string; mailbox: string }, reason: string): number {
-    const list = this.read();
     // An email being sent is withdrawn too: its send checks again just before
     // the server and stops (once it reached the server it stays sent).
-    const hit = (p: MailProposal): boolean =>
-      (p.state === 'waiting' || p.state === 'approved' || p.state === 'sending')
-      && ('id' in match ? p.id === match.id : p.agentId === match.agentId && p.mailbox === match.mailbox);
-    const gone = list.filter(hit);
+    const gone = this.withdraw(match, reason, (p) => p.state === 'waiting' || p.state === 'approved' || p.state === 'sending');
     if (!gone.length) return 0;
-    const ids = new Set(gone.map((p) => p.id));
-    this.write(list.map((p) => (ids.has(p.id) ? { ...p, state: 'cancelled' as const, decidedAt: this.now(), cancelReason: reason } : p)));
     const agentId = gone[0].agentId;
     const lines = gone.map((p) => `"${p.subject.slice(0, 80)}" to ${p.to.slice(0, 120)} (${p.id})`).join('\n');
     try {
       this.deps.send({ to: agentId, act: 'inform', subject: gone.length === 1 ? 'Email withdrawn' : `${gone.length} emails withdrawn`, body: `Not sent, and not to be sent another way: ${reason}\n${lines}` });
     } catch (e) { console.error('[mail] cancel message:', e); }
     return gone.length;
+  }
+
+  /** Marks the matching emails cancelled with a reason; returns them. */
+  private withdraw(match: { id: string } | { agentId: string; mailbox: string }, reason: string, open: (p: MailProposal) => boolean): MailProposal[] {
+    const list = this.read();
+    const gone = list.filter((p) => open(p) && ('id' in match ? p.id === match.id : p.agentId === match.agentId && p.mailbox === match.mailbox));
+    if (!gone.length) return [];
+    const ids = new Set(gone.map((p) => p.id));
+    this.write(list.map((p) => (ids.has(p.id) ? { ...p, state: 'cancelled' as const, decidedAt: this.now(), cancelReason: reason } : p)));
+    return gone;
+  }
+
+  /**
+   * The owner changed a member's Sending on a mailbox it keeps (owner,
+   * 2026-10-09). The member is told and its memory notes get the new rule, so
+   * an older note to propose no longer wins. Can send takes its waiting emails
+   * off Ask me and hands them back to send itself; approved ones stay, and it
+   * may still send them by id. Draft only is withdrawn by `cancel` first.
+   * `handBack` false (a paused grant, which can't send) keeps them on Ask me.
+   */
+  sendingChanged(agentId: string, mailbox: string, address: string, sending: SendingMode, handBack = true): void {
+    const handedBack = sending === 'send' && handBack
+      ? this.withdraw({ agentId, mailbox }, `The owner set you to Can send from ${address}, so it is yours to send.`, (p) => p.state === 'waiting')
+      : [];
+    try { this.deps.send({ to: agentId, ...sendingChangeMessage(address, sending, handedBack) }); } catch (e) { console.error('[mail] sending change message:', e); }
+    try { this.deps.remember(agentId, sendingMemoryLine(address, sending, this.today())); } catch { /* the change stands */ }
+  }
+
+  /**
+   * Waiting emails from a mailbox their member sends from on Can send, which
+   * puts nothing on Ask me: handed back with the same notice as a switch, so
+   * an office whose cards came before this rule ends up the same (owner,
+   * 2026-10-09). `canSend` gives the mailbox's address, or null when the
+   * member does not send from it on Can send. Run at launch.
+   */
+  handBackCanSend(canSend: (agentId: string, mailbox: string) => string | null): number {
+    const groups = new Map<string, MailProposal>();
+    for (const p of this.waiting()) groups.set(`${p.agentId}\u0000${p.mailbox}`, p);
+    let n = 0;
+    for (const p of groups.values()) {
+      const address = canSend(p.agentId, p.mailbox);
+      if (address === null) continue;
+      this.sendingChanged(p.agentId, p.mailbox, address, 'send');
+      n++;
+    }
+    return n;
   }
 
   /**

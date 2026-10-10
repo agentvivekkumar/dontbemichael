@@ -36,15 +36,34 @@ export type { ScheduledMission } from '../shared/missions';
  *  section 6): what Michael concentrates on in each standup run. */
 export const OPS_STANDUP_FOCUS =
   'First close your open requests from the owner: route each answer and reply done to it. ' +
-  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
-  'or move it to doing with who it waits on, or to done. ' +
-  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'Then fix each blocked card with nothing asked: ask its question on Ask me, ' +
+  'move it to waiting naming who in waitingOn, or to done. ' +
+  'Check the floor in fleet.json: who is doing what, whether each member still runs, ' +
   'whether in-flight cards are on track, and whether any card has nobody on it. ' +
-  'Re-engage anyone stalled and keep the board accurate.';
+  'A doing card held on someone outside the office or a teammate goes to waiting, naming who in waitingOn; ' +
+  'a waiting card returns to doing when they answer; else chase them. ' +
+  'Re-engage anyone stalled and keep the board right.';
 
 /** Standup focus texts the app shipped before. An office still carrying one
  *  word for word gets the current one at launch; the owner's own text stays. */
 export const OPS_STANDUP_BUILT_IN_FOCUSES: readonly string[] = [
+  // 2026-10-09 dev builds only: Waiting without the step that brings a card
+  // back to doing, so an office that ran one still gets the current text.
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+  'or move it to waiting with who it waits on in waitingOn, or to done. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+  'Move every doing card that waits on someone outside the office or a teammate to waiting, naming who in waitingOn. ' +
+  'Re-engage anyone stalled and keep the board accurate.',
+  // 2026-10-03, before the Waiting column: it sent a card held on someone to
+  // doing, so every hour it undid the Waiting rule and no card ever reached it.
+  'First close your open requests from the owner: route each answer and reply done to it. ' +
+  'Then fix every blocked card with nothing asked: put its question for the owner on Ask me, ' +
+  'or move it to doing with who it waits on, or to done. ' +
+  'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
+  'whether in-flight cards are on track, and whether any card has nobody on it. ' +
+  'Re-engage anyone stalled and keep the board accurate.',
   // 2026-10-02, before blocked cards with nothing asked were listed.
   'First close your open requests from the owner: route each answer and reply done to it. ' +
   'Then check the floor through fleet.json: who is doing what, whether each team member is still running, ' +
@@ -906,6 +925,14 @@ function markClaudeOnboarded(c: ClaudeConfig): boolean {
   return true;
 }
 
+/** The key Claude Code files a folder under in ~/.claude.json "projects". On
+ *  Windows it turns backslashes into forward slashes ("C:/Users/Ann/Office")
+ *  and looks only that up, so a folder trusted as "C:\Users\Ann\Office" still
+ *  stops the agent on the trust question and it exits (seen live 2026-10-09). */
+export function claudeProjectKey(folder: string, platform: string = process.platform): string {
+  return platform === 'win32' ? folder.replaceAll('\\', '/') : folder;
+}
+
 /** Claude Code looks a folder up by its real name on disk. On a Mac a folder
  *  typed as "SunRiseBakery" opens "SunriseBakery" too, but only the real name
  *  counts as trusted, so trust that as well; otherwise the agent stops on the
@@ -914,7 +941,9 @@ function trustClaudeFolder(c: ClaudeConfig, cwd: string): boolean {
   let real = cwd;
   try { real = realpathSync.native(cwd); } catch { /* folder not there yet */ }
   let changed = false;
-  for (const key of new Set([cwd, real])) {
+  // The folder as typed and as Claude Code files it: an older Claude that still
+  // looks the raw Windows path up keeps working too.
+  for (const key of new Set([cwd, real].flatMap((p) => [p, claudeProjectKey(p)]))) {
     if (c.projects?.[key]?.hasTrustDialogAccepted === true) continue;
     c.projects = c.projects ?? {};
     c.projects[key] = { ...(c.projects[key] ?? {}), hasTrustDialogAccepted: true };
@@ -956,7 +985,8 @@ export function approveClaudeApiKey(key: string, home: string = homedir()): bool
  *  rarely touch files a running `claude` also writes):
  *   1. `~/.claude/settings.json` → `skipDangerousModePermissionPrompt` +
  *      `skipAutoPermissionPrompt` — these gate the bypass-mode warning (global).
- *   2. `~/.claude.json`, in one pass: `projects[cwd].hasTrustDialogAccepted` (the
+ *   2. `~/.claude.json`, in one pass: `projects[claudeProjectKey(cwd)].hasTrustDialogAccepted`
+ *      (forward slashes on Windows, plus the folder as typed and its real name on disk; the
  *      per-folder "do you trust the files in this folder?" dialog),
  *      `hasCompletedOnboarding` (the first-run welcome), and with
  *      `opts.approveKey` the chosen API key in `customApiKeyResponses.approved`.

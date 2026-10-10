@@ -2171,6 +2171,9 @@
     "keyError": {
       "invalid": "这看起来不像 API 密钥，请粘贴完整的密钥。",
       "rejected": "Anthropic 未接受该密钥，请检查后重试。",
+      "refused": "Anthropic 未接受该密钥：{{reason}}",
+      "workspace": "请使用在 console.anthropic.com 工作区中创建的密钥。",
+      "busy": "Anthropic 当前繁忙，请一分钟后重试。",
       "unreachable": "无法检查该密钥。请检查网络连接，然后重试。",
       "store": "无法在这台电脑上保存密钥，请重试。"
     },

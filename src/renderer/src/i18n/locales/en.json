@@ -2171,6 +2171,9 @@
     "keyError": {
       "invalid": "That doesn't look like an API key. Paste the whole key.",
       "rejected": "Anthropic did not accept that key. Check it and try again.",
+      "refused": "Anthropic did not accept that key: {{reason}}",
+      "workspace": "Use a key made inside a workspace at console.anthropic.com.",
+      "busy": "Anthropic is busy right now. Try again in a minute.",
       "unreachable": "Could not check the key. Check your internet connection, then try again.",
       "store": "Could not save the key on this computer. Try again."
     },

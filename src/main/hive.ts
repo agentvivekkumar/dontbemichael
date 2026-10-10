@@ -18,6 +18,7 @@
  *
  * Everything here runs in the Electron main process.
  */
+import { hookShell, shellCommand, type HookShell } from './hookShell';
 import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
@@ -1256,8 +1257,12 @@ export class HiveManager {
     const stripConnectors = !opts.connectors || opts.connectors.strip || !settingsWritten;
     if (sock && shim) {
       env.HIVE_SOCK = sock;
+      // The shell Claude Code runs the hooks and status line in (hookShell.ts).
+      // A Git Bash the app found is pinned, so Claude Code picks the same one.
+      const shell = hookShell();
+      if (shell.gitBash) env.CLAUDE_CODE_GIT_BASH_PATH = shell.gitBash;
       const settingsPath = join(dir, 'settings.json');
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? []));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell));
       args.push('--settings', settingsPath);
     }
     if (stripConnectors) {
@@ -1470,13 +1475,17 @@ export class HiveManager {
     return Array.from(new Set(out));
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = []): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash'): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
-    // these through `sh -c` with a stripped PATH, where `node` is often absent.
-    const cmd = this.nodeRun(shim);
+    // these through a shell with a stripped PATH, where `node` is often absent.
+    // On Windows that shell is PowerShell when there is no Git Bash, which can't
+    // parse two quoted paths in a row, so the command is written for the shell
+    // and the hook names it (hookShell.ts).
+    const node = this.nodeCommand();
+    const cmd = shellCommand(shell, node, shim);
     const entry = (matcher?: string) => ({
       ...(matcher ? { matcher } : {}),
-      hooks: [{ type: 'command', command: cmd }]
+      hooks: [{ type: 'command', command: cmd, ...(process.platform === 'win32' ? { shell } : {}) }]
     });
     const mcpServers = this.buildDefaultMcpServers(cwd, cfg);
     return {
@@ -1502,7 +1511,9 @@ export class HiveManager {
       // the only clean programmatic source for the session's REAL context
       // window. The shim prints a compact in-terminal gauge and forwards the
       // payload to the harness (agent-card context gauge, exact limit).
-      statusLine: { type: 'command', command: `${cmd} --status`, padding: 0 },
+      // No `shell` field here: Claude Code runs it in its default shell, which
+      // the pinned Git Bash (or its absence) makes the same as `shell`.
+      statusLine: { type: 'command', command: shellCommand(shell, node, shim, '--status'), padding: 0 },
       // Native OS sandbox for Bash subprocesses (macOS Seatbelt / Linux bubblewrap).
       // Auto mode spawns with `--permission-mode bypassPermissions`, which only
       // silences PROMPTS; the sandbox is a separate, opt-in layer that was never
@@ -1518,11 +1529,16 @@ export class HiveManager {
       // denyRead/denyWrite (with allowRead re-opening an agent's own folder and
       // the Office inside Michael's) hold shell commands, and permission deny
       // rules hold the file tools. Deny rules apply in auto mode too.
+      //
+      // Not on Windows: Claude Code has no sandbox there, so "sandboxed only"
+      // refused every shell command ("Shell command execution is blocked by
+      // policy") and team members could not clear their inbox or read files.
+      // There the deny rules still hold the file tools (owner, 2026-10-09).
       ...(writableDirs.length
         ? {
             sandbox: {
               enabled: true,
-              ...(folders?.sandboxOnly ? { allowUnsandboxedCommands: false } : {}),
+              ...(folders?.sandboxOnly && process.platform !== 'win32' ? { allowUnsandboxedCommands: false } : {}),
               filesystem: {
                 allowWrite: writableDirs,
                 ...(folders?.sandbox.denyWrite.length ? { denyWrite: folders.sandbox.denyWrite } : {}),
