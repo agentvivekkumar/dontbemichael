@@ -162,10 +162,13 @@ test('the office schedule is the one section on its tab, so it does not fold (ow
   assert.doesNotMatch(tab, /title=\{t\('schedulesSection\.officeSchedule'\)\}/);
 });
 
-test('fixing or removing a mailbox that needed the owner closes its Ask me card (MB-7)', () => {
+test('fixing a mailbox, or removing one that needed the owner, closes its Ask me card (MB-7)', () => {
   const main = read('src/main/index.ts');
-  assert.match(main, /if \(res\.ok && before\?\.status === 'needs-attention'\) closeMailboxCard\(res\.record\.id,/);
+  // Any successful fix closes it: the card can open during the login test, after `before` was read.
+  assert.match(main, /if \(res\.ok && before\) closeMailboxCard\(res\.record\.id,/);
   assert.match(main, /if \(res\.ok && rec\?\.status === 'needs-attention'\) closeMailboxCard\(id,/);
+  // Only an open card is closed, so one already done keeps its result.
+  assert.match(main, /t\?\.id === cardId && t\.status !== 'done'\);\s*if \(open\) hive\.patchTask\(cardId, \{ status: 'done', result \}\);/);
   const dialog = read('src/renderer/src/components/AddMailboxDialog.tsx');
   assert.match(dialog, /button:not\(\[disabled\]\):not\(\[tabindex="-1"\]\)/, 'the Tab trap ends on the chosen service, not a skipped tile');
   assert.match(read('src/renderer/src/components/MailboxesSettings.tsx'), /refocus\(ok \? 'add' : `remove-\$\{id\}`\);/);

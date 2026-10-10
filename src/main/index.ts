@@ -561,7 +561,13 @@ function markMailboxStatus(id: string, status: 'connected' | 'needs-attention', 
 
 /** Close a mailbox's "needs you" Ask me card (MB-7), if one is open. */
 function closeMailboxCard(id: string, result: string): void {
-  try { hive.patchTask(`mailbox-attention-${id}`, { status: 'done', result }); } catch (e) { console.error('[mail] ask me card:', e); }
+  const cardId = `mailbox-attention-${id}`;
+  try {
+    // A card already done keeps the result it closed with.
+    const ledger = hive.tasks() as { tasks?: HiveTask[] };
+    const open = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).some((t) => t?.id === cardId && t.status !== 'done');
+    if (open) hive.patchTask(cardId, { status: 'done', result });
+  } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
 /** Send on approval (docs/designs/send-on-approval.md): proposals the owner
@@ -4427,8 +4433,10 @@ ipcMain.handle('mail:save', async (_evt, input: unknown) => {
   const fixId = (input as { id?: unknown }).id;
   const before = typeof fixId === 'string' ? (readConfig().mailboxes ?? []).find((m) => m.id === fixId) : undefined;
   const res = await saveMailbox(mailService, mailAdmin, PROVIDER_PRESETS, input as AddMailboxInput);
-  // Fixing a mailbox that needed the owner closes its Ask me card (MB-7).
-  if (res.ok && before?.status === 'needs-attention') closeMailboxCard(res.record.id, `${res.record.address} is connected again.`);
+  // Fixing a mailbox closes its Ask me card (MB-7). Not only when it needed the
+  // owner before: a failure during the login test can open the card after
+  // `before` was read, and the fix that just worked has to close it too.
+  if (res.ok && before) closeMailboxCard(res.record.id, `${res.record.address} is connected again.`);
   return res;
 });
 ipcMain.handle('mail:remove', (_evt, id: unknown) => {
