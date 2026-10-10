@@ -815,14 +815,43 @@ function ref(v: unknown): MailRef | undefined {
   return typeof o.mailbox === 'string' && (typeof o.id === 'string' || typeof o.id === 'number') ? { mailbox: o.mailbox, id: String(o.id) } : undefined;
 }
 
+type MailRequestDeps = Pick<MailDeps, 'getConfig' | 'log'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean };
+
+/** A value an agent chose, safe to put in a log line: printable ASCII only, so
+ *  it cannot start a second line. */
+function logSafe(v: string): string {
+  return v.replace(/[^\x20-\x7e]/g, '?');
+}
+
 /**
  * One md-mail tool call, already authenticated by the broker token (so `agentId`
- * is trusted). Checks `mailAccess` for the op, MB-8 for references, then runs it.
- * Never throws: every outcome is a status and a JSON body the MCP server relays.
+ * is trusted). Runs it, then writes one line to `deps.log`: who, which mailbox,
+ * which operation, the status and how long it took. Only ids and the outcome
+ * are logged, never an address, subject or body. Never throws.
  */
 export async function handleMailRequest(
   svc: MailService,
-  deps: Pick<MailDeps, 'getConfig'> & { audit?: (event: Record<string, unknown>) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean },
+  deps: MailRequestDeps,
+  agentId: string,
+  op: string,
+  body: Record<string, unknown>
+): Promise<MailRequestResult> {
+  const started = Date.now();
+  const res = await runMailCall(svc, deps, agentId, op, body);
+  try {
+    const kind = typeof res.body.kind === 'string' ? ` (${logSafe(res.body.kind)})` : '';
+    deps.log?.(`[mail] ${logSafe(agentId)} ${logSafe(op)} ${logSafe(str(body.mailbox, 100) ?? '-')}: ${res.status}${kind} in ${Date.now() - started} ms`);
+  } catch { /* a logging problem never changes the answer */ }
+  return res;
+}
+
+/**
+ * Checks `mailAccess` for the op, MB-8 for references, then runs it.
+ * Never throws: every outcome is a status and a JSON body the MCP server relays.
+ */
+async function runMailCall(
+  svc: MailService,
+  deps: MailRequestDeps,
   agentId: string,
   op: string,
   body: Record<string, unknown>

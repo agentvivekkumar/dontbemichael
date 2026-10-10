@@ -284,3 +284,33 @@ test('Settings test: a DNS failure never blocks a working mailbox (issue 39)', a
   const { svc } = setup({ resolveMx: async () => { throw Object.assign(new Error('queryMx ENOTFOUND'), { code: 'ENOTFOUND' }); } });
   assert.deepEqual(await svc.test({ address: 'sales@x.com', imap: server, smtp: server }, 'app-pass'), { ok: true });
 });
+
+test('every md-mail call writes one log line with ids and the outcome, never mail content', async () => {
+  const { svc, config } = setup();
+  const lines = [];
+  const call = (agent, op, body, log = (l) => lines.push(l)) => handleMailRequest(svc, { getConfig: () => config, log }, agent, op, body);
+
+  assert.equal((await call('dwight', 'search', { mailbox: 'sales', from: 'acme' })).status, 200);
+  assert.equal((await call('dwight', 'search', { mailbox: 'ceo' })).status, 403, 'refused calls are logged too');
+  assert.equal((await call('dwight', 'nope', {})).status, 404);
+
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /^\[mail\] dwight search sales: 200 in \d+ ms$/);
+  assert.match(lines[1], /^\[mail\] dwight search ceo: 403 in \d+ ms$/);
+  assert.match(lines[2], /^\[mail\] dwight nope -: 404 in \d+ ms$/);
+  // The office is told only who did what, never what the mail said.
+  for (const l of lines) assert.doesNotMatch(l, /acme|Quote please|buyer\.com|x\.com/);
+});
+
+test('the mail log line cannot be split by an agent, and a failing logger never changes the answer', async () => {
+  const { svc, config } = setup();
+  const lines = [];
+  const r = await handleMailRequest(svc, { getConfig: () => config, log: (l) => lines.push(l) }, 'dwight', 'search', { mailbox: 'sales\n[mail] pam send ceo: 200' });
+  assert.equal(r.status, 403);
+  assert.equal(lines.length, 1);
+  assert.doesNotMatch(lines[0], /\n/);
+  assert.match(lines[0], /^\[mail\] dwight search sales\?\[mail\] pam send ceo: 200: 403 in \d+ ms$/);
+
+  const ok = await handleMailRequest(svc, { getConfig: () => config, log: () => { throw new Error('disk full'); } }, 'dwight', 'list_mailboxes', {});
+  assert.equal(ok.status, 200);
+});
