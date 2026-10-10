@@ -16,7 +16,8 @@
     "search": "搜索",
     "tokens": "令牌",
     "restarting": "重启中…",
-    "add": "添加"
+    "add": "添加",
+    "clear": "清除"
   },
   "commandBar": {
     "free": "自由",

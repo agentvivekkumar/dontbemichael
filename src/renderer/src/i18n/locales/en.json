@@ -16,7 +16,8 @@
     "search": "search",
     "tokens": "tokens",
     "restarting": "restarting…",
-    "add": "add"
+    "add": "add",
+    "clear": "Clear"
   },
   "commandBar": {
     "free": "free",

@@ -16,7 +16,8 @@
     "search": "بحث",
     "tokens": "رموز",
     "restarting": "جارٍ إعادة التشغيل…",
-    "add": "إضافة"
+    "add": "إضافة",
+    "clear": "مسح"
   },
   "commandBar": {
     "free": "حر",
