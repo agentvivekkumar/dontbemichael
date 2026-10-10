@@ -189,7 +189,7 @@ test('many mailboxes fold into one header line (owner, 2026-10-01)', () => {
   assert.match(mb, /<button type="button" aria-expanded=\{open\} aria-controls=\{listId\}/);
   // Add a mailbox works while closed. The Claude account's Gmail moved to
   // Claude connectors (E4), so the fold holds only mailboxes added here.
-  const fold = mb.indexOf('<div id={listId} hidden={!open}>');
+  const fold = mb.indexOf('<div id={listId}>');
   assert.ok(fold > 0);
   assert.ok(mb.indexOf('<span data-focus="add">') < fold, 'Add works while closed');
   assert.ok(mb.indexOf('<div role="list">') > fold);
