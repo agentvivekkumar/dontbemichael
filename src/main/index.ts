@@ -2978,6 +2978,17 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
+  // A link or a dropped file must never replace the app with another page: a
+  // web link opens in the browser instead, under the same http(s) rule as above.
+  // Reloading the app's own page (App.tsx does after a harness home change) and
+  // the dev server's pages still go through.
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.split('#')[0] === win.webContents.getURL().split('#')[0]) return;
+    if (isDev && process.env.ELECTRON_RENDERER_URL && url.startsWith(process.env.ELECTRON_RENDERER_URL)) return;
+    e.preventDefault();
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+  });
+
   // Close interception when live PTYs exist. The red-X destroys the window;
   // intercept it the same way before-quit does so PTY users aren't surprised.
   win.on('close', (e) => {
