@@ -2195,11 +2195,30 @@ export class HiveManager {
    *  that keeps writing broken files is not woken into a loop. */
   static readonly QUARANTINE_NOTICE_GAP_MS = 10 * 60_000;
 
+  /** Move an outbox file into its .sent archive. A name already archived gets a
+   *  unique prefix instead of replacing the earlier message (rename overwrites),
+   *  and a file that cannot be moved at all is removed, so it is never routed
+   *  again on the next tick. */
+  private archiveOutboxFile(fromPath: string, destDir: string, f: string): void {
+    const dest = join(destDir, f);
+    try {
+      if (!existsSync(dest)) {
+        renameSync(fromPath, dest);
+        return;
+      }
+    } catch { /* fall through to a unique name */ }
+    try {
+      renameSync(fromPath, join(destDir, `${Date.now()}-${randomBytes(4).toString('hex')}-${f}`));
+    } catch {
+      try { rmSync(fromPath, { force: true }); } catch { /* best effort */ }
+    }
+  }
+
   /** Set an unreadable outbox file aside and tell its sender, who otherwise
    *  believes it was delivered. */
   private quarantine(id: string, outbox: string, f: string): void {
     this.appendLog({ kind: 'drop', reason: 'malformed-json', from: id, file: f });
-    try { renameSync(join(outbox, f), join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+    this.archiveOutboxFile(join(outbox, f), join(outbox, '.sent'), `bad-${f}`);
     const last = this.quarantineNoticeAt.get(id) ?? 0;
     if (Date.now() - last < HiveManager.QUARANTINE_NOTICE_GAP_MS) return;
     this.quarantineNoticeAt.set(id, Date.now());
@@ -2275,7 +2294,7 @@ export class HiveManager {
             }
             this.appendLog({ kind: 'schedule-request', from: id, id: msg.id });
             this.routeMessage(this.normalize({ to: id, act: 'inform', subject: 'Schedule request', body: reply }, 'scheduler'));
-            renameSync(full, join(outbox, '.sent', f));
+            this.archiveOutboxFile(full, join(outbox, '.sent'), f);
             routed++;
             continue;
           }
@@ -2283,11 +2302,11 @@ export class HiveManager {
           // Repaired text replaces the original in place, then one rename
           // archives it, so a failed step can never deliver it twice.
           if (repairedText !== null) writeFileSync(full, repairedText);
-          renameSync(full, join(outbox, '.sent', f)); // archive, don't reprocess
+          this.archiveOutboxFile(full, join(outbox, '.sent'), f); // archive, don't reprocess
           routed++;
         } catch {
           // malformed file — quarantine so we don't spin on it
-          try { renameSync(full, join(outbox, '.sent', `bad-${f}`)); } catch { /* noop */ }
+          this.archiveOutboxFile(full, join(outbox, '.sent'), `bad-${f}`);
         }
       }
     }
