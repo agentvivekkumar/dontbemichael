@@ -138,9 +138,10 @@ export class SlackWebhookServer {
   /**
    * Bind the local HTTP server, then open a public tunnel to it. The HTTP
    * handler (the security boundary) is live the instant `listen` resolves; the
-   * tunnel is opened afterwards and is non-fatal — if it can't be established
-   * (offline, loca.lt down, timed out) the server keeps running and we report
-   * the tunnel error without a URL.
+   * tunnel is opened afterwards. If it can't be established (offline, loca.lt
+   * down, timed out) the server is closed again and we report the tunnel error:
+   * the caller drops the instance on any ok:false, so a server left listening
+   * could never be stopped, and its port would stay taken for the next try.
    */
   async start(): Promise<{ ok: boolean; url?: string; error?: string }> {
     if (this.server) return { ok: false, error: 'already running' };
@@ -158,6 +159,7 @@ export class SlackWebhookServer {
       // tunnelmole runs in the background; there is no close handle to wire here.
       return { ok: true, url };
     } catch (e) {
+      this.stop();
       // Surface the tunnel failure rather than silently returning ok:true with no url.
       return { ok: false, error: `tunnel unavailable: ${errMsg(e)}` };
     }

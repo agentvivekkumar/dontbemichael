@@ -39,11 +39,11 @@ own memory, working on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.1.5: Windows offices start, and the Waiting column works.**
-> On Windows, team members no longer stop at a hidden folder trust question. Cards that wait on a
-> customer or teammate move to Waiting and back to Doing when they answer. The API key form says
-> why a key was not accepted. In 0.1.4, team members could send email on your approval and
-> Michael started answering you in the app.
+> **New in 0.1.7: a clear Microsoft 365 message, and safer large files.**
+> A mailbox on your own domain that runs on Microsoft 365 now says it cannot be connected yet,
+> instead of a misleading error. A Word, Excel or PowerPoint file too big to read is refused before
+> it can use up memory, an email is no longer sent twice after a restart, and web links open in your
+> browser. In 0.1.6, Can send stopped putting emails on Ask me.
 > [Every feature, release by release](./docs/FEATURES.md).
 
 ## Contents

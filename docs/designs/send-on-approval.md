@@ -34,7 +34,7 @@ Access tab > Email > Sending, three choices in this order:
 
 | Choice | Value | What the agent can do |
 |---|---|---|
-| Can send | `send` | `send` goes out at once |
+| Can send | `send` | `send` goes out at once; `propose` is refused, so nothing reaches Ask me |
 | Send on approval | `approval` | `propose` puts it on Ask me; `send` with the approved proposal's id |
 | Draft only | `draft` | `draft` saves to the mailbox's Drafts; `send` refused |
 
@@ -44,11 +44,34 @@ with no `sending` reads `send ? 'send' : 'draft'`.
 
 ### The rule (mailAccess)
 
-- `propose` needs Send on approval (or Can send, so a sender may still ask first).
+- `propose` needs Send on approval. Can send refuses it, so nothing from a sender reaches Ask me (owner, 2026-10-09: a member on Can send kept filing cards from old memory notes).
 - `send` needs Can send, or Send on approval with a `proposal` id. The broker then
   sends the approved version it stored, never text from the call, so nothing can
   change between the owner's yes and the send.
 - Draft only refuses both and says where the switch is.
+- A `standing` id counts only under Send on approval. Under Can send the email
+  goes out as any other send, never checked and never put on Ask me.
+
+### Changing Sending
+
+When the owner changes a member's Sending on a mailbox it keeps (its own, or a
+Send only grant), the member gets one "Sending changed" message and a memory
+note naming the new choice. The note replaces any earlier note about how it
+sends from there, so an old note to propose never wins (owner, 2026-10-09).
+
+- **To Can send:** its waiting emails leave Ask me, are marked withdrawn and
+  are listed in the message for the member to send itself. Approved ones stay
+  and can still go by their id. Standing approvals stay on record. On a paused
+  Send only grant (nobody reads that mailbox, or it needs attention), which
+  can't send, the waiting emails stay on Ask me; the member still gets the
+  message and the note.
+- **To Send on approval:** nothing is withdrawn.
+- **To Draft only:** waiting and approved emails are withdrawn, as before.
+
+At launch, emails still waiting from a member already on Can send go back to
+it the same way, once, so offices that switched before this rule match. Only a
+member on the roster that can send from that mailbox now gets them back; a
+paused grant keeps them on Ask me.
 
 ### Proposals
 

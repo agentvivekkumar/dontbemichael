@@ -12,6 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
+const { posixOnly } = require('./platform.cjs');
 
 const { harnessWriteDecision } = loadTs('src/main/harnessGuard.ts');
 
@@ -98,7 +99,7 @@ test('changing the case of the path does not get around it on macOS', () => {
   assert.equal(decide('/Users/me/HARNESSAGENTS/hive/agents/OSCAR/memory/inbox.md').deny, false, 'and plumbing still passes');
 });
 
-test('on Linux, where case matters, a different-case folder is a different folder', () => {
+test('on Linux, where case matters, a different-case folder is a different folder', posixOnly('Windows paths ignore case, so path.relative matches either case there'), () => {
   assert.equal(decide('/Users/me/harnessagents/hive/x.md', { caseInsensitive: false }).deny, false);
 });
 

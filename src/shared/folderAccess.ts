@@ -14,8 +14,10 @@
  *
  * One pure module feeds both layers that enforce this:
  *  - `folderPolicy` becomes the Claude Code settings for a spawn: the OS
- *    sandbox (which covers shell commands, even in auto mode) plus permission
- *    deny rules (which cover Claude's own file tools).
+ *    sandbox (which covers shell commands, even in auto mode, on a Mac and
+ *    Linux; Claude Code has no sandbox on Windows, so shell commands are not
+ *    limited there, owner 2026-10-09) plus permission deny rules (which cover
+ *    Claude's own file tools on every platform).
  *  - `folderDecision` is asked by the PreToolUse hook on every file tool call,
  *    so it sees folders created after the agent started, and it covers Michael's
  *    own top-level files, which a static rule can't express without also hiding
@@ -183,9 +185,15 @@ export function folderToolTarget(tool: string, input: unknown, cwd: string | und
     const pattern = str('pattern');
     const cut = pattern ? pattern.search(/[*?[{]/) : -1;
     const prefix = pattern ? (cut === -1 ? pattern : pattern.slice(0, cut)) : '';
-    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') ? join(p, prefix) : prefix;
+    if (prefix) p = p && !isAbsolute(prefix) && !prefix.startsWith('~/') && !prefix.startsWith('~\\') ? join(p, prefix) : prefix;
   }
   if (!p) return null;
-  if (p.startsWith('~/') && typeof process !== 'undefined' && process.env.HOME) p = resolve(process.env.HOME, p.slice(2));
+  if (typeof process !== 'undefined') {
+    const home = process.env.HOME || process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null);
+    if (home) {
+      if (p === '~') p = home;
+      else if (p.startsWith('~/') || p.startsWith('~\\')) p = resolve(home, p.slice(2));
+    }
+  }
   return isAbsolute(p) ? resolve(p) : cwd ? resolve(cwd, p) : null;
 }

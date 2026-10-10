@@ -65,7 +65,9 @@ test('the Sending choice: three modes, and an older record reads its send flag',
   assert.equal(mailAccess(cfg, 'pam', 'ceo', 'propose').ok, true);
   assert.equal(mailAccess(cfg, 'pam', 'ceo', 'send', 'mp_1').ok, true, 'the broker then checks the proposal');
   assert.equal(mailAccess(cfg, 'kelly', 'support', 'send').ok, true);
-  assert.equal(mailAccess(cfg, 'kelly', 'support', 'propose').ok, true, 'a sender may still ask first');
+  const ask = mailAccess(cfg, 'kelly', 'support', 'propose');
+  assert.equal(ask.ok, false, 'Can send puts nothing on Ask me (owner, 2026-10-09)');
+  assert.match(ask.reason, /Send the email yourself with send; nothing goes on Ask me/);
 });
 
 test('propose, approve with edits, then send: the approved version goes out exactly', async (t) => {
@@ -253,7 +255,12 @@ test('a send under a standing approval goes out only when the separate check say
 
   verdict = { fits: true };
   assert.equal((await call('pam', 'send', { ...email, forward: { mailbox: 'ceo', id: '3' } })).status, 409, 'never forwards');
-  assert.equal((await call('kelly', 'send', { ...email, mailbox: 'support' })).status, 409, 'only its own agent and mailbox');
+  // Can send ignores a standing id: the email goes out as any send, never checked or held.
+  const checks = out.checks.length;
+  assert.equal((await call('kelly', 'send', { ...email, mailbox: 'support' })).status, 200, 'Can send sends it');
+  assert.equal(out.checks.length, checks, 'no fit check on Can send');
+  assert.equal(approvals.getStanding(rule.id).sends.length, 1, 'not counted against another agent\'s approval');
+  out.sends.pop();
   assert.equal((await call('nick', 'send', { ...email, mailbox: 'it' })).status, 403, 'Draft only refuses it before any check');
 
   assert.deepEqual(approvals.revokeStanding(rule.id), { ok: true });

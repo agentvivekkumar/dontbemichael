@@ -48,6 +48,8 @@ src/
     hive.ts                  on-disk multi-agent layer (memory, mailboxes, router)
     bundledSkills.ts         native workspace skill provisioning for Codex and Gemini
     hooks.ts                 hook server + provider hook shims (`cth-hook`, `agy-hook`)
+    hookShell.ts             the shell Claude Code runs hooks and the status line in (bash, or PowerShell on Windows
+                             without Git Bash), and each hook command written for it
     memory.ts                semantic memory layer (CLI wrapper, degrade-to-noop)
     config.ts                harness config persistence + home setup; Claude Code's ~/.claude.json (folder trust,
                              the first-run welcome, an approved API key), written to a copy and swapped in;
@@ -66,7 +68,8 @@ src/
     mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
     integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
     mailApprovals.ts         Send on approval's store (mail-proposals.json in the app's data folder): emails waiting on
-                             Ask me, the owner's decisions, standing approvals, Send only send records and pauses
+                             Ask me, the owner's decisions, standing approvals, Send only send records and pauses,
+                             and the Sending changed notice that hands waiting emails back on Can send
                              (docs/designs/send-on-approval.md, shared-mailboxes.md; the rules are in shared/mailProposals.ts)
     standingCheck.ts         the separate quick check (hidden Claude, no tools) that an email fits a standing approval;
                              anything it can't read counts as no, so the email goes to the owner
@@ -128,6 +131,7 @@ src/
     michaelWorkStyle.ts      Michael's default Work style
     agentAccess.ts           what an agent can really reach, for its profile's Uses row
     submitConfirm.ts         confirms a line typed into an agent's terminal was submitted, pressing Enter again if not
+    terminalOverflow.ts      the office log line for a terminal still drawn past its box after a fit (sizes only)
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring

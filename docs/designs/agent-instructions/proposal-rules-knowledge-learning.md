@@ -16,7 +16,7 @@ All 117 tidy ups before 2026-09-25 failed because the Claude Code sign in had ex
 
 ## 3. Live check of the folder rules
 
-Confirm in a real run that Claude Code's deny rules hold in auto mode. The unit tests pass. The Claude Code sign in is fixed, so this can run now. Also check two things added on 2026-09-25: a team member's shell command can't run with the sandbox off (`allowUnsandboxedCommands: false`), and nothing an agent needs (web or network tools) broke because of it; and a link inside a team member's folder can't open Michael's files.
+Confirm in a real run that Claude Code's deny rules hold in auto mode. The unit tests pass. The Claude Code sign in is fixed, so this can run now. Also check two things added on 2026-09-25: a team member's shell command can't run with the sandbox off (`allowUnsandboxedCommands: false`, Mac and Linux only: Windows has no Claude Code sandbox, so since 2026-10-09 the app leaves it off there and only the file tool deny rules apply), and nothing an agent needs (web or network tools) broke because of it; and a link inside a team member's folder can't open Michael's files.
 
 ## 4. Memory notes that pretend to be from the owner
 

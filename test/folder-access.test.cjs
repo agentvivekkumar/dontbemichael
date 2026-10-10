@@ -27,29 +27,35 @@ const { folderPolicy, folderDecision, folderToolTarget } = loadTs('src/shared/fo
 const { folderLayoutFor } = loadTs('src/main/officeFile.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 
-const B = '/Users/me/Documents/Pho';
+// Absolute on this platform (D:\Users\me\... on Windows), so the expected
+// paths match what the path helpers give back there.
+const abs = (p) => path.resolve(p);
+const B = abs('/Users/me/Documents/Pho');
+const SALES = abs('/Users/me/Dropbox/Sales');
 const layout = {
   business: B,
-  teamFolders: [`${B}/Finance`, `${B}/Admin`, '/Users/me/Dropbox/Sales']
+  teamFolders: [path.join(B, 'Finance'), path.join(B, 'Admin'), SALES]
 };
-const oscar = { isGod: false, cwd: `${B}/Finance` };
+/** A Claude Code rule for everything under a folder: `//` then the path with forward slashes. */
+const ruleFor = (tool, folder) => `${tool}(//${folder.replace(/\\/g, '/').replace(/^\//, '')}/**)`;
+const oscar = { isGod: false, cwd: path.join(B, 'Finance') };
 const michael = { isGod: true, cwd: B };
 
 test('a team member opens its own folder and nothing else of the office', () => {
   const allow = (tool, p) => folderDecision(oscar, layout, tool, p, true).deny === false;
-  assert.ok(allow('Read', `${B}/Finance/statements/june.pdf`));
-  assert.ok(allow('Write', `${B}/Finance/summary.md`));
-  assert.ok(!allow('Read', `${B}/Admin/contracts.docx`), 'a peer\'s folder is private');
-  assert.ok(!allow('Grep', '/Users/me/Dropbox/Sales'), 'even when the owner put it outside the business folder');
-  assert.ok(!allow('Read', `${B}/plan.md`), 'Michael\'s own files are his');
-  assert.ok(!allow('Read', `${B}/Office/Company profile.md`), 'the retired Office folder is just part of Michael\'s');
-  assert.ok(allow('Read', '/Users/me/Downloads/rates.csv'), 'places outside the office are not this rule\'s business');
+  assert.ok(allow('Read', path.join(B, 'Finance', 'statements', 'june.pdf')));
+  assert.ok(allow('Write', path.join(B, 'Finance', 'summary.md')));
+  assert.ok(!allow('Read', path.join(B, 'Admin', 'contracts.docx')), 'a peer\'s folder is private');
+  assert.ok(!allow('Grep', SALES), 'even when the owner put it outside the business folder');
+  assert.ok(!allow('Read', path.join(B, 'plan.md')), 'Michael\'s own files are his');
+  assert.ok(!allow('Read', path.join(B, 'Office', 'Company profile.md')), 'the retired Office folder is just part of Michael\'s');
+  assert.ok(allow('Read', abs('/Users/me/Downloads/rates.csv')), 'places outside the office are not this rule\'s business');
   // Case differs from the disk on macOS: the registry once held "SunriseBakery" for "SunRiseBakery".
-  assert.ok(!allow('Read', `${B.toLowerCase()}/admin/x`));
+  assert.ok(!allow('Read', path.join(B.toLowerCase(), 'admin', 'x')));
 });
 
 test('the refusal tells the agent what to do instead', () => {
-  const d = folderDecision(oscar, layout, 'Read', `${B}/Admin/x.md`, true, 'Michael');
+  const d = folderDecision(oscar, layout, 'Read', path.join(B, 'Admin', 'x.md'), true, 'Michael');
   assert.equal(d.deny, true);
   assert.match(d.reason, /only they and Michael can open it/);
   assert.match(d.reason, /ask Michael/);
@@ -57,44 +63,48 @@ test('the refusal tells the agent what to do instead', () => {
 });
 
 test('agents sharing a folder (same role) both open it', () => {
-  const kevin = { isGod: false, cwd: `${B}/Finance` };
-  assert.equal(folderDecision(kevin, layout, 'Read', `${B}/Finance/june.pdf`, true).deny, false);
+  const kevin = { isGod: false, cwd: path.join(B, 'Finance') };
+  assert.equal(folderDecision(kevin, layout, 'Read', path.join(B, 'Finance', 'june.pdf'), true).deny, false);
 });
 
 test('Michael reads everything and changes only what is his', () => {
   const allow = (tool, p) => folderDecision(michael, layout, tool, p, true).deny === false;
-  assert.ok(allow('Read', `${B}/Finance/june.pdf`));
-  assert.ok(allow('Read', '/Users/me/Dropbox/Sales/leads.csv'));
-  assert.ok(!allow('Write', `${B}/Finance/june.pdf`), 'a team member\'s folder is theirs to change');
-  assert.ok(!allow('Edit', '/Users/me/Dropbox/Sales/leads.csv'));
-  assert.ok(allow('Write', `${B}/notes.md`), 'his own folder');
+  assert.ok(allow('Read', path.join(B, 'Finance', 'june.pdf')));
+  assert.ok(allow('Read', path.join(SALES, 'leads.csv')));
+  assert.ok(!allow('Write', path.join(B, 'Finance', 'june.pdf')), 'a team member\'s folder is theirs to change');
+  assert.ok(!allow('Edit', path.join(SALES, 'leads.csv')));
+  assert.ok(allow('Write', path.join(B, 'notes.md')), 'his own folder');
 });
 
 test('the spawn settings hold the same rules for shell commands and file tools', () => {
   const w = folderPolicy(oscar, layout, true);
-  assert.deepEqual(w.sandbox.denyRead, [B, `${B}/Admin`, '/Users/me/Dropbox/Sales']);
-  assert.deepEqual(w.sandbox.allowRead, [`${B}/Finance`], 'its own folder reopened inside Michael\'s');
+  assert.deepEqual(w.sandbox.denyRead, [B, path.join(B, 'Admin'), SALES]);
+  assert.deepEqual(w.sandbox.allowRead, [path.join(B, 'Finance')], 'its own folder reopened inside Michael\'s');
   assert.deepEqual(w.sandbox.denyWrite, []);
-  assert.ok(w.deny.includes(`Read(//Users/me/Documents/Pho/Admin/**)`));
+  assert.ok(w.deny.includes(ruleFor('Read', path.join(B, 'Admin'))));
   assert.ok(!w.deny.some((r) => r.includes('/Finance')), 'never locks the agent out of its own folder');
 
   assert.equal(w.sandboxOnly, true, 'a team member can\'t switch the sandbox off');
   const g = folderPolicy(michael, layout, true);
   assert.equal(g.sandboxOnly, false, 'Michael keeps it');
   assert.deepEqual(g.sandbox.denyRead, []);
-  assert.deepEqual(g.sandbox.denyWrite, [`${B}/Finance`, `${B}/Admin`, '/Users/me/Dropbox/Sales']);
+  assert.deepEqual(g.sandbox.denyWrite, [path.join(B, 'Finance'), path.join(B, 'Admin'), SALES]);
   assert.ok(g.deny.every((r) => r.startsWith('Edit(')), 'Michael is never denied a read');
 });
 
 test('the path a file tool touches', () => {
-  assert.equal(folderToolTarget('Read', { file_path: 'june.pdf' }, `${B}/Finance`), `${B}/Finance/june.pdf`);
-  assert.equal(folderToolTarget('Grep', { pattern: 'x', path: `${B}/Admin` }, `${B}/Finance`), `${B}/Admin`);
-  assert.equal(folderToolTarget('Glob', { pattern: `${B}/Admin/**/*.md` }, `${B}/Finance`), `${B}/Admin`);
-  assert.equal(folderToolTarget('Grep', { pattern: 'x' }, `${B}/Finance`), null, 'no path: its own folder');
+  assert.equal(folderToolTarget('Read', { file_path: 'june.pdf' }, path.join(B, 'Finance')), path.join(B, 'Finance', 'june.pdf'));
+  assert.equal(folderToolTarget('Grep', { pattern: 'x', path: path.join(B, 'Admin') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
+  assert.equal(folderToolTarget('Glob', { pattern: path.join(B, 'Admin', '**', '*.md') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
+  assert.equal(folderToolTarget('Grep', { pattern: 'x' }, path.join(B, 'Finance')), null, 'no path: its own folder');
+  const home = process.env.HOME || process.env.USERPROFILE;
+  assert.equal(folderToolTarget('Read', { file_path: '~/test.txt' }, path.join(B, 'Finance')), path.resolve(home, 'test.txt'));
+  assert.equal(folderToolTarget('Read', { file_path: '~\\test.txt' }, path.join(B, 'Finance')), path.resolve(home, 'test.txt'));
+  assert.equal(folderToolTarget('Read', { file_path: '~' }, path.join(B, 'Finance')), home);
 });
 
 test('the layout drops folders that are not a team member\'s own place', () => {
-  const docs = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-folders-')));
+  const docs = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-folders-')));
   const biz = path.join(docs, 'Pho');
   for (const f of ['Finance', 'Admin']) fs.mkdirSync(path.join(biz, f), { recursive: true });
   const app = path.join(docs, 'HarnessAgents');
@@ -117,26 +127,49 @@ test('a Claude agent\'s settings file carries the folder rules', async () => {
     { folderPolicy: folderPolicy(oscar, layout, true) }
   );
   const settings = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8'));
-  assert.deepEqual(settings.sandbox.filesystem.denyRead, [B, `${B}/Admin`, '/Users/me/Dropbox/Sales']);
-  assert.deepEqual(settings.sandbox.filesystem.allowRead, [`${B}/Finance`]);
-  assert.ok(settings.permissions.deny.includes('Read(//Users/me/Documents/Pho/Admin/**)'));
+  assert.deepEqual(settings.sandbox.filesystem.denyRead, [B, path.join(B, 'Admin'), SALES]);
+  assert.deepEqual(settings.sandbox.filesystem.allowRead, [path.join(B, 'Finance')]);
+  assert.ok(settings.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))));
   assert.ok(Array.isArray(settings.permissions.additionalDirectories), 'the write allowances are still there');
-  assert.equal(settings.sandbox.allowUnsandboxedCommands, false, 'no shell command runs outside the sandbox');
+  // Windows has no Claude Code sandbox, so the lock is left off there (owner, 2026-10-09).
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, process.platform === 'win32' ? undefined : false, 'no shell command runs outside the sandbox');
+});
+
+test('on Windows a team member keeps its shell: no sandbox only lock, the file tool deny rules stay', async (t) => {
+  // Value: protects=Windows team members can run commands (inbox clearing, knowledge search, Word and Excel) while Read and Edit stay held (owner, 2026-10-09); fails_when=the lock is written on Windows, where Claude Code then blocks every command ("Shell command execution is blocked by policy"), or the deny rules or other platforms change with it; why_new=Pam and Dwight were blocked on every command on a Windows office; seam=process.platform
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-folder-win-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const real = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  let inj;
+  try {
+    inj = await new HiveManager(() => home).ensureAgent(
+      { id: 'oscar', name: 'Oscar', provider: 'claude', cwd: oscar.cwd },
+      { folderPolicy: folderPolicy(oscar, layout, true) }
+    );
+  } finally {
+    Object.defineProperty(process, 'platform', real);
+  }
+  const settings = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8'));
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, undefined, 'commands may run where there is no sandbox');
+  assert.equal(settings.sandbox.enabled, true, 'a sandbox still applies wherever Claude Code has one');
+  assert.ok(settings.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))), 'the file tools stay held');
+  assert.equal(folderPolicy(oscar, layout, true).sandboxOnly, true, 'the policy itself is unchanged');
 });
 
 test('a name starting with two dots is inside its folder; a relative Glob is judged by its folder', () => {
   const allow = (tool, p) => folderDecision(oscar, layout, tool, p, true).deny === false;
-  assert.ok(allow('Read', `${B}/Finance/..notes`));
-  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**' }, `${B}/Finance`), `${B}/Admin/`.replace(/\/$/, ''));
-  assert.ok(!allow('Glob', folderToolTarget('Glob', { pattern: '../Admin/**' }, `${B}/Finance`)));
-  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md' }, `${B}/Finance`), null, 'a pattern in its own folder names no other');
+  assert.ok(allow('Read', path.join(B, 'Finance', '..notes')));
+  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**' }, path.join(B, 'Finance')), path.join(B, 'Admin'));
+  assert.ok(!allow('Glob', folderToolTarget('Glob', { pattern: '../Admin/**' }, path.join(B, 'Finance'))));
+  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md' }, path.join(B, 'Finance')), null, 'a pattern in its own folder names no other');
 });
 
 test('the hook judges the real path too, so a link out of an agent\'s folder is refused', () => {
   const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
   assert.match(hooks, /const real = realPathOf\(target\);/);
   const { realPathOf } = loadTs('src/main/hooks.ts');
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-link-')));
+  const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-link-')));
   fs.mkdirSync(path.join(dir, 'Biz', 'Finance'), { recursive: true });
   fs.symlinkSync(path.join(dir, 'Biz'), path.join(dir, 'Biz', 'Finance', 'biz'));
   const real = realPathOf(path.join(dir, 'Biz', 'Finance', 'biz', 'payroll.xlsx'));
@@ -148,16 +181,16 @@ test('the hook judges the real path too, so a link out of an agent\'s folder is 
 });
 
 test('a Glob with a path is judged by where its pattern points', () => {
-  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**', path: `${B}/Finance` }, `${B}/Finance`), `${B}/Admin`);
-  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md', path: `${B}/Finance/docs` }, `${B}/Finance`), `${B}/Finance/docs`);
-  assert.equal(folderToolTarget('Glob', { pattern: `${B}/Admin/*.pdf`, path: `${B}/Finance` }, `${B}/Finance`), `${B}/Admin`);
+  assert.equal(folderToolTarget('Glob', { pattern: '../Admin/**', path: path.join(B, 'Finance') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
+  assert.equal(folderToolTarget('Glob', { pattern: '**/*.md', path: path.join(B, 'Finance', 'docs') }, path.join(B, 'Finance')), path.join(B, 'Finance', 'docs'));
+  assert.equal(folderToolTarget('Glob', { pattern: path.join(B, 'Admin', '*.pdf'), path: path.join(B, 'Finance') }, path.join(B, 'Finance')), path.join(B, 'Admin'));
 });
 
 test('an agent whose folder is reached through a link still opens its own files', () => {
   const { realPathOf } = loadTs('src/main/hooks.ts');
   const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
   assert.match(hooks, /cwd: realPathOf\(me\.cwd\) \?\? me\.cwd/);
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'md-linkcwd-')));
+  const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-linkcwd-')));
   fs.mkdirSync(path.join(dir, 'Biz', 'Finance'), { recursive: true });
   fs.symlinkSync(path.join(dir, 'Biz'), path.join(dir, 'BizLink'));
   const l = { business: path.join(dir, 'Biz'), teamFolders: [path.join(dir, 'Biz', 'Finance')] };

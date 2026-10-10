@@ -1,3 +1,4 @@
-- **Windows offices start:** no more hidden trust question stopping the team.
-- **Waiting column works:** cards held on someone move there and back.
-- **Clear API key reasons,** such as a key made outside a workspace.
+- **Microsoft 365 on your own domain:** a clear message.
+- **Large Office files** are refused, not unpacked.
+- **No repeat emails** after a restart.
+- **Web links** open in your browser.

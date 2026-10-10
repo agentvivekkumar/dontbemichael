@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadTs = require('./load-ts.cjs');
 
-const { mailAccess, agentMailboxes, mailToolsJustAttached, mailboxIdFor, isMicrosoftAddress } = loadTs('src/shared/mailboxes.ts');
+const { mailAccess, agentMailboxes, mailToolsJustAttached, mailboxIdFor, isMicrosoftAddress, mxPointsToMicrosoft, isMicrosoftMxExchange } = loadTs('src/shared/mailboxes.ts');
 const { MailService, handleMailRequest, classifyMailError, setAgentCapabilities } = loadTs('src/main/mail.ts');
 
 const server = { host: 'h', port: 993, secure: true };
@@ -65,7 +65,8 @@ function setup(over = {}) {
     getPassword: (id) => (id === 'sales' || id === 'ceo' ? 'app-pass' : undefined),
     markStatus: (id, status, reason) => state.statuses.push({ id, status, reason }),
     createImap: () => fakeImap(state),
-    createSmtp: () => ({ async sendMail(m) { if (state.smtpError) throw state.smtpError; state.sends.push(m); return { messageId: m.messageId }; }, async verify() {}, close() {} })
+    createSmtp: () => ({ async sendMail(m) { if (state.smtpError) throw state.smtpError; state.sends.push(m); return { messageId: m.messageId }; }, async verify() {}, close() {} }),
+    resolveMx: over.resolveMx ?? (async () => [])
   };
   const svc = new MailService(deps);
   const call = (agent, op, body) => handleMailRequest(svc, deps, agent, op, body);
@@ -105,6 +106,17 @@ test('helpers: first enable, ids, Microsoft addresses', () => {
   assert.equal(mailboxIdFor('sales@example.com', ['sales-example-com']), 'sales-example-com-2');
   assert.equal(isMicrosoftAddress('a@outlook.com'), true);
   assert.equal(isMicrosoftAddress('a@gmail.com'), false);
+});
+
+test('helpers: Microsoft 365 MX records catch custom domains (issue 39)', () => {
+  assert.equal(isMicrosoftMxExchange('github-com.mail.protection.outlook.com'), true);
+  assert.equal(isMicrosoftMxExchange('github-com.mail.protection.outlook.com.'), true);
+  assert.equal(isMicrosoftMxExchange('MICROSOFT-COM.MAIL.PROTECTION.OUTLOOK.COM'), true);
+  assert.equal(isMicrosoftMxExchange('aspmx.l.google.com'), false);
+  assert.equal(mxPointsToMicrosoft([{ exchange: 'x' }].map((r) => r.exchange)), false);
+  assert.equal(mxPointsToMicrosoft(['aspmx.l.google.com']), false);
+  assert.equal(mxPointsToMicrosoft(['github-com.mail.protection.outlook.com']), true);
+  assert.equal(mxPointsToMicrosoft([]), false);
 });
 
 test('list_mailboxes shows only the agent\'s own mailboxes and its sending right', async () => {
@@ -209,5 +221,66 @@ test('Settings test: Outlook is refused before any connection', async () => {
   assert.equal(r.ok, false);
   assert.equal(r.kind, 'unsupported');
   assert.equal(state.connects, undefined);
+  assert.deepEqual(await svc.test({ address: 'sales@x.com', imap: server, smtp: server }, 'app-pass'), { ok: true });
+});
+
+test('send journal persists deduplication IDs to journalPath across service instances', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mail-journal-test-'));
+  const journalPath = path.join(tmpDir, 'journal.json');
+
+  try {
+    const config = cfg();
+    const sends1 = [];
+    const deps1 = {
+      getConfig: () => config,
+      getPassword: () => 'app-pass',
+      markStatus: () => {},
+      createImap: () => fakeImap({ folders: { INBOX: [], Drafts: [], Sent: [] } }),
+      createSmtp: () => ({ async sendMail(m) { sends1.push(m); return { messageId: '<msg-101>' }; }, async verify() {}, close() {} }),
+      journalPath
+    };
+    const svc1 = new MailService(deps1);
+    const msg = { mailbox: 'sales', to: 'customer@buyer.com', subject: 'Quote', body: 'Quote details' };
+
+    const res1 = await handleMailRequest(svc1, deps1, 'dwight', 'send', msg);
+    assert.equal(res1.status, 200);
+    assert.equal(sends1.length, 1);
+    assert.ok(fs.existsSync(journalPath), 'journal file was written');
+
+    // Simulate app restart with a new MailService instance reading from journalPath
+    const sends2 = [];
+    const deps2 = {
+      getConfig: () => config,
+      getPassword: () => 'app-pass',
+      markStatus: () => {},
+      createImap: () => fakeImap({ folders: { INBOX: [], Drafts: [], Sent: [] } }),
+      createSmtp: () => ({ async sendMail(m) { sends2.push(m); return { messageId: '<msg-102>' }; }, async verify() {}, close() {} }),
+      journalPath
+    };
+    const svc2 = new MailService(deps2);
+
+    const res2 = await handleMailRequest(svc2, deps2, 'dwight', 'send', msg);
+    assert.equal(res2.status, 200);
+    assert.equal(res2.body.repeated, true);
+    assert.equal(sends2.length, 0, 'did not send again across restart');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('Settings test: a custom domain on Microsoft 365 gets the same message (issue 39)', async () => {
+  const { svc, state } = setup({ resolveMx: async () => [{ exchange: 'github-com.mail.protection.outlook.com', priority: 0 }] });
+  const r = await svc.test({ address: 'test@github.com', imap: server, smtp: server }, 'x');
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'unsupported');
+  assert.match(r.reason, /Microsoft 365/);
+  assert.equal(state.connects, undefined);
+});
+
+test('Settings test: a DNS failure never blocks a working mailbox (issue 39)', async () => {
+  const { svc } = setup({ resolveMx: async () => { throw Object.assign(new Error('queryMx ENOTFOUND'), { code: 'ENOTFOUND' }); } });
   assert.deepEqual(await svc.test({ address: 'sales@x.com', imap: server, smtp: server }, 'app-pass'), { ok: true });
 });
