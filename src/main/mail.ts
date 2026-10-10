@@ -17,6 +17,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { resolveMx } from 'node:dns/promises';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer';
@@ -28,6 +29,7 @@ import {
   asSendingMode,
   grantPaused,
   isMicrosoftAddress,
+  mxPointsToMicrosoft,
   mailboxHolder,
   mailAccess,
   mailboxAddress,
@@ -50,6 +52,7 @@ import { OWN_SENDS_ONLY, proposalSendProblem, standingProblem, standingTooLong, 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
 const SEND_TIMEOUT_MS = 60_000;
+const MX_LOOKUP_TIMEOUT_MS = 5_000;
 const SEARCH_DEFAULT = 20;
 const SEARCH_MAX = 50;
 const BODY_MAX_CHARS = 50_000;
@@ -168,6 +171,8 @@ export interface MailDeps {
   markStatus(mailboxId: string, status: 'connected' | 'needs-attention', reason?: string): void;
   createImap?(server: MailServer, user: string, pass: string): ImapLike;
   createSmtp?(server: MailServer, user: string, pass: string): SmtpLike;
+  /** MX lookup for the Microsoft 365 check (issue 39). Injected so tests run offline. */
+  resolveMx?(domain: string): Promise<Array<{ exchange: string }>>;
   log?(line: string): void;
   /** Where the sends of the last SEND_MEMORY_MS are kept on disk, so a repeat
    *  after a restart still gets the first result back instead of a second email.
@@ -255,10 +260,12 @@ export class MailService {
   private readonly inFlight = new Map<string, Promise<{ sent: boolean; messageId: string }>>();
   private readonly createImap: NonNullable<MailDeps['createImap']>;
   private readonly createSmtp: NonNullable<MailDeps['createSmtp']>;
+  private readonly resolveMx: NonNullable<MailDeps['resolveMx']>;
 
   constructor(private readonly deps: MailDeps) {
     this.createImap = deps.createImap ?? defaultImap;
     this.createSmtp = deps.createSmtp ?? defaultSmtp;
+    this.resolveMx = deps.resolveMx ?? resolveMx;
     this.loadJournal();
   }
 
@@ -704,10 +711,29 @@ export class MailService {
     }, 'Checking Sent');
   }
 
+  /** True when the address domain MX records point at Microsoft 365 (issue 39).
+   *  Fail open: any lookup problem returns false so a working mailbox is never
+   *  blocked by DNS. Businesses behind a mail filter keep their old behaviour. */
+  private async domainUsesMicrosoft365(address: string): Promise<boolean> {
+    const domain = address.split('@')[1]?.trim().toLowerCase();
+    if (!domain) return false;
+    try {
+      const records = await withTimeout(this.resolveMx(domain), MX_LOOKUP_TIMEOUT_MS, 'Looking up the mail server');
+      return mxPointsToMicrosoft((records ?? []).map((r) => r.exchange));
+    } catch { return false; }
+  }
+
   /** Settings "Test and save": log in to IMAP and SMTP with the given password
    *  before anything is stored. */
   async test(rec: Pick<MailboxRecord, 'address' | 'imap' | 'smtp'>, password: string): Promise<{ ok: true } | { ok: false; kind: MailErrorKind; reason: string }> {
     if (isMicrosoftAddress(rec.address)) {
+      return { ok: false, kind: 'unsupported', reason: 'Outlook and Microsoft 365 mailboxes stopped accepting app passwords, so they cannot be connected yet.' };
+    }
+    // Issue 39: most small businesses on Microsoft 365 use their own domain,
+    // so the address check never fires. Look at the domain MX records. Any
+    // lookup failure falls through to the normal IMAP test, so a working
+    // mailbox is never blocked by DNS.
+    if (await this.domainUsesMicrosoft365(rec.address)) {
       return { ok: false, kind: 'unsupported', reason: 'Outlook and Microsoft 365 mailboxes stopped accepting app passwords, so they cannot be connected yet.' };
     }
     const client = this.createImap(rec.imap, rec.address, password);
