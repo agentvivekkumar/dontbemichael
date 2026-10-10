@@ -274,14 +274,14 @@ export class WebhookServer {
   }
 
   private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    // Rate limit first — cheapest possible rejection, ahead of any work.
-    if (!this.allowRequest('', RATE_LIMIT)) { json(res, 429, { ok: false, error: 'rate limited' }); return; }
     const id = readEndpointId(req);
     const endpoint = id !== null ? this.endpoints.get(id) ?? null : null;
     // Per-endpoint budget, with every unknown id sharing one bucket (see UNKNOWN_BUCKET).
     if (!this.allowRequest(endpoint ? endpoint.id : UNKNOWN_BUCKET, PER_ENDPOINT_RATE_LIMIT)) {
       json(res, 429, { ok: false, error: 'rate limited' }); return;
     }
+    // Requests already rejected by one bucket must not consume the shared budget.
+    if (!this.allowRequest('', RATE_LIMIT)) { json(res, 429, { ok: false, error: 'rate limited' }); return; }
     const method = req.method ?? '';
     if (method === 'GET') { this.handleStatus(req, res, endpoint); return; }
     if (method === 'POST') { this.handleCreate(req, res, endpoint); return; }
