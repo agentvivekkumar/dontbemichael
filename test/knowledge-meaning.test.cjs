@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
+const { posixOnly } = require('./platform.cjs');
 
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'md-kg-meaning-'));
 const electron = require.resolve('electron');
@@ -43,7 +44,7 @@ test('the mirror holds one file per document, titled, and drops removed ones', (
   assert.notEqual(m2.signature, m.signature, 'so it gets indexed again');
 });
 
-test('the palace indexes the mirror into "company", prunes, and skips an unchanged store', async (t) => {
+test('the palace indexes the mirror into "company", prunes, and skips an unchanged store', posixOnly('fakes the mempalace binary with a #!/bin/sh script'), async (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-kg-palace-'));
   const log = path.join(home, 'calls.log');
   const bin = path.join(home, 'mempalace');

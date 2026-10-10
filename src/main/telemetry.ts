@@ -28,6 +28,7 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { readAgentUsage } from './transcript';
+import { readCodexUsage } from './codexUsage';
 import { normalizeModel } from './pricing';
 
 // ─── The locked cross-lane contract (do not change without re-agreeing) ───────
@@ -123,6 +124,10 @@ export interface TelemetryCollectorOptions {
    *  cwd (the common case for hive workers) pulls in every other agent's and
    *  every past session's history too. */
   resolveSessionId?: (agentId: string) => string | undefined;
+  /** A Codex agent's CODEX_HOME, or null for any other engine. Codex sends no
+   *  OTel to this collector and writes no transcripts the default reader sees,
+   *  so its fallback reads the session's rollout there instead. */
+  resolveCodexHome?: (agentId: string) => string | null;
 }
 
 export class TelemetryCollector {
@@ -133,6 +138,7 @@ export class TelemetryCollector {
   private readonly emit?: (channel: string, payload: unknown) => void;
   private readonly resolveCwd?: (agentId: string) => string | null;
   private readonly resolveSessionId?: (agentId: string) => string | undefined;
+  private readonly resolveCodexHome?: (agentId: string) => string | null;
 
   /** sessionId → running accumulation. */
   private readonly sessions = new Map<string, SessionAccum>();
@@ -152,6 +158,7 @@ export class TelemetryCollector {
     this.emit = opts.emit;
     this.resolveCwd = opts.resolveCwd;
     this.resolveSessionId = opts.resolveSessionId;
+    this.resolveCodexHome = opts.resolveCodexHome;
   }
 
   /** Bind the loopback OTLP listener. The handler is live the instant this
@@ -434,7 +441,8 @@ export class TelemetryCollector {
     if (!cwd) return null;
     const sessionId = this.resolveSessionId?.(agentId);
     if (!sessionId) return null;
-    const u = readAgentUsage(cwd, { sessionId });
+    const codexHome = this.resolveCodexHome?.(agentId);
+    const u = codexHome ? readCodexUsage(codexHome, sessionId) : readAgentUsage(cwd, { sessionId });
     if (!u.inputTokens && !u.outputTokens && !u.cacheReadTokens && !u.cacheWriteTokens) return null;
     return {
       agentId,

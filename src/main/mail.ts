@@ -35,6 +35,7 @@ import {
   mailToolsJustAttached,
   secretRefForMailbox,
   sendOnlyGrant,
+  sendingFor,
   sendingMode,
   sendingWords,
   type MailAccessConfig,
@@ -735,9 +736,10 @@ export interface ProposalStore {
  *  could not run, which counts as not fitting. */
 export type StandingFitCheck = (kind: string, email: StandingCheckEmail) => Promise<{ fits: true } | { fits: false; reason: string } | null>;
 
-/** What each Sending choice lets the agent do, for list_mailboxes. */
+/** What each Sending choice lets the agent do, for list_mailboxes. The Sending
+ *  changed notice says the same in shared/mailProposals.ts SENDING_CHANGE; change both. */
 const SENDING_HOW: Record<SendingMode, string> = {
-  send: 'send goes out at once. You may still propose an email when you want the owner to approve it first.',
+  send: 'send goes out at once. propose is refused: nothing goes on Ask me, so you decide, and you ask Michael when you are unsure about an email.',
   approval: 'propose puts the email on Ask me for the owner; when they approve it you get a message, then call send with its proposal id. For a kind listed in standing_approvals, call send with the full email and that standing id instead. When your memory notes show the owner approving one kind of email unchanged again and again, offer it with offer_standing on your next proposal.',
   draft: 'draft saves the email in the mailbox\'s Drafts for the owner to send; send and propose are refused.'
 };
@@ -752,7 +754,7 @@ const sendingStanding = new Set<string>();
 const sentUnrecorded = new Map<string, string>();
 
 /** What Send only means, for a grant's list_mailboxes entry. */
-const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send work under its sending; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
+const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send follow its sending, below; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
 
 function str(v: unknown, max = 5000): string | undefined {
   return typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined;
@@ -793,6 +795,9 @@ export async function handleMailRequest(
   // A Send only grant on the named mailbox (shared-mailboxes.md).
   const grant = sendOnlyGrant(cfg, agentId);
   const underGrant = !!grant && !!mailbox && grant.mailbox === mailbox;
+  // Can send puts nothing on Ask me (owner, 2026-10-09): a standing id from an
+  // older memory note is ignored and the email goes out as any other send.
+  const canSend = !!mailbox && sendingFor(cfg, agentId, mailbox) === 'send';
 
   if (op === 'list_mailboxes') {
     const recs = cfg.mailboxes ?? [];
@@ -925,7 +930,7 @@ export async function handleMailRequest(
     // A standing approval: fixed facts first, then the separate check. An email
     // that does not plainly fit goes to the owner on Ask me instead, so a
     // generous reading never sends it.
-    if (op === 'send' && standingId) {
+    if (op === 'send' && standingId && !canSend) {
       if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };
       const rule = deps.proposals.getStanding(standingId);
       const problem = standingProblem(rule, agentId, mailbox!, input);
@@ -955,6 +960,20 @@ export async function handleMailRequest(
         // The check can take a minute: the approval, the access and the grant are
         // checked again before anything leaves, so a revoke in that time holds.
         const now = deps.getConfig();
+        if (sendingFor(now, agentId, mailbox!) === 'send') {
+          // Switched to Can send while the check ran: the standing approval no
+          // longer applies and nothing goes on Ask me (owner, 2026-10-09), so
+          // the email goes out as any other send, whatever the check said.
+          const out = await svc.send(agentId, mailbox!, input, () => {
+            const a = mailAccess(deps.getConfig(), agentId, mailbox, 'send', undefined, { present: deps.present });
+            return a.ok ? null : a.reason;
+          });
+          if (underGrant && !(out as { repeated?: boolean }).repeated) {
+            recordGrantSend(out, input);
+            try { deps.audit?.({ kind: 'mail-sent', agentId, mailbox, messageId: String(out.messageId ?? ''), grant: true }); } catch { /* the send stands */ }
+          }
+          return { status: 200, body: out };
+        }
         const still = deps.proposals.getStanding(standingId);
         const stillProblem = standingProblem(still, agentId, mailbox!, input);
         const stillAccess = mailAccess(now, agentId, mailbox, 'send', standingId, { present: deps.present });
@@ -1051,6 +1070,11 @@ export interface MailAdminDeps {
   endGrant?(agentId: string, mailbox: string, reason: string): void;
   /** Withdraw an agent's waiting and approved emails from a mailbox. */
   cancelFor?(agentId: string, mailbox: string, reason: string): void;
+  /** The owner changed an agent's Sending on a mailbox it keeps: tell it,
+   *  note it in its memory, and on Can send hand back its waiting emails. */
+  sendingChanged?(agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean): void;
+  /** Whether a team member is on the roster, for a grant's pause. Absent: assumed. */
+  present?(agentId: string): boolean;
 }
 
 export interface AddMailboxInput {
@@ -1185,8 +1209,9 @@ export function setAgentCapabilities(
   try {
     if (ownedBefore && ownedBefore !== ownedAfter) {
       admin.endGrant?.(agentId, ownedBefore, ownedAfter ? `The owner gave you ${address(ownedAfter)} instead of ${address(ownedBefore)}.` : `The owner turned your email from ${address(ownedBefore)} off.`);
-    } else if (ownedBefore && ownedBefore === ownedAfter && sending === 'draft' && sendingMode(before!.email) !== 'draft') {
-      admin.cancelFor?.(agentId, ownedBefore, `The owner set you to Draft only from ${address(ownedBefore)}.`);
+    } else if (ownedBefore && ownedBefore === ownedAfter && sending && sending !== sendingMode(before!.email)) {
+      if (sending === 'draft') admin.cancelFor?.(agentId, ownedBefore, `The owner set you to Draft only from ${address(ownedBefore)}.`);
+      admin.sendingChanged?.(agentId, ownedBefore, address(ownedBefore), sending, true);
     }
   } catch (e) { console.error('[mail] mailbox change:', e); }
   return { ok: true, restartNeeded: mailToolsJustAttached(before, after), ...(movedFrom ? { movedFrom } : {}) };
@@ -1223,8 +1248,11 @@ export function setSendOnly(
   try {
     if (prior?.mailbox && prior.mailbox !== grant?.mailbox) {
       admin.endGrant?.(agentId, prior.mailbox, `The owner removed your Send only access to ${address(prior.mailbox)}.`);
-    } else if (prior && grant && grant.sending === 'draft' && asSendingMode(prior.sending) !== 'draft') {
-      admin.cancelFor?.(agentId, grant.mailbox, `The owner set you to Draft only from ${address(grant.mailbox)}.`);
+    } else if (prior && grant && grant.sending !== asSendingMode(prior.sending)) {
+      if (grant.sending === 'draft') admin.cancelFor?.(agentId, grant.mailbox, `The owner set you to Draft only from ${address(grant.mailbox)}.`);
+      // A paused grant can't send, so its waiting emails stay on Ask me (Codex
+      // review): handing them back would strand them.
+      admin.sendingChanged?.(agentId, grant.mailbox, address(grant.mailbox), grant.sending, !grantPaused(admin.getConfig(), grant.mailbox, admin.present));
     }
   } catch (e) { console.error('[mail] grant change:', e); }
   return { ok: true, restartNeeded: mailToolsJustAttached(before, after) };

@@ -709,6 +709,9 @@ const api = {
     ipcRenderer.invoke('pty:resize', id, cols, rows),
   redrawPty: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('pty:redraw', id),
+  /** A terminal still drawn past its box after a fit: sizes only, to the office log. */
+  logTerminalOverflow: (info: Record<string, number | string>): void =>
+    ipcRenderer.send('terminal:overflow', info),
   killPty: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('pty:kill', id),
   listPtys: (): Promise<Array<{

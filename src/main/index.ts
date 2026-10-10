@@ -87,7 +87,8 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
 import { standingFitCheck } from './standingCheck';
-import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingMode, sendingWords } from '../shared/mailboxes';
+import { terminalOverflowEvent } from '../shared/terminalOverflow';
+import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -331,7 +332,8 @@ const telemetry = new TelemetryCollector({
   resolveCwd: (agentId) => hive.registry().agents[agentId]?.cwd ?? null,
   // D11: scopes the transcript fallback to this agent's own session instead of
   // summing every transcript in a (routinely shared) cwd.
-  resolveSessionId: (agentId) => hive.lastSession(agentId)
+  resolveSessionId: (agentId) => hive.lastSession(agentId),
+  resolveCodexHome: (agentId) => hive.codexHome(agentId)
 });
 // Usage provider (Seam 1) — the INTEGRATION swap: Oscar's telemetry collector (#7)
 // IS the provider, replacing Lane A's interim StubUsageProvider. Same
@@ -609,7 +611,9 @@ const mailAdmin = {
   setSecret: (ref: string, value: string) => integrations.setSecret(ref, value),
   deleteSecret: (ref: string) => integrations.deleteSecret(ref),
   endGrant: (agentId: string, mailbox: string, reason: string) => mailApprovals.endGrant(agentId, mailbox, reason),
-  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); }
+  cancelFor: (agentId: string, mailbox: string, reason: string) => { mailApprovals.cancel({ agentId, mailbox }, reason); },
+  sendingChanged: (agentId: string, mailbox: string, address: string, sending: SendingMode, handBack: boolean) => mailApprovals.sendingChanged(agentId, mailbox, address, sending, handBack),
+  present: memberPresent
 };
 
 /**
@@ -3762,6 +3766,21 @@ ipcMain.handle('pty:resize', (_evt, id: string, cols: number, rows: number) => {
   if (typeof id !== 'string' || typeof cols !== 'number' || typeof rows !== 'number') return { ok: false, error: 'invalid args' };
   return ptyManager.resize(id, cols, rows);
 });
+// A terminal still drawn past its box after a fit (Windows report, 2026-10-09).
+// Numbers and the platform only, so the office log names the case next time.
+let lastTerminalOverflowLog = 0;
+const loggedOverflowSizes = new Set<string>();
+ipcMain.on('terminal:overflow', (_evt, info: unknown) => {
+  // At most one line a minute for the whole app, and each terminal size once a
+  // session: the log is committed with the office.
+  if (Date.now() - lastTerminalOverflowLog < 60_000) return;
+  const event = terminalOverflowEvent(info, process.platform);
+  const size = event ? [event.rows, event.cols, event.dpr, event.fontSize].join('/') : '';
+  if (!event || loggedOverflowSizes.has(size) || loggedOverflowSizes.size >= 20) return;
+  loggedOverflowSizes.add(size);
+  lastTerminalOverflowLog = Date.now();
+  if (event) { try { hive.appendLog(event); } catch { /* best-effort */ } }
+});
 ipcMain.handle('pty:redraw', (_evt, id: string) => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   return ptyManager.redraw(id);
@@ -6748,6 +6767,13 @@ function bootstrapHiveServices(): void {
   // Waiting schedule requests reach Michael, and ones he leaves undecided
   // reach the owner (sweepScheduleRequests).
   try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
+  // Can send puts nothing on Ask me: cards filed before that rule go back to
+  // their member with a notice that replaces an old note to propose.
+  try {
+    const cfg = readConfig();
+    // Only where the member can send now: a paused grant keeps its cards on Ask me.
+    mailApprovals.handBackCanSend((agentId, mailbox) => (memberPresent(agentId) && sendingFor(cfg, agentId, mailbox) === 'send' && mailAccess(cfg, agentId, mailbox, 'send', undefined, { present: memberPresent }).ok ? mailboxAddress(cfg, mailbox) : null));
+  } catch (e) { console.error('[mail] Can send hand back failed', e); }
   if (scheduleSweepTimer) clearInterval(scheduleSweepTimer);
   scheduleSweepTimer = setInterval(() => {
     try { sweepScheduleRequests(); } catch (e) { console.error('[schedules] request sweep failed', e); }
