@@ -181,6 +181,7 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={mode === 'installed' ? t('skillsTab.searchInstalled') : t('skillsTab.searchCatalog')}
+          aria-label={mode === 'installed' ? t('skillsTab.searchInstalled') : t('skillsTab.searchCatalog')}
           style={{
             borderRadius: 'var(--cth-r-md)',
             flex: 1, minWidth: 140, padding: '4px 8px',
@@ -189,6 +190,17 @@ export function SkillsTab({ agentCwd }: { agentCwd?: string }) {
             fontFamily: 'var(--cth-font-ui)', fontSize: 12
           }}
         />
+        {query.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label={t('common.clear')}
+            title={t('common.clear')}
+            style={actionBtn('quiet')}
+          >
+            {t('common.clear')}
+          </button>
+        )}
         {mode === 'browse' && (
           <select
             value={category}
