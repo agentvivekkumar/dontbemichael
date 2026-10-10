@@ -46,7 +46,6 @@ src/
     index.ts                 window, IPC handlers, quit guard
     pty.ts                   node-pty manager (spawn/write/resize/kill/stream)
     hive.ts                  on-disk multi-agent layer (memory, mailboxes, router)
-    bundledSkills.ts         native workspace skill provisioning for Codex and Gemini
     hooks.ts                 hook server + provider hook shims (`cth-hook`, `agy-hook`)
     hookShell.ts             the shell Claude Code runs hooks and the status line in (bash, or PowerShell on Windows
                              without Git Bash), and each hook command written for it
@@ -199,17 +198,6 @@ landing-remotion/            Remotion project that renders the landing page's "h
 HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 docs/message-queue.md        who may type into an agent's terminal, and when
 ```
-
-Codex and Gemini worker startup exposes bundled skills individually in the worker's
-working folder under `.agents/skills`. Links target the app's resource directory,
-so removing another worker's private folder does not break them. Windows uses
-directory junctions, with a copy fallback when links are unavailable. An ownership
-record lets restart refresh or retire unchanged app entries while preserving owner
-skills in `.agents/skills` and `.gemini/skills`, including edited fallback copies.
-The existing private `.claude/skills` copy remains available to bundled helper
-commands through `AGENT_DIR`. Provisioning failures go to the hive log and worker
-startup continues. Workspace trust and skill activation follow each CLI's rules;
-engine availability still follows `BUILD_ENGINES`.
 
 <div align="right">(<a href="#architecture-project-structure-and-design-system">↑ back to top</a>)</div>
 

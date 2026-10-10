@@ -63,7 +63,6 @@ import { OFFICE_ROLES } from '../shared/officeRoles';
 import { APP_NAME } from '../shared/appName';
 import { isPeerAssignment, rerouteToMichael, hopDropNotice } from '../shared/handoffRule';
 import { sleepSync } from './atomicFile';
-import { provisionBundledSkills } from './bundledSkills';
 
 /** The subset of HarnessConfig the hive consumes for the default-MCP merge.
  *  Kept as a local shape so hive.ts never imports the foundation-owned config
@@ -1030,11 +1029,6 @@ export class HiveManager {
     // Store the EXPANDED cwd, never the raw `~/…` the user typed — the registry is
     // read by hooks, the roster and the worker watcher, none of which run a shell.
     const cwd = this.cwdValidity(meta.cwd);
-    // Native discovery follows the worker's cwd, not its private AGENT_DIR.
-    if (opts.skillsDir && cwd.valid && meta.cwd && (meta.provider === 'codex' || meta.provider === 'gemini')) {
-      const issues = provisionBundledSkills(opts.skillsDir, meta.cwd);
-      if (issues.length) this.appendLog({ kind: 'skills-provision', agentId: meta.id, issues });
-    }
     reg.agents[meta.id] = {
       ...prev,
       ...meta,
@@ -1130,6 +1124,7 @@ export class HiveManager {
             if (desc.shim === 'agy') this.installAgyHooks();
             else if (desc.shim === 'codex') {
               env.CODEX_HOME = this.installCodexHooks(dir, meta.id);
+              if (opts.skillsDir) this.copyBundledSkills(opts.skillsDir, join(env.CODEX_HOME, 'skills'));
               // Codex refuses to run hooks from a config dir without persisted
               // "hook trust" (normally an interactive gate). Our hooks.json is
               // hive-authored inside an isolated CODEX_HOME, so we bypass that gate
