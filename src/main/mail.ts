@@ -58,6 +58,9 @@ const SEARCH_MAX = 50;
 const BODY_MAX_CHARS = 50_000;
 const IDLE_CLOSE_MS = 5 * 60_000;
 const SEND_MEMORY_MS = 10 * 60_000;
+/** How long a send the app stopped in the middle of stays refused. Longer than
+ *  the repeat window: whether it went out is unknown, and such sends are rare. */
+const PENDING_MEMORY_MS = 24 * 60 * 60_000;
 /** The most mail one send may forward or attach from, in all. */
 const REFERENCE_MAX_BYTES = 25 * 1024 * 1024;
 const REFERENCE_TOO_LARGE = 'That email is too large to forward or attach from (over 25 MB in all). Send a new email instead, or ask the owner to forward it.';
@@ -176,6 +179,8 @@ export interface MailDeps {
   log?(line: string): void;
   /** Where the sends of the last SEND_MEMORY_MS are kept on disk, so a repeat
    *  after a restart still gets the first result back instead of a second email.
+   *  A send is written here before the server sees it, so one the app stopped
+   *  in the middle of is not sent a second time either (for PENDING_MEMORY_MS).
    *  Without it the record lives in memory only. */
   journalPath?: string;
 }
@@ -255,6 +260,10 @@ export class MailService {
    *  config on every tool call. */
   private readonly lastStatus = new Map<string, 'connected' | 'needs-attention'>();
   private readonly sent = new Map<string, { at: number; result: { messageId: string } }>();
+  /** Sends handed to the server whose answer has not come back, saved before
+   *  the server sees them. Outside a running send, one is left over from a run
+   *  that stopped mid-send: it may have gone out, so it is not sent again. */
+  private readonly pending = new Map<string, { at: number; messageId: string }>();
   /** Sends in progress by the same key, so an identical send that overlaps
    *  waits for the first and gets its result instead of sending again. */
   private readonly inFlight = new Map<string, Promise<{ sent: boolean; messageId: string }>>();
@@ -277,9 +286,11 @@ export class MailService {
       const raw = JSON.parse(readFileSync(this.deps.journalPath, 'utf8'));
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         const now = Date.now();
-        for (const [k, v] of Object.entries(raw as Record<string, { at?: number; messageId?: string }>)) {
+        for (const [k, v] of Object.entries(raw as Record<string, { at?: number; messageId?: string; pending?: boolean }>)) {
           if (v && typeof v.at === 'number' && typeof v.messageId === 'string') {
-            if (now - v.at <= SEND_MEMORY_MS) {
+            if (v.pending === true) {
+              if (now - v.at <= PENDING_MEMORY_MS) this.pending.set(k, { at: v.at, messageId: v.messageId });
+            } else if (now - v.at <= SEND_MEMORY_MS) {
               this.sent.set(k, { at: v.at, result: { messageId: v.messageId } });
             }
           }
@@ -288,18 +299,24 @@ export class MailService {
     } catch { /* best-effort */ }
   }
 
-  private saveJournal(): void {
-    if (!this.deps.journalPath) return;
+  /** False only when the journal could not be written. */
+  private saveJournal(): boolean {
+    if (!this.deps.journalPath) return true;
     try {
-      const data: Record<string, { at: number; messageId: string }> = {};
+      const data: Record<string, { at: number; messageId: string; pending?: true }> = {};
       for (const [k, v] of this.sent) {
         data[k] = { at: v.at, messageId: v.result.messageId };
       }
+      for (const [k, v] of this.pending) {
+        data[k] = { at: v.at, messageId: v.messageId, pending: true };
+      }
       writeFileAtomic(this.deps.journalPath, JSON.stringify(data, null, 2), 0o600);
-    } catch { /* best-effort */ }
+      return true;
+    } catch { return false; }
   }
 
   private recordSent(key: string, at: number, messageId: string): void {
+    this.pending.delete(key);
     this.sent.set(key, { at, result: { messageId } });
     this.saveJournal();
   }
@@ -665,14 +682,46 @@ export class MailService {
         pruned = true;
       }
     }
+    for (const [k, v] of this.pending) {
+      if (now - v.at > PENDING_MEMORY_MS) {
+        this.pending.delete(k);
+        pruned = true;
+      }
+    }
     if (pruned) this.saveJournal();
     const prior = this.sent.get(key);
     if (prior) return { ...prior.result, sent: true, repeated: true };
     const running = this.inFlight.get(key);
     if (running) return { ...(await running), repeated: true };
-    const attempt = this.sendOnce(key, now, id, input, beforeSmtp);
+    // Not running, yet saved as handed to the server: the app stopped in the
+    // middle of this send, so it is looked for in Sent instead of sent again.
+    const left = this.pending.get(key);
+    const attempt = left ? this.settleInterrupted(key, id, left) : this.sendOnce(key, now, id, input, beforeSmtp);
     this.inFlight.set(key, attempt);
     try { return await attempt; } finally { this.inFlight.delete(key); }
+  }
+
+  /** A send the app stopped in the middle of: if its Message-ID is in Sent, the
+   *  server took it and the first result comes back. That is not marked
+   *  repeated: the stopped run never got to record the send (grant, standing
+   *  approval, office log), so this caller records it once. If it is not in
+   *  Sent, it may still have gone out (only Gmail files sent mail itself; for
+   *  the rest the app adds the copy after the server answers), so it is refused. */
+  private async settleInterrupted(key: string, id: string, left: { at: number; messageId: string }): Promise<{ sent: boolean; messageId: string }> {
+    const mayHaveGone = 'This email may already have gone out: the app stopped while sending it, and it is not in Sent yet. Do not send it again; tell Michael, so the owner can check with the recipient.';
+    let found: boolean;
+    try { found = await this.inSent(id, left.messageId); } catch (e) {
+      const err = classifyMailError(e);
+      // Only a passing problem is worth another try; any other leaves it unknown.
+      if (err.kind === 'network' || err.kind === 'timeout') {
+        throw new MailError(err.kind, `Not sent now. The app stopped while sending this email before, and Sent could not be checked for it: ${err.message} Try again in a moment.`);
+      }
+      throw new MailError('refused', mayHaveGone);
+    }
+    if (!found) throw new MailError('refused', mayHaveGone);
+    // The repeat window starts now: the stop may have been long before.
+    this.recordSent(key, Date.now(), left.messageId);
+    return { sent: true, messageId: left.messageId };
   }
 
   private async sendOnce(key: string, now: number, id: string, input: ComposeInput, beforeSmtp?: () => string | null): Promise<{ sent: boolean; messageId: string }> {
@@ -683,6 +732,10 @@ export class MailService {
     if (stop) throw new MailError('refused', `Not sent. ${stop}`);
     const smtp = this.createSmtp(rec.smtp, rec.address, this.password(id));
     try {
+      // Saved before the server sees it, so a stop before its answer never
+      // leads to a second copy. If that can't be saved, nothing goes out.
+      this.pending.set(key, { at: now, messageId });
+      if (!this.saveJournal()) throw new MailError('unknown', 'The app could not record this send before sending it. Try again in a moment.');
       await withTimeout(smtp.sendMail(msg), SEND_TIMEOUT_MS, 'Sending');
     } catch (e) {
       const err = classifyMailError(e);
@@ -691,6 +744,9 @@ export class MailService {
         const found = await this.inSent(id, messageId).catch(() => false);
         if (found) { this.recordSent(key, now, messageId); return { sent: true, messageId }; }
       }
+      // Reported as not sent, so a retry may send it.
+      this.pending.delete(key);
+      this.saveJournal();
       this.note(id, err);
       throw new MailError(err.kind, `Not sent. ${err.message}`);
     } finally { smtp.close?.(); }

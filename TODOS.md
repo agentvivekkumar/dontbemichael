@@ -91,18 +91,6 @@
 
 ## Mail approvals and Michael replies (deferred from ship of feat/mail-approvals-michael-replies, 2026-10-07)
 
-### Never send a plain email twice across a restart
-
-**What:** A small saved send journal, written before each plain send goes to the mail server and checked before any send, so a retry after a crash returns the first result.
-
-**Why:** Codex review (pass 2, P1). Plain Can send emails are kept from going out twice only in memory (MailService.send's send once map and in-flight map), so if the app stops right after the server accepts an email, the agent's retry sends a second copy with a new Message-ID. Approved proposals already avoid this with the saved `sending` state.
-
-**Context:** Owner decision D11 in the ship: the size cap went in, this was deferred. Start in `src/main/mail.ts` (`send`, `sendOnce`); key on the same hash `send` already computes; keep it app private like mail-proposals.json.
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** None
-
 ### Keep the approvals file in memory
 
 **What:** Load mail-proposals.json once, keep it in memory, write through with an atomic rename, and read again only when its time stamp changes.
