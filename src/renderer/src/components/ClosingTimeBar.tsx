@@ -283,4 +283,7 @@ const hint: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--
 /** A failed Remind or Close without them, or a closing time that would not
  *  start: coral soft box, coral text, so it reads as an error at AA contrast. */
 const errorStyle: CSSProperties = { marginTop: 6, padding: '6px 10px', borderRadius: 'var(--cth-r-md)', fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-coral-text)', background: 'var(--cth-coral-soft)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-coral) 35%, transparent)' };
-const detailStyle: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)' };
+/** The current action line. Agent text: clipped so stacked combining marks
+ *  never draw over the rows around it, and wrapped anywhere so a long file
+ *  path or command keeps its end (owner, 2026-10-10). */
+const detailStyle: CSSProperties = { fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)', overflow: 'hidden', overflowWrap: 'anywhere' };
