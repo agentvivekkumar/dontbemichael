@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.1.6). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.1.7). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -100,6 +100,18 @@ moving, and brings you only the decisions that need you.
   or takes an Anthropic API key instead. Skip it, and Ask me keeps a card until Michael can start.
 
 ## Part 2: Every change, release by release
+
+### 0.1.7 (2026-10-09)
+- Microsoft 365 on your own domain: testing such a mailbox looks up where the domain's mail goes and
+  says Microsoft 365 cannot be connected yet, instead of a server or password error. A failed lookup
+  never blocks a working mailbox.
+- Large Office files: a Word, Excel or PowerPoint file whose text parts add up to more than 200 MB,
+  or more than 5,000 parts, is refused before anything is unpacked. Photos do not count.
+- An email asked for twice within 10 minutes is sent once, even across a restart.
+- Links and dropped files no longer replace the app window; web links open in your browser.
+- Slack can be retried after its tunnel fails; sent team messages with the same file name are both
+  kept; folder rules on Windows read `~` as the home folder.
+- Groundwork for Codex: its usage and cost reach the caps and cost views (not offered yet).
 
 ### 0.1.6 (2026-10-09)
 - Can send means no approval cards: a team member on Can send sends without asking, and moving one

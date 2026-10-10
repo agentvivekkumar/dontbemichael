@@ -1,4 +1,4 @@
-- **Can send** no longer puts emails on Ask me.
-- **Windows without Git for Windows:** team members work again.
-- **Windows commands** run for team members again.
-- **The terminal refits** when its text size changes.
+- **Microsoft 365 on your own domain:** a clear message.
+- **Large Office files** are refused, not unpacked.
+- **No repeat emails** after a restart.
+- **Web links** open in your browser.

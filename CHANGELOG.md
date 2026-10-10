@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.1.7] (2026-10-09)
+
+### Fixed
+
+- **Microsoft 365 mailboxes on your own domain get the right message.** Testing a mailbox like info@yourbusiness.com that runs on Microsoft 365 said the mail server could not be reached or the password was wrong, so owners kept retrying something that cannot work yet. The test now looks up where the domain's mail goes, and a Microsoft 365 domain gets the same "Outlook and Microsoft 365 mailboxes stopped accepting app passwords" message as an @outlook.com address. If the lookup fails, the test carries on as before, so a working mailbox is never blocked.
+- **A large Word, Excel or PowerPoint file can no longer take the office down.** Each part of such a file was capped, but not all of them together, so a file with many large parts could use up the app's memory and stop every team member. A file whose text parts add up to more than 200 MB, or that has more than 5,000 of them, is now refused before anything is unpacked, with a plain reason. Photos inside a document do not count, so a picture heavy document still reads.
+- **An email is not sent twice after a restart.** The app remembers each email a team member sent for 10 minutes, so the same email asked for again gets the first result back. That memory now survives quitting and reopening the app.
+- **The app window stays on the app.** A clicked link or a file dropped on the window could replace the whole office with that page. Web links now open in your browser.
+- **Slack can be retried after its tunnel fails.** When the public tunnel could not open, the Slack listener kept its port, so every later try failed until the app was restarted. It now lets the port go.
+- **Team messages are kept when two share a file name.** Sorting a sent message away could overwrite an earlier one with the same name and lose it from the thread history, and a message that could not be moved was delivered again every few seconds. Both are fixed.
+- **Folder rules on Windows understand `~`.** A path starting with `~` was judged against the team member's own folder instead of the home folder on Windows.
+
+### Added
+
+- **Codex usage and cost.** Groundwork for a second engine: a Codex team member's tokens and cost now reach the token caps, cost caps and cost views, and GPT models are priced as OpenAI models. Codex is not offered as an engine yet.
+
 ## [0.1.6] (2026-10-09)
 
 ### Fixed
