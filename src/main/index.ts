@@ -4052,6 +4052,12 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
     }
   }
 
+  // Refuse a move onto a folder that already holds an office: mode move would
+  // copy this office over that one (cpSync with force).
+  if (mode === 'move' && homeFolderStatus(newHome).hasOffice) {
+    return { ok: false, error: 'That folder already holds an office. Choose an empty folder to move to, or open that office instead.' };
+  }
+
   const ensured = ensureHarnessHome(newHome);
   if (!ensured.ok) return ensured;
 
