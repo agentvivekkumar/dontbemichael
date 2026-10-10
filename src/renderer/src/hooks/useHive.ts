@@ -155,6 +155,7 @@ function submitToPty(
         accepted: () => promptSubmits.since(agentId, typedAt),
         pressEnter: () => window.cth.writePty(ptyId, '\r'),
         stillSafe: () => isTerminalAutomationSafe(ptyId) && !hasTerminalDraft(ptyId)
+          && !promptSubmits.attentionSince(agentId, typedAt)
       });
       if (!ok) console.warn(`[submit] ${agentId} did not accept the prompt after retries`);
     }
@@ -683,6 +684,7 @@ export function useHive(config: HarnessConfig | null): void {
   useEffect(() => {
     return window.cth.onHiveHookEvent((e) => {
       if (!e.agentId) return;
+      if (e.event === 'Notification' || e.event === 'PermissionRequest') promptSubmits.noteAttention(e.agentId);
       const { updateAgent, agents } = useStore.getState();
       const self = agents.find((a) => a.id === e.agentId);
       if (!self) return;
