@@ -65,29 +65,51 @@ interface StoreFile {
 const SUBJECT_MAX = 500;
 const BODY_MAX = 200_000;
 const NOTE_MAX = 2000;
+const STORE_UNREADABLE =
+  'The saved mail approvals file could not be read, so nothing was saved over it. Try again; if it keeps failing, the file needs repair.';
 
 export class MailApprovals implements ProposalStore {
   constructor(private deps: MailApprovalDeps) {}
 
   private now(): number { return this.deps.now?.() ?? Date.now(); }
 
+  private empty(): StoreFile {
+    return { proposals: [], standing: [], sends: [], paused: {} };
+  }
+
+  private coerceStore(v: unknown): StoreFile | null {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    const raw = v as Record<string, unknown>;
+    const ok = <T extends { id?: unknown }>(a: unknown): T[] => (Array.isArray(a) ? (a as T[]).filter((x) => x && typeof x.id === 'string') : []);
+    const sends = Array.isArray(raw.sends) ? (raw.sends as SendRecord[]).filter((r) => r && typeof r.messageId === 'string' && typeof r.agentId === 'string') : [];
+    const paused = raw.paused && typeof raw.paused === 'object' && !Array.isArray(raw.paused) ? (raw.paused as Record<string, PausedNotice>) : {};
+    return { ...raw, proposals: ok<MailProposal>(raw.proposals), standing: ok<StandingApproval>(raw.standing), sends, paused };
+  }
+
   private load(): StoreFile {
-    const empty: StoreFile = { proposals: [], standing: [], sends: [], paused: {} };
     try {
-      if (!existsSync(this.deps.path)) return empty;
-      const v = JSON.parse(readFileSync(this.deps.path, 'utf8')) as Record<string, unknown>;
-      const ok = <T extends { id?: unknown }>(a: unknown): T[] => (Array.isArray(a) ? (a as T[]).filter((x) => x && typeof x.id === 'string') : []);
-      const sends = Array.isArray(v?.sends) ? (v.sends as SendRecord[]).filter((r) => r && typeof r.messageId === 'string' && typeof r.agentId === 'string') : [];
-      const paused = v?.paused && typeof v.paused === 'object' && !Array.isArray(v.paused) ? (v.paused as Record<string, PausedNotice>) : {};
-      // Any other key is kept as it was, so a newer build's data survives (EV3).
-      return { ...v, proposals: ok<MailProposal>(v?.proposals), standing: ok<StandingApproval>(v?.standing), sends, paused };
-    } catch { return empty; }
+      if (!existsSync(this.deps.path)) return this.empty();
+      return this.coerceStore(JSON.parse(readFileSync(this.deps.path, 'utf8'))) ?? this.empty();
+    } catch { return this.empty(); }
+  }
+
+  private loadForWrite(): StoreFile {
+    if (!existsSync(this.deps.path)) return this.empty();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(this.deps.path, 'utf8'));
+    } catch {
+      throw new Error(STORE_UNREADABLE);
+    }
+    const store = this.coerceStore(parsed);
+    if (!store) throw new Error(STORE_UNREADABLE);
+    return store;
   }
 
   /** Writes the parts given and keeps every other part as it is (EV3: a save
    *  that knew only proposals and standing wiped the rest). */
   private save(next: Partial<StoreFile>): void {
-    const cur = this.load();
+    const cur = this.loadForWrite();
     const data = { ...cur, ...next, proposals: pruneProposals(next.proposals ?? cur.proposals, this.now()) };
     const tmp = `${this.deps.path}.tmp`;
     writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
