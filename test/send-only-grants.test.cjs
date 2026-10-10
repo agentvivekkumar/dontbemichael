@@ -352,6 +352,20 @@ test('send records survive every other write to the approvals file', async (t) =
   assert.equal(list[0].messageId, '<5>');
 });
 
+test('a damaged approvals file is not replaced with a new empty store', (t) => {
+  const { approvals, dir } = setup(t);
+  const file = path.join(dir, 'mail-proposals.json');
+  const damaged = '{"proposals": [';
+  fs.writeFileSync(file, damaged, 'utf8');
+
+  assert.throws(
+    () => approvals.file({ agentId: 'pam', mailbox: 'ceo', to: 'a@b.com', subject: 'x', body: 'y' }),
+    /saved mail approvals file could not be read/i
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), damaged, 'left exactly as it was');
+  assert.equal(fs.existsSync(`${file}.tmp`), false, 'no replacement temp file is left behind');
+});
+
 test('ending a grant withdraws its emails and revokes its standing approvals in one message; Draft only withdraws', async (t) => {
   // Value: protects=no dead errands and no silently revived trust (D13, OV6); fails_when=cancel or revoke is skipped, or one message per rule; why_new=no grant lifecycle existed; seam=none
   const { call, approvals, admin, out, cfg } = setup(t, office('approval'));
