@@ -1182,8 +1182,8 @@ function archiveOrphanedAgents(): void {
  *  launch, as soon as Michael is up, including a brand-new office right after
  *  setup. The hourly timer then restarts from this fire, so the next one comes an
  *  hour later. Only when the standup is on and runs on an interval; a standup the
- *  owner moved to weekly slots keeps to its slots. Michael starting again later in
- *  the same launch doesn't fire it again. */
+ *  owner moved to weekly slots or timing lines keeps to its slots. Michael
+ *  starting again later in the same launch doesn't fire it again. */
 let standupFiredThisLaunch = false;
 
 /** Office open (src/shared/officeOpen.ts): read once per launch from the log,
@@ -1233,7 +1233,7 @@ function catchUpOwnerAnswers(): void {
 function standupOnOfficeOpen(): void {
   if (standupFiredThisLaunch || !hive.enabled()) return;
   const m = (readConfig().missions ?? []).find((x) => x.id === OPS_STANDUP_MISSION.id);
-  if (!m || !m.enabled || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
+  if (!m || !m.enabled || normalizeTimes(m.times) || normalizeWeekly(m.weekly) || !(m.intervalMs > 0)) return;
   standupFiredThisLaunch = true;
   try {
     hive.send({ to: m.to, act: 'inform', subject: m.label, body: scheduledRunBody(m.label, m.body, m.focus) }, 'scheduler');
