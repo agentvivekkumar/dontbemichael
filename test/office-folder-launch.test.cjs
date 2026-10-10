@@ -82,6 +82,12 @@ test('Settings never offers to move an office on top of another one', () => {
   assert.match(settings, /otherOffices\.map\(\(h\) =>/);
 });
 
+test('main refuses mode move onto a folder that already holds an office', () => {
+  const main = read('src/main/index.ts');
+  const handler = main.slice(main.indexOf("ipcMain.handle('config:changeHome'"));
+  assert.match(handler.slice(0, 2500), /mode === 'move' && homeFolderStatus\(newHome\)\.hasOffice/);
+});
+
 test('"start over here" leaves a real office behind, so the next launch goes in', async (t) => {
   // The relaunch trusts only a folder holding hive/registry.json; a bare folder
   // would loop the owner back to the missing screen.
