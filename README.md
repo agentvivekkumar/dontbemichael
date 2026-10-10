@@ -95,7 +95,7 @@ terminal. That changes almost every decision:
 | **Cost and data** | Free, with a paid Pro plan; anonymous usage stats | Free, no paid plan, no usage data sent |
 
 If you write code and want a team of coding agents, Munder Difflin is the better fit. If you run a
-business and want the work done without watching terminals, this is.
+business and want the work done without watching terminals, this is the better fit.
 
 ## Your team
 
