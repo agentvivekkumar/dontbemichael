@@ -15,8 +15,9 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Every job blocks: a red job fails the run. The owner makes these required
-# checks on main in the "protect main" ruleset (a repository setting).
+# Every job blocks: a red job fails the run. All four are required checks on
+# main in the "protect main" ruleset (a repository setting the owner changes),
+# so renaming a job here also means renaming its required check there.
 jobs:
   typecheck:
     name: Typecheck

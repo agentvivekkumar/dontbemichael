@@ -315,7 +315,7 @@ Synthesized from this review's findings. Effort ratios: features ~30x, tests ~50
 - [x] **T9 (P2, human: ~4h / CC: ~20min)** — UI — Beta pill with InfoTip, prefilled Report a problem (E4)
   - Files: `SettingsHeroCard.tsx`, locales; Verify: URL carries only the three fields
 - [ ] **T10 (P1, owner + CC)** — proof — Claude Code smoke (item 0), then E3 if needed; rc.1 and rc.2 checklist with S2 rows on the physical PC
-- [ ] **T11 (P2, owner)** — go live — set WINDOWS_RELEASE=on, add `test-windows` as a required check, website link (E5, push confirmed)
+- [ ] **T11 (P2, owner)** — go live — set WINDOWS_RELEASE=on, add `test-windows` as a required check, website link (E5, push confirmed). WINDOWS_RELEASE=on done 2026-10-05; "Tests (Windows)" required since 2026-10-10; the website link is still open
 
 ## Completion Summary
 
