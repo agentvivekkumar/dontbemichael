@@ -23,6 +23,7 @@ import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
 } from '../shared/memoryIndex';
+import { localDay } from '../shared/messageView';
 import type { AgentFolderPolicy } from '../shared/folderAccess';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync,
@@ -2518,7 +2519,7 @@ export class HiveManager {
     const dir = this.agentDir(id);
     if (!existsSync(dir)) return false;
     const line = (v: string) => v.replace(/\s+/g, ' ').trim();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay(new Date().toISOString());
     const note = `- From the owner (${today}), answering a question on "${line(task)}": Q: ${line(q)} A: ${line(a)}\n`;
     try {
       mkdirSync(join(dir, 'memory'), { recursive: true });

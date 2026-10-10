@@ -25,6 +25,7 @@ import {
   type SendRecord,
   type StandingApproval
 } from '../shared/mailProposals';
+import { localDay } from '../shared/messageView';
 import type { SendingMode } from '../shared/mailboxes';
 import type { ProposalStore } from './mail';
 
@@ -119,7 +120,7 @@ export class MailApprovals implements ProposalStore {
 
   private read(): MailProposal[] { return this.load().proposals; }
   private write(list: MailProposal[]): void { this.save({ proposals: list }); }
-  private today(): string { return new Date(this.now()).toISOString().slice(0, 10); }
+  private today(): string { return localDay(new Date(this.now()).toISOString()); }
 
   /** Standing approvals still in force, for one agent or all. */
   standing(agentId?: string): StandingApproval[] {

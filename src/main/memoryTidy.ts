@@ -34,6 +34,7 @@ import {
   INDEX_BUDGET_TOKENS, INDEX_PRUNE_AT, applyOps, archiveLines, entriesBlock, estimateTokens,
   legacyNotes, parseInbox, parseIndex, renderIndex, validateOps, type MemoryEntry
 } from '../shared/memoryIndex';
+import { localDay } from '../shared/messageView';
 
 const TIDY_MODEL = 'claude-haiku-4-5';
 const TIMEOUT_MS = 180_000;
@@ -168,7 +169,7 @@ export class MemoryTidy {
       catch { /* the processing file stays; the next pass reads it back below */ }
     };
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay(new Date().toISOString());
     let raw: unknown;
     try {
       raw = await this.askModel(home, entries, notes, overBudget);
