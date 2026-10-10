@@ -457,7 +457,7 @@ def build_social():
             f".s{{position:absolute;right:0;top:95px;width:660px;-webkit-mask-image:radial-gradient(420px 330px at 55% 52%,#000 60%,transparent 100%)}}"
             f"</style></head><body><img class='s' src='_studio.png'><div class='t'><div class='l'>{svg}</div>"
             f"<h1>Michael finally learned to delegate.</h1>"
-            f"<p>An AI office for your small business. Talk to Michael; the team does the work on your Mac.</p>"
+            f"<p>An AI office for your small business. Talk to Michael; the team does the work on your computer.</p>"
             f"<div class='u'>DONTBEMICHAEL.COM</div></div></body></html>")
     p = write("social/_card.html", html)
     chrome(f"file://{p}", out("social/og-card-1200x630.png"), 1200, 630, transparent=False)
