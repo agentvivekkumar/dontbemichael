@@ -46,7 +46,7 @@ moving, and brings you only the decisions that need you.
   or any IMAP mailbox. Passwords stay encrypted on your computer.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
-- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. A team member can't reach a mailbox you didn't give it.
+- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. Can send never puts an email on Needs you, and moving a team member to it hands back the emails still waiting there, unless it sends only from a mailbox nobody on the team watches right now. A team member can't reach a mailbox you didn't give it.
 - When you keep approving the same kind of email unchanged, the team member can offer to send that
   kind without asking. You tick it on the card and can revoke it on its Access tab; a separate quick
   check reads each such email first, and anything that doesn't fit comes to you.
