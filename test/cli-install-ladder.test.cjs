@@ -70,7 +70,9 @@ test('the no-node script explains the real problem instead of failing at it', ()
 test('the native rung actually runs, and says why it differs', () => {
   const out = script('claude', false);
   assert.match(out, /no Node needed/);
-  const native = installInfoForProvider('claude').nativeCommand;
+  // The script above is the darwin one, so compare with the darwin installer,
+  // not the host's (a Windows runner would expect the PowerShell form).
+  const native = installInfoForProvider('claude', 'darwin').nativeCommand;
   assert.ok(out.split('\n').includes(native), 'the installer must be an executed line, not only echoed');
 });
 
