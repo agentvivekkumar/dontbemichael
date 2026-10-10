@@ -64,3 +64,10 @@ test('the counter strip moves on to the orchestrator, and says when his terminal
   assert.equal(h({ acked: 0, total: 0 }), 'No workers on the floor. Waiting for the orchestrator');
   assert.equal(h({ acked: 0, total: 0, godLive: false }), "No workers on the floor. The orchestrator's terminal ended");
 });
+
+test('the action line is clipped and wraps anywhere: marks stay in their row, long paths keep their end (owner, 2026-10-10)', () => {
+  // Value: protects=stacked combining marks never draw over other rows, and a long file path is never cut off; fails_when=overflow hidden or overflowWrap anywhere is dropped from detailStyle; why_new=PR 86 clipped paths without wrapping; seam=none
+  const bar = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/components/ClosingTimeBar.tsx'), 'utf8');
+  assert.match(bar, /const detailStyle: CSSProperties = \{[^}]*overflow: 'hidden'[^}]*overflowWrap: 'anywhere'[^}]*\};/);
+  assert.match(bar, /\{d\.line && <div style=\{detailStyle\}>\{d\.line\}<\/div>\}/, 'each worker row');
+});
