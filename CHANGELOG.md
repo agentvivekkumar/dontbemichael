@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.1.6] (2026-10-09)
+
+### Fixed
+
+- **Windows offices without Git for Windows.** On those computers Claude Code runs team members' hooks in PowerShell, which could not read the command the app wrote, so every hook failed with "Unexpected token" in the terminal and Michael and the team never reported what they were doing. The app now writes each hook and the status line for the shell Claude Code will use there.
+- **Team members on Windows can run commands.** Claude Code has no sandbox on Windows, and the app told it that team members' commands must run sandboxed, so every command a team member tried was blocked by policy: they could not clear handled messages, search company knowledge or read Word and Excel files. On Windows that rule is now left off. The rules that keep each team member's file tools out of other folders stay, and Mac and Linux are unchanged.
+- **Terminal stays inside its box.** On a Windows office a team member's terminal drew its last row past its frame, over the Queue box. The terminal now refits whenever its character cells change size on their own, such as after a font loads, a display scale change or a renderer swap. If a fit still leaves it past its box, the sizes go to the office log so the cause can be pinned down.
+- **Can send means no approval cards.** A team member you moved from Send on approval to Can send kept putting emails on Ask me, because its notes still said to propose them and the app never told it the setting changed. Can send now sends without asking: the team member can no longer put an email on Ask me, and an old standing approval no longer routes one there. Changing a team member's Sending tells them and adds the new rule to their notes. Moving them to Can send hands their waiting emails back to send themselves; while nobody on the team reads the inbox they send from, or that inbox needs attention, those emails stay on Ask me instead. Offices that switched before this fix get the same hand back at launch.
+
 ## [0.1.5] (2026-10-09)
 
 ### Fixed

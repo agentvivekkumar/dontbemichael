@@ -14,8 +14,10 @@
  *
  * One pure module feeds both layers that enforce this:
  *  - `folderPolicy` becomes the Claude Code settings for a spawn: the OS
- *    sandbox (which covers shell commands, even in auto mode) plus permission
- *    deny rules (which cover Claude's own file tools).
+ *    sandbox (which covers shell commands, even in auto mode, on a Mac and
+ *    Linux; Claude Code has no sandbox on Windows, so shell commands are not
+ *    limited there, owner 2026-10-09) plus permission deny rules (which cover
+ *    Claude's own file tools on every platform).
  *  - `folderDecision` is asked by the PreToolUse hook on every file tool call,
  *    so it sees folders created after the agent started, and it covers Michael's
  *    own top-level files, which a static rule can't express without also hiding

@@ -254,6 +254,14 @@ test('a record never sends agents to the disk root, the home folder, or key and 
   }
 });
 
+test('a disk root is never a usable folder, however its letters are cased', () => {
+  // Value: protects=no agent is sent to a disk root on Windows; fails_when=the root check compares a lowercased path with an uppercased root again; why_new=Windows accepted C:\ because "c:\" !== "C:\"; seam=none
+  const root = path.parse(os.tmpdir()).root;
+  for (const r of [root, root.toLowerCase(), root.toUpperCase()]) {
+    assert.equal(file.isUsableTeamFolder(r), false, r);
+  }
+});
+
 test('an older office uses the folder its team shares as Michael\'s', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'office-'));
   const biz = fs.mkdtempSync(path.join(os.tmpdir(), 'biz-'));

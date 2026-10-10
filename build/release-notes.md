@@ -1,3 +1,4 @@
-- **Windows offices start:** no more hidden trust question stopping the team.
-- **Waiting column works:** cards held on someone move there and back.
-- **Clear API key reasons,** such as a key made outside a workspace.
+- **Can send** no longer puts emails on Ask me.
+- **Windows without Git for Windows:** team members work again.
+- **Windows commands** run for team members again.
+- **The terminal refits** when its text size changes.

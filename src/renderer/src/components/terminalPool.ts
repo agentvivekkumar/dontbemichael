@@ -795,6 +795,27 @@ export function attachTerminal(entry: TerminalEntry, container: HTMLElement): vo
   }
 }
 
+/** How far the terminal's screen is drawn past the box it sits in, in CSS
+ *  pixels (0 when it fits). A Windows office saw Claude's last row drawn over
+ *  the Queue box (2026-10-09); a correct fit never does that. */
+export function screenOverflowPx(entry: TerminalEntry): number {
+  const screen = entry.term.element?.querySelector('.xterm-screen');
+  if (!screen || !entry.host.isConnected) return 0;
+  return Math.max(0, screen.getBoundingClientRect().bottom - entry.host.getBoundingClientRect().bottom);
+}
+
+/** Calls `cb` when xterm's drawn size changes on its own: the cell re-measured
+ *  after a font load, a display scale change, or a renderer swap. None of these
+ *  resize the host, so the ResizeObserver never sees them and the grid would
+ *  keep rows the box can't hold. Private API, as the fit addon itself uses. */
+export function onCellSizeChange(entry: TerminalEntry, cb: () => void): () => void {
+  try {
+    const rs = (entry.term as unknown as { _core?: { _renderService?: { onDimensionsChange?: (f: () => void) => { dispose(): void } } } })._core?._renderService;
+    const sub = rs?.onDimensionsChange?.(cb);
+    return () => { try { sub?.dispose(); } catch { /* gone */ } };
+  } catch { return () => { /* not available */ }; }
+}
+
 /** Take the terminal off screen: drop the WebGL lease and unparent the host.
  *  Everything that makes the terminal a terminal — buffer, scrollback, pty
  *  subscription — stays in the pool, so re-attaching shows it fully rendered. */

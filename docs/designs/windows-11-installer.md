@@ -33,6 +33,28 @@ Owner, 2026-10-04: "we have users asking for windows 11 installable."
 - Owner memory said "no outside users yet" on 2026-10-03; this request is the first
   outside demand.
 
+## Field findings on a Windows office (2026-10-09)
+
+Seen on a Windows 11 PC without Git for Windows, checked against Claude Code
+2.1.296, and fixed in code:
+
+- **Hooks run in PowerShell there.** Claude Code runs hook and status line
+  commands in bash when it finds Git Bash (`CLAUDE_CODE_GIT_BASH_PATH`, the
+  Program Files Git folders, or `git` on PATH), and otherwise in PowerShell. It
+  does not use cmd.exe. The app wrote `"<launcher>" "<cth-hook.cjs>"`, which
+  PowerShell refuses ("Unexpected token"), so every hook failed. `hookShell.ts`
+  now finds Git Bash the same way. Each hook names its shell, and its command is
+  written for that shell: `& '<launcher>' '<cth-hook.cjs>'` under PowerShell.
+  The status line takes no `shell` and no `args`, so it runs in Claude Code's
+  default shell. A Git Bash the app found is passed to the agent as
+  `CLAUDE_CODE_GIT_BASH_PATH`, so both pick the same one. This settles E3:
+  current Claude Code runs without Git Bash, so no Git for Windows step is needed.
+- **No sandbox.** Claude Code has no sandbox on Windows. Team members'
+  `allowUnsandboxedCommands: false` made it refuse every shell command ("Shell
+  command execution is blocked by policy"). The app now leaves that setting off
+  on Windows (owner, 2026-10-09). The file tool deny rules still keep each team
+  member to its own folder; shell commands are not limited there yet.
+
 ## Draft scope (from the request)
 
 - A Windows 11 installer people can download and run, and an office that works on it.
