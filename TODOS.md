@@ -109,13 +109,6 @@
 **Effort:** S
 **Priority:** P2
 
-### Close a stale "needs you" card after an edit race
-
-**What:** In `mail:save` (`src/main/index.ts`), close the mailbox's Ask me card whenever a fix succeeds, not only when the mailbox was needs-attention before the login test. A failure during the test can open the card and leave it open.
-
-**Effort:** XS
-**Priority:** P3
-
 ## Mail approvals and Michael replies (deferred from ship of feat/mail-approvals-michael-replies, 2026-10-07)
 
 ### Never send a plain email twice across a restart
