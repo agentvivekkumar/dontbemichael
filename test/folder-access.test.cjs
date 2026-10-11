@@ -82,6 +82,7 @@ test('the spawn settings hold the same rules for shell commands and file tools',
   assert.deepEqual(w.sandbox.allowRead, [path.join(B, 'Finance')], 'its own folder reopened inside Michael\'s');
   assert.deepEqual(w.sandbox.denyWrite, []);
   assert.ok(w.deny.includes(ruleFor('Read', path.join(B, 'Admin'))));
+  assert.ok(w.deny.includes(ruleFor('Write', path.join(B, 'Admin'))));
   assert.ok(!w.deny.some((r) => r.includes('/Finance')), 'never locks the agent out of its own folder');
 
   assert.equal(w.sandboxOnly, true, 'a team member can\'t switch the sandbox off');
@@ -89,7 +90,7 @@ test('the spawn settings hold the same rules for shell commands and file tools',
   assert.equal(g.sandboxOnly, false, 'Michael keeps it');
   assert.deepEqual(g.sandbox.denyRead, []);
   assert.deepEqual(g.sandbox.denyWrite, [path.join(B, 'Finance'), path.join(B, 'Admin'), SALES]);
-  assert.ok(g.deny.every((r) => r.startsWith('Edit(')), 'Michael is never denied a read');
+  assert.ok(g.deny.every((r) => r.startsWith('Edit(') || r.startsWith('Write(')), 'Michael is never denied a read');
 });
 
 test('the path a file tool touches', () => {

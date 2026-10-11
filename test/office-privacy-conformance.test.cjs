@@ -93,7 +93,7 @@ function claudeView(settings, cwd) {
   return {
     sandboxOnly,
     toolsMayRead: (p) => !anyUnder(dirsOf('Read'), p),
-    toolsMayWrite: (p) => !anyUnder(dirsOf('Edit'), p),
+    toolsMayWrite: (p) => !anyUnder(dirsOf('Edit'), p) && !anyUnder(dirsOf('Write'), p),
     toolsMayWriteAllowList: (p) => anyUnder((settings.permissions && settings.permissions.additionalDirectories) || [], p),
     shellMayRead: (p) => !sandboxOnly || anyUnder(fsx.allowRead || [], p) || !anyUnder(fsx.denyRead || [], p),
     shellMayWrite: (p) => !sandboxOnly || (anyUnder([cwd, ...(fsx.allowWrite || [])], p) && !anyUnder(fsx.denyWrite || [], p)),

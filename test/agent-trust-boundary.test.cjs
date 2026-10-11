@@ -75,6 +75,7 @@ test('no agent reads or changes the app private folder, with or without a busine
       assert.ok(pol.sandbox.denyWrite.includes(priv), 'shell writes');
       assert.ok(pol.deny.some((r) => r.startsWith('Read(') && r.includes('/w/home/private')), 'Read tool');
       assert.ok(pol.deny.some((r) => r.startsWith('Edit(') && r.includes('/w/home/private')), 'Edit tool');
+      assert.ok(pol.deny.some((r) => r.startsWith('Write(') && r.includes('/w/home/private')), 'Write tool');
       for (const tool of ['Read', 'Grep', 'Write', 'Edit']) {
         assert.equal(folderDecision(agent, layout, tool, token, true).deny, true, `${tool} ${agent.isGod ? 'Michael' : 'team member'}`);
       }
@@ -104,6 +105,7 @@ test('no agent changes the hook program or any agent settings, through the shell
       for (const f of locked) {
         assert.ok(pol.sandbox.denyWrite.includes(f), `shell writes ${f} (${who})`);
         assert.ok(pol.deny.includes(`Edit(/${f.replace(/\\/g, '/').replace(/^(?!\/)/, '/')}/**)`), `Edit tool ${f} (${who})`);
+        assert.ok(pol.deny.includes(`Write(/${f.replace(/\\/g, '/').replace(/^(?!\/)/, '/')}/**)`), `Write tool ${f} (${who})`);
       }
       for (const target of [path.join(bin, 'cth-hook.cjs'), path.join(settings, 'ada.json')]) {
         for (const tool of ['Write', 'Edit', 'MultiEdit']) {

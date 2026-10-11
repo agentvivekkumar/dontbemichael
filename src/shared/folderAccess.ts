@@ -78,11 +78,11 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   if (layout.appPrivate) {
     policy.sandbox.denyRead.push(layout.appPrivate);
     policy.sandbox.denyWrite.push(layout.appPrivate);
-    policy.deny.push(rule('Read', layout.appPrivate), rule('Edit', layout.appPrivate));
+    policy.deny.push(rule('Read', layout.appPrivate), rule('Edit', layout.appPrivate), rule('Write', layout.appPrivate));
   }
   for (const f of layout.appLocked ?? []) {
     policy.sandbox.denyWrite.push(f);
-    policy.deny.push(rule('Edit', f));
+    policy.deny.push(rule('Edit', f), rule('Write', f));
   }
 
   if (agent.isGod) {
@@ -90,7 +90,7 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
     for (const f of teamFoldersOf(layout, same)) {
       if (inside(f, agent.cwd)) continue; // never lock Michael out of his own folder
       policy.sandbox.denyWrite.push(f);
-      policy.deny.push(rule('Edit', f));
+      policy.deny.push(rule('Edit', f), rule('Write', f));
     }
     return policy;
   }
@@ -106,7 +106,7 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   }
   for (const f of others) {
     policy.sandbox.denyRead.push(f);
-    policy.deny.push(rule('Read', f), rule('Edit', f));
+    policy.deny.push(rule('Read', f), rule('Edit', f), rule('Write', f));
   }
   return policy;
 }
@@ -164,7 +164,7 @@ export function folderDecision(
 }
 
 /** A Claude Code permission rule for everything under an absolute folder. */
-function rule(tool: 'Read' | 'Edit', folder: string): string {
+function rule(tool: 'Read' | 'Edit' | 'Write', folder: string): string {
   const p = resolve(folder).replace(/\\/g, '/');
   // Absolute paths are written with a leading `//` in permission rules.
   return `${tool}(/${p.startsWith('/') ? p : `/${p}`}/**)`;
