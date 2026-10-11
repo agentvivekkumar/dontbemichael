@@ -1313,6 +1313,7 @@
     "noHandoffs": "No handoffs yet. Only office notices so far.",
     "today": "Today",
     "yesterday": "Yesterday",
+    "undated": "Undated",
     "verb": {
       "request": "{{from}} asked {{to}}",
       "query": "{{from}} asked {{to}}",

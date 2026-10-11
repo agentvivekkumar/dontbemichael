@@ -1313,6 +1313,7 @@
     "noHandoffs": "还没有交接，目前只有办公室通知。",
     "today": "今天",
     "yesterday": "昨天",
+    "undated": "无日期",
     "verb": {
       "request": "{{from}} 请 {{to}} 帮忙",
       "query": "{{from}} 问 {{to}}",

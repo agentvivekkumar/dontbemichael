@@ -74,3 +74,18 @@ test('strings in every language, no dashes, no literal Michael', () => {
     }
   }
 });
+
+test('a conversation with no usable date gets an Undated heading, listed after the dated days', () => {
+  const v = messageView([
+    msg({ id: 'bad1', from: 'god', act: 'request', subject: 'Old note', conversation: 'u1', created_at: 'not a date' }),
+    msg({ id: 'ok', from: 'god', act: 'request', subject: 'Inbox summary', conversation: 'c1', created_at: at(15) }),
+    msg({ id: 'bad2', from: 'god', act: 'request', subject: 'Another', conversation: 'u2', created_at: '' })
+  ]);
+  assert.deepEqual(v.days.map((d) => d.day), [localDay(at(15)), ''], 'dated first, one shared undated section');
+  assert.equal(v.days[1].threads.length, 2);
+  for (const l of ['en', 'ar', 'zh-CN']) {
+    const j = JSON.parse(read(`src/renderer/src/i18n/locales/${l}.json`));
+    assert.ok(j.threads.undated, `${l} has threads.undated`);
+  }
+  assert.match(read('src/renderer/src/components/ThreadsPanel.tsx'), /if \(!day\) return t\('threads\.undated'\)/);
+});

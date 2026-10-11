@@ -68,6 +68,7 @@ export function ThreadsPanel({ agentId }: ThreadsPanelProps) {
     try { return new Date(iso).toLocaleTimeString(i18n.language, { hour: 'numeric', minute: '2-digit' }); } catch { return ''; }
   };
   const dayLabel = (day: string) => {
+    if (!day) return t('threads.undated');
     const today = localDay(new Date().toISOString());
     const yesterday = localDay(new Date(Date.now() - 86_400_000).toISOString());
     if (day === today) return t('threads.today');
