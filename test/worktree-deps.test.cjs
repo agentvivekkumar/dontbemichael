@@ -88,6 +88,7 @@ test('does not follow the dependency symlink when removing a worktree', async ()
   assert.deepEqual(await linkWorktreeDeps(repo, wtPath), { ok: true, skipped: false });
   const worktreeNodeModules = path.join(wtPath, 'node_modules');
   assert.equal(fs.lstatSync(worktreeNodeModules).isSymbolicLink(), true, 'symlink must exist before removal');
+  assert.deepEqual(await unlinkWorktreeDeps(repo, wtPath), { ok: true, removed: true });
   assert.deepEqual(await removeWorktree(repo, wtPath), { ok: true });
 
   assert.equal(fs.readFileSync(sentinel, 'utf8'), 'still here\n');

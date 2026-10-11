@@ -18,11 +18,13 @@ const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 test('a waiting card keeps its status and who it waits on through the parse', () => {
   const { parseTasks } = loadTs('src/renderer/src/components/hiveTasks.ts');
-  const [a, b, c] = parseTasks({ tasks: [
-    { id: 'k1', title: 'Salesforce setup', status: 'waiting', waitingOn: ' customer Gopi ', assignee: 'kelly' },
-    { id: 'o1', title: 'Summary', status: 'waiting' },
-    { id: 'x1', title: 'Odd', status: 'parked' }
-  ] });
+  const [a, b, c] = parseTasks({
+    tasks: [
+      { id: 'k1', title: 'Salesforce setup', status: 'waiting', waitingOn: ' customer Gopi ', assignee: 'kelly' },
+      { id: 'o1', title: 'Summary', status: 'waiting' },
+      { id: 'x1', title: 'Odd', status: 'parked' }
+    ]
+  });
   assert.equal(a.status, 'waiting');
   assert.equal(a.waitingOn, 'customer Gopi');
   assert.equal(b.status, 'waiting');
@@ -118,6 +120,29 @@ test('the renderer can patch a card only with Ask me answers; a move goes throug
   const handler = src.slice(src.indexOf("ipcMain.handle('hive:patchTask'"), src.indexOf("ipcMain.handle('hive:moveTask'"));
   assert.match(handler, /if \(Object\.keys\(patch\)\.some\(\(k\) => k !== 'humanQA'\)\) return \{ ok: false, error: 'only Ask me answers can be patched' \};/);
   assert.ok(handler.indexOf("k !== 'humanQA'") < handler.indexOf('hive.patchTask('), 'refused before anything is written');
-  const callers = require('node:child_process').execSync("grep -rn 'hivePatchTask(' src/renderer || true", { cwd: require('node:path').resolve(__dirname, '..') }).toString().trim().split('\n').filter(Boolean);
+
+  const root = path.resolve(__dirname, '..');
+  const callers = [];
+
+  function visit(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        visit(fullPath);
+      } else if (entry.isFile()) {
+        const lines = fs.readFileSync(fullPath, 'utf8').split(/\r?\n/);
+
+        lines.forEach((line, index) => {
+          if (line.includes('hivePatchTask(')) {
+            callers.push(`${path.relative(root, fullPath)}:${index + 1}:${line}`);
+          }
+        });
+      }
+    }
+  }
+
+  visit(path.join(root, 'src/renderer'));
+
   for (const c of callers) assert.match(c, /hivePatchTask\([^,]+, \{ humanQA: [^}]+\}\)/, c);
 });
