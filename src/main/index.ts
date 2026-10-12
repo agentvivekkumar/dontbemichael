@@ -340,7 +340,10 @@ const telemetry = new TelemetryCollector({
   // D11: scopes the transcript fallback to this agent's own session instead of
   // summing every transcript in a (routinely shared) cwd.
   resolveSessionId: (agentId) => hive.lastSession(agentId),
-  resolveCodexHome: (agentId) => hive.codexHome(agentId)
+  resolveCodexHome: (agentId) => hive.codexHome(agentId),
+  // Provider gate for the transcript fallback: its readers only understand
+  // the Claude Code and Codex transcript layouts.
+  resolveProvider: (agentId) => hive.registry().agents[agentId]?.provider
 });
 // Usage provider (Seam 1) — the INTEGRATION swap: Oscar's telemetry collector (#7)
 // IS the provider, replacing Lane A's interim StubUsageProvider. Same
