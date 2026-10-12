@@ -22,7 +22,7 @@ require.cache[electron] = {
   exports: { Notification: class { show() {} static isSupported() { return false; } } }
 };
 
-const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability, quickbooksAccessToSave } = loadTs('src/shared/quickbooks.ts');
+const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability, quickbooksAccessToSave, agentBooksReadDefault } = loadTs('src/shared/quickbooks.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 const { HookServer } = loadTs('src/main/hooks.ts');
 
@@ -232,4 +232,17 @@ test('quickbooks:setAccess checks the hive registry and writes nothing when it r
   assert.match(handler, /quickbooksAccessToSave\(agentId, cap, onTeam, \(opts as \{ hiring\?: unknown \} \| undefined\)\?\.hiring === true\)/);
   assert.ok(handler.indexOf('if (!quickbooks) return { ok: false };') < handler.indexOf('readConfig()'), 'refused before the config is read or written');
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'src', 'preload', 'index.ts'), 'utf8'), /ipcRenderer\.invoke\('quickbooks:setAccess', agentId, cap, opts\)/);
+});
+
+test('the QuickBooks role default follows the pack card, never the free-text title (PR #191 review)', () => {
+  // Value: protects=a hired bookkeeper gets QuickBooks on + Read only even though its id is a fresh generated one, while a custom role titled "Bookkeeper" and a renamed hire behave correctly; fails_when=the default is keyed on the job title or the agent id alone; why_new=review of PR #191: an access permission must not follow typed text; seam=booksReadRoleIds injected
+  const booksReadRoleIds = new Set(['oscar']);
+  assert.equal(agentBooksReadDefault('oscar', undefined, booksReadRoleIds), true, 'the setup team id keeps the default');
+  assert.equal(agentBooksReadDefault('oscar-lm3k9x', 'bakery/oscar', booksReadRoleIds), true, 'a hire from the books card with a generated id is on');
+  assert.equal(agentBooksReadDefault('bookkeeper-abc', undefined, booksReadRoleIds), false, 'a custom role titled "Bookkeeper" with no card stays off');
+  assert.equal(agentBooksReadDefault('oscar-lm3k9x', 'bakery/oscar', booksReadRoleIds), true, 'a renamed hire from the books card is still on');
+  assert.equal(agentBooksReadDefault('pam', 'bakery/pam', booksReadRoleIds), false, 'a hire from a non-books card is off');
+  assert.equal(agentBooksReadDefault('pam', 'oscar', booksReadRoleIds), false, 'a card id without a businessType prefix is not a sourceCard');
+  assert.equal(agentBooksReadDefault('', undefined, booksReadRoleIds), false);
+  assert.equal(agentBooksReadDefault('oscar-lm3k9x', '', booksReadRoleIds), false);
 });

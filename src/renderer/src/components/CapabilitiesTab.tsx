@@ -67,7 +67,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const [booksAnswer, setBooksAnswer] = useState<{ id: string; on: boolean } | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    void window.cth.quickbooksRoleDefaults().then((ids) => { if (alive) setBooksAnswer({ id: agent.id, on: ids.includes(agent.id) }); }).catch(() => {});
+    void window.cth.quickbooksRoleDefault(agent.id).then((on) => { if (alive) setBooksAnswer({ id: agent.id, on }); }).catch(() => {});
     return () => { alive = false; };
   }, [agent.id]);
   const booksDefault = booksAnswer?.id === agent.id ? booksAnswer.on : undefined;

@@ -371,6 +371,11 @@ export interface AgentMeta {
   provider?: AgentProvider;
   role?: string;
   capabilities?: string[];
+  /** The office pack card this agent's job was copied from when hired,
+   *  `<businessType>/<cardId>` (hire redesign E2). Drives the QuickBooks role
+   *  default (see `agentBooksReadDefault`): a hired bookkeeper's record keeps
+   *  its card, so renaming the role never loses the default. */
+  sourceCard?: string;
   cwd: string;
   isGod?: boolean;
   /** Michael's prep assistant — enriches prompts and forwards them to Michael.

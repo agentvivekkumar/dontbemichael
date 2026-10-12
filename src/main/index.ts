@@ -97,7 +97,7 @@ import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
-import { quickbooksAccessToSave } from '../shared/quickbooks';
+import { agentBooksReadDefault, quickbooksAccessToSave } from '../shared/quickbooks';
 import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
@@ -2165,34 +2165,15 @@ function booksReadRoleIds(): Set<string> {
   return ids;
 }
 
-/** Job titles (lowercased) of pack roles that read the books. Read once:
- *  the bundled packs don't change while the app runs. */
-let booksReadTitles: Set<string> | undefined;
-function booksReadRoleTitles(): Set<string> {
-  if (booksReadTitles) return booksReadTitles;
-  const titles = new Set<string>();
-  try {
-    for (const { pack } of loadBundledPacks({ packsDir }).packs) {
-      for (const role of pack.agents) {
-        if (levelFor(role, 'books.read') !== 'off') titles.add(role.role.trim().toLowerCase());
-      }
-    }
-  } catch (e) { console.error('[quickbooks] pack role titles:', e); }
-  booksReadTitles = titles;
-  return titles;
-}
-
-/** QuickBooks on + Read-only default, based on the agent's role — not the agent id.
- *  `booksReadRoleIds()` holds pack role *ids* (e.g. `oscar`), but a hired agent gets
- *  a fresh agent id, so a bookkeeper hired later never matched and started with
- *  QuickBooks off. Match the hire's job title against the pack roles instead. */
+/** QuickBooks on + Read-only default, based on the pack card the agent was
+ *  hired from — never the free-text job title. The card id at the end of the
+ *  agent's `sourceCard` (`<businessType>/<cardId>`, recorded at hire) is
+ *  matched against `booksReadRoleIds()`; the setup team matches by id. */
 function agentHasBooksRead(agentId: string): boolean {
-  // Back-compat: an agent whose id literally is a books role id (the original oscar).
-  if (booksReadRoleIds().has(agentId)) return true;
-  let title = '';
-  try { title = (hive.registry().agents[agentId]?.role ?? '').split(': ')[0].trim().toLowerCase(); }
+  let card: string | undefined;
+  try { card = hive.registry().agents[agentId]?.sourceCard; }
   catch { /* no hive yet */ }
-  return !!title && booksReadRoleTitles().has(title);
+  return agentBooksReadDefault(agentId, card, booksReadRoleIds());
 }
 
 /** The agent-facing `doc-text` CLI, built beside index.js (inside the asar when
@@ -4710,8 +4691,12 @@ ipcMain.handle('mail:setSendOnly', (_evt, agentId: unknown, grant: unknown) => {
   if (grant !== null && (!grant || typeof grant !== 'object')) return { ok: false, restartNeeded: false };
   return setSendOnly(mailAdmin, agentId, grant as { mailbox?: unknown; sending?: unknown } | null);
 });
-/** Roles that may use QuickBooks, Read only, before the owner chooses. */
-ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);
+/** One answer, in one place, for one agent: the QuickBooks on + Read only
+ *  default before the owner chooses. The Access tab and the Profile tab ask
+ *  through here instead of re-deriving it, so they always show what the hook
+ *  server and the spawn plan actually use (review of PR #191). */
+ipcMain.handle('quickbooks:roleDefault', (_evt, agentId: unknown) =>
+  typeof agentId === 'string' && agentHasBooksRead(agentId));
 /** Save one agent's QuickBooks capability. The hook reads it on the agent's
  *  next call, so nothing restarts. Only for a team member, or the new id of a
  *  hire in progress (issue 132); anything else writes nothing. */

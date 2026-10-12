@@ -93,6 +93,18 @@ export function quickbooksCapability(saved: QuickBooksCapability | undefined, ro
   return { enabled: roleReadsBooks, changes: false };
 }
 
+/** Whether an agent gets QuickBooks on + Read only by default, before the
+ *  owner chooses. True when the agent's own id is a books-reading pack role id
+ *  (the setup team), or the role id at the end of its `sourceCard`
+ *  ("<businessType>/<cardId>") is one. A free-text role title never grants
+ *  access: a custom role someone names "Bookkeeper" stays off, and renaming a
+ *  real bookkeeper keeps it on (owner, review of PR #191). */
+export function agentBooksReadDefault(agentId: string, sourceCard: string | undefined, booksReadRoleIds: Set<string>): boolean {
+  if (booksReadRoleIds.has(agentId)) return true;
+  const cardId = typeof sourceCard === 'string' ? sourceCard.split('/')[1] : undefined;
+  return !!cardId && booksReadRoleIds.has(cardId);
+}
+
 /** What `quickbooks:setAccess` saves for `agentId`, or null to refuse it
  *  (issue 132). An id must be on the team: one that is not (a typo, a member
  *  who was removed) would quietly apply to a later member who gets that id. A

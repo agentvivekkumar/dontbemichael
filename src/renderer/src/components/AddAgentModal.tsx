@@ -700,6 +700,10 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
         provider,
         cwd,
         role: description || undefined,
+        // The pack card this hire was copied from ("<businessType>/<cardId>"):
+        // main keeps it on the registry record so the QuickBooks role default
+        // follows the card, not the free-text title (review of PR #191).
+        sourceCard,
         // A hire manifest may carry validated capability tags (routing hints).
         capabilities: hireMeta?.capabilities
       }

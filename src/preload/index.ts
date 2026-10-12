@@ -990,8 +990,10 @@ const api = {
     ipcRenderer.on('connectors:restartNeeded', listener);
     return () => ipcRenderer.removeListener('connectors:restartNeeded', listener);
   },
-  /** Agents that may use QuickBooks, Read only, before the owner chooses (Oscar). */
-  quickbooksRoleDefaults: (): Promise<string[]> => ipcRenderer.invoke('quickbooks:roleDefaults'),
+  /** An agent's QuickBooks on + Read only default before the owner chooses:
+   *  one answer, in one place — the Access tab and the Profile tab show what
+   *  the hook server and the spawn plan actually use (review of PR #191). */
+  quickbooksRoleDefault: (agentId: string): Promise<boolean> => ipcRenderer.invoke('quickbooks:roleDefault', agentId),
   /** Save one agent's QuickBooks capability (through the owner's Claude account).
    *  Refused for an id not on the team, unless `hiring` says it is a new hire's. */
   quickbooksSetAccess: (agentId: string, cap: { enabled: boolean; changes: boolean }, opts?: { hiring?: boolean }): Promise<{ ok: boolean }> =>
