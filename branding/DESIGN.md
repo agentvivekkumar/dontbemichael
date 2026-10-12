@@ -1306,6 +1306,27 @@ installed for you if it's missing" and "Sign in with your Claude plan, or an Ant
 key"), and an `ink-3` line under them. No buttons: nothing in it can be clicked. One row at
 980 px and up; under that the text stacks beside the avatar.
 
+### 9.13 Task board (web)
+
+A home page section right after the refund story's Sending block (§9.11) and before the
+"Everything else" tiles: eyebrow "The board", heading "See every job, and who it's waiting
+on.", and a read only picture of the Tasks view (§7.20) in the story's cast. A `card-2`
+frame, `r-2xl`, `shadow-lg`, padding 18: the header ("Tasks" 18/24 600, count chips To do,
+Doing, Waiting, Blocked in `coral` soft, Done in `green` soft, a lock icon and "New work goes
+through Michael" in `t-meta` `ink-3`), then five columns in the app's order on a tinted
+`floor` ground, Blocked tinted `coral` soft, with 6 px square keys (`ink-4`, `blue`, `amber`,
+`coral`, `green`). Task cards as §7.20: mono id, title, assignee avatar and name. A Waiting
+card carries an `amber` soft "Waiting on {who}" chip, one on a customer and one on a
+teammate; the Blocked card is the story's refund (Northwind Cafe, Invoice #4471) with the
+18 px coral "?" and a `coral` soft "Waiting for you" chip; Done cards show a green check and
+the first line of Michael's result (`ink-2`, 11/15), then "N more". Under the frame, three
+plain notes keyed like the columns: Waiting says who it waits on, Blocked always waits on
+you, Done shows what came of it. The frame is one `role="img"` with a full text label;
+nothing in it can be clicked. Five columns at 980 px and up. Under that the board leads with
+what an owner checks first (owner, 2026-10-12): Blocked and Waiting side by side, Done across
+both columns with its cards two across, then To do and Doing as count rows without cards;
+under 480 px everything stacks in that order. The board never scrolls sideways.
+
 ---
 
 ## 10. Iconography [Both]
@@ -1506,6 +1527,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-10 | The owner's message to Michael flies as a paper plane in the owner's indigo, not an envelope; it lands at his office with the two rings (§8.8, §8.12). |
 | 2026-10-09 | Web, Windows first class: the platform switch drops the Beta tag (§9.8, §9.9 retired for web); the Windows note is a lead line plus bullets; the home page gets the Sending switch with the mail approval card (§9.11), the setup inset (§9.12) and six "Everything else" tiles (§9.5); the social card says "on your computer" (§9.7). |
 | 2026-10-10 | Panel tabs: the mouse wheel scrolls an overflowing tab row sideways, and an edge fades while tabs are hidden past it (§7.11). |
+| 2026-10-12 | Web: the home page's task board after the refund story, the Tasks view (§7.20) as a read only picture that leads with Blocked and Waiting on small screens (§9.13). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
