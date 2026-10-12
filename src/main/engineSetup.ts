@@ -10,7 +10,7 @@
  *
  * Electron free, so the decisions and the scripts are testable without an app.
  */
-import { providerPreset } from '../shared/agentProvider';
+import { credentialMethodForProvider, providerPreset, type AgentProvider } from '../shared/agentProvider';
 import { existsSync } from 'node:fs';
 import { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineSetupStatus } from '../shared/engineSetup';
 export { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineSetupStatus };
@@ -44,6 +44,80 @@ export function findClaudeFast(e: {
     }
   }
   return null;
+}
+
+/** Binary names a provider's engine resolves as, per platform (issue #237).
+ *  First entry is the canonical command; the rest are platform aliases. */
+export function engineBinaryNames(provider: AgentProvider, platform: string = process.platform): string[] {
+  const win = platform === 'win32';
+  switch (provider) {
+    case 'claude': return win ? ['claude.exe', 'claude.cmd'] : ['claude'];
+    case 'codex': return win ? ['codex.exe', 'codex.cmd'] : ['codex'];
+    case 'grok': return win ? ['grok.exe', 'grok.cmd'] : ['grok'];
+    case 'kimi': return win ? ['kimi.exe', 'kimi.cmd'] : ['kimi'];
+    case 'gemini': return win ? ['gemini.exe', 'gemini.cmd'] : ['gemini'];
+    case 'antigravity': return win ? ['agy.exe', 'agy.cmd'] : ['agy'];
+    case 'qwen': return win ? ['qwen.exe', 'qwen.cmd'] : ['qwen'];
+    case 'opencode': return win ? ['opencode.exe', 'opencode.cmd'] : ['opencode'];
+    case 'crush': return win ? ['crush.exe', 'crush.cmd'] : ['crush'];
+    case 'pi': return win ? ['pi.exe', 'pi.cmd'] : ['pi'];
+    case 'copilot': return win ? ['copilot.exe', 'copilot.cmd'] : ['copilot'];
+    case 'cursor': return win ? ['cursor-agent.exe', 'cursor-agent.cmd', 'agent.exe'] : ['cursor-agent', 'agent'];
+    default: return [];
+  }
+}
+
+/** Where any engine binary is, without launching a shell (issue #237). Same
+ *  strategy as findClaudeFast: the captured PATH plus the installers' known
+ *  folders. `exists` is injectable so tests run without a file system. */
+export function findEngineBinary(e: {
+  provider: AgentProvider;
+  platform: string;
+  pathEnv: string;
+  home: string;
+  appData?: string;
+  localAppData?: string;
+  exists?: (p: string) => boolean;
+}): string | null {
+  if (e.provider === 'claude') {
+    return findClaudeFast({ platform: e.platform, pathEnv: e.pathEnv, home: e.home, appData: e.appData, localAppData: e.localAppData, exists: e.exists });
+  }
+  const exists = e.exists ?? existsSync;
+  const win = e.platform === 'win32';
+  const sep = win ? '\\' : '/';
+  const names = engineBinaryNames(e.provider, e.platform);
+  if (!names.length) return null;
+  const dirs = e.pathEnv.split(win ? ';' : ':').filter(Boolean);
+  const known = win
+    ? [`${e.home}\\.local\\bin`, ...(e.localAppData ? [`${e.localAppData}\\Programs\\${e.provider}`] : []), ...(e.appData ? [`${e.appData}\\npm`] : [])]
+    : [`${e.home}/.local/bin`, '/opt/homebrew/bin', '/usr/local/bin', `${e.home}/.volta/bin`];
+  for (const dir of [...dirs, ...known]) {
+    for (const n of names) {
+      const p = dir.endsWith(sep) ? dir + n : dir + sep + n;
+      if (exists(p)) return p;
+    }
+  }
+  return null;
+}
+
+/** The install for any engine, run where the owner can watch it (issue #237).
+ *  Claude keeps its standalone installer (no Node, no password); other engines
+ *  run their trusted `nativeInstallCommand` when the vendor ships one, else
+ *  their npm `installCommand`. Trusted, hardcoded constants only. */
+export function engineInstallScript(provider: AgentProvider, platform: string = process.platform): string {
+  if (provider === 'claude') return claudeInstallScript(platform);
+  const preset = providerPreset(provider);
+  const native = preset.nativeInstallCommand;
+  const cmd = (platform === 'win32' ? native?.win32 : native?.posix) ?? preset.installCommand;
+  if (!cmd) {
+    return platform === 'win32'
+      ? `echo. & echo   Install ${preset.label} by hand, then press Try again. & echo.`
+      : `echo ''\necho '  Install ${preset.label} by hand, then press Try again.'\necho ''`;
+  }
+  if (platform === 'win32') {
+    return ['echo.', `echo   Installing ${preset.label}...`, 'echo.', cmd].join(' & ');
+  }
+  return [`echo ''`, `echo '  Installing ${preset.label}...'`, `echo ''`, cmd].join('\n');
 }
 
 /** `claude auth status --json`: `{ loggedIn, email, ... }`. null when it is not that. */
@@ -100,7 +174,14 @@ export function claudeMissingScript(platform: string = process.platform, godName
 }
 
 /** Where Claude stands, from what main can see (the engineSetup:status IPC).
- *  The facts come in as functions so this decision runs without Electron. */
+ *  The facts come in as functions so this decision runs without Electron.
+ *
+ *  The generic path (issue #237): pass `provider` for any engine. Claude keeps
+ *  its legacy shapes byte-identical (the Ready step and its tests pin them);
+ *  every other provider resolves its install from `enginePath` and its sign-in
+ *  from its preset `credentialMethod`: `none` is signed in once installed, an
+ *  `api-key` reads the secret store via `hasApiKey`, and `cli-login` /
+ *  `claude-account` run `authStatus` against the installed binary. */
 export async function readEngineSetupStatus(i: {
   /** Michael's engine is Claude (setup's pick, or the saved one). */
   isClaude: boolean;
@@ -114,7 +195,40 @@ export async function readEngineSetupStatus(i: {
   hasKey: () => boolean;
   /** `claude auth status --json`, parsed; null when unreadable. */
   authStatus: (path: string) => Promise<{ signedIn: boolean; email?: string } | null>;
+  /** Michael's engine (setup's pick, or the saved one). When present and not
+   *  Claude, the generic per-provider path below runs. */
+  provider?: AgentProvider;
+  /** Where that engine's binary resolves, or null when not installed. */
+  enginePath?: string | null;
+  /** The provider's API key (for `api-key` credentials) is in the secret store. */
+  hasApiKey?: () => boolean;
 }): Promise<EngineSetupStatus> {
+  // Generic per-provider path (issue #237). Claude never reaches it: the
+  // legacy shapes below stay pinned.
+  if (i.provider && i.provider !== 'claude') {
+    const provider = i.provider;
+    const method = credentialMethodForProvider(provider);
+    if (!method) return { applies: false, installed: true, signedIn: null, needed: false };
+    const enginePath = i.enginePath ?? null;
+    if (!enginePath) {
+      return { applies: true, provider, credentialKind: method.kind, installed: false, signedIn: false, needed: true };
+    }
+    if (method.kind === 'none') {
+      return { applies: true, provider, credentialKind: method.kind, installed: true, signedIn: true, needed: false };
+    }
+    if (method.kind === 'api-key') {
+      const has = (i.hasApiKey ?? i.hasKey)();
+      return { applies: true, provider, credentialKind: method.kind, installed: true, signedIn: has, needed: engineSetupNeeded(true, has) };
+    }
+    // 'cli-login' (and any future command-validated kind): the login state is
+    // whatever the engine's own status probe reports; unreadable never blocks.
+    const auth = await i.authStatus(enginePath);
+    const signedIn = auth ? auth.signedIn : null;
+    return {
+      applies: true, provider, credentialKind: method.kind, installed: true, signedIn,
+      ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn)
+    };
+  }
   if (!i.isClaude && !i.teamNeedsClaude) return { applies: false, installed: true, signedIn: null, needed: false };
   const team = !i.isClaude ? { forTeam: true } : {};
   if (!i.claudePath) return { applies: true, ...team, installed: false, signedIn: false, needed: true };

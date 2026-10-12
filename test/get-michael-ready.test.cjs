@@ -86,7 +86,7 @@ test('the rows follow what main reports and what the step started', () => {
 
 test('setup ends on the Ready step with Claude, and Open the office waits for it', () => {
   const w = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(w, /const withReady = isClaudeProvider\(godProvider\);/);
+  assert.match(w, /const withReady = engineSetupStepApplies\(godProvider\);/);
   assert.match(w, /const lastStep: Step = withReady \? 'ready' : 'permissions';/);
   assert.match(w, /: s === 'permissions' \? 'ready'/);
   assert.match(w, /\{step === 'ready' && <GetMichaelReady provider=\{godProvider\} onReadyChange=\{setEngineReady\} \/>\}/);

@@ -21,6 +21,7 @@ import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
 import { MAX_HOOK_FRAME_BYTES, validateHookEvent } from '../shared/hookEvents';
+import { isRateLimitFailure } from '../shared/agentProvider';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
 
@@ -392,11 +393,14 @@ export class HookServer {
       return {};
     }
 
-    // A turn that ended on an API error (issue 124). Claude Code ignores the
-    // answer; the usage limit starts the office break. Registered with the
-    // `rate_limit` matcher, and checked again here.
+    // A turn that ended on an API error (issue 124, generalized per provider
+    // in issue #237). The usage/plan limit starts the office break. Registered
+    // with the per-provider `rateLimitSignals` matchers (hive.hookSettings),
+    // and checked again here against every known signal, since the bridge does
+    // not know which provider a failed turn ran on: Claude's `rate_limit`,
+    // Codex's `rate_limit_exceeded`, Google's `RESOURCE_EXHAUSTED`.
     if (event === 'StopFailure') {
-      if (agentId && !subagent && p.error === 'rate_limit') this.plan({ kind: 'limit', agentId });
+      if (agentId && !subagent && isRateLimitFailure(p.error, p.message)) this.plan({ kind: 'limit', agentId });
       return {};
     }
     if (event === 'UserPromptSubmit' && agentId && !subagent) this.plan({ kind: 'prompt', agentId });

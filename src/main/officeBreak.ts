@@ -1,7 +1,10 @@
 /**
- * The office break (issue 124). On a smaller Claude plan the team reaches its
- * usage limit during the day. Claude Code says so with a StopFailure hook whose
- * `error` is `rate_limit`, and its status line carries when each limit window
+ * The office break (issue 124, per-provider signals in issue #237). On a
+ * smaller plan the team reaches its usage limit during the day. The engine
+ * says so with a StopFailure hook whose `error`/`message` matches its preset
+ * `rateLimitSignals` (Claude `rate_limit`, Codex `rate_limit_exceeded`,
+ * Google `RESOURCE_EXHAUSTED` — see `isRateLimitFailure`), and Claude's
+ * status line carries when each limit window
  * resets (`rate_limits.<window>.resets_at`, epoch seconds). This class turns
  * those signals into one office state:
  *

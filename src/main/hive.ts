@@ -1618,8 +1618,12 @@ export class HiveManager {
         // 'compacting' on the floor instead of looking frozen.
         PreCompact: [entry()],
         PostCompact: [entry()],
-        // A turn cut off by the usage limit starts the office break (issue 124).
-        StopFailure: [entry('rate_limit')]
+        // A turn cut off by the usage limit starts the office break (issue 124,
+        // generalized per provider in issue #237): Claude's `rate_limit`,
+        // Codex's `rate_limit_exceeded`, Google's `RESOURCE_EXHAUSTED`. One
+        // entry per signal — a bridge that never emits one simply never
+        // matches it.
+        StopFailure: [entry('rate_limit'), entry('rate_limit_exceeded'), entry('RESOURCE_EXHAUSTED'), entry('resource_exhausted')]
       }
     };
   }

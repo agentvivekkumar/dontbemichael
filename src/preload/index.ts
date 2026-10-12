@@ -1025,14 +1025,16 @@ const api = {
   /** Where Claude stands: installed, signed in. `provider` is setup's pick
    *  before it is saved; otherwise Michael's saved engine. */
   engineSetupStatus: (provider?: AgentProvider): Promise<EngineSetupStatus> => ipcRenderer.invoke('engineSetup:status', provider),
-  /** Run Claude's standalone installer in the `engine-setup-install` terminal. */
-  engineSetupInstall: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:install'),
-  /** Run `claude auth login` (opens the browser) in the `engine-setup-signin` terminal. */
-  engineSetupSignIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:signIn'),
-  /** Use an Anthropic API key instead of a Claude account: checked with
-   *  Anthropic, then kept write only in the secret store. Never read back. */
-  engineSetupUseApiKey: (key: string): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> =>
-    ipcRenderer.invoke('engineSetup:useApiKey', key),
+  /** Run the engine's installer in the `engine-setup-install` terminal. */
+  engineSetupInstall: (provider?: AgentProvider): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:install', provider),
+  /** Run the engine's login (`claude auth login`, or the provider's own login
+   *  command) in the `engine-setup-signin` terminal. */
+  engineSetupSignIn: (provider?: AgentProvider): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('engineSetup:signIn', provider),
+  /** Use an API key instead of an account login: Claude's is checked with
+   *  Anthropic; other engines' keys are shape-checked. Kept write only in the
+   *  secret store under `backend` (`anthropic` default). Never read back. */
+  engineSetupUseApiKey: (key: string, backend?: string): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> =>
+    ipcRenderer.invoke('engineSetup:useApiKey', key, backend),
   /** A setup terminal ended, or an agent could not start for want of Claude. */
   onEngineSetupChanged: (cb: (e: { id: string; exitCode: number | null }) => void): (() => void) => {
     const listener = (_e: IpcRendererEvent, info: { id: string; exitCode: number | null }): void => cb(info);

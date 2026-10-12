@@ -16,7 +16,7 @@ import { buildPtyEnv } from './ptyEnv';
 import { isSameOrInside } from './pathInside';
 import {
   apiKeyShapeOk, checkAnthropicKey, claudeInstallScript, claudeMissingScript, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
-  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
+  claudeAuthStatusCommand, engineInstallScript, findClaudeFast, findEngineBinary, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
 import { setHiddenClaudeAuthEnv } from './hiddenClaude';
@@ -114,9 +114,11 @@ import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
 import {
   argsWithAutoModeFlag,
+  credentialMethodForProvider,
   inferAgentProvider,
   isClaudeProvider,
   nonInteractiveEnvForProvider,
+  normalizeAgentProvider,
   providerPreset,
   installInfoForProvider,
   type AgentProvider
@@ -5468,15 +5470,34 @@ const claudeAuth = makeClaudeAuthReader((path, done) => {
 ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
   const cfg = readConfig();
   const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
-  const isClaude = isClaudeProvider(inferAgentProvider('claude', p));
+  const resolved = normalizeAgentProvider(p) ?? inferAgentProvider('claude', p);
+  const isClaude = isClaudeProvider(resolved);
   const teamNeedsClaude = [...claudeBlocked.values()].some((b) => !b.god);
+  // Per-provider credential validation (issue #237): a non-Claude pick resolves
+  // its own binary and secret-store key, so the step validates it before
+  // Michael spawns instead of failing with a 401 at runtime.
+  const credential = credentialMethodForProvider(resolved);
+  const apiBackend = credential?.kind === 'api-key' ? credential.backend : null;
+  const enginePath = !isClaude
+    ? findEngineBinary({
+        provider: resolved, platform: process.platform,
+        pathEnv: process.platform === 'win32' ? (process.env.PATH || '') : userShellPath(),
+        home: homedir(), appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA,
+        exists: existsSync
+      })
+    : null;
   const status = await readEngineSetupStatus({
     isClaude,
     teamNeedsClaude,
     claudePath: isClaude || teamNeedsClaude ? claudePathFast() : null,
     claudeAuth: cfg.claudeAuth,
     hasKey: () => integrations.hasSecret(providerKeyRef('anthropic')),
-    authStatus: (path) => claudeAuth.read(path)
+    authStatus: (path) => claudeAuth.read(path),
+    ...(isClaude ? {} : {
+      provider: resolved,
+      enginePath,
+      hasApiKey: apiBackend ? () => integrations.hasSecret(providerKeyRef(apiBackend)) : () => false
+    })
   });
   // Ready now: the terminals that could not start. Each leaves the list when it
   // actually starts on Claude (spawnAgentCore), so every reader sees the same.
@@ -5486,19 +5507,51 @@ ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<Eng
 // Start the install (or keep the one already running). The step watches the
 // terminal's exit and then reads the status again. On macOS and Linux it runs
 // under /bin/sh, not the owner's shell: the script is POSIX, and fish is not.
-ipcMain.handle('engineSetup:install', (e): { ok: boolean; error?: string } => {
-  if (!shouldStartInstall({ installRunning: ptyManager.list().some((x) => x.id === ENGINE_INSTALL_PTY), installed: !!claudePathFast() })) return { ok: true };
-  const script = claudeInstallScript(process.platform);
+ipcMain.handle('engineSetup:install', (e, provider?: unknown): { ok: boolean; error?: string } => {
+  const resolved = normalizeAgentProvider(provider) ?? 'claude';
+  // Claude keeps its pinned fast path; other engines resolve their own binary
+  // the same shell-free way (issue #237).
+  if (resolved === 'claude') {
+    if (!shouldStartInstall({ installRunning: ptyManager.list().some((x) => x.id === ENGINE_INSTALL_PTY), installed: !!claudePathFast() })) return { ok: true };
+  } else if (!shouldStartInstall({
+    installRunning: ptyManager.list().some((x) => x.id === ENGINE_INSTALL_PTY),
+    installed: !!findEngineBinary({
+      provider: resolved, platform: process.platform,
+      pathEnv: process.platform === 'win32' ? (process.env.PATH || '') : userShellPath(),
+      home: homedir(), appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA,
+      exists: existsSync
+    })
+  })) return { ok: true };
+  const script = engineInstallScript(resolved, process.platform);
   const res = process.platform === 'win32'
-    ? ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: 'claude', cols: 100, rows: 12, shellScript: script }, e.sender)
+    ? ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: resolved === 'claude' ? 'claude' : providerPreset(resolved).defaultCommand, cols: 100, rows: 12, shellScript: script }, e.sender)
     : ptyManager.spawn({ id: ENGINE_INSTALL_PTY, cwd: homedir(), command: '/bin/sh', args: ['-c', script], cols: 100, rows: 12 }, e.sender);
-  if (res.ok) analytics.track('agent_install_started', { provider: 'claude', rung: 'native' });
-  else analytics.track('agent_spawn_failed', { provider: 'claude', reason: spawnFailReason(res.error) });
+  if (res.ok) analytics.track('agent_install_started', { provider: resolved, rung: 'native' });
+  else analytics.track('agent_spawn_failed', { provider: resolved, reason: spawnFailReason(res.error) });
   return res;
 });
 // Sign in: `claude auth login` opens the browser. A fresh run each time, so
-// "Open the browser again" works after a closed tab.
-ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
+// "Open the browser again" works after a closed tab. Other engines run their
+// own login command (`credentialMethod.command`); api-key engines have no
+// terminal sign-in — the key form in the step stores the key instead.
+ipcMain.handle('engineSetup:signIn', (e, provider?: unknown): { ok: boolean; error?: string } => {
+  const resolved = normalizeAgentProvider(provider) ?? 'claude';
+  if (resolved !== 'claude') {
+    const credential = credentialMethodForProvider(resolved);
+    if (!credential || credential.kind !== 'cli-login') return { ok: false, error: 'api-key' };
+    const bin = findEngineBinary({
+      provider: resolved, platform: process.platform,
+      pathEnv: process.platform === 'win32' ? (process.env.PATH || '') : userShellPath(),
+      home: homedir(), appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA,
+      exists: existsSync
+    });
+    if (!bin) return { ok: false, error: 'not installed' };
+    if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
+    const parts = credential.command.trim().split(/\s+/);
+    const [head, ...rest] = parts;
+    const command = head === providerPreset(resolved).defaultCommand ? bin : head;
+    return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command, args: rest, cols: 100, rows: 12 }, e.sender);
+  }
   const claude = claudePathFast();
   if (!claude) return { ok: false, error: 'not installed' };
   // Signing in with an account means the team uses it, not a key.
@@ -5506,24 +5559,32 @@ ipcMain.handle('engineSetup:signIn', (e): { ok: boolean; error?: string } => {
   if (ptyManager.list().some((x) => x.id === ENGINE_SIGNIN_PTY)) ptyManager.kill(ENGINE_SIGNIN_PTY);
   return ptyManager.spawn({ id: ENGINE_SIGNIN_PTY, cwd: homedir(), command: claude, args: ['auth', 'login'], cols: 100, rows: 12 }, e.sender);
 });
-// Use an Anthropic API key instead of a Claude account. The key is checked with
-// Anthropic first, so a typo never becomes a team that cannot start; then kept
-// write only in the secret store (the same Anthropic key as Settings, AI
-// engines) and approved for Claude Code. It never comes back over IPC.
-ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> => {
+// Use an API key instead of an account login. Claude's key is checked with
+// Anthropic first, so a typo never becomes a team that cannot start; other
+// engines' keys are shape-checked and kept write only in the secret store
+// under their own backend (no remote check: only Anthropic's probe exists).
+// The key never comes back over IPC.
+ipcMain.handle('engineSetup:useApiKey', async (_e, raw: unknown, backend?: unknown): Promise<{ ok: boolean; error?: 'invalid' | 'rejected' | 'refused' | 'workspace' | 'busy' | 'unreachable' | 'store'; reason?: string }> => {
   const key = typeof raw === 'string' ? raw.trim() : '';
   if (!apiKeyShapeOk(key)) return { ok: false, error: 'invalid' };
-  // Electron's fetch follows the system proxy, so the check works wherever Claude does.
-  const { verdict, reason } = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
-  if (verdict !== 'ok') return { ok: false, error: verdict, ...(reason ? { reason } : {}) };
-  // Approved in ~/.claude.json first: a key Claude would stop to ask about is
-  // never saved as ready (fail closed; the owner can try again).
-  let approved = false;
-  try { approved = approveClaudeApiKey(key); } catch { approved = false; }
-  if (!approved) return { ok: false, error: 'store' };
-  const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
+  const which = typeof backend === 'string' && backend ? backend : 'anthropic';
+  if (which === 'anthropic') {
+    // Electron's fetch follows the system proxy, so the check works wherever Claude does.
+    const { verdict, reason } = await checkAnthropicKey(key, net.fetch as unknown as KeyCheckFetch);
+    if (verdict !== 'ok') return { ok: false, error: verdict, ...(reason ? { reason } : {}) };
+    // Approved in ~/.claude.json first: a key Claude would stop to ask about is
+    // never saved as ready (fail closed; the owner can try again).
+    let approved = false;
+    try { approved = approveClaudeApiKey(key); } catch { approved = false; }
+    if (!approved) return { ok: false, error: 'store' };
+    const saved = integrations.setSecret(providerKeyRef('anthropic'), key);
+    if (!saved.ok) return { ok: false, error: 'store' };
+    writeConfig({ claudeAuth: 'apiKey' });
+    try { liveWebContents()?.send('engineSetup:changed', { id: 'api-key', exitCode: null }); } catch { /* window gone */ }
+    return { ok: true };
+  }
+  const saved = integrations.setSecret(providerKeyRef(which), key);
   if (!saved.ok) return { ok: false, error: 'store' };
-  writeConfig({ claudeAuth: 'apiKey' });
   try { liveWebContents()?.send('engineSetup:changed', { id: 'api-key', exitCode: null }); } catch { /* window gone */ }
   return { ok: true };
 });

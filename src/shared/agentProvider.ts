@@ -59,11 +59,37 @@ export type BridgeDescriptor =
       inboxDelivery: 'terminal' | 'serve';
     };
 
+/** How the owner proves to an engine that the office may run on it (issue
+ *  #237). One entry per preset, declared alongside `installCommand` so the
+ *  onboarding wizard can validate credentials BEFORE Michael spawns instead
+ *  of surfacing a 401 inside a terminal the owner was told is autonomous:
+ *   - 'claude-account' → `claude auth login` (browser OAuth)
+ *   - 'api-key'        → a key kept write-only in the secret store, read main
+ *                        only at spawn (`envVar`, e.g. OPENAI_API_KEY; `backend`
+ *                        is the `apikey:<backend>` secret-store namespace)
+ *   - 'cli-login'      → a login command run visibly (`command`, e.g.
+ *                        `gcloud auth login`)
+ *   - 'none'           → local / owner-keyed models with nothing to validate. */
+export type EngineCredentialMethod =
+  | { kind: 'claude-account' }
+  | { kind: 'api-key'; envVar: string; label: string; backend: string }
+  | { kind: 'cli-login'; command: string; label: string }
+  | { kind: 'none'; label: string };
+
 export interface AgentProviderPreset {
   id: AgentProvider;
   label: string;
   /** The binary spawned when the user hasn't typed a custom command. */
   defaultCommand: string;
+  /** What "signed in" means for this engine (see EngineCredentialMethod).
+   *  Absent = unknown: the setup step validates only the install. */
+  credentialMethod?: EngineCredentialMethod;
+  /** Substrings (case-insensitive) matched against a failed turn's `error` +
+   *  `message` to recognize this provider's plan/quota exhaustion (issue #237:
+   *  OpenAI's `rate_limit_exceeded`, Google's `RESOURCE_EXHAUSTED`, …). The
+   *  office break dispatches on the preset instead of hard-coding Claude's
+   *  `rate_limit`. */
+  rateLimitSignals?: string[];
   /** Slash / CLI command reference for this provider. */
   commandGroups: CmdGroup[];
   /** Environment variable to set for non-interactive / first-run suppression. */
@@ -202,6 +228,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // Claude Code 2.1.280+; an older CLI runs Opus 5 instead (modelCliFloor.ts).
     recommendedOrchestratorModel: 'claude-opus-5-5',
     resumeFlag: '--resume',
+    credentialMethod: { kind: 'claude-account' },
+    rateLimitSignals: ['rate_limit'],
     // Official Claude Code install (npm global). Used by the missing-CLI auto-install.
     installCommand: 'npm install -g @anthropic-ai/claude-code',
     // Anthropic's official native installer — a standalone binary, no node/npm.
@@ -259,6 +287,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // used to silently start a brand-new session instead of continuing.
     resumeFlag: undefined,
     resumeSubcommand: 'resume',
+    credentialMethod: { kind: 'api-key', envVar: 'OPENAI_API_KEY', label: 'OpenAI API key', backend: 'openai' },
+    rateLimitSignals: ['rate_limit_exceeded', 'rate_limit'],
     // Official OpenAI Codex CLI install (npm global). Used by the missing-CLI auto-install.
     installCommand: 'npm install -g @openai/codex',
     docsUrl: 'https://github.com/openai/codex'
@@ -282,7 +312,9 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // `grok [PROMPT]` accepts the initial hive protocol as a positional prompt.
     positionalInitialPrompt: true,
     // Grok resumes interactively with `grok --resume <session-id-or-title>`.
-    resumeFlag: '--resume'
+    resumeFlag: '--resume',
+    credentialMethod: { kind: 'api-key', envVar: 'XAI_API_KEY', label: 'xAI API key', backend: 'xai' },
+    rateLimitSignals: ['rate_limit']
   },
   {
     id: 'kimi',
@@ -299,7 +331,9 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // Kimi's interactive TUI has no positional initial-prompt form. It supports
     // lifecycle hooks, but Munder Difflin does not yet install a Kimi hook bridge,
     // so mail must bounce rather than being delivered with no drain path.
-    canReceiveInbox: false
+    canReceiveInbox: false,
+    credentialMethod: { kind: 'api-key', envVar: 'KIMI_API_KEY', label: 'Moonshot API key', backend: 'moonshot' },
+    rateLimitSignals: ['rate_limit']
   },
   {
     // Google's official Gemini CLI. Unlike Antigravity (`agy`), this is the
@@ -321,6 +355,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     initialPromptFlag: '-i',
     recommendedOrchestratorModel: 'pro',
     resumeFlag: '--resume',
+    credentialMethod: { kind: 'api-key', envVar: 'GEMINI_API_KEY', label: 'Google API key', backend: 'google' },
+    rateLimitSignals: ['resource_exhausted', 'rate_limit'],
     installCommand: 'npm install -g @google/gemini-cli',
     docsUrl: 'https://github.com/google-gemini/gemini-cli'
   },
@@ -338,7 +374,9 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     canReceiveInbox: true, // via the agy-hook bridge (Stop→drain); verified agy honors hook decisions
     initialPromptFlag: '-i', // agy --prompt-interactive: orient the session, then continue
     recommendedOrchestratorModel: 'Gemini 3.1 Pro (High)', // agy takes the display-name label
-    resumeFlag: '--conversation' // agy: resume a previous conversation by ID
+    resumeFlag: '--conversation', // agy: resume a previous conversation by ID
+    credentialMethod: { kind: 'cli-login', command: 'agy login', label: 'Antigravity login' },
+    rateLimitSignals: ['resource_exhausted', 'rate_limit']
   },
   {
     // qwen-code — the Qwen CLI (a gemini-cli fork) driving any OpenAI-compatible
@@ -362,7 +400,9 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     initialPromptFlag: '-i',
     // Qwen's long-context coder model for the orchestrator. // TODO-verify
     recommendedOrchestratorModel: 'qwen3-coder-plus',
-    resumeFlag: undefined
+    resumeFlag: undefined,
+    credentialMethod: { kind: 'none', label: 'No sign-in' },
+    rateLimitSignals: ['rate_limit']
   },
   {
     // OpenCode — the TypeScript AI coding agent (opencode.ai / anomalyco/opencode,
@@ -413,6 +453,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // Capturing the TUI session id for resume is unverified; spawn fresh on respawn
     // (protocol re-injected as the initial prompt), matching codex.
     resumeFlag: undefined,
+    credentialMethod: { kind: 'none', label: 'No sign-in' },
+    rateLimitSignals: ['rate_limit'],
     installCommand: 'npm install -g opencode-ai@latest', // trusted, hardcoded
     // Node-free installers, for the rung that runs when npm is absent AND no Node
     // installer could be resolved (offline / unsupported platform) — until now
@@ -475,6 +517,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     initialPromptFlag: undefined,
     seedDelivery: 'type-into-tui',
     resumeFlag: '--session', // Crush supports resume by id (also --continue for most-recent)
+    credentialMethod: { kind: 'none', label: 'No sign-in' },
+    rateLimitSignals: ['rate_limit'],
     installCommand: 'npm install -g @charmland/crush', // trusted, hardcoded (brew/go/winget also valid)
     docsUrl: 'https://github.com/charmbracelet/crush'
   },
@@ -510,6 +554,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     canReceiveInbox: true,
     initialPromptFlag: undefined, // positional, like codex: pi "<prompt>"
     resumeFlag: '--session',
+    credentialMethod: { kind: 'none', label: 'No sign-in' },
+    rateLimitSignals: ['rate_limit'],
     // --ignore-scripts: don't run the package's postinstall on the user's machine.
     installCommand: 'npm install -g --ignore-scripts @earendil-works/pi-coding-agent',
     docsUrl: 'https://pi.dev/docs/latest'
@@ -541,6 +587,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // Print mode exits per turn and there is no hook bridge to drain on idle, so a
     // copilot worker can't receive routed inbox mail (it bounces to the god).
     canReceiveInbox: false,
+    credentialMethod: { kind: 'cli-login', command: 'copilot login', label: 'GitHub Copilot login' },
+    rateLimitSignals: ['rate_limit'],
     installCommand: 'npm install -g @github/copilot', // trusted, hardcoded
     docsUrl: 'https://docs.github.com/copilot/concepts/agents/about-copilot-cli'
   },
@@ -575,6 +623,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     seedDelivery: 'type-into-tui',
     recommendedOrchestratorModel: 'gpt-5.6-luna-high',
     resumeFlag: '--resume',
+    credentialMethod: { kind: 'cli-login', command: 'cursor-agent login', label: 'Cursor login' },
+    rateLimitSignals: ['rate_limit'],
     // Official install is a curl|bash script (not npm). Prefer the native rung so
     // a node-free machine can still self-heal. Trusted hardcoded constants only.
     nativeInstallCommand: {
@@ -592,7 +642,9 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     supportsModel: false,
     autoFlag: '',
     hiveAware: false,
-    canReceiveInbox: false // no inbox-drain path → mail bounces to the god
+    canReceiveInbox: false, // no inbox-drain path → mail bounces to the god
+    credentialMethod: { kind: 'none', label: 'No sign-in' },
+    rateLimitSignals: ['rate_limit']
   }
 ];
 
@@ -738,6 +790,57 @@ export interface ProviderInstallInfo {
   nativeCommand?: string;
   label: string;
   docsUrl?: string;
+}
+
+/** The credential contract for an engine (issue #237). Unknown ids degrade to
+ *  undefined: the setup step then validates the install only. */
+export function credentialMethodForProvider(provider: AgentProvider | undefined): EngineCredentialMethod | undefined {
+  if (!provider) return undefined;
+  return providerPreset(provider).credentialMethod;
+}
+
+/** Whether this engine needs a sign-in row in Get Michael ready: anything but
+ *  'none'. Local / owner-keyed models install and start with no validation. */
+export function engineNeedsSignIn(provider: AgentProvider | undefined): boolean {
+  const method = credentialMethodForProvider(provider);
+  if (!method) return provider === 'claude';
+  return method.kind !== 'none';
+}
+
+/** The rate-limit substrings for one provider (lowercase, de-duplicated). */
+export function rateLimitSignalsForProvider(provider: AgentProvider | undefined): string[] {
+  const signals = providerPreset(provider ?? 'claude').rateLimitSignals ?? ['rate_limit'];
+  return Array.from(new Set(signals.map((s) => s.toLowerCase())));
+}
+
+/** Every rate-limit signal any preset declares, for bridges that do not know
+ *  which provider a failed turn ran on. */
+export function allRateLimitSignals(): string[] {
+  const out = new Set<string>();
+  for (const p of AGENT_PROVIDER_PRESETS) {
+    for (const s of p.rateLimitSignals ?? []) out.add(s.toLowerCase());
+  }
+  if (!out.size) out.add('rate_limit');
+  return [...out];
+}
+
+/** True when a failed turn's `error`/`message` reads as plan/quota exhaustion
+ *  on the given provider (or on any known provider when omitted). Pure string
+ *  matching: hook payloads carry the vendor's code as text (`rate_limit`,
+ *  `rate_limit_exceeded`, `RESOURCE_EXHAUSTED`), never a typed object. */
+export function isRateLimitFailure(
+  error: unknown,
+  message?: unknown,
+  provider?: AgentProvider
+): boolean {
+  // Bridges carry the vendor's code as text; some put prose in `message`
+  // ("Rate limit reached") while the signal reads `rate_limit`. Spaces and
+  // hyphens count as underscores so both spellings match.
+  const hay = `${typeof error === 'string' ? error : ''} ${typeof message === 'string' ? message : ''}`
+    .toLowerCase().replace(/[\s-]+/g, '_');
+  if (!hay.replace(/_/g, '').trim()) return false;
+  const signals = provider ? rateLimitSignalsForProvider(provider) : allRateLimitSignals();
+  return signals.some((s) => s && hay.includes(s));
 }
 
 export function installInfoForProvider(

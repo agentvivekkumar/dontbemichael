@@ -12,7 +12,8 @@ import { InfoTip } from './InfoTip';
 import { SpritePortrait } from './SpritePortrait';
 import { ProviderLogo } from './ProviderLogo';
 import { modelsForProvider, onboardingEngineChoices, teamDefaultsFromMichael, type AgentProvider, type HarnessConfig } from '@/store/config';
-import { isClaudeProvider, providerPreset } from '@shared/agentProvider';
+import { providerPreset } from '@shared/agentProvider';
+import { engineSetupStepApplies } from '@shared/engineSetup';
 import { GetMichaelReady, GetMichaelReadyInfo } from './GetMichaelReady';
 import {
   classifyEngineAvailability, engineAvailabilityBadge, engineAvailabilityMessage, engineBlocksOnboarding
@@ -321,10 +322,13 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   useEffect(() => { void probeEngines(); }, []);
   const selectedEngine = classifyEngineAvailability(engines, godProvider);
   const engineBlocked = engineBlocksOnboarding(selectedEngine);
-  // Get Michael ready (docs/designs/get-michael-ready.md): with Claude, setup
-  // ends on a Ready step that installs it and signs the owner in, where they
-  // can see it. Open the office waits for it; Set up later does not.
-  const withReady = isClaudeProvider(godProvider);
+  // Get Michael ready (docs/designs/get-michael-ready.md, per-provider in
+  // issue #237): setup ends on a Ready step that installs the picked engine
+  // and validates its credentials where the owner can see it. The step adapts
+  // its rows to the engine's credentialMethod (account, API key, login
+  // command, or install-only). Open the office waits for it; Set up later
+  // does not.
+  const withReady = engineSetupStepApplies(godProvider);
   const lastStep: Step = withReady ? 'ready' : 'permissions';
   const [engineReady, setEngineReady] = useState(false);
 
