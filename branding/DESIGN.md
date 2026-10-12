@@ -1330,21 +1330,24 @@ under 480 px everything stacks in that order. The board never scrolls sideways.
 ### 9.14 File tabs (web)
 
 A home page section right after the task board (§9.13) and before the "Everything else"
-tiles: eyebrow "Files", heading "Open the file he means, right in the office.", and a read
-only picture of a file tab (§7.2) opened from a file chip on an Ask me card (§7.8). Same
+tiles: eyebrow "Files", heading "Read the file he means, beside his question.", a lead that
+names only what opens in a tab (CSV files, notes, text and pictures; never "spreadsheets" or
+"in the office", owner CEO D8) and sets the picture later that morning, after the board's
+9:15, and a read only picture of a file tab (§7.2) opened from a file chip on an Ask me card (§7.8). Same
 frame as §9.13 (`card-2`, `r-2xl`, `shadow-lg`). The top bar as §7.2: Office, Tasks, Who
 talks to whom, the `line-2` hairline, then two file tabs (a Markdown note, and a CSV that is
 selected, `ink` fill, its name whole), and the coral Needs you pill showing 1. Under it, the
 file view (§7.2: name, "Oscar / Payments" in `ink-3`, Open in app and Show in Finder) with
 the CSV as a table: Date, From, Invoice and Amount, amounts right aligned in mono, eight
-September payments in the story's customers whose last row has no invoice. Beside it, the
+September payments, none named like the demo office (Harbor & Pine), whose last row has no
+invoice. Beside it, the
 right column's Ask me card from Oscar asks whether that payment is the renewal deposit; the
 question names the file as a chip (`sheet` icon, the name without extension, "Open"), an
 answer is being typed, and it holds up 2 tasks. Under the frame, three plain notes: named
 files are buttons; read it beside the question; up to five at once, with PDF and Office files
 opening in their own app. The frame is one `role="img"` with a full text label; nothing in it
 can be clicked. File view and card side by side at 980 px and up; under that the card comes
-first, then the file, and the tab bar drops Who talks to whom and the Markdown tab, then the
+first (no wider than the app's 520 px right column), then the file, and the tab bar drops Who talks to whom and the Markdown tab, then the
 Needs you pill under 600 px and Tasks under 480 px, so the selected file tab keeps its whole
 name. Under 400 px the table steps down to 11 / 16. The section never scrolls sideways.
 
