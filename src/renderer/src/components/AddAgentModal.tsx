@@ -373,7 +373,14 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     const base = safeFolder(chosenJob?.folder ?? (title.trim() === newJobStart(character).title ? newJobStart(character).folder : undefined) ?? title) || safeFolder(name);
     const n = name.trim();
     const candidates = [base, `${base}_${n}`, ...Array.from({ length: 8 }, (_, i) => `${base}_${n}_${i + 2}`)];
-    const onDisk = await window.cth.foldersExist(michaelFolder, candidates).catch(() => ({} as Record<string, boolean>));
+    let onDisk: Record<string, boolean>;
+    try {
+      onDisk = await window.cth.foldersExist(michaelFolder, candidates);
+    } catch {
+      setFolderName('');
+      setError(tr('addAgent.errFolder'));
+      return;
+    }
     const used = new Set(team.map((a) => basename(a.cwd ?? '').toLowerCase()));
     setFolderName(hireFolderName(base, n, (f) => !!onDisk[f] || used.has(f.toLowerCase())));
   };

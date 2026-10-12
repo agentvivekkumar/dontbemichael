@@ -30,8 +30,10 @@ test('the hire wizard asks for Role, what to send and Work style, stored as Role
 test('a new team member gets its own folder inside Michael\'s, suffixed with its name on a clash', () => {
   assert.match(modal, /const michaelFolder = config\.businessFolder;/);
   assert.match(modal, /window\.cth\.foldersExist\(michaelFolder, candidates\)/);
-  assert.match(modal, /setFolderName\(hireFolderName\(base, n, \(f\) => !!onDisk\[f\] \|\| used\.has\(f\.toLowerCase\(\)\)\)\)/, 'on disk or used by a teammate');
-  assert.match(modal, /if \(michaelFolder && !customCwd\) \{\s*const \[made\] = await window\.cth\.foldersEnsure\(\[cwd\]\)/, 'made on hire, never overwritten');
+  assert.match(modal, /let onDisk: Record<string, boolean>/);
+  assert.match(modal, /setFolderName\(''\);\s*setError\(tr\('addAgent\.errFolder'\)\);\s*return;/,'a failed folder check clears the suggestion and reports an error');
+  assert.match(modal, /setFolderName\(hireFolderName\(base, n, \(f\) => !!onDisk\[f\] \|\| used\.has\(f\.toLowerCase\(\)\)\)\)/,'on disk or used by a teammate');
+  assert.match(modal,/if \(michaelFolder && !customCwd\) \{\s*const \[made\] = await window\.cth\.foldersEnsure\(\[cwd\]\)/, 'made on hire, never overwritten');
 });
 
 test('Michael\'s folder is never a team member\'s own folder', () => {
