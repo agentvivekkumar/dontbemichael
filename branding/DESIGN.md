@@ -1336,7 +1336,8 @@ names only what opens in a tab (CSV files, notes, text and pictures; never "spre
 9:15, and a read only picture of a file tab (§7.2) opened from a file chip on an Ask me card (§7.8). Same
 frame as §9.13 (`card-2`, `r-2xl`, `shadow-lg`). The top bar as §7.2: Office, Tasks, Who
 talks to whom, the `line-2` hairline, then two file tabs (a Markdown note, and a CSV that is
-selected, `ink` fill, its name whole), and the coral Needs you pill showing 1. Under it, the
+selected, `ink` fill, its name whole), each named as the app names it, without folder or
+extension (the same name as its chip), and the coral Needs you pill showing 1. Under it, the
 file view (§7.2: name, "Oscar / Payments" in `ink-3`, Open in app and Show in Finder) with
 the CSV as a table: Date, From, Invoice and Amount, amounts right aligned in mono, eight
 September payments, none named like the demo office (Harbor & Pine), whose last row has no
