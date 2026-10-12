@@ -1170,7 +1170,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   </Row>
                 </div>
                 <div style={{ flex: '0 0 auto' }}>
-                  <Row label={tr('addAgent.model')} info={tr('addAgent.wizard.modelPurpose', { name: name.trim() })}>
+                  <Row label={tr('addAgent.model')} info={tr('addAgent.wizard.modelPurpose', { name: name.trim() })} align="end">
                     <Select
                       label={tr('addAgent.model')}
                       value={model ?? ''}
@@ -1478,12 +1478,12 @@ const inputStyle: React.CSSProperties = {
 
 /** A field with its label; `info` puts the explanation behind an info icon
  *  beside the label instead of text on the screen (owner, 2026-09-27). */
-function Row({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
+function Row({ label, info, align, children }: { label: string; info?: string; align?: 'start' | 'end'; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--cth-ink-2)' }}>{label}</span>
-        {info && <InfoTip text={info} label={label} />}
+        {info && <InfoTip text={info} label={label} align={align} />}
       </span>
       {children}
     </label>
