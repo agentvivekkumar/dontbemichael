@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState ,type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
@@ -53,6 +53,23 @@ function TalkToMichael() {
   const [sendFailed, setSendFailed] = useState(false);
   // A notification click opens the dock at its question (12A).
   useEffect(() => window.cth.onOwnerOpenDock?.((id) => setDock(true, id)), [setDock]);
+
+  // Escape key se chat popup close karne ka logic
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      // Agar escape key dabayi gayi aur dock(chat) khula hai
+      if (event.key === 'Escape') {
+        // Chat popup ko close kar do
+        setDock(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [setDock]);
 
   const add = (incoming: Attachment[]) => setAttachments((prev) => {
     const seen = new Set(prev.map((a) => a.path));
