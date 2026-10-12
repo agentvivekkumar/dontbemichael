@@ -9,8 +9,14 @@ export function isEngineSetupPty(id: string): boolean {
   return id === ENGINE_INSTALL_PTY || id === ENGINE_SIGNIN_PTY;
 }
 
+export type EngineCredentialMethod =
+  | { kind: 'claude-account' }
+  | { kind: 'api-key' }
+  | { kind: 'cli-login' }
+  | { kind: 'none' };
+
 export interface EngineSetupStatus {
-  /** False for an engine this step does not set up (anything but Claude). */
+  /** False for an engine with no credential setup method. */
   applies: boolean;
   /** Michael runs on another engine, but a team member on Claude could not
    *  start for want of it: the card speaks about the team, not Michael. */
@@ -19,8 +25,7 @@ export interface EngineSetupStatus {
   /** null: installed, but the sign in state could not be read. Never blocks. */
   signedIn: boolean | null;
   email?: string;
-  /** How Claude signs in: the owner's Claude account or an Anthropic API key. */
-  method?: 'account' | 'apiKey';
+  credentialMethod?: EngineCredentialMethod;
   /** Michael cannot start until this is done. */
   needed: boolean;
   /** Once ready: the terminals that could not start for want of Claude and

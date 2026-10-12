@@ -220,7 +220,7 @@ export function GetMichaelReady({ provider, onReadyChange }: {
           </div>
         </Row>
       );
-      default: return status?.method === 'apiKey' ? (
+      default: return status?.credentialMethod?.kind === 'api-key' ? (
         <Row icon="check" tone="ok" label={t('engineSetup.apiKey')} status={t('engineSetup.usingApiKey')} />
       ) : (
         <Row icon="check" tone="ok" label={t('engineSetup.account')}

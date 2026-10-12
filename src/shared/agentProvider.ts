@@ -13,6 +13,7 @@
  * the existing `codex` preset.
  */
 import type { CmdGroup } from './claudeCommands';
+import type { EngineCredentialMethod } from './engineSetup';
 import { COMMAND_GROUPS as CLAUDE_COMMAND_GROUPS } from './claudeCommands';
 import { CODEX_COMMAND_GROUPS } from './codexCommands';
 import { GROK_COMMAND_GROUPS } from './grokCommands';
@@ -64,6 +65,10 @@ export interface AgentProviderPreset {
   label: string;
   /** The binary spawned when the user hasn't typed a custom command. */
   defaultCommand: string;
+  /** How this engine establishes the owner's credentials. */
+  credentialMethod?: EngineCredentialMethod;
+  /** Provider-specific error token emitted when a request hits its rate limit. */
+  rateLimitSignal?: string;
   /** Slash / CLI command reference for this provider. */
   commandGroups: CmdGroup[];
   /** Environment variable to set for non-interactive / first-run suppression. */
@@ -189,6 +194,7 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     id: 'claude',
     label: 'Claude Code',
     defaultCommand: 'claude',
+    rateLimitSignal: 'rate_limit',
     commandGroups: CLAUDE_COMMAND_GROUPS,
     autoModeFlag: '--permission-mode bypassPermissions',
     supportsModel: true,
@@ -216,6 +222,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     id: 'codex',
     label: 'Codex · GPT',
     defaultCommand: 'codex',
+    credentialMethod: { kind: 'cli-login' },
+    rateLimitSignal: 'rate_limit_exceeded',
     commandGroups: CODEX_COMMAND_GROUPS,
     // Auto mode: never prompt (-a never) but KEEP codex's OS sandbox, scoped to the
     // workspace (-s workspace-write). The app used to spawn with
@@ -308,6 +316,8 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     id: 'gemini',
     label: 'Gemini CLI',
     defaultCommand: 'gemini',
+    credentialMethod: { kind: 'cli-login' },
+    rateLimitSignal: 'RESOURCE_EXHAUSTED',
     commandGroups: [],
     // `--yolo` is deprecated upstream; approval-mode is the current spelling.
     autoModeFlag: '--approval-mode=yolo',

@@ -24,7 +24,7 @@ require.cache[electron] = {
 };
 
 const { OfficeBreak, resetFromRateLimits, RESET_GRACE_MS, RETRY_MS, CHECK_TIMEOUT_MS } = loadTs('src/main/officeBreak.ts');
-const { heldByBreak } = loadTs('src/shared/officeBreak.ts');
+const { heldByBreak, isProviderRateLimitSignal } = loadTs('src/shared/officeBreak.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 const { HookServer } = loadTs('src/main/hooks.ts');
 const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
@@ -170,13 +170,25 @@ test('a later reset moves the check; an earlier one does not pull it in', () => 
   assert.equal(b.current().due, T0 + 30 * HOUR + RESET_GRACE_MS);
 });
 
-test('only Claude agents are held, and only while waiting', () => {
-  // Value: protects=a member on another engine keeps working, and the check can run; fails_when=the break holds Codex or holds during the check; why_new=issue 124; seam=none
+test('only providers with a rate-limit signal are held, and only while waiting', () => {
+  // Value: protects=unsupported engines keep working, and the check can run; fails_when=the break holds an engine without a signal or holds during the check; why_new=issue 124 and issue 237; seam=none
   assert.equal(heldByBreak(null, 'claude'), false);
   assert.equal(heldByBreak({ until: null, checking: false }, 'claude'), true);
   assert.equal(heldByBreak({ until: null, checking: false }, undefined), true, 'an agent with no engine named is on Claude');
-  assert.equal(heldByBreak({ until: null, checking: false }, 'codex'), false);
+  assert.equal(heldByBreak({ until: null, checking: false }, 'codex'), true);
+  assert.equal(heldByBreak({ until: null, checking: false }, 'gemini'), true);
+  assert.equal(heldByBreak({ until: null, checking: false }, 'grok'), false);
   assert.equal(heldByBreak({ until: null, checking: true }, 'claude'), false);
+});
+
+test('provider presets identify their own rate-limit signals', () => {
+  // Value: protects Codex and Gemini rate limits from being missed or cross-matched; fails_when=provider signals drift from the preset; why_new=issue 237; seam=shared preset lookup
+  assert.equal(isProviderRateLimitSignal('claude', 'rate_limit'), true);
+  assert.equal(isProviderRateLimitSignal('codex', 'rate_limit_exceeded'), true);
+  assert.equal(isProviderRateLimitSignal('gemini', 'RESOURCE_EXHAUSTED'), true);
+  assert.equal(isProviderRateLimitSignal('codex', 'RESOURCE_EXHAUSTED'), false);
+  assert.equal(isProviderRateLimitSignal('custom', 'rate_limit'), false);
+  assert.equal(isProviderRateLimitSignal(undefined, 'rate_limit'), true, 'unspecified providers retain the Claude default');
 });
 
 test('the hook server passes on the usage limit, the reset times and finished turns', async (t) => {
@@ -185,6 +197,8 @@ test('the hook server passes on the usage limit, the reset times and finished tu
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
   const inj = await hive.ensureAgent({ id: 'a1', name: 'Sales', provider: 'claude', cwd: home });
+  await hive.ensureAgent({ id: 'c1', name: 'Codex', provider: 'codex', cwd: home });
+  await hive.ensureAgent({ id: 'g1', name: 'Gemini', provider: 'gemini', cwd: home });
   const signals = [];
   const server = new HookServer(hive, () => null, () => ({ notifications: false }), undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, (s) => signals.push(s));
   const rl = { five_hour: { used_percentage: 23.5, resets_at: 1738425600 } };
@@ -196,11 +210,15 @@ test('the hook server passes on the usage limit, the reset times and finished tu
   server.handle({ agent_id: 'a1', hook_event_name: 'UserPromptSubmit', prompt: 'go on' });
   server.handle({ agent_id: 'a1', hook_event_name: 'Stop' });
   server.handle({ agent_id: 'a1', hook_event_name: 'SubagentStop' });
+  server.handle({ agent_id: 'c1', hook_event_name: 'Stop', error: 'rate_limit_exceeded' });
+  server.handle({ agent_id: 'g1', hook_event_name: 'Stop', error: 'RESOURCE_EXHAUSTED' });
   assert.deepEqual(signals, [
     { kind: 'limits', agentId: 'a1', rateLimits: rl },
     { kind: 'limit', agentId: 'a1' },
     { kind: 'prompt', agentId: 'a1' },
-    { kind: 'turn', agentId: 'a1' }
+    { kind: 'turn', agentId: 'a1' },
+    { kind: 'limit', agentId: 'c1' },
+    { kind: 'limit', agentId: 'g1' }
   ], 'an overloaded server or a subagent is not the plan limit');
 
   // Claude Code calls the hook only on the usage limit.

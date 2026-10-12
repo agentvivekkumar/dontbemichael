@@ -234,15 +234,15 @@ test('where Claude stands: another engine never asks, a missing Claude needs set
     { name: 'Claude not installed', in: { isClaude: true, claudePath: null }, auth: '{"loggedIn":true}',
       want: { applies: true, installed: false, signedIn: false, needed: true }, asksAuth: false, asksKey: false },
     { name: 'API key chosen and stored', in: { isClaude: true, claudePath: '/x/claude', claudeAuth: 'apiKey', key: true }, auth: '{"loggedIn":false}',
-      want: { applies: true, installed: true, signedIn: true, method: 'apiKey', needed: false }, asksAuth: false, asksKey: true },
+      want: { applies: true, installed: true, signedIn: true, credentialMethod: { kind: 'api-key' }, needed: false }, asksAuth: false, asksKey: true },
     { name: 'API key chosen but missing', in: { isClaude: true, claudePath: '/x/claude', claudeAuth: 'apiKey', key: false }, auth: '{"loggedIn":true}',
-      want: { applies: true, installed: true, signedIn: false, method: 'apiKey', needed: true }, asksAuth: false, asksKey: true },
+      want: { applies: true, installed: true, signedIn: false, credentialMethod: { kind: 'api-key' }, needed: true }, asksAuth: false, asksKey: true },
     { name: 'account signed in', in: { isClaude: true, claudePath: '/x/claude', claudeAuth: 'account', key: true }, auth: '{"loggedIn":true,"email":"owner@example.com"}',
-      want: { applies: true, installed: true, signedIn: true, method: 'account', email: 'owner@example.com', needed: false }, asksAuth: true, asksKey: false },
+      want: { applies: true, installed: true, signedIn: true, credentialMethod: { kind: 'claude-account' }, email: 'owner@example.com', needed: false }, asksAuth: true, asksKey: false },
     { name: 'account signed out (no claudeAuth saved yet)', in: { isClaude: true, claudePath: '/x/claude' }, auth: '{"loggedIn":false,"email":"old@example.com"}',
-      want: { applies: true, installed: true, signedIn: false, method: 'account', needed: true }, asksAuth: true, asksKey: false },
+      want: { applies: true, installed: true, signedIn: false, credentialMethod: { kind: 'claude-account' }, needed: true }, asksAuth: true, asksKey: false },
     { name: 'auth status unreadable', in: { isClaude: true, claudePath: '/x/claude', claudeAuth: 'account' }, auth: 'error: unknown command auth',
-      want: { applies: true, installed: true, signedIn: null, method: 'account', needed: false }, asksAuth: true, asksKey: false }
+      want: { applies: true, installed: true, signedIn: null, credentialMethod: { kind: 'claude-account' }, needed: false }, asksAuth: true, asksKey: false }
   ];
   for (const c of cases) {
     const calls = { auth: [], key: 0 };
@@ -257,6 +257,23 @@ test('where Claude stands: another engine never asks, a missing Claude needs set
     assert.deepEqual(calls.auth, c.asksAuth ? [c.in.claudePath] : [], `${c.name}: auth status is read only on the account path, at the installed Claude`);
     assert.equal(calls.key > 0, c.asksKey, `${c.name}: the key store is read only on the key path`);
   }
+});
+
+test('CLI login status dispatches separately, while unknown login state stays non-blocking', async () => {
+  // Value: protects Codex/Gemini setup from using Claude auth or API-key checks; fails_when=cli-login is treated as a Claude account or unknown is blocking; why_new=unified multi-engine onboarding; seam=plain callbacks
+  const base = { isClaude: false, credentialMethod: { kind: 'cli-login' }, claudePath: null, cliInstalled: true, hasKey: () => { throw new Error('API key path used'); }, authStatus: async () => { throw new Error('Claude auth path used'); } };
+  assert.deepEqual(await setup.readEngineSetupStatus({ ...base, cliLoginStatus: async () => false }), {
+    applies: true, installed: true, signedIn: false, credentialMethod: { kind: 'cli-login' }, needed: true
+  });
+  assert.deepEqual(await setup.readEngineSetupStatus(base), {
+    applies: true, installed: true, signedIn: null, credentialMethod: { kind: 'cli-login' }, needed: false
+  });
+  assert.deepEqual(await setup.readEngineSetupStatus({ ...base, credentialMethod: { kind: 'none' } }), {
+    applies: false, installed: true, signedIn: null, needed: false
+  });
+  assert.equal(setup.parseCliLoginStatus('Logged in using ChatGPT'), true);
+  assert.equal(setup.parseCliLoginStatus('Not logged in'), false);
+  assert.equal(setup.parseCliLoginStatus('', 'unexpected response'), null);
 });
 
 test('the install starts once: a second ask while one runs, or after Claude is there, starts nothing', () => {

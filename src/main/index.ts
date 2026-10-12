@@ -16,7 +16,7 @@ import { buildPtyEnv } from './ptyEnv';
 import { isSameOrInside } from './pathInside';
 import {
   apiKeyShapeOk, checkAnthropicKey, claudeInstallScript, claudeMissingScript, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY,
-  claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
+  claudeAuthStatusCommand, findClaudeFast, findEngineFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, parseCliLoginStatus, readEngineSetupStatus,
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
 import { setHiddenClaudeAuthEnv } from './hiddenClaude';
@@ -1781,8 +1781,8 @@ function ownerToast(title: string, body: string): void {
 }
 
 // ─── Office break (issue 124) ────────────────────────────────────────────────
-// The Claude plan reached its usage limit: the office says so and stops typing
-// into Claude terminals, and starts again by itself. Schedules still run on
+// A supported engine reached its usage limit: the office says so and stops typing
+// into matching terminals, and starts again by itself. Schedules still run on
 // time; their jobs wait in the inboxes until the break ends.
 // The state and its steps are OfficeBreak's (src/main/officeBreak.ts).
 const OFFICE_BREAK_KV_KEY = 'office.break';
@@ -1816,7 +1816,7 @@ function cutOffNames(ids: string[]): string {
 }
 
 function onPlanSignal(signal: PlanSignal): void {
-  if (!onClaudePlan(signal.agentId)) return;
+  if (!supportsOfficeBreak(signal.agentId)) return;
   if (signal.kind === 'limits') {
     if (officeBreak.noteRateLimits(signal.rateLimits)) { armOfficeBreak(); publishOfficeBreak(); }
     return;
@@ -1831,17 +1831,18 @@ function onPlanSignal(signal: PlanSignal): void {
   const view = officeBreak.view();
   try { hive.appendLog({ kind: 'office-break', step, agentId: signal.agentId, until: view?.until ?? null }); } catch { /* best-effort */ }
   if (step === 'started') {
+    const engine = providerPreset(hive.registry().agents[signal.agentId]?.provider ?? 'claude').label;
     ownerToast(michaelName(), view?.until
-      ? `The office is on a break. Your Claude plan reached its limit. Work starts again around ${breakClock(view.until)}.`
-      : 'The office is on a break. Your Claude plan reached its limit. Work starts again when it resets.');
+      ? `The office is on a break. Your ${engine} usage limit was reached. Work starts again around ${breakClock(view.until)}.`
+      : `The office is on a break. Your ${engine} usage limit was reached. Work starts again when it resets.`);
   }
   armOfficeBreak();
   publishOfficeBreak();
 }
 
-/** Whether the agent runs on the Claude plan, whatever the break state. */
-function onClaudePlan(agentId: string): boolean {
-  try { return (hive.registry().agents[agentId]?.provider ?? 'claude') === 'claude'; } catch { return true; }
+/** Only engines with a declared limit signal can start or end an office break. */
+function supportsOfficeBreak(agentId: string): boolean {
+  try { return !!providerPreset(hive.registry().agents[agentId]?.provider ?? 'claude').rateLimitSignal; } catch { return false; }
 }
 
 function runOfficeBreakTick(): void {
@@ -1850,13 +1851,13 @@ function runOfficeBreakTick(): void {
   if (!r) { armOfficeBreak(); return; }
   if (r.step === 'over') { endOfficeBreak(r.ended); return; }
   // The reset time has passed: delivery is open again, and Michael's turn on
-  // this message shows whether the plan answers.
+  // this message shows whether the engine accepts work again.
   const cut = cutOffNames(officeBreak.current()?.cutOff ?? []);
   try {
     if (hive.enabled()) {
       hive.send({
         to: 'god', act: 'inform', subject: 'Usage limit reset',
-        body: `The Claude plan's usage limit should have reset, so the office's break may be over. Carry on with what was waiting.${cut ? ` ${cut} stopped mid task when the limit was reached; they are told to carry on once a turn goes through.` : ''}`
+        body: `The engine's usage limit should have reset, so the office's break may be over. Carry on with what was waiting.${cut ? ` ${cut} stopped mid task when the limit was reached; they are told to carry on once a turn goes through.` : ''}`
       }, 'system');
     }
     hive.appendLog({ kind: 'office-break', step: 'check' });
@@ -1879,7 +1880,7 @@ function endOfficeBreak(ended: OfficeBreakState): void {
       for (const id of cutOff) {
         hive.send({
           to: id, act: 'inform', subject: 'Usage limit reset',
-          body: 'The Claude plan\'s usage limit has reset. Continue the task you were working on when it was reached; do not repeat work that is already done.'
+          body: 'The usage limit has reset. Continue the task you were working on when it was reached; do not repeat work that is already done.'
         }, 'system');
       }
     }
@@ -5465,18 +5466,42 @@ const claudeAuth = makeClaudeAuthReader((path, done) => {
   const cmd = claudeAuthStatusCommand(process.platform, path, process.env.ComSpec);
   execFile(cmd.file, cmd.args, { timeout: 15_000, env, windowsVerbatimArguments: cmd.verbatim }, (err, stdout) => done(err, String(stdout ?? '')));
 });
+function codexLoginStatus(path: string): Promise<boolean | null> {
+  const winShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(path);
+  const file = winShim ? process.env.ComSpec || 'cmd.exe' : path;
+  const args = winShim ? ['/d', '/s', '/c', `""${path}" login status"`] : ['login', 'status'];
+  const env = buildPtyEnv(process.env, process.platform === 'win32' ? (process.env.PATH || '') : userShellPath());
+  return new Promise((resolve) => {
+    execFile(file, args, { timeout: 10_000, env, windowsVerbatimArguments: winShim }, (_err, stdout, stderr) => {
+      resolve(parseCliLoginStatus(String(stdout ?? ''), String(stderr ?? '')));
+    });
+  });
+}
 ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
   const cfg = readConfig();
   const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
-  const isClaude = isClaudeProvider(inferAgentProvider('claude', p));
+  const providerId = inferAgentProvider('claude', p);
+  const isClaude = isClaudeProvider(providerId);
+  const preset = providerPreset(providerId);
+  const credentialMethod = isClaude
+    ? cfg.claudeAuth === 'apiKey' ? { kind: 'api-key' as const } : { kind: 'claude-account' as const }
+    : preset.credentialMethod ?? { kind: 'none' as const };
+  const cliPath = credentialMethod.kind === 'cli-login'
+    ? findEngineFast(preset.defaultCommand, { platform: process.platform, pathEnv: userShellPath() })
+    : null;
   const teamNeedsClaude = [...claudeBlocked.values()].some((b) => !b.god);
   const status = await readEngineSetupStatus({
     isClaude,
+    credentialMethod,
     teamNeedsClaude,
     claudePath: isClaude || teamNeedsClaude ? claudePathFast() : null,
+    cliInstalled: !!cliPath,
     claudeAuth: cfg.claudeAuth,
     hasKey: () => integrations.hasSecret(providerKeyRef('anthropic')),
-    authStatus: (path) => claudeAuth.read(path)
+    authStatus: (path) => claudeAuth.read(path),
+    cliLoginStatus: credentialMethod.kind === 'cli-login' && providerId === 'codex' && cliPath
+      ? () => codexLoginStatus(cliPath)
+      : undefined
   });
   // Ready now: the terminals that could not start. Each leaves the list when it
   // actually starts on Claude (spawnAgentCore), so every reader sees the same.

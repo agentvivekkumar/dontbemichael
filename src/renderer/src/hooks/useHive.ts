@@ -1030,8 +1030,8 @@ export function useHive(config: HarnessConfig | null): void {
       // the queue with no escape hatch at all. Idle/draft/picker safety below
       // still applies to manual messages; only the pause is bypassed.
       if (control?.autoDeliveryPaused && !next.manual) return { sent: false };
-      // The Claude plan's usage limit holds the office (issue 124): nothing is
-      // typed into a Claude terminal until the break ends. "Send now" still goes.
+      // A provider's usage limit holds the office (issue 124): nothing is
+      // typed into a supported engine terminal until the break ends. "Send now" still goes.
       if (heldByBreak(getOfficeBreak(), target.provider) && !next.manual) return { sent: false };
       // Hold queued messages until the target finishes its boot sequence.
       if ((bootGraceUntil.current[target.id] ?? 0) >= now) return { sent: false };

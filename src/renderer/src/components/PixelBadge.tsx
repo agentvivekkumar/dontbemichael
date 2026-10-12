@@ -11,7 +11,7 @@ export type StatusKind =
   // would overwrite it); derived at render, see `hasTerminalDraft`. Without it
   // a held queue looked identical to an idle agent doing nothing.
   | 'typing'
-  // The office break (issue 124): the Claude plan reached its usage limit.
+  // The office break (issue 124): an engine reached its usage limit.
   // Derived at render from the break, like 'typing'.
   | 'break';
 

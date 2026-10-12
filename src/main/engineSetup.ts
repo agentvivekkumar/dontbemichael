@@ -12,7 +12,7 @@
  */
 import { providerPreset } from '../shared/agentProvider';
 import { existsSync } from 'node:fs';
-import { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineSetupStatus } from '../shared/engineSetup';
+import { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineCredentialMethod, type EngineSetupStatus } from '../shared/engineSetup';
 export { engineSetupNeeded, ENGINE_INSTALL_PTY, ENGINE_SIGNIN_PTY, isEngineSetupPty, type EngineSetupStatus };
 
 /** Where Claude is, without launching a shell. The PTY's lookup runs a login
@@ -46,6 +46,25 @@ export function findClaudeFast(e: {
   return null;
 }
 
+/** Find a preset CLI on the captured PATH without launching a login shell. */
+export function findEngineFast(command: string, e: {
+  platform: string;
+  pathEnv: string;
+  exists?: (p: string) => boolean;
+}): string | null {
+  const exists = e.exists ?? existsSync;
+  const win = e.platform === 'win32';
+  const names = win ? [`${command}.exe`, `${command}.cmd`, command] : [command];
+  const dirs = e.pathEnv.split(win ? ';' : ':').filter(Boolean);
+  for (const dir of dirs) {
+    for (const name of names) {
+      const path = dir.endsWith(win ? '\\' : '/') ? dir + name : `${dir}${win ? '\\' : '/'}${name}`;
+      if (exists(path)) return path;
+    }
+  }
+  return null;
+}
+
 /** `claude auth status --json`: `{ loggedIn, email, ... }`. null when it is not that. */
 export function parseClaudeAuthStatus(stdout: string): { signedIn: boolean; email?: string } | null {
   try {
@@ -55,6 +74,14 @@ export function parseClaudeAuthStatus(stdout: string): { signedIn: boolean; emai
   } catch {
     return null;
   }
+}
+
+/** Parse Codex's `login status` output without treating an unfamiliar response as signed out. */
+export function parseCliLoginStatus(stdout: string, stderr = ''): boolean | null {
+  const output = `${stdout}\n${stderr}`.trim();
+  if (/\bnot\s+(?:logged\s+in|authenticated)\b|\bno\s+credentials\b/i.test(output)) return false;
+  if (/\b(?:logged\s+in|authenticated)\b/i.test(output)) return true;
+  return null;
 }
 
 /** The install, run where the owner can watch it (behind Show details). Uses
@@ -104,29 +131,41 @@ export function claudeMissingScript(platform: string = process.platform, godName
 export async function readEngineSetupStatus(i: {
   /** Michael's engine is Claude (setup's pick, or the saved one). */
   isClaude: boolean;
+  credentialMethod?: EngineCredentialMethod;
   /** A team member on Claude could not start for want of it (Michael may be
    *  on another engine): the step and the card apply to the team. */
   teamNeedsClaude?: boolean;
   /** Where `claude` resolves, or null when it is not installed. */
   claudePath: string | null;
+  cliInstalled?: boolean;
   claudeAuth?: 'account' | 'apiKey';
   /** The Anthropic key is in the secret store. */
   hasKey: () => boolean;
   /** `claude auth status --json`, parsed; null when unreadable. */
   authStatus: (path: string) => Promise<{ signedIn: boolean; email?: string } | null>;
+  cliLoginStatus?: () => Promise<boolean | null>;
 }): Promise<EngineSetupStatus> {
-  if (!i.isClaude && !i.teamNeedsClaude) return { applies: false, installed: true, signedIn: null, needed: false };
+  const forClaude = i.isClaude || !!i.teamNeedsClaude;
+  const credentialMethod = forClaude
+    ? (i.claudeAuth === 'apiKey' ? { kind: 'api-key' as const } : { kind: 'claude-account' as const })
+    : i.credentialMethod ?? { kind: 'none' as const };
+  if (credentialMethod.kind === 'none') return { applies: false, installed: true, signedIn: null, needed: false };
   const team = !i.isClaude ? { forTeam: true } : {};
-  if (!i.claudePath) return { applies: true, ...team, installed: false, signedIn: false, needed: true };
-  // An API key the owner chose signs every Claude agent in; no account needed.
-  if (i.claudeAuth === 'apiKey') {
+  if (credentialMethod.kind === 'cli-login') {
+    const installed = i.cliInstalled ?? false;
+    if (!installed) return { applies: true, ...team, installed: false, signedIn: false, credentialMethod, needed: true };
+    const signedIn = await i.cliLoginStatus?.() ?? null;
+    return { applies: true, ...team, installed: true, signedIn, credentialMethod, needed: engineSetupNeeded(true, signedIn) };
+  }
+  if (!i.claudePath) return { applies: true, ...team, installed: false, signedIn: false, credentialMethod, needed: true };
+  if (credentialMethod.kind === 'api-key') {
     const has = i.hasKey();
-    return { applies: true, ...team, installed: true, signedIn: has, method: 'apiKey', needed: engineSetupNeeded(true, has) };
+    return { applies: true, ...team, installed: true, signedIn: has, credentialMethod, needed: engineSetupNeeded(true, has) };
   }
   // A Claude too old to have `auth status` reads as unknown: never blocking.
   const auth = await i.authStatus(i.claudePath);
   const signedIn = auth ? auth.signedIn : null;
-  return { applies: true, ...team, installed: true, signedIn, method: 'account', ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn) };
+  return { applies: true, ...team, installed: true, signedIn, credentialMethod, ...(auth?.email ? { email: auth.email } : {}), needed: engineSetupNeeded(true, signedIn) };
 }
 
 /** Start the install only when Claude is missing and no install is running:

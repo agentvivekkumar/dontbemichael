@@ -91,6 +91,10 @@ test('cursor preset is interactive (no -p), uses force+trust auto flags, types s
 test('codex preset still resolves (no regression)', () => {
   assert.strictEqual(ap.inferAgentProvider('codex'), 'codex');
   assert.strictEqual(ap.providerPreset('codex').defaultCommand, 'codex');
+  assert.deepStrictEqual(ap.providerPreset('codex').credentialMethod, { kind: 'cli-login' });
+  assert.strictEqual(ap.providerPreset('codex').rateLimitSignal, 'rate_limit_exceeded');
+  assert.deepStrictEqual(ap.providerPreset('gemini').credentialMethod, { kind: 'cli-login' });
+  assert.strictEqual(ap.providerPreset('gemini').rateLimitSignal, 'RESOURCE_EXHAUSTED');
 });
 
 if (failures > 0) {

@@ -1,16 +1,16 @@
 /**
- * The office break (issue 124). On a smaller Claude plan the team reaches its
- * usage limit during the day. Claude Code says so with a StopFailure hook whose
- * `error` is `rate_limit`, and its status line carries when each limit window
- * resets (`rate_limits.<window>.resets_at`, epoch seconds). This class turns
+ * The office break (issue 124). An engine reaches its usage limit during the
+ * day. Its provider preset declares the matching rate-limit signal, and Claude
+ * status lines also carry when each limit window resets
+ * (`rate_limits.<window>.resets_at`, epoch seconds). This class turns
  * those signals into one office state:
  *
- *  - waiting: the limit is reached. Nothing types into a Claude terminal.
+ *  - waiting: the limit is reached. Nothing types into a held engine terminal.
  *    Schedules still run as configured: their jobs wait in the inboxes.
  *  - checking: the reset time has passed (a minute later, so Claude Code's own
  *    automatic continue goes first). Delivery opens again and Michael is told,
  *    so one turn can show whether work can start.
- *  - over: a Claude turn finished that was asked for after the limit was
+ *  - over: a turn finished that was asked for after the limit was
  *    reached (while checking, any finished turn). Team members who were cut
  *    off are told to carry on, and the waiting inbox mail is delivered as usual.
  *
@@ -36,9 +36,9 @@ export interface OfficeBreakState {
   until: number | null;
   /** When the next step runs: the check, or the end of a check. */
   due: number;
-  /** Claude team members whose turn the limit cut off. */
+  /** Team members whose turn the limit cut off. */
   cutOff: string[];
-  /** Claude agents given a prompt since the limit was reached: a turn of
+  /** Agents given a prompt since the limit was reached: a turn of
    *  theirs that finishes shows the plan answers. Any other turn that finishes
    *  while waiting was already on its way and ends nothing. */
   prompted: string[];
@@ -73,7 +73,7 @@ export class OfficeBreak {
   /** Undefined until first read: the saved state is loaded on first use, after
    *  the store has opened. */
   private saved: OfficeBreakState | null | undefined;
-  /** The newest reset time read from any Claude status line. */
+  /** The newest reset time read from a provider status line. */
   private lastReset: number | null = null;
 
   constructor(private store: OfficeBreakStore, private now: () => number = Date.now) {}
@@ -103,7 +103,7 @@ export class OfficeBreak {
     return this.state ? { ...this.state, cutOff: [...this.state.cutOff], prompted: [...this.state.prompted] } : null;
   }
 
-  /** Whether Claude terminals are held right now (schedules never are). */
+  /** Whether held engine terminals are held right now (schedules never are). */
   holding(): boolean {
     return this.state?.phase === 'waiting';
   }
@@ -143,7 +143,7 @@ export class OfficeBreak {
     return again ? 'again' : 'held';
   }
 
-  /** A Claude agent submitted a prompt: it is no longer cut off (Claude Code's
+  /** An agent submitted a prompt: it is no longer cut off (the CLI's
    *  own continue, or the owner typed), and its next finished turn shows the
    *  plan answers. The break itself goes on. */
   promptSubmitted(agentId: string): void {
@@ -156,7 +156,7 @@ export class OfficeBreak {
     });
   }
 
-  /** A Claude turn finished, so the plan answers again: the break is over.
+  /** A turn finished, so the engine answers again: the break is over.
    *  While waiting, only a turn asked for after the limit counts: one already
    *  on its way when the limit was reached can still land. Returns the ended
    *  state, or null when there was no break or it goes on. */

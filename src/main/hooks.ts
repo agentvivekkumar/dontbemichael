@@ -23,6 +23,7 @@ import { estimateCostUsd } from './pricing';
 import { MAX_HOOK_FRAME_BYTES, validateHookEvent } from '../shared/hookEvents';
 import { resolveGodName } from '../shared/godIdentity';
 import { APP_NAME } from '../shared/appName';
+import { isProviderRateLimitSignal } from '../shared/officeBreak';
 
 /** The same terminal prompt is relayed to Michael at most once in this window. */
 const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
@@ -392,15 +393,17 @@ export class HookServer {
       return {};
     }
 
-    // A turn that ended on an API error (issue 124). Claude Code ignores the
-    // answer; the usage limit starts the office break. Registered with the
-    // `rate_limit` matcher, and checked again here.
+    // A provider-specific error signal starts the office break. Claude Code
+    // delivers StopFailure with its `rate_limit` matcher; other bridges carry
+    // their signal on the ordinary stop payload.
+    const provider = agentId ? this.hive.registry().agents[agentId]?.provider : undefined;
+    const rateLimitHit = !!agentId && !subagent && isProviderRateLimitSignal(provider, p.error);
+    if (rateLimitHit) this.plan({ kind: 'limit', agentId });
     if (event === 'StopFailure') {
-      if (agentId && !subagent && p.error === 'rate_limit') this.plan({ kind: 'limit', agentId });
       return {};
     }
     if (event === 'UserPromptSubmit' && agentId && !subagent) this.plan({ kind: 'prompt', agentId });
-    if (event === 'Stop' && agentId && !subagent && !p.stop_hook_active) this.plan({ kind: 'turn', agentId });
+    if (event === 'Stop' && agentId && !subagent && !p.stop_hook_active && !rateLimitHit) this.plan({ kind: 'turn', agentId });
 
     // 7C.3 — a graceful operator HALT overrides everything (incl. the inbox
     // drain below): stop the agent CLEANLY at this hook boundary rather than

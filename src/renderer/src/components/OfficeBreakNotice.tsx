@@ -1,5 +1,5 @@
 /**
- * The office break (issue 124): the Claude plan reached its usage limit, so the
+ * The office break (issue 124): an engine reached its usage limit, so the
  * team waits until it resets. Main keeps the state (src/main/officeBreak.ts)
  * and pushes it here. Two notices, both quiet: a card at the top of Needs you,
  * not counted (there is nothing to decide, like a report), and a chip in the

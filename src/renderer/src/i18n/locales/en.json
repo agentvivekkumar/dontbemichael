@@ -2208,9 +2208,9 @@
   },
   "officeBreak": {
     "title": "The office is on a break",
-    "body": "Your Claude plan reached its limit. Work starts again around {{time}}.",
-    "bodyUnknown": "Your Claude plan reached its limit. Work starts again when it resets.",
-    "info": "Your Claude plan reached its usage limit, so the team cannot work. Scheduled jobs still go out on time and wait in the inbox until the break ends. The team starts again on its own. A bigger Claude plan means fewer breaks.",
+    "body": "An engine reached its usage limit. Work starts again around {{time}}.",
+    "bodyUnknown": "An engine reached its usage limit. Work starts again when it resets.",
+    "info": "An engine reached its usage limit, so the team cannot work. Scheduled jobs still go out on time and wait in the inbox until the break ends. The team starts again on its own.",
     "chip": "On a break until {{time}}",
     "chipUnknown": "On a break"
   }
