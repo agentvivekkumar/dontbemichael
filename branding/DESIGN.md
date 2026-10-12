@@ -1344,9 +1344,9 @@ answer is being typed, and it holds up 2 tasks. Under the frame, three plain not
 files are buttons; read it beside the question; up to five at once, with PDF and Office files
 opening in their own app. The frame is one `role="img"` with a full text label; nothing in it
 can be clicked. File view and card side by side at 980 px and up; under that the card comes
-first, then the file. Under 640 px the tab bar drops Who talks to whom and the Markdown tab,
-and under 480 px Tasks and the Needs you pill, so the selected file tab keeps its whole name.
-The section never scrolls sideways.
+first, then the file, and the tab bar drops Who talks to whom and the Markdown tab, then the
+Needs you pill under 600 px and Tasks under 480 px, so the selected file tab keeps its whole
+name. Under 400 px the table steps down to 11 / 16. The section never scrolls sideways.
 
 ---
 
