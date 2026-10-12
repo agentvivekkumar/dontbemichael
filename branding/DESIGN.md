@@ -1327,6 +1327,27 @@ what an owner checks first (owner, 2026-10-12): Blocked and Waiting side by side
 both columns with its cards two across, then To do and Doing as count rows without cards;
 under 480 px everything stacks in that order. The board never scrolls sideways.
 
+### 9.14 File tabs (web)
+
+A home page section right after the task board (§9.13) and before the "Everything else"
+tiles: eyebrow "Files", heading "Open the file he means, right in the office.", and a read
+only picture of a file tab (§7.2) opened from a file chip on an Ask me card (§7.8). Same
+frame as §9.13 (`card-2`, `r-2xl`, `shadow-lg`). The top bar as §7.2: Office, Tasks, Who
+talks to whom, the `line-2` hairline, then two file tabs (a Markdown note, and a CSV that is
+selected, `ink` fill, its name whole), and the coral Needs you pill showing 1. Under it, the
+file view (§7.2: name, "Oscar / Payments" in `ink-3`, Open in app and Show in Finder) with
+the CSV as a table: Date, From, Invoice and Amount, amounts right aligned in mono, eight
+September payments in the story's customers whose last row has no invoice. Beside it, the
+right column's Ask me card from Oscar asks whether that payment is the renewal deposit; the
+question names the file as a chip (`sheet` icon, the name without extension, "Open"), an
+answer is being typed, and it holds up 2 tasks. Under the frame, three plain notes: named
+files are buttons; read it beside the question; up to five at once, with PDF and Office files
+opening in their own app. The frame is one `role="img"` with a full text label; nothing in it
+can be clicked. File view and card side by side at 980 px and up; under that the card comes
+first, then the file. Under 640 px the tab bar drops Who talks to whom and the Markdown tab,
+and under 480 px Tasks and the Needs you pill, so the selected file tab keeps its whole name.
+The section never scrolls sideways.
+
 ---
 
 ## 10. Iconography [Both]
@@ -1528,6 +1549,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-09 | Web, Windows first class: the platform switch drops the Beta tag (§9.8, §9.9 retired for web); the Windows note is a lead line plus bullets; the home page gets the Sending switch with the mail approval card (§9.11), the setup inset (§9.12) and six "Everything else" tiles (§9.5); the social card says "on your computer" (§9.7). |
 | 2026-10-10 | Panel tabs: the mouse wheel scrolls an overflowing tab row sideways, and an edge fades while tabs are hidden past it (§7.11). |
 | 2026-10-12 | Web: the home page's task board after the refund story, the Tasks view (§7.20) as a read only picture that leads with Blocked and Waiting on small screens (§9.13). |
+| 2026-10-12 | Web: file tabs after the task board, a CSV open in a file tab (§7.2) from a chip on Oscar's Ask me card (§7.8), the card beside it, as a read only picture (§9.14). |
 | 2026-10-04 | Banter flies as paper planes only; an envelope on the floor is always a real message (§8.8, §8.12). |
 | 2026-10-04 | Ask me file rows: a question's named files open from the card, or show in Finder (§7.8); `file` and `sheet` icons (§10). |
 | 2026-10-01 | Pre-landing review fixes: dialogs close when closing time starts and its bar sits above them; the compact grid stays clear of the right column; selecting someone dims the rest of the stage to 45% (§7.14); Traces behind a flag (§7.11); setup screens on v2 fields and rows (§7.25); the composer keeps its width and takes pastes (§7.19); Settings and closing time copy in plain words. |
