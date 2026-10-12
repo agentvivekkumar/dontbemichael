@@ -1342,11 +1342,13 @@ file view (§7.2: name, "Oscar / Payments" in `ink-3`, Open in app and Show in F
 the CSV as a table: Date, From, Invoice and Amount, amounts right aligned in mono, eight
 September payments, none named like the demo office (Harbor & Pine), whose last row has no
 invoice. Beside it, the
-right column's Ask me card from Oscar asks whether that payment is the renewal deposit; the
+right column's Ask me card, Michael's question for Oscar, asks whether that payment is the renewal deposit; the
 question names the file as a chip (`sheet` icon, the name without extension, "Open"), an
-answer is being typed, and it holds up 2 tasks. Under the frame, three plain notes: named
-files are buttons; read it beside the question; up to five at once, with PDF and Office files
-opening in their own app. The frame is one `role="img"` with a full text label; nothing in it
+answer is being typed, and it holds up 2 tasks. Under the frame, three plain notes that add
+what the lead leaves out: named files are buttons (Open, or Show in Finder, "Show in folder"
+on Windows, for anything else, §7.8); the question stays beside it (§7.2); up to five at once,
+a sixth closing the one opened longest ago, with PDF and Office files opening in their own
+app. The frame is one `role="img"` with a full text label; nothing in it
 can be clicked. File view and card side by side at 980 px and up; under that the card comes
 first (no wider than the app's 520 px right column), then the file, and the tab bar drops Who talks to whom and the Markdown tab, then the
 Needs you pill under 600 px and Tasks under 480 px, so the selected file tab keeps its whole
