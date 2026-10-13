@@ -146,11 +146,14 @@ test('every hook installer routes through the launcher — none left on bare nod
   // rather than write into the developer's real ~/.gemini / ~/.grok.
   const realHome = process.env.HOME;
   const realProfile = process.env.USERPROFILE;
+  const realGeminiHome = process.env.GEMINI_CLI_HOME;
   process.env.HOME = home;
   process.env.USERPROFILE = home;
+  process.env.GEMINI_CLI_HOME = home;
   t.after(() => {
     if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
     if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
+    if (realGeminiHome === undefined) delete process.env.GEMINI_CLI_HOME; else process.env.GEMINI_CLI_HOME = realGeminiHome;
   });
   assert.equal(os.homedir(), home, 'home redirect failed — aborting before touching the real home');
 
