@@ -293,7 +293,7 @@ test('with an unreadable secrets file, deleteSecret does not throw, says so, and
   }
 });
 
-test('when the secrets file cannot be written, deleteSecret says so and the secret is still there (issue 133)', { skip: process.platform === 'win32' ? 'POSIX folder modes' : false }, () => {
+test('when the secrets file cannot be written, deleteSecret says so and the secret is still there (issue 133)', { skip: process.platform === 'win32' ? 'POSIX folder modes' : process.getuid?.() === 0 ? 'needs a user other than root, which ignores folder modes' : false }, () => {
   // Value: protects=a failed write is reported, not taken as removed; fails_when=deleteSecret swallows a failed write as success; why_new=a failed write threw out of deleteSecret; seam=a read-only userData folder
   setSecret('mail:billing', 'app-password-7');
   setSecret('apikey:openai', 'sk-keep');
