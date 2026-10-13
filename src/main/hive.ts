@@ -606,8 +606,8 @@ const OWNER_READ_SKEW_MS = 5 * 60 * 1000;
 
 /** A folder as Gemini CLI's --include-directories can carry it. The flag splits
  *  every value on commas, so a path with one ("Acme, LLC") goes relative to
- *  the agent's cwd, which Gemini resolves against. Undefined when that still
- *  holds a comma; the per-agent settings file names the folder either way. */
+ *  the agent's cwd, which Gemini resolves against. Undefined when the relative
+ *  path still contains a comma, so the caller can report that limitation. */
 export function geminiIncludeDirArg(cwd: string, dir: string): string | undefined {
   if (!dir.includes(',')) return dir;
   const rel = cwd ? relative(cwd, dir) : '';
