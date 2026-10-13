@@ -11,6 +11,7 @@ import { join, resolve, sep, basename, dirname, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { request as httpsRequest } from 'node:https';
 import { PtyManager, type ProcessLaunch, type SpawnOptions } from './pty';
+import { savePastedImage } from './pastes';
 import { resolveCommand as resolveCliCommand, isSafeCommandName, userShellPath } from './shellEnv';
 import { buildPtyEnv } from './ptyEnv';
 import { isSameOrInside } from './pathInside';
@@ -103,7 +104,6 @@ import { quickbooksAccessToSave } from '../shared/quickbooks';
 import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
-import { pastesDir, savePaste, sweepOldPastes } from './pastes';
 import { buildWorkerLaunch } from './workerLaunch';
 import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
@@ -5660,7 +5660,8 @@ ipcMain.handle('clipboard:saveImage', async () => {
   try {
     const img = clipboard.readImage();
     if (img.isEmpty()) return { ok: false as const, error: 'no image in clipboard' };
-    return { ok: true as const, file: savePaste(pastesDir(app.getPath('userData')), img.toPNG()) };
+    const file = savePastedImage(app.getPath('userData'), img.toPNG());
+    return { ok: true as const, file };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
   }
@@ -7082,7 +7083,6 @@ function bootstrapHiveServices(): void {
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.ensureHive();
   try { sweepOrphanAgentMcp(); } catch (e) { console.error('[mail] orphan agent-mcp sweep failed', e); }
-  sweepOldPastes(pastesDir(app.getPath('userData')));
   // Read the Claude account's connectors in the background (D11).
   void refreshClaudeConnectors('start');
   // Waiting schedule requests reach Michael, and ones he leaves undecided
