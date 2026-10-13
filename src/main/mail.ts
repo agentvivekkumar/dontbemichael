@@ -60,6 +60,8 @@ const SEARCH_MAX = 50;
 const BODY_MAX_CHARS = 50_000;
 const IDLE_CLOSE_MS = 5 * 60_000;
 const SEND_MEMORY_MS = 10 * 60_000;
+const SEARCH_KEEP_MS = 60_000;
+const SEARCHES_KEPT = 20;
 /** How long a send the app stopped in the middle of stays refused. Longer than
  *  the repeat window: whether it went out is unknown, and such sends are rare. */
 const PENDING_MEMORY_MS = 24 * 60 * 60_000;
@@ -325,6 +327,7 @@ interface OpenBox { client: ImapLike; timer?: ReturnType<typeof setTimeout> }
 
 export class MailService {
   private readonly boxes = new Map<string, OpenBox>();
+  private readonly searches = new Map<string, { mailbox: string; at: number; uids: number[] }>();
   /** Last status written per mailbox, so a working call does not rewrite
    *  config on every tool call. */
   private readonly lastStatus = new Map<string, 'connected' | 'needs-attention'>();
@@ -423,8 +426,13 @@ export class MailService {
     if (open) this.drop(id);
     const rec = this.record(id);
     const client = this.createImap(rec.imap, rec.address, this.password(id));
-    client.on?.('error', () => this.drop(id));
-    client.on?.('close', () => this.drop(id));
+    // A replaced socket can finish closing after its successor connects.
+    // Only the client still held for this mailbox may drop that connection.
+    const disconnected = (): void => {
+      if (this.boxes.get(id)?.client === client) this.drop(id);
+    };
+    client.on?.('error', disconnected);
+    client.on?.('close', disconnected);
     try {
       await withTimeout(client.connect(), CALL_TIMEOUT_MS, 'Connecting to the mailbox');
     } catch (e) {
@@ -539,19 +547,24 @@ export class MailService {
       if (!Object.keys(query).length) query.all = true;
       // Never the owner's unsent drafts: Gmail's All Mail (the archive) holds them too.
       query.draft = false;
-      const uids = (await c.search(query, { uid: true })) || [];
-      const newest = [...uids].sort((a, b) => b - a);
+      
+      const newest = await this.searchIds(c, id, key, query, page);
       const slice = newest.slice(page * limit, page * limit + limit);
       const messages: Array<{ id: string; from: string; subject: string; date: string; unread: boolean }> = [];
       if (slice.length) {
         for await (const m of c.fetch(slice, { uid: true, envelope: true, flags: true }, { uid: true })) {
+          
+          // imapflow hands back the raw header text when it cannot read a date,
+          // and toISOString throws on that, failing the whole search over one email.
+          const sent = m.envelope?.date ? new Date(m.envelope.date) : null;
           messages.push({
             id: messageIdFor(key, m.uid),
             from: addrText(m.envelope?.from),
             subject: m.envelope?.subject ?? '',
-            date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : '',
+            date: sent && !Number.isNaN(sent.getTime()) ? sent.toISOString() : '',
             unread: !(m.flags instanceof Set ? m.flags.has('\\Seen') : false)
           });
+
         }
       }
       messages.sort((a, b) => uidOf(b.id) - uidOf(a.id));
@@ -566,6 +579,21 @@ export class MailService {
     }, 'Searching the mailbox');
   }
 
+    /** The ids a query matches, newest first. A later page reuses what its
+   *  first page found, for up to SEARCH_KEEP_MS. */
+  private async searchIds(c: ImapLike, id: string, key: FolderKey, query: Record<string, unknown>, page: number): Promise<number[]> {
+    const now = Date.now();
+    for (const [k, v] of this.searches) if (now - v.at > SEARCH_KEEP_MS) this.searches.delete(k);
+    const cacheKey = JSON.stringify([id, key, query]);
+    const kept = this.searches.get(cacheKey);
+    if (page > 0 && kept) return kept.uids;
+    const uids = [...((await c.search(query, { uid: true })) || [])].sort((a, b) => b - a);
+    this.searches.delete(cacheKey);
+    this.searches.set(cacheKey, { mailbox: id, at: now, uids });
+    if (this.searches.size > SEARCHES_KEPT) this.searches.delete(this.searches.keys().next().value!);
+    return uids;
+  }
+
   /**
    * Inbox zero (owner, 2026-10-03): take messages out of the inbox without
    * deleting any. `archive` marks them read and moves them to the archive, or,
@@ -576,6 +604,8 @@ export class MailService {
    */
   async organize(id: string, action: 'archive' | 'mark_read' | 'mark_junk', uids: number[], label?: string) {
     if (!uids.length) throw new MailError('bad-request', `${action} needs the message ids from search.`);
+    // Moved or marked mail changes what a search finds: search again.
+    for (const [k, v] of this.searches) if (v.mailbox === id) this.searches.delete(k);
     return this.inFolder(id, MailService.inbox, async (c) => {
       if (!c.messageFlagsAdd || !c.messageMove) throw new MailError('unsupported', 'This mailbox cannot move messages.');
       // Only the asked-for ids are searched, not the whole inbox.
@@ -1029,7 +1059,23 @@ async function runMailRequest(
     refs: { forward: !!ref(body.forward), attachFrom: !!attachRefs?.length },
     present: deps.present
   });
-  if (!access.ok) return { status: 403, body: { error: access.reason } };
+
+  if (!access.ok) {
+    try {
+      deps.audit?.({
+        kind: 'mail-access-denied',
+        agentId,
+        mailbox: mailbox ?? null,
+        operation: op,
+        outcome: 'denied',
+        timestamp: new Date().toISOString()
+      });
+    } catch {
+      // Audit logging must not expose details or alter the refusal.
+    }
+
+    return { status: 403, body: { error: access.reason } };
+  }
   // A Send only grant on the named mailbox (shared-mailboxes.md).
   const grant = sendOnlyGrant(cfg, agentId);
   const underGrant = !!grant && !!mailbox && grant.mailbox === mailbox;
