@@ -374,7 +374,7 @@ Setup offers only Claude Code, signed in with a Claude account or an Anthropic A
 still carries presets for other agent CLIs (Codex, Gemini, Grok, Kimi, Qwen, OpenCode, Crush, pi,
 Copilot and Cursor), API keys for other providers and local models,
 but this build doesn't offer them. Some developer features are switched off because business
-owners don't use them: git views, the built in code editor, temporary helper agents, voice, and
+owners don't use them: git views, the built-in code editor, temporary helper agents, voice, and
 opening a Terminal in an agent's folder. Each one has a switch in
 [`src/shared/buildFeatures.ts`](./src/shared/buildFeatures.ts).
 
