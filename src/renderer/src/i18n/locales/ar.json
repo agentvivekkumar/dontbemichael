@@ -1681,6 +1681,7 @@
     "industryPlaceholder": "مثلًا: عيادة أسنان",
     "addressHead": "عنوان المقر الرئيسي",
     "street": "عنوان الشارع",
+    "streetPlaceholder": "مثلًا: 123 الشارع الرئيسي",
     "city": "المدينة",
     "region": "الولاية أو المنطقة",
     "postalCode": "الرمز البريدي",

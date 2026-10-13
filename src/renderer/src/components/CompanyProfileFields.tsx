@@ -96,7 +96,7 @@ export function CompanyProfileFields({ value, onChange, parts, needsIndustry, mi
           <Head>{t('companyProfile.addressHead')}</Head>
           <Field label={t('companyProfile.street')} required>
             <input value={text(value.address?.street)} onChange={(e) => setAddress({ street: orUndefined(e.target.value) })}
-              aria-required aria-invalid={miss('street')} className="cth-input" style={fieldStyle} />
+              placeholder={t('companyProfile.streetPlaceholder')} aria-required aria-invalid={miss('street')} className="cth-input" style={fieldStyle} />
           </Field>
           <div style={grid2}>
             <Field label={t('companyProfile.city')} required>

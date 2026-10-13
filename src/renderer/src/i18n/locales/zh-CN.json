@@ -1681,6 +1681,7 @@
     "industryPlaceholder": "例如：牙科诊所",
     "addressHead": "总部地址",
     "street": "街道地址",
+    "streetPlaceholder": "例如：中山路123号",
     "city": "城市",
     "region": "州或地区",
     "postalCode": "邮政编码",
