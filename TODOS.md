@@ -288,6 +288,7 @@
 
 **Effort:** S
 **Priority:** P3
+**Completed:** `useHive` resets `action` to `'thinking'` on `PostToolUse` (and `UserPromptSubmit`) when no parallel tool is running, so the closing-time row never names a completed tool while waiting for output.
 
 
 ### Parallel tool calls clear each other's detail

@@ -97,7 +97,7 @@ test('every closing-time string the dialog shows exists in English', () => {
 test('a finished tool call leaves the row: its detail clears and the clock restarts', () => {
   // Value: protects=the owner never judges an agent by a tool call that already ended; fails_when=PostToolUse keeps the previous actionDetail; why_new=review run 2 pass B (red team); seam=none
   const hive = read('src/renderer/src/hooks/useHive.ts');
-  assert.match(hive, /e\.event === 'PostToolUse' \|\| e\.event === 'UserPromptSubmit'[\s\S]{0,400}updateAgent\(e\.agentId, \{ status: 'working', actionDetail: undefined, actionAt: Date\.now\(\) \}\)/);
+  assert.match(hive, /e\.event === 'PostToolUse' \|\| e\.event === 'UserPromptSubmit'[\s\S]{0,400}updateAgent\(e\.agentId, \{ status: 'working', action: 'thinking', actionDetail: undefined, actionAt: Date\.now\(\) \}\)/);
   assert.match(hive, /action: 'thinking', actionDetail: undefined, actionAt: Date\.now\(\)/);
 });
 

@@ -40,12 +40,22 @@ test('after a tool call ends, the row drops its detail and counts from when it e
   const during = { status: 'working', action: 'using Bash', actionDetail: 'Run the full test suite', actionAt: NOW - 9 * 60_000 };
   assert.equal(row(during).line, '“Run the full test suite” · 9 min');
   // What useHive's PostToolUse patch leaves (pinned in closing-time-dialog.test.cjs).
-  const after = { ...during, status: 'working', actionDetail: undefined, actionAt: NOW - 2 * 60_000 };
+  const after = { ...during, status: 'working', action: 'thinking', actionDetail: undefined, actionAt: NOW - 2 * 60_000 };
   const r = row(after);
   assert.equal(r.state, 'stillWorking');
   assert.doesNotMatch(r.line, /Run the full test suite/, 'the finished call is gone');
-  assert.match(r.line, / · 2 min$/, 'minutes since it ended, not since it started');
+  assert.doesNotMatch(r.line, /using Bash/, 'the finished tool is no longer named');
+  assert.equal(r.line, 'thinking · 2 min');
   assert.doesNotMatch(row({ ...after, actionAt: NOW - 30_000 }).line, /min/, 'under a minute: no minutes yet');
+});
+
+test('a finished tool call is not named as running on the closing-time row', () => {
+  // Value: protects=the owner never reads a finished step as still running; fails_when=row falls back to finished tool caption; why_new=TODOS "Row still names a finished tool"; seam=none
+  const postTool = { status: 'working', action: 'thinking', actionAt: NOW - 3 * 60_000 };
+  const r = row(postTool);
+  assert.equal(r.state, 'stillWorking');
+  assert.equal(r.line, 'thinking · 3 min');
+  assert.doesNotMatch(r.line, /using /);
 });
 
 test('a refused or failed action shows a message; one that went through shows none', () => {
