@@ -461,9 +461,19 @@ test('Gemini 0.60+ uses user-scoped lifecycle hooks and trusts the worker worksp
   assert.equal(fs.existsSync(path.join(harness, 'hive', 'agents', 'gemini-1', '.gemini-hive', 'system-settings.json')), false,
     'do not create a user-owned file that Gemini will reject as a system settings file');
 
+  // A user may add a personal hook to the same event group; refreshing ours must not delete it.
+  const editedByUser = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const afterAgentGroup = editedByUser.hooks.AfterAgent.find((group) =>
+    (group.hooks || []).some((item) => item.name === 'munder-hive-after-agent'));
+  afterAgentGroup.hooks.push({ name: 'personal-co-located-hook', type: 'command', command: 'echo keep me' });
+  fs.writeFileSync(settingsPath, JSON.stringify(editedByUser, null, 2), 'utf8');
+
   // Re-spawning the same agent must replace only our own entries, never append duplicates.
   await hive.ensureAgent(meta);
   const again = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.ok(again.hooks.AfterAgent.some((group) =>
+    group.hooks.some((item) => item.name === 'personal-co-located-hook')),
+    'a user hook in the same group as ours must survive refresh');
   for (const [event, name] of Object.entries(managed)) {
     assert.equal(again.hooks[event].flatMap((group) => group.hooks || [])
       .filter((item) => item.name === name).length, 1, `${event} must remain idempotent after respawn`);
