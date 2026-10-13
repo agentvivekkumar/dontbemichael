@@ -210,15 +210,6 @@
 **Effort:** S
 **Priority:** P3
 
-### A refused tool call still shows its detail
-
-**What:** PreToolUse that the hook denies (paused or gated) still sends `detail`.
-
-**Why:** The row names a step that never ran.
-
-**Effort:** S
-**Priority:** P3
-
 ### Parallel tool calls clear each other's detail
 
 **What:** Track detail per tool call so one call's PostToolUse does not clear another's.
