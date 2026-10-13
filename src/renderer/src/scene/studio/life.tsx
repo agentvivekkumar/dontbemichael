@@ -400,7 +400,16 @@ function colorOf(kind: FlightKind, T: SceneTokens, own?: string): string {
  *  and a ping where it lands. */
 function Token({ f, T, still }: { f: Flight; T: SceneTokens; still: boolean }) {
   const ref = useRef<SVGAnimateMotionElement | null>(null);
-  useEffect(() => { if (!still) { try { ref.current?.beginElement(); } catch { /* no SMIL */ } } }, [still]);
+  // animateMotion with begin="indefinite" does not move the head until
+  // beginElement() runs. Until then SVG parks the group at the stage origin
+  // (issue #300): a clipped envelope or paper plane in the top-left corner.
+  const [motion, setMotion] = useState<'pending' | 'running' | 'static'>('pending');
+  useEffect(() => {
+    if (still) return;
+    const el = ref.current;
+    if (!el || typeof el.beginElement !== 'function') { setMotion('static'); return; }
+    try { el.beginElement(); setMotion('running'); } catch { setMotion('static'); }
+  }, [still]);
   const color = colorOf(f.kind, T, f.color);
   const dur = `${FLIGHT_MS / 1000}s`;
   const head = <TokenHead kind={f.kind} color={color} T={T} />;
@@ -421,7 +430,8 @@ function Token({ f, T, still }: { f: Flight; T: SceneTokens; still: boolean }) {
       {ping(f.start, 0, 18)}
       {f.ping && ping(f.end, FLIGHT_MS - 120, 30)}
       {f.ping && ping(f.end, FLIGHT_MS + 120, 30)}
-      <g>
+      <g transform={motion === 'running' ? undefined : `translate(${f.start[0]},${f.start[1]})`}
+        visibility={motion === 'pending' ? 'hidden' : 'visible'}>
         <animateMotion ref={ref} dur={dur} begin="indefinite" fill="freeze" path={f.d} calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.25 1"
           rotate={plane ? 'auto' : undefined} />
         <g className="cth-st-tokenhead">{plane && f.end[0] < f.start[0] ? <g transform="scale(1,-1)">{head}</g> : head}</g>

@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Token origin flash #300</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; }
+  svg { background: #1c1930; border: 1px solid #444; display: block; margin: 12px 0; }
+  .label { font: 12px sans-serif; fill: #aaa; }
+</style>
+<p>Left: delayed beginElement (bug). Right: hidden until motion starts (fix). Red square marks SVG origin (0,0).</p>
+<div style="display:flex;gap:16px">
+<svg id="bug" viewBox="0 0 400 220" width="400" height="220">
+  <rect x="0" y="0" width="16" height="16" fill="#e44" opacity="0.7"/>
+  <text x="20" y="14" class="label">origin</text>
+  <path d="M80,160 C160,40 240,180 320,90" fill="none" stroke="#8af" stroke-dasharray="1 6"/>
+  <g id="bugHead">
+    <animateMotion id="bugMotion" begin="indefinite" dur="2s" fill="freeze" path="M80,160 C160,40 240,180 320,90"/>
+    <rect x="-10" y="-7" width="20" height="14" rx="2" fill="#fff" stroke="#4af" stroke-width="1.5"/>
+  </g>
+</svg>
+<svg id="fix" viewBox="0 0 400 220" width="400" height="220">
+  <rect x="0" y="0" width="16" height="16" fill="#e44" opacity="0.7"/>
+  <text x="20" y="14" class="label">origin</text>
+  <path d="M80,160 C160,40 240,180 320,90" fill="none" stroke="#8af" stroke-dasharray="1 6"/>
+  <g id="fixHead" transform="translate(80,160)" visibility="hidden">
+    <animateMotion id="fixMotion" begin="indefinite" dur="2s" fill="freeze" path="M80,160 C160,40 240,180 320,90"/>
+    <rect x="-10" y="-7" width="20" height="14" rx="2" fill="#fff" stroke="#6c6" stroke-width="1.5"/>
+  </g>
+</svg>
+</div>
+<script>
+  setTimeout(() => {
+    document.getElementById('bugMotion').beginElement();
+    const head = document.getElementById('fixHead');
+    document.getElementById('fixMotion').beginElement();
+    head.removeAttribute('transform');
+    head.setAttribute('visibility', 'visible');
+  }, 8000);
+</script>
