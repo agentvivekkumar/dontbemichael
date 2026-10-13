@@ -3595,7 +3595,8 @@ export class HiveManager {
   private installGeminiHooks(): void {
     const root = this.root();
     if (!root) return;
-    const settingsDir = join(homedir(), '.gemini');
+    const geminiHome = process.env.GEMINI_CLI_HOME?.trim() || homedir();
+    const settingsDir = join(geminiHome, '.gemini');
     const settingsPath = join(settingsDir, 'settings.json');
     const shim = join(root, 'bin', 'gemini-hook.cjs');
     try {
@@ -3647,12 +3648,16 @@ export class HiveManager {
         AfterTool: [hook('after-tool', '.*')],
         AfterAgent: [hook('after-agent')]
       };
-      const hasManagedHook = (entry: unknown): boolean => {
-        if (!isRecord(entry)) return false;
-        if (typeof entry.name === 'string' && entry.name.startsWith('munder-hive-')) return true;
-        return Array.isArray(entry.hooks) && entry.hooks.some((item) =>
-          isRecord(item) && typeof item.name === 'string' && item.name.startsWith('munder-hive-')
+      const withoutManagedHooks = (entry: unknown): unknown[] => {
+        if (!isRecord(entry)) return [entry];
+        if (typeof entry.name === 'string' && entry.name.startsWith('munder-hive-')) return [];
+        if (!Array.isArray(entry.hooks)) return [entry];
+        const retainedHooks = entry.hooks.filter((item) =>
+          !(isRecord(item) && typeof item.name === 'string' && item.name.startsWith('munder-hive-'))
         );
+        if (retainedHooks.length === entry.hooks.length) return [entry];
+        if (retainedHooks.length === 0) return [];
+        return [{ ...entry, hooks: retainedHooks }];
       };
       for (const [event, entries] of Object.entries(managed)) {
         const previous = mergedHooks[event];
@@ -3660,7 +3665,7 @@ export class HiveManager {
           console.error(`[hive] installGeminiHooks skipped: user hooks.${event} is not an array`);
           return;
         }
-        const retained = (Array.isArray(previous) ? previous : []).filter((entry) => !hasManagedHook(entry));
+        const retained = (Array.isArray(previous) ? previous : []).flatMap(withoutManagedHooks);
         mergedHooks[event] = [...retained, ...entries];
       }
       settings.hooks = mergedHooks;
