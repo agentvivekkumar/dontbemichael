@@ -145,7 +145,7 @@ const iconButton: CSSProperties = {
 
 // v2 (branding/DESIGN.md 7.23): an ink tooltip, 260px max.
 const bubble: CSSProperties = {
-  zIndex: 400,
+  zIndex: 600,
   width: 'max-content',
   maxWidth: 'min(260px, calc(100vw - 16px))',
   maxHeight: 'calc(100vh - 16px)',
