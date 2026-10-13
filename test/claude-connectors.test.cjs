@@ -304,7 +304,7 @@ test('over the hook socket, a gate that throws refuses an MCP call and lets a bu
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-conn-sock-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
-  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
+  const { env } = await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
   const server = new HookServer(hive, () => null, () => { throw new Error('config unreadable'); });
   server.start();
   t.after(() => server.stop());
@@ -316,7 +316,7 @@ test('over the hook socket, a gate that throws refuses an MCP call and lets a bu
     c.on('end', () => resolve(JSON.parse(out)));
     c.on('error', reject);
   });
-  const base = { agent_id: 'pam', session_id: 's1', hook_event_name: 'PreToolUse', tool_input: {}, cwd: home };
+  const base = { agent_id: 'pam', hook_token: env.HIVE_HOOK_TOKEN, session_id: 's1', hook_event_name: 'PreToolUse', tool_input: {}, cwd: home };
   for (const tool_name of ['mcp__claude_ai_HubSpot__search_crm_objects', 'ReadMcpResourceTool']) {
     const r = await ask({ ...base, tool_name });
     assert.equal(r.hookSpecificOutput.permissionDecision, 'deny', tool_name);
@@ -391,13 +391,13 @@ async function throughShim(t, cfg, payload) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-conn-shim2-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
-  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
+  const { env } = await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
   const server = new HookServer(hive, () => null, () => ({ harnessHome: home, claudeConnectors: LIST, ...cfg }));
   server.start();
   t.after(() => server.stop());
   await new Promise((r) => setTimeout(r, 50));
   return new Promise((resolve) => {
-    const p = spawn(process.execPath, [hive.shimPath()], { env: { PATH: process.env.PATH, AGENT_ID: 'pam', HIVE_SOCK: hive.sockPath() } });
+    const p = spawn(process.execPath, [hive.shimPath()], { env: { PATH: process.env.PATH, AGENT_ID: 'pam', HIVE_HOOK_TOKEN: env.HIVE_HOOK_TOKEN, HIVE_SOCK: hive.sockPath() } });
     let out = '';
     p.stdout.on('data', (d) => { out += d; });
     p.on('close', () => resolve(out));

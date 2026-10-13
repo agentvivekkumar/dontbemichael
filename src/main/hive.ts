@@ -1091,6 +1091,9 @@ export class HiveManager {
 
     const env: Record<string, string> = {
       AGENT_ID: meta.id,
+      // A fresh secret each start that every hook bridge sends with its frames,
+      // so one agent cannot post events as another (issue #61).
+      HIVE_HOOK_TOKEN: this.mintHookToken(meta.id),
       AGENT_NAME: meta.name,
       HIVE_ROOT: root,
       AGENT_DIR: dir
@@ -1229,7 +1232,7 @@ export class HiveManager {
             // slow sidecar start past the 4s ceiling), so try a few times before
             // giving up: without this ONE bad moment at spawn cost the agent its
             // hive events for the whole session.
-            const port = await this.startProxyBridgeWithRetry(meta.id, { sock, sessionId, api: desc.api, upstream });
+            const port = await this.startProxyBridgeWithRetry(meta.id, { sock, token: env.HIVE_HOOK_TOKEN, sessionId, api: desc.api, upstream });
             // Only redirect the CLI through the proxy if the sidecar actually bound a
             // port. On failure leave routing untouched → the CLI talks to its real
             // upstream directly (degraded: no synthesized hive events, but it still
@@ -1524,6 +1527,21 @@ export class HiveManager {
    * This is what lets auto mode keep the OS sandbox on — the old full-bypass
    * posture existed only because these paths sit outside the project cwd.
    */
+  /** Hook frame secrets (issue #61): token to agent, in memory only and never
+   *  in the hive folder. Each start replaces the agent's last token. */
+  private hookTokens = new Map<string, string>();
+  private mintHookToken(agentId: string): string {
+    for (const [t, a] of this.hookTokens) if (a === agentId) this.hookTokens.delete(t);
+    const token = randomBytes(24).toString('hex');
+    this.hookTokens.set(token, agentId);
+    return token;
+  }
+
+  /** The agent a hook frame's token was given to, or undefined. */
+  hookAgent(token: unknown): string | undefined {
+    return typeof token === 'string' ? this.hookTokens.get(token) : undefined;
+  }
+
   /** An agent's per-session Claude settings: in `<harnessHome>/agent-settings`,
    *  outside the hive and so outside every agent's writable sandbox (issue 100). */
   private settingsPathFor(dir: string): string {
@@ -1730,7 +1748,7 @@ export class HiveManager {
    *  listener. Resolves the bound port, or 0 once every attempt has failed. */
   private async startProxyBridgeWithRetry(
     agentId: string,
-    cfg: { sock: string; sessionId: string; api: 'openai' | 'anthropic'; upstream: string }
+    cfg: { sock: string; token: string; sessionId: string; api: 'openai' | 'anthropic'; upstream: string }
   ): Promise<number> {
     for (let attempt = 1; attempt <= PROXY_BIND_ATTEMPTS; attempt++) {
       const port = await this.startProxyBridge(agentId, cfg);
@@ -1745,7 +1763,7 @@ export class HiveManager {
 
   private startProxyBridge(
     agentId: string,
-    cfg: { sock: string; sessionId: string; api: 'openai' | 'anthropic'; upstream: string }
+    cfg: { sock: string; token: string; sessionId: string; api: 'openai' | 'anthropic'; upstream: string }
   ): Promise<number> {
     this.stopProxyBridge(agentId);
     const script = this.proxyShimPath();
@@ -1762,6 +1780,7 @@ export class HiveManager {
             ELECTRON_RUN_AS_NODE: '1',
             HIVE_SOCK: cfg.sock,
             AGENT_ID: agentId,
+            HIVE_HOOK_TOKEN: cfg.token,
             UPSTREAM_BASE_URL: cfg.upstream,
             HIVE_PROXY_SESSION: cfg.sessionId,
             HIVE_PROXY_API: cfg.api
@@ -4718,6 +4737,8 @@ process.stdin.on('end', () => {
   const me = process.env.AGENT_ID || null;
   if (me && payload.agent_id && payload.agent_id !== me) payload.subagent_id = payload.agent_id;
   payload.agent_id = me || payload.agent_id || null;
+  // Proves which agent sent this frame; the app checks it against agent_id.
+  payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
   const sock = process.env.HIVE_SOCK;
   if (isStatus) {
     // Status-line mode: Claude Code pipes the session status JSON (incl.
@@ -4833,6 +4854,7 @@ process.stdin.on('end', () => {
     process.exit(0);
   };
   try {
+    payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
     const c = net.createConnection(sock, () => c.write(JSON.stringify(payload) + '\\n'));
     c.setEncoding('utf8');
     c.on('data', (d) => { resp += d; });
@@ -4860,6 +4882,7 @@ function post(payload) {
   try {
     if (!SOCK) return;
     payload.agent_id = payload.agent_id || AGENT;
+    payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
     var c = net.createConnection(SOCK, function () { try { c.end(JSON.stringify(payload) + '\\n'); } catch (e) {} });
     c.on('error', function () {});
   } catch (e) {}
@@ -4897,6 +4920,7 @@ function post(payload) {
   try {
     if (!SOCK) return;
     payload.agent_id = payload.agent_id || AGENT;
+    payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
     const c = createConnection(SOCK, () => { try { c.end(JSON.stringify(payload) + '\\n'); } catch (e) {} });
     c.on('error', () => {});
   } catch (e) {}
@@ -4955,6 +4979,7 @@ function ctxSize(model) {
 // Fire-and-forget emit of a shim-shaped payload to the hive socket. Never throws.
 function emit(payload) {
   if (!SOCK) return;
+  payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
   try {
     const c = net.createConnection(SOCK, function () { c.end(JSON.stringify(payload) + '\\n'); });
     c.on('error', function () {});
@@ -5186,6 +5211,7 @@ process.stdin.on('end', () => {
     process.exit(0);
   };
   try {
+    payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
     const c = net.createConnection(sock, () => c.write(JSON.stringify(payload) + '\\n'));
     c.setEncoding('utf8');
     c.on('data', (d) => { resp += d; });
@@ -5260,6 +5286,7 @@ process.stdin.on('end', () => {
     process.exit(0);
   };
   try {
+    payload.hook_token = process.env.HIVE_HOOK_TOKEN || null;
     const c = net.createConnection(sock, () => c.write(JSON.stringify(payload) + '\\n'));
     c.setEncoding('utf8');
     c.on('data', (d) => { resp += d; });

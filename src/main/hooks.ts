@@ -94,6 +94,8 @@ function mcpDeny(reason: string): unknown {
 interface HookPayload {
   hook_event_name?: string;
   agent_id?: string | null;
+  /** The sending agent's secret from its spawn (issue #61); checked, then dropped. */
+  hook_token?: string | null;
   /** Set by the shim when the call came from a Task subagent of agent_id. */
   subagent_id?: string;
   session_id?: string;
@@ -276,10 +278,21 @@ export class HookServer {
         const frame = pending.subarray(0, nl).toString('utf8');
         let payload: HookPayload = {};
         try { payload = JSON.parse(frame); } catch { /* ignore */ }
-        let res: unknown = {};
         // A gate that throws allows a built-in tool as before, but never an MCP
         // call: connectors fail closed (D8).
-        try { res = this.handle(payload); } catch { res = payload.hook_event_name === 'PreToolUse' && isMcpCall(payload.tool_name) ? mcpDeny(CONNECTOR_UNDECIDED) : {}; }
+        const refused = (): unknown => payload.hook_event_name === 'PreToolUse' && isMcpCall(payload.tool_name) ? mcpDeny(CONNECTOR_UNDECIDED) : {};
+        // The frame's token, not its agent_id, says which agent sent it (issue
+        // #61). A Task subagent's frame rides under its parent's token.
+        const from = this.hive.hookAgent(payload.hook_token);
+        delete payload.hook_token;
+        if (!from || (payload.agent_id && payload.agent_id !== from)) {
+          this.hive.appendLog({ kind: 'hook-frame-rejected', reason: from ? 'agent-mismatch' : 'token', agentId: payload.agent_id ?? null, event: payload.hook_event_name ?? null });
+          conn.end(JSON.stringify(refused()));
+          return;
+        }
+        payload.agent_id = from;
+        let res: unknown = {};
+        try { res = this.handle(payload); } catch { res = refused(); }
         conn.end(JSON.stringify(res ?? {}));
       });
       conn.on('error', () => { /* shim hung up — ignore */ });

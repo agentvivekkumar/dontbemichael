@@ -37,13 +37,15 @@ async function openServer(t) {
   const logs = [];
   const hive = {
     sockPath: () => sock,
-    appendLog: (entry) => logs.push(entry)
+    appendLog: (entry) => logs.push(entry),
+    // Framing only: every frame counts as Pam's (the token check has its own tests).
+    hookAgent: () => 'pam'
   };
   const server = new HookServer(hive, () => null, () => ({ notifications: false }));
 
   // Exercise the real net.Server framing path while isolating these tests from
   // HookServer's unrelated routing behavior.
-  server.handle = (payload) => {
+  server.handle = ({ agent_id, ...payload }) => {
     routed.push(payload);
     return {};
   };
