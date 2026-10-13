@@ -400,15 +400,19 @@ test('Gemini 0.60+ uses user-scoped lifecycle hooks and trusts the worker worksp
 
   const realHome = process.env.HOME;
   const realProfile = process.env.USERPROFILE;
+  const realGeminiHome = process.env.GEMINI_CLI_HOME;
+  const geminiConfigRoot = path.join(base, 'custom-gemini-home');
   process.env.HOME = userHome;
   process.env.USERPROFILE = userHome;
+  process.env.GEMINI_CLI_HOME = geminiConfigRoot;
   t.after(() => {
     if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
     if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
+    if (realGeminiHome === undefined) delete process.env.GEMINI_CLI_HOME; else process.env.GEMINI_CLI_HOME = realGeminiHome;
   });
   assert.equal(os.homedir(), userHome, 'home redirect failed — aborting before touching the real home');
 
-  const settingsPath = path.join(userHome, '.gemini', 'settings.json');
+  const settingsPath = path.join(geminiConfigRoot, '.gemini', 'settings.json');
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify({
     context: { includeDirectories: ['/keep/user/directory'] },
@@ -449,6 +453,8 @@ test('Gemini 0.60+ uses user-scoped lifecycle hooks and trusts the worker worksp
     group.hooks.some((item) => item.name === 'personal-after-agent')),
     'existing hooks for a managed event must be preserved');
   assert.ok(fs.existsSync(path.join(harness, 'hive', 'bin', 'gemini-hook.cjs')));
+  assert.equal(fs.existsSync(path.join(userHome, '.gemini', 'settings.json')), false,
+    'respect GEMINI_CLI_HOME instead of writing to the default home');
   assert.equal(fs.existsSync(path.join(harness, 'hive', 'agents', 'gemini-1', '.gemini-hive', 'system-settings.json')), false,
     'do not create a user-owned file that Gemini will reject as a system settings file');
 
