@@ -250,6 +250,7 @@
 
 **Effort:** S
 **Priority:** P3
+**Completed:** `parseMcpList` recognizes non-`claude.ai` servers matching `namesQuickBooks` as the `Intuit QuickBooks` connector, so a locally added QuickBooks MCP server shows its connection status in Settings.
 
 ## Closing time (deferred from ship of feat/closing-time-progress, 2026-09-29)
 

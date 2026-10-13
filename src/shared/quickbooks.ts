@@ -18,7 +18,7 @@ export interface QuickBooksCapability {
 /** A server name that is QuickBooks: "claude_ai_Intuit_QuickBooks",
  *  "claude.ai Intuit QuickBooks", "QuickBooksOnline", "qbo-test". Not bare
  *  "intuit", which Intuit TurboTax shares. One rule for tools and resources. */
-function namesQuickBooks(server: string): boolean {
+export function namesQuickBooks(server: string): boolean {
   return /quickbooks/i.test(server) || /(^|[^a-z0-9])qbo([^a-z0-9]|$)/i.test(server);
 }
 
