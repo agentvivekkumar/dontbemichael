@@ -82,6 +82,12 @@ import {
 import { HOUSE_RULES_CHANGED_SUBJECT, houseRulesNoticeBody, houseRulesToTell } from '../shared/houseRulesNotice';
 import { applyGuardFixes, restoreDone, dueReminders, guardSignature, emptyGuardState, guardCards, type GuardCard, type GuardState } from '../shared/cardGuards';
 import { sleepSync } from './atomicFile';
+import {
+  evaluateTaskCompletion,
+  verifyTaskCompletion,
+  type TaskVerification,
+  type VerificationContext
+} from '../shared/taskVerification';
 
 /** A thread id an agent wrote, kept only when it is a plain token. */
 function safeConversation(v: unknown): v is string {
@@ -225,6 +231,8 @@ export interface HiveTask {
   closedBy?: 'owner';
   closedAt?: string;
   closedReason?: string;
+  /** Verified task completion outcome (pending, verified, failed, not_supported) */
+  verification?: TaskVerification;
 }
 
 /**
@@ -3279,6 +3287,19 @@ export class HiveManager {
     this.commit(`hive: tasks (${merged.length})`);
   }
 
+  private verificationContextFetcher: (() => VerificationContext) | null = null;
+  /** Set context fetcher for verifying task actions against independent system records. */
+  setVerificationContextFetcher(fetcher: () => VerificationContext): void {
+    this.verificationContextFetcher = fetcher;
+  }
+  private verificationContext(): VerificationContext | undefined {
+    try { return this.verificationContextFetcher?.(); } catch { return undefined; }
+  }
+  /** Verify a task against independent system records (e.g. mail sends). */
+  verifyTask(task: HiveTask): TaskVerification {
+    return verifyTaskCompletion(task, this.verificationContext());
+  }
+
   /** Append one card against the latest on-disk ledger. Renderer callers must
    *  use this instead of re-writing a collection they read before another
    *  source (webhook, Slack, god, voice) added work. Idempotent by task id. */
@@ -3303,6 +3324,38 @@ export class HiveManager {
     if (patch.status === 'done' && !('humanQA' in patch) && tasks[index].status !== 'done') {
       const settled = withdrawnOnClose(tasks[index].humanQA, new Date().toISOString());
       if (settled) patch = { ...patch, humanQA: settled };
+    }
+    // Verified task completion: when work is marked done by an AI agent/service
+    // rather than the owner's close, check actual independent system records.
+    if (patch.status === 'done' && patch.closedBy !== 'owner' && tasks[index].closedBy !== 'owner') {
+      const candidate: HiveTask = { ...tasks[index], ...patch, id };
+      const decision = evaluateTaskCompletion(candidate, this.verificationContext());
+      if (!decision.allowed) {
+        patch = {
+          ...patch,
+          status: 'blocked',
+          verification: decision.verification
+        };
+        this.appendLog({
+          kind: 'task-verification-failed',
+          taskId: id,
+          method: decision.verification.method,
+          reason: decision.verification.reason
+        });
+      } else {
+        patch = {
+          ...patch,
+          verification: decision.verification
+        };
+        if (decision.verification.status === 'verified') {
+          this.appendLog({
+            kind: 'task-verified',
+            taskId: id,
+            method: decision.verification.method,
+            evidence: decision.verification.evidence
+          });
+        }
+      }
     }
     // The app moving a Done card on (the owner's reopen, a mailbox that broke
     // again) is allowed; agents write the file directly and never pass here.
@@ -3345,9 +3398,9 @@ export class HiveManager {
     const wasDone = card.status === 'done' || !!this.guardState().done[id];
     if (wasDone && (status !== 'todo' || !why)) return false;
     const from = wasDone ? 'done' : card.status;
-    // A card out of Done no longer has a result: none of it is sent or shown
+    // A card out of Done no longer has a result or verification: none of it is sent or shown
     // as the outcome until the work finishes again.
-    if (!this.patchTask(id, { status, waitingOn: undefined, closedBy: undefined, closedAt: undefined, closedReason: undefined, ...(wasDone ? { result: undefined } : {}) })) return false;
+    if (!this.patchTask(id, { status, waitingOn: undefined, closedBy: undefined, closedAt: undefined, closedReason: undefined, ...(wasDone ? { result: undefined, verification: undefined } : {}) })) return false;
     if (wasDone && card.status !== 'done') { delete this.guardState().done[id]; this.saveGuard(); }
     if (from !== status) this.tellGodOwnerChange(card, { kind: 'moved', from, to: status, ...(why ? { reason: why } : {}) });
     return true;

@@ -1,5 +1,7 @@
 import { openAskIndexes } from '@shared/askMeRouting';
 import { isNextAt } from '@shared/cardGuards';
+import type { TaskVerification } from '@shared/taskVerification';
+export type { TaskVerification, VerificationStatus } from '@shared/taskVerification';
 
 /* The hive task ledger as the renderer reads it: the card types, the open
  * question rule and the one parser every reader goes through. Plain TypeScript
@@ -51,6 +53,8 @@ export interface HiveTask {
   /** What came of the card, in Michael's words: he writes it when he marks the
    *  card Done (issue 51). Shown on the card, never checked or invented. */
   result?: string;
+  /** Verified task completion outcome (pending, verified, failed, not_supported) */
+  verification?: TaskVerification;
 }
 
 /** The card's open questions for the human, oldest first: every ask with no
@@ -134,7 +138,16 @@ export function parseTasks(raw: unknown): HiveTask[] {
         : undefined,
       closedBy: t.closedBy === 'owner' ? 'owner' as const : undefined,
       closedReason: typeof t.closedReason === 'string' ? t.closedReason : undefined,
-      result: typeof t.result === 'string' && t.result.trim() ? t.result : undefined
+      result: typeof t.result === 'string' && t.result.trim() ? t.result : undefined,
+      verification: (t.verification && typeof t.verification === 'object' && typeof (t.verification as { status?: unknown }).status === 'string')
+        ? {
+            status: (t.verification as { status: string }).status as TaskVerification['status'],
+            method: typeof (t.verification as { method?: unknown }).method === 'string' ? (t.verification as { method: string }).method : undefined,
+            evidence: typeof (t.verification as { evidence?: unknown }).evidence === 'string' ? (t.verification as { evidence: string }).evidence : undefined,
+            reason: typeof (t.verification as { reason?: unknown }).reason === 'string' ? (t.verification as { reason: string }).reason : undefined,
+            verifiedAt: typeof (t.verification as { verifiedAt?: unknown }).verifiedAt === 'string' ? (t.verification as { verifiedAt: string }).verifiedAt : undefined
+          }
+        : undefined
     }));
 }
 

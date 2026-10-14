@@ -297,11 +297,13 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
         {/* What came of it, first line of Michael's result (issue 51); a card
             the owner closed says so below instead. */}
         {done && task.closedBy !== 'owner' && resultHeadline(task.result) && (
-          <span data-result title={resultHeadline(task.result)} style={{
+          <span data-result data-verification={task.verification?.status || 'unverified'} title={resultHeadline(task.result)} style={{
             fontSize: 11, lineHeight: '15px', color: 'var(--cth-ink-3)',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
           }}>
-            <span aria-hidden style={{ color: 'var(--cth-green-text)', fontWeight: 600, marginInlineEnd: 4 }}>✓</span>
+            <span aria-hidden style={{ color: task.verification?.status === 'verified' ? 'var(--cth-green-text)' : task.verification?.status === 'failed' ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)', fontWeight: 600, marginInlineEnd: 4 }}>
+              {task.verification?.status === 'verified' ? '✓' : task.verification?.status === 'failed' ? '✗' : '•'}
+            </span>
             {resultHeadline(task.result)}
           </span>
         )}
@@ -492,6 +494,40 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
               }}>
                 <FileText source={task.result} who={{ assignee: qaAssignee }} />
               </div>
+            </div>
+          )}
+
+          {/* Verified Task Completion: confirmation from the system where the action ran */}
+          {task.status === 'done' && task.closedBy !== 'owner' && task.verification && (
+            <div data-task-verification style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {label(t('kanban.verification'))}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                padding: '4px 10px', borderRadius: 'var(--cth-r-md)',
+                fontSize: 12, fontWeight: 600,
+                background: task.verification.status === 'verified' ? 'var(--cth-green-soft)'
+                  : task.verification.status === 'failed' ? 'var(--cth-coral-soft)'
+                  : 'color-mix(in srgb, var(--cth-floor) 70%, transparent)',
+                color: task.verification.status === 'verified' ? 'var(--cth-green-text)'
+                  : task.verification.status === 'failed' ? 'var(--cth-coral-text)'
+                  : 'var(--cth-ink-2)'
+              }}>
+                <span>
+                  {task.verification.status === 'verified' ? '✓ ' + t('kanban.verified')
+                    : task.verification.status === 'failed' ? '✗ ' + t('kanban.verificationFailed')
+                    : t('kanban.unverified')}
+                </span>
+                {task.verification.evidence && (
+                  <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 10.5, opacity: 0.85 }}>
+                    ({task.verification.evidence})
+                  </span>
+                )}
+              </div>
+              {task.verification.reason && (
+                <div style={{ fontSize: 12, color: 'var(--cth-ink-2)', lineHeight: '17px' }}>
+                  {task.verification.reason}
+                </div>
+              )}
             </div>
           )}
 

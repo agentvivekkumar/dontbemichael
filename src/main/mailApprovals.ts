@@ -124,6 +124,12 @@ export class MailApprovals implements ProposalStore {
 
   private load(): StoreFile { return this.current() ?? this.empty(); }
 
+  /** Read-only snapshot of sends and proposals (for verified completion checks). */
+  snapshot(): { proposals: MailProposal[]; sends: SendRecord[] } {
+    const s = this.load();
+    return { proposals: s.proposals, sends: s.sends };
+  }
+
   private loadForWrite(): StoreFile {
     const store = this.current();
     if (!store) throw new Error(STORE_UNREADABLE);

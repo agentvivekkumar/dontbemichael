@@ -35,6 +35,8 @@ import type {
 export type {
   ContextRule, ContextTriggerConfig, OrgTriggerConfig, TriggerHistoryEntry, WebhookTrigger
 } from '../shared/triggers';
+import type { TaskVerification, VerificationStatus } from '../shared/taskVerification';
+export type { TaskVerification, VerificationStatus } from '../shared/taskVerification';
 
 /** Renderer-visible integration record: the secretRef handle is redacted to a
  *  presence boolean. Matches main `integrations.listRecordsRedacted()` — the
@@ -191,6 +193,8 @@ export interface HiveTask {
   closedBy?: 'owner';
   closedAt?: string;
   closedReason?: string;
+  /** Verified task completion outcome (pending, verified, failed, not_supported) */
+  verification?: TaskVerification;
 }
 
 /** A message the router just delivered, with its resolved recipient ids. Drives

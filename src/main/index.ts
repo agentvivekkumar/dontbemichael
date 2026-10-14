@@ -611,6 +611,12 @@ const mailApprovals = new MailApprovals({
   canSend: (agentId, mailbox, proposalId) => memberPresent(agentId) && mailAccess(readConfig(), agentId, mailbox, 'send', proposalId, { present: memberPresent }).ok
 });
 
+// Verified task completion: connect independent mail system records to the hive verifier.
+hive.setVerificationContextFetcher(() => {
+  const loaded = mailApprovals.snapshot();
+  return { sends: loaded.sends, proposals: loaded.proposals };
+});
+
 /** Does an email fit a standing approval: a separate quick model decides, never the agent. */
 const standingFit = standingFitCheck({
   // An empty folder only the app writes, never the office folder agents work

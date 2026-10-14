@@ -18,6 +18,7 @@
  * load it directly.
  */
 import { openAskIndexes } from './askMeRouting';
+import type { TaskVerification } from './taskVerification';
 
 export interface GuardCard {
   id: string;
@@ -26,6 +27,7 @@ export interface GuardCard {
   assignee?: string;
   nextAt?: string;
   humanQA?: unknown[];
+  verification?: TaskVerification;
   [field: string]: unknown;
 }
 
@@ -115,6 +117,11 @@ export function guardCards(raw: unknown[], before: GuardState): GuardResult {
       return { ...t, ...fixes[t.id] };
     }
     const placed = placedOf(t.id, before.placed[t.id]);
+    if (t.status === 'done' && t.verification?.status === 'failed') {
+      const fallback = placed ? placed.status : 'blocked';
+      fixes[t.id] = { status: fallback };
+      return { ...t, ...fixes[t.id] };
+    }
     if (t.status === 'triage' && placed) {
       untriaged.push({ card: t, to: placed.status });
       fixes[t.id] = { ...placed };
