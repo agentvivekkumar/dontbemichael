@@ -110,14 +110,64 @@ export function outboundPrompt(subject: string, body: string, nonce: string): st
   ].join('\n');
 }
 
-/** The first JSON object in the model's answer, read strictly. */
+/** The index just past the JSON object `s` opens with, or -1 when `s` does
+ *  not open with a whole object. Braces inside strings do not count. */
+function leadingObjectEnd(s: string): number {
+  if (s[0] !== '{') return -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * The JSON object the model's answer opens with, bare or in a code fence.
+ *
+ * Asked for JSON only, Haiku answers with the object in a fence and then, about
+ * two times in three, a sentence on why ("The message asks a general question
+ * about tax rates..."). Read strictly, every one of those was unreadable, so
+ * the check denied it: plain questions never reached Research, and most of
+ * Research's answers never reached the team.
+ *
+ * So text after the object is ignored, but nothing else is loosened. The
+ * answer must still START with the object; and a different decision anywhere
+ * after it (the model changed its mind, or quoted one) makes it unsure.
+ */
 function readJson(answer: string): Record<string, unknown> | null {
-  const a = answer.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
-  if (!a.startsWith('{') || !a.endsWith('}')) return null;
-  try {
-    const v = JSON.parse(a) as unknown;
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
-  } catch { return null; }
+  let a = answer.trim();
+  const fence = /^```[a-z]*[ \t]*\r?\n?/i.exec(a);
+  if (fence) a = a.slice(fence[0].length).trimStart();
+  const end = leadingObjectEnd(a);
+  if (end < 0) return null;
+  let rest = a.slice(end);
+  if (fence) {
+    // A fence left open is read as before only when nothing follows the object.
+    const close = rest.trimStart();
+    if (close.startsWith('```')) rest = close.slice(3);
+    else if (close) return null;
+  }
+  let v: unknown;
+  try { v = JSON.parse(a.slice(0, end)); } catch { return null; }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const decision = typeof o.decision === 'string' ? o.decision.trim().toUpperCase() : '';
+  const named = [
+    ...Array.from(rest.matchAll(/"decision"\s*:\s*"([^"]*)"/gi), (m) => m[1].trim().toUpperCase()),
+    ...Array.from(rest.matchAll(/\b(PASS|CLEAN|DENY)\b/g), (m) => m[1])
+  ];
+  return named.some((d) => d !== decision) ? null : o;
 }
 
 function kinds(v: unknown, settings: DataClassSettings): DataClassId[] | null {
