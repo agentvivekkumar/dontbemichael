@@ -51,6 +51,7 @@ test('a Codex agent gets a usage sample from its rollout', () => {
   assert.equal(s.model, 'gpt-5');
   assert.ok(s.usd > 0);
   assert.equal(s.sessionId, '', 'fallback samples stay out of the cost-ledger dedup gate');
+  assert.equal(s.transcriptSessionId, SID, 'the rollout\'s session id goes along for the lifetime ledger');
 });
 
 test('without a session id a Codex agent still reports no data', () => {

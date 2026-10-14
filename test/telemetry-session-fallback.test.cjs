@@ -103,4 +103,5 @@ test('D11: a returned fallback sample keeps sessionId empty (preserves the #56 c
   });
   const sample = telemetry.getAgentUsage('worker-x');
   assert.equal(sample.sessionId, '', 'a transcript-fallback sample must never look like a live OTel session');
+  assert.equal(sample.transcriptSessionId, undefined, 'Claude also reports through OTel, so its fallback stays out of the ledger');
 });

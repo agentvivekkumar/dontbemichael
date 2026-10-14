@@ -91,7 +91,7 @@ import { registerRealtimeIpc } from './realtime';
 import { registerRealtimeActionIpc } from './realtimeActions';
 import { initCompletionWatcher } from './realtimeCompletionWatcher';
 import type { TaskCard, InboxMessage } from './realtimeCompletionWatcher';
-import { TelemetryCollector } from './telemetry';
+import { TelemetryCollector, costLedgerRow } from './telemetry';
 import { CostLedgerTotals } from './costLifetime';
 import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
@@ -2061,6 +2061,10 @@ ipcMain.handle('office:addCredit', () => { void shell.openExternal(ANTHROPIC_BIL
  *  emit each BreakerState on control:breakerState (Seam 2), and enforce any
  *  escalation. God is in the LEDGER (cost visibility) but NOT the breaker inputs
  *  (the heartbeat manages god; we never auto-steer/kill the orchestrator). */
+/** agentId → the last transcript-fallback row written to the cost ledger, so a
+ *  frozen transcript is not appended again on every beat (see costLedgerRow). */
+const lastFallbackLedgerRow = new Map<string, string>();
+
 function runBreakerBeat(progressWindowMs: number): void {
   if (!hive.enabled()) return;
   const reg = hive.registry();
@@ -2086,7 +2090,11 @@ function runBreakerBeat(progressWindowMs: number): void {
     // (2,417 dupes observed). A truthy sessionId is set only by a live session
     // (aggregateLive picks the most-recent live session id), so this gates on
     // "is there a live session" without changing any live-agent behavior.
-    if (sample?.sessionId) hive.appendCostLedger(sample); // ledger covers everyone incl. god
+    // #358: a Codex agent has no live session, so its transcript total is the
+    // only record of its spend; costLedgerRow writes it under the transcript's
+    // session id, once per change, and still skips Claude's fallback.
+    const ledgerRow = costLedgerRow(sample, lastFallbackLedgerRow);
+    if (ledgerRow) hive.appendCostLedger(ledgerRow); // ledger covers everyone incl. god
     // Second source for the resume key. recordSession() is otherwise reachable
     // ONLY from the hook shim, so any window where hooks don't land leaves the
     // registry with no sessionId and "Restart & Continue" refuses to continue —

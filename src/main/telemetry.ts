@@ -51,6 +51,43 @@ export interface AgentUsageSample {
   /** Normalized model id (`claude-opus-4-8`, no `[1m]` suffix). */
   model: string;
   usd: number;
+  /** The session a transcript-fallback sample was read from, set ONLY when that
+   *  transcript is the engine's sole usage source (Codex today). `sessionId`
+   *  stays '' on every fallback sample, so nothing mistakes it for live OTel;
+   *  this field is what lets `costLedgerRow` still record the spend. */
+  transcriptSessionId?: string;
+}
+
+/**
+ * The row the breaker beat should append to `cost-ledger.jsonl` for `sample`,
+ * or null to append nothing. `lastFallback` is the caller's agentId → last
+ * written fallback row, kept across beats.
+ *
+ * A live OTel sample is written as it is, every beat (unchanged #56 behaviour).
+ * A transcript-fallback sample is written under its transcript's session id, so
+ * the lifetime fold (costLifetime.ts) keys it per session like any other row,
+ * but only when its numbers changed since the last row for that agent: an idle
+ * agent's frozen transcript would otherwise rewrite the same row every ~30s
+ * (the 2,417 duplicates #56 was about).
+ *
+ * Claude's transcript fallback never carries `transcriptSessionId`. Its session
+ * also reports through OTel, whose counter restarts with the app; a whole-session
+ * transcript total in the same (agent, session) fold would read that restart as
+ * a new segment and count the spend twice.
+ */
+export function costLedgerRow(
+  sample: AgentUsageSample | null,
+  lastFallback: Map<string, string>
+): AgentUsageSample | null {
+  if (!sample) return null;
+  if (sample.sessionId) return sample;
+  const sid = sample.transcriptSessionId;
+  if (!sid) return null;
+  const sig = [sid, sample.usd, sample.input, sample.output, sample.cacheRead, sample.cacheCreation].join('|');
+  if (lastFallback.get(sample.agentId) === sig) return null;
+  lastFallback.set(sample.agentId, sig);
+  const { transcriptSessionId: _sid, ...row } = sample;
+  return { ...row, sessionId: sid };
 }
 
 /** Breaker state, emitted by Lane A's policy on `control:breakerState` and
@@ -453,7 +490,10 @@ export class TelemetryCollector {
       cacheRead: u.cacheReadTokens,
       cacheCreation: u.cacheWriteTokens,
       model: u.model ?? '',
-      usd: u.estimatedCostUsd
+      usd: u.estimatedCostUsd,
+      // Codex sends no OTel, so its rollout total is the whole truth for this
+      // session and is safe to put in the lifetime ledger (see costLedgerRow).
+      ...(codexHome ? { transcriptSessionId: sessionId } : {})
     };
   }
 
