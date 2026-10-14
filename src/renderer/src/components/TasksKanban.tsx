@@ -605,11 +605,19 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
 
 function PriorityDots({ level }: { level: number }) {
   const { t } = useTranslation();
-  // 1 = lowest, 5 = highest (DESIGN.md 7.21): five dots, filled in ink.
+  // 1 = lowest, 5 = highest (DESIGN.md 7.21): five dots, color-coded by urgency
+  // so high-priority cards are instantly scannable without opening the detail view.
+  // Low (1-2): neutral ink; medium (3): amber; high (4-5): coral.
+  function dotColor(i: number): string {
+    if (i > level) return 'var(--cth-line-2)';
+    if (level >= 4) return 'var(--cth-coral-base)';
+    if (level === 3) return 'var(--cth-amber)';
+    return 'var(--cth-ink)';
+  }
   return (
     <span title={t('kanban.priority', { level })} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 30 }}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i <= level ? 'var(--cth-ink)' : 'var(--cth-line-2)' }} />
+        <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor(i) }} />
       ))}
     </span>
   );
