@@ -126,12 +126,39 @@ export function stripPathToken(raw: string): string {
  * `/tmp/dump.bin` reach the reveal branch while a bare `electron.43` on a prose
  * line stays dead text. It is a heuristic and it is meant to be: the cost of a
  * false positive is one underline that stats to nothing and does nothing.
+ *
+ * For tokens from quoted strings, we additionally check that they don't contain
+ * prose-like patterns (multiple words before the last separator) to avoid
+ * underlining things like "/ see notes.md" as paths.
  */
-export function isPathToken(token: string): boolean {
+export function isPathToken(token: string, raw?: string): boolean {
   const ext = extensionOf(token);
   if (!ext) return false;
   if (PREVIEW_EXTS.has(ext) || EDIT_EXTS.has(ext) || isImagePath(token)) return true;
-  return /[/\\]/.test(token);
+  
+  // Check if the token contains a path separator
+  if (!/[/\\]/.test(token)) return false;
+  
+  // If the token came from a quoted match, check for prose patterns
+  if (raw) {
+    const q = raw[0];
+    if (q === '"' || q === "'" || q === '`') {
+      // Extract content inside quotes
+      const quoted = raw.slice(1, raw.length - 1);
+      // Find the last path separator
+      const lastSepMatch = quoted.match(/[/\\][^/\\]*$/);
+      if (lastSepMatch) {
+        const beforeLastSep = quoted.substring(0, lastSepMatch.index);
+        // Check if there are multiple words (two or more spaces) before the last separator
+        // This catches patterns like "/ see notes.md" but allows "some/path/notes.md"
+        if (/\s+\S+\s+/.test(beforeLastSep)) {
+          return false;
+        }
+      }
+    }
+  }
+  
+  return true;
 }
 
 /**

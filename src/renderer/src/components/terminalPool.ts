@@ -967,7 +967,7 @@ const mdStatCache = new Map<string, { isFile: boolean; path: string }>();
 
 function resolvePathCandidate(ptyId: string, raw: string): string | null {
   const p = stripPathToken(raw);
-  if (!isPathToken(p)) return null;
+  if (!isPathToken(p, raw)) return null;
   if (p.startsWith('~/') || p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p)) return p;
   // relative → resolve against the owning agent's cwd. Async store import keeps
   // this module usable in the node test harness (no zustand/react at load).
