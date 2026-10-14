@@ -14,9 +14,9 @@
   <img src="./branding/reference/studio/home-light.png" alt="The office: a pod for each department around Michael's glass office, and the Needs you board on the right with what waits on you" width="1240">
 </picture>
 
-Pick your kind of business, pick your team, and Michael, your office manager, runs the office
-while you run the business. Every team member is an AI agent with a job, its own folder and its
-own memory, working on your computer.
+Pick your kind of business and choose your team. Michael, your office manager, runs the office while you run the business.
+
+Every team member is an AI agent with a clear job, its own folder, and its own memory. Everything runs on your computer.
 
 <p>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
@@ -62,25 +62,16 @@ own memory, working on your computer.
 ## What it is
 
 Don't Be Michael is a desktop app that runs a small office of AI team members for your business.
-Each team member is a [Claude Code](https://claude.com/claude-code) agent with a role: finance,
-customer support, sales, marketing and so on. Michael is the office manager. You talk to him; he
-routes the work, answers the team's questions, and asks you only when something needs your
-decision.
 
-Everything runs on your computer, on the Claude plan you already have. Each team member has a
-desk in an office you can watch, a pod for each department around Michael's glass office, so you
-can see who is working on what.
+Each team member is an AI agent with a specific role (finance, customer support, sales, marketing, and more). Michael is the office manager. You talk to him. He routes the work, answers the team’s questions, and only brings you the decisions that need your attention.
 
 ## How it differs from Munder Difflin
 
-Don't Be Michael grew out of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
-and it keeps that project's core: every team member is a real Claude Code process in its own
-terminal, and the team coordinates through the hive, a folder of plain files. What was built on
-top is a different product for a different person.
+Don't Be Michael grew out of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin). It keeps the same core idea: every team member is a real Claude Code process running in its own terminal, and the team coordinates through a shared folder of plain files called the hive.
 
-Munder Difflin is an agent harness for developers: it turns the coding CLIs you already run into
-clones of you. Don't Be Michael is an office for a small business owner who never opens a
-terminal. That changes almost every decision:
+What was built on top is a different product for a different person.
+
+Munder Difflin is an agent harness for developers. It turns the coding tools you already use into copies of you. Don't Be Michael is an office for small business owners who never want to open a terminal. That difference changes almost every decision:
 
 | | Munder Difflin | Don't Be Michael |
 |---|---|---|
@@ -98,8 +89,7 @@ business and want the work done without watching terminals, this is the better f
 
 ## Your team
 
-Setup asks for your business and your kind of business, then suggests a team from that business's
-Office Pack. You pick who joins, and you can hire more later.
+During setup, you tell the app your business name and the kind of business you run. It then suggests a starting team from that business type’s Office Pack. You choose who joins, and you can hire more people later.
 
 | Kind of business | Suggested team |
 |---|---|
