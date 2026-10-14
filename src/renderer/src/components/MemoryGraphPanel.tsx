@@ -390,7 +390,7 @@ function NodeTip({ node, memories }: { node: GraphNode; memories: Record<string,
         <div style={tipTitle}>{node.label}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}>
           <PixelBadge status={node.status} />
-          <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{t('memoryGraph.messageLinks', { count: node.degree })}</span>
+          <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{t(node.degree === 1 ? 'memoryGraph.messageLink' : 'memoryGraph.messageLinks', { count: node.degree })}</span>
         </div>
         <div style={tipBody}>{snippet}</div>
       </>
@@ -412,7 +412,7 @@ function EdgeTip({ edge, nodeById }: { edge: GraphEdge; nodeById: Map<string, Gr
     <>
       <div style={tipTitle}>{t('memoryGraph.pair', { a, b })}</div>
       <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--cth-violet-text)', margin: '3px 0' }}>
-        {t('memoryGraph.messagesCount', { count: edge.weight })}
+        {t(edge.weight === 1 ? 'memoryGraph.messageCount' : 'memoryGraph.messagesCount', { count: edge.weight })}
       </div>
       {edge.lastSubject && <div style={tipBody}>{t('memoryGraph.last', { subject: truncate(edge.lastSubject, 80) })}</div>}
     </>

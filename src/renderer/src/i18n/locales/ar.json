@@ -1458,6 +1458,7 @@
   "memoryGraph": {
     "refresh": "تحديث",
     "loadingMemory": "جارٍ تحميل الذاكرة…",
+    "messageLink": "{{count}} رابط رسائل",
     "messageLinks": "{{count}} رابط رسائل",
     "noMemory": "لم تُسجَّل أي ذاكرة بعد.",
     "rangeLabel": "الفترة الزمنية",
@@ -1473,6 +1474,7 @@
     },
     "noMessagesInRange": "لا توجد رسائل بين فريقك في هذه الفترة.",
     "pair": "{{a}} و{{b}}",
+    "messageCount": "{{count}} رسالة",
     "messagesCount": "{{count}} رسائل",
     "last": "الأخيرة: {{subject}}",
     "legendPerson": "شخص",
