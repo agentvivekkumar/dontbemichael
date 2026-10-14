@@ -27,7 +27,7 @@ const { HookServer } = loadTs('src/main/hooks.ts');
 const { HOOK_PATH_UNCHECKED } = loadTs('src/shared/hookEvents.ts');
 const F = loadTs('src/shared/folderAccess.ts');
 const R = loadTs('src/shared/research.ts');
-const { readResearchNotes, MAX_NOTES_TOTAL } = loadTs('src/main/researchNotes.ts');
+const { readResearchNotes, readResearchFile, MAX_NOTES_TOTAL } = loadTs('src/main/researchNotes.ts');
 
 const unix = { skip: process.platform === 'win32' ? 'unix socket paths' : false };
 
@@ -139,6 +139,22 @@ test('Pete\'s notes stop at the total a copy may carry', (t) => {
   assert.ok(out.length > 0);
   const src = fs.readFileSync(path.join(__dirname, '..', 'src/main/researchNotes.ts'), 'utf8');
   assert.match(src, /const buf = Buffer\.allocUnsafe\(st\.size \+ 1\);/, 'read to its size, from the open file');
+});
+
+test('Pete\'s notes still read where a path stat has no volume, as on Windows 11 24H2', (t) => {
+  // Value: protects=Pete's notes and mail reach the team on Windows 11 24H2; fails_when=the same file check compares a path stat's dev of 0 to the open file's real one; why_new=Node 22 on Windows 11 24H2 dropped every note; seam=fs.statSync
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-notes-dev-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'memory.md');
+  fs.writeFileSync(file, 'a note');
+  const realStat = fs.statSync;
+  t.after(() => { fs.statSync = realStat; });
+  fs.statSync = (p, o) => Object.assign(realStat(p, o), { dev: 0 });
+  assert.equal(readResearchFile(dir, file), 'a note');
+  assert.equal(readResearchNotes(dir), 'a note');
+  // The file id still has to match: a file swapped in is refused.
+  fs.statSync = (p, o) => Object.assign(realStat(p, o), { dev: 0, ino: -1 });
+  assert.equal(readResearchFile(dir, file), null);
 });
 
 test('a path with spaces around it is judged as Claude Code reads it, trimmed', { skip: process.platform === 'win32' ? 'posix paths' : false }, async (t) => {
