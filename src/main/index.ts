@@ -21,7 +21,7 @@ import {
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
 import { runHiddenClaude, setHiddenClaudeAuthEnv } from './hiddenClaude';
-import { makeTrustLayer, TRUST_MODEL, TRUST_TIMEOUT_MS } from './trustLayer';
+import { makeTrustLayer, TRUST_MAX_CHARS, TRUST_MODEL, TRUST_TIMEOUT_MS } from './trustLayer';
 import { dataClassSettings } from '../shared/dataClasses';
 import { RESEARCH_DESK_DIR, RESEARCH_ID, RESEARCH_WORK_STYLE } from '../shared/research';
 import { initAutoUpdater, abortPendingRestart } from './updater';
@@ -69,7 +69,7 @@ import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckReq
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { makeResearchGoal } from './researchGoal';
-import { ownResearchDir, readResearchNotes } from './researchNotes';
+import { checkNotesInParts, ownResearchDir, readResearchNotes } from './researchNotes';
 import { claudeProjectsRoot, projectDir, readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
 import { SlackWebhookServer, SlackReplyServer, postSlackReply, type SlackEventFile } from './slack';
@@ -691,10 +691,13 @@ async function researchNotesForPalace(id: string, agentDir: string): Promise<str
   // A copy the layer did not pass this time is not kept from last time.
   const clear = (): null => { try { rmSync(join(dir, 'memory.md'), { force: true }); } catch { /* next time */ } return null; };
   if (!text) return clear();
-  const v = await trustLayer.outbound({ subject: 'Research notes', body: text });
-  if (v.decision === 'deny') return clear();
+  // In parts small enough for one check each: one long note a web page talked
+  // Research into writing no longer empties what the team can search.
+  const subject = 'Research notes';
+  const kept = await checkNotesInParts(text, (body) => trustLayer.outbound({ subject, body }), TRUST_MAX_CHARS - subject.length);
+  if (kept === null) return clear();
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'memory.md'), `${v.body}\n`, 'utf8');
+  writeFileSync(join(dir, 'memory.md'), `${kept}\n`, 'utf8');
   return dir;
 }
 

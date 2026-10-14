@@ -128,3 +128,46 @@ export function readResearchNotes(agentDir: string): string {
   } catch { /* none */ }
   return parts.join('\n\n').trim();
 }
+
+/** Pieces joined with `sep` into parts of at most `max` characters. */
+function pack(pieces: string[], sep: string, max: number): string[] {
+  const out: string[] = [];
+  let cur = '';
+  for (const p of pieces) {
+    if (cur && cur.length + sep.length + p.length > max) { out.push(cur); cur = ''; }
+    cur = cur ? cur + sep + p : p;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** `text` cut for the trust layer (TODOS: "Check Pete's notes in parts"):
+ *  whole paragraphs packed into parts of at most `max` characters, and each
+ *  paragraph longer than that in pieces of its own, cut between lines. Each
+ *  inner list is judged together, so a paragraph in pieces is kept whole or
+ *  not at all: an instruction cut in two can't get through half by half. */
+export function notesInParts(text: string, max: number): string[][] {
+  const groups: string[][] = [];
+  const whole: string[] = [];
+  const flush = (): void => { groups.push(...pack(whole.splice(0), '\n\n', max).map((p) => [p])); };
+  for (const para of text.split(/\n{2,}/)) {
+    if (para.length <= max) { whole.push(para); continue; }
+    flush();
+    const lines = para.split('\n').flatMap((l) => (l.length <= max ? [l] : l.match(new RegExp(`[\\s\\S]{1,${max}}`, 'g')) ?? []));
+    groups.push(pack(lines, '\n', max));
+  }
+  flush();
+  return groups;
+}
+
+/** The notes checked part by part: what the check refuses is left out and
+ *  the rest is kept, cleaned. Null when nothing passes. */
+export async function checkNotesInParts(
+  text: string,
+  check: (body: string) => Promise<{ decision: string; body?: string }>,
+  max: number
+): Promise<string | null> {
+  const verdicts = await Promise.all(notesInParts(text, max).map((group) => Promise.all(group.map((p) => check(p)))));
+  const kept = verdicts.flatMap((vs) => (vs.every((v) => v.decision !== 'deny' && typeof v.body === 'string') ? [vs.map((v) => v.body).join('\n')] : []));
+  return kept.length ? kept.join('\n\n') : null;
+}
