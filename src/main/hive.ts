@@ -3712,16 +3712,21 @@ export class HiveManager {
     try { this.guardBoard(); } catch (e) { console.error('[hive] board guard:', e); }
     const raw = this.tasks() as { tasks?: unknown };
     const tasks = Array.isArray(raw?.tasks) ? (raw.tasks as CardLike[]) : [];
-    // A card that has ended (Done, or closed by the owner) needs no routing,
-    // unless the owner answered after it closed: an open question stays on Ask
-    // me on a Done card, and that answer is still Michael's to route. Only an
-    // owner's close is timed (closedAt; a card keeps no other update time), so
-    // a request on a card Michael or the app marked Done is taken as settled.
-    const closedAt = new Map(tasks.filter((t) => t?.status === 'done').map((t) => [t.id, (t as { closedAt?: unknown }).closedAt]));
+    // The owner ending a card settles what was already waiting on it: they
+    // closed the matter, so an answer given before needs no routing, and one
+    // given after still does. An owner close is marked closedBy, which is what
+    // the house rules ask every agent to write, and it is timed only when the
+    // app made it (closedAt; a card keeps no other update time), so a close
+    // Michael recorded in the owner's words settles what waited. A card ended
+    // any other way settles nothing, because Michael is the one who still has
+    // to route the owner's answer on it
+    // (TODOS.md, "Owner requests on cards Michael marked Done").
+    const ended = new Map(tasks.filter((t) => t?.status === 'done').map((t) => [t.id, t as { closedAt?: unknown; closedBy?: unknown }]));
     this.ownerRequestsCache = openOwnerRequests(toMichael, fromMichael, aliases).filter((r) => {
-      if (!closedAt.has(r.taskId)) return true;
-      const at = closedAt.get(r.taskId);
-      return typeof at === 'string' && r.createdAt > at;
+      const card = ended.get(r.taskId);
+      if (!card || card.closedBy !== 'owner') return true;
+      const at = card.closedAt;
+      return typeof at === 'string' ? r.createdAt > at : false;
     });
     // The same tick finds Blocked cards nothing is moving (card-lifecycle.md
     // section 7): no open ask, no open owner request; and open questions held

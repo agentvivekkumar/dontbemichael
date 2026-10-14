@@ -273,8 +273,8 @@ test('the launch catch-up sends every answer since the card\'s last owner reques
   assert.deepEqual(out.map((x) => [x.task.id, x.q]), [['two', 'Q1?'], ['two', 'Q3?'], ['moved', 'Q?'], ['old-and-new', 'New?']]);
 });
 
-test('an owner request on a Done card stays open only when it came after the owner closed the card', async (t) => {
-  // Value: protects=an answer given after a card closed still reaches Michael's open requests, and one settled by the close is dropped; fails_when=every request on a Done card is dropped, or one older than the close lingers; why_new=pre-landing review 2026-10-05; seam=none
+test('an owner request on a Done card is settled only by a close the owner made', async (t) => {
+  // Value: protects=an answer given after the owner closed a card still reaches Michael's open requests, one the close settled is dropped, and a card ended without an owner close settles nothing; fails_when=every request on a Done card is dropped, one older than the owner's close lingers, or a card Michael ended is taken as settling the answer on it; why_new=pre-landing review 2026-10-05, extended by TODOS.md "Owner requests on cards Michael marked Done"; seam=none
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-owner-req-done-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
@@ -282,13 +282,35 @@ test('an owner request on a Done card stays open only when it came after the own
   const before = hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card early', body: 'x', conversation: 'card:early' }, 'human');
   const after = hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card late', body: 'x', conversation: 'card:late' }, 'human');
   hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card plain', body: 'x', conversation: 'card:plain' }, 'human');
+  hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card recorded', body: 'x', conversation: 'card:recorded' }, 'human');
   const shift = (iso, ms) => new Date(Date.parse(iso) + ms).toISOString();
   hive.writeTasks([
     { id: 'early', title: 'Early', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', closedBy: 'owner', closedAt: shift(before.created_at, 60_000) },
     { id: 'late', title: 'Late', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', closedBy: 'owner', closedAt: shift(after.created_at, -60_000) },
-    { id: 'plain', title: 'Plain', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'finished' }
+    // Ended without an owner close, so nothing settled the answer on it.
+    { id: 'plain', title: 'Plain', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'finished' },
+    // The owner closed it and Michael recorded that in the owner's words, the
+    // way the house rules ask. The app did not make the close, so it carries
+    // no time, and it still settles the answer that was already waiting.
+    { id: 'recorded', title: 'Recorded', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', closedBy: 'owner', closedReason: 'the owner said to drop it' }
   ]);
-  assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['late']);
+  assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['late', 'plain']);
+});
+
+test('an owner answer on a card Michael ended in the ledger himself is still his to route', async (t) => {
+  // Value: protects=the owner's answer still reaches Michael's open requests when he, not the owner, ended the card, including when he writes tasks.json himself; fails_when=only an owner's close is taken as a close, so a card ended any other way settles the answer on it; why_new=TODOS.md "Owner requests on cards Michael marked Done"; seam=none
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-owner-req-ledger-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true });
+  // Michael is the board's only scribe and writes tasks.json himself, so the
+  // card is Done with no owner close and no close time of any kind.
+  fs.mkdirSync(path.join(home, 'hive'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'hive', 'tasks.json'), JSON.stringify({
+    tasks: [{ id: 'ledger', title: 'Ledger', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'finished' }]
+  }));
+  hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card ledger', body: 'x', conversation: 'card:ledger' }, 'human');
+  assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['ledger']);
 });
 
 test('Michael withdraws a question on a card the owner moved, and never moves that card back', () => {
