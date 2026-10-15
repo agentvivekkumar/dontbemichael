@@ -690,6 +690,14 @@
     "researchEngine": "{{name}} runs only on Claude, where the privacy protection works.",
     "researchName": "Name them anything. Whatever you call them, they stay your Research team member, the one who uses the internet."
   },
+  "workStyleReview": {
+    "title": "What {{name}} will follow",
+    "intro": "The app wrote these instructions from your work style. Nothing is saved until you use them.",
+    "simpler": "The full instructions couldn't be written just now, so these are a simpler version made straight from your words. Use them now, or change the work style and try again later.",
+    "change": "Change work style",
+    "use": "Use these and save",
+    "useAndHire": "Use these and hire {{name}}"
+  },
   "onboarding": {
     "damagedConfig": "Your saved settings could not be read, so setup starts again. The old file is kept at",
     "resume": {
