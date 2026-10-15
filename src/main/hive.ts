@@ -750,6 +750,11 @@ export class HiveManager {
    *  without a restart (knowledgeUpdate). */
   private knowledgeTold = new Map<string, boolean>();
 
+  /** agentId → per-spawn hook authentication token. In-memory only, created on spawn,
+   *  revoked on archive/respawn. Used to derive agent identity for incoming hook frames
+   *  rather than trusting the untrusted `agent_id` claim in the frame. */
+  private hookTokens = new Map<string, string>();
+
   /**
    * What a running agent should be told because the owner turned company
    * knowledge on or off since it was last told, or null when nothing changed.
@@ -761,6 +766,44 @@ export class HiveManager {
     if (k.active && !k.cliPath) return null;
     this.knowledgeTold.set(agentId, k.active);
     return k.active ? companyKnowledgeLine(this.nodeCommand(), k.cliPath!, k.root, k.meaning) : COMPANY_KNOWLEDGE_OFF;
+  }
+
+  /** Generate a cryptographically random per-agent hook authentication token.
+   *  Tokens are at least 32 bytes of randomness (64 hex chars) — sufficient for
+   *  brute-force resistance and constant-time comparison. */
+  private generateHookToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  /** Create and store a fresh token for the given agent, revoking any previous one.
+   *  Called on spawn/respawn; the returned token is injected into the agent's env. */
+  setHookToken(agentId: string): string {
+    const token = this.generateHookToken();
+    this.hookTokens.set(agentId, token);
+    return token;
+  }
+
+  /** Return the current token for an agent, or undefined if none is active. */
+  getHookToken(agentId: string): string | undefined {
+    return this.hookTokens.get(agentId);
+  }
+
+  /** Revoke the token for an agent (on archive/respawn/shutdown). */
+  revokeHookToken(agentId: string): void {
+    this.hookTokens.delete(agentId);
+  }
+
+  /** Validate an incoming frame's token, returning the authenticated agent id if
+   *  the token matches a live agent. Constant-time comparison is used to avoid
+   *  timing leaks. */
+  authenticateHookFrame(token: string | undefined): string | undefined {
+    if (!token) return undefined;
+    for (const [agentId, expected] of this.hookTokens.entries()) {
+      if (expected.length === token.length && crypto.timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(token, 'utf8'))) {
+        return agentId;
+      }
+    }
+    return undefined;
   }
 
   /** The embedded OTLP collector's loopback URL, set by the main process once the
@@ -1230,6 +1273,11 @@ export class HiveManager {
       HIVE_ROOT: root,
       AGENT_DIR: dir
     };
+    // Mint a fresh hook authentication token for this spawn. The token is stored
+    // in memory only, injected into the agent's environment so the shim and proxy
+    // sidecar can include it in every frame, and revoked on archive/respawn.
+    const hookToken = this.setHookToken(meta.id);
+    env.HIVE_HOOK_TOKEN = hookToken;
     // The bundled-node launcher, so an agent can run the hive's .cjs helpers (KG
     // CLI, Slack reply helper) even when `node` is not on its PATH. Invoking the
     // Electron binary directly would open a second app window, so this must stay
@@ -1514,6 +1562,9 @@ export class HiveManager {
       this.atomicWriteJson(join(root, 'registry.json'), reg);
       this.appendLog({ kind: 'archive', agentId: id, archived });
       this.commit(`hive: ${archived ? 'archive' : 'unarchive'} ${id}`);
+      // Revoke hook token on archive: the old spawn identity is no longer valid.
+      // Token will be minted anew on the next spawn.
+      if (archived) this.revokeHookToken(id);
     } catch { /* best-effort — never crash a lifecycle handler */ }
   }
   /** Mark (or clear) that the owner closed this agent. Best-effort, like setArchived. */
@@ -5624,6 +5675,9 @@ process.stdin.on('end', () => {
   const me = process.env.AGENT_ID || null;
   if (me && payload.agent_id && payload.agent_id !== me) payload.subagent_id = payload.agent_id;
   payload.agent_id = me || payload.agent_id || null;
+  // Attach the per-spawn hook authentication token so the server can derive
+  // agent identity from the token rather than trusting agent_id in the payload.
+  if (process.env.HIVE_HOOK_TOKEN) payload.hook_token = process.env.HIVE_HOOK_TOKEN;
   const sock = process.env.HIVE_SOCK;
   if (isStatus) {
     // Status-line mode: Claude Code pipes the session status JSON (incl.
@@ -5751,6 +5805,7 @@ process.stdin.on('end', () => {
   const payload = {
     hook_event_name: event,
     agent_id: agentId,
+    hook_token: process.env.HIVE_HOOK_TOKEN || null,
     session_id: agy.conversationId,
     transcript_path: agy.transcriptPath,
     cwd: Array.isArray(agy.workspacePaths) ? agy.workspacePaths[0] : undefined,
@@ -5802,6 +5857,7 @@ function post(payload) {
   try {
     if (!SOCK) return;
     payload.agent_id = payload.agent_id || AGENT;
+    if (process.env.HIVE_HOOK_TOKEN) payload.hook_token = process.env.HIVE_HOOK_TOKEN;
     var c = net.createConnection(SOCK, function () { try { c.end(JSON.stringify(payload) + '\\n'); } catch (e) {} });
     c.on('error', function () {});
   } catch (e) {}
@@ -5839,6 +5895,7 @@ function post(payload) {
   try {
     if (!SOCK) return;
     payload.agent_id = payload.agent_id || AGENT;
+    if (process.env.HIVE_HOOK_TOKEN) payload.hook_token = process.env.HIVE_HOOK_TOKEN;
     const c = createConnection(SOCK, () => { try { c.end(JSON.stringify(payload) + '\\n'); } catch (e) {} });
     c.on('error', () => {});
   } catch (e) {}
@@ -5897,6 +5954,7 @@ function ctxSize(model) {
 // Fire-and-forget emit of a shim-shaped payload to the hive socket. Never throws.
 function emit(payload) {
   if (!SOCK) return;
+  if (process.env.HIVE_HOOK_TOKEN) payload.hook_token = process.env.HIVE_HOOK_TOKEN;
   try {
     const c = net.createConnection(SOCK, function () { c.end(JSON.stringify(payload) + '\\n'); });
     c.on('error', function () {});
@@ -6109,7 +6167,8 @@ process.stdin.on('end', () => {
   const payload = {
     ...gemini,
     hook_event_name: names[gemini.hook_event_name] || gemini.hook_event_name || 'Unknown',
-    agent_id: agentId
+    agent_id: agentId,
+    hook_token: process.env.HIVE_HOOK_TOKEN || null
   };
   let resp = '';
   const done = () => {
@@ -6175,6 +6234,7 @@ process.stdin.on('end', () => {
   const payload = {
     hook_event_name: names[grok.hookEventName] || grok.hookEventName || 'Unknown',
     agent_id: agentId,
+    hook_token: process.env.HIVE_HOOK_TOKEN || null,
     session_id: grok.sessionId,
     cwd: grok.cwd || grok.workspaceRoot,
     tool_name: grok.toolName,

@@ -105,6 +105,10 @@ const PATH_FREE_TOOLS: ReadonlySet<string> = new Set(['Grep']);
 interface HookPayload {
   hook_event_name?: string;
   agent_id?: string | null;
+  /** Authentication token for this agent's current spawn. Supplied by the shim/env
+   *  from HIVE_HOOK_TOKEN. The hook server authenticates the frame by matching this
+   *  token against the live token map, ignoring the untrusted agent_id claim. */
+  hook_token?: string;
   /** Set by the shim when the call came from a Task subagent of agent_id. */
   subagent_id?: string;
   session_id?: string;
@@ -375,7 +379,24 @@ export class HookServer {
   }
 
   private handle(p: HookPayload): unknown {
-    const agentId = p.agent_id ?? undefined;
+    // Authenticate the frame first: derive agent identity from the token, not from the
+    // untrusted payload.agent_id. Reject frames with missing/invalid tokens to prevent
+    // impersonation.
+    const token = p.hook_token;
+    const authenticatedAgentId = this.hive.authenticateHookFrame(token);
+    if (!authenticatedAgentId) {
+      // Log rejection for diagnostics but do not use the untrusted agent_id.
+      this.hive.appendLog({
+        kind: 'hook-frame-rejected',
+        reason: 'authentication-failed',
+        providedAgentId: p.agent_id ?? null,
+        hasToken: !!token
+      });
+      return {};
+    }
+    // Override payload's agent_id with the authenticated identity for the rest of the
+    // handler. The payload's agent_id is still available for subagent checks.
+    const agentId = authenticatedAgentId;
     const event = p.hook_event_name ?? 'Unknown';
     // A Task subagent's calls are checked as its team member (every gate below),
     // but its own finish, transcript and session are not the agent's: a
