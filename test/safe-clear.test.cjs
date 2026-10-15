@@ -148,6 +148,41 @@ test('no handoff within ten minutes: give up, leave the conversation alone', (t)
   assert.ok(!r.typed.includes('/clear'));
 });
 
+test('a session start cancels the previous session\'s pending clear', (t) => {
+  const r = rig(t);
+  r.clearer.beat();
+  r.writeHandoff('Nothing open.');
+  r.clearer.noteHook('oscar', 'Stop');
+  r.tick(5_000);
+  // Restart & Continue can reuse the agent id while an ask is in flight.
+  r.clearer.noteHook('oscar', 'SessionStart');
+  r.tick(30_000); r.set({ idleMs: 30_000 });
+  r.clearer.beat();
+  assert.ok(!r.typed.includes('/clear'), 'the old Stop must not clear the new session');
+  assert.equal(r.clears.length, 0, 'no conversation is recorded as cleared');
+  assert.equal(fs.existsSync(r.handoff), false, 'the old handoff is discarded');
+  assert.equal(r.log.at(-1).kind, 'clear-cancelled');
+  assert.equal(r.log.at(-1).reason, 'session-start');
+});
+
+test('after a session start, clearing needs a fresh handoff and Stop', (t) => {
+  const r = rig(t);
+  r.clearer.beat();
+  r.clearer.noteHook('oscar', 'SessionStart');
+  r.tick(45 * 60_000);
+  r.clearer.beat();
+  assert.equal(r.typed.length, 2, 'a fresh ask is sent when the new session is idle');
+  r.writeHandoff('Nothing open in the new session.');
+  r.tick(30_000); r.set({ idleMs: 30_000 });
+  r.clearer.beat();
+  assert.ok(!r.typed.includes('/clear'), 'a handoff alone is insufficient');
+  r.clearer.noteHook('oscar', 'Stop');
+  r.tick(30_000);
+  r.clearer.beat();
+  assert.deepEqual(r.typed.slice(2), ['/clear']);
+  assert.equal(r.clears.length, 1);
+});
+
 test('the hive answers what is open, keeps the handoff for one session start, and restores a session', async (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-safeclear-hive-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
