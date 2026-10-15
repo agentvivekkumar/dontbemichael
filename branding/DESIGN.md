@@ -1503,9 +1503,10 @@ hero, no cards, Download the only call to action. One column at about 70 charact
 then six sections under h2s: Who reaches what (one table: your team, Michael and Pete
 against web pages and search, your files and mailboxes, and connectors), The trust layer
 (out: as written, cleaned or not sent; in: instructions removed, the answer labelled, an answer
-that tries to steer flagged to Michael; nothing goes through when the check can't run), Links
-in the app (every link in a reply names the site it opens, and shows the real one when the
-words name a different site, §7.8; owner, 2026-10-15), What stays private (the twelve kinds with their defaults), What goes to Claude, and Where your data
+that tries to steer flagged to Michael; nothing goes through when the check can't run), What
+stays private (the twelve kinds with their defaults), Links in the app (every link in a reply
+names the site it opens, and shows the real one when the words name a different site, §7.8;
+owner, 2026-10-15), What goes to Claude, and Where your data
 lives. Every sentence holds on Mac and Windows; the page states no limit notes. Headings sit
 closer to their text than to the section above; the page never scrolls sideways at 320 px.
 ---
@@ -1740,7 +1741,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-09-28 | (v1) Web: Pro offering removed; nav cut to four links plus Download. |
 | 2026-09-24 | (v1) One spec for app and web, moved into `branding/` with the brand kit. |
 | 2026-10-14 | Web: the privacy section after the Sending block, a Privacy first badge, a three position trust layer switch with the app's Privacy check notes and Pete's labelled answer, and Settings, Research & privacy as a read only picture; Pete's globe avatar; the /security page to read (§9.15, §9.16). |
-| 2026-10-15 | Web: the Files notes swap the five tab limit for what the office reads (Excel exports from accounting and payroll software, long PDFs, PowerPoint decks), PDF and Office opening joins the first note (§9.15); `/security` gains a Links in the app section (§9.16) (owner, 2026-10-15). |
+| 2026-10-15 | Web: the Files notes swap the five tab limit for what the office reads (Excel exports from accounting and payroll software, long PDFs, PowerPoint decks), PDF and Office opening joins the first note (§9.14); `/security` gains a Links in the app section (§9.16) (owner, 2026-10-15). |
 
 ---
 
