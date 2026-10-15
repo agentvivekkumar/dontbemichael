@@ -17,6 +17,7 @@ import { resultHeadline, waitsOnHuman, type HiveTask, type TaskStatus, nextAtLab
 import { FileText, useAskFileChecks } from './FileChip';
 import { blockedWithNothingAsked, michaelCardState, type WorkHours } from '@shared/ownerRequests';
 import { isAnswered, isWithdrawn } from '@shared/askMeRouting';
+import { canRetryTask, failedAtLabel, taskAfterRetry, taskFailure } from '@shared/taskFailure';
 
 type Status = TaskStatus;
 
@@ -108,6 +109,21 @@ export function TasksKanban() {
       const result = await window.cth.hiveCloseTask(id);
       if (!result.ok) void refresh();
     } catch { /* keep last good; the next poll re-syncs from disk */ }
+  }, [refresh]);
+
+  // Retry asks Michael to try a safe failed card again. The button stays
+  // disabled until this returns, and main refuses a second retry of a card
+  // that has already left the failed state.
+  const retryTask = useCallback(async (id: string) => {
+    try {
+      const result = await window.cth.hiveRetryTask(id);
+      if (result.ok) updateNeedsYouTasks((prev) => prev.map((t) => (t.id === id ? (taskAfterRetry(t) ?? t) : t)));
+      void refresh();
+      return { ok: !!result.ok };
+    } catch {
+      void refresh();
+      return { ok: false };
+    }
   }, [refresh]);
 
   const restorableAgents = useStore((s) => s.restorableAgents);
@@ -228,6 +244,7 @@ export function TasksKanban() {
                     godName={godName}
                     onOpen={() => openTaskDetail(x.id)}
                     onDismiss={() => dismissTask(x.id)}
+                    onRetry={() => retryTask(x.id)}
                   />
                 ))}
                 {col.key === 'done' && !filtering && all.length > DONE_SHOWN && (
@@ -246,12 +263,103 @@ export function TasksKanban() {
 }
 
 // ─── Card ────────────────────────────────────────────────────────────────────
-// Deliberately minimal — a colored status edge, the task id, the title, a
-// whisper of an assignee. Everything else (the full contract, deps, controls)
-// lives in the detail view a click away: a kanban card can carry little more
-// than a title.
+// Deliberately small: the id, the title, a whisper of an assignee. A failed
+// card also says why, when, and how many retries, with Retry when trying
+// again is safe. Everything else lives in the detail view a click away.
 
-function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, onOpen, onDismiss }: {
+/** One retry in flight per card. A second click while it runs, or after the
+ *  card has left the failed state, does not send another. */
+function useTaskRetry(task: HiveTask, onRetry: () => Promise<{ ok: boolean }>) {
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const run = () => {
+    if (lock.current || busy || !canRetryTask(task)) return;
+    lock.current = true;
+    setBusy(true);
+    void onRetry().finally(() => {
+      lock.current = false;
+      setBusy(false);
+    });
+  };
+  return { busy, run, failure: taskFailure(task), eligible: canRetryTask(task) };
+}
+
+function retryCountText(count: number, none: string, once: string, many: string): string {
+  if (count <= 0) return none;
+  if (count === 1) return once;
+  return many;
+}
+
+/** Failure reason, time and retry count, plus Retry when the card can safely
+ *  be tried again. The action is its own button, never nested in the card's
+ *  open button, so a retry does not also open the detail. */
+function TaskFailureView({ task, onRetry, variant, onOpen }: {
+  task: HiveTask;
+  onRetry: () => Promise<{ ok: boolean }>;
+  variant: 'card' | 'detail';
+  /** The board card opens its detail from the failure text. Retry stops that click. */
+  onOpen?: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const rtl = useRtl();
+  const retry = useTaskRetry(task, onRetry);
+  if (!retry.failure) return null;
+  const when = failedAtLabel(retry.failure.failedAt, i18n.language);
+  const detail = variant === 'detail';
+  return (
+    <div
+      data-failure
+      data-failure-state={retry.busy ? 'retrying' : 'failed'}
+      role="status"
+      aria-busy={retry.busy || undefined}
+      onClick={onOpen}
+      style={detail ? {
+        display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 'var(--cth-r-lg)',
+        background: 'var(--cth-coral-soft)',
+        boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cth-coral-base) 30%, transparent)'
+      } : {
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5, padding: '0 12px 11px',
+        cursor: onOpen ? 'pointer' : undefined
+      }}
+    >
+      <span data-failure-status style={{
+        alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 999,
+        fontSize: 10.5, fontWeight: 600,
+        background: detail ? 'var(--cth-card)' : 'var(--cth-coral-soft)', color: 'var(--cth-coral-text)'
+      }}>{retry.busy ? t('kanban.retrying') : t('kanban.failed')}</span>
+      {retry.failure.reason && (
+        <span data-failure-reason dir={rtl ? 'auto' : undefined} style={{
+          fontSize: detail ? 12.5 : 12, lineHeight: detail ? '18px' : '16px', color: 'var(--cth-ink)', wordBreak: 'break-word',
+          ...(detail ? { whiteSpace: 'pre-wrap' } : {
+            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+          })
+        }}>{retry.failure.reason}</span>
+      )}
+      {when && <span data-failure-time style={{ fontSize: 11.5, color: 'var(--cth-ink-2)' }}>{t('kanban.failedWhen', { when })}</span>}
+      <span data-failure-retries data-retry-count={retry.failure.retryCount} style={{ fontSize: 11.5, color: 'var(--cth-ink-2)' }}>
+        {retryCountText(
+          retry.failure.retryCount,
+          t('kanban.retryNone'),
+          t('kanban.retryOnce'),
+          t('kanban.retryMany', { count: retry.failure.retryCount })
+        )}
+      </span>
+      {(retry.eligible || retry.busy) && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PixelButton
+            variant="secondary"
+            size="sm"
+            disabled={retry.busy}
+            title={t('kanban.retryTaskTitle')}
+            onClick={retry.run}
+          >{retry.busy ? t('kanban.retrying') : t('kanban.retryTask')}</PixelButton>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, onOpen, onDismiss, onRetry }: {
   task: HiveTask;
   accent: string;
   done?: boolean;
@@ -261,20 +369,27 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
   godName: string;
   onOpen: () => void;
   onDismiss: () => void;
+  onRetry: () => Promise<{ ok: boolean }>;
 }) {
   const { t, i18n } = useTranslation();
   const [hover, setHover] = useState(false);
   const next = nextAtLabel(task.nextAt, i18n.language);
   return (
-    <div style={{ position: 'relative', display: 'flex' }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div
+      style={{
+        position: 'relative', display: 'flex', flexDirection: 'column', borderRadius: 'var(--cth-r-lg)',
+        background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)'
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <button
         onClick={onOpen}
         title={t('kanban.openTaskDetails')}
         style={{
-          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5, padding: '11px 12px',
+          width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5, padding: '11px 12px',
           border: 'none', cursor: 'pointer', textAlign: 'start', borderRadius: 'var(--cth-r-lg)',
-          background: 'var(--cth-card)', boxShadow: 'inset 0 0 0 1px var(--cth-line), var(--cth-shadow-sm)',
-          fontFamily: 'var(--cth-font-ui)'
+          background: 'transparent', fontFamily: 'var(--cth-font-ui)'
         }}
       >
         {/* The id the god writes into tasks.json: cards are referred to by id in
@@ -336,6 +451,7 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
           </span>
         )}
       </button>
+      {!done && <TaskFailureView task={task} onRetry={onRetry} onOpen={onOpen} variant="card" />}
       {waitsOnHuman(task) && (
         <span title={t('kanban.needsYouTitle')} style={{
           position: 'absolute', top: 9, insetInlineEnd: 10, width: 18, height: 18, borderRadius: '50%', display: 'grid', placeItems: 'center',
@@ -373,7 +489,7 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
 // the big stage instead of the narrow side panel. Exported for App's
 // TaskDetailOverlay; opened via the store's openTaskDetail from anywhere.
 
-export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign, onClose }: {
+export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign, onRetry, onClose }: {
   task: HiveTask;
   all: HiveTask[];
   assigneeName?: string;
@@ -381,6 +497,7 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
   /** Out of Done, into To do, with the owner's reason (card-lifecycle.md 10). */
   onReopen: (reason: string) => void;
   onAssign: () => void;
+  onRetry: () => Promise<{ ok: boolean }>;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -480,6 +597,14 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
               </span>
             </div>
           </div>
+
+          {/* Why a failed card stopped, and Retry when trying again is safe. */}
+          {task.status !== 'done' && taskFailure(task) && (
+            <div>
+              {label(t('kanban.failureTitle'))}
+              <TaskFailureView task={task} onRetry={onRetry} variant="detail" />
+            </div>
+          )}
 
           {/* What came of a Done card, in Michael's words, first (issue 51):
               never checked or invented, and nothing when he wrote none. */}

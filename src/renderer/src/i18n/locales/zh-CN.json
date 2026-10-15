@@ -1593,7 +1593,16 @@
     "ageDays": "{{count}} 天",
     "closedByOwner": "由负责人关闭",
     "nothingAsked": "没有提问",
-    "nothingAskedTitle": "已阻塞，但没有等待你回答的问题。{{godName}} 会被提醒向你提问或移动它。"
+    "nothingAskedTitle": "已阻塞，但没有等待你回答的问题。{{godName}} 会被提醒向你提问或移动它。",
+    "failed": "失败",
+    "failureTitle": "出了什么问题",
+    "failedWhen": "失败于 {{when}}",
+    "retryNone": "还没有再试",
+    "retryOnce": "已经再试过一次",
+    "retryMany": "已经再试过 {{count}} 次",
+    "retryTask": "重试此任务",
+    "retrying": "正在重试",
+    "retryTaskTitle": "请 {{godName}} 再试一次。已经完成的步骤不会重复。"
   },
   "queueComposer": {
     "recording": "● 录音中，点击停止转写",

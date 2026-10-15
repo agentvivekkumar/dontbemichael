@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store/store';
+import { taskAfterRetry } from '@shared/taskFailure';
+import { updateNeedsYouTasks } from '@/shell/useNeedsYou';
 import { TaskDetail, parseTasks, type HiveTask } from './TasksKanban';
 
 /**
@@ -69,6 +71,22 @@ export function TaskDetailOverlay() {
     } catch { void refresh(); }
   };
 
+  const retry = async () => {
+    try {
+      const result = await window.cth.hiveRetryTask(task.id);
+      if (result.ok) {
+        const apply = (t: HiveTask) => (t.id === task.id ? (taskAfterRetry(t) ?? t) : t);
+        setTasks((prev) => prev.map(apply));
+        updateNeedsYouTasks((prev) => prev.map(apply));
+      }
+      void refresh();
+      return { ok: !!result.ok };
+    } catch {
+      void refresh();
+      return { ok: false };
+    }
+  };
+
   const assign = () => {
     // Route through the Command Center's dispatch box (which mails the god —
     // the human never writes into a worker's inbox directly).
@@ -89,6 +107,7 @@ export function TaskDetailOverlay() {
       onMove={(s) => void move(s)}
       onReopen={(reason) => void reopen(reason)}
       onAssign={assign}
+      onRetry={retry}
       onClose={closeTaskDetail}
     />
   );

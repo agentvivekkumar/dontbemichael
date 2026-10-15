@@ -97,7 +97,7 @@ const UI_CODE = [
   'src/renderer/src/hooks/useRestoreTeam.ts',
   ...['updateState', 'toolCatalog', 'releaseDrop', 'claudeCommands', 'codexCommands', 'hire', 'integrations',
     'manifestFields', 'ossModels', 'imageTypes', 'triggers', 'agentDefinition', 'officePack', 'officeRoles',
-    'teamPlan', 'businessProfile'].map((f) => `src/shared/${f}.ts`),
+    'teamPlan', 'businessProfile', 'taskFailure'].map((f) => `src/shared/${f}.ts`),
   ...['docText', 'docTextCli', 'agentFolders', 'skills', 'git', 'webhook', 'control', 'breaker', 'hooks',
     'cliInstall', 'realtime', 'harnessGuard', 'packs'].map((f) => `src/main/${f}.ts`)
 ];

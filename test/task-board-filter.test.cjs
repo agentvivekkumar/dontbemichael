@@ -33,6 +33,7 @@ test('the search matches the title, description, result and id, in any case', ()
   assert.equal(taskMatches(card({ result: 'Quote accepted' }), { query: 'accepted', assignee: '' }), true);
   assert.equal(taskMatches(card(), { query: 't_42', assignee: '' }), true);
   assert.equal(taskMatches(card(), { query: 'invoice', assignee: '' }), false);
+  assert.equal(taskMatches(card({ failureReason: 'The supplier site timed out' }), { query: 'timed out', assignee: '' }), true);
 });
 
 test('every typed word must appear, in any order', () => {

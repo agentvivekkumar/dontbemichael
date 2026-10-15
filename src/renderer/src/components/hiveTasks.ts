@@ -51,6 +51,12 @@ export interface HiveTask {
   /** What came of the card, in Michael's words: he writes it when he marks the
    *  card Done (issue 51). Shown on the card, never checked or invented. */
   result?: string;
+  /** Why the work failed, when, and how many retries have already happened.
+   *  `retryable` is true only when trying the same work again is safe. */
+  failureReason?: string;
+  failedAt?: string;
+  retryCount?: number;
+  retryable?: boolean;
 }
 
 /** The card's open questions for the human, oldest first: every ask with no
@@ -134,7 +140,11 @@ export function parseTasks(raw: unknown): HiveTask[] {
         : undefined,
       closedBy: t.closedBy === 'owner' ? 'owner' as const : undefined,
       closedReason: typeof t.closedReason === 'string' ? t.closedReason : undefined,
-      result: typeof t.result === 'string' && t.result.trim() ? t.result : undefined
+      result: typeof t.result === 'string' && t.result.trim() ? t.result : undefined,
+      failureReason: typeof t.failureReason === 'string' && t.failureReason.trim() ? t.failureReason.trim().slice(0, 500) : undefined,
+      failedAt: typeof t.failedAt === 'string' && Number.isFinite(Date.parse(t.failedAt)) ? t.failedAt : undefined,
+      retryCount: typeof t.retryCount === 'number' && Number.isInteger(t.retryCount) && t.retryCount >= 0 && t.retryCount <= 999 ? t.retryCount : undefined,
+      retryable: t.retryable === true ? true : t.retryable === false ? false : undefined
     }));
 }
 
@@ -184,11 +194,12 @@ export function filterActive(f: TaskFilter): boolean {
 }
 
 /** Does a card pass the filter? Every typed word must appear, in any case, in
- *  the card's id, title, description or result; a member must be its assignee. */
+ *  the card's id, title, description, result or failure reason; a member must
+ *  be its assignee. */
 export function taskMatches(task: HiveTask, f: TaskFilter): boolean {
   if (f.assignee && task.assignee !== f.assignee) return false;
   const words = f.query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
-  const text = [task.id, task.title, task.description, task.result].filter(Boolean).join(' ').toLowerCase();
+  const text = [task.id, task.title, task.description, task.result, task.failureReason].filter(Boolean).join(' ').toLowerCase();
   return words.every((w) => text.includes(w));
 }

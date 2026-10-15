@@ -5542,6 +5542,11 @@ ipcMain.handle('hive:closeTask', (_evt, id: unknown, reason: unknown) => {
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   return { ok: hive.ownerCloseTask(id, typeof reason === 'string' ? reason : undefined) };
 });
+ipcMain.handle('hive:retryTask', (_evt, id: unknown) => {
+  if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid task id' };
+  if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  return { ok: hive.ownerRetryTask(id) };
+});
 ipcMain.handle('hive:setArchived', (_evt, id: unknown, archived: unknown) => {
   if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
