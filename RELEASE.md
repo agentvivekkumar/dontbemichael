@@ -4,10 +4,11 @@
 
 ## What's new in 0.2.1
 
-- **Pete joins the office's idle time fun,** with lines and paper plane conversations of his own, and a first day welcome each time you turn him on.
+- **Excel files exported from accounting, payroll and other business systems are read,** instead of refused as empty, and PowerPoint text keeps slide order.
 - **Reset & start over starts truly fresh.** It erases everything the app made for your office and keeps your team's folders, your own files and your Claude sign in.
-- **Webhooks in the communication only mode hold anything but a plain status question** for your approval, however it is worded or labelled.
-- **Michael hears every message the privacy check keeps from Pete,** and why, and an Ask me card that needs you on a website links straight to it.
+- Webhooks in the communication only mode hold anything but a plain status question for your approval, however it is worded or labelled.
+- Michael hears every message the privacy check keeps from Pete, and why, and an Ask me card that needs you on a website links straight to it.
+- Pete joins the office's idle time fun, with lines and paper plane conversations of his own, and a first day welcome each time you turn him on.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
