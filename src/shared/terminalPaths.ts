@@ -76,8 +76,9 @@ export type PathAction = 'preview' | 'edit' | 'reveal';
  * then looks RELATIVE and gets joined onto the agent's cwd.
  */
 // Only explicit path prefixes qualify for a whole quoted match; otherwise prose
-// such as "Update README.md" must fall through to the filename inside it.
-const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^"\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^'\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^`\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
+// such as "Update README.md" or "/ see notes.md" must fall through to the
+// filename inside it. Path separators cannot have adjacent whitespace.
+const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?!\s|[\\/])(?:[^"\r\n\s\\/]|[\\/](?!\s)|[ ](?!\s|[\\/]))*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?!\s|[\\/])(?:[^'\r\n\s\\/]|[\\/](?!\s)|[ ](?!\s|[\\/]))*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?!\s|[\\/])(?:[^`\r\n\s\\/]|[\\/](?!\s)|[ ](?!\s|[\\/]))*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
 
 /** A fresh matcher. The regex is stateful (`g`), so callers must never share one. */
 export function pathTokenMatcher(): RegExp {
@@ -130,6 +131,7 @@ export function stripPathToken(raw: string): string {
 export function isPathToken(token: string): boolean {
   const ext = extensionOf(token);
   if (!ext) return false;
+  if (/(?:^|[\\/])\s|\s[\\/]/.test(token)) return false;
   if (PREVIEW_EXTS.has(ext) || EDIT_EXTS.has(ext) || isImagePath(token)) return true;
   return /[/\\]/.test(token);
 }
