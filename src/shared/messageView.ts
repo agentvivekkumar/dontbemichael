@@ -107,5 +107,7 @@ export function verbKey(act: string): string {
 /** What a row quotes: the subject, else the body's first line. */
 export function gist(m: Pick<HistoryItem, 'subject' | 'body'>, max = 160): string {
   const text = (m.subject?.trim() || m.body?.split('\n').find((l) => l.trim()) || '').replace(/\s+/g, ' ').trim();
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  if (text.length <= max) return text;
+  // Never end on half an emoji: drop a high surrogate whose pair fell past the cut.
+  return `${text.slice(0, max - 1).replace(/[\uD800-\uDBFF]$/, '')}…`;
 }
