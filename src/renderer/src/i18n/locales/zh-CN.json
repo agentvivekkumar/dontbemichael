@@ -1375,7 +1375,13 @@
     "ideTip": "打开 IDE：浏览并编辑 {{name}} 工作区中的文件，并将他们未提交的更改作为差异查看。",
     "openIdeAria": "打开 IDE",
     "openTerminalTip": "在 {{cwd}} 中打开你的系统终端应用，位于该智能体文件夹中的普通 shell，与该智能体自己的终端相互独立。",
-    "openTerminalAria": "在该智能体的文件夹中打开系统终端"
+    "openTerminalAria": "在该智能体的文件夹中打开系统终端",
+    "noNote": "没有备注"
+  },
+  "completionToast": {
+    "orchestrator": "协调者",
+    "completed": "{{name}} · 已完成",
+    "dismiss": "关闭"
   },
   "memoryPanel": {
     "notSetUp": "未设置",
