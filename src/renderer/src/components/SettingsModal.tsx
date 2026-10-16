@@ -214,7 +214,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   // The backdrop closes through the same guard, and only on a real click on
   // it: a click outside used to drop staged changes without asking.
   const backdrop = useBackdropClose(() => closeFnRef.current());
-  const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? 'the orchestrator';
+  const godName = useStore((s) => s.agents.find((a) => a.isGod)?.name) ?? t('common.orchestrator');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>(initialSection ?? 'General');

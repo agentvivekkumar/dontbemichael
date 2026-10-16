@@ -1,5 +1,6 @@
 {
   "common": {
+    "orchestrator": "المنسق",
     "on": "تشغيل",
     "off": "إيقاف",
     "cancel": "إلغاء",
