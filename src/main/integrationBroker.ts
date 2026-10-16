@@ -322,7 +322,9 @@ export class IntegrationBroker {
         res.end();
       }
     } catch {
-      try { res.end(); } catch { /* socket gone */ }
+      // The status is already sent and the body has no length, so a clean end
+      // would read to the agent as a whole answer. Drop the connection instead.
+      res.destroy();
     } finally {
       clearTimeout(timer);
     }
