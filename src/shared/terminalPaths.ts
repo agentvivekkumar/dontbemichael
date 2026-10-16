@@ -77,7 +77,9 @@ export type PathAction = 'preview' | 'edit' | 'reveal';
  */
 // Only explicit path prefixes qualify for a whole quoted match; otherwise prose
 // such as "Update README.md" must fall through to the filename inside it.
-const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^"\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^'\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^`\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
+// A prefix followed by whitespace is prose too ("/ see notes.md"): the character
+// after the prefix must be non-whitespace, or the filename inside is linked instead.
+const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^\s"\r\n][^"\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^\s'\r\n][^'\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^\s`\r\n][^`\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
 
 /** A fresh matcher. The regex is stateful (`g`), so callers must never share one. */
 export function pathTokenMatcher(): RegExp {
