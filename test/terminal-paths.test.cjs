@@ -129,6 +129,14 @@ test('quoted prose keeps linking the file name inside it', () => {
   assert.deepEqual(tokensIn("Michael's notes: see plan.md' later"), ['plan.md']);
 });
 
+test('a quoted phrase that starts with a slash links the file name, not the phrase', () => {
+  // Value: protects=slash-prefixed quoted prose underlines the file inside it; fails_when=the whole phrase is one path and the click finds nothing; why_new=TODOS.md terminal links, "/ see notes.md"; seam=none
+  assert.deepEqual(tokensIn('"/ see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn("'/ see notes.md'"), ['notes.md']);
+  assert.deepEqual(tokensIn('`/ see notes.md`'), ['notes.md']);
+  assert.deepEqual(tokensIn('note: "/ also check README.md"'), ['README.md']);
+});
+
 test('quoted versions and prose do not become file paths', () => {
   assert.deepEqual(tokensIn('version "v0.4.5", cost \'0.92\', called `spring.thaw`'), []);
 });
