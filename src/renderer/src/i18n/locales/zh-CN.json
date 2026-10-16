@@ -255,7 +255,8 @@
       "freshDesc": "当前办公室留在旧文件夹里，不再使用。随时可以切换回去。",
       "openTitle": "打开这个文件夹里的办公室",
       "openDesc": "这个文件夹里已经有一个办公室。应用会切换过去，当前办公室保持原位。",
-      "couldNotOpen": "无法打开那个办公室。"
+      "couldNotOpen": "无法打开那个办公室。",
+      "couldNotChange": "无法更改办公室文件夹。"
     },
     "resetConfirm": {
       "body": "这会永久抹除你的办公室：团队、所有人的记忆、你的设置、“记忆与知识”、保存的密钥和历史记录。团队的文件夹及其中的文件会保留，你的 Claude 登录也会保留。所有人停止工作，应用将重新打开设置。此操作无法撤销。"
@@ -385,7 +386,14 @@
       "orgKeyPlaceholder": "粘贴你的组织密钥",
       "orgConfigOnly": "目前仅限配置。组织消息服务尚不存在，所以这里的密钥不会启动任何传输，它会被保存、显示在触发器标签页中，然后等待。",
       "newSecret": "已生成新密钥，请立即复制。",
-      "secretFailed": "无法生成新密钥，请重试。"
+      "secretFailed": "无法生成新密钥，请重试。",
+      "noteSaved": "已保存",
+      "noteListening": "聆听中",
+      "noteNoTunnel": "已启动，但隧道不可用",
+      "noteStartFailed": "启动失败",
+      "noteStopped": "已停止",
+      "noteSaveFailed": "无法保存",
+      "noteDeleted": "已删除"
     },
     "voice": {
       "freeFlow": "自由输入",
