@@ -191,6 +191,11 @@ export interface HiveTask {
   closedBy?: 'owner';
   closedAt?: string;
   closedReason?: string;
+  /** Why the work failed, when, and whether trying it again is safe. */
+  failureReason?: string | null;
+  failedAt?: string | null;
+  retryCount?: number;
+  retryable?: boolean | null;
 }
 
 /** A message the router just delivered, with its resolved recipient ids. Drives
@@ -1355,6 +1360,9 @@ const api = {
   /** The owner ends a card: Done, marked "Closed by owner", never deleted. */
   hiveCloseTask: (id: string, reason?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:closeTask', id, reason),
+  /** Ask to try a failed card again. Refused unless the card can safely be retried. */
+  hiveRetryTask: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hive:retryTask', id),
 
   // ─── Scheduled missions (recurring auto-dispatch) ──────────────────────────
   listMissions: (): Promise<ScheduledMission[]> => ipcRenderer.invoke('missions:list'),

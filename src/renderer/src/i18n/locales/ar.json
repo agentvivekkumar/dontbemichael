@@ -1593,7 +1593,16 @@
     "ageDays": "{{count}} ي",
     "closedByOwner": "أغلقه المالك",
     "nothingAsked": "لا سؤال",
-    "nothingAskedTitle": "محجوبة، لكن لا شيء فيها ينتظرك. يُطلب من {{godName}} أن يسألك أو ينقلها."
+    "nothingAskedTitle": "محجوبة، لكن لا شيء فيها ينتظرك. يُطلب من {{godName}} أن يسألك أو ينقلها.",
+    "failed": "تعذر",
+    "failureTitle": "ما الذي تعذر",
+    "failedWhen": "تعذر في {{when}}",
+    "retryNone": "لم تُعد المحاولة",
+    "retryOnce": "أُعيدت المحاولة مرة واحدة",
+    "retryMany": "أُعيدت المحاولة {{count}} مرات",
+    "retryTask": "أعد المحاولة",
+    "retrying": "جارٍ إعادة المحاولة",
+    "retryTaskTitle": "يطلب من {{godName}} المحاولة مرة أخرى. الخطوة التي تمت لا تتكرر."
   },
   "queueComposer": {
     "recording": "● يسجّل، انقر إيقاف للتفريغ النصي",

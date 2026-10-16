@@ -1593,7 +1593,16 @@
     "ageDays": "{{count}} d",
     "closedByOwner": "Closed by owner",
     "nothingAsked": "Nothing asked",
-    "nothingAskedTitle": "Blocked, but nothing on it waits on you. {{godName}} is told to ask you or move it."
+    "nothingAskedTitle": "Blocked, but nothing on it waits on you. {{godName}} is told to ask you or move it.",
+    "failed": "Failed",
+    "failureTitle": "What went wrong",
+    "failedWhen": "Failed {{when}}",
+    "retryNone": "Not tried again",
+    "retryOnce": "Tried again once",
+    "retryMany": "Tried again {{count}} times",
+    "retryTask": "Retry task",
+    "retrying": "Retrying",
+    "retryTaskTitle": "Asks {{godName}} to try this again. A finished step is not repeated."
   },
   "queueComposer": {
     "recording": "● recording. Click stop to transcribe",

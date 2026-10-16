@@ -226,7 +226,8 @@ export function michaelCardState(createdAt: string, now: number, days: readonly 
  *  conversation. */
 export type OwnerCardChange =
   | { kind: 'closed'; reason?: string }
-  | { kind: 'moved'; from: string; to: string; reason?: string };
+  | { kind: 'moved'; from: string; to: string; reason?: string }
+  | { kind: 'retried'; retryCount: number };
 
 const STATUS_WORDS: Record<string, string> = { triage: 'Triage', todo: 'To do', doing: 'Doing', waiting: 'Waiting', blocked: 'Blocked', done: 'Done' };
 
@@ -238,6 +239,15 @@ export function ownerChangeNote(task: { id: string; title?: string }, change: Ow
       body: [
         `The owner closed ${card} as Done.${change.reason ? ` Reason: ${change.reason}` : ''}`,
         'This is the owner\'s decision, not finished work. Treat the card as closed: stop work on it and tell whoever has it. Do not reopen it unless the owner asks.'
+      ].join('\n')
+    };
+  }
+  if (change.kind === 'retried') {
+    return {
+      subject: `OWNER RETRY card ${cardText(task.id, 60)}`,
+      body: [
+        `The owner asked to try ${card} again. This is retry ${change.retryCount}. The card is back in To do and its failure is cleared.`,
+        'Check what already happened before you repeat a send, a charge, or any other finished step, then route the work.'
       ].join('\n')
     };
   }
