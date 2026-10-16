@@ -1415,10 +1415,19 @@ export function useHive(config: HarnessConfig | null): void {
   }, [config?.onboardingComplete]);
   useEffect(() => {
     if (!config?.onboardingComplete) return;
+    const queue = (agentId: string): void => {
+      const a = useStore.getState().agents.find((x) => x.id === agentId);
+      if (a?.ptyId) useStore.getState().setPendingRestart(agentId, { at: Date.now(), reason: 'calendar' });
+    };
+    void window.cth.calendarPendingRestarts().then((ids) => ids.forEach(queue)).catch(() => {});
+    return window.cth.onCalendarRestartNeeded(({ agentId }) => queue(agentId));
+  }, [config?.onboardingComplete]);
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
     const CEILING_MS = 10 * 60_000;
     const POLL_MS = 5_000;
     const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
-    const WHY = { email: 'turn on email', connectors: 'apply its connectors', engine: 'start on Claude Code' } as const;
+    const WHY = { calendar: 'load its calendar tools', email: 'turn on email', connectors: 'apply its connectors', engine: 'start on Claude Code' } as const;
     const inFlight = new Set<string>();
     const tick = (): void => {
       const { pendingRestart, agents, setPendingRestart, updateAgent } = useStore.getState();

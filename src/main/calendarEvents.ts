@@ -6,24 +6,14 @@
 import ICAL from 'ical.js';
 import type { CalendarAvailability, CalendarDateTime, CalendarEvent, CalendarRange } from '../shared/calendarRead';
 import { CaldavError } from './caldavErrors';
-import { calendarRecord } from '../shared/calendarAccounts';
+import { parseCalendarRange } from '../../resources/calendar-tool-contract.cjs';
 
 export const MAX_CALENDAR_EVENTS = 10_000;
 export interface ReadRange extends CalendarRange { startMs: number; endMs: number }
 export function validateRange(input: unknown): ReadRange {
-  if (!calendarRecord(input) || Object.keys(input).some((k) => !['start', 'end', 'timeZone'].includes(k))) throw new CaldavError('invalid');
-  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-  const { start, end, timeZone } = input;
-  if (typeof start !== 'string' || typeof end !== 'string' || !iso.test(start) || !iso.test(end)) throw new CaldavError('invalid');
-  const startMs = Date.parse(start), endMs = Date.parse(end);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || new Date(startMs).toISOString().replace('.000Z', 'Z') !== start
-    || new Date(endMs).toISOString().replace('.000Z', 'Z') !== end || endMs <= startMs || endMs - startMs > 90 * 86400_000
-    || startMs < Date.UTC(1900, 0) || endMs >= Date.UTC(2200, 0)) throw new CaldavError('invalid');
-  if (timeZone !== undefined) {
-    if (typeof timeZone !== 'string' || timeZone.length > 100) throw new CaldavError('invalid');
-    try { new Intl.DateTimeFormat('en', { timeZone }); } catch { throw new CaldavError('invalid'); }
-  }
-  return { start, end, ...(typeof timeZone === 'string' ? { timeZone } : {}), startMs, endMs };
+  const parsed = parseCalendarRange(input);
+  if (!parsed) throw new CaldavError('invalid');
+  return parsed;
 }
 export const davTime = (iso: string): string => iso.replace(/[-:]/g, '');
 

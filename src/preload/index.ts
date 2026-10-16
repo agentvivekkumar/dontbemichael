@@ -3,9 +3,9 @@ import type { DataClassId, DataClassSetting } from '../shared/dataClasses';
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
-import type { CalendarAccount } from '../shared/calendars';
+import type { CalendarAccount, CalendarAccess } from '../shared/calendars';
 import type { CalendarAvailability, CalendarDiscovery, CalendarEvent, CalendarRange, CalendarResult } from '../shared/calendarRead';
-import type { CalendarListResult, CalendarRemoveResult, CalendarSaveInput, CalendarSaveResult } from '../shared/calendarAccounts';
+import type { CalendarListResult, CalendarRemoveResult, CalendarSaveInput, CalendarSaveResult, CalendarGrantResult } from '../shared/calendarAccounts';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
@@ -976,6 +976,14 @@ const api = {
   calendarAccountsAdd: (input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:add', input),
   calendarAccountsUpdate: (id: string, input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:update', id, input),
   calendarAccountsRemove: (id: string): Promise<CalendarRemoveResult> => ipcRenderer.invoke('calendarAccounts:remove', id),
+  calendarAccountsSelect: (id: string, calendar: string, enabled: boolean): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:select', id, calendar, enabled),
+  calendarPendingRestarts: (): Promise<string[]> => ipcRenderer.invoke('calendar:pendingRestarts'),
+  onCalendarRestartNeeded: (cb: (payload: { agentId: string }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { agentId: string }): void => cb(payload);
+    ipcRenderer.on('calendar:restartNeeded', listener);
+    return () => { ipcRenderer.removeListener('calendar:restartNeeded', listener); };
+  },
+  calendarSetGrant: (agentId: string, calendar: string, access: CalendarAccess | null): Promise<CalendarGrantResult> => ipcRenderer.invoke('calendar:setGrant', agentId, calendar, access),
   calendarAccountsTest: (id: string): Promise<CalendarResult<CalendarDiscovery>> => ipcRenderer.invoke('calendarAccounts:test', id),
   calendarEvents: (id: string, range: CalendarRange): Promise<CalendarResult<CalendarEvent[]>> => ipcRenderer.invoke('calendar:events', id, range),
   calendarAvailability: (id: string, range: CalendarRange): Promise<CalendarResult<CalendarAvailability>> => ipcRenderer.invoke('calendar:availability', id, range),

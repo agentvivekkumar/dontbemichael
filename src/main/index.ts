@@ -1,3 +1,4 @@
+import { CalendarSessions } from './calendarSessions';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, powerMonitor, powerSaveBlocker, screen, shell, Notification } from 'electron';
 import { ownerLedger } from '../shared/taskLedger';
 import { ownValue } from '../shared/ownValue';
@@ -99,6 +100,8 @@ import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
 import { CalendarAccounts } from './calendarAccounts';
 import { CalendarService } from './calendar';
+import { handleCalendarRequest } from './calendarRoutes';
+import { hasCalendarTools } from '../shared/calendarTools';
 import { calendarSettingsPatchAllowed } from '../shared/calendarAccounts';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, cannotStoreReason, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
@@ -403,6 +406,11 @@ function memberPresent(agentId: string): boolean {
   return has(snap.agents) || has(snap.restorable);
 }
 
+/** Calendar access requires a known current roster entry, with no role default. */
+function calendarMemberPresent(agentId: string): boolean {
+  return agentId !== RESEARCH_ID && !!roster.read() && memberPresent(agentId);
+}
+
 function standingGoalFromRoster(agentId: string): string | null {
   const snap = roster.read();
   if (!snap || !Array.isArray(snap.agents)) return null;
@@ -457,7 +465,8 @@ const hookServer = new HookServer(
   companyProfileForAgents,
   (agentId) => booksReadRoleIds().has(agentId),
   memberPresent,
-  (signal) => onPlanSignal(signal)
+  (signal) => onPlanSignal(signal),
+  calendarMemberPresent
 );
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
@@ -720,13 +729,17 @@ function researchFolders(): string[] {
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
   getSecret: integrations.getSecret,
-  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line) }, agentId, op, body) : undefined
+  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line) }, agentId, op, body) : undefined,
+  calendar: (agentId, tool, body) => handleCalendarRequest(calendarService, { getConfig: readConfig, present: calendarMemberPresent }, agentId, tool, body)
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
  *  Slack helper below). */
 function mdMailScriptPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'md-mail-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-mail-mcp.cjs');
+}
+function mdCalendarScriptPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'md-calendar-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-calendar-mcp.cjs');
 }
 
 /** Delete this agent's md-mail MCP file from the private dir and the legacy
@@ -791,8 +804,10 @@ const calendarAccounts = new CalendarAccounts({
   saveConfig: (patch) => { writeConfig(patch); },
   canStoreSecrets: integrations.canStoreSecrets,
   setSecret: integrations.setSecret,
-  deleteSecret: integrations.deleteSecret
+  deleteSecret: integrations.deleteSecret,
+  present: calendarMemberPresent
 });
+const calendarSessions = new CalendarSessions();
 const calendarService = new CalendarService({ accounts: calendarAccounts, getConfig: readConfig, getSecret: integrations.getSecret });
 
 /**
@@ -894,6 +909,7 @@ function teardownPty(id: string): void {
   //    harmless for a non-worker PTY; ensures a dead worker's token can never
   //    reach an integration.
   try { removeMdMailMcp(agentId ?? id); } catch { /* best-effort */ }
+  calendarSessions.remove(id);
   try { integrationBroker.revoke(id); } catch { /* best-effort */ }
   // 1) Archive the agent — retained + flagged; only live-PTY agents are active.
   if (ptyCli.delete(id)) void refreshCliUpdate();
@@ -4209,31 +4225,43 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   if (provider === 'codex' && opts.hive?.id) {
     await enableCodexRemoteForSpawn(opts, opts.hive.id);
   }
-  // Mail tools (docs/designs/multi-mailbox.md, eng E1): an agent whose
-  // Capabilities include email gets the md-mail MCP server, which Claude Code
-  // starts outside the Bash sandbox, holding this agent's own broker token.
-  // Revoked in teardownPty with the rest of this PTY's grants. `--mcp-config`
-  // takes several values, so it must stay the last argument. Never while
-  // SHOW_MAILBOXES is off, even with email saved earlier.
-  if (SHOW_MAILBOXES && claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
+  let calendarAttached = false;
+  // App mail and calendar servers share a per-session capability, so adding
+  // either cannot rotate away the other's token. Claude starts these outside
+  // the Bash sandbox; teardown removes their shared private config and token.
+  // --mcp-config accepts multiple values and must remain the last argument.
+  // SHOW_MAILBOXES controls mail only; calendar access requires explicit grants.
+  if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
     const agentId = opts.hive.id;
     const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
     const root = hive.root();
     // A Send only grant alone gets the tools too (shared-mailboxes.md, item 1).
-    if (home && root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
+    const mailTools = SHOW_MAILBOXES && hasMailTools(readConfig().agentCapabilities?.[agentId]);
+    const calendarTools = calendarMemberPresent(agentId) && hasCalendarTools(readConfig(), agentId);
+    if (home && root && (mailTools || calendarTools)) {
       try {
         // Fresh token every spawn (#63 rotate on respawn); old path under agents/
         // is removed so siblings cannot read a leftover broker token.
         const token = integrationBroker.grant(opts.id, [], agentId);
         const file = mdMailMcpPath(home, agentId);
         mkdirSync(dirname(file), { recursive: true });
-        writeFileSync(file, JSON.stringify({ mcpServers: { 'md-mail': { command: hive.nodeCommand(), args: [mdMailScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } } } }, null, 2), { mode: 0o600 });
+        const env = { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token };
+        const mcpServers = {
+          ...(mailTools ? { 'md-mail': { command: hive.nodeCommand(), args: [mdMailScriptPath()], env } } : {}),
+          ...(calendarTools ? { 'md-calendar': { command: hive.nodeCommand(), args: [mdCalendarScriptPath()], env } } : {})
+        };
+        writeFileSync(file, JSON.stringify({ mcpServers }, null, 2), { mode: 0o600 });
         try { unlinkSync(legacyMdMailMcpPath(root, agentId)); } catch { /* none left */ }
         opts.args = [...(opts.args ?? []), '--mcp-config', file];
+        calendarAttached = calendarTools;
       } catch (e) { console.error('[mail] md-mail config:', e); }
     }
   }
   const res = ptyManager.spawn(opts, owner);
+  if (res.ok && claudeProvider && opts.hive?.id && opts.hive.role !== 'worker') {
+    calendarSessions.record(opts.id, opts.hive.id, calendarAttached);
+    notifyCalendarSessions(readConfig());
+  }
   // What its connectors were at start, so a later change can restart it (D2).
   if (res.ok && opts.hive?.id && connectorPlan) {
     const failures = connectorsApplied ? 0 : (connectorsUnapplied.get(opts.hive.id) ?? 0) + 1;
@@ -4979,13 +5007,22 @@ ipcMain.handle('hive:procedure', (_evt, id: unknown, slug: unknown) =>
 ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hive.inbox(id) : []));
 
 // ─── IPC: mailboxes and Capabilities (docs/designs/multi-mailbox.md) ─────────
+function notifyCalendarSessions(cfg: HarnessConfig): void {
+  calendarSessions.changed(cfg, calendarMemberPresent, (agentId) => {
+    try { liveWebContents()?.send('calendar:restartNeeded', { agentId }); } catch { /* window gone */ }
+  });
+}
+onConfigWritten(notifyCalendarSessions);
+ipcMain.handle('calendar:pendingRestarts', () => calendarSessions.pending(readConfig(), calendarMemberPresent));
 ipcMain.handle('calendarAccounts:list', () => calendarAccounts.list());
 ipcMain.handle('calendarAccounts:add', (_evt, input: unknown) => calendarAccounts.add(input));
 ipcMain.handle('calendarAccounts:update', (_evt, id: unknown, input: unknown) => calendarAccounts.update(id, input));
 ipcMain.handle('calendarAccounts:remove', (_evt, id: unknown) => calendarAccounts.remove(id));
+ipcMain.handle('calendarAccounts:select', (_evt, id: unknown, calendar: unknown, enabled: unknown) => calendarAccounts.selectCalendar(id, calendar, enabled));
+ipcMain.handle('calendar:setGrant', (_evt, agentId: unknown, calendar: unknown, access: unknown) => calendarAccounts.setGrant(agentId, calendar, access));
 ipcMain.handle('calendarAccounts:test', (_evt, id: unknown) => calendarService.testConnection(id));
-// The trusted renderer is the owner. Agent identity will come from the broker
-// token in a later phase, never from a renderer supplied field.
+// The trusted renderer is the owner. Agent requests use the authenticated
+// broker token, never a renderer supplied agent identity.
 ipcMain.handle('calendar:events', (_evt, id: unknown, range: unknown) => calendarService.events(id, range, { kind: 'owner' }));
 ipcMain.handle('calendar:availability', (_evt, id: unknown, range: unknown) => calendarService.availability(id, range, { kind: 'owner' }));
 // Records carry no password; the renderer only ever sends one, to save it.

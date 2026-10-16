@@ -1,8 +1,9 @@
-# Calendar read only service (Issue #374, Phase 2B)
+# Calendar read only integration (Issue #374, Phases 2B and 2C)
 
 The implementation follows the [business calendars proposal](https://github.com/Yong-Park/dontbemichael/blob/docs/business-calendars/docs/designs/business-calendars.md).
-It adds main process services and owner IPC only. Calendar UI, broker routes,
-agent hooks, MCP tools, proposals and all calendar writes remain out of scope.
+Phase 2B adds the main-process service and owner IPC. Phase 2C adds calendar
+settings, per-agent access controls, authenticated broker routes, hooks and
+read-only MCP tools. Proposals and all calendar writes remain out of scope.
 
 ## Services
 
@@ -36,7 +37,7 @@ ignores cancelled and transparent events, and returns the free complement.
 Agent reads use the Phase 1 permission rule. The caller context must be supplied
 by trusted main code; owner IPC never accepts a claimed agent identity. Access
 and account snapshots are checked before sending requests and before returning
-data. The later broker must derive the agent ID from its authenticated token.
+data. The broker derives the agent ID from its authenticated token.
 
 ## Security and bounds
 
@@ -78,7 +79,7 @@ framework is added and no recurrence expansion runs in the client. The dependenc
 implementations remain external to the Electron main bundle, and nothing is
 added to the renderer bundle.
 
-## Explicit limitations and Phase 2C
+## Explicit limitations
 
 The service supports Basic authentication with app passwords; Google/Microsoft
 OAuth and Digest authentication remain out of scope. Live provider accounts
@@ -100,7 +101,82 @@ is an explicit interpretation for dates/floating times, not a guessed machine
 local zone. Calendar timezone inference and custom VTIMEZONE evaluation remain
 unsupported. The supported date range and response limits fail explicitly.
 
-Phase 2C still needs owner connection and calendar-selection UI, agent grant
-management, broker routes, credential-free MCP tools and hook enforcement.
-Those surfaces should call this service and derive agent identity from the
-broker token. Later approval and booking phases remain separate.
+Phase 2C adds owner controls and read tools below. Approval and booking phases
+remain separate.
+
+## Phase 2C: owner controls and read tools
+
+Settings > Connections > Calendars supports iCloud, Fastmail, Zoho and custom
+CalDAV app-password accounts. Preset addresses are editable for regional and
+custom endpoints. A new password is submitted only to the existing main-process
+account API, then cleared from the form. There is no API to retrieve a saved
+password. Save and test uses fresh discovery metadata, and only the authenticated
+service marks an account connected. Failed authentication leaves the saved
+account available for repair without creating duplicate accounts on retry.
+Newly discovered calendars start disabled. Selection uses a main-process delta
+operation; removal revokes the account's grants and uses existing secret cleanup.
+
+The Access tab starts with no grants for every identity. Turning a calendar on
+creates Read only access. Read only, Book on approval and Can book are stored
+using a validated main-process grant delta that preserves other capabilities.
+Disabled, removed and unverified calendars remain unavailable. Research cannot
+hold calendar access. The UI explains that approval and booking are configuration
+for future functionality; neither enables writes in this phase. Copy is provided
+in English, Simplified Chinese and Arabic, using existing design tokens.
+
+`resources/md-calendar-mcp.cjs` is a credential-free stdio adapter with exactly
+three tools. The shared pure JavaScript contract validates arguments identically
+in the MCP server, the hook and the broker, including prototype names, unknown
+fields, duplicate IDs and bounded UTC intervals:
+
+| Tool | Arguments | Successful result |
+| --- | --- | --- |
+| `list_calendars` | Empty object | Granted, enabled, connected calendar IDs, names and configured levels; no account or credential metadata |
+| `search_events` | `calendar`, `start`, `end`, optional `time_zone`, `text`, `limit` | Events, total matched count and explicit `limited` flag |
+| `free_busy` | `calendars`, `start`, `end`, optional `time_zone` | Union of busy spans and its free complement across every requested calendar |
+
+Times are explicit UTC seconds and intervals are limited to 90 days. Floating
+and all-day events require an explicit IANA `time_zone` where interpretation is
+necessary. Search defaults to 100 results, with a maximum of 500; text is a
+literal case-insensitive substring of UID, summary, location or description.
+Free/busy accepts one to ten unique calendar IDs and never uses limited search
+results. Any uncertain schedule, incomplete response or authorization failure
+fails the entire free/busy request. It never returns partial availability.
+
+The existing loopback integration broker accepts only authenticated POST requests
+to `/calendar/<tool>`. Agent identity comes exclusively from a live capability
+with a trusted agent binding; temporary worker capabilities have no fallback.
+Membership and shared `calendarAccess` checks run before any read and again
+before returning results. Multi-calendar authorization is checked as a whole
+before dispatch. Revoked tokens are checked after body parsing and after the
+handler returns. Bodies are limited to 16 KiB with a five second deadline;
+responses are limited to 4 MiB. Errors omit server diagnostics and credentials.
+The MCP adapter requires an exact IPv4 loopback broker address, does not follow
+redirects, has a 40 second request timeout and bounds stdin lines and responses.
+All CalDAV networking and credentials remain in the Phase 2B main service.
+
+The connector gate recognizes `md-calendar`, then the dedicated PreToolUse hook
+uses the same tool contract and calendar rule as the broker. All calendar MCP
+resources and every tool outside the three above are refused, including proposal
+and write tools under Book grants. The broker remains authoritative even when
+a client bypasses the hook. Existing mail and connector policies are preserved.
+
+Claude sessions with explicit calendar access receive the server using the
+existing private agent MCP configuration. Mail and calendar share one minted
+capability per session, avoiding token rotation conflicts. The private file is
+mode 0600 and is removed with its capability at teardown. No new dependency is
+introduced. Only Claude Code is currently offered by the application; other
+engine-specific MCP adapters remain outside this phase. Running sessions that
+started without calendar tools are queued for the existing idle restart flow
+when an explicit grant becomes usable, including after re-enabling an account's
+calendar. Pending restarts can be recovered after a renderer reload. Revocations
+apply immediately, without waiting for a restart.
+
+## Remaining Phase 3 work
+
+Trusted, durable proposals and owner approval, exact approved-change verification,
+write-capable CalDAV operations and automatic booking are still unimplemented.
+There are no calendar writes, proposal tools or OAuth flows in this phase.
+The Phase 2B interoperability and recurrence limitations above still apply.
+Automated tests use mock transports; live provider account verification and an
+interactive Electron UI smoke test remain manual release checks.

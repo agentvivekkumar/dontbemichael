@@ -73,6 +73,8 @@ export interface IntegrationBrokerDeps {
   getSecret: (secretRef: string | undefined) => string | undefined;
   /** md-mail tool calls, `POST /mail/<tool>` (docs/designs/multi-mailbox.md). */
   mail?: MailRouteHandler;
+  /** Read only calendar tools; identity always comes from the capability. */
+  calendar?: MailRouteHandler;
 }
 
 /** True for IPv4 loopback (127.0.0.0/8) and IPv6 ::1 (incl. v4-mapped). Mirrors slack.ts. */
@@ -189,6 +191,14 @@ export class IntegrationBroker {
     if (!cap) return IntegrationBroker.sendError(res, 401, 'unauthorized', 'missing or invalid capability token');
 
     const rawUrl = req.url ?? '';
+    const calendarMatch = /^\/calendar\/([a-z_]{1,32})$/.exec(rawUrl);
+    if (calendarMatch) {
+      if (!this.deps.calendar) return IntegrationBroker.sendError(res, 404, 'not_found', 'Calendar tools are not available.');
+      if (!cap.agentId) return IntegrationBroker.sendError(res, 403, 'forbidden', 'Calendar tools require a team member capability.');
+      if (req.method !== 'POST') return IntegrationBroker.sendError(res, 405, 'method', 'Use POST for read only calendar tools.');
+      void this.calendar(req, res, cap, calendarMatch[1]);
+      return;
+    }
     // 3a) Mail tools: POST /mail/<tool> with a JSON body. Access is checked per
     //     call against the agent's Capabilities (mailAccess), not the token's
     //     integration list.
@@ -251,6 +261,35 @@ export class IntegrationBroker {
       res.end(JSON.stringify(out.body));
     } catch (e) {
       IntegrationBroker.sendError(res, 500, 'mail_error', e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  private async calendar(req: IncomingMessage, res: ServerResponse, cap: Capability, tool: string): Promise<void> {
+    try {
+      const raw = await new Promise<string>((resolve, reject) => {
+        const chunks: Buffer[] = []; let bytes = 0;
+        const timer = setTimeout(() => { reject(new Error('timeout')); req.destroy(); }, 5000);
+        const fail = () => { clearTimeout(timer); reject(new Error('invalid')); };
+        req.on('data', (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes > 16 * 1024) { clearTimeout(timer); reject(new Error('too_large')); req.destroy(); }
+          else chunks.push(chunk);
+        });
+        req.on('end', () => { clearTimeout(timer); if (!req.complete) fail(); else resolve(Buffer.concat(chunks).toString('utf8')); });
+        req.on('error', fail); req.on('aborted', fail);
+        req.on('close', () => { if (!req.complete) fail(); });
+      });
+      let body: unknown;
+      try { body = JSON.parse(raw || '{}'); } catch { return IntegrationBroker.sendError(res, 400, 'invalid', 'Calendar arguments must be a JSON object.'); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return IntegrationBroker.sendError(res, 400, 'invalid', 'Calendar arguments must be a JSON object.');
+      if (this.resolveCapability(IntegrationBroker.tokenFrom(req)) !== cap) return IntegrationBroker.sendError(res, 403, 'denied', 'Your calendar session changed. Restart the session.');
+      const out = await this.deps.calendar!(cap.agentId!, tool, body as Record<string, unknown>);
+      if (this.resolveCapability(IntegrationBroker.tokenFrom(req)) !== cap) return IntegrationBroker.sendError(res, 403, 'denied', 'Your calendar session changed. Restart the session.');
+      if (res.headersSent) return;
+      res.writeHead(out.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(out.body));
+    } catch {
+      IntegrationBroker.sendError(res, 503, 'unavailable', 'The calendar request could not be completed safely. Try again.');
     }
   }
 

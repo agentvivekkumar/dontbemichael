@@ -337,7 +337,7 @@ test('generic settings IPC cannot bypass account management', () => {
   const handlers = new Map();
   const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
   const lines = main.split('\n').filter((line) => line.startsWith("ipcMain.handle('calendarAccounts:") && !line.startsWith("ipcMain.handle('calendarAccounts:test'"));
-  assert.equal(lines.length, 4);
+  assert.equal(lines.length, 5);
   // Exercise the actual IPC registrations without booting Electron or a network.
   const registrations = ts.transpileModule(lines.join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('ipcMain', 'calendarAccounts', registrations)(ipcMain, setup().manager);

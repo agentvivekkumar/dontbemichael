@@ -1,3 +1,4 @@
+import { CalendarAccessSection } from './CalendarAccessSection';
 import { RESEARCH_ID } from '../../../shared/research';
 import { useEffect, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -365,6 +366,8 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
             </div>
           )}
         </TriggerCard>}
+
+        <CalendarAccessSection key={agent.id} agent={agent} config={config} />
 
         <TriggerCard
           title={t('capabilities.connectors')}

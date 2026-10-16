@@ -1,3 +1,4 @@
+import { RESEARCH_ID } from '../shared/research';
 /** Config backed calendar account management.
  * Synchronous operations use the same atomic config and encrypted secret store
  * as mailboxes. No passwords or raw dependency errors are returned or logged.
@@ -5,10 +6,11 @@
 import { randomBytes } from 'node:crypto';
 import type { CalendarAccount } from '../shared/calendars';
 import type { AgentCapabilities } from '../shared/mailboxes';
+import { hasCalendarTools } from '../shared/calendarTools';
 import {
   CALENDAR_SETTINGS_INVALID, CALENDAR_UNVERIFIED, calendarAccountId, calendarRecord,
   isCalendarSecretRef, validateCalendarAccountSettings, validateStoredCalendarAccount,
-  type CalendarFailure, type CalendarListResult, type CalendarRemoveResult, type CalendarSaveResult
+  type CalendarFailure, type CalendarListResult, type CalendarRemoveResult, type CalendarSaveResult, type CalendarGrantResult
 } from '../shared/calendarAccounts';
 
 export interface CalendarAccountConfig {
@@ -23,6 +25,8 @@ export interface CalendarAccountDeps {
   canStoreSecrets(): boolean;
   setSecret(ref: string, password: string): { ok: boolean };
   deleteSecret(ref: string): boolean;
+  /** Current team membership, required when granting access. */
+  present?(agentId: string): boolean;
 }
 const failed = (error: string): CalendarFailure => ({ ok: false, error });
 const storageError = 'The calendar account could not be saved safely. Try again.';
@@ -64,6 +68,32 @@ export class CalendarAccounts {
   list(): CalendarListResult {
     try { return { ok: true, accounts: this.state().accounts }; }
     catch { return failed('The saved calendar account settings could not be read safely.'); }
+  }
+
+  setGrant(agentId: unknown, calendarId: unknown, access: unknown): CalendarGrantResult {
+    try {
+      if (typeof agentId !== 'string' || !agentId.trim() || agentId === RESEARCH_ID || agentId === 'constructor' || agentId === '__proto__' || agentId === 'prototype' || !this.deps.present?.(agentId) || !calendarAccountId(calendarId)
+        || (access !== null && access !== 'read' && access !== 'approval' && access !== 'book')) return failed(CALENDAR_SETTINGS_INVALID);
+      const { cfg, accounts } = this.state();
+      if (access !== null && !accounts.some((a) => a.calendars.some((c) => c.id === calendarId && c.enabled))) return failed('Choose an enabled calendar in Settings first.');
+      const before = hasCalendarTools(cfg, agentId);
+      const current = cfg.agentCapabilities?.[agentId] ?? {};
+      const calendars = (current.calendars ?? []).filter((g) => g.calendar !== calendarId);
+      if (access !== null) calendars.push({ calendar: calendarId, access });
+      const agentCapabilities = { ...cfg.agentCapabilities, [agentId]: { ...current, calendars } };
+      this.deps.saveConfig({ agentCapabilities });
+      return { ok: true, restartNeeded: !before && hasCalendarTools({ ...cfg, agentCapabilities }, agentId) };
+    } catch { return failed('Calendar access could not be saved. Try again.'); }
+  }
+
+  selectCalendar(accountId: unknown, calendarId: unknown, enabled: unknown): CalendarSaveResult {
+    try {
+      if (!calendarAccountId(accountId) || !calendarAccountId(calendarId) || typeof enabled !== 'boolean') return failed(CALENDAR_SETTINGS_INVALID);
+      const account = this.state().accounts.find((a) => a.id === accountId);
+      if (!account || !account.calendars.some((c) => c.id === calendarId)) return failed(CALENDAR_SETTINGS_INVALID);
+      const { status: _status, statusReason: _reason, secretRef: _ref, ...settings } = account;
+      return this.update(accountId, { account: { ...settings, calendars: settings.calendars.map((c) => c.id === calendarId ? { ...c, enabled } : c) } });
+    } catch { return failed(storageError); }
   }
 
   /** Main internal only. Called by the CalDAV service after authenticated

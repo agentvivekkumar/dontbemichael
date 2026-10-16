@@ -7,6 +7,7 @@ export type CalendarFailure = { ok: false; error: string };
 export type CalendarSaveResult = { ok: true; record: CalendarAccount; cleanupPending: boolean } | CalendarFailure;
 export type CalendarListResult = { ok: true; accounts: CalendarAccount[] } | CalendarFailure;
 export type CalendarRemoveResult = { ok: true; affected: string[]; cleanupPending: boolean } | CalendarFailure;
+export type CalendarGrantResult = { ok: true; restartNeeded: boolean } | CalendarFailure;
 
 export const CALENDAR_UNVERIFIED = 'Authentication has not been verified yet.';
 export const CALENDAR_SETTINGS_INVALID = 'The calendar account settings are not valid. Check the account details and try again.';
