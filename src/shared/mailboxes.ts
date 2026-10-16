@@ -12,6 +12,7 @@
  */
 
 import type { QuickBooksCapability } from './quickbooks';
+import type { CalendarGrant } from './calendars';
 
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
 
@@ -85,6 +86,8 @@ export interface SendOnlyGrant {
 }
 
 export interface AgentCapabilities {
+  /** Business calendar access. Absent on older records means no access. */
+  calendars?: CalendarGrant[];
   email?: EmailCapability;
   /** Send only from another member's mailbox (SendOnlyGrant). */
   sendOnly?: SendOnlyGrant;
