@@ -1693,7 +1693,14 @@
     "copyPath": "复制路径",
     "saveTitle": "保存（Cmd/Ctrl+S）",
     "saved": "已保存",
-    "save": "保存"
+    "save": "保存",
+    "copyAbsolutePath": "复制绝对路径",
+    "openInIde": "在 IDE 中打开",
+    "saveFailed": "出错",
+    "loading": "加载中…",
+    "loadingEditor": "正在加载编辑器…",
+    "nothingOpen": "没有打开的文件",
+    "nothingOpenHint": "从文件树中选一个文件来编辑，或选一个改动过的文件查看差异。"
   },
   "gitPanes": {
     "jumpConfirm": "把仓库跳转到 {{sha}}（\"{{subject}}\"）？\n\n这会脱离 HEAD。若工作区不干净或有智能体正在运行，将自动阻止。",

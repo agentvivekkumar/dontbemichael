@@ -1693,7 +1693,14 @@
     "copyPath": "نسخ المسار",
     "saveTitle": "حفظ (Cmd/Ctrl+S)",
     "saved": "حُفِظ",
-    "save": "حفظ"
+    "save": "حفظ",
+    "copyAbsolutePath": "نسخ المسار الكامل",
+    "openInIde": "فتح في IDE",
+    "saveFailed": "خطأ",
+    "loading": "جارٍ التحميل…",
+    "loadingEditor": "جارٍ تحميل المحرر…",
+    "nothingOpen": "لا شيء مفتوح",
+    "nothingOpenHint": "اختر ملفًا من الشجرة لتحريره، أو ملفًا تغيّر لعرض الفروقات."
   },
   "gitPanes": {
     "jumpConfirm": "نقل المستودع إلى {{sha}} (\"{{subject}}\")؟\n\nهذا يفصل HEAD. يُمنع تلقائيًا إذا كانت الشجرة غير نظيفة أو كان وكيل في منتصف عمله.",

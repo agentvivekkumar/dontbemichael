@@ -1693,7 +1693,14 @@
     "copyPath": "copy path",
     "saveTitle": "Save (Cmd/Ctrl+S)",
     "saved": "saved",
-    "save": "save"
+    "save": "save",
+    "copyAbsolutePath": "Copy absolute path",
+    "openInIde": "Open in the IDE",
+    "saveFailed": "err",
+    "loading": "loading…",
+    "loadingEditor": "loading editor…",
+    "nothingOpen": "nothing open",
+    "nothingOpenHint": "Pick a file from the tree to edit, or a changed file to diff."
   },
   "gitPanes": {
     "jumpConfirm": "Jump the repo to {{sha}} (\"{{subject}}\")?\n\nThis detaches HEAD. Blocked automatically if the tree is dirty or an agent is in the middle of a run.",
