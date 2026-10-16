@@ -21,7 +21,7 @@
 import { WEB_SETTINGS_UNREADABLE, WEB_TOOLS, type SandboxNetwork } from '../shared/webAccess';
 import {
   addressedToResearch, ANSWER_UNCHECKED, ANSWER_UNCHECKED_SUBJECT, hasAttachments, looksLikeInjection, NOT_SENT_SUBJECT,
-  PRIVACY_CHECK_SENDER, REFUSAL_CHECK_FAILED, REFUSAL_FILES, REFUSAL_OFF, RESEARCH_HOUSE_RULE, RESEARCH_ID, RESEARCH_REPLY_LABEL,
+  PRIVACY_CHECK_SENDER, REFUSAL_CHECK_FAILED, REFUSAL_FILES, REFUSAL_NOT_DELIVERED, REFUSAL_OFF, RESEARCH_HOUSE_RULE, RESEARCH_ID, RESEARCH_REPLY_LABEL,
   RESEARCH_UNCHECKED_TOOL, NOT_SENT_SUBJECT_OUT, RESEARCH_ONLY_ASKERS, RESEARCH_NAME, RESEARCH_ROLE, isReservedName,
   SENT_AS_SUBJECT, sentAsBody, nameKey, researchText, cleanResearchName, RESEARCH_ONLY_SKILLS
 } from '../shared/research';
@@ -2481,7 +2481,7 @@ export class HiveManager {
     const what = from === 'human' ? 'A note from the owner'
       : from === 'system' ? 'A message from the app'
         : `${reg.agents[from]?.name?.trim() || from}'s message`;
-    const next = reason === REFUSAL_CHECK_FAILED
+   const next = reason === REFUSAL_CHECK_FAILED || reason === REFUSAL_NOT_DELIVERED
       ? 'This is an app problem. If it keeps happening, tell the owner.'
       : reason === REFUSAL_OFF
         ? `The owner turns ${n} on in Settings, Research & privacy.`
@@ -2578,24 +2578,36 @@ export class HiveManager {
     };
     const layer = this.trustLayer;
     const policy = this.policyOf(layer);
+        // The pending row goes only once the note is accounted for: delivered, or
+    // its refusal told. A delivery error is told to Michael, not just logged.
+    const settle = (): void => { if (!fromAgent) this.researchPending(msg, false); };
     layer.inbound({ subject: msg.subject, body: msg.body }).then((v) => {
       this.researchQueued--;
-      if (!fromAgent) this.researchPending(msg, false);
+      let delivered = false;
       try {
         // The owner changed what stays private while it was checked: checked
         // again under the new settings (Codex review, third ship).
-        if (this.policyOf(layer) !== policy) { this.queueForResearch(msg); return; }
-        if (v.decision === 'deny') return refuse(v.reason);
+        if (this.policyOf(layer) !== policy) { settle(); this.queueForResearch(msg); return; }
+        if (v.decision === 'deny') { refuse(v.reason); settle(); return; }
         // Research may have been turned off while the check ran.
-        if (!this.researchOn()) return refuse(REFUSAL_OFF, 'research-off');
+        if (!this.researchOn()) { refuse(REFUSAL_OFF, 'research-off'); settle(); return; }
         this.deliverToResearch(msg.from, msg, v.subject, v.body);
+        delivered = true;
+        settle();
         if (v.decision === 'clean' && fromAgent) this.tellSender(msg.from, msg.id, msg.conversation, SENT_AS_SUBJECT, sentAsBody(v.subject, v.body, this.researchName()), true);
-        this.commit('hive: trust layer delivered to research');
-      } catch (e) { console.error('[research] delivering a checked message', e); }
+      } catch (e) {
+        console.error('[research] delivering a checked message', e);
+        // Once it was delivered, a later error does not make it unsent.
+        if (!delivered) {
+          try { refuse(REFUSAL_NOT_DELIVERED, 'not-delivered'); settle(); } catch (e2) { console.error('[research] telling that a checked message was not delivered', e2); }
+        }
+        return;
+      }
+      try { this.commit('hive: trust layer delivered to research'); } catch (e) { console.error('[research] committing a delivery', e); }
     }, () => {
       this.researchQueued--;
-      if (!fromAgent) this.researchPending(msg, false);
       try { refuse(REFUSAL_CHECK_FAILED, 'failed'); } catch { /* logged above */ }
+      settle();
     });
   }
 
