@@ -55,6 +55,8 @@ import {
   type JobProfile
 } from '@shared/hireTemplates';
 import { firstTaskSection, roleLabel, plainFallback } from '@shared/workStyleText';
+import { reviewKey, reviewOf, standingReview, type WorkStyleReview } from '@shared/workStyleReview';
+import { WorkStyleReviewPanel } from './WorkStyleReviewPanel';
 import { useRtl } from '@/i18n/useDirection';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { SHOW_IMPORT_HIRE, SHOW_ENGINE_PICKER, SHOW_MAILBOXES } from '@shared/buildFeatures';
@@ -267,6 +269,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [suggesting, setSuggesting] = useState(false);
   const [suggestFailed, setSuggestFailed] = useState(false);
   const [writingInstructions, setWritingInstructions] = useState(false);
+  // The instructions written at Hire, shown before the hire goes ahead
+  // (shared/workStyleReview.ts).
+  const [review, setReview] = useState<WorkStyleReview | null>(null);
   const describeSeq = useRef(0);
   const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business, manager: godName });
   // The run being written, with the text it replaces, so Stop puts it back.
@@ -640,12 +645,22 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     // What the owner typed under "First task", which the instructions leave out.
     const typedFirstTask = firstTaskSection(workStyle)?.body.trim().slice(0, FIRST_TASK_EDITED_MAX) || '';
     if (!goal || workStyle.trim() !== plainOfBase.trim()) {
-      setWritingInstructions(true);
-      const res = await window.cth.workStyleConvert({ to: 'instructions', text: workStyle, ctx: styleCtx(), previous: baseInstructions || undefined })
-        .catch(() => null);
-      setWritingInstructions(false);
-      goal = res?.text?.trim() || '';
-      if (!goal) { setBusy(false); setError(tr('addAgent.wizard.errInstructions')); return; }
+      // The owner reads the instructions before anyone is hired: the first
+      // Hire writes and shows them, and Hire again uses them exactly as shown.
+      const key = reviewKey(workStyle, styleCtx());
+      const shown = standingReview(review, key);
+      if (shown) goal = shown.text;
+      else {
+        setWritingInstructions(true);
+        const res = await window.cth.workStyleConvert({ to: 'instructions', text: workStyle, ctx: styleCtx(), previous: baseInstructions || undefined })
+          .catch(() => null);
+        setWritingInstructions(false);
+        const written = reviewOf(key, res);
+        setBusy(false);
+        if (!written) { setError(tr('addAgent.wizard.errInstructions')); return; }
+        setReview(written);
+        return;
+      }
     }
     // The folder is made here, the first time it's needed; an existing one is
     // left exactly as it is.
@@ -777,6 +792,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   };
 
   const stepIndex = STEPS.indexOf(step);
+  // Shown while it still stands: a new name, title or work style writes them
+  // again at Hire.
+  const reviewing = standingReview(review, reviewKey(workStyle, styleCtx()));
   const jobGroups = useMemo(() => {
     const byTitle = new Map<string, HireJob[]>();
     // This business's own card for the character's job is already their job
@@ -831,7 +849,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
             </PixelButton>
           ) : (
             <PixelButton variant="primary" size="md" onClick={submit} disabled={busy || checking || suggesting || !workStyle.trim()}>
-              {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : tr('addAgent.spawn')}
+              {writingInstructions ? tr('addAgent.wizard.writingInstructions', { name: name.trim() }) : busy ? tr('addAgent.spawning') : checking ? tr('addAgent.wizard.checking') : reviewing ? tr('workStyleReview.useAndHire', { name: name.trim() }) : tr('addAgent.spawn')}
             </PixelButton>
           )}
         </>
@@ -1117,6 +1135,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                 </div>
               </div>
 
+              {reviewing ? (
+                <WorkStyleReviewPanel review={reviewing} name={name.trim()} onChange={() => setReview(null)} />
+              ) : (
               <Row label={tr('addAgent.workStyle')} info={tr('addAgent.wizard.workStyleIntro', { name: name.trim(), godName })}>
                 <textarea
                   dir={rtl ? 'auto' : undefined}
@@ -1144,6 +1165,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
                   {suggestFailed && <span role="alert" style={{ ...helperStyle, color: 'var(--cth-ink-2)' }}>{tr('addAgent.wizard.suggestFailed')}</span>}
                 </div>
               </Row>
+              )}
 
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ flex: '1 1 380px', minWidth: 0 }}>

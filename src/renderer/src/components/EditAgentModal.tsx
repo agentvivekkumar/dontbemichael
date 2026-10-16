@@ -22,7 +22,9 @@ import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
 import { firstTaskSection, roleLabel, plainFallback } from '@shared/workStyleText';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
+import { reviewKey, reviewOf, standingReview, type WorkStyleReview } from '@shared/workStyleReview';
 import { ScheduledJobsList } from './ScheduledJobs';
+import { WorkStyleReviewPanel } from './WorkStyleReviewPanel';
 import { sendTypedFirstTask } from '@/shell/typedFirstTask';
 import { useResearchName } from '@/shell/research';
 
@@ -76,6 +78,9 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const [writing, setWriting] = useState(false);
   const [goalError, setGoalError] = useState(false);
   const [writeError, setWriteError] = useState(false);
+  // The instructions written from a changed work style, shown before they are
+  // saved (shared/workStyleReview.ts).
+  const [review, setReview] = useState<WorkStyleReview | null>(null);
   const describeSeq = useRef(0);
   /** Show the agent's instructions as a plain description: the quick rewrite
    *  at once, the model's when it arrives, unless the owner started typing. */
@@ -108,6 +113,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     setModel(agent.model);
     setRole(splitAgentRole(agent.description).role);
     setRoleDescription(splitAgentRole(agent.description).roleDescription);
+    setReview(null);
     describe(effectiveWorkStyle(agent));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id]);
@@ -137,22 +143,31 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
     // Michael and his assistant may clear theirs; that saves no work style.
     if (!goal.trim()) trimmedGoal = '';
     else if (goal.trim() !== plainOfGoal.trim()) {
-      setWriting(true);
-      setWriteError(false);
-      const res = await window.cth.workStyleConvert({
-        to: 'instructions',
-        text: goal,
-        ctx: {
-          name: trimmedName,
-          title: role.trim() || undefined,
-          business: { name: config?.businessName, city: config?.businessCity },
-          manager: godName
-        },
-        previous: effectiveWorkStyle(agent) || undefined
-      }).catch(() => null);
-      setWriting(false);
-      if (!res?.text?.trim()) { setWriteError(true); return; }
-      trimmedGoal = res.text.trim();
+      // The owner reads the instructions before they are kept: the first Save
+      // writes and shows them, and Save again keeps them exactly as shown.
+      const key = reviewKey(goal, { name: trimmedName, title: role });
+      const shown = standingReview(review, key);
+      if (shown) trimmedGoal = shown.text;
+      else {
+        setWriting(true);
+        setWriteError(false);
+        const res = await window.cth.workStyleConvert({
+          to: 'instructions',
+          text: goal,
+          ctx: {
+            name: trimmedName,
+            title: role.trim() || undefined,
+            business: { name: config?.businessName, city: config?.businessCity },
+            manager: godName
+          },
+          previous: effectiveWorkStyle(agent) || undefined
+        }).catch(() => null);
+        setWriting(false);
+        const written = reviewOf(key, res);
+        if (!written) { setWriteError(true); return; }
+        setReview(written);
+        return;
+      }
     }
     // A new name goes through the office registry first, the rename Michael
     // and the team read names from. If it's refused (say, the name is taken),
@@ -192,6 +207,8 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   };
 
   const who = name.trim() || agent.name;
+  // Shown while it still stands: a new name or role writes them again on Save.
+  const reviewing = goal.trim() !== plainOfGoal.trim() ? standingReview(review, reviewKey(goal, { name: who, title: role })) : null;
   // What the folded Engine line shows: the provider, and the model when it has one.
   const providerLabel = AGENT_PROVIDER_PRESETS.find((p) => p.id === provider)?.label ?? provider;
   const modelLabel = preset.supportsModel && model ? (modelsForProvider(provider).find((m) => m.id === model)?.label ?? model) : '';
@@ -212,7 +229,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
         <>
           <PixelButton variant="ghost" size="md" onClick={onClose}>{t('editAgent.cancel')}</PixelButton>
           <div style={{ flex: 1 }} />
-          <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? t('editAgent.writing') : t('editAgent.save')}</PixelButton>
+          <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing}>{writing ? t('editAgent.writing') : reviewing ? t('workStyleReview.use') : t('editAgent.save')}</PixelButton>
         </>
       )}
     >
@@ -267,6 +284,9 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
             />
           </Row>
 
+          {reviewing ? (
+            <WorkStyleReviewPanel review={reviewing} name={who} onChange={() => setReview(null)} grow />
+          ) : (
           <Row
             grow
             label={t('editAgent.workStyle')}
@@ -282,6 +302,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
               style={{ ...inputStyle, fontFamily: 'var(--cth-font-ui)', resize: 'none', minHeight: 320, flex: 1 }}
             />
           </Row>
+          )}
           <ScheduledJobsList agentId={agent.id} compact />
           {goalError && (
             <span role="alert" style={{ ...helperStyle, color: 'var(--cth-coral-text)' }}>
