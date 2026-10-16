@@ -5503,7 +5503,7 @@ function recordOwnerAnswerKeys(keys: string[]): void {
   writeConfig({ ownerAnswerKeys: [...new Set([...prior, ...keys])].slice(-OWNER_ANSWER_KEYS_MAX) });
 }
 
-ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
+ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown, index: unknown) => {
   if (typeof id !== 'string' || !id || !patch || typeof patch !== 'object' || Array.isArray(patch)) {
     return { ok: false, error: 'invalid task patch' };
   }
@@ -5519,12 +5519,13 @@ ipcMain.handle('hive:patchTask', (_evt, id: unknown, patch: unknown) => {
   // list, and an entry already on disk may be one an agent wrote.
   const qa = (patch as { humanQA?: unknown }).humanQA;
   if (!Array.isArray(qa)) return { ok: false, landed: false, error: 'no Ask me answers in the patch' };
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return { ok: false, landed: false, error: 'no question picked for the answer' };
   const ledger = hive.tasks() as { tasks?: HiveTask[] };
   const onDisk = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id)?.humanQA ?? [];
   // The renderer's list is a few seconds old, so it only adds answers to
   // questions still open on disk: a newer ask, a changed question or a
   // withdrawal written since all stand (askMeRouting.ts mergeHumanQA).
-  const { humanQA, added } = mergeHumanQA(onDisk, qa);
+  const { humanQA, added } = mergeHumanQA(onDisk, qa, index);
   if (!added.length) return { ok: true, landed: false };
   const ok = hive.patchTask(id, { humanQA: humanQA as HiveTask['humanQA'] });
   const keys = answerKeysOf(id, added.map((i) => humanQA[i]));

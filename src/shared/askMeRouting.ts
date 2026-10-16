@@ -147,10 +147,13 @@ export function openReportIndexes(qa: readonly (AskEntry | null | undefined)[] |
  *  the same and still open on disk. Its list is a few seconds old, so a
  *  withdrawal (dismissedAt) Michael wrote since, a slot whose question changed
  *  and an entry added on disk all stand (pre-landing review, 2026-10-05).
+ *  `only`: the one slot being answered; no other slot takes an answer, so a
+ *  stale answer in the list never lands on a question asked again since.
  *  `added`: the slots that took an answer. */
-export function mergeHumanQA(onDisk: unknown[], incoming: unknown[]): { humanQA: unknown[]; added: number[] } {
+export function mergeHumanQA(onDisk: unknown[], incoming: unknown[], only?: number): { humanQA: unknown[]; added: number[] } {
   const added: number[] = [];
   const humanQA = onDisk.map((d, i) => {
+    if (only !== undefined && i !== only) return d;
     const e = incoming[i];
     if (!d || typeof d !== 'object' || !e || typeof e !== 'object') return d;
     const disk = d as AskEntry;

@@ -202,7 +202,7 @@ export function AskMeTab() {
       });
       const updated = next.find((candidate) => candidate.id === task.id);
       const result = updated
-        ? await window.cth.hivePatchTask(task.id, { humanQA: updated.humanQA })
+        ? await window.cth.hivePatchTask(task.id, { humanQA: updated.humanQA }, index)
         : { ok: false, landed: false };
       if (!result.ok || result.landed === false) throw new Error('task changed before answer could be saved');
       updateNeedsYouTasks(() => next);
