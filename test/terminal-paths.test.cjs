@@ -129,6 +129,16 @@ test('quoted prose keeps linking the file name inside it', () => {
   assert.deepEqual(tokensIn("Michael's notes: see plan.md' later"), ['plan.md']);
 });
 
+test('a quoted phrase that only starts with a path prefix is not one path', () => {
+  // The prefix must be followed by a non-space, so the phrase falls through to
+  // the file name inside it instead of underlining a path that does not exist.
+  assert.deepEqual(tokensIn('he said "/ see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn("note: '~/ read plan.md'"), ['plan.md']);
+  assert.deepEqual(tokensIn('see `./ open config.yml`'), ['config.yml']);
+  // Paths with spaces inside still keep their whole path.
+  assert.deepEqual(tokensIn('saved "/Users/Jane/My Reports/summary.md"'), ['/Users/Jane/My Reports/summary.md']);
+});
+
 test('quoted versions and prose do not become file paths', () => {
   assert.deepEqual(tokensIn('version "v0.4.5", cost \'0.92\', called `spring.thaw`'), []);
 });
