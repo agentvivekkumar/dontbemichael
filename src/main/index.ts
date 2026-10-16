@@ -95,6 +95,11 @@ import {
   type TriggerHistoryEntry, type TriggerMode, type WebhookTrigger
 } from '../shared/triggers';
 import {
+  tryCodeFirstExecution,
+  type CodeFirstRequest,
+  type CodeFirstResult
+} from '../shared/codeFirstExecution';
+import {
   appendTriggerHistory, clearTriggerHistory, listTriggerHistory, updateTriggerHistory
 } from './triggerHistory';
 import { transcribeWithGroq, DEFAULT_GROQ_MODEL } from './freeflow';
@@ -2938,6 +2943,52 @@ function dispatchWebhookWork(arg: {
   /** 'webhook' | 'org' — only for the subject line and the god-facing note. */
   origin: 'webhook' | 'org';
 }): boolean {
+  // Check whether this task can be executed deterministically with code first
+  let codeFirst: CodeFirstResult | null = null;
+  try {
+    let ledgerTasks: HiveTask[] = [];
+    try {
+      const ledger = hive.tasks() as { tasks?: HiveTask[] };
+      ledgerTasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    } catch { /* ledger read error */ }
+    const cf = tryCodeFirstExecution({ text: arg.message, title: arg.title }, { tasks: ledgerTasks });
+    if (cf.handled) {
+      codeFirst = cf;
+    }
+  } catch (e) {
+    console.error('[codeFirst] execution error, falling back to agent:', e instanceof Error ? e.message : e);
+  }
+
+  if (codeFirst && codeFirst.handled) {
+    try {
+      const card: HiveTask = {
+        id: arg.taskId,
+        title: arg.title,
+        description: arg.message,
+        status: 'done',
+        result: codeFirst.summary,
+        dependsOn: [],
+        priority: 1,
+        createdAt: new Date().toISOString(),
+        ...(arg.tokenHash ? { webhook: { tokenHash: arg.tokenHash } } : {})
+      };
+      hive.addTask(card);
+      // Notify God/orchestrator of the completed deterministic work
+      hive.send({
+        to: 'god',
+        act: 'inform',
+        subject: `[Code First] ${arg.title}`,
+        body: `Completed deterministically via code first execution:\n${codeFirst.summary}\n\nKanban card ${arg.taskId} marked done.`,
+        requires_reply: false
+      }, arg.origin);
+      return true;
+    } catch (e) {
+      console.error('[codeFirst] could not save completed card, falling back to agent:', e);
+      // Fall through to standard agent dispatch
+    }
+  }
+
+  // Standard LLM agent dispatch (existing workflow)
   try {
     const card: HiveTask = {
       id: arg.taskId,
@@ -5483,6 +5534,17 @@ ipcMain.handle('hive:addTask', (_evt, task: unknown) => {
   }
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   return { ok: hive.addTask(task as HiveTask) };
+});
+ipcMain.handle('codeFirst:execute', (_evt, req: unknown) => {
+  if (!req || typeof req !== 'object') {
+    return { matched: false, handled: false, fallbackReason: 'invalid_input' };
+  }
+  let ledgerTasks: HiveTask[] = [];
+  try {
+    const ledger = hive.tasks() as { tasks?: HiveTask[] };
+    ledgerTasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+  } catch { /* ledger read error */ }
+  return tryCodeFirstExecution(req as CodeFirstRequest, { tasks: ledgerTasks });
 });
 /** The digest an answer is recorded by: its question and answer, word for word. */
 function answerDigest(q: string, a: string): string {
