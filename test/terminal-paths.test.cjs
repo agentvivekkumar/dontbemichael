@@ -127,6 +127,18 @@ test('quoted prose keeps linking the file name inside it', () => {
   assert.deepEqual(tokensIn('git commit -m "Update README.md"'), ['README.md']);
   assert.deepEqual(tokensIn('error: "Could not read config.yml"'), ['config.yml']);
   assert.deepEqual(tokensIn("Michael's notes: see plan.md' later"), ['plan.md']);
+  assert.deepEqual(tokensIn('run "/ see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn("run '/ see notes.md'"), ['notes.md']);
+  assert.deepEqual(tokensIn('run `/ see notes.md`'), ['notes.md']);
+  assert.deepEqual(tokensIn('run "// see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn('run "/docs/ see notes.md"'), ['notes.md']);
+});
+
+test('a token with adjacent whitespace around a path separator is not a path', () => {
+  assert.equal(isPathToken('/ see notes.md'), false);
+  assert.equal(isPathToken('// see notes.md'), false);
+  assert.equal(isPathToken('docs/ /notes.md'), false);
+  assert.equal(isPathToken('/docs/ see notes.md'), false);
 });
 
 test('quoted versions and prose do not become file paths', () => {
