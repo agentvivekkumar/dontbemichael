@@ -97,6 +97,8 @@ import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
+import { CalendarAccounts } from './calendarAccounts';
+import { calendarSettingsPatchAllowed } from '../shared/calendarAccounts';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, cannotStoreReason, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
 import { standingFitCheck } from './standingCheck';
@@ -782,6 +784,14 @@ const mailAdmin = {
   present: memberPresent,
   canStoreSecrets: () => integrations.canStoreSecrets()
 };
+
+const calendarAccounts = new CalendarAccounts({
+  getConfig: readConfig,
+  saveConfig: (patch) => { writeConfig(patch); },
+  canStoreSecrets: integrations.canStoreSecrets,
+  setSecret: integrations.setSecret,
+  deleteSecret: integrations.deleteSecret
+});
 
 /**
  * Send only grants on a mailbox nobody on the team reads are paused (S3, D10).
@@ -4464,6 +4474,7 @@ ipcMain.handle('integrations:test', async (_evt, payload: unknown) => {
 ipcMain.handle('config:get', (): HarnessConfig => readConfig());
 ipcMain.handle('config:damagedCopy', (): string | null => damagedConfigCopy());
 ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
+  if (!calendarSettingsPatchAllowed(patch)) throw new Error('Use calendar account management to change calendar accounts.');
   // FIRST RUN: every hive-bound service is started by bootstrapHiveServices(),
   // which runs once at app-ready and early-returns on `!hive.enabled()` — i.e.
   // whenever harnessHome is still null, which is exactly the state a fresh
@@ -4966,6 +4977,10 @@ ipcMain.handle('hive:procedure', (_evt, id: unknown, slug: unknown) =>
 ipcMain.handle('hive:inbox', (_evt, id: unknown) => (typeof id === 'string' ? hive.inbox(id) : []));
 
 // ─── IPC: mailboxes and Capabilities (docs/designs/multi-mailbox.md) ─────────
+ipcMain.handle('calendarAccounts:list', () => calendarAccounts.list());
+ipcMain.handle('calendarAccounts:add', (_evt, input: unknown) => calendarAccounts.add(input));
+ipcMain.handle('calendarAccounts:update', (_evt, id: unknown, input: unknown) => calendarAccounts.update(id, input));
+ipcMain.handle('calendarAccounts:remove', (_evt, id: unknown) => calendarAccounts.remove(id));
 // Records carry no password; the renderer only ever sends one, to save it.
 ipcMain.handle('mail:save', async (_evt, input: unknown) => {
   if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
@@ -7854,6 +7869,7 @@ function onSystemResume(reason: string): void {
 }
 
 app.whenReady().then(() => {
+  calendarAccounts.cleanup();
   // Realtime Michael mic-gate hygiene (rt-8 / Pam rt-10 nit): the voice session
   // opens the mic permission gate by persisting realtimeVoiceEnabled=true and
   // closes it on disconnect — but a hard crash/reload mid-session skips that

@@ -3,6 +3,8 @@ import type { DataClassId, DataClassSetting } from '../shared/dataClasses';
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
+import type { CalendarAccount } from '../shared/calendars';
+import type { CalendarListResult, CalendarRemoveResult, CalendarSaveInput, CalendarSaveResult } from '../shared/calendarAccounts';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
@@ -320,6 +322,7 @@ export interface HarnessConfig {
    *  src/main/config.ts. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
+  calendarAccounts?: CalendarAccount[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
   /** The QuickBooks row's switch under Settings > Connections > Claude connectors.
    *  Off or absent refuses everyone. Mirrors src/main/config.ts. */
@@ -967,6 +970,11 @@ const api = {
   mailSave: (input: { id?: string; provider: MailProvider; address: string; password: string; imap?: MailServer; smtp?: MailServer }): Promise<{ ok: true; record: MailboxRecord } | { ok: false; kind: string; reason: string }> =>
     ipcRenderer.invoke('mail:save', input),
   mailRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> => ipcRenderer.invoke('mail:remove', id),
+  // Passwords cross only into main. Account responses contain metadata only.
+  calendarAccountsList: (): Promise<CalendarListResult> => ipcRenderer.invoke('calendarAccounts:list'),
+  calendarAccountsAdd: (input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:add', input),
+  calendarAccountsUpdate: (id: string, input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:update', id, input),
+  calendarAccountsRemove: (id: string): Promise<CalendarRemoveResult> => ipcRenderer.invoke('calendarAccounts:remove', id),
   /** `move: true` confirms taking a mailbox another agent holds (one agent per
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
