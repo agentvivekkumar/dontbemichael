@@ -48,6 +48,13 @@ const { folderPolicy } = loadTs('src/shared/folderAccess.ts');
 const { folderLayoutFor } = loadTs('src/main/officeFile.ts');
 const C = loadTs('src/shared/claudeConnectors.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
+// These tests check the settings where Claude Code's sandbox starts (a Mac, or a
+// Linux with bubblewrap); whether it starts on the machine running the tests is
+// osSandbox.ts's job and has its own test (os-sandbox.test.cjs).
+{
+  const sb = loadTs('src/main/osSandbox.ts');
+  sb.setOsSandboxProbe(() => sb.classifyOsSandbox({ platform: process.platform, has: () => true, apparmorRestrictsUserns: () => null, bwrapStarts: () => ({ ok: true }) }));
+}
 const { HookServer } = loadTs('src/main/hooks.ts');
 
 // The same rule the app uses for file name case (index.ts, hooks.ts).

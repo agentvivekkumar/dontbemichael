@@ -21,6 +21,13 @@ const { posixOnly } = require('./platform.cjs');
 const electron = require.resolve('electron');
 require.cache[electron] = { id: electron, filename: electron, loaded: true, exports: { Notification: class { show() {} static isSupported() { return false; } } } };
 const { HiveManager } = loadTs('src/main/hive.ts');
+// These tests check the settings where Claude Code's sandbox starts (a Mac, or a
+// Linux with bubblewrap); whether it starts on the machine running the tests is
+// osSandbox.ts's job and has its own test (os-sandbox.test.cjs).
+{
+  const sb = loadTs('src/main/osSandbox.ts');
+  sb.setOsSandboxProbe(() => sb.classifyOsSandbox({ platform: process.platform, has: () => true, apparmorRestrictsUserns: () => null, bwrapStarts: () => ({ ok: true }) }));
+}
 const { HookServer } = loadTs('src/main/hooks.ts');
 const R = loadTs('src/shared/research.ts');
 const W = loadTs('src/shared/webAccess.ts');

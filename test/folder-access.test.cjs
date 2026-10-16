@@ -26,6 +26,13 @@ require.cache[electron] = {
 const { folderPolicy, folderDecision, folderToolTarget } = loadTs('src/shared/folderAccess.ts');
 const { folderLayoutFor } = loadTs('src/main/officeFile.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
+// These tests check the settings where Claude Code's sandbox starts (a Mac, or a
+// Linux with bubblewrap); whether it starts on the machine running the tests is
+// osSandbox.ts's job and has its own test (os-sandbox.test.cjs).
+{
+  const sb = loadTs('src/main/osSandbox.ts');
+  sb.setOsSandboxProbe(() => sb.classifyOsSandbox({ platform: process.platform, has: () => true, apparmorRestrictsUserns: () => null, bwrapStarts: () => ({ ok: true }) }));
+}
 
 // Absolute on this platform (D:\Users\me\... on Windows), so the expected
 // paths match what the path helpers give back there.

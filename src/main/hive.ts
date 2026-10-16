@@ -27,6 +27,7 @@ import {
 } from '../shared/research';
 
 import { hookShell, shellCommand, type HookShell } from './hookShell';
+import { osSandboxStatus } from './osSandbox';
 import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
@@ -1747,6 +1748,9 @@ export class HiveManager {
   }
 
   private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash', network?: SandboxNetwork, shellWrite?: string[]): unknown {
+    // Whether Claude Code's shell sandbox starts on this computer, asked of the
+    // machine rather than read off the OS name (osSandbox.ts).
+    const sandboxHolds = osSandboxStatus().holds;
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through a shell with a stripped PATH, where `node` is often absent.
     // On Windows that shell is PowerShell when there is no Git Bash, which can't
@@ -1826,11 +1830,13 @@ export class HiveManager {
               enabled: true,
               // A member without the internet is held to the sandbox even
               // without a business folder, or a rerun outside it would reach
-              // the internet (issue #230). Not on Windows: no sandbox there (#187).
-              ...((folders?.sandboxOnly || network) && process.platform !== 'win32' ? { allowUnsandboxedCommands: false } : {}),
+              // the internet (issue #230). Only where the sandbox starts: on
+              // Windows (#187), and on a Linux without bubblewrap or with
+              // AppArmor blocking it, the lock refuses every command (osSandbox.ts).
+              ...((folders?.sandboxOnly || network) && sandboxHolds ? { allowUnsandboxedCommands: false } : {}),
               // No host for the shell of anyone but Research. strictAllowlist
               // makes the empty list a rule, not a prompt saver, in auto mode.
-              ...(network && process.platform !== 'win32' ? { network } : {}),
+              ...(network && sandboxHolds ? { network } : {}),
               filesystem: {
                 allowWrite: shellWrite ?? writableDirs,
                 // The hook program runs outside the sandbox on every tool call,
