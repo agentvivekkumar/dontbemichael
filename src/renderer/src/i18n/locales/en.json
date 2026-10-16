@@ -1223,7 +1223,9 @@
     "focusFromOlder": "Started from this job's older instructions.",
     "addFocus": "Add a focus area",
     "checking": "Checking…",
-    "saveAnyway": "Save anyway"
+    "saveAnyway": "Save anyway",
+    "suggestedTitle": "Suggested routines",
+    "suggestedAdd": "Add paused"
   },
   "webhooksSection": {
     "summaryNone": "none",

@@ -1223,7 +1223,9 @@
     "focusFromOlder": "以此任务的旧说明为起点。",
     "addFocus": "添加重点",
     "checking": "正在检查…",
-    "saveAnyway": "仍然保存"
+    "saveAnyway": "仍然保存",
+    "suggestedTitle": "推荐例行工作",
+    "suggestedAdd": "添加已暂停"
   },
   "webhooksSection": {
     "summaryNone": "无",

@@ -1223,7 +1223,9 @@
     "focusFromOlder": "بدأ من التعليمات القديمة لهذه المهمة.",
     "addFocus": "أضف محور تركيز",
     "checking": "جارٍ التحقق…",
-    "saveAnyway": "احفظ على أي حال"
+    "saveAnyway": "احفظ على أي حال",
+    "suggestedTitle": "المهام المقترحة",
+    "suggestedAdd": "إضافة متوقفة مؤقتا"
   },
   "webhooksSection": {
     "summaryNone": "لا شيء",

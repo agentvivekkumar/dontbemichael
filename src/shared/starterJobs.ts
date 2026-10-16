@@ -65,3 +65,44 @@ export function starterMissionsFor(
   }
   return out;
 }
+
+/**
+ * Up to 3 suggested starter missions for an agent whose schedules are empty (Decision 5A).
+ * Each suggested mission is created paused (`enabled: false`), owned by `to`, ready
+ * for one-click addition on the Schedules tab.
+ */
+export function suggestedStarterMissions(
+  jobs: StarterJob[] | undefined,
+  hours: StarterHours | undefined,
+  defId: string,
+  to: string,
+  existing: ScheduledMission[],
+  godId: string,
+  newId: (i: number) => string,
+  maxSuggestions = 3
+): ScheduledMission[] {
+  if (!jobs || !hours) return [];
+  const have = new Set(missionsFor(existing, to, godId).map((m) => m.label.trim().toLowerCase()));
+  const out: ScheduledMission[] = [];
+  for (const job of jobs) {
+    if (out.length >= maxSuggestions) break;
+    if (job.agentId !== defId || have.has(job.title.trim().toLowerCase())) continue;
+    const when = parseStarterSchedule(job.schedule, hours);
+    const focus = cleanFocus(job.focus);
+    if (!when || !focus) continue;
+    out.push({
+      id: newId(out.length),
+      label: job.title.trim(),
+      intervalMs: when.intervalMs,
+      ...(when.weekly ? { weekly: when.weekly } : {}),
+      ...(when.times ? { times: when.times } : {}),
+      to,
+      body: '',
+      focus,
+      enabled: false,
+      createdBy: OWNER
+    });
+    have.add(job.title.trim().toLowerCase());
+  }
+  return out;
+}

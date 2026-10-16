@@ -14,6 +14,7 @@ import { formatTimes, normalizeTimes } from '@shared/scheduleTimes';
 import { WhenLines, fieldsFromLines, linesFromMission, sameLines, type LineDraft } from './WhenLines';
 import { cleanFocus, FOCUS_MAX, GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
+import { suggestedStarterMissions } from '@shared/starterJobs';
 import { useRtl } from '@/i18n/useDirection';
 
 /**
@@ -527,6 +528,115 @@ function useNameOf(): (id: string) => string {
   };
 }
 
+function useStarterSuggestions(agentId: string, to: string, mineCount: number): ScheduledMission[] {
+  const agents = useStore((s) => s.agents);
+  const missions = useStore((s) => s.missions);
+  const godId = useGodId();
+  const [suggestions, setSuggestions] = useState<ScheduledMission[]>([]);
+
+  useEffect(() => {
+    if (mineCount > 0) {
+      setSuggestions([]);
+      return;
+    }
+    let alive = true;
+    window.cth.packsList().then(({ packs, core }) => {
+      if (!alive) return;
+      const agent = agents.find((a) => a.id === agentId);
+      const allPacks = [...packs.map((p) => p.pack), core].filter(Boolean);
+      let targetPack = allPacks[0];
+      let defId = agentId;
+
+      if (agent?.sourceCard) {
+        const [type, id] = agent.sourceCard.split('/');
+        if (type && id) {
+          const match = allPacks.find((p) => p?.businessType === type);
+          if (match) {
+            targetPack = match;
+            defId = id;
+          }
+        }
+      } else {
+        const match = allPacks.find((p) => p?.starterMissions?.some((m) => m.agentId === agentId));
+        if (match) targetPack = match;
+      }
+
+      if (!targetPack?.starterMissions?.length || !targetPack.officeHours) {
+        setSuggestions([]);
+        return;
+      }
+
+      const stamp = Date.now().toString(36);
+      const list = suggestedStarterMissions(
+        targetPack.starterMissions,
+        targetPack.officeHours,
+        defId,
+        to,
+        missions,
+        godId,
+        (i) => `m_${stamp}_${agentId}_${i}`
+      );
+      setSuggestions(list);
+    }).catch(() => {
+      if (alive) setSuggestions([]);
+    });
+
+    return () => { alive = false; };
+  }, [agentId, to, mineCount, agents, missions, godId]);
+
+  return suggestions;
+}
+
+function SuggestedJobs({
+  suggestions,
+  onAdd,
+  busy
+}: {
+  suggestions: ScheduledMission[];
+  onAdd: (m: ScheduledMission) => void;
+  busy: boolean;
+}) {
+  const { t } = useTranslation();
+  if (!suggestions.length) return null;
+  return (
+    <div data-suggested-routines style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--cth-ink-500)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {t('schedulesSection.suggestedTitle')}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {suggestions.map((m) => (
+          <div
+            key={m.label}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '8px 12px',
+              borderRadius: 'var(--cth-r-md)',
+              background: 'var(--cth-card)',
+              boxShadow: 'inset 0 0 0 1px var(--cth-line)'
+            }}
+          >
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cth-ink)' }}>{m.label}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--cth-ink-3)', marginTop: 1 }}>{whenText(m, t)}</div>
+              {m.focus && (
+                <div style={{ fontSize: 11.5, color: 'var(--cth-ink-2)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.focus}
+                </div>
+              )}
+            </div>
+            <PixelButton variant="secondary" size="sm" onClick={() => onAdd(m)} disabled={busy}>
+              {t('schedulesSection.suggestedAdd')}
+            </PixelButton>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** One agent's own schedules, editable. `agentId` is its floor id. */
 export function AgentSchedules({ agentId, agentName }: { agentId: string; agentName: string }) {
   const { t } = useTranslation();
@@ -551,6 +661,13 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   const agent = agents.find((a) => a.id === agentId);
   const focusOwner: FocusOwner = { agentId, name: agentName, workStyle: agent ? effectiveWorkStyle(agent) : '', jobs: mine };
 
+  const suggestions = useStarterSuggestions(agentId, to, mine.length);
+  const { busy, run } = useSaveOp();
+
+  const handleAddSuggestion = (m: ScheduledMission) => {
+    void run(() => window.cth.upsertMission(m), refreshMissions);
+  };
+
   return (
     <div>
       {mine.length === 0 ? (
@@ -573,6 +690,13 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
         ))}
       </div>
       <AddSchedule to={to} ownerName={agentName} focusOwner={focusOwner} />
+      {mine.length === 0 && (
+        <SuggestedJobs
+          suggestions={suggestions}
+          onAdd={handleAddSuggestion}
+          busy={busy}
+        />
+      )}
     </div>
   );
 }
