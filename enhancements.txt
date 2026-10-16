@@ -1,0 +1,11 @@
+This is the enhancements listed by Jonathan Tinti 
+
+1. Usage tracking of "employees" 
+In order for business to understand how agents are working and what resources they are using up, 
+we should implement a usage tracker for each one. This will show how many tokens each agent uses 
+along with estimated cost and runs per "employee". 
+
+2. Budgets 
+This would be set by the business owner. This is to prevent one agent from using too many tokens 
+and exceeding the budget. After the agent has reached a threshold near the budget, let's say 75%, it would 
+prompt the owner for authorization 
