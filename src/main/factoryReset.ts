@@ -14,13 +14,15 @@
  * the updater's log and version stamp, the anonymous usage id, and the hero,
  * model and skill catalog caches.
  */
-import { existsSync, readFileSync, readdirSync, rmdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, parse, resolve } from 'node:path';
 import { officeRecordPath, readOfficeRecord } from './officeFile';
 import { AGENT_TMP_DIR } from '../shared/folderAccess';
 import { RESEARCH_DESK_DIR } from '../shared/research';
 import { privateRoot } from '../shared/agentPrivatePaths';
+import { isSameOrInside } from './pathInside';
+import { claudeProjectsRoot } from './transcript';
 
 /** Created by the app in the office folder. office.json and private/ have
  *  plain names an owner could use too, so they are handled on their own below. */
@@ -72,12 +74,15 @@ export const APP_DATA_ENTRIES = [
   ...CHECK_FOLDERS
 ] as const;
 
+export const PENDING_RESET_CLEANUP = 'pending-reset-cleanup.json';
+
 /** In the app's data folder and kept by a reset: they describe this install,
  *  not the office (test/factory-reset.test.cjs checks every name is in one list). */
 export const APP_DATA_KEPT = [
   'config.json', 'hero.json', 'model-catalog.json', 'skill-catalog.json', 'last-run-version', 'updater.log',
   // The anonymous usage id and its version stamp (analytics.ts).
-  'telemetry-install-id', 'telemetry-last-version'
+  'telemetry-install-id', 'telemetry-last-version',
+  PENDING_RESET_CLEANUP
 ] as const;
 
 /** Is this folder an office the app made, and not the owner's home folder or a
@@ -177,4 +182,113 @@ function appWorktrees(home: string): string[] {
       try { return statSync(join(d, '.git')).isFile(); } catch { return false; }
     });
   } catch { return []; }
+}
+
+/**
+ * A saved list of paths to delete at startup needs checks that it only names
+ * the app's own folders (TODOS.md).
+ * Checks that target is absolute, not broad (never home folder or disk root),
+ * and matches an app data entry, an office entry, a worktree, a project
+ * transcript folder, or a knowledge store entry.
+ */
+export function isAppOwnedPath(target: string, userData: string): boolean {
+  if (typeof target !== 'string' || !target.trim()) return false;
+  const abs = resolve(target);
+  if (isBroad(abs)) return false;
+
+  // 1. Inside userData (excluding userData itself)
+  const u = resolve(userData);
+  if (isSameOrInside(u, abs) && abs !== u) return true;
+
+  // 2. Inside Claude Code's projects root (excluding projects root itself)
+  try {
+    const cc = resolve(claudeProjectsRoot());
+    if (isSameOrInside(cc, abs) && abs !== cc) return true;
+  } catch { /* ignore */ }
+
+  // 3. An office folder entry, private entry, or worktree
+  const parent = parse(abs).dir;
+  if (parent && isOfficeFolder(parent)) {
+    const base = parse(abs).base;
+    if ((OFFICE_FOLDER_ENTRIES as readonly string[]).includes(base)) return true;
+    if (base === 'office.json') return true;
+  }
+  const grandParent = parse(parent).dir;
+  if (grandParent && parse(parent).base === 'private' && isOfficeFolder(grandParent)) {
+    const base = parse(abs).base;
+    if ((PRIVATE_ENTRIES as readonly string[]).includes(base)) return true;
+  }
+  if (grandParent && parse(parent).base === 'worktrees' && isOfficeFolder(grandParent)) {
+    try {
+      if (statSync(join(abs, '.git')).isFile()) return true;
+    } catch { /* absent or not a worktree */ }
+  }
+
+  // 4. Inside a knowledge store
+  if (parent && isKnowledgeStore(parent)) {
+    if (parse(abs).base === 'index.jsonl') return true;
+  }
+  if (grandParent && isKnowledgeStore(grandParent)) {
+    const mid = parse(parent).base;
+    if (mid === 'docs' || mid === 'meaning') return true;
+  }
+
+  return false;
+}
+
+/** Save paths that could not be deleted during reset, to be swept on next launch. */
+export function savePendingResetCleanup(userData: string, failed: string[]): void {
+  if (!Array.isArray(failed) || failed.length === 0) return;
+  const safe = Array.from(new Set(failed.filter((x): x is string => typeof x === 'string' && isAppOwnedPath(x, userData))));
+  if (!safe.length) return;
+  try {
+    writeFileSync(join(userData, PENDING_RESET_CLEANUP), JSON.stringify(safe, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[reset] save pending cleanup:', e);
+  }
+}
+
+/** Erase leftover paths from a previous reset early at launch (TODOS.md). */
+export function sweepPendingResetCleanup(userData: string): { swept: string[]; stillFailed: string[] } {
+  const file = join(userData, PENDING_RESET_CLEANUP);
+  if (!existsSync(file)) return { swept: [], stillFailed: [] };
+
+  let paths: string[] = [];
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    if (Array.isArray(raw)) paths = raw.filter((x): x is string => typeof x === 'string');
+  } catch {
+    try { rmSync(file, { force: true }); } catch { /* ignore */ }
+    return { swept: [], stillFailed: [] };
+  }
+
+  const swept: string[] = [];
+  const stillFailed: string[] = [];
+
+  for (const p of paths) {
+    if (!isAppOwnedPath(p, userData)) {
+      continue;
+    }
+    if (!existsSync(p)) {
+      swept.push(p);
+      continue;
+    }
+    try {
+      rmSync(p, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      if (!existsSync(p)) swept.push(p);
+      else stillFailed.push(p);
+    } catch {
+      stillFailed.push(p);
+    }
+  }
+
+  try {
+    if (stillFailed.length > 0) {
+      writeFileSync(file, JSON.stringify(stillFailed, null, 2), 'utf8');
+    } else {
+      rmSync(file, { force: true });
+    }
+  } catch { /* ignore */ }
+
+  return { swept, stillFailed };
 }
