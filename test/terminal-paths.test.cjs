@@ -129,6 +129,38 @@ test('quoted prose keeps linking the file name inside it', () => {
   assert.deepEqual(tokensIn("Michael's notes: see plan.md' later"), ['plan.md']);
 });
 
+test('a quoted phrase that starts with a slash does not link the whole phrase', () => {
+  // Ship review of mit/named-links (2026-10-13): "/ see notes.md" underlined
+  // the whole phrase and the click found nothing. A quoted match whose text
+  // after the prefix holds no further separator must be a single word, so
+  // prose fails the quoted alternative and falls through to the filename
+  // inside, like "Update README.md" does.
+  assert.deepEqual(tokensIn('run "/ see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn("run '/ see notes.md'"), ['notes.md']);
+  assert.deepEqual(tokensIn('run `/ see notes.md`'), ['notes.md']);
+  assert.deepEqual(tokensIn('run "C:\\see notes.md"'), ['notes.md']);
+  assert.deepEqual(tokensIn('run "~/see notes.md"'), ['notes.md']);
+});
+
+test('quoted paths with spaces still link when the spaces sit in directory names', () => {
+  // Only a quoted match with no separator after the prefix must be one word;
+  // spaces anywhere else are a real path and keep linking whole.
+  assert.deepEqual(
+    tokensIn('open "/Users/Jane/Business Reports/summary.md"'),
+    ['/Users/Jane/Business Reports/summary.md']
+  );
+  assert.deepEqual(tokensIn('open "./my docs/v1.2/notes.md"'), ['./my docs/v1.2/notes.md']);
+  assert.deepEqual(tokensIn('open "/tmp/a b.md"'), ['/tmp/a b.md']);
+  assert.deepEqual(tokensIn('open "/notes.md"'), ['/notes.md']);
+});
+
+test('unquoted paths are unaffected by the quoted-prose guard', () => {
+  assert.deepEqual(
+    tokensIn('at /tmp/notes.md and ./a/b.ts, see build/icon.png'),
+    ['/tmp/notes.md', './a/b.ts', 'build/icon.png']
+  );
+});
+
 test('quoted versions and prose do not become file paths', () => {
   assert.deepEqual(tokensIn('version "v0.4.5", cost \'0.92\', called `spring.thaw`'), []);
 });

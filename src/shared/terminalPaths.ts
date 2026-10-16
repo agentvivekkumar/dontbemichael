@@ -77,7 +77,15 @@ export type PathAction = 'preview' | 'edit' | 'reveal';
  */
 // Only explicit path prefixes qualify for a whole quoted match; otherwise prose
 // such as "Update README.md" must fall through to the filename inside it.
-const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^"\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^'\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])[^`\r\n]*\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
+// The quoted alternatives allow spaces because paths with spaces are real, so
+// a quoted phrase that starts with a slash could still swallow prose: "/ see
+// notes.md" used to underline the whole phrase and the click found nothing
+// (ship review of mit/named-links, 2026-10-13). The guard is the text after
+// the prefix: when it holds another separator the spaces are directory names
+// ("./docs/my notes.md" keeps linking whole); when it holds none, it must be
+// a single word, so prose fails the quoted alternative and falls through to
+// the filename inside it, exactly like "Update README.md".
+const PATH_TOKEN_RE = /"(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?:[^"\r\n]*[\\/][^"\r\n]*|[^"\r\n\\/\s]*)\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?"|'(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?:[^'\r\n]*[\\/][^'\r\n]*|[^'\r\n\\/\s]*)\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?'|`(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?:[^`\r\n]*[\\/][^`\r\n]*|[^`\r\n\\/\s]*)\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?`|(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,7}(?::\d+)?/g;
 
 /** A fresh matcher. The regex is stateful (`g`), so callers must never share one. */
 export function pathTokenMatcher(): RegExp {
