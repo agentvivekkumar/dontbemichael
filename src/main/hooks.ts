@@ -78,6 +78,7 @@ import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
 import { accessLine, agentAccessSummary } from '../shared/agentAccess';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
+import { calendarToolAccess } from '../shared/calendarTools';
 import { WEB_SETTINGS_UNREADABLE, WEB_TOOLS, webAccess } from '../shared/webAccess';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
@@ -254,7 +255,9 @@ export class HookServer {
     /** The office break's signals (issue 124): a status line's usage windows,
      *  a turn cut off by the usage limit, a prompt taken, a turn finished.
      *  Optional so tests can omit it. */
-    private onPlan?: (signal: PlanSignal) => void
+    private onPlan?: (signal: PlanSignal) => void,
+    /** Strict calendar roster policy; mail retains its legacy fallback. */
+    private calendarMemberPresent?: (agentId: string) => boolean
   ) {}
 
   start(): void {
@@ -583,6 +586,15 @@ export class HookServer {
             permissionDecisionReason: d.reason
           }
         };
+      }
+    }
+
+    if (event === 'PreToolUse' && /^mcp__md-calendar__/.test(p.tool_name ?? '')) {
+      const tool = /^mcp__md-calendar__([a-z_]+)$/.exec(p.tool_name ?? '')?.[1];
+      const access = calendarToolAccess(mcpConfig(), agentId, tool, p.tool_input, this.calendarMemberPresent ?? this.memberPresent);
+      if (!access.ok) {
+        this.emitRefused(agentId, event, p);
+        return mcpDeny(access.reason);
       }
     }
 

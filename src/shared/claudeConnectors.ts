@@ -172,6 +172,7 @@ export function spawnConnectorPlan(cfg: ConnectorConfig, agentId: string, roleRe
 export type McpTarget =
   | { kind: 'none' }
   | { kind: 'app' }
+  | { kind: 'calendar' }
   | { kind: 'connector'; key: string }
   | { kind: 'unknown-connector'; server: string }
   | { kind: 'other'; server: string }
@@ -187,6 +188,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
     // deny rules hide a server's tools, not its resources (owner, 2026-10-02).
     if (typeof s !== 'string' || !s) return { kind: 'all-servers' };
     if (s === APP_MCP_SERVER) return { kind: 'app' };
+    if (s === 'md-calendar') return { kind: 'calendar' };
     const c = /^claude\.ai (.+)$/.exec(s);
     if (c) {
       const key = knownKeys(cfg).find((k) => k === c[1].trim());
@@ -198,6 +200,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
   if (!m) return { kind: 'none' };
   server = m[1];
   if (server.startsWith(`${APP_MCP_SERVER}__`)) return { kind: 'app' };
+  if (server.startsWith('md-calendar__')) return { kind: 'calendar' };
   // The longest matching prefix wins ("Google" vs "Google Drive"). Two names
   // that become the same tool prefix ("Foo Bar", "Foo_Bar") cannot be told
   // apart, so neither is (Codex adversarial review, 2026-10-02).
@@ -250,6 +253,9 @@ export function connectorAccess(
   // resource call naming md-mail is refused (Codex adversarial review, 2026-10-02).
   if (target.kind === 'app') {
     return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office mail server has no resources to read. ${TELL_MICHAEL}` } : { ok: true };
+  }
+  if (target.kind === 'calendar') {
+    return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office calendar server has no resources to read. ${TELL_MICHAEL}` } : { ok: true };
   }
   if (target.kind === 'other') {
     return { ok: false, reason: `"${target.server}" is not one of the office's connections, so you cannot use it. ${TELL_MICHAEL}` };

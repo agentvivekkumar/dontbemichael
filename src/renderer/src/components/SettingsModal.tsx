@@ -1,3 +1,4 @@
+import { CalendarsSettings } from './CalendarsSettings';
 import { ResearchPrivacySettings } from './ResearchPrivacySettings';
 import { cleanDataClassOverrides } from '../../../shared/dataClasses';
 import { MailboxesSettings } from './MailboxesSettings';
@@ -1665,6 +1666,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
 
                       {/* Connected-services registry (generic, registry-driven);
                           the hardcoded Slack/Webhook/Free Flow blocks below stay as-is. */}
+                      <CalendarsSettings />
+
+                      <div style={sectionRule} />
+
                       <IntegrationsRegistry />
 
                       <div style={sectionRule} />

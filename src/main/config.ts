@@ -1,6 +1,7 @@
 import type { ResearchConfig } from '../shared/research';
 import type { DataClassId, DataClassSetting } from '../shared/dataClasses';
 import type { MailboxRecord, AgentCapabilities } from '../shared/mailboxes';
+import type { CalendarAccount } from '../shared/calendars';
 import type { CompanyProfile } from '../shared/companyProfile';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
@@ -290,6 +291,10 @@ export interface HarnessConfig {
   /** Mailboxes connected in Settings (docs/designs/multi-mailbox.md). Metadata
    *  only; each app password lives in the secret store under `mail:<id>`. */
   mailboxes?: MailboxRecord[];
+  /** Calendar metadata only. Passwords live in the encrypted secret store. */
+  calendarAccounts?: CalendarAccount[];
+  /** Handles awaiting deletion after an interrupted credential replacement. */
+  calendarSecretCleanup?: string[];
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
