@@ -68,9 +68,10 @@ const anyUnder = (dirs, p) => dirs.some((d) => under(d, p));
 // tool rules, the hook and the connector gate still hold, and are checked.
 const SHELL_FENCED = !onWindows;
 
-/** The folder in a Claude permission rule: `Read(//Users/a/Biz/Admin/**)` → `/Users/a/Biz/Admin`. */
+/** The folder in a Claude permission rule: `Read(//Users/a/Biz/Admin/**)` → `/Users/a/Biz/Admin`,
+ *  or the one file a rule names: `Read(//Users/a/.claude/history.jsonl)`. */
 function ruleDir(rule, tool) {
-  const m = new RegExp(`^${tool}\\((.*)/\\*\\*\\)$`).exec(rule);
+  const m = new RegExp(`^${tool}\\((.*?)(?:/\\*\\*)?\\)$`).exec(rule);
   if (!m) return null;
   let p = m[1].replace(/^\/\//, '/');
   if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1); // a Windows drive letter
@@ -171,7 +172,7 @@ async function buildOffice(t) {
   );
   const hook = (agent_id, tool_name, tool_input) =>
     server.handle({ agent_id, session_id: 's1', hook_event_name: 'PreToolUse', tool_name, tool_input, cwd: agents[agent_id].cwd });
-  return { base, business, agents, spawned, hook };
+  return { base, business, agents, spawned, hook, hive, server };
 }
 
 const denied = (r) => !!(r && r.hookSpecificOutput && r.hookSpecificOutput.permissionDecision === 'deny');
@@ -269,4 +270,55 @@ test('office privacy conformance: folders, shell writes and connectors hold for 
       }
     }
   });
+});
+
+// Value: protects=no member of a real office, Michael included, opens Claude Code's transcripts or prompt history with its file tools, and no team member with its shell; fails_when=folderLayoutFor drops claudeProjects/claudeHistory, the policy stops writing their rules, or the hook stops refusing them; why_new=the walls were tested as pure rules only, not through the settings the app writes and the real hook shim; seam=none
+test('office privacy conformance: nobody opens Claude Code\'s transcripts or prompt history', async (t) => {
+  const { spawn } = require('node:child_process');
+  const cfgDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md claude cfg-')));
+  const before = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = cfgDir;
+  t.after(() => {
+    if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = before;
+    fs.rmSync(cfgDir, { recursive: true, force: true });
+  });
+  const o = await buildOffice(t);
+  // Oscar's conversation, as Claude Code keeps it, and the prompt history.
+  const transcript = path.join(cfgDir, 'projects', '-Pho-Bakery-Finance', 'session.jsonl');
+  const history = path.join(cfgDir, 'history.jsonl');
+  fs.mkdirSync(path.dirname(transcript), { recursive: true });
+  fs.writeFileSync(transcript, '{"type":"user","message":"payroll numbers"}\n');
+  fs.writeFileSync(history, '{"display":"what did Pete find"}\n');
+
+  for (const id of ['god', 'oscar', 'pam', 'kelly']) {
+    const { view, settings } = o.spawned[id];
+    for (const f of [transcript, history]) {
+      assert.ok(!view.toolsMayRead(f), `${id}: file tools must not read ${f}`);
+      assert.ok(!view.toolsMayWrite(f), `${id}: file tools must not change ${f}`);
+      // Michael's shell may leave the sandbox (sandboxOnly is for team members).
+      if (SHELL_FENCED && id !== 'god') assert.ok(!view.shellMayRead(f), `${id}: the shell must not read ${f}`);
+      assert.ok(denied(await o.hook(id, 'Read', { file_path: f })), `${id}: hook must refuse a read of ${f}`);
+    }
+    assert.ok(denied(await o.hook(id, 'Grep', { pattern: 'payroll', path: path.join(cfgDir, 'projects') })), `${id}: hook must refuse a search of the projects folder`);
+    assert.equal(settings.autoMemoryEnabled, false, `${id}: Claude Code's auto memory is off`);
+  }
+
+  // Through the real hook shim and socket, as Claude Code runs it on a Read.
+  o.server.start();
+  t.after(() => o.server.stop());
+  if (!o.server.server.listening) await new Promise((r) => o.server.server.once('listening', r));
+  const viaShim = (id, file_path) => new Promise((resolve) => {
+    const p = spawn(process.execPath, [o.hive.shimPath()], {
+      env: { PATH: process.env.PATH, AGENT_ID: id, HIVE_SOCK: o.hive.sockPath(), HIVE_HOOK_SEAL: o.spawned[id].inj.env.HIVE_HOOK_SEAL }
+    });
+    let out = '';
+    p.stdout.on('data', (d) => { out += d; });
+    p.on('close', () => resolve(out ? JSON.parse(out) : {}));
+    p.stdin.end(JSON.stringify({ session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path }, cwd: o.agents[id].cwd }));
+  });
+  const r = await viaShim('pam', transcript);
+  assert.ok(denied(r), 'pam: the shim relays the refusal');
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Claude Code's own record/);
+  assert.ok(denied(await viaShim('pam', history)), 'pam: and for the history file');
+  assert.ok(!denied(await viaShim('pam', path.join(o.agents.pam.cwd, 'notes.md'))), 'pam: her own folder still opens');
 });

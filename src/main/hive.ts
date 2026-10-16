@@ -1800,6 +1800,10 @@ export class HiveManager {
       // default; set here so the owner's own Claude settings can't turn it off
       // for the team. Read from --settings (user scope), never ~/.claude.
       autoContinueAtUsageLimit: true,
+      // Claude Code's auto memory lives in its projects folder, which no agent
+      // opens (folderAccess.ts, claudeProjects); the office keeps each agent's
+      // memory in its own folder instead.
+      autoMemoryEnabled: false,
       // Native OS sandbox for Bash subprocesses (macOS Seatbelt / Linux bubblewrap).
       // Auto mode spawns with `--permission-mode bypassPermissions`, which only
       // silences PROMPTS; the sandbox is a separate, opt-in layer that was never
