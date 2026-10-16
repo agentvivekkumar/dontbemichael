@@ -58,6 +58,9 @@ export class SafeClearer {
   /** Fed by the hook server for every event. */
   noteHook(agentId: string | undefined, event: string, message?: string): void {
     if (!agentId) return;
+    // A restart can reuse the agent id. Its previous session's handoff and
+    // Stop must never authorize clearing the conversation that just started.
+    if (event === 'SessionStart' && this.phase.has(agentId)) this.cancel(agentId, 'session-start');
     const t = this.now();
     this.lastHookAt.set(agentId, t);
     if (event === 'Stop') this.lastStopAt.set(agentId, t);
