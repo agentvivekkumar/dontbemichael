@@ -245,6 +245,10 @@ test('every connector is offered for a binding: switched off ones greyed, QuickB
   // A hire saves for its new id before the spawn, so it says it is hiring (issue 132).
   assert.match(modal, /isQuickBooksKey\(binding\.connectorKey\)\s*\? window\.cth\.quickbooksSetAccess\(id, \{ enabled: true, changes: false \}, \{ hiring: true \}\)/, 'QuickBooks bound read only');
   assert.match(modal, /window\.cth\.quickbooksSetAccess\(id, \{ enabled: false, changes: false \}, \{ hiring: true \}\)/, 'and taken back if the spawn fails');
+  // A books card is saved Read only before spawn, and only when no other connector was bound.
+  assert.match(modal, /if \(!binding\?\.connectorKey && cardReadsBooks\(sourceCard, new Set\(await window\.cth\.quickbooksRoleDefaults\(\)\.catch\(\(\) => \[\]\)\)\)\)/);
+  assert.match(modal, /grantedBooksRole = true/);
+  assert.match(modal, /if \(grantedBooksRole\) void window\.cth\.quickbooksSetAccess\(id, \{ enabled: false, changes: false \}, \{ hiring: true \}\)/, 'a failed hire gives the default back');
 });
 
 test('binding clears an earlier overlap message, and the message names every way to bind', () => {

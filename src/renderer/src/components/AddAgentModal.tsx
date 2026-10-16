@@ -30,6 +30,7 @@ import { FIRST_TASK_EDITED_MAX } from '@shared/firstTask';
 import { teamAccent } from '@shared/teamPlan';
 import { mailboxHolder } from '@shared/mailboxes';
 import { connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
+import { cardReadsBooks } from '@shared/quickbooks';
 import { Select } from './triggers/ui';
 import {
   NEW_JOB_KEY,
@@ -660,7 +661,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     const id = hireAgentId(name);
     const ptyId = `pty-${id}`;
     const description = hireRole(title, routing);
-    // Give back what a binding granted (a mailbox, a connector) when the hire fails.
+    // Give back what this hire was given (a mailbox, a connector, or the books
+    // role default) when the hire fails, so a failed id holds nothing.
+    let grantedBooksRole = false;
     const releaseBindingAccess = (): void => {
       if (binding?.mailboxId) void window.cth.mailSetCapabilities(id, { email: { enabled: false, mailboxes: [], send: false } }).catch(() => undefined);
       if (binding?.connectorKey) {
@@ -668,6 +671,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
           ? window.cth.quickbooksSetAccess(id, { enabled: false, changes: false }, { hiring: true })
           : window.cth.connectorsSetGrant(id, binding.connectorKey, false)).catch(() => undefined);
       }
+      if (grantedBooksRole) void window.cth.quickbooksSetAccess(id, { enabled: false, changes: false }, { hiring: true }).catch(() => undefined);
     };
     // A mailbox binding is set before the spawn, so the agent starts with it.
     if (binding?.mailboxId) {
@@ -683,6 +687,18 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
         releaseBindingAccess();
         setBusy(false); setError(tr('capabilities.saveFailed')); return;
       }
+    }
+    // The original books role (Oscar) is Read only because its id is the pack
+    // role id. A later hire of that job gets a new id, so save the same
+    // default before it starts. A binding to another connector still starts
+    // with only that one. A new job has no source card, so it stays off.
+    if (!binding?.connectorKey && cardReadsBooks(sourceCard, new Set(await window.cth.quickbooksRoleDefaults().catch(() => [])))) {
+      const res = await window.cth.quickbooksSetAccess(id, { enabled: true, changes: false }, { hiring: true }).catch(() => null);
+      if (!res?.ok) {
+        releaseBindingAccess();
+        setBusy(false); setError(tr('capabilities.saveFailed')); return;
+      }
+      grantedBooksRole = true;
     }
     const [exe, ...args] = tokenizeCommand(command.trim());
     const spawnRes = await window.cth.spawnPty({

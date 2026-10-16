@@ -254,6 +254,7 @@
 
 **Effort:** S
 **Priority:** P3
+**Completed:** A hire whose job traces to a books card is saved Read only before it starts (`cardReadsBooks` in `src/shared/quickbooks.ts`, applied in the hire wizard). The original pack member still uses the role id default. A new job, and a hire bound to a different connector, stay unchanged.
 
 ### Show a locally added QuickBooks server in the status
 

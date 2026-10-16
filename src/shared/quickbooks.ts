@@ -85,6 +85,18 @@ export function isQuickBooksReadTool(toolName: string): boolean {
   return READ_TOOLS.has(tool);
 }
 
+/**
+ * A hire whose job traces to a pack role that reads the books.
+ * `sourceCard` is `businessType/roleId` (setup also stores a bare role id).
+ * A later hire's own id is never that role id (`hireAgentId` adds a stamp),
+ * so matching only the id leaves the new bookkeeper off.
+ */
+export function cardReadsBooks(sourceCard: string | undefined, booksRoleIds: ReadonlySet<string>): boolean {
+  if (!sourceCard) return false;
+  const id = sourceCard.split('/').filter(Boolean).pop();
+  return !!id && booksRoleIds.has(id);
+}
+
 /** An agent's QuickBooks capability: its saved choice, or, before the owner
  *  chose, on and Read only for roles that read the books (Oscar), off for the
  *  rest (owner, 2026-09-29). */
