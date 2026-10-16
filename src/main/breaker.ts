@@ -200,6 +200,13 @@ export class CircuitBreaker {
     this.get(agentId).errorCount += 1;
   }
 
+  /** A call was refused only because it waits on the owner's OK (QuickBooks,
+   *  issue 320). That is the agent waiting, not failing, so the errors before
+   *  it do not build toward a storm. */
+  recordApprovalWait(agentId: string): void {
+    this.get(agentId).errorCount = 0;
+  }
+
   /** A human submitted a prompt to this agent (UserPromptSubmit hook). Stamps
    *  the conversation progress clock the no-progress arm reads (#376). Only
    *  that arm gains a way to see this work — the loop, error-storm, velocity
