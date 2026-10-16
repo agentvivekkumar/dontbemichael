@@ -336,7 +336,7 @@ test('generic settings IPC cannot bypass account management', () => {
   assert.match(main, /app\.whenReady\(\)\.then\(\(\) => \{\s*calendarAccounts\.cleanup\(\)/);
   const handlers = new Map();
   const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
-  const lines = main.split('\n').filter((line) => line.startsWith("ipcMain.handle('calendarAccounts:"));
+  const lines = main.split('\n').filter((line) => line.startsWith("ipcMain.handle('calendarAccounts:") && !line.startsWith("ipcMain.handle('calendarAccounts:test'"));
   assert.equal(lines.length, 4);
   // Exercise the actual IPC registrations without booting Electron or a network.
   const registrations = ts.transpileModule(lines.join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -402,4 +402,24 @@ test('a secret store failure after writing a secret is recovered from the journa
   assert.deepEqual(success(f.manager.list()).accounts, []);
   assert.deepEqual(config.readConfig().calendarSecretCleanup, []);
   assert.equal(fs.existsSync(f.secretsFile), false);
+});
+
+test('authenticated discovery uses the real encrypted store and persists only verified metadata', async () => {
+  const f = setup();
+  const added = success(f.manager.add(request())).record;
+  const { discovery } = require('./caldav-fixtures.cjs');
+  const { CalendarService } = loadTs('src/main/calendar.ts');
+  const { CaldavTransport } = loadTs('src/main/caldavTransport.ts');
+  const replies = discovery();
+  const transport = new CaldavTransport({ resolve: async () => [{ address: '8.8.8.8', family: 4 }], send: async (r) => {
+    assert.equal(r.headers.authorization, `Basic ${Buffer.from(`${settings().username}:${password}`).toString('base64')}`);
+    return replies.shift();
+  } });
+  const service = new CalendarService({ accounts: f.manager, getConfig: config.readConfig, getSecret: secrets.getSecret, transport });
+  const result = await service.testConnection('office');
+  assert.equal(result.ok, true, result.error);
+  assert.equal(config.readConfig().calendarAccounts[0].status, 'connected');
+  assert.equal(secrets.getSecret(added.secretRef), password);
+  assert.equal(JSON.stringify(result).includes(password), false);
+  assert.equal(fs.readFileSync(f.configFile, 'utf8').includes(password), false);
 });

@@ -1,4 +1,4 @@
-/** Config backed calendar account management. No authentication or CalDAV yet.
+/** Config backed calendar account management.
  * Synchronous operations use the same atomic config and encrypted secret store
  * as mailboxes. No passwords or raw dependency errors are returned or logged.
  */
@@ -64,6 +64,28 @@ export class CalendarAccounts {
   list(): CalendarListResult {
     try { return { ok: true, accounts: this.state().accounts }; }
     catch { return failed('The saved calendar account settings could not be read safely.'); }
+  }
+
+  /** Main internal only. Called by the CalDAV service after authenticated
+   * discovery, never from an IPC payload. A stale result cannot verify a new
+   * password or overwrite account changes made while a request was running.
+   */
+  applyConnectionResult(expected: CalendarAccount, discovered?: Pick<CalendarAccount, 'serverUrl' | 'calendars'>, reason?: string): { ok: boolean } {
+    try {
+      const { cfg, accounts } = this.state();
+      const current = accounts.find((a) => a.id === expected.id);
+      if (!current || JSON.stringify(current) !== JSON.stringify(expected)) return { ok: false };
+      const next = validateStoredCalendarAccount({ ...current, ...(discovered ?? {}),
+        status: discovered ? 'connected' : 'needs-attention', statusReason: discovered ? undefined : reason ?? CALENDAR_UNVERIFIED });
+      if (!next) return { ok: false };
+      const otherIds = new Set(accounts.filter((a) => a.id !== current.id).flatMap((a) => a.calendars.map((c) => c.id)));
+      if (next.calendars.some((c) => otherIds.has(c.id))) return { ok: false };
+      const stale = new Set(current.calendars.filter((c) => !next.calendars.some((n) => n.id === c.id && n.url === c.url)).map((c) => c.id));
+      for (const c of next.calendars) if (!current.calendars.some((before) => before.id === c.id)) stale.add(c.id);
+      const caps = this.revoke(cfg.agentCapabilities, stale);
+      this.deps.saveConfig({ calendarAccounts: accounts.map((a) => a.id === current.id ? next : a), ...(caps ? { agentCapabilities: caps } : {}) });
+      return { ok: true };
+    } catch { return { ok: false }; }
   }
 
   /** Retried on subsequent management writes or at app startup. A crash after

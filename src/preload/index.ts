@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'ele
 import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
 import type { CalendarAccount } from '../shared/calendars';
+import type { CalendarAvailability, CalendarDiscovery, CalendarEvent, CalendarRange, CalendarResult } from '../shared/calendarRead';
 import type { CalendarListResult, CalendarRemoveResult, CalendarSaveInput, CalendarSaveResult } from '../shared/calendarAccounts';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
@@ -975,6 +976,9 @@ const api = {
   calendarAccountsAdd: (input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:add', input),
   calendarAccountsUpdate: (id: string, input: CalendarSaveInput): Promise<CalendarSaveResult> => ipcRenderer.invoke('calendarAccounts:update', id, input),
   calendarAccountsRemove: (id: string): Promise<CalendarRemoveResult> => ipcRenderer.invoke('calendarAccounts:remove', id),
+  calendarAccountsTest: (id: string): Promise<CalendarResult<CalendarDiscovery>> => ipcRenderer.invoke('calendarAccounts:test', id),
+  calendarEvents: (id: string, range: CalendarRange): Promise<CalendarResult<CalendarEvent[]>> => ipcRenderer.invoke('calendar:events', id, range),
+  calendarAvailability: (id: string, range: CalendarRange): Promise<CalendarResult<CalendarAvailability>> => ipcRenderer.invoke('calendar:availability', id, range),
   /** `move: true` confirms taking a mailbox another agent holds (one agent per
    *  mailbox); without it main answers `heldBy` and changes nothing. */
   mailSetCapabilities: (agentId: string, caps: AgentCapabilities & { move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>

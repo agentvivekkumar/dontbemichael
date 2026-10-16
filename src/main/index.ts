@@ -98,6 +98,7 @@ import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
 import { CalendarAccounts } from './calendarAccounts';
+import { CalendarService } from './calendar';
 import { calendarSettingsPatchAllowed } from '../shared/calendarAccounts';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, cannotStoreReason, type AddMailboxInput } from './mail';
 import { MailApprovals } from './mailApprovals';
@@ -792,6 +793,7 @@ const calendarAccounts = new CalendarAccounts({
   setSecret: integrations.setSecret,
   deleteSecret: integrations.deleteSecret
 });
+const calendarService = new CalendarService({ accounts: calendarAccounts, getConfig: readConfig, getSecret: integrations.getSecret });
 
 /**
  * Send only grants on a mailbox nobody on the team reads are paused (S3, D10).
@@ -4981,6 +4983,11 @@ ipcMain.handle('calendarAccounts:list', () => calendarAccounts.list());
 ipcMain.handle('calendarAccounts:add', (_evt, input: unknown) => calendarAccounts.add(input));
 ipcMain.handle('calendarAccounts:update', (_evt, id: unknown, input: unknown) => calendarAccounts.update(id, input));
 ipcMain.handle('calendarAccounts:remove', (_evt, id: unknown) => calendarAccounts.remove(id));
+ipcMain.handle('calendarAccounts:test', (_evt, id: unknown) => calendarService.testConnection(id));
+// The trusted renderer is the owner. Agent identity will come from the broker
+// token in a later phase, never from a renderer supplied field.
+ipcMain.handle('calendar:events', (_evt, id: unknown, range: unknown) => calendarService.events(id, range, { kind: 'owner' }));
+ipcMain.handle('calendar:availability', (_evt, id: unknown, range: unknown) => calendarService.availability(id, range, { kind: 'owner' }));
 // Records carry no password; the renderer only ever sends one, to save it.
 ipcMain.handle('mail:save', async (_evt, input: unknown) => {
   if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
