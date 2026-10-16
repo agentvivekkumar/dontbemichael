@@ -551,3 +551,32 @@ test('md-mail resources are refused, and connectors whose names collide are refu
   assert.equal(C.connectorAccess(cfg, 'pam', 'mcp__claude_ai_Foo_Bar__x', {}, false).ok, false);
 });
 
+// Value: protects=a locally added QuickBooks server from claude mcp add shows its status in Settings; fails_when=parseMcpList only matches claude.ai prefixes; why_new=TODOS "Show a locally added QuickBooks server in the status"; seam=none
+test('a locally added QuickBooks server shows in the connectors list with its status', () => {
+  const stdout = [
+    'Checking MCP server health…',
+    '',
+    'quickbooks: /opt/bin/quickbooks-mcp - ✔ Connected',
+    'serena: uvx serena - ✔ Connected'
+  ].join('\n');
+  const r = C.parseMcpList(stdout);
+  assert.equal(r.connectors.length, 1);
+  assert.equal(r.connectors[0].key, 'Intuit QuickBooks');
+  assert.equal(r.connectors[0].status, 'connected');
+  assert.equal(r.connectors[0].url, '/opt/bin/quickbooks-mcp');
+  assert.deepEqual(r.servers, ['serena'], 'non-QuickBooks local servers remain personal servers');
+
+  const authNeeded = C.parseMcpList('qbo-dev: node server.js - ! Needs authentication');
+  assert.equal(authNeeded.connectors[0].key, 'Intuit QuickBooks');
+  assert.equal(authNeeded.connectors[0].status, 'needs-sign-in');
+});
+
+test('a locally added QuickBooks server does not duplicate a claude.ai QuickBooks connector', () => {
+  const stdout = [
+    'claude.ai Intuit QuickBooks: https://ai-inc.quickbooks.intuit.com/v1/mcp - ✔ Connected',
+    'quickbooks: /opt/bin/quickbooks-mcp - ✔ Connected'
+  ].join('\n');
+  const r = C.parseMcpList(stdout);
+  assert.equal(r.connectors.filter((c) => c.key === 'Intuit QuickBooks').length, 1);
+});
+

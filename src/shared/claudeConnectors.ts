@@ -16,7 +16,7 @@
  * Pure: no fs, no electron.
  */
 import type { AgentCapabilities } from './mailboxes';
-import { quickbooksCapability } from './quickbooks';
+import { quickbooksCapability, namesQuickBooks } from './quickbooks';
 import { emailCalendarAllowed } from './mcpCatalog';
 
 /** `unreachable`: the check failed to connect (a network or server failure),
@@ -86,8 +86,15 @@ export function parseMcpList(stdout: string): McpList | null {
     seen++;
     const [, name, target, mark, words] = m;
     const c = /^claude\.ai (.+)$/.exec(name);
-    if (!c) { if (!servers.includes(name)) servers.push(name); continue; }
-    const key = c[1].trim().slice(0, KEY_MAX);
+    let key: string | undefined;
+    if (c) {
+      key = c[1].trim().slice(0, KEY_MAX);
+    } else if (namesQuickBooks(name)) {
+      key = QUICKBOOKS_KEY;
+    } else {
+      if (!servers.includes(name)) servers.push(name);
+      continue;
+    }
     if (!key || connectors.some((x) => x.key === key)) continue;
     const ok = (!mark || mark === '✔' || mark === '✓') && /\bconnected\b/i.test(words) && !/\bnot\b|needs|fail|error/i.test(words);
     const unreachable = !ok && (mark === '✘' || mark === '✗' || /fail|error/i.test(words)) && !/needs|auth/i.test(words);
