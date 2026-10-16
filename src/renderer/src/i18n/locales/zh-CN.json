@@ -780,7 +780,14 @@
       "model": "模型",
       "modelNote": "这里设置 {{godName}} 和整个团队使用的模型，之后可以在设置中更改。",
       "maxPlan": "<strong>需要 Claude Max 套餐</strong>，办公室才能全天运转。较小的套餐会在白天用完额度，办公室将暂停，直到额度重置。",
-      "seePlans": "查看 Claude 套餐"
+      "seePlans": "查看 Claude 套餐",
+      "badgeInstalled": "已安装",
+      "badgeInstallsOnFirstRun": "首次运行时安装",
+      "badgeNotInstalled": "未安装",
+      "engineMissing": "{{label}} 尚未安装在这台电脑上，应用也无法为它自动安装，所以 {{godName}} 无法启动。请先安装它，然后点击“重新检查”。或者选择 Claude Code，它会在首次运行时自动安装。",
+      "checkAgain": "重新检查",
+      "checking": "检查中…",
+      "installInstructions": "安装说明"
     },
     "permissions": {
       "autonomyHead": "智能体可以自行做到什么程度？",
