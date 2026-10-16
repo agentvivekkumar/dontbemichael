@@ -22,7 +22,7 @@ require.cache[electron] = {
   exports: { Notification: class { show() {} static isSupported() { return false; } } }
 };
 
-const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability, quickbooksAccessToSave } = loadTs('src/shared/quickbooks.ts');
+const { isQuickBooksConnectorTool, isQuickBooksReadTool, quickbooksCapability, quickbooksAccessToSave, cardReadsBooks } = loadTs('src/shared/quickbooks.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 const { HookServer } = loadTs('src/main/hooks.ts');
 
@@ -160,6 +160,19 @@ test('the QuickBooks gate leaves every other tool to its own rule', async (t) =>
     assert.doesNotMatch(r.hookSpecificOutput.permissionDecisionReason, /QuickBooks/, tool_name);
   }
   assert.ok(!denied(await call('Read')), 'built-in tools are untouched');
+});
+
+test('a later hire of a books card is Read only even though its id is not the pack role id', () => {
+  // Value: protects=hiring the finance job again starts Read only, the same as Oscar; fails_when=only the literal role id counts, so angela-m1abc stays off; why_new=hireAgentId always stamps a new id; seam=none
+  const books = new Set(['oscar']);
+  assert.equal(cardReadsBooks('restaurant-food/oscar', books), true);
+  assert.equal(cardReadsBooks('core/oscar', books), true);
+  assert.equal(cardReadsBooks('oscar', books), true, 'setup stores the bare role id');
+  assert.equal(cardReadsBooks('restaurant-food/pam', books), false);
+  assert.equal(cardReadsBooks('restaurant-food/oscar-extra', books), false, 'a stamped hire id is not itself a books role');
+  assert.equal(cardReadsBooks(undefined, books), false, 'a new job has no card');
+  assert.equal(cardReadsBooks('', books), false);
+  assert.equal(cardReadsBooks('restaurant-food/', books), false);
 });
 
 test('every bundled pack gives Oscar, and only roles with books.read, the QuickBooks default', () => {
