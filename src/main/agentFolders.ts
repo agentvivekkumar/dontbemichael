@@ -1,3 +1,4 @@
+
 /**
  * Where each agent's folder lives on the owner's disk (Decisions 44, 45).
  *
@@ -23,8 +24,13 @@ export const OFFICE_FOLDER = 'Office';
 
 const FALLBACK_BUSINESS = 'My Business';
 const MAX_NAME = 60;
-/** Names Windows reserves for devices; a folder by one of these can't be opened there. */
-const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/**
+ * Windows reserves device names even when followed by an extension.
+ * Examples: CON, CON.txt, NUL.log, COM1.data.
+ */
+const WINDOWS_RESERVED =
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 
 /**
  * One safe folder name from anything a person or a pack might supply.
@@ -46,14 +52,24 @@ export function safeFolderName(raw: string, fallback = 'Folder'): string {
     .replace(/^[.\s-]+/, '')
     .replace(/[.\s]+$/, '');
 
-  if (name.length > MAX_NAME) name = name.slice(0, MAX_NAME).replace(/[.\s]+$/, '');
+  if (name.length > MAX_NAME) {
+    name = name.slice(0, MAX_NAME).replace(/[.\s]+$/, '');
+  }
+
   if (!name) return fallback;
-  if (WINDOWS_RESERVED.test(name)) name = `${name}-folder`;
+
+  if (WINDOWS_RESERVED.test(name)) {
+    name = `${name}-folder`;
+  }
+
   return name;
 }
 
 /** `~/Documents/<Business name>` — the parent of every default agent folder. */
-export function businessFolderRoot(documentsDir: string, businessName: string): string {
+export function businessFolderRoot(
+  documentsDir: string,
+  businessName: string
+): string {
   return join(documentsDir, safeFolderName(businessName, FALLBACK_BUSINESS));
 }
 
@@ -64,14 +80,24 @@ export function businessFolderRoot(documentsDir: string, businessName: string): 
  * above already makes that impossible; this is the check that proves it, kept
  * because a folder path is exactly where a quiet mistake does lasting damage.
  */
-export function defaultAgentFolder(documentsDir: string, businessName: string, folderName: string): string {
+export function defaultAgentFolder(
+  documentsDir: string,
+  businessName: string,
+  folderName: string
+): string {
   const root = businessFolderRoot(documentsDir, businessName);
   const path = join(root, safeFolderName(folderName));
-  if (!isInside(root, path)) throw new Error(`Folder "${folderName}" would land outside ${root}`);
+
+  if (!isInside(root, path)) {
+    throw new Error(`Folder "${folderName}" would land outside ${root}`);
+  }
+
   return path;
 }
 
-export type EnsureFolderResult = { ok: true; path: string; created: boolean } | { ok: false; path: string; reason: string };
+export type EnsureFolderResult =
+  | { ok: true; path: string; created: boolean }
+  | { ok: false; path: string; reason: string };
 
 /**
  * Make sure a folder exists, creating it (and its parents) only if it is missing.
@@ -79,26 +105,54 @@ export type EnsureFolderResult = { ok: true; path: string; created: boolean } | 
  * are shown to the owner during setup.
  */
 export function ensureFolder(path: string): EnsureFolderResult {
-  if (!isAbsolute(path)) return { ok: false, path, reason: 'The folder location is incomplete.' };
+  if (!isAbsolute(path)) {
+    return {
+      ok: false,
+      path,
+      reason: 'The folder location is incomplete.'
+    };
+  }
+
   try {
     const st = statSync(path);
+
     return st.isDirectory()
       ? { ok: true, path, created: false }
-      : { ok: false, path, reason: 'A file with that name is already there. Pick a different folder.' };
-  } catch {
-    /* missing: create it below */
+      : {
+          ok: false,
+          path,
+          reason: 'A file with that name is already there. Pick a different folder.'
+        };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+
+    // Only a missing path should trigger folder creation. Other errors may
+    // indicate a permissions issue or another filesystem problem.
+    if (code !== 'ENOENT') {
+      return {
+        ok: false,
+        path,
+        reason:
+          code === 'EACCES' || code === 'EPERM'
+            ? 'The app isn\'t allowed to access that folder. Pick a folder you own.'
+            : 'The folder location couldn\'t be checked. Pick a different location.'
+      };
+    }
   }
+
   try {
     mkdirSync(path, { recursive: true });
     return { ok: true, path, created: true };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
+
     return {
       ok: false,
       path,
-      reason: code === 'EACCES' || code === 'EPERM'
-        ? 'The app isn\'t allowed to create a folder there. Pick a folder you own.'
-        : 'The folder couldn\'t be created. Pick a different location.'
+      reason:
+        code === 'EACCES' || code === 'EPERM'
+          ? 'The app isn\'t allowed to create a folder there. Pick a folder you own.'
+          : 'The folder couldn\'t be created. Pick a different location.'
     };
   }
 }
@@ -106,5 +160,6 @@ export function ensureFolder(path: string): EnsureFolderResult {
 /** True when `child` is `parent` itself or somewhere below it. */
 function isInside(parent: string, child: string): boolean {
   const rel = relative(resolve(parent), resolve(child));
+
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
