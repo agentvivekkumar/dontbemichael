@@ -597,7 +597,7 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     // a node-free machine can still self-heal. Trusted hardcoded constants only.
     nativeInstallCommand: {
       posix: 'curl https://cursor.com/install -fsS | bash',
-      win32: 'irm https://cursor.com/install?win32=true | iex'
+      win32: 'powershell -c irm https://cursor.com/install?win32=true ^| iex'
     },
     docsUrl: 'https://cursor.com/docs/cli/install'
   },

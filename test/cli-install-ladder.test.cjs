@@ -17,7 +17,7 @@ const loadTs = require('./load-ts.cjs');
 const { posixOnly, windowsOnly } = require('./platform.cjs');
 
 const { chooseInstallRung, buildMissingCliScript, installSucceeded } = loadTs('src/main/cliInstall.ts');
-const { installInfoForProvider } = loadTs('src/shared/agentProvider.ts');
+const { installInfoForProvider, AGENT_PROVIDER_PRESETS } = loadTs('src/shared/agentProvider.ts');
 
 // The POSIX shell script unless a test names the platform: the Windows form is
 // one cmd.exe line, pinned by its own tests below.
@@ -99,6 +99,19 @@ test('the Windows script stays a single quote-free cmd.exe line', () => {
   }
   assert.match(buildMissingCliScript('claude', 'claude', false, 'win32'), /powershell/,
     'the native rung must be the PowerShell form on Windows, not the curl one');
+});
+
+test('every Windows native installer runs under cmd.exe as written', () => {
+  // A bare `|` pipes the echo banner into the next command, and `irm`/`iex`
+  // are PowerShell only: cmd answers "'iex' is not recognized".
+  for (const preset of AGENT_PROVIDER_PRESETS) {
+    const win32 = preset.nativeInstallCommand?.win32;
+    if (!win32) continue;
+    const out = buildMissingCliScript(preset.defaultCommand, preset.id, false, 'win32');
+    assert.ok(!out.includes('"'), `${preset.id}: embedded quote`);
+    assert.doesNotMatch(win32, /(^|[^^])\|/, `${preset.id}: unescaped pipe`);
+    if (/\b(irm|iex)\b/.test(win32)) assert.match(win32, /^powershell /, `${preset.id}: PowerShell commands need powershell`);
+  }
 });
 
 test('a hostile binary name cannot inject a command into the banner', () => {
