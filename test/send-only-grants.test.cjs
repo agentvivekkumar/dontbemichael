@@ -526,6 +526,179 @@ test('a damaged pause notice does not disturb the good ones beside it', (t) => {
   assert.deepEqual(approvals.pausedDue([told, waiting, damaged]), [], 'nothing repeats');
 });
 
+// Saved proposals damaged in one field (a hand edit, another tool, a version mismatch).
+const NOW = 10_000_000;
+const HOUR = 60 * 60 * 1000;
+const proposalCard = (over = {}) => ({ agentId: 'dwight', mailbox: 'ceo', to: 'a@b.com', subject: 'Intro', body: 'Hello.', createdAt: NOW - 3 * HOUR, state: 'waiting', ...over });
+const seedStore = (dir, store) => fs.writeFileSync(path.join(dir, 'mail-proposals.json'), JSON.stringify({ proposals: [], standing: [], sends: [], paused: {}, ...store }), 'utf8');
+const readStore = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'mail-proposals.json'), 'utf8'));
+
+test('a damaged waiting card cannot stop a grant from ending: the standing approval is revoked and the member is told', (t) => {
+  // Value: protects=ending a grant always revokes its standing approvals (D13) even beside a damaged card; fails_when=a card with no subject or To makes cancel throw before the revoke; why_new=saved proposals were trusted past their id; seam=none
+  const { approvals, dir, out } = setup(t, office('approval'), { now: NOW });
+  const rule = { id: 'sa_good', agentId: 'dwight', mailbox: 'ceo', kind: 'Meeting notes', createdAt: NOW - HOUR, fromProposal: 'mp_old' };
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_bad', to: undefined, subject: undefined, body: undefined }), proposalCard({ id: 'mp_ok', subject: 'Good one' })], standing: [rule] });
+  assert.doesNotThrow(() => approvals.endGrant('dwight', 'ceo', 'The owner removed your Send only access.'));
+  const saved = readStore(dir);
+  assert.ok(saved.standing.find((r) => r.id === 'sa_good').revokedAt, 'the standing approval is revoked');
+  assert.deepEqual(saved.proposals.map((p) => p.state), ['cancelled', 'cancelled'], 'both waiting cards are withdrawn');
+  const told = out.messages.filter((m) => m.to === 'dwight').map((m) => m.subject);
+  assert.deepEqual(told, ['2 emails withdrawn', 'Standing approval revoked']);
+  assert.ok(out.memory.some(([id, line]) => id === 'dwight' && /Meeting notes/.test(line) && /revoked/.test(line)), 'the member keeps a note of the revoke');
+});
+
+test('a damaged approved card cannot hide the reminder for a valid overdue one, and nothing is reminded twice', (t) => {
+  // Value: protects=Michael hears once of every approved email that has not gone out; fails_when=one card with no To makes sweep throw on every run, or a later run tells Michael again; why_new=sweep read subject and To without a check; seam=none
+  const { approvals, dir, out } = setup(t, office('approval'), { now: NOW });
+  const approved = { state: 'approved', decidedAt: NOW - 2 * HOUR };
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_bad', to: undefined, subject: undefined, approved: { subject: 'x', body: 'y' }, ...approved }), proposalCard({ id: 'mp_ok', subject: 'Good one', approved: { subject: 'Good one', body: 'Hello.' }, ...approved })] });
+  assert.doesNotThrow(() => approvals.sweep());
+  const toMichael = out.messages.filter((m) => m.to === 'god');
+  assert.ok(toMichael.some((m) => m.body.includes('mp_ok') && m.body.includes('Good one')), 'the valid card is reminded');
+  assert.equal(readStore(dir).proposals.find((p) => p.id === 'mp_ok').remindedMichael, true);
+  const reminders = () => out.messages.filter((m) => m.to === 'god' && m.body.includes('mp_ok')).length;
+  assert.equal(reminders(), 1, 'the valid card is reminded exactly once');
+  const sentBefore = out.messages.length;
+  assert.doesNotThrow(() => approvals.sweep());
+  assert.equal(out.messages.length, sentBefore, 'a later run tells nobody again');
+  assert.equal(reminders(), 1);
+});
+
+test('a damaged card that may already have gone out stays on record and still refuses a second send', async (t) => {
+  // Value: protects=an email that may have gone out is never sent twice (issue 101); fails_when=a card in sending with a damaged field is dropped, so send says no such proposal and the member proposes again; why_new=the repair keeps the record; seam=fake mail transport (proves nothing reaches it)
+  const { approvals, dir, call, state } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, { proposals: [{ id: 'mp_sending', agentId: 'dwight', mailbox: 'ceo', createdAt: NOW - HOUR, state: 'sending' }] });
+  approvals.file({ agentId: 'pam', mailbox: 'ceo', to: 'a@b.com', subject: 'Unrelated', body: 'b' });
+  const kept = readStore(dir).proposals.find((p) => p.id === 'mp_sending');
+  assert.ok(kept, 'an unrelated write keeps it');
+  assert.equal(kept.state, 'sending');
+  assert.equal(kept.createdAt, NOW - HOUR);
+  const r = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_sending' });
+  assert.equal(r.status, 409);
+  assert.match(r.body.error, /may already have gone out/);
+  assert.equal(state.sends.length, 0);
+});
+
+test('declining a damaged waiting card still tells the member', (t) => {
+  // Value: protects=the owner's decision always reaches the member; fails_when=the decision is saved and then building its message throws, so the member never hears; why_new=decide saved before it read To and subject; seam=none
+  const { approvals, dir, out } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_bad', to: undefined, subject: undefined, body: undefined })] });
+  assert.deepEqual(approvals.decide('mp_bad', 'decline', {}, ''), { ok: true });
+  assert.equal(readStore(dir).proposals[0].state, 'declined');
+  assert.deepEqual(out.messages.filter((m) => m.to === 'dwight').map((m) => m.subject), ['Email not sent']);
+  assert.equal(out.memory.filter(([id]) => id === 'dwight').length, 1, 'and it is noted in the member\'s memory');
+});
+
+test('a damaged waiting card with no subject or body cannot be approved blank, and goes once the owner writes them', async (t) => {
+  // Value: protects=nothing blank or unwritten is ever approved, so a damaged card cannot send an empty email; fails_when=approving a card whose subject and body read as empty saves an empty approval that then sends; why_new=the load repair made such a card approvable; seam=fake mail transport
+  const { approvals, dir, call, state, out } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_bad', subject: undefined, body: undefined })] });
+  assert.deepEqual(approvals.decide('mp_bad', 'approve', {}, ''), { ok: false, error: 'subject and body needed' });
+  assert.equal(readStore(dir).proposals[0].state, 'waiting', 'still waiting for the owner');
+  assert.equal(out.messages.filter((m) => m.to === 'dwight').length, 0, 'the member is told nothing');
+  assert.deepEqual(approvals.decide('mp_bad', 'approve', { subject: 'Hello', body: 'Written by the owner.' }, ''), { ok: true });
+  assert.deepEqual(readStore(dir).proposals[0].approved, { subject: 'Hello', body: 'Written by the owner.' });
+  const sent = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_bad' });
+  assert.equal(sent.status, 200);
+  assert.equal(state.sends.length, 1);
+  assert.equal(state.sends[0].subject, 'Hello');
+  assert.equal(state.sends[0].text, 'Written by the owner.');
+});
+
+test('a saved proposal that names no member or mailbox is left out; one that does is kept', (t) => {
+  // Value: protects=nothing acts on a card that no member or mailbox owns; fails_when=a card with no agentId or mailbox reaches cancel, sweep or Ask me; why_new=only the id was checked; seam=none
+  const { approvals, dir } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, {
+    proposals: [
+      proposalCard({ id: 'mp_noagent', agentId: undefined }),
+      proposalCard({ id: 'mp_blankagent', agentId: '' }),
+      proposalCard({ id: 'mp_nobox', mailbox: undefined }),
+      proposalCard({ id: 'mp_numbox', mailbox: 7 }),
+      proposalCard({ id: 'mp_kept', to: undefined })
+    ]
+  });
+  assert.deepEqual(approvals.waiting().map((p) => p.id), ['mp_kept']);
+  for (const id of ['mp_noagent', 'mp_blankagent', 'mp_nobox', 'mp_numbox']) assert.equal(approvals.get(id), undefined, id);
+  assert.equal(approvals.get('mp_kept').to, '', 'a missing To reads as empty');
+});
+
+test('an approved card whose To names nobody is withdrawn, and its Cc alone never reaches the mail transport', async (t) => {
+  // Value: protects=an email nobody addressed never goes to its Cc alone; fails_when=a card whose To is missing, not text, blank or has no mailbox in it reaches the mail server because it has a Cc; why_new=the approved send passed To and Cc on without a check, and the mail library drops a To it cannot read; seam=fake mail transport (the guard runs before it; what a real SMTP server receives was checked by hand, not here)
+  const names = [['missing', undefined], ['not text', 42], ['blank', '   '], ['a word', 'not-an-address'], ['no domain', 'foo@'], ['only separators', ','], ['an empty group', 'undisclosed-recipients:;']];
+  for (const [name, to] of names) {
+    const { approvals, dir, call, state, out } = setup(t, office('approval'), { now: NOW });
+    seedStore(dir, { proposals: [proposalCard({ id: 'mp_cc', to, cc: 'c@d.com', state: 'approved', decidedAt: NOW - HOUR, approved: { subject: 'Intro', body: 'Hello.' } })] });
+    const r = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_cc' });
+    assert.equal(r.status, 403, name);
+    assert.match(r.body.error, /no valid To address/, name);
+    assert.equal(state.sends.length, 0, `${name}: nothing reached the mail server`);
+    assert.equal(approvals.get('mp_cc').state, 'cancelled', name);
+    assert.ok(out.messages.some((m) => m.to === 'dwight' && m.subject === 'Email withdrawn'), `${name}: the member is told`);
+  }
+  // A card that may already have gone out keeps its own refusal, whatever its To says.
+  const { approvals, dir, call, state } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_s', to: 'not-an-address', cc: 'c@d.com', state: 'sending', decidedAt: NOW - HOUR, approved: { subject: 'Intro', body: 'Hello.' } })] });
+  const held = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_s' });
+  assert.equal(held.status, 409);
+  assert.match(held.body.error, /may already have gone out/);
+  assert.equal(approvals.get('mp_s').state, 'sending', 'still on record as sending');
+  assert.equal(state.sends.length, 0);
+});
+
+test('the To formats the mail library reads are still handed to the mail transport: a name with an address, a quoted name, a group, a list', async (t) => {
+  // Value: protects=the To check never refuses an address the mail library can use; fails_when=the check refuses a display name, a quoted local part, a group or a semicolon list; why_new=guards the new To check; seam=fake mail transport (shows the guard lets them through, not that a server delivers them)
+  for (const to of ['Dwight Schrute <dwight@example.com>', '"john doe"@example.com', 'Team: a@b.com, c@d.com;', 'a@b.com; c@d.com', 'dwight@example.com']) {
+    const { dir, call, state } = setup(t, office('approval'), { now: NOW });
+    seedStore(dir, { proposals: [proposalCard({ id: 'mp_ok', to, cc: 'c@d.com', state: 'approved', decidedAt: NOW - HOUR, approved: { subject: 'Intro', body: 'Hello.' } })] });
+    const r = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_ok' });
+    assert.equal(r.status, 200, to);
+    assert.equal(state.sends.length, 1, to);
+    assert.equal(state.sends[0].to, to, `${to}: sent to exactly what was approved`);
+  }
+});
+
+test('an approved card whose approved text is damaged is refused, never sent as the agent\'s draft', async (t) => {
+  // Value: protects=only text the owner approved ever goes out (EV2); fails_when=an approved card whose approved text is not a subject and a body is sent with the agent's own draft in its place; why_new=the send gate only checked that approved text existed, and the reader fell back to the draft field by field; seam=fake mail transport (checks nothing reaches it, not what a server does)
+  const draft = { subject: 'Draft subject', body: 'Draft body' };
+  const damaged = [['text', 'oops'], ['number', 5], ['true', true], ['list', ['x']], ['empty object', {}], ['no body', { subject: 'Edited subject' }], ['no subject', { body: 'Owner edited body' }], ['body not text', { subject: 'Edited subject', body: 7 }]];
+  for (const [name, approvedText] of damaged) {
+    const { approvals, dir, call, state } = setup(t, office('approval'), { now: NOW });
+    seedStore(dir, { proposals: [proposalCard({ id: 'mp_a', ...draft, state: 'approved', decidedAt: NOW - HOUR, approved: approvedText })] });
+    const r = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_a' });
+    assert.equal(r.status, 409, name);
+    assert.match(r.body.error, /cannot be sent/, name);
+    assert.equal(state.sends.length, 0, `${name}: nothing reached the mail transport`);
+    assert.equal(approvals.get('mp_a').state, 'approved', `${name}: still approved, not sent and not marked sending`);
+  }
+  // The same card with well formed approved text still goes, as the owner left it.
+  const { dir, call, state } = setup(t, office('approval'), { now: NOW });
+  seedStore(dir, { proposals: [proposalCard({ id: 'mp_a', ...draft, state: 'approved', decidedAt: NOW - HOUR, approved: { subject: 'Edited subject', body: 'Owner edited body' } })] });
+  assert.equal((await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_a' })).status, 200);
+  assert.equal(state.sends.length, 1);
+  assert.equal(state.sends[0].subject, 'Edited subject');
+  assert.equal(state.sends[0].text, 'Owner edited body');
+});
+
+test('valid waiting, approved and sending cards read and behave as they did', async (t) => {
+  // Value: protects=the repair changes nothing for a well formed card (issue 101 for the sending one); fails_when=a valid card is rewritten, an approved one is handed on other than as approved, or a sending one is sent; why_new=guards the new load step; seam=fake mail transport
+  const { approvals, dir, call, state } = setup(t, office('approval'), { now: NOW });
+  const waiting = proposalCard({ id: 'mp_w', cc: 'c@d.com', offerStanding: 'Intro emails' });
+  const approved = proposalCard({ id: 'mp_a', state: 'approved', decidedAt: NOW - HOUR, approved: { subject: 'Intro (edited)', body: 'Hello there.' } });
+  const sending = proposalCard({ id: 'mp_s', state: 'sending', decidedAt: NOW - HOUR, approved: { subject: 'Intro', body: 'Hello.' } });
+  seedStore(dir, { proposals: [waiting, approved, sending] });
+  for (const card of [waiting, approved, sending]) assert.deepEqual(approvals.get(card.id), card, card.id);
+  assert.deepEqual(approvals.waiting().map((p) => p.id), ['mp_w']);
+  const sent = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_a' });
+  assert.equal(sent.status, 200);
+  assert.equal(state.sends.length, 1);
+  assert.equal(state.sends[0].to, 'a@b.com');
+  assert.equal(state.sends[0].subject, 'Intro (edited)');
+  const held = await call('dwight', 'send', { mailbox: 'ceo', proposal: 'mp_s' });
+  assert.equal(held.status, 409);
+  assert.match(held.body.error, /may already have gone out/);
+  assert.equal(state.sends.length, 1, 'the sending card sent nothing');
+});
+
 test('setters: a grant survives email off and moves, owning the mailbox replaces it, and removing the mailbox ends it', (t) => {
   // Value: protects=the grant is its own field (OV2) with the plan's lifecycle (3b); fails_when=an email write erases it, or a removed mailbox leaves a grant; why_new=new field; seam=none
   const { admin, cfg, approvals } = setup(t);
