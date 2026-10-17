@@ -19,8 +19,12 @@ if (!process.env.PULSE_UNDER_ELECTRON) {
   try { bin = require('electron'); } catch { bin = null; }
   const ok = typeof bin === 'string' && fs.existsSync(bin);
   test('telemetry store and processor (run under Electron\'s Node)', { skip: ok ? false : 'no Electron binary' }, () => {
+    // Not as a child of the outer runner: with NODE_TEST_CONTEXT set, the inner
+    // run reports to a parent that isn't listening and exits 0 even when a test fails.
+    const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1', PULSE_UNDER_ELECTRON: '1' };
+    delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(bin, ['--test', __filename], {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PULSE_UNDER_ELECTRON: '1' },
+      env,
       encoding: 'utf8', timeout: 300_000
     });
     assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
@@ -126,11 +130,11 @@ test('cost counts a restart whole, repeats are not stored, and a crash mid batch
 test('a failed write is counted for its day and the day is reported; records keep the presence and card facts', (t) => {
   // Value: protects=D15 and E2, E3, E4 sources; fails_when=a failed write is silent, or reopen, held time or away share is lost; why_new=D15; seam=none; no_claim=disk full on a real disk (closed handle stands in)
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-pulse-fail-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   let open = false;
   const persist = new PersistStore(path.join(dir, 'harness.db'));
   persist.open();
-  t.after(() => persist.close());
+  // Closed before its folder goes: Windows can't delete an open database.
+  t.after(() => { persist.close(); fs.rmSync(dir, { recursive: true, force: true }); });
   const when = new Date(2026, 9, 14, 10).getTime();
   const store = new TelemetryStore(() => (open ? persist.database() : null), () => '/office', () => when);
   store.record({ agentId: 'pam', kind: 'email', ts: when, value: 3 });
