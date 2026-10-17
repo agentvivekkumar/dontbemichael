@@ -291,6 +291,26 @@ test('an owner request on a Done card stays open only when it came after the own
   assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['late']);
 });
 
+test('an owner answer on a card Michael marked Done stays his open request', async (t) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-owner-req-michael-done-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', cwd: home, isGod: true });
+  const tick = () => new Promise((r) => setTimeout(r, 5));
+  hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card a', body: 'x', conversation: 'card:a' }, 'human');
+  await tick();
+  // Michael marks both cards Done in the file, with a question still open on b.
+  fs.writeFileSync(path.join(hive.root(), 'tasks.json'), JSON.stringify({ tasks: [
+    { id: 'a', title: 'A', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'done' },
+    { id: 'b', title: 'B', status: 'done', dependsOn: [], priority: 3, createdAt: 'x', result: 'done', humanQA: [{ q: 'Which supplier?' }] }
+  ] }));
+  assert.deepEqual(hive.refreshOwnerRequests(), [], 'the request from before the card was Done is settled');
+  await tick();
+  // The owner answers the open question afterwards.
+  hive.send({ to: 'god', act: 'request', subject: 'OWNER ANSWER on card b', body: 'x', conversation: 'card:b' }, 'human');
+  assert.deepEqual(hive.refreshOwnerRequests().map((r) => r.taskId), ['b']);
+});
+
 test('Michael withdraws a question on a card the owner moved, and never moves that card back', () => {
   // Value: protects=Michael's tidy note never tells him to undo an owner's move; fails_when=the off Blocked note says only to move the card back to Blocked; why_new=pre-landing review 2026-10-05; seam=none
   const { asksToTidy } = loadTs('src/shared/ownerRequests.ts');
