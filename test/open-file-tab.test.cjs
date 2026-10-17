@@ -155,6 +155,20 @@ test('CSV and TSV become a table; broken quoting falls back to text (E3)', () =>
   assert.equal(CSV_ROW_LIMIT, 1000);
 });
 
+for (const [format, sep] of [['CSV', ','], ['TSV', '\t']]) {
+  test(`${format} ignores a leading UTF-8 BOM without changing field content`, () => {
+    // Value: protects=BOM-prefixed previews keep their columns and field values; fails_when=the BOM hides an opening quote or meaningful characters are stripped; why_new=existing examples have no BOM; seam=none
+    const source = `"Customer${sep}name"${sep}Amount\r\nAcme${sep}100\r\n`;
+    const decoded = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(source, 'utf8')]).toString('utf8');
+    assert.deepEqual(parseDelimited(decoded, sep), [[`Customer${sep}name`, 'Amount'], ['Acme', '100']]);
+    assert.deepEqual(parseDelimited(`\ufeffName${sep}Amount\nAcme${sep}100`, sep), [['Name', 'Amount'], ['Acme', '100']]);
+    assert.deepEqual(parseDelimited(`\ufeff"\ufeffCustomer"${sep} note \nAc\ufeffme${sep}\ufeff100`, sep), [['\ufeffCustomer', ' note '], ['Ac\ufeffme', '\ufeff100']]);
+    assert.deepEqual(parseDelimited(`Name${sep}\ufeffAmount`, sep), [['Name', '\ufeffAmount']]);
+    assert.equal(parseDelimited('\ufeff"unclosed', sep), null, 'unclosed quotes still fall back to text');
+    assert.deepEqual(parseDelimited('\ufeff', sep), [], 'a BOM alone contains no rows');
+  });
+}
+
 test('wiring: tabs after Who talks to whom, never saved, Ask me beside a file, watchers dropped on reload', () => {
   // Value: protects=the owner's tab and column behavior and the watcher cap; fails_when=the column hides on a file tab, a restart lands on a file tab, or watchers leak; why_new=all new; seam=none
   const store = read('src/renderer/src/store/store.ts');

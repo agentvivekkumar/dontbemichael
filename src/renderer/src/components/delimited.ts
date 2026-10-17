@@ -13,7 +13,8 @@ export function parseDelimited(text: string, sep: string): string[][] | null {
   let row: string[] = [];
   let cell = '';
   let quoted = false;
-  for (let i = 0; i < text.length; i++) {
+  // A leading UTF-8 BOM is an encoding marker, not part of the first cell.
+  for (let i = text.startsWith('\ufeff') ? 1 : 0; i < text.length; i++) {
     const c = text[i];
     if (quoted) {
       if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
