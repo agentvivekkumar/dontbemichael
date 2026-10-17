@@ -110,6 +110,15 @@ const PROVIDER_BLURB_KEYS: Partial<Record<AgentProvider, string>> = {
   cursor: 'onboarding.providerBlurb.cursor'
 };
 
+// The engine status badge (engineAvailability.ts) in the app language. The
+// shared module ships the English words; each one points at a locale key, and
+// t() falls back to the English badge when the key is missing.
+const ENGINE_STATUS_KEYS: Record<string, string> = {
+  'INSTALLED': 'onboarding.orchestrator.statusInstalled',
+  'INSTALLS ON FIRST RUN': 'onboarding.orchestrator.statusInstallsOnFirstRun',
+  'NOT INSTALLED': 'onboarding.orchestrator.statusNotInstalled'
+};
+
 export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps) {
   const { t } = useTranslation();
   // Onboarding runs before god exists in the store, so read the persisted name.
@@ -918,7 +927,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                               color: bad ? 'var(--cth-ink-500)' : 'var(--cth-ink-900)',
                               boxShadow: 'inset 0 0 0 1px var(--cth-line-2)',
                               fontFamily: 'var(--cth-font-display)', flexShrink: 0
-                            }}>{badge}</span>
+                            }}>{t(ENGINE_STATUS_KEYS[badge], { defaultValue: badge })}</span>
                           );
                         })()}
                         {p.id === 'claude' && (
@@ -978,14 +987,17 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 2px var(--cth-ink-900)',
                     fontSize: 12, lineHeight: '17px', color: 'var(--cth-ink-900)'
                   }}>
-                    <span>{engineAvailabilityMessage(selectedEngine, providerPreset(godProvider).label)}</span>
+                    <span>{t('onboarding.orchestrator.engineNotInstalled', {
+                      label: providerPreset(godProvider).label,
+                      defaultValue: engineAvailabilityMessage(selectedEngine, providerPreset(godProvider).label)
+                    })}</span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <PixelButton variant="secondary" size="sm" onClick={() => { void probeEngines(); }} disabled={probing}>
-                        {probing ? 'checking...' : 'check again'}
+                        {probing ? t('onboarding.orchestrator.checking') : t('onboarding.orchestrator.checkAgain')}
                       </PixelButton>
                       {selectedEngine.docsUrl && (
                         <PixelButton variant="ghost" size="sm" onClick={() => { void window.cth.openExternal(selectedEngine.docsUrl!); }}>
-                          install instructions
+                          {t('onboarding.orchestrator.installInstructions')}
                         </PixelButton>
                       )}
                     </div>

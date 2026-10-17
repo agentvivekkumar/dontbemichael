@@ -780,7 +780,14 @@
       "model": "Model",
       "modelNote": "This sets the model {{godName}} and your whole team use. You can change it later in Settings.",
       "maxPlan": "<strong>You'll need a Claude Max plan</strong> to keep your office running full time. Smaller plans reach their usage limit during the day, and the office pauses until the limit resets.",
-      "seePlans": "See Claude plans"
+      "seePlans": "See Claude plans",
+      "statusInstalled": "Installed",
+      "statusInstallsOnFirstRun": "Installs on first run",
+      "statusNotInstalled": "Not installed",
+      "engineNotInstalled": "{{label}} is not installed on this computer and the app has no installer for it, so {{godName}} could not start. Install it first, then press \"check again\". Or pick Claude Code, which installs itself on first run.",
+      "checkAgain": "check again",
+      "checking": "checking...",
+      "installInstructions": "install instructions"
     },
     "permissions": {
       "autonomyHead": "How much can agents do on their own?",
