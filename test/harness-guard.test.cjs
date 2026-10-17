@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
-const { posixOnly } = require('./platform.cjs');
+const { posixOnly, windowsOnly } = require('./platform.cjs');
 
 const { harnessWriteDecision } = loadTs('src/main/harnessGuard.ts');
 
@@ -178,7 +178,7 @@ test('a path with whitespace, tilde or using path property is judged as Claude C
   assert.equal(harnessWriteDecision({
     tool: 'Write', toolInput: { path: `${HOME}/roster.json` }, cwd: FOLDER,
     agentId: 'oscar', isGod: false, harnessHome: HOME, hiveRoot: HIVE, caseInsensitive: true
-  }).deny, true, 'input using path property');
+  }).deny, true, 'defensive fallback for path property');
   assert.equal(decide('   ').deny, false, 'whitespace-only path names no file');
 
   const realHome = os.homedir();
@@ -190,7 +190,6 @@ test('a path with whitespace, tilde or using path property is judged as Claude C
   });
   assert.equal(realDecide('~/HarnessAgents/roster.json').deny, true, 'tilde path into harness home');
   assert.equal(realDecide('~/HarnessAgents/hive/tasks.json').deny, true, 'tilde path into hive root');
-  assert.equal(realDecide('~\\HarnessAgents\\roster.json').deny, true, 'windows tilde path');
   assert.equal(realDecide('~/HarnessAgents/hive/agents/oscar/memory/inbox.md').deny, false, 'protocol files with tilde still pass');
 
   const tildeDecide = (file_path) => harnessWriteDecision({
@@ -198,4 +197,18 @@ test('a path with whitespace, tilde or using path property is judged as Claude C
     agentId: 'oscar', isGod: false, harnessHome: '~/HarnessAgents', hiveRoot: '~/HarnessAgents/hive', caseInsensitive: true
   });
   assert.equal(tildeDecide('~/HarnessAgents/roster.json').deny, true, 'harnessHome with tilde');
+});
+
+test('on Windows, backslash-separated tilde paths are expanded and guarded', windowsOnly('Windows backslash path separator'), () => {
+  // Value: protects=Windows agents cannot bypass the harness guard using backslash tilde paths (~\\HarnessAgents\\...); fails_when=Windows tilde paths are resolved relative to cwd; why_new=Windows path separator parity; seam=harnessWriteDecision
+  const realHome = os.homedir();
+  const realHarness = path.join(realHome, 'HarnessAgents');
+  const realHive = path.join(realHarness, 'hive');
+  const realDecide = (file_path) => harnessWriteDecision({
+    tool: 'Write', toolInput: { file_path }, cwd: path.join(realHome, 'Documents', 'Pho', 'Finance'),
+    agentId: 'oscar', isGod: false, harnessHome: realHarness, hiveRoot: realHive, caseInsensitive: true
+  });
+  assert.equal(realDecide('~\\HarnessAgents\\roster.json').deny, true, 'windows tilde path');
+  assert.equal(realDecide('~\\HarnessAgents\\hive\\tasks.json').deny, true, 'windows tilde path into hive');
+  assert.equal(realDecide('~\\HarnessAgents\\hive\\agents\\oscar\\memory\\inbox.md').deny, false, 'windows protocol file still passes');
 });
