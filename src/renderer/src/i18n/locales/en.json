@@ -1480,6 +1480,7 @@
   "memoryGraph": {
     "refresh": "Refresh",
     "loadingMemory": "loading memory…",
+    "messageLink": "{{count}} message link",
     "messageLinks": "{{count}} message links",
     "noMemory": "No memory recorded yet.",
     "rangeLabel": "Time range",
@@ -1495,6 +1496,7 @@
     },
     "noMessagesInRange": "No messages between your team in this time range.",
     "pair": "{{a}} and {{b}}",
+    "messageCount": "{{count}} message",
     "messagesCount": "{{count}} messages",
     "last": "Last: {{subject}}",
     "legendPerson": "Person",
