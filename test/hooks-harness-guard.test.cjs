@@ -70,8 +70,14 @@ test('on a business install, a document written into the hive is refused through
   assert.equal(r.hookSpecificOutput.hookEventName, 'PreToolUse');
   assert.match(r.hookSpecificOutput.permissionDecisionReason, /only for coordination/);
   assert.ok(r.hookSpecificOutput.permissionDecisionReason.includes(f.finance), 'names the agent\'s own folder');
+  // Padded path or path property is also intercepted before touching disk
+  const rPadded = await f.write('  ' + path.join(f.hiveRoot, 'shared', 'brand-voice.md') + '  ');
+  assert.ok(denied(rPadded), 'padded path is denied');
+  const rPathProp = await f.write(undefined, { tool_input: { path: path.join(f.hiveRoot, 'shared', 'brand-voice.md'), content: 'x' } });
+  assert.ok(denied(rPathProp), 'input with path property is denied');
   // The floor hears about it too, so the owner can see an agent was steered.
 });
+
 
 test('the same install still lets an agent write its memory and its work, and read anything', async (t) => {
   const f = await floor(t, ({ home, office }) => ({ harnessHome: home, officeFolder: office }));
