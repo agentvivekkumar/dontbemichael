@@ -373,22 +373,29 @@ function TaskCard({ task, done, assigneeName, withGod, nothingAsked, godName, on
 // the big stage instead of the narrow side panel. Exported for App's
 // TaskDetailOverlay; opened via the store's openTaskDetail from anywhere.
 
-export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign, onClose }: {
+export function TaskDetail({ task, all, assigneeName, teammates, onMove, onReopen, onReassign, onAssign, onClose }: {
   task: HiveTask;
   all: HiveTask[];
   assigneeName?: string;
+  /** Team members the owner can move the card to (issue #248), excluding Michael. */
+  teammates: { id: string; name: string }[];
   onMove: (s: Status) => void;
   /** Out of Done, into To do, with the owner's reason (card-lifecycle.md 10). */
   onReopen: (reason: string) => void;
+  /** Move the card to another team member so Michael learns. */
+  onReassign: (assigneeId: string, reason?: string) => void;
   onAssign: () => void;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [reopening, setReopening] = useState(false);
+  const [movingTo, setMovingTo] = useState(false);
   const [why, setWhy] = useState('');
+  const [moveToId, setMoveToId] = useState('');
   const next = nextAtLabel(task.nextAt, i18n.language);
   const rtl = useRtl();
   const detailGodName = useResolvedGodName();
+  const canMoveTo = task.status !== 'done' && teammates.some((m) => m.id !== task.assignee);
   // Every file the Q&A trail names, checked in one go rather than per question.
   const qaAssignee = typeof task.assignee === 'string' ? task.assignee : undefined;
   // Each question as the card shows it, options and parts included, so a file
@@ -475,6 +482,17 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
                     {assigneeName}
                   </span>
                 : <span style={{ fontSize: 12.5, color: 'var(--cth-ink-3)' }}>{t('kanban.unassigned')}</span>}
+              {task.assignReason && (
+                <div data-assign-reason style={{ marginTop: 4, fontSize: 11.5, lineHeight: '16px', color: 'var(--cth-ink-3)', maxWidth: 160 }}>
+                  {task.assignReason}
+                </div>
+              )}
+              {canMoveTo && !movingTo && (
+                <button type="button" onClick={() => { setMovingTo(true); setMoveToId(teammates.find((m) => m.id !== task.assignee)?.id ?? ''); setWhy(''); }} style={{
+                  marginTop: 6, border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                  fontFamily: 'var(--cth-font-ui)', fontSize: 11.5, fontWeight: 600, color: 'var(--cth-blue-text)', textDecoration: 'underline'
+                }}>{t('kanban.moveTo')}</button>
+              )}
             </div>
             <div>{label(t('kanban.priorityLabel'))}<PriorityDots level={Math.max(1, Math.min(5, task.priority))} /></div>
             <div>{label(t('kanban.created'))}
@@ -509,6 +527,30 @@ export function TaskDetail({ task, all, assigneeName, onMove, onReopen, onAssign
               <div style={{ display: 'flex', gap: 6 }}>
                 <PixelButton variant="primary" size="sm" disabled={!why.trim()} onClick={() => { onReopen(why.trim()); setReopening(false); setWhy(''); }}>{t('kanban.reopen')}</PixelButton>
                 <PixelButton variant="secondary" size="sm" onClick={() => { setReopening(false); setWhy(''); }}>{t('common.cancel')}</PixelButton>
+              </div>
+            </div>
+          )}
+
+          {/* Move to another team member so Michael learns (issue #248). */}
+          {movingTo && canMoveTo && (
+            <div data-move-to style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {label(t('kanban.moveTo'))}
+              <select value={moveToId} onChange={(e) => setMoveToId(e.target.value)} aria-label={t('kanban.moveTo')} style={{
+                height: 30, padding: '0 8px', borderRadius: 'var(--cth-r-md)', border: 'none', cursor: 'pointer',
+                background: 'var(--cth-card)', color: 'var(--cth-ink)', boxShadow: 'inset 0 0 0 1px var(--cth-line-input)',
+                fontFamily: 'var(--cth-font-ui)', fontSize: 12.5, fontWeight: 600
+              }}>
+                {teammates.filter((m) => m.id !== task.assignee).map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <textarea className="cth-input" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('kanban.moveToWhy')} aria-label={t('kanban.moveToWhy')} style={{
+                resize: 'vertical', padding: '6px 8px', border: 'none', outline: 'none',
+                background: 'var(--cth-card)', color: 'var(--cth-ink)', fontFamily: 'var(--cth-font-ui)', fontSize: 12.5
+              }} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <PixelButton variant="primary" size="sm" disabled={!moveToId} onClick={() => { onReassign(moveToId, why.trim() || undefined); setMovingTo(false); setWhy(''); }}>{t('kanban.moveToConfirm')}</PixelButton>
+                <PixelButton variant="secondary" size="sm" onClick={() => { setMovingTo(false); setWhy(''); }}>{t('common.cancel')}</PixelButton>
               </div>
             </div>
           )}
