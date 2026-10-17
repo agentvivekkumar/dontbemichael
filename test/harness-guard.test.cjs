@@ -168,3 +168,18 @@ test('an agent saves into its own scratch folder in the app\'s home, and no one 
   assert.equal(decide(`${HOME}/agent-tmp/pam/notes.md`).deny, true, 'another agent\'s');
   assert.equal(decide(`${HOME}/agent-tmp/oscar-2/notes.md`).deny, true, 'a name that only starts the same');
 });
+
+test('a path with whitespace, tilde or using path property is judged as Claude Code resolves it', () => {
+  // Value: protects=agents cannot bypass harness folder boundaries with leading spaces, tilde expansion, or path property; fails_when=the guard resolves padded or tilde paths relative to cwd or ignores path property; why_new=security audit parity with folderAccess; seam=harnessWriteDecision
+  assert.equal(decide(`  ${HOME}/roster.json  `).deny, true, 'padded with whitespace');
+  assert.equal(decide(`\t${HIVE}/tasks.json`).deny, true, 'leading tab');
+  assert.equal(decide('~/HarnessAgents/roster.json').deny, true, 'tilde path into harness home');
+  assert.equal(decide('~/HarnessAgents/hive/tasks.json').deny, true, 'tilde path into hive root');
+  assert.equal(decide('~\\HarnessAgents\\roster.json').deny, true, 'windows tilde path');
+  assert.equal(harnessWriteDecision({
+    tool: 'Write', toolInput: { path: `${HOME}/roster.json` }, cwd: FOLDER,
+    agentId: 'oscar', isGod: false, harnessHome: HOME, hiveRoot: HIVE, caseInsensitive: true
+  }).deny, true, 'input using path property');
+  assert.equal(decide('   ').deny, false, 'whitespace-only path names no file');
+  assert.equal(decide('~/HarnessAgents/hive/agents/oscar/memory/inbox.md').deny, false, 'protocol files with tilde still pass');
+});
