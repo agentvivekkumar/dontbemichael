@@ -111,8 +111,16 @@ function luhn(digits: string): boolean {
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/;
 // A phone number: an optional +country code, then 9 to 15 digits in groups.
 const PHONE = /(?:^|[^\w])(\+?\d[\d\s().-]{7,}\d)(?![\w])/g;
-const CARD = /(?:\d[ -]?){12,18}\d/g;
-const IBAN = /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b/;
+// A card number: 13 to 19 digits, grouped by spaces, hyphens or dots. The
+// Luhn check and the digit-count gate in patternHits are what keep version
+// strings and IP addresses (4.111.1111, 192.168.1.100) out; the separator set
+// only decides what spacing we can SEE, so a card written 4111.1111.1111.1111
+// is not missed the way a space- or hyphen-only pattern missed it.
+const CARD = /(?:\d[ .-]?){12,18}\d/g;
+// An IBAN: two letters, two check digits, then grouped alphanumerics. Letters
+// are matched in either case: a lowercase `de89...` is the same account number
+// as `DE89...`, and only the uppercase form used to be seen.
+const IBAN = /\b[A-Za-z]{2}\d{2}(?:\s?[A-Za-z0-9]{4}){2,7}(?:\s?[A-Za-z0-9]{1,4})?\b/;
 const US_SSN = /\b\d{3}-\d{2}-\d{4}\b/;
 const SECRETS: RegExp[] = [
   /\bsk-[A-Za-z0-9_-]{16,}/,
