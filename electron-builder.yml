@@ -169,9 +169,14 @@ nsis:
 
 # ---- Linux ----
 linux:
+  executableName: dontbemichael
   category: Development
-  icon: build/icon.png
+  icon: build/icons
+  # Placeholder; the project owner will set the release maintainer.
+  maintainer: "Package Maintainer <maintainer@example.invalid>"
   target:
     - target: AppImage
       arch: [x64]
-  artifactName: Dont-Be-Michael-${version}-linux-x86_64.AppImage
+    - target: deb
+      arch: [x64]
+  artifactName: Dont-Be-Michael-${version}-linux-x86_64.${ext}

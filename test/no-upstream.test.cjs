@@ -46,7 +46,7 @@ test('updates come from this repo, with installers named for this app', () => {
   const builder = read('electron-builder.yml');
   assert.match(builder, /publish:\n\s+provider: github\n\s+owner: agentvivekkumar\n\s+repo: dontbemichael/);
   // The file names the build produces are the ones installerUrl() links to.
-  for (const name of ['Dont-Be-Michael-${version}-mac-${arch}.${ext}', 'Dont-Be-Michael-${version}-win-x64-setup.exe', 'Dont-Be-Michael-${version}-linux-x86_64.AppImage']) {
+  for (const name of ['Dont-Be-Michael-${version}-mac-${arch}.${ext}', 'Dont-Be-Michael-${version}-win-x64-setup.exe', 'Dont-Be-Michael-${version}-linux-x86_64.${ext}']) {
     assert.ok(builder.includes(`artifactName: ${name}`), name);
   }
 });
