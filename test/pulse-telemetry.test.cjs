@@ -157,6 +157,37 @@ test('a failed write is counted for its day and the day is reported; records kee
   assert.deepEqual([day.tasks, day.emails, day.awayPieces], [1, 2, 3], 'the owner was away for all of it');
 });
 
+test('a card reopened or held before the period and finished in it keeps its reopen and its held time', (t) => {
+  // Value: protects=kept as is and speed for a card older than the period; fails_when=cards() folds only the period's events, so an earlier reopen, a hold that began before the period, or an earlier finish is counted wrong; why_new=Codex adversarial review 2026-10-16; seam=none; no_claim=none beyond protects
+  const { store, proc, clock } = setup(t);
+  const H = 3600_000, D = 86_400_000;
+  const t0 = clock.now();
+  const made = t0 - 10 * D;
+  const since = t0 - 2 * D;
+  const board = (c1, c2, ts) => store.tasks([
+    { id: 'c1', status: c1, assignee: 'nick', createdAt: new Date(made).toISOString() },
+    { id: 'c2', status: c2, assignee: 'nick', createdAt: new Date(made).toISOString() }
+  ], ts);
+  board('todo', 'doing', made);              // the first read only remembers
+  board('blocked', 'doing', made + H);
+  board('done', 'done', made + 3 * H);
+  store.record({ agentId: 'nick', kind: 'card-reopen', ts: made + 4 * H, attrs: { id: 'c1' } });
+  board('todo', 'done', made + 4 * H);
+  board('waiting', 'done', made + 5 * H);    // held into the period
+  store.record({ agentId: 'nick', kind: 'card-reopen', ts: t0 - 4 * H, attrs: { id: 'c2' } });
+  board('doing', 'todo', t0 - 3 * H);
+  board('done', 'todo', t0 - H);
+  proc.tick('/office');
+  const cards = proc.cards('/office', since);
+  const c1 = cards.find((c) => c.id === 'c1');
+  assert.equal(c1.reopened, true, 'the reopen before the period counts');
+  assert.equal(c1.heldMs, 2 * H + (t0 - 3 * H) - (made + 5 * H), 'both holds count, the one across the period start whole');
+  assert.deepEqual([c1.createdAt, c1.doneAt], [made, t0 - H]);
+  assert.equal(cards.find((c) => c.id === 'c2').doneAt, undefined, 'a finish before the period is not one in it');
+  const { keptAsIs } = loadTs('src/shared/teamPerformance.ts');
+  assert.deepEqual(keptAsIs('nick', [], cards), { kept: 0, decisions: 1, share: null });
+});
+
 const { PulseService } = loadTs('src/main/pulse.ts');
 
 function service(t, opts = {}) {
