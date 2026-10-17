@@ -354,6 +354,7 @@ Rules:
 | `t-view` | 20 / 26 | 600 | View title on the stage ("Office", "Tasks") |
 | `t-panel` | 15 / 20 | 600 | Right column heading, person name in the panel header |
 | `t-ui` | 13 / 18 | 400 to 600 | Base UI: tabs, buttons, inputs, body |
+| `t-read` | 14 / 22 | 400 | Long text boxes in a wide panel only (what a person handles, their work style) |
 | `t-body` | 12 / 16.5 | 400 | Card body text, Michael's questions, descriptions |
 | `t-meta` | 11 / 15 | 400 to 600 | Captions, chips, meta lines, hints |
 | `t-micro` | 10 / 13 | 600 | Uppercase micro labels, status pills, badges |
@@ -393,7 +394,7 @@ One window, four regions. Nothing else is permanent.
 | Top bar (56): lockup, view tabs, clock, version, icons, Needs  |
 +---------------------------------------------+-----------------+
 | Stage (fills)                               | Right column    |
-|   Office / Tasks / Who talks to whom        | (380, resizable)|
+|   Office / Tasks / Who talks to whom        | (420, resizable)|
 |                                             |                 |
 | Bottom bar (50, floats 24 above the edge)   |                 |
 +---------------------------------------------+-----------------+
@@ -403,14 +404,14 @@ One window, four regions. Nothing else is permanent.
 |---|---|---|
 | Top bar | 56 px, ground `chrome` under `card` at 70% | §7.1 |
 | Stage | Fills | The current view (§7.2): Office (studio, §8), Tasks (§7.20), Pulse (§7.27), Who talks to whom (§7.22) |
-| Right column | 380 px default, 340 min, 520 max, drag to resize (SidebarSplitter, double click resets; its grip shows only on hover) | Closed by default: while nothing waits and nobody is open the column is not there and the office takes the window (`bleed` 0, no splitter). Otherwise the Needs you board, the selected person's panel or Michael's panel (§7.6). Work tab widens it to 480. It has no ground of its own (owner, 2026-09-30: a panel behind cards is a layer too many): the Needs you heading and cards, and the person and Michael panels (cards themselves), sit straight on the stage, which runs on underneath (`StudioStage` `bleed`); the scene still fits the space left of it |
+| Right column | 420 px default, 320 min, 1200 max and never closer than 360 px to the window's left edge, drag to resize (SidebarSplitter, double click resets to 420; its grip shows only on hover); a person's or Michael's panel can also open wide in the center (§7.6) | Closed by default: while nothing waits and nobody is open the column is not there and the office takes the window (`bleed` 0, no splitter). Otherwise the Needs you board, the selected person's panel or Michael's panel (§7.6). Work tab widens it to 480. It has no ground of its own (owner, 2026-09-30: a panel behind cards is a layer too many): the Needs you heading and cards, and the person and Michael panels (cards themselves), sit straight on the stage, which runs on underneath (`StudioStage` `bleed`); the scene still fits the space left of it |
 | Bottom bar | 50 px tall, floats 24 px left, 22 px right and 26 px above the stage's bottom edge | Talk to Michael composer, next job chip and Hire (§7.19) |
 
 Rules:
 
 - **No bottom strip of agent cards, no left floor, no permanent Command Center.** People
   live on the stage.
-- Minimum window 1280 × 800: the studio scales down to fit the stage beside a 340 px
+- Minimum window 1280 × 800: the studio scales down to fit the stage beside a 320 px
   right column. Below 1100 px of stage width the platform scales, never crops.
 - Focus mode (full screen terminal) keeps its v1 behavior with v2 styling. Hidden in this
   build (`SHOW_FOCUS_MODE`, owner, 2026-10-01): no button opens it and a saved preference
@@ -455,8 +456,8 @@ The v1 "no radius" rule is retired.
 
 ### 6.3 Borders
 
-Hairlines only: 1 px. The exceptions are the 2.5 px top rule on mailbox tags (§7.18), the
-3 px coral left rule on Ask me cards (§7.8), and the 1.5 px coral ring and 700 title and
+Hairlines only: 1 px. The exceptions are the 2.5 px top rule on mailbox tags (§7.18) and
+the 1.5 px coral ring and 700 title and
 button of the Danger zone card in Settings, General, which is loud on purpose because
 Reset deletes the office (owner, 2026-10-02). Edit agent's Danger zone (§7.26) is the one
 other card with that coral tint and ring, because Delete removes a team member for good
@@ -496,7 +497,8 @@ its real path; opening it again selects it; at most 5, a sixth closes the one op
 longest ago. They shrink to fit (down to about 72 px), and the fixed tabs, the clock and
 Needs you never move. Never saved: the app restarts on the last fixed view. Closing the
 selected tab selects the file tab to its left, or the view the owner came from. The right
-column stays beside a file tab, so an Ask me card is answered while its file is read.
+column stays beside a file tab, so an Ask me card is answered while its file is read. A
+file tab has no bottom bar (owner, 2026-10-16); it stays mounted, hidden, as on Pulse.
 
 The file view: a `card` header with the name (14 / 600), its place in office words
 ("Office / IT", or a team member's name and folder; `ink-3`, full path as tooltip), and
@@ -573,6 +575,24 @@ team to restore. It never opens the column or counts toward Needs you.
 Closing a person's or Michael's panel returns to the board while anything waits, and
 collapses the column when nothing does.
 
+**Wide panel** (design review 2026-10-16). A button beside close on a person's and
+Michael's panel, and in Edit agent's header (`expand`, then `minimize`; tooltip and label
+"Open wide" / "Back to the side"), moves the panel to the center of the window: 10% in
+from each side, 12 px under the top bar and above the bottom edge, at every window size.
+The choice is remembered on this computer and applies to every panel that can open wide;
+it is never set by the window's size. The Needs you board and Ask me cards never go wide.
+The column keeps its slot, so the office does not reflow, and dims under the top bar
+(`--cth-backdrop`), so the coral pill stays bright and live; the office and the bottom bar
+are out of reach (inert) and a click on the dimming does nothing. Inside, text is at most
+720 px across and centered; the Work tab's terminal fills the panel. Edit agent lays over
+the wide panel in two columns: the short fields (300 to 360 px) and the work style (up
+to 720 px), titled "Edit {name}" with a 28 px avatar and the role, long boxes in `t-read`.
+Leaving Edit with unsaved changes, by any way out (close, Cancel, Esc, the pill or strip,
+another person, a menu item), asks "Discard changes to {name}?" with Keep editing as the
+default. Esc: a field with text is left first, then the panel goes back to the side, then
+the column closes. The move takes 320 ms (`dur-slow`, transform only), the dimming fades
+in over 200 ms; reduced motion switches at once. In Arabic it mirrors.
+
 ### 7.6a Office stops (OfficeBreakNotice)
 
 When Claude cannot work, the office says why on one card at the top of Needs you
@@ -597,6 +617,40 @@ take a few minutes to show." with the buttons back), Done (the card and chip
 go). Out of credit and an expired account login also check on their own every
 15 minutes; a key that stopped working waits for Change key. Resuming only sends
 the next message: nothing restarts, except the Claude terminals after a new key.
+
+### 7.6b Not reporting (SilentEngineCards)
+
+A team member whose AI engine stopped reporting to the app (issue #326; design review
+2026-10-16; approved picture `silent-engine-v2.html`). Its reports are how the app follows
+its work and checks its folders and tools, so the owner hears, plainly, and can act in one
+click. A plain Ask me card (§7.8: no side rule, no "from" line) at the top of Needs you,
+under an Office stops card when one shows, counted in the Needs you button.
+
+- **Words.** Title "{name} isn't reporting to the app"; one line "{name} is still working.
+  The app can't check {name}'s folder and tool limits."; a time line in `t-meta` `ink-3`
+  ("Last checked in {n} min ago." or "Hasn't checked in since {name} started, {n} min
+  ago."). Why it matters is behind the info icon. Names only, never he or she, in every
+  language.
+- **One card per engine, version and kind** (never checked in, or went quiet mid work);
+  Research has a card of its own. Members silenced together ("Kelly, Dwight and Oscar
+  aren't reporting to the app") share one card and one count; a member who reports again
+  drops off the list.
+- **States.** Not reporting (Restart {name}); Restarting or Checking (a spinner, no
+  buttons); a restart didn't help, or the version is known never to report: the engine and
+  version named, with Change engine (opens Edit {name}, the engine open) and Keep working
+  unchecked; Paused, where nothing else guards the files (Windows, Gemini anywhere, and
+  Research): Restart and Keep working unchecked, or Change engine and Keep working unchecked
+  after a failed restart; Done closes it with "{name} is reporting again". Research's card
+  offers Restart only: it is never kept working unchecked (owner, 2026-10-17).
+- **Michael.** When Michael isn't reporting, the office's own card, built like The office
+  stopped (§7.6a) with an "The office" kicker, sits first: "Michael is still working, but
+  can't pass on mail or work right now." with Restart Michael. Never restarted on its own.
+- **Elsewhere.** An amber `Not reporting` tag (`amber-soft`, `amber-text`) replaces the
+  member's status pill on its pod and panel header; one amber line above the panel's tabs
+  ("The app can't see {name}'s work right now. The Work tab still shows it live."), or,
+  when the owner kept it working unchecked, "{name} works unchecked on {engine}, by your
+  choice." with Check again. One desktop notice in Michael's name when a card first
+  appears, only with notifications on.
 
 ### 7.7 Buttons
 
@@ -1138,8 +1192,13 @@ the whole window: no right column and no bottom bar (owner, 2026-10-15). Opening
 or a person goes back to the office, as from Tasks; the bottom bar stays mounted, hidden, so a
 half written message survives the switch.
 
-- Header: "Pulse" `t-view`, a period select (This week, Last week, Last 4 weeks; weeks start
-  Monday; remembered), "Collecting since" in `t-meta` `ink-3`. A first start reads the eight
+- Header: "Pulse" `t-view`, a period select (Today, This week, This month; weeks start
+  Monday; remembered), then **Compare** (owner, 2026-10-16): the app's switch (§7.12, green
+  when on) reading "Compare", spoken "Compare with yesterday / last week / last month", with an
+  (i): "Both bars count the same days so far." Remembered. While the span before starts before
+  the first live recorded day, it keeps the owner's position, greyed and not clickable, and its
+  (i) says "Too few to compare yet. This month can compare from 1 December." Then "Collecting
+  since" in `t-meta` `ink-3`. A first start reads the eight
   weeks before it from the office log, members' sessions and the cost ledger, so Pulse never
   starts at zero; recommendations still count from live recording.
 - **Recommendations** first (owner, 2026-10-15): up to three recommendation cards in `amber` soft with a 1 px `amber`
@@ -1160,17 +1219,41 @@ half written message survives the switch.
   stopped), web answers with instructions to AI agents removed (of all answers; flagged to
   Michael), messages held because the check could not run (`amber` soft while above zero,
   "Nothing went out unchecked"), and steps stopped by the owner's settings by gate. A held
-  message is never counted as protection.
+  message is never counted as protection. Above zero, the held tile carries "See what was held"
+  (12/600, `amber` text), which opens a list in the member detail's frame (owner, 2026-10-16):
+  per held message a `card-2` row in the owner's words (owner, 2026-10-16): a 13/600 headline
+  saying what was not sent ("Pete's notes were not added to the team's shared knowledge",
+  "Pam's question to Pete was not sent") with the time at the end, the subject in quotes and
+  the start of the message (two lines at most; none for Pete's notes or the app's own
+  reminder), one `amber` sentence on why with the check's own report behind an (i), and one
+  `ink-3` sentence on what happens next and whether the owner needs to do anything. When the
+  count is above the rows, one line says how many more have no details. A read that fails says
+  "Couldn't read the list." with Try again.
+  The questions tile carries "See each question" and the answers tile "See each answer" (12/600,
+  `indigo` text, when the count is above zero), each opening a list in the same frame (owner,
+  2026-10-16; mockup `checked-lists-v2.html`): under the title one count line for the period with
+  an (i) on what the marks mean; changed, stopped and flagged rows first, each a `card-2` row with a
+  13/600 sentence headline ("Pam's question to Pete had private parts taken out", "Pete's answer to
+  Pam had web instructions taken out and was flagged to Michael") and the time at the end; the
+  text with removed words struck through (`ink-3` on `neutral-soft`) and the other side's words on
+  `green-soft`, or, when over 40% of what went out is new or there are more than 4 changes, the two
+  texts under 10/600 caps captions; long texts show the changes with about 80 characters around
+  them and "Show the whole answer"; hidden characters show as "[12 hidden characters]"; "Taken
+  out" kinds as `green-soft` pills, "Needed" and "Flagged to Michael" as `amber-soft` pills; one
+  `ink-3` sentence on who was told and whether the owner needs to act. Rows sent as written fold
+  into one line ("17 sent as written") that opens one line items between hairlines. The
+  questions list points to the held list when the period has holds. Every text is plain,
+  `dir="auto"`; marks carry hidden "taken out:" and "sent instead:" for screen readers.
 - **One row of four tiles** under Kept safe (owner, 2026-10-15), each only as big as what it
   shows, 12/14 px padding: What the team learned (the period's new notes as one mono 24 px number, a bar and legend by
   source: `green` your answers, `ink-4` on the job, `indigo` Michael; under it the notes and
   written ways of working held in all), Questions to you per 100 requests in the period (one
-  number, then up, down or same against the same span just before; under 20 requests, too few
-  to tell), both following the period select (owner, 2026-10-15), Spent with plan use (a mono 24 px total with what it is beneath at the top;
+  number with its counts; under 20 requests, too few to tell), both following the period
+  select (owner, 2026-10-15), Spent with plan use (a mono 24 px total with what it is beneath at the top;
   plan use at the foot as a full width 8 px bar with its percent and reset day, on a Claude
   plan only, turning `amber` with a soft "Runs out around …" when the pace says so; who spent
   what is Team at work's job), and Your time with While you were away past a hairline (the
-  number at the top, what it means or how it compares with the period before at the foot).
+  number at the top, what it means at the foot).
   Each tile spreads its content top to bottom so none holds an empty foot. On a Claude plan with a known price
   (Settings > Agents, else the plan found in the owner's Claude account), every dollar on
   Pulse is a member's part of the plan's real cost for the days so far in the period, split by
@@ -1189,10 +1272,15 @@ half written message survives the switch.
   for its work" (twice the usual value per hour, with ten minutes of work and three peers at
   least). A row opens the member detail, an overlay like Task detail (§7.21): six facts in
   `card-2` boxes and a four week value bar.
-- **Trends on Last 4 weeks** (owner, 2026-10-15): every top tile adds its week by week
-  trend under its total: four small bars (value above, week below; stacked by source on What
-  the team learned; who did it bars give way to them) for counts and money, a small line for
-  rates (questions per 100, while you were away). A one week period shows none.
+- **Compare** (owner, 2026-10-16): with the switch on, every top tile shows two small bars
+  under its total, the span before and this one, named Yesterday and Today, Last week and This
+  week, Last month and This month. The span before runs up to the same day: all of yesterday;
+  last week's Monday to the same weekday; last month's 1st to the same date, capped at its last
+  day. The earlier bar is muted (`ink-4`, or the series color at 45%) with a 1 px `ink-3`
+  outline; this one is `ink-2` or the series color; the value sits above each in mono 10 px.
+  Bars take the place of who did it and of Kept safe's breakdown while Compare is on. A span
+  with too few requests for a rate draws no bar and reads "…". Team at work shows the period
+  only. With Compare off, no tile compares.
 - Layout by the window's width: 1100 px and wider, 4 a row and every Team at work column;
   760 to 1099, tiles 2 by 2; under 760, one
   column and Team at work with name, bar, hours and value. Coral is never used on Pulse. Every chart has an
@@ -1860,6 +1948,9 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-14 | Edit agent: a Danger zone under the engine with Delete, for anyone but Michael, his assistant and Pete; the one card besides Settings' Danger zone with the coral ring (§6.3, §7.26). |
 | 2026-10-15 | Ask me: options as rows to pick, with a Recommended tag, and several questions with a line each; picking never sends, Reply on its own row says what it sends, and any question may be left blank (§7.8). |
 | 2026-10-15 | Pulse, a view tab between Tasks and Who talks to whom that takes the whole window: recommendations, what got done, Kept safe, the row of four tiles, Team at work, and trends on Last 4 weeks (§5.2, §7.2, §7.6, §7.27). |
+| 2026-10-16 | Pulse: periods Today, This week, This month, and Compare, two bars per tile against the span before up to the same day, the switch kept in place while a period cannot compare yet; Last week and Last 4 weeks go (§7.27). |
+| 2026-10-17 | Not reporting (§7.6b): a card on Needs you when a team member's engine stops reporting to the app, one per engine version, with Restart, Change engine and Keep working unchecked; an amber Not reporting tag on its pod and panel; the office's own card for Michael. §6.3 drops the stale coral left rule on Ask me cards (§7.8 has none since 2026-09-30). |
+| 2026-10-16 | Wide panel: a person's or Michael's panel, and Edit agent over it, open wide in the center of the window with the office dimmed under the top bar; Edit wide in two columns with "Edit {name}"; unsaved changes ask before any way out; `t-read` 14 / 22 (§4.2, §5.2, §7.6). The right column drag reads as built: 420 default, 320 to 1200 (§5.2). |
 | 2026-10-15 | Studio: a department plate on each pod's pad ("HR" for people), so the pod says what it does (§7.14, §8.3); every monitor, Michael's too, is frameless glass, clear when idle and tinted in `acc` with scrolling lines at work (§3.4, §3.5, §8.3, §8.5); `home-light` and `home-dark` re-shot (§20). |
 
 ---

@@ -21,7 +21,7 @@
 import { WEB_SETTINGS_UNREADABLE, WEB_TOOLS, type SandboxNetwork } from '../shared/webAccess';
 import {
   addressedToResearch, ANSWER_UNCHECKED, ANSWER_UNCHECKED_SUBJECT, hasAttachments, looksLikeInjection, NOT_SENT_SUBJECT,
-  PRIVACY_CHECK_SENDER, REFUSAL_CHECK_FAILED, REFUSAL_FILES, REFUSAL_OFF, RESEARCH_HOUSE_RULE, RESEARCH_ID, RESEARCH_REPLY_LABEL,
+  PRIVACY_CHECK_SENDER, REFUSAL_CHECK_FAILED, REFUSAL_FILES, REFUSAL_OFF, REFUSAL_TOO_LONG, RESEARCH_HOUSE_RULE, RESEARCH_ID, RESEARCH_REPLY_LABEL,
   RESEARCH_UNCHECKED_TOOL, NOT_SENT_SUBJECT_OUT, RESEARCH_ONLY_ASKERS, RESEARCH_NAME, RESEARCH_ROLE, isReservedName,
   SENT_AS_SUBJECT, sentAsBody, nameKey, researchText, cleanResearchName, RESEARCH_ONLY_SKILLS
 } from '../shared/research';
@@ -44,7 +44,10 @@ import { join, dirname, basename, isAbsolute, relative, resolve, sep } from 'nod
 import { homedir } from 'node:os';
 import { spawnSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes, createHash, createHmac } from 'node:crypto';
-import type { InboundVerdict, OutboundVerdict, TrustLayer } from './trustLayer';
+import { readMessageFile, researchDeliveredId } from './messageFile';
+import { asText, type InboundVerdict, type OutboundVerdict, type TrustLayer } from './trustLayer';
+import { CHECKED_ARCHIVE_DIR, CHECKED_FILE, keepText, splitForArchive, type CheckedOutcome, type CheckedRow } from '../shared/checkedRecord';
+import { heldWaits, heldWhy, tidy, HELD_FILE, HELD_KEEP_MS, HELD_OPENING_MAX, HELD_SUBJECT_MAX, type HeldRow, type HeldTold, type HeldWhy } from '../shared/heldRecord';
 import type { AgentUsageSample } from './usage';
 import { COMMAND_GROUPS } from '../shared/claudeCommands';
 import {
@@ -354,7 +357,7 @@ export function michaelInstructions(name: string, b: PromptBusiness, p: PromptPa
     ...(briefing ? ['', '## The business', briefing] : []),
     '',
     '## Routing work',
-    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. You are the only one who assigns work: a team member never hands a job to another, and when one asks another to do something, the app delivers it to you marked as a handoff, so decide who does it. Team members may ask each other for facts directly. The roster is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
+    'The team roster (every team member\'s name, role and what they handle) arrives at the start of each session and again when the team changes. Route by those descriptions. You are the only one who assigns work: a team member never hands a job to another, and when one asks another to do something, the app delivers it to you marked as a handoff, so decide who does it. Team members may ask each other for facts directly, and so do you: each member\'s notes and inbox are its own, so to learn what one knows or how its work stands, send it a query and read its card and the work it publishes. Never open a member\'s hive folder (agents/<id>/ in the hive), its notes or its inbox; the work folders and files a member hands off stay yours to read and check. The roster is the only current list of the team, and when the owner names someone, send the work to them. Use one team member by default and several only for truly independent parts, because each hand-off costs the owner time and money. Each hand-off states the objective, what to send back and in what form, where to look (a file path, an earlier message, the task card), and what is out of scope. When a team member reports back, trust the result and relay it; redoing routine work doubles the cost. A team member marked busy gets new work after the current task; one on hold is talking with the owner, so keep their work until the hold ends.',
     '',
     '## Doing it yourself',
     'Answer small things yourself: a fact you know, a short reply, a quick lookup. Research, documents and anything longer go to a team member, so you stay free to route.',
@@ -421,7 +424,7 @@ export function teamMemberInstructions(name: string, role: string, michael: stri
     '',
     `When you finish or get stuck, message ${michael} with what you did, what you found and what you need. ${michael} passes your words to the owner, who reads them on a phone, so lead with the result, keep it to a few plain sentences, and use commas, colons and periods instead of dashes, which the owner prefers.`,
     '',
-    `Only ${michael} assigns work. If you need a fact from a teammate to do your job, ask them directly: write to their id (listed in registry.json in ${p.hiveRoot}) with "act": "query", and answer a teammate's query the same way with "act": "inform". If they cannot help, or you need someone else to do something, tell ${michael} and he hands it off. Never give a teammate work yourself.`,
+    `Only ${michael} assigns work. If you need a fact from a teammate to do your job, ask them directly: write to their id (listed in registry.json in ${p.hiveRoot}) with "act": "query", and answer a teammate's query the same way with "act": "inform". If they cannot help, or you need someone else to do something, tell ${michael}, who hands it off. Never give a teammate work yourself. A teammate\'s hive folder (agents/<id>/ in the hive), notes and inbox are theirs: never open them, ask instead. Files a teammate hands off or keeps in a shared work folder are fine to read.`,
     '',
     `Act on each message in your inbox (${p.inbox}), then move it to ${p.inboxDone}. To message ${michael}, write a JSON file to your outbox (${p.outbox}) with "to": "michael", "act" (done, inform or query), "subject" and "body". A message sent by the scheduler names a job from your Work style: do it, and if there is nothing to do, stop without messaging anyone. Its replies about your schedule requests (subject "Schedule request", "Schedule change approved" or "Schedule change declined") are notices, not jobs: read them and do nothing else. Never ask the owner in your terminal (nobody answers it): file the question in the triage folder.${p.docText ? ` To read a Word, Excel or PowerPoint file, run ${p.docText} "<file>".` : ''} ${p.protocol} has the full message format.`
   ].join('\n');
@@ -514,24 +517,6 @@ function shortRand(): string {
   return randomBytes(3).toString('hex');
 }
 
-/** The most a message file may hold for the app to read it. */
-const MAX_MESSAGE_FILE_BYTES = 4 * 1024 * 1024;
-
-/** A message file read without following a link or waiting on a pipe: an
- *  agent's own folder may hold either, and the app reads with the owner's
- *  rights (red team, third ship). Null for anything but a plain file. */
-function readMessageFile(path: string): string | null {
-  let fd = -1;
-  try {
-    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
-    const st = fstatSync(fd);
-    if (!st.isFile() || st.size > MAX_MESSAGE_FILE_BYTES) return null;
-    return readFileSync(fd, 'utf8');
-  } catch { return null; } finally {
-    if (fd >= 0) try { closeSync(fd); } catch { /* closed */ }
-  }
-}
-
 /** Write over an agent's own file in place, only when it is a plain file
  *  with one name: never through a link or a second name it made for a file
  *  of someone else's (red team, third ship). Throws otherwise. */
@@ -547,7 +532,9 @@ function rewriteOwnFile(path: string, text: string): void {
 
 /** Non-memory files `mempalace mine` must not ingest (Claude Code hooks config,
  *  cursor, raw inbox/outbox JSON). `mempalace mine` honors .gitignore, so we drop
- *  one in each agent dir; written on birth here and refreshed by the mine loop.
+ *  one in each agent dir; written on birth here and refreshed once per process
+ *  (untrackCodexHomes). The palace mines company knowledge only now (owner,
+ *  2026-10-16), so the file's lasting job is keeping .codex out of git.
  *
  *  `.codex/` is here for a second reason as well, and it is the load-bearing one:
  *  a Codex worker's CODEX_HOME lives INSIDE its agent dir (see installCodexHooks —
@@ -793,6 +780,11 @@ export class HiveManager {
    *  spawn or its last update. Lets an owner's toggle reach running agents
    *  without a restart (knowledgeUpdate). */
   private knowledgeTold = new Map<string, boolean>();
+  /** Per agent: the members whose hive folders its Read rules hid when it
+   *  started (AgentFolderPolicy.walledMembers). The hook refuses a search over
+   *  every member's folder while someone hired since is not among them. */
+  private walledAtStart = new Map<string, readonly string[]>();
+  walledMembersOf(id: string): readonly string[] | null { return this.walledAtStart.get(id) ?? null; }
 
   /**
    * What a running agent should be told because the owner turned company
@@ -1148,7 +1140,6 @@ export class HiveManager {
   async ensureAgent(
     meta: AgentMeta,
     opts: {
-      semanticMemory?: boolean;
       knowledgeGraph?: boolean;
       /** ABSOLUTE path to the Knowledge-Graph CLI (`knowledge.env().KG_CLI`), baked
        *  into the agent's prompt instead of a `$KG_CLI` shell reference — `$VAR` is
@@ -1324,7 +1315,7 @@ export class HiveManager {
     if (!isHiveAwareProvider(meta.provider)) {
       const preset = providerPreset(meta.provider ?? 'claude');
       const flag = preset.initialPromptFlag;
-      const prompt = this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business);
+      const prompt = this.injectedPrompt(meta, dir, root, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business);
       // agy, codex, and grok expose a Claude-style lifecycle-hook surface, so each
       // gets the SAME live status + Stop→inbox-drain Claude does — selected by the
       // preset's `hookBridge`. agy needs a translating shim (its hook stdin/stdout
@@ -1481,7 +1472,7 @@ export class HiveManager {
     const args: string[] = [];
     if (!claudeProvider) return { args, env };
 
-    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business));
+    args.push('--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.knowledgeGraph ?? false, opts.kgCliPath, opts.businessFolder, opts.docTextCliPath, opts.kgRoot, opts.meaningSearch, opts.business));
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
     // user's repo) so the agent reports activity and drains its inbox on Stop.
@@ -1509,6 +1500,8 @@ export class HiveManager {
       mkdirSync(dirname(settingsPath), { recursive: true });
       this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell, opts.network, meta.isResearch ? this.researchShellWrite(dir, meta.cwd) : undefined));
       args.push('--settings', settingsPath);
+      if (opts.folderPolicy?.walledMembers) this.walledAtStart.set(meta.id, opts.folderPolicy.walledMembers);
+      else this.walledAtStart.delete(meta.id);
       // A `claude` the agent starts from its shell has no hook and no deny
       // rules, so it would load every connector on the account (TODOS, P1).
       // Claude Code sources CLAUDE_ENV_FILE before each shell command, so the
@@ -2107,7 +2100,7 @@ export class HiveManager {
    *
    * 🔒 PROMPT-CACHE INVARIANT — keep this prefix VOLATILE-FREE. It interpolates
    * only values stable for an agent's whole lifetime (name, id, dir, root,
-   * semanticMemory). Do NOT add dates, UUIDs, counters, board/registry state, or
+   * the knowledge settings). Do NOT add dates, UUIDs, counters, board/registry state, or
    * any `Date.now()`-derived text here: a prefix that changes per spawn defeats
    * Anthropic's prompt cache (re-priming the whole system prompt every turn).
    * Volatile context belongs on the live channels — the inbox (hive messages) and
@@ -2128,7 +2121,6 @@ export class HiveManager {
     meta: AgentMeta,
     dir: string,
     root: string,
-    semanticMemory: boolean,
     knowledgeGraph: boolean,
     kgCliPath?: string,
     businessFolder?: string,
@@ -2151,12 +2143,12 @@ export class HiveManager {
       : '';
     const ctxLine = 'LIVE CONTEXT: each agent row in the LIVE ROSTER carries a `ctx NN%` tag — its live context-window occupancy. Treat it as the real headroom signal when routing: prefer an agent with a LOW `ctx` for a big task; treat a HIGH `ctx` (near 100%) as busy rather than idle, even if the cumulative token count looks modest.';
 
-    const memoryLine = semanticMemory
-      // The palace location is named, not spelled as `$MEMPALACE_PALACE_PATH`:
-      // `mempalace` reads that env var itself, and the POSIX `$` form was noise
-      // (or an empty expansion) for a Windows agent that tried to use it literally.
-      ? 'Semantic memory: the whole hive shares a searchable MemPalace at the path in your MEMPALACE_PALACE_PATH environment variable. To recall relevant past knowledge across the team, run `mempalace search "<query>"`; run `mempalace wake-up` at the start of a task for a memory digest. Your memory index is mined into the palace automatically.'
-      : '';
+    // Each member's memory is its own (owner, 2026-10-16): nobody, Michael
+    // included, opens another's notes; they ask. Company knowledge is the one
+    // store everyone searches (knowledgeLine).
+    const memoryLine = meta.isGod
+      ? 'PRIVATE MEMORY: each team member\'s notes, memory and inbox are its own. Never open a team member\'s hive folder (agents/<id>/), its notes or inbox, or the hive\'s change history (.git). To learn what one knows or how its work stands, send it a "query", and read its card on the board and the work it publishes; its work folder and the files it hands off stay yours to read.'
+      : 'PRIVATE MEMORY: your notes and memory are yours alone, and each teammate\'s are theirs. Never open another team member\'s hive folder (agents/<id>/), its notes or inbox, or the hive\'s change history (.git). To learn what a teammate knows, ask them with a "query" message; files a teammate hands off are fine to read. The one store everyone searches is company knowledge.';
     // Company knowledge (on by default). Volatile-free: the bundled-node launcher
     // and the KG CLI are both fixed absolute paths for an install, so baking them
     // keeps the prefix prompt-cache-stable while making the command runnable in
@@ -2332,8 +2324,20 @@ export class HiveManager {
   /** Checks under way or finished, by the outbox file's content. A message
    *  waits in its outbox until its check finishes; an app restart checks it
    *  again; an entry nobody claims is forgotten after TRUST_CHECK_KEEP_MS. */
-  private trustChecks = new Map<string, { done: boolean; at: number; verdict?: InboundVerdict | OutboundVerdict }>();
+  private trustChecks = new Map<string, { done: boolean; at: number; verdict?: InboundVerdict | OutboundVerdict; firstAt: number; tries: number; retryAt?: number }>();
   static readonly TRUST_CHECK_KEEP_MS = 10 * 60_000;
+  /** A check that could not run (no answer, an unreadable one, a failure) is
+   *  tried again for this long before the message is held: the check's hidden
+   *  session can take minutes while the whole team starts (owner, 2026-10-16:
+   *  "why messages are not queued and waited", D1 30 minutes). Nothing goes
+   *  out unchecked meanwhile. */
+  static TRUST_WAIT_MS = 30 * 60_000;
+  /** The gap before try `tries + 1`: 30 s, 1, 2 and 4 minutes, then every 5. */
+  static trustRetryDelayMs(tries: number): number { return Math.min(5 * 60_000, 30_000 * 2 ** Math.max(0, tries)); }
+  /** A deny that only says the check could not run this time. */
+  private checkMayRunLater(v: InboundVerdict | OutboundVerdict): boolean {
+    return v.decision === 'deny' && heldWaits(heldWhy(v, REFUSAL_CHECK_FAILED, REFUSAL_TOO_LONG));
+  }
   /** Ids of clean copies the trust layer produced; only these reach Research. */
   private researchCleared = new Set<string>();
   /** The sender's message behind each clean copy, by the copy's id and its
@@ -2555,22 +2559,122 @@ export class HiveManager {
       // The subject is the sender's words: every kind of quote mark and line
       // break is dropped so it can't close the quote and add text in the app's
       // voice. The reason's own "Not sent..." opening is not repeated.
-      body: `${what} for ${n} ("${String(subject ?? '').replace(/[\p{Pi}\p{Pf}"\u201e\u201f\u2033\uff02\s]+/gu, ' ').trim().slice(0, 80)}") was not sent: ${researchText(reason, n).replace(/^Not sent( to [^:]+)?: /, '')} ${next}`
+      body: `${what} for ${n} ("${tidy(subject, HELD_SUBJECT_MAX)}") was not sent: ${researchText(reason, n).replace(/^Not sent( to [^:]+)?: /, '')} ${next}`
     }, PRIVACY_CHECK_SENDER), godId);
   }
 
+  /** Michael hears of a Research answer the check could not clear, as he does
+   *  of a held question, so a card waiting on it never stalls unseen (owner,
+   *  2026-10-16, D5). */
+  private tellMichaelAnswerHeld(to: string | null, subject: unknown): void {
+    const reg = this.registry();
+    const godId = reg.godId ?? 'god';
+    const n = this.researchName();
+    // `to` null: the answer was for Michael himself.
+    const toName = to ? reg.agents[to]?.name?.trim() || to : null;
+    this.deliver(this.normalize({
+      to: godId, act: 'inform', subject: `${n}'s answer was not delivered`,
+      body: toName
+        ? `${n}'s answer to ${toName} ("${tidy(subject, HELD_SUBJECT_MAX)}") was not delivered: the privacy check could not run, so nothing went out unchecked. ${toName} was told to ask again if the work still needs it. This is an app problem. If it keeps happening, tell the owner.`
+        : `${n}'s answer to you ("${tidy(subject, HELD_SUBJECT_MAX)}") was not delivered: the privacy check could not run, so nothing went out unchecked. Ask ${n} again if the work still needs it. This is an app problem. If it keeps happening, tell the owner.`
+    }, PRIVACY_CHECK_SENDER), godId);
+  }
+
+  /** One row per hold in the owner's private folder, never the committed log
+   *  (it carries the subject and the opening of the message), and one
+   *  trust-held line with no text, which Pulse counts (owner, 2026-10-16). */
+  recordHeld(way: 'in' | 'out', from: string, to: string, subject: unknown, body: unknown, why: HeldWhy, error: string | undefined, told: HeldTold): void {
+    this.appendLog({ kind: 'trust-held', way });
+    const home = this.getHome();
+    if (!home) return;
+    const reg = this.registry();
+    const nameOf = (id: string): string | null => (id === 'human' || id === 'system' ? null : id === RESEARCH_ID ? this.researchName() : reg.agents[id]?.name?.trim() || null);
+    const row: HeldRow = {
+      at: Date.now(), way, from, fromName: nameOf(from), to, toName: nameOf(to),
+      subject: tidy(asText(subject), HELD_SUBJECT_MAX), opening: tidy(asText(body), HELD_OPENING_MAX),
+      why, ...(error ? { error: tidy(error, 200) } : {}), told
+    };
+    const file = join(privateRoot(home), HELD_FILE);
+    try {
+      mkdirSync(privateRoot(home), { recursive: true });
+      appendFileSync(file, `${JSON.stringify(row)}\n`, 'utf8');
+      // Once a day, rows past the keep window go (Pulse keeps raw events as long).
+      if (row.at - this.heldPrunedAt > 86_400_000) {
+        this.heldPrunedAt = row.at;
+        const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
+        const keep = lines.filter((l) => { try { return (JSON.parse(l) as HeldRow).at >= row.at - HELD_KEEP_MS; } catch { return false; } });
+        // Written again only when a row went.
+        if (keep.length !== lines.length) writeFileSync(file, keep.length ? `${keep.join('\n')}\n` : '', 'utf8');
+      }
+    } catch { /* best effort: the count still shows, and the list says what it cannot show */ }
+  }
+  private heldPrunedAt = 0;
+
+  /** One row per message the check let through or stopped, both ways, in the
+   *  owner's private folder (both texts, whole up to 4,000 characters; eng D1),
+   *  and one trust-checked line with no text, which Pulse counts (eng D5).
+   *  Once a day rows past 62 days move to the archive, which the app never
+   *  deletes (eng D2; only a reset does, D3). A hold is recordHeld's. */
+  recordChecked(way: 'in' | 'out', from: string, to: string, outcome: CheckedOutcome, wrote: { subject?: unknown; body?: unknown },
+    sent?: { subject?: unknown; body?: unknown }, extra: { kinds?: readonly string[]; flagged?: boolean } = {}): void {
+    this.appendLog({ kind: 'trust-checked', way, decision: outcome, ...(way === 'out' ? { flagged: extra.flagged === true } : {}) });
+    const home = this.getHome();
+    if (!home) return;
+    const reg = this.registry();
+    const nameOf = (id: string): string | null => (id === 'human' || id === 'system' ? null : id === RESEARCH_ID ? this.researchName() : reg.agents[id]?.name?.trim() || null);
+    const keep = (t: { subject?: unknown; body?: unknown }) => { const s = keepText(asText(t.subject)); const b = keepText(asText(t.body)); return { text: { subject: s.text, body: b.text }, cut: s.cut || b.cut }; };
+    const w = keep(wrote);
+    const g = sent ? keep(sent) : null;
+    const changed = !!g && (g.text.subject !== w.text.subject || g.text.body !== w.text.body);
+    const row: CheckedRow = {
+      at: Date.now(), way, from, fromName: nameOf(from), to, toName: nameOf(to), outcome, wrote: w.text,
+      ...(changed && g ? { sent: g.text } : {}),
+      ...(extra.kinds?.length ? { kinds: [...extra.kinds] } : {}),
+      ...(extra.flagged ? { flagged: true } : {}),
+      ...(w.cut || (changed && g?.cut) ? { cut: true } : {})
+    };
+    const file = join(privateRoot(home), CHECKED_FILE);
+    try {
+      mkdirSync(privateRoot(home), { recursive: true });
+      appendFileSync(file, `${JSON.stringify(row)}\n`, 'utf8');
+      if (row.at - this.checkedArchivedAt > 86_400_000) {
+        this.checkedArchivedAt = row.at;
+        const { keep: live, archive } = splitForArchive(readFileSync(file, 'utf8').split('\n'), row.at);
+        if (archive.size) {
+          // The archive first: a stop in between leaves a row in both, never in neither.
+          const dir = join(privateRoot(home), CHECKED_ARCHIVE_DIR);
+          mkdirSync(dir, { recursive: true });
+          for (const [month, lines] of archive) appendFileSync(join(dir, `${month}.jsonl`), `${lines.join('\n')}\n`, 'utf8');
+          writeFileSync(file, live.length ? `${live.join('\n')}\n` : '', 'utf8');
+        }
+      }
+    } catch { /* best effort: the count still shows, and the list says how many have no details */ }
+  }
+  private checkedArchivedAt = 0;
+
   /** Start a check, or read the one under way. `key` is the content hash. */
   private trustCheck(key: string, start: () => Promise<InboundVerdict | OutboundVerdict>): InboundVerdict | OutboundVerdict | 'hold' {
+    const now = Date.now();
     const c = this.trustChecks.get(key);
-    if (!c) {
-      this.trustChecks.set(key, { done: false, at: Date.now() });
+    const launch = (firstAt: number, tries: number): 'hold' => {
+      this.trustChecks.set(key, { done: false, at: now, firstAt, tries });
       start().then(
-        (verdict) => { this.trustChecks.set(key, { done: true, at: Date.now(), verdict }); },
-        () => { this.trustChecks.set(key, { done: true, at: Date.now(), verdict: { decision: 'deny', reason: REFUSAL_CHECK_FAILED } }); }
+        (verdict) => { this.trustChecks.set(key, { done: true, at: Date.now(), verdict, firstAt, tries }); },
+        () => { this.trustChecks.set(key, { done: true, at: Date.now(), verdict: { decision: 'deny', reason: REFUSAL_CHECK_FAILED }, firstAt, tries }); }
       );
       return 'hold';
+    };
+    if (!c) return launch(now, 0);
+    // Waiting for its next try, or running.
+    if (!c.done) return c.retryAt !== undefined && now >= c.retryAt ? launch(c.firstAt, c.tries + 1) : 'hold';
+    if (!c.verdict) return 'hold';
+    // The check could not run: the message keeps waiting in its outbox and is
+    // tried again, until TRUST_WAIT_MS from its first try.
+    if (this.checkMayRunLater(c.verdict) && now - c.firstAt < HiveManager.TRUST_WAIT_MS) {
+      this.trustChecks.set(key, { done: false, at: now, firstAt: c.firstAt, tries: c.tries, retryAt: now + HiveManager.trustRetryDelayMs(c.tries) });
+      this.appendLog({ kind: 'trust-wait', way: key.startsWith('out:') ? 'out' : 'in', tries: c.tries + 1 });
+      return 'hold';
     }
-    if (!c.done || !c.verdict) return 'hold';
     this.trustChecks.delete(key);
     return c.verdict;
   }
@@ -2588,27 +2692,43 @@ export class HiveManager {
   private pruneTrustChecks(now = Date.now()): void {
     // Only finished checks: one still running or waiting its turn is kept, so
     // a long queue never starts a second paid check for the same message.
-    for (const [k, c] of this.trustChecks) if (c.done && now - c.at > HiveManager.TRUST_CHECK_KEEP_MS) this.trustChecks.delete(k);
+    for (const [k, c] of this.trustChecks) {
+      // A finished check nobody claimed, or one waiting to be tried again whose
+      // message is gone (it would have been held by now).
+      if ((c.done && now - c.at > HiveManager.TRUST_CHECK_KEEP_MS) || (c.retryAt !== undefined && now - c.firstAt > HiveManager.TRUST_WAIT_MS + HiveManager.TRUST_CHECK_KEEP_MS)) this.trustChecks.delete(k);
+    }
   }
 
   /** A teammate's or Michael's message to Research, from its outbox. Held
    *  until the trust layer answers; then the clean copy goes to Research and the
    *  sender hears what was asked, or the sender alone hears why not. */
   private researchInboundGate(senderId: string, msg: HiveMessage, partial: Partial<HiveMessage>, raw: string, on: boolean): 'hold' | 'denied' | 'sent' {
-    const deny = (reason: string): 'denied' => {
+    const deny = (reason: string, held?: { why: HeldWhy; error?: string }): 'denied' => {
       this.appendLog({ kind: 'trust-denied', from: senderId, id: msg.id });
       this.tellSender(senderId, msg.id, msg.conversation, NOT_SENT_SUBJECT, reason);
       this.tellMichaelNotSent(senderId, partial.subject, reason);
+      if (held) this.recordHeld('in', senderId, RESEARCH_ID, partial.subject, partial.body, held.why, held.error, senderId === (this.registry().godId ?? 'god') ? 'sender' : 'sender+michael');
       return 'denied';
     };
     if (!on) return deny(REFUSAL_OFF);
+    // Research not reporting (SD16): the question waits with Michael as it is,
+    // before any check is paid for, and nobody is told it reached Research.
+    if (this.memberMail?.(RESEARCH_ID) === 'hold') {
+      this.holdForMichael({ ...msg, from: senderId }, [RESEARCH_ID], this.registry().godId ?? 'god');
+      return 'sent';
+    }
     if (hasAttachments(partial)) return deny(REFUSAL_FILES);
-    if (!this.trustLayer) return deny(REFUSAL_CHECK_FAILED);
+    if (!this.trustLayer) return deny(REFUSAL_CHECK_FAILED, { why: 'no-layer' });
     const layer = this.trustLayer;
     const v = this.trustCheck(`in:${this.trustKey(layer, raw)}`, () => layer.inbound({ subject: partial.subject, body: partial.body }));
     if (v === 'hold') return 'hold';
-    if (v.decision === 'deny') return deny(v.reason);
+    if (v.decision === 'deny') {
+      const why = heldWhy(v, REFUSAL_CHECK_FAILED, REFUSAL_TOO_LONG);
+      if (!why) this.recordChecked('in', senderId, RESEARCH_ID, 'stop', partial, undefined, { kinds: 'kinds' in v ? v.kinds : undefined });
+      return deny(v.reason, why ? { why, error: v.error } : undefined);
+    }
     this.deliverToResearch(senderId, msg, v.subject, v.body);
+    this.recordChecked('in', senderId, RESEARCH_ID, v.decision, partial, v, { kinds: 'removed' in v ? v.removed : undefined });
     if (v.decision === 'clean') this.tellSender(senderId, msg.id, msg.conversation, SENT_AS_SUBJECT, sentAsBody(v.subject, v.body, this.researchName()), true);
     return 'sent';
   }
@@ -2627,9 +2747,13 @@ export class HiveManager {
       else if (msg.from !== 'human' && msg.from !== 'system') return;
       this.tellMichaelNotSent(msg.from, msg.subject, reason);
     };
+    // Who heard of a hold: the sender (a teammate) and Michael, or Michael alone.
+    const told: HeldTold = fromAgent ? (msg.from === (this.registry().godId ?? 'god') ? 'sender' : 'sender+michael') : 'michael';
+    const held = (why: HeldWhy, error?: string): void => this.recordHeld('in', msg.from, RESEARCH_ID, msg.subject, msg.body, why, error, told);
     if (!this.researchOn() || !this.trustLayer) {
       this.appendLog({ kind: 'trust-denied', from: msg.from, id: msg.id, reason: this.trustLayer ? 'research-off' : 'no-layer' });
       tell(this.trustLayer ? REFUSAL_OFF : REFUSAL_CHECK_FAILED);
+      if (!this.trustLayer && this.researchOn()) held('no-layer');
       return;
     }
     this.researchQueued++;
@@ -2642,25 +2766,53 @@ export class HiveManager {
     };
     const layer = this.trustLayer;
     const policy = this.policyOf(layer);
-    layer.inbound({ subject: msg.subject, body: msg.body }).then((v) => {
+    const firstAt = Date.now();
+    const attempt = (tries: number): void => { layer.inbound({ subject: msg.subject, body: msg.body }).then((v) => {
+      // The check could not run: tried again with growing gaps, still waiting
+      // and still in the pending list, until TRUST_WAIT_MS (owner, 2026-10-16).
+      if (this.checkMayRunLater(v) && Date.now() - firstAt < HiveManager.TRUST_WAIT_MS && this.researchOn() && this.policyOf(layer) === policy) {
+        this.appendLog({ kind: 'trust-wait', way: 'in', tries: tries + 1 });
+        setTimeout(() => attempt(tries + 1), HiveManager.trustRetryDelayMs(tries));
+        return;
+      }
       this.researchQueued--;
       if (!fromAgent) this.researchPending(msg, false);
       try {
         // The owner changed what stays private while it was checked: checked
         // again under the new settings (Codex review, third ship).
         if (this.policyOf(layer) !== policy) { this.queueForResearch(msg); return; }
-        if (v.decision === 'deny') return refuse(v.reason);
+        // Turned off while it waited for a check that could not run.
+        if (!this.researchOn() && this.checkMayRunLater(v)) return refuse(REFUSAL_OFF, 'research-off');
+        if (v.decision === 'deny') {
+          const why = heldWhy(v, REFUSAL_CHECK_FAILED, REFUSAL_TOO_LONG);
+          if (why) held(why, v.error);
+          else this.recordChecked('in', msg.from, RESEARCH_ID, 'stop', msg, undefined, { kinds: v.kinds });
+          return refuse(v.reason);
+        }
         // Research may have been turned off while the check ran.
         if (!this.researchOn()) return refuse(REFUSAL_OFF, 'research-off');
         this.deliverToResearch(msg.from, msg, v.subject, v.body);
+        this.recordChecked('in', msg.from, RESEARCH_ID, v.decision, msg, v, { kinds: v.decision === 'clean' ? v.removed : undefined });
         if (v.decision === 'clean' && fromAgent) this.tellSender(msg.from, msg.id, msg.conversation, SENT_AS_SUBJECT, sentAsBody(v.subject, v.body, this.researchName()), true);
         this.commit('hive: trust layer delivered to research');
       } catch (e) { console.error('[research] delivering a checked message', e); }
     }, () => {
+      if (Date.now() - firstAt < HiveManager.TRUST_WAIT_MS && this.researchOn() && this.policyOf(layer) === policy) {
+        this.appendLog({ kind: 'trust-wait', way: 'in', tries: tries + 1 });
+        setTimeout(() => attempt(tries + 1), HiveManager.trustRetryDelayMs(tries));
+        return;
+      }
       this.researchQueued--;
       if (!fromAgent) this.researchPending(msg, false);
-      try { refuse(REFUSAL_CHECK_FAILED, 'failed'); } catch { /* logged above */ }
-    });
+      try {
+        // The owner changed what stays private meanwhile: checked again under
+        // the new settings, as a check that answered is (ship review 2026-10-17).
+        if (this.researchOn() && this.policyOf(layer) !== policy) { this.queueForResearch(msg); return; }
+        if (!this.researchOn()) refuse(REFUSAL_OFF, 'research-off');
+        else { refuse(REFUSAL_CHECK_FAILED, 'failed'); held('failed'); }
+      } catch { /* logged above */ }
+    }); };
+    attempt(0);
   }
 
   /** The owner's and the app's messages for Research whose check is under
@@ -2770,9 +2922,17 @@ export class HiveManager {
     const lowerTo = typeof msg.to === 'string' ? msg.to.trim().toLowerCase() : '';
     const logTo = recipient ?? (['god', 'michael', 'human'].includes(lowerTo) ? lowerTo : 'invalid');
     const logId = createHash('sha256').update(String(msg.id)).digest('hex').slice(0, 16);
-    const deny = (): 'denied' => {
+    // Every outbound deny is a hold: the check could not run. The waiting
+    // member and Michael are told (owner, 2026-10-16, D5), and Pulse lists it.
+    const deny = (v?: { reason: string; by?: string; error?: string }): 'denied' => {
       this.appendLog({ kind: 'trust-denied', from: RESEARCH_ID, to: logTo, id: logId });
-      if (recipient && recipient !== RESEARCH_ID) this.tellSender(recipient, null, msg.conversation, ANSWER_UNCHECKED_SUBJECT, ANSWER_UNCHECKED);
+      const tellsRecipient = !!recipient && recipient !== RESEARCH_ID;
+      if (tellsRecipient) this.tellSender(recipient!, null, msg.conversation, ANSWER_UNCHECKED_SUBJECT, ANSWER_UNCHECKED);
+      const michaelIsRecipient = toMichael || recipient === godId;
+      // Michael as the registered recipient already heard it from tellSender.
+      if (!(tellsRecipient && recipient === godId)) this.tellMichaelAnswerHeld(michaelIsRecipient ? null : recipient, partial.subject);
+      const why = v ? heldWhy(v, REFUSAL_CHECK_FAILED, REFUSAL_TOO_LONG) ?? 'failed' : 'no-layer';
+      this.recordHeld('out', RESEARCH_ID, michaelIsRecipient ? godId : recipient ?? logTo, partial.subject, partial.body, why, v?.error, michaelIsRecipient ? 'recipient' : tellsRecipient ? 'recipient+michael' : 'michael');
       return 'denied';
     };
     // Research writes only to someone whose question it is answering, or to
@@ -2801,7 +2961,7 @@ export class HiveManager {
     const layer = this.trustLayer;
     const v = this.trustCheck(`out:${this.trustKey(layer, raw)}`, () => layer.outbound({ subject: partial.subject, body: partial.body }));
     if (v === 'hold') return 'hold';
-    if (v.decision === 'deny') return deny();
+    if (v.decision === 'deny') return deny(v);
     // Back into the sender's own thread, only when it goes back to that
     // sender; Research knows only the clean copies' ids, so any other reply
     // id it writes is dropped (ship review pass 3).
@@ -2813,7 +2973,7 @@ export class HiveManager {
     const out = this.normalize({
       // The app's id, the same for the same file, so an answer delivered
       // again after a crash replaces itself instead of arriving twice.
-      id: `research-${createHash('sha256').update(fileKey).digest('hex').slice(0, 24)}`,
+      id: researchDeliveredId(fileKey),
       to: msg.to,
       act: 'inform',
       subject: v.subject,
@@ -2823,6 +2983,8 @@ export class HiveManager {
     }, RESEARCH_ID);
     const flagged = ('flagged' in v && v.flagged) || looksLikeInjection(`${v.subject}\n${v.body}`);
     this.routeMessage(out);
+    // What the team read, without the label the app puts above it (eng O4, DD1).
+    this.recordChecked('out', RESEARCH_ID, out.to, v.decision, partial, v, { flagged });
     if (flagged) {
       const toName = reg.agents[out.to]?.name ?? out.to;
       this.appendLog({ kind: 'research-reply-flagged', to: logTo, id: out.id });
@@ -2998,6 +3160,11 @@ export class HiveManager {
     }
     // Anything else for Research (an app note, an owner answer, a send()) goes
     // through the trust layer first, in the background (ship review D2.1).
+    // Research not reporting: its questions wait with Michael like anyone's (SD16).
+    if (addressedToResearch(msg.to, reg.agents, this.researchName()) && msg.from !== RESEARCH_ID && this.memberMail?.(RESEARCH_ID) === 'hold') {
+      this.holdForMichael(msg, [RESEARCH_ID], godId);
+      return;
+    }
     if (addressedToResearch(msg.to, reg.agents, this.researchName()) && msg.from !== RESEARCH_ID && !this.researchCleared.has(msg.id)) {
       this.appendLog({ kind: 'message-held-for-trust-layer', from: msg.from, id: msg.id });
       this.queueForResearch({ ...msg, to: RESEARCH_ID });
@@ -3015,6 +3182,8 @@ export class HiveManager {
     // Targets that actually took delivery. The log below reports these instead of
     // intent, so a bounced or dropped message can never read as delivered.
     const delivered: string[] = [];
+    // Members not reporting whose copy goes to Michael, as one held copy.
+    const held: string[] = [];
     for (const t of targets) {
       // The send-only prep assistant must never be a delivery target: it doesn't
       // drain an inbox, so direct mail to it would rot unread (observed live: a
@@ -3027,6 +3196,14 @@ export class HiveManager {
           to: godId,
           subject: `[bounced — "${t}" is the send-only prep assistant; route work to a real agent] ${msg.subject}`
         }, godId);
+        continue;
+      }
+      // Not reporting (issue #326): held for Michael, or by terminal when kept.
+      const silent = t !== godId ? this.memberMail?.(t) ?? null : null;
+      if (silent === 'hold') { held.push(t); continue; }
+      if (silent === 'handoff') {
+        if (!this.emitTerminalHandoff(msg, t)) held.push(t);
+        else delivered.push(t);
         continue;
       }
       // A provider without safe-idle lifecycle state (a hookless custom command)
@@ -3075,6 +3252,7 @@ export class HiveManager {
         }, godId);
       }
     }
+    if (held.length) this.holdForMichael(msg, held, godId);
     this.appendLog({ kind: 'message', from: msg.from, to: msg.to, act: msg.act, subject: msg.subject, id: msg.id, delivered });
     this.lastRouted = { id: msg.id, delivered };
     this.emitMessage(msg, targets);
@@ -4232,6 +4410,25 @@ export class HiveManager {
   /** Main is told of each reply Michael sends to an owner question, for the
    *  one notification per final reply (12A). */
   private ownerReplyListener: ((msg: HiveMessage) => void) | null = null;
+  /** A member that isn't reporting to the app (issue #326, SD12): its new mail
+   *  is held for Michael ('hold'), or reaches it by its terminal when the owner
+   *  kept it working unchecked ('handoff'); null flows as usual. Set by index.ts. */
+  memberMail: ((agentId: string) => 'hold' | 'handoff' | null) | null = null;
+  /** Mail for a member that isn't reporting goes to Michael instead (SD12). */
+  /** One copy for Michael per message, naming every member it was held for,
+   *  under its own id so it never replaces his own copy of a broadcast or
+   *  another held one (ship review 2026-10-17). The note when a member reports
+   *  again tells him to send what still needs doing. */
+  private holdForMichael(msg: HiveMessage, ids: readonly string[], godId: string): void {
+    const reg = this.registry();
+    const names = ids.map((t) => (t === RESEARCH_ID ? this.researchName() : reg.agents[t]?.name ?? t));
+    for (const t of ids) this.appendLog({ kind: 'message-held-not-reporting', to: t, id: msg.id });
+    const who = names.map((n) => `"${n}"`).join(', ');
+    const what = names.length === 1
+      ? `${who} isn't reporting to the app; route this to someone else, or send it to ${names[0]} again once ${names[0]} reports`
+      : `${who} aren't reporting to the app; route this to someone else, or send it to them again once they report`;
+    this.deliver({ ...msg, id: `${msg.id}-held`, to: godId, subject: `[held: ${what}] ${msg.subject}` }, godId);
+  }
   onOwnerReply(cb: ((msg: HiveMessage) => void) | null): void { this.ownerReplyListener = cb; }
 
   /** Michael's terminal words for a question his turn sent nothing about
@@ -5339,8 +5536,8 @@ export class HiveManager {
    * record (those carry user.email / account / org / hashed-user-id). The sample
    * is PII-free by construction upstream (the provider's normalize step), so we
    * add no redaction here; we just must not widen what we write. The file lives
-   * at the hive ROOT, so `mempalace mine` (which only scans per-agent dirs) never
-   * ingests it — no palace noise, no MINE_IGNORE entry needed.
+   * at the hive ROOT, which the palace never mines (it holds company knowledge
+   * only), so no MINE_IGNORE entry is needed.
    *
    * Like appendLog: append to disk now (durable immediately), let it ride the
    * next natural commit. Best-effort — never throws into the beat.
@@ -5454,8 +5651,7 @@ export class HiveManager {
    * predates that ignore line goes on committing every SQLite and transcript
    * revision exactly as before — the .gitignore reads as a fix while the repo
    * keeps growing. This closes that: once per process, refresh every agent's
-   * ignore file (agents that are not running never pass through spawn, and the
-   * mine loop only reaches them if mempalace is installed) and drop any tracked
+   * ignore file (agents that are not running never pass through spawn) and drop any tracked
    * `.codex` path from the index. The files stay on disk, so `codex --resume`
    * is unaffected; only their history stops.
    */
@@ -5704,20 +5900,16 @@ You (god) are responsible for situational awareness. To see the live state of ev
 breaker level, last tool, last-active time, and inbox backlog. Pair it with \`registry.json\` (the roster)
 and \`log.jsonl\` (the event feed). IMPORTANT: \`claude agents\` will NOT show your hive's sibling
 sessions (they're spawned independently) — \`fleet.json\` is your source of truth for them. For a deeper
-look at one agent, read its \`agents/<id>/memory.md\` and \`inbox/\`, or send it a \`query\`. A full
+look at one agent, send it a \`query\` and read its card on the board: its \`agents/<id>/\` folder, notes and inbox are its own, never yours to open (owner, 2026-10-16). A full
 Claude Code command reference (slash = your own session only; CLI = your shell, can target the fleet)
 is in \`COMMANDS.md\` in the hive root.
 
-${ALLOW_TEMP_WORKERS ? SPAWN_WORKER_MD : ''}## Semantic memory (optional — when \`mempalace\` is installed)
-When \`MEMPALACE_PALACE_PATH\` is set in your environment, the hive shares a
-searchable MemPalace and you have the \`mempalace\` CLI:
-- \`mempalace search "<query>"\` — recall relevant past knowledge across the whole
-  team by meaning (not just keywords). Add \`--wing <agent-id>\` to scope to one
-  agent, \`--results N\` to widen.
-- \`mempalace wake-up\` — a short digest of what matters, good at the start of a task.
-
-Your memory index is mined into the palace automatically, so what the app keeps
-there becomes searchable by every agent. You don't run \`mine\` yourself.
+${ALLOW_TEMP_WORKERS ? SPAWN_WORKER_MD : ''}## Private memory
+Your notes and memory are yours alone, and each other agent's are theirs: never
+open another agent's \`agents/<id>/\` folder, its notes or inbox, or the hive's git
+history. To learn what another agent knows, send it a \`query\`. The one store every
+agent searches is company knowledge (by meaning: \`mempalace search "<query>" --wing company\`
+when \`mempalace\` is installed).
 `;
 
 /** PROTOCOL.md for a business office: the message format and the files, in

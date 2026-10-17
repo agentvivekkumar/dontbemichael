@@ -84,7 +84,7 @@ export const ASK_TOOL_REFUSAL =
   "Don't ask the owner here: nobody answers your terminal. File it as one new file in the hive's triage folder (your questions as one \"ask\", what you were doing in \"description\"). Michael checks it and puts it on the owner's ASK ME board.";
 
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
-import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, agentTmpDecision, agentTmpName, folderDecision, folderToolTarget, AGENT_TMP_DIR, isSharedTempSave, researchFolderDecision, sharedTempWriteDecision, tempFolders, researchWallDecision } from '../shared/folderAccess';
+import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, agentTmpDecision, agentTmpName, folderDecision, folderToolTarget, AGENT_TMP_DIR, isSharedTempSave, researchFolderDecision, sharedTempWriteDecision, tempFolders, researchWallDecision, memberWallDecision } from '../shared/folderAccess';
 import { REFUSAL_WEB_TOOL, REFUSAL_WEB_TOOL_OFF, RESEARCH_DESK_DIR, RESEARCH_ID, RESEARCH_NAME, RESEARCH_SANDBOX_ONLY, RESEARCH_UNCHECKED_TOOL, researchText } from '../shared/research';
 import { folderLayoutFor } from './officeFile';
 import { expandTilde } from './fs';
@@ -1022,6 +1022,14 @@ export class HookServer {
   /** agentId → when the app last restarted it for a prompt; outlives the episode. */
   private stuckRestartAt = new Map<string, number>();
 
+  /** The one automatic restart a member gets per STUCK_AGAIN_MS, shared by the
+   *  stuck path and the not reporting watch (issue #326, eng R4). */
+  mayAutoRestart(agentId: string): boolean {
+    const last = this.stuckRestartAt.get(agentId);
+    return last === undefined || this.now() - last >= STUCK_AGAIN_MS;
+  }
+  noteAutoRestart(agentId: string): void { this.stuckRestartAt.set(agentId, this.now()); }
+
   /** A member stopped on a prompt: restart them once, or, when it comes back
    *  before they moved on (or no window can restart them), Michael asks the owner. */
   private stuckOnPrompt(agentId: string, text: string): void {
@@ -1169,6 +1177,23 @@ export class HookServer {
     for (const t of both) {
       const r = researchWallDecision(researchWall, tool, t, ci, rName());
       if (r.deny) return r;
+    }
+    // Each member's hive folder is its own, for everyone, Michael included
+    // (owner, 2026-10-16: a member's memory is private; ask the member).
+    if (hiveRoot) {
+      const nameOf = (id: string): string => (id === RESEARCH_ID ? rName() : reg.agents[id]?.name?.trim() || id);
+      // Who its start time Read rules cover, against the roster now: a
+      // member hired since is refused only to a search over everyone's folders.
+      const roster = { members: Object.keys(reg.agents ?? {}), walled: this.hive.walledMembersOf?.(agentId) ?? null };
+      // Each target judged against the hive as named and as the folder it
+      // really is, as the Research wall is: an office under a linked folder
+      // must not let a link in a member's own folder through (ship review).
+      for (const root of withReal([hiveRoot])) {
+        for (const t of both) {
+          const r = memberWallDecision(root, agentId, tool, t, ci, nameOf, roster);
+          if (r.deny) return r;
+        }
+      }
     }
     // While Research is on, nobody saves into the shared temp folders its
     // shell can read; each agent has its own scratch folder (owner, D7.2).

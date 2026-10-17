@@ -23,6 +23,7 @@ import { chooseRosterSource } from './rosterSource';
 import { renamePatches, swapName } from '@shared/hireTemplates';
 import { canOpen } from '../shell/closingFloor';
 import { closeTab, openTab, type FileTab, type FixedView } from './fileTabs';
+import { afterLeave, attemptLeave } from './leaveGuard';
 
 export type ToolKind =
   | 'Read' | 'Edit' | 'Write' | 'Bash' | 'WebFetch' | 'WebSearch'
@@ -39,8 +40,9 @@ export interface AnswerPick { pick?: number; parts?: ({ chip?: number; text?: st
 export interface PendingRestart {
   at: number;
   /** engine: Claude Code was just set up (docs/designs/get-michael-ready.md).
-   *  stuck: the session stopped on a prompt (hooks.ts stuckOnPrompt). */
-  reason: 'email' | 'connectors' | 'engine' | 'stuck';
+   *  stuck: the session stopped on a prompt (hooks.ts stuckOnPrompt).
+   *  silent: its engine stopped reporting to the app (issue #326). */
+  reason: 'email' | 'connectors' | 'engine' | 'stuck' | 'silent';
   /** The owner pressed Restart now: do not wait for idle. */
   now?: boolean;
   /** The last restart attempt failed; it is tried again on the next tick. */
@@ -261,6 +263,11 @@ interface State {
    *  fallback for anything that genuinely has no particular agent in mind. */
   ideAgentId: string | null;
   sidebarWidth: number;
+  /** The person's or Michael's panel opens wide, centered over the office
+   *  (wide panel WD6): the owner's choice, remembered on this computer, never
+   *  set by the window's size. The Needs you board ignores it (WD1). */
+  panelWide: boolean;
+  setPanelWide: (on: boolean) => void;
   sidebarTab: SidebarTab;
   godStatus: GodStatus;
   /** Per-agent outgoing message queue (agent id → messages awaiting delivery).
@@ -338,6 +345,12 @@ interface State {
    *  floor — the card content grows: contracts, deps, the human Q&A trail). */
   taskDetailId: string | null;
   openTaskDetail: (id: string) => void;
+  /** Open Edit {name} for a member from outside its panel (a Needs you card's
+   *  Change engine, issue #326): its panel opens and Edit with it. */
+  editAgentRequest: { agentId: string; engine: boolean; seq: number } | null;
+  requestEditAgent: (agentId: string, opts?: { engine?: boolean }) => void;
+  /** Edit opened for the request: it is used once (ship review 2026-10-17). */
+  clearEditAgentRequest: () => void;
   closeTaskDetail: () => void;
   /** One-shot prefill for the Command Center's dispatch box (a task detail's
    *  "assign" from anywhere in the app). seq-keyed like ccTabRequest. */
@@ -451,6 +464,7 @@ interface State {
 
 const LS_SIDEBAR_WIDTH = 'cth.sidebarWidth';
 const LS_SIDEBAR_TAB = 'cth.sidebarTab';
+const LS_PANEL_WIDE = 'cth.panelWide';
 const LS_AGENTS = 'cth.agents';
 const LS_ARCHIVED = 'cth.archivedAgents';
 const LS_RESTORABLE = 'cth.restorableAgents';
@@ -850,6 +864,9 @@ const initialSidebarWidth = (() => {
   } catch { /* noop */ }
   return 420;
 })();
+const initialPanelWide = (() => {
+  try { return window.localStorage.getItem(LS_PANEL_WIDE) === '1'; } catch { return false; }
+})();
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
@@ -918,12 +935,14 @@ export const useStore = create<State>((set, get) => ({
   addAgentOpen: false,
   ccTabRequest: null,
   memoryFocusRequest: null,
-  openAgentProfile: (agentId) => set((s) => {
+  // Every action that changes the panel asks the leave guard first, so Edit
+  // agent's unsaved changes are never lost without asking (leaveGuard.ts).
+  openAgentProfile: (agentId) => { attemptLeave({ selectedId: agentId, rightColumn: 'person' }, () => set((s) => {
     const seq = (s.ccTabRequest?.seq ?? 0) + 1;
     persistAgents(s.agents, agentId);
     return { selectedId: agentId, ccTabRequest: { tab: 'profile', seq }, rightColumn: 'person' as const, ...officeView(s.floorView) };
-  }),
-  openAgentMemory: (agentId) => set((s) => {
+  })); },
+  openAgentMemory: (agentId) => { attemptLeave({ selectedId: get().agents.find((a) => a.isGod)?.id ?? get().selectedId, rightColumn: 'person' }, () => set((s) => {
     const god = s.agents.find((a) => a.isGod);
     const seq = (s.ccTabRequest?.seq ?? 0) + 1;
     const selectedId = god?.id ?? s.selectedId;
@@ -935,15 +954,19 @@ export const useStore = create<State>((set, get) => ({
       rightColumn: 'person' as const,
       ...officeView(s.floorView)
     };
-  }),
+  })); },
   // 'human' was Michael's Ask me tab; in v2 Ask me is the Needs you board.
-  requestCommandCenterTab: (tab) =>
-    set((s) => tab === 'human'
-      ? { rightColumn: 'board' as const, ...officeView(s.floorView) }
-      // Not onto a person who has gone home at closing time (5A).
-      : s.selectedId && !canOpen(s.selectedId, s.goneHome)
-        ? {}
-        : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, rightColumn: 'person' as const, ...officeView(s.floorView) }),
+  requestCommandCenterTab: (tab) => {
+    const s0 = get();
+    // Not onto a person who has gone home at closing time (5A).
+    const blocked = tab !== 'human' && !!s0.selectedId && !canOpen(s0.selectedId, s0.goneHome);
+    attemptLeave(blocked ? null : { selectedId: s0.selectedId, rightColumn: tab === 'human' ? 'board' : 'person' }, () =>
+      set((s) => tab === 'human'
+        ? { rightColumn: 'board' as const, ...officeView(s.floorView) }
+        : s.selectedId && !canOpen(s.selectedId, s.goneHome)
+          ? {}
+          : { ccTabRequest: { tab, seq: (s.ccTabRequest?.seq ?? 0) + 1 }, rightColumn: 'person' as const, ...officeView(s.floorView) }));
+  },
   missions: [],
   missionsStatus: 'loading',
   setMissions: (missions, status = 'ready') => set({ missions, missionsStatus: status }),
@@ -957,6 +980,11 @@ export const useStore = create<State>((set, get) => ({
   ideOpen: false,
   ideAgentId: null,
   sidebarWidth: initialSidebarWidth,
+  panelWide: initialPanelWide,
+  setPanelWide: (on) => {
+    try { window.localStorage.setItem(LS_PANEL_WIDE, on ? '1' : '0'); } catch { /* noop */ }
+    set({ panelWide: on });
+  },
   sidebarTab: initialSidebarTab,
   godStatus: 'booting',
   messageQueues: initialQueues,
@@ -965,20 +993,20 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
   // A person who has gone home at closing time opens from nowhere (5A).
-  select: (id) => set((s) => {
+  select: (id) => { attemptLeave(canOpen(id, get().goneHome) ? { selectedId: id, rightColumn: 'person' } : null, () => set((s) => {
     if (!canOpen(id, s.goneHome)) return {};
     persistAgents(s.agents, id);
     return { selectedId: id, ccTabRequest: null, memoryFocusRequest: null, rightColumn: 'person', ...officeView(s.floorView) };
-  }),
+  })); },
   goneHome: [],
   setGoneHome: (ids) => set((s) => (ids.length === s.goneHome.length && ids.every((id) => s.goneHome.includes(id)) ? {} : { goneHome: ids })),
   rightColumn: 'closed',
-  setRightColumn: (column) => set({ rightColumn: column }),
-  openNeedsYou: (opts) => set((s) => ({
+  setRightColumn: (column) => { attemptLeave({ selectedId: get().selectedId, rightColumn: column }, () => set({ rightColumn: column })); },
+  openNeedsYou: (opts) => { attemptLeave({ selectedId: get().selectedId, rightColumn: 'board' }, () => set((s) => ({
     rightColumn: 'board',
     ...officeView(s.floorView),
     needsYouFocus: { seq: (s.needsYouFocus?.seq ?? 0) + 1, ...(opts?.taskId ? { taskId: opts.taskId } : {}) }
-  })),
+  }))); },
   needsYouFocus: null,
 
   updateAgent: (id, patch) =>
@@ -1190,6 +1218,14 @@ export const useStore = create<State>((set, get) => ({
     }),
   taskDetailId: null,
   openTaskDetail: (id) => set({ taskDetailId: id }),
+  editAgentRequest: null,
+  requestEditAgent: (agentId, opts) => {
+    get().select(agentId);
+    // After the select applies, so Keep editing drops the request with it; the
+    // panel clears it once it opens Edit (ship review 2026-10-17).
+    afterLeave(() => set((s) => ({ editAgentRequest: { agentId, engine: !!opts?.engine, seq: (s.editAgentRequest?.seq ?? 0) + 1 } })));
+  },
+  clearEditAgentRequest: () => set({ editAgentRequest: null }),
   closeTaskDetail: () => set({ taskDetailId: null }),
   dispatchSeedRequest: null,
   requestDispatchSeed: (text) =>

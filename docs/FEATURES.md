@@ -82,6 +82,10 @@ moving, and brings you only the decisions that need you.
   looked up, where things live, and the steps for jobs it repeats. A background tidy up merges and
   updates them instead of letting them pile up.
 - Your answers to its questions go straight into its memory, so it doesn't ask again.
+- Each team member's memory is its own. Nobody, Michael included, reads or searches another's
+  notes: to learn what a teammate knows, they ask that teammate, and Michael reads the task board
+  and the work each one hands in. On a Mac, Claude members' shells are walled off from each
+  other's notes too.
 - Company profile and company knowledge (Word, Excel, PowerPoint, PDF, and scans on a Mac) are
   shared with the whole team, searchable by meaning.
 
@@ -116,17 +120,27 @@ moving, and brings you only the decisions that need you.
 - Every team member has a Profile, Access, Messages, Memory and Work tab written for owners, not
   developers. Views for the task board and for who talks to whom, over any time from the last hour
   to the last month.
+- A person's panel and Edit agent open wide in the center of the window for long reading and
+  writing, and leaving Edit with unsaved changes asks first.
+- When a team member's AI engine stops reporting to the app, Needs you says so with Restart.
+  Michael restarts one that never checked in once on his own, its mail goes to him until it
+  reports again, and where nothing else guards its files its terminal is stopped until you
+  restart it.
 - Pulse shows what the office got done and what each team member costs, as pictures:
   recommendations first (a schedule that mostly finds nothing to do, or a member whose work would
   suit a lighter model), each with its numbers and applied only by your click, with Undo; what got
   done and who did it; Kept safe, what the trust layer kept off the internet, the web answers it
-  cleaned of instructions to AI agents, anything held because it could not be checked, and the
+  cleaned of instructions to AI agents, anything held because it could not be checked (open it to
+  see what each one was, when and why; open the questions or answers to see each one as written
+  and as it went out, with what was taken out marked), and the
   steps your settings stopped; Learning, what the team learned in the period and whether it asks
-  you less than before; your plan use and your time; and Team at work, how busy each member is next to the
+  you less; your plan use and your time; and Team at work, how busy each member is next to the
   others, and what their work costs. On a Claude plan, costs are the plan's real price
   (found in your Claude account, or the price you set in Settings) split by each member's share
-  of the work, with the pay per use figure one click away. It fills in the weeks before
-  it started from what the office already keeps, so it never starts at zero.
+  of the work, with the pay per use figure one click away. Pick Today, This week or This month,
+  and turn on Compare to see each figure next to the same days of the day, week or month
+  before. It fills in the weeks before it started from what the office already keeps, so it
+  never starts at zero.
 
 ### 8. Built for small business owners
 - Setup by kind of business: restaurant and food, retail, professional services, home services,

@@ -26,18 +26,6 @@
 **Priority:** P2
 **Depends on:** None
 
-### Message when the OS cannot encrypt stored credentials
-
-**What:** A plain-language path for when Electron's `safeStorage` reports encryption unavailable, so connecting an account fails visibly instead of silently.
-
-**Why:** The secret store refuses to write without OS encryption — "a secret is never written unless `safeStorage.isEncryptionAvailable()`" (`src/main/integrations.ts:12`, enforced at `:111`). That is the correct security behavior, but no screen explains it. On Linux without a keyring, or a Mac with a damaged keychain, the owner clicks Connect and nothing happens.
-
-**Context:** Surfaced by the outside-voice pass during the 2026-09-15 engineering review. The onboarding failure table in the design doc covers cancelled sign-ins, wrong accounts, denied scopes and expired tokens, but not this one. Cheapest fix: check availability before opening the sign-in window in the Connector Center, say what is wrong and what to do, and gate any credential write on the same check. One test for the unavailable case. Mailboxes are done (PR #136): `canStoreSecrets` is checked before the login test, and `cannotStoreReason` in `src/main/mail.ts` says what to do on each platform. Connected apps in the Connector Center are done (agentvivekkumar/dontbemichael#211, by DavidFHCh): the save checks first, saves nothing, and shows the same advice. Still open: saved AI keys (`integrations.setSecret` for a provider key in `src/main/index.ts`, the backend key and the Anthropic key saves), which can reuse both.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** Decision 8 (product-owned connections) and the Connector Center screen; only bites once the product holds credentials itself, from Phase 2.
-
 ## Research agent (deferred from the third ship of mit/named-links, 2026-10-13)
 
 ### A checked message for Pete is never dropped when delivery fails
@@ -73,16 +61,6 @@
 **Priority:** P2
 **Depends on:** None
 
-### Check Pete's notes in parts
-
-**What:** Send Pete's notes to the trust layer in parts small enough for one check, instead of as one batch that a check refuses when it is too long.
-
-**Why:** A refused batch removes the team's cleaned copy of Pete's notes (`researchNotesForPalace` in `src/main/index.ts`), so one long note a web page talks Pete into writing empties what the team can search.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ### Take the internet from team members' shells on Windows
 
 **What:** Hold team members' shell commands off the internet on Windows, where Claude Code has no sandbox, or say on the Research screen that it only holds on a Mac.
@@ -93,21 +71,23 @@
 **Priority:** P2
 **Depends on:** A Windows shell sandbox, or a firewall rule per team member.
 
-### End a credit or sign in stop only on a finished turn
+### Wall members' notes from every engine's shell, and on Windows
 
-**What:** When the office stopped because the Claude account ran out of credit or its sign in stopped working, end the stop when a turn finishes, never because a check heard nothing for ten minutes.
+**What:** Keep a team member's shell from reading another member's hive folder (agents/<id>/) and the hive's git history on every engine, not only Claude on a Mac and Linux, and on Windows.
 
-**Why:** After a restart, or with no Claude session alive to take Michael's check, silence ends the stop (`CHECK_TIMEOUT_MS` in `src/main/officeBreak.ts`) and the team is given work on an account that still cannot run it, then stops again.
+**Why:** Member memory is private (owner, 2026-10-16), and the walls are Claude Code's sandbox Read rules plus the hook on file tools. Codex, Gemini and the other engines get no such shell rule, and Windows has no sandbox at all, so a shell command there can still read a teammate's notes; on Windows that includes Research, which can reach the internet from its shell. Found by the ship review and the Codex adversarial review of the running branch (2026-10-17, owner D3.3).
 
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
+**Context:** The prompts tell every member to ask instead; the file tool hook refuses everywhere. Each engine's own sandbox config, where one exists, is the place to add the rule; Windows needs the same shell sandbox as the item above.
 
-### Read the registry once per router tick
+**Effort:** M
+**Priority:** P2
+**Depends on:** A Windows shell sandbox for the Windows part.
 
-**What:** In `routeOnce`, read the registry and Pete's name once per tick, not once per outbox file.
+### Keep a teammate's question to Pete across a quit while its check waits
 
-**Why:** Each outbox file asks `addressedToResearch` with a fresh `registry()` read, so a busy tick reads registry.json once per message (performance review, third ship).
+**What:** Save a teammate's own message to Research while it waits for the privacy check (up to 30 minutes), as the owner's and the app's notes are saved, and tell the sender and Michael after a restart.
+
+**Why:** queueForResearch writes only the owner's and the app's notes to research-pending.json; a teammate's question that waits through a quit or a crash is lost with no word to anyone. The wait used to be seconds; it is now up to 30 minutes, mostly while the team starts. Found by the ship review red team (2026-10-17, owner D3.3).
 
 **Effort:** S
 **Priority:** P3
@@ -295,33 +275,35 @@
 **Priority:** P3
 **Depends on:** None
 
-## Named links (from the eng review of docs/designs/named-links.md, 2026-10-11)
+### Fill in Pulse's earlier checks off the main process
 
-### Copy a link's address from a card
+**What:** Run the one-time backfill of Pulse's questions and answers lists, and the parse of the 62 day list, off the main process (a worker, or rows in the telemetry database queried by time and way).
 
-**What:** A right-click "Copy link address" on links in the app's rendered markdown.
+**Why:** The first open of the list scans every member's inbox and sent folders and then parses the whole checked.jsonl on the main process; a large office stalls the window and every timer for that time. The live file is now read without blocking, but the scan and the parse are not. Found by the Codex adversarial review (2026-10-17).
 
-**Why:** Named links (docs/designs/named-links.md) show "HubSpot" instead of the raw URL, so selecting the text copies the name, not the address. The app has no context menu (`src/main/index.ts` sets `setWindowOpenHandler` and `will-navigate` handlers, no `context-menu`), so an owner who forwards a record link has to open it and copy it from the browser.
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
 
-**Pros:** One step to share a link again; works app wide, not only on cards.
+### Retry the backfill when it skipped files it could not read
 
-**Cons:** New main-process menu code and a translated label in en, ar and zh-CN for a rare need.
+**What:** Write the backfill's done mark only after a scan that read every file it meant to, and record how many it skipped, so a scan cut short by files being written or a slow volume runs again.
 
-**Context:** Accepted as a TODO in the eng review (D4, owner 2026-10-11) to keep the named links change display only. Start with `webContents.on('context-menu')`: Electron passes `params.linkURL`; show one item only when it is an `http`, `https` or `mailto` link, and write it with `clipboard.writeText`.
+**Why:** ensureCheckedBackfill writes checked-backfill.json whatever it read, so a scan that met unreadable files never fills in their details. Links and pipes an agent left are skipped on purpose and must not count as a failure. Found by the Codex adversarial review (2026-10-17).
 
 **Effort:** S
-**Priority:** P3
-**Depends on:** Named links shipped.
+**Priority:** P4
+**Depends on:** None
 
 ## Terminal links (from the ship review of mit/named-links, 2026-10-13)
 
 ### A quoted phrase that starts with a slash links as a path
 
-**What:** Since #280, a whole quoted match that starts with a path prefix and ends in a file ending is linked, so quoted prose like "/ see notes.md" underlines the whole phrase and ⌘-click finds nothing.
+**What:** Quoted prose that starts with a real folder still links as one path: "/tmp is full, see notes.md" underlines the whole phrase and ⌘-click finds nothing. PR 378 (2026-10-17) fixed the case with a space next to a slash ("/ see notes.md" now links only notes.md); a phrase like this one has no such space, so the pattern cannot tell it from a real file named with spaces.
 
 **Why:** A link that leads nowhere reads as broken.
 
-**Context:** `PATH_TOKEN_RE` in `src/shared/terminalPaths.ts`. Fix: link a quoted match only when it holds no run of two or more words before the last path separator, or check it exists before underlining (the chip path already does).
+**Context:** `PATH_TOKEN_RE` (`quotedPathRe`) in `src/shared/terminalPaths.ts`. Fix: check a quoted match exists on disk before underlining it (the chip path already does), and fall back to the file name inside it when it does not.
 
 **Effort:** S
 **Priority:** P3
@@ -772,6 +754,22 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 
 ## Engines
 
+### Run Gemini members in Gemini's own sandbox
+
+**What:** Start Gemini team members with Gemini's own sandbox (`-s`) where it works, so a Gemini member has a guard besides its reports to the app.
+
+**Why:** The app starts Gemini with `--yolo` and no sandbox (`src/shared/agentProvider.ts`), so a Gemini member whose reports stop has no guard at all. The #326 design therefore stops a silent Gemini member on every platform; with a sandbox it could keep working the way a Claude member on a Mac does.
+
+**Pros:** Gemini offices stop far less often; parity with Claude and Codex on a Mac.
+
+**Cons:** Gemini's sandbox needs Docker or Podman on some platforms, may block tools the team uses, and needs its own writable folder setup (like Codex `--add-dir`).
+
+**Context:** From the #326 eng review, 2026-10-16 (decision R2). Start in `hive.ts` where Gemini's `--include-directories` are added, and check what `-s` needs on each platform.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** none; independent of #326.
+
 ### Make a second engine (Codex first) ready for an office
 
 **What:** Close the gaps that keep engines other than Claude Code out of `BUILD_ENGINES`, starting with Codex, then add it to the list.
@@ -784,7 +782,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`). Codex now gets bundled skills in its private `CODEX_HOME/skills`; other engines still need native skill discovery. The md-mail server is the same gap (issue #109): `index.ts` writes it and passes `--mcp-config` only for Claude, so a Codex member with email starts with no mail tools. Fix: write an `[mcp_servers.md-mail]` entry in the agent's private `CODEX_HOME/config.toml` (same command, args and env, a fresh broker token each spawn), removed at teardown like the Claude file. The mail gate in `hooks.ts` matches only Claude's `mcp__md-mail__` tool names, so the same change makes it match Codex's names too: a mail tool on any engine passes the same check, and a test proves a Codex mail call is gated.
 4. Antigravity gets no extra writable directories, so hive file writes may be refused. Gemini CLI done 2026-10-11: the folders Codex gets with `--add-dir` go into its per-agent settings file as `context.includeDirectories` and onto argv as `--include-directories` (Gemini CLI 0.60 and later skip a system settings file in a folder the user owns; `geminiIncludeDirArg`, `test/auto-mode-sandbox.test.cjs`).
 5. Antigravity agents never get their standing goal, and an Antigravity Michael never gets the roster (no SessionStart/UserPromptSubmit event).
-6. The app's own background calls run only on Claude (issue #85): memory tidy up (`src/main/memoryTidy.ts`), the standing approval check (`standingCheck.ts`), the hire check (`hireCheck.ts`) and the three Work style helpers (`workStyleConvert.ts`) all pass `defaultCommand` to `runHiddenClaude`, which builds Claude arguments. On a Codex office each fails; the worst is the standing approval check, so every email under a standing approval falls back to Ask me. Fix: a `runHiddenModel({ engine, tier, prompt, noTools, cwd, timeoutMs })` with one runner per engine, the engine taken from Michael's preset, not the command string. Claude keeps the current path. Codex runs `codex exec --ephemeral --ignore-user-config --skip-git-repo-check -s read-only -C <empty dir> --disable shell_tool --disable unified_exec --disable apps --disable browser_use --disable computer_use -c web_search=disabled -o <answer file>` (tested in #85 with codex-cli 0.162.1: two standing checks judged right, a prompt asking for a shell command refused). An engine with no runner returns unavailable at once and the caller uses its existing fallback. Callers that read text written by agents or outside senders (the standing check, the memory tidy up) keep `noTools: true` and a runner serves them only with every tool off. Tests: each caller with a fake runner, answered and unavailable, and one that a Codex office never runs `codex` with Claude arguments.
+6. ~~The app's own background calls run only on Claude (issue #85).~~ Done 2026-10-17 (PR 354): `runHiddenModel` in `src/main/hiddenModel.ts` picks the runner from Michael's engine for all six (memory tidy up, the standing approval check, the hire check and the three Work style helpers). Claude keeps its runner and models; Codex runs `codex exec` read only in an empty folder with every tool off and the prompt on stdin, using Michael's model or the CLI default; any other engine answers unavailable and the caller keeps its fallback (`test/hidden-model.test.cjs`, `test/hidden-model-callers.test.cjs`). Still open: a runner for Gemini.
 7. Michael's first prompt is still written for one engine (`INITIAL_GOD_PROMPT` in `src/renderer/src/hooks/useHive.ts:77`). The spawn prompt and PROTOCOL.md now say "AI agents".
 8. No permission-prompt detection for these engines (no Notification event), which matters only with auto mode off.
 9. The access policy reaches Claude only (issue #48). Folder privacy (`denyRead`/`denyWrite`), connector deny and the MCP list are written into Claude's `--settings` (`hookSettings` in `src/main/hive.ts`); Codex gets its own workspace sandbox and `--add-dir`, but no folder read privacy or connector deny. Before any engine joins `BUILD_ENGINES`: build the one policy into each engine's own settings, record per engine which rules it can enforce, and where it can't, limit that agent (mail Draft only, connectors off) with the reason on its Access tab. A test per engine tries a read of another member's folder, a write outside its own and a denied connector, and passes only when each is blocked or the agent is limited. `test/engine-readiness.test.cjs` checks the preset half today. Issue #139 adds: make it a typed `isolation` capability on each engine preset (OS sandbox plus deny rules, a PreToolUse check only, or none), so `BUILD_ENGINES` refuses an engine that has not proved its kind, and an engine with none never hosts a member who holds a private folder; put the app's private mail token folder (`agentPrivatePaths.ts`, #63) in every engine's denied set; and note the hook gaps: pi has only PreToolUse, and the proxy tier (qwen) has no hooks at all, so its shell is unguarded.
@@ -864,6 +862,46 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Message when the OS cannot encrypt stored credentials
+
+**What:** A plain-language path for when Electron's `safeStorage` reports encryption unavailable, so connecting an account fails visibly instead of silently.
+
+**Why:** The secret store refuses to write without OS encryption — "a secret is never written unless `safeStorage.isEncryptionAvailable()`" (`src/main/integrations.ts:12`, enforced at `:111`). That is the correct security behavior, but no screen explains it. On Linux without a keyring, or a Mac with a damaged keychain, the owner clicks Connect and nothing happens.
+
+**Effort:** S
+**Priority:** P2
+**Completed:** merged 2026-10-17. Mailboxes (PR #136), connected apps (agentvivekkumar/dontbemichael#211, by DavidFHCh) and saved AI keys (agentvivekkumar/dontbemichael#384, by fayzan-cbr) each check the secret store first and say what to do on each platform.
+
+### Read the registry once per router tick
+
+**What:** In `routeOnce`, read the registry and Pete's name once per tick, not once per outbox file.
+
+**Why:** Each outbox file asks `addressedToResearch` with a fresh `registry()` read, so a busy tick reads registry.json once per message (performance review, third ship).
+
+**Effort:** S
+**Priority:** P3
+**Completed:** merged 2026-10-17. `routeOnce` reads the registry and Research's name once per tick, the first time a message needs them; delivery still reads per message (agentvivekkumar/dontbemichael#385, by amartya1523).
+
+### End a credit or sign in stop only on a finished turn
+
+**What:** When the office stopped because the Claude account ran out of credit or its sign in stopped working, end the stop when a turn finishes, never because a check heard nothing for ten minutes.
+
+**Why:** After a restart, or with no Claude session alive to take Michael's check, silence ends the stop (`CHECK_TIMEOUT_MS` in `src/main/officeBreak.ts`) and the team is given work on an account that still cannot run it, then stops again.
+
+**Effort:** S
+**Priority:** P3
+**Completed:** merged 2026-10-17. A credit or sign in check that hears nothing goes back to waiting and checks again after RETRY_MS; only a finished turn ends the stop. The plan limit keeps its old ending and a key stop still waits for the owner (agentvivekkumar/dontbemichael#383, by amartya1523).
+
+### Copy a link's address from a card
+
+**What:** A right-click "Copy link address" on links in the app's rendered markdown.
+
+**Why:** Named links (docs/designs/named-links.md) show "HubSpot" instead of the raw URL, so selecting the text copies the name, not the address. The app has no context menu (`src/main/index.ts` sets `setWindowOpenHandler` and `will-navigate` handlers, no `context-menu`), so an owner who forwards a record link has to open it and copy it from the browser.
+
+**Effort:** S
+**Priority:** P3
+**Completed:** merged 2026-10-17. Right-clicking a web or email link anywhere in the app shows one item, Copy link address, which copies the real address; the label follows the app language (`src/shared/linkMenu.ts`, agentvivekkumar/dontbemichael#372, by Yash-Nimkar0, closes #370).
 
 ### A refused tool call still shows its detail
 

@@ -29,27 +29,59 @@ test('a trust layer deny is a stop only when the check judged it; a check that c
   assert.deepEqual(trustKeys({ way: 'out', decision: 'pass', flagged: true }), ['out-pass', 'out-flagged']);
   assert.deepEqual(trustKeys({ way: 'sideways', decision: 'pass' }), []);
   assert.equal(keptSafe([]).any, false);
+  // From v 2 (2026-10-16) a hold is counted from the hive's trust-held line,
+  // which the held list shares, so a v 2 line never counts it twice.
+  for (const by of ['no-answer', 'unreadable', 'length']) assert.deepEqual(trustKeys({ way: 'in', decision: 'deny', by, v: 2 }), [], by);
+  assert.deepEqual(trustKeys({ way: 'out', decision: 'deny', by: 'no-answer', v: 2 }), []);
+  assert.deepEqual(trustKeys({ way: 'in', decision: 'deny', by: 'model', v: 2 }), ['in-stop'], 'a stop still counts');
 });
 
-test('Learning: notes by week and source, the running total, and questions per 100 requests once a week has enough', () => {
-  // Value: protects=the Learning row; fails_when=a note lands in the wrong week, the total ignores earlier notes, a thin week shows a rate, or knows leaves out procedures; why_new=owner proposal 3; seam=none; no_claim=what a note says
+test('the held list reads its rows, drops lines that are not rows, and tidies like Michael\'s note', () => {
+  // Value: protects=the held list never breaks on a bad line, and its holds match the count's rule; fails_when=a torn line throws, a stop is called a hold, or quotes survive; why_new=held list (owner, 2026-10-16); seam=none; no_claim=none beyond protects
+  const H = loadTs('src/shared/heldRecord.ts');
+  const R = loadTs('src/shared/research.ts');
+  assert.equal(H.parseHeld('{"at":1'), null);
+  assert.equal(H.parseHeld(JSON.stringify({ at: 1, way: 'up', from: 'x', why: 'no-answer' })), null);
+  assert.deepEqual(H.parseHeld(JSON.stringify({ at: 1, way: 'in', from: 'human', to: 'research', toName: 'Pete', subject: 's', opening: 'o', why: 'failed', told: 'michael' })),
+    { at: 1, way: 'in', from: 'human', fromName: null, to: 'research', toName: 'Pete', subject: 's', opening: 'o', why: 'failed', told: 'michael' });
+  assert.equal(H.tidy('Say \u201chi\u201d\nnow', 80), 'Say hi now');
+  const why = (v) => H.heldWhy(v, R.REFUSAL_CHECK_FAILED, R.REFUSAL_TOO_LONG);
+  assert.deepEqual(['length', 'no-answer', 'unreadable', 'settings'].map((by) => why({ reason: 'x', by })), ['too-long', 'no-answer', 'unreadable', 'settings']);
+  assert.deepEqual(['model', 'pattern', 'recheck'].map((by) => why({ reason: 'x', by })), [null, null, null]);
+  assert.deepEqual([why({ reason: R.REFUSAL_CHECK_FAILED }), why({ reason: R.REFUSAL_TOO_LONG }), why({ reason: R.REFUSAL_OFF })], ['failed', 'too-long', null]);
+  // The owner's two questions (2026-10-16): which notes, and what caused it.
+  const index = '# Memory, Research (research)\n\n<!-- memory index v1 -->\nThe app keeps this file. Add notes to memory/inbox.md; they are sorted in here in the background.';
+  assert.equal(H.notesPreview(index), '', 'the empty index page is no notes');
+  assert.equal(H.notesPreview(`${index}\n\ninbox.md\n- King Arthur recipe pages load fully\n- IRS rates table on irs.gov`), 'King Arthur recipe pages load fully \u00b7 IRS rates table on irs.gov');
+  assert.equal(H.notesPreview('- a\n'.repeat(400)).length, 300);
+  const cause = (why, error) => H.heldCause({ why, error });
+  assert.deepEqual([cause('no-answer', 'hidden session never took the prompt (signed out, or a screen is waiting)'), cause('no-answer', 'no answer within 60 seconds'), cause('no-answer', 'hidden session timed out'), cause('no-answer'), cause('unreadable'), cause('too-long'), cause('settings'), cause('no-layer'), cause('failed')],
+    ['starting', 'slow', 'slow', 'checkDown', 'unreadable', 'tooLong', 'settings', 'off', 'checkDown']);
+});
+
+test('Learning: the period\'s notes by source, its questions per 100 requests once it has enough, the span before, and what the team holds in all', () => {
+  // Value: protects=the Learning row for every period (owner, 2026-10-15 and 2026-10-16); fails_when=a note or ask lands in the wrong span, a span drops its first or last day, a thin span shows a rate, or the in all totals follow the period; why_new=Learning moved from weeks to ranges (76cfcf01 regression class); seam=none; no_claim=what a note says
+  const { periodRange, previousRange } = loadTs('src/shared/teamPerformance.ts');
   const now = new Date(2026, 9, 15, 12).getTime(); // a Thursday
   const notes = [
-    { agentId: 'pam', source: 'owner', date: '2026-09-10' },   // before the four weeks: only in the total
-    { agentId: 'pam', source: 'owner', date: '2026-09-22' },
-    { agentId: 'pam', source: 'task', date: '2026-10-13' },
+    { agentId: 'pam', source: 'owner', date: '2026-09-10' },   // outside every span: only in all
+    { agentId: 'pam', source: 'owner', date: '2026-10-06' },   // last week, Tuesday
+    { agentId: 'pam', source: 'task', date: '2026-10-12' },    // this week's first day
     { agentId: 'god', source: 'michael', date: '2026-10-14' },
-    { agentId: 'god', source: 'tool', date: '2026-10-15' }
+    { agentId: 'god', source: 'tool', date: '2026-10-15' }     // today
   ];
-  const asks = [{ raisedBy: 'pam', askedAt: new Date(2026, 9, 13, 9).getTime() }, { raisedBy: 'god', askedAt: new Date(2026, 9, 14, 9).getTime() }];
-  const turns = [{ day: '2026-10-13', turns: 30 }, { day: '2026-10-14', turns: 10 }, { day: '2026-10-06', turns: MIN_TURNS_FOR_RATE - 1 }];
-  const l = learning({ now, notes, procedures: { pam: 2 }, asks, turns });
-  assert.deepEqual(l.weeks.map((w) => w.from), ['2026-09-21', '2026-09-28', '2026-10-05', '2026-10-12']);
-  assert.deepEqual(l.weeks.map((w) => w.total), [2, 2, 2, 5]);
-  assert.deepEqual(l.weeks[3].added, { you: 0, job: 2, michael: 1 });
-  assert.equal(l.weeks[3].per100, 5, '2 questions in 40 requests');
-  assert.equal(l.weeks[2].per100, null, 'too few requests');
-  assert.deepEqual([l.notes, l.procedures, l.knows.pam, l.knows.god], [5, 2, 5, 2]);
+  const asks = [{ raisedBy: 'pam', askedAt: new Date(2026, 9, 13, 9).getTime() }, { raisedBy: 'god', askedAt: new Date(2026, 9, 15, 23, 59).getTime() }];
+  const turns = [{ day: '2026-10-13', turns: 30 }, { day: '2026-10-15', turns: 10 }, { day: '2026-10-06', turns: MIN_TURNS_FOR_RATE - 1 }];
+  const week = learning({ notes, procedures: { pam: 2 }, asks, turns, range: periodRange('this-week', now), previous: previousRange('this-week', now) });
+  assert.deepEqual(week.period.added, { you: 0, job: 2, michael: 1 });
+  assert.equal(week.period.per100, 5, '2 questions in 40 requests');
+  assert.deepEqual(week.previous.added, { you: 1, job: 0, michael: 0 });
+  assert.equal(week.previous.per100, null, 'too few requests');
+  const today = learning({ notes, procedures: { pam: 2 }, asks, turns, range: periodRange('today', now) });
+  assert.deepEqual([today.period.added.job, today.period.asks, today.period.turns, today.previous], [1, 1, 10, null], 'the last minute of the day counts');
+  const month = learning({ notes, procedures: { pam: 2 }, asks, turns, range: periodRange('this-month', now) });
+  assert.equal(month.period.added.you + month.period.added.job + month.period.added.michael, 4);
+  assert.deepEqual([week.notes, week.procedures, week.knows.pam, week.knows.god], [5, 2, 5, 2], 'in all, whatever the period');
 });
 
 test('Team at work: busiest, several times the average, quiet, and costly for its work only against enough peers', () => {
@@ -218,6 +250,25 @@ test('the backfill counts only a frame naming the wrong member as an impostor, a
     ['refused', 'god', 'impostor', 1], ['card-reopen', 'pam', 'c1', 1], ['trust', null, 'deny', 1]
   ]);
   assert.deepEqual(trustKeys(pts[2].attrs), ['in-stop'], 'a past decision folds like a live one');
+});
+
+test('the backfill keeps a trust line\'s version and reads the hive\'s checked and held lines, so a past message counts once', () => {
+  // Value: protects=Kept safe for days before live recording counts each message once (eng D5); fails_when=logPoints drops v (a v 3 line counts again beside its trust-checked line), skips trust-checked or trust-held, or keeps a line with no known way; why_new=checked-list.test.cjs pins the case label only; seam=none; no_claim=the processor fold (pulse-telemetry.test.cjs)
+  const { checkedKeys } = loadTs('src/shared/pulseSafety.ts');
+  const pts = logPoints([
+    { ts: 10, kind: 'trust-layer', way: 'in', decision: 'clean', v: 3 },
+    { ts: 10, kind: 'trust-checked', way: 'in', decision: 'clean', flagged: false },
+    { ts: 10, kind: 'trust-checked', way: 'out', decision: 'pass', flagged: true },
+    { ts: 10, kind: 'trust-held', way: 'out' },
+    { ts: 10, kind: 'trust-checked', way: 'up', decision: 'pass' },
+    { ts: 10, kind: 'trust-held' }
+  ], 0, 50, new Set(['pam']));
+  assert.deepEqual(pts.map((p) => [p.kind, p.attrs.way, p.attrs.bf]), [['trust', 'in', 1], ['trust-checked', 'in', 1], ['trust-checked', 'out', 1], ['trust-held', 'out', 1]]);
+  assert.equal(pts[0].attrs.v, 3);
+  assert.deepEqual(trustKeys(pts[0].attrs), [], 'the v 3 trust line adds nothing');
+  assert.deepEqual(checkedKeys(pts[1].attrs), ['in-clean'], 'the hive\'s line counts it, once');
+  assert.deepEqual(checkedKeys(pts[2].attrs), ['out-pass', 'out-flagged']);
+  assert.ok(!('v' in logPoints([{ ts: 10, kind: 'trust-layer', way: 'in', decision: 'pass' }], 0, 50, new Set())[0].attrs), 'an older line stays unversioned and still counts');
 });
 
 test('a step stopped from the floor counts as paused in the backfill, as hooks.ts counts it live', () => {
