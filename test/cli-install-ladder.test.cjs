@@ -18,6 +18,8 @@ const { posixOnly, windowsOnly } = require('./platform.cjs');
 
 const { chooseInstallRung, buildMissingCliScript, installSucceeded } = loadTs('src/main/cliInstall.ts');
 const { installInfoForProvider } = loadTs('src/shared/agentProvider.ts');
+const { PtyManager } = loadTs('src/main/pty.ts');
+const { tokenizeCommand } = loadTs('src/shared/commandLine.ts');
 
 // The POSIX shell script unless a test names the platform: the Windows form is
 // one cmd.exe line, pinned by its own tests below.
@@ -177,4 +179,21 @@ test('the install exit handler relaunches only on installSucceeded', () => {
   const branch = src.slice(start, src.indexOf('teardownPty(id);', start));
   assert.match(branch, /if \(installSucceeded\(exitCode, \(\) => ptyManager\.isCommandAvailable\(pending\.bin\)\)\)/);
   assert.doesNotMatch(branch, /if \(exitCode === 0\)/);
+});
+
+test('a CLI installed under a folder with a space is not reported missing', () => {
+  // Value: protects=the missing-CLI check probes the same executable pty.spawn runs; fails_when=index.ts splits the command on spaces again and probes `C:\Users\John`; why_new=a user name with a space showed "CLI missing" for an installed CLI; seam=source pin, main has no Electron harness
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8');
+  assert.ok(!src.includes(String.raw`opts.command.trim().split(/\s+/)[0]`), 'opts.command is already the bare executable');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'John Smith '));
+  try {
+    const exe = path.join(dir, process.platform === 'win32' ? 'claude.exe' : 'claude');
+    fs.writeFileSync(exe, '', { mode: 0o755 });
+    // What every renderer caller sends main: the executable with its quotes removed.
+    const [command] = tokenizeCommand(`"${exe}" --model opus`);
+    assert.equal(command, exe);
+    assert.equal(new PtyManager().isCommandAvailable(command.trim()), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

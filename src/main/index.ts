@@ -3779,7 +3779,9 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // this id, so when the install PTY exits teardownPty is a harmless no-op (the agent
   // isn't archived and no worktree is torn down) before the relaunch takes over.
   {
-    const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+    // Already the bare executable (callers split args off), and it may hold a
+    // space: `C:\Users\John Smith\...\claude.exe`. Probe what pty.spawn runs.
+    const bin = opts.command.trim();
     // Claude is set up where the owner can see it: the Ready step at the end of
     // setup, or the Get Michael ready card on Ask me (engineSetup.ts). Its
     // installer used to run here, in a terminal the owner never sees, behind a
@@ -4148,7 +4150,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
       const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
       const requested = at < 0 ? undefined : args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);
       if (requested && CLAUDE_MODEL_CLI_FLOOR[requested]) {
-        const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+        const bin = opts.command.trim();
         const pick = modelForCli(requested, await claudeCliVersion(ptyManager.commandPath(bin)));
         if (pick.downgraded) {
           if (args[at] === '--model') args[at + 1] = pick.model; else args[at] = `--model=${pick.model}`;
@@ -4384,7 +4386,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // Record the Claude Code version this agent starts on, only once its terminal
   // is really running: a failed spawn must not count as an agent to upgrade.
   if (res.ok && opts.hive?.id && claudeProvider) {
-    const binPath = ptyManager.commandPath(opts.command.trim().split(/\s+/)[0] || opts.command);
+    const binPath = ptyManager.commandPath(opts.command.trim());
     void claudeCliVersion(binPath).then((started) => {
       if (!binPath || !started || !ptyToAgent.has(opts.id)) return;
       ptyCli.set(opts.id, { bin: binPath, started });
