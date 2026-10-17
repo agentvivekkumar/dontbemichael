@@ -139,7 +139,7 @@ for (const [label, names] of [
 
 test('a procedure name cannot take another procedure\'s allocated suffix', () => {
   // Value: protects=generated suffixes stay reserved across later operations; fails_when=a later natural slug overwrites an allocated one; why_new=collisions can involve suffixed paths too; seam=none
-  const names = ['客户退款流程', '供应商付款流程', 'procedure-2'];
+  const names = ['Send invoices', 'Send-invoices', 'send-invoices-2'];
   const ops = names.map((name) => ({ op: 'procedure', name, steps: `1. ${name}`, source: 'task' }));
   const first = mi.applyOps([], ops, '2026-10-13');
   assert.equal(new Set(first.procedures.map((p) => p.slug)).size, 3);
@@ -180,9 +180,10 @@ test('the model receives full procedure names so truncated labels remain updatab
   assert.equal((await f.tidy.tidyNow('oscar'))[0].tidied, true);
   const before = mi.parseIndex(fs.readFileSync(indexPath, 'utf8')).entries;
   assert.ok(names.every((name) => !fs.readFileSync(indexPath, 'utf8').includes(name)), 'the index alone cannot convey either full name');
+  fs.writeFileSync(path.join(f.dir, 'memory', 'procedures', 'reserved.md'), 'missing heading');
   delete f.tidy.askModel;
-  const hidden = loadTs('src/main/hiddenClaude.ts');
-  const model = t.mock.method(hidden, 'runHiddenClaude', async (prompt, options) => {
+  const hidden = loadTs('src/main/hiddenModel.ts');
+  const model = t.mock.method(hidden, 'runHiddenModel', async (prompt, options) => {
     const section = prompt.split('--- STORED PROCEDURES ---\n')[1]?.split('\n\n')[0];
     assert.ok(section, 'the model needs the full-name lookup');
     const stored = section.split('\n').map((line) => JSON.parse(line));
@@ -252,21 +253,116 @@ for (const failure of ['procedure', 'index']) {
   });
 }
 
-test('an unreadable procedure identity keeps notes and the existing file untouched', async (t) => {
-  // Value: protects=an incomplete procedure cannot be mistaken for another workflow; fails_when=tidy guesses an identity and overwrites its file; why_new=updates now consult stored full names; seam=model response
+for (const timing of ['before model', 'during model']) {
+  for (const damage of ['no heading', 'missing', 'unreadable']) {
+    test(`a procedure with ${damage} ${timing} reserves its path while other notes are tidied`, async (t) => {
+      // Value: protects=damaged files cannot block unrelated learning or be overwritten; fails_when=either identity scan throws or releases an occupied path; why_new=covers both scans and deterministic read failure; seam=model response and one file read
+      const f = office(t);
+      const memDir = path.join(f.dir, 'memory');
+      const dir = path.join(memDir, 'procedures');
+      const indexPath = path.join(f.dir, 'memory.md');
+      const inbox = path.join(memDir, 'inbox.md');
+      const damagedPath = path.join(dir, 'send-invoices.md');
+      const validPath = path.join(dir, 'weekly-summary.md');
+      const original = '# Send invoices\n\n1. Original invoice steps\n';
+      const damaged = 'incomplete procedure without a heading';
+      fs.mkdirSync(dir);
+      fs.writeFileSync(damagedPath, original);
+      fs.writeFileSync(validPath, '# Weekly summary\n\n1. Original summary steps\n');
+      // The headingless file has no index entry: directory entries must reserve paths too.
+      const entries = damage === 'no heading' ? [] : [e('m1', 'procedure', 'Send invoices: steps in memory/procedures/send-invoices.md')];
+      entries.push(e('m2', 'procedure', 'Weekly summary: steps in memory/procedures/weekly-summary.md'));
+      fs.writeFileSync(indexPath, mi.renderIndex('Oscar', 'oscar', entries));
+      const read = fs.readFileSync;
+      let unreadable = false;
+      let failedReads = 0;
+      t.mock.method(fs, 'readFileSync', (file, ...args) => {
+        if (unreadable && file === damagedPath) {
+          failedReads++;
+          throw Object.assign(new Error('simulated unreadable procedure'), { code: 'EACCES' });
+        }
+        return read(file, ...args);
+      });
+      const breakIdentity = () => {
+        if (damage === 'no heading') fs.writeFileSync(damagedPath, damaged);
+        else if (damage === 'missing') fs.rmSync(damagedPath);
+        else unreadable = true;
+      };
+      if (timing === 'before model') breakIdentity();
+      const ask = f.tidy.askModel;
+      f.tidy.askModel = async (...args) => {
+        assert.equal(args[4].get('send-invoices'), timing === 'before model' ? null : 'Send invoices');
+        if (timing === 'during model') breakIdentity();
+        return ask(...args);
+      };
+      f.setReply({ ops: [
+        { op: 'add', kind: 'fact', text: 'Supplier cutoff is Thursday noon', source: 'owner' },
+        { op: 'procedure', name: 'Send invoices', steps: '1. New invoice steps' },
+        { op: 'procedure', name: 'Weekly summary', steps: '1. Updated summary steps' }
+      ] });
+      fs.writeFileSync(inbox, '- Keep the supplier cutoff and both workflows.\n');
+      assert.equal((await f.tidy.tidyNow('oscar'))[0].tidied, true);
+      assert.equal(f.asked.length, 1);
+      const after = mi.parseIndex(read(indexPath, 'utf8')).entries;
+      assert.ok(after.some((entry) => entry.kind === 'fact' && entry.text === 'Supplier cutoff is Thursday noon'));
+      assert.equal(after.find((entry) => entry.id === 'm2').text, entries.find((entry) => entry.id === 'm2').text);
+      assert.match(read(validPath, 'utf8'), /Updated summary steps/);
+      if (damage !== 'no heading') assert.deepEqual(after.find((entry) => entry.id === 'm1'), entries[0]);
+      const replacement = after.find((entry) => mi.procedurePointer(entry.text)?.slug === 'send-invoices-2');
+      assert.ok(replacement, 'the damaged or missing path stays reserved');
+      assert.match(read(path.join(dir, 'send-invoices-2.md'), 'utf8'), /New invoice steps/);
+      assert.equal(fs.existsSync(inbox), false);
+      assert.equal(fs.existsSync(path.join(memDir, 'inbox.processing.md')), false);
+
+      f.tidy.askModel = ask;
+      f.setReply({ ops: [{ op: 'procedure', name: 'Send invoices', steps: '1. Updated invoice steps' }] });
+      fs.writeFileSync(inbox, '- Update the invoice steps.\n');
+      assert.equal((await f.tidy.tidyNow('oscar'))[0].tidied, true);
+      const again = mi.parseIndex(read(indexPath, 'utf8')).entries;
+      assert.deepEqual(again.map((entry) => [entry.id, entry.text]), after.map((entry) => [entry.id, entry.text]));
+      assert.match(read(path.join(dir, 'send-invoices-2.md'), 'utf8'), /Updated invoice steps/);
+      if (damage === 'missing') assert.equal(fs.existsSync(damagedPath), false);
+      else assert.equal(read(damagedPath, 'utf8'), damage === 'no heading' ? damaged : original);
+      if (damage === 'unreadable') assert.ok(failedReads >= 3, 'both scans and subsequent updates encounter the unreadable file');
+      assert.equal(fs.readdirSync(dir).length, damage === 'missing' ? 2 : 3);
+    });
+  }
+
+  test(`a procedure directory read failure ${timing} still retains source notes`, async (t) => {
+    // Value: protects=unrelated filesystem errors do not permit unsafe allocation or note deletion; fails_when=directory enumeration errors are swallowed; why_new=identity errors alone may be tolerated; seam=directory read and model response
+    const f = office(t);
+    const dir = path.join(f.dir, 'memory', 'procedures');
+    const inbox = path.join(f.dir, 'memory', 'inbox.md');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(f.dir, 'memory.md'), mi.renderIndex('Oscar', 'oscar', []));
+    fs.writeFileSync(inbox, '- Keep these steps.\n');
+    let fail = timing === 'before model';
+    const readdir = fs.readdirSync;
+    t.mock.method(fs, 'readdirSync', (file, ...args) => {
+      if (file === dir && fail) throw Object.assign(new Error('simulated directory read failure'), { code: 'EIO' });
+      return readdir(file, ...args);
+    });
+    f.tidy.askModel = async () => { fail = true; return { ops: [{ op: 'procedure', name: 'Send invoices', steps: '1. Send' }] }; };
+    const [result] = await f.tidy.tidyNow('oscar');
+    assert.equal(result.tidied, false);
+    assert.equal(result.reason, 'write-failed');
+    assert.equal(fs.readFileSync(inbox, 'utf8'), '- Keep these steps.\n');
+    assert.deepEqual(readdir(dir), []);
+  });
+}
+
+test('an invalid procedure pointer does not block unrelated notes or change the entry', async (t) => {
+  // Value: protects=legacy malformed pointers cannot block all future tidies; fails_when=an unparseable pointer aborts the pass; why_new=missing files still have valid pointers; seam=model response
   const f = office(t);
-  const memDir = path.join(f.dir, 'memory');
-  const dir = path.join(memDir, 'procedures');
-  const inbox = path.join(memDir, 'inbox.md');
-  fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(f.dir, 'memory.md'), mi.renderIndex('Oscar', 'oscar', []));
-  fs.writeFileSync(path.join(dir, 'procedure.md'), 'incomplete procedure without a heading');
-  fs.writeFileSync(inbox, '- Keep these steps.\n');
-  f.setReply({ ops: [{ op: 'procedure', name: '客户退款流程', steps: '1. Refund', source: 'owner' }] });
-  const [result] = await f.tidy.tidyNow('oscar');
-  assert.equal(result.tidied, false);
-  assert.equal(fs.readFileSync(inbox, 'utf8'), '- Keep these steps.\n');
-  assert.equal(fs.readFileSync(path.join(dir, 'procedure.md'), 'utf8'), 'incomplete procedure without a heading');
+  const indexPath = path.join(f.dir, 'memory.md');
+  const entry = e('m1', 'procedure', 'Steps: memory/procedures/../unknown.md');
+  fs.writeFileSync(indexPath, mi.renderIndex('Oscar', 'oscar', [entry]));
+  fs.writeFileSync(path.join(f.dir, 'memory', 'inbox.md'), '- Keep the cutoff.\n');
+  f.setReply({ ops: [{ op: 'add', kind: 'fact', text: 'Cutoff is noon', source: 'owner' }] });
+  assert.equal((await f.tidy.tidyNow('oscar'))[0].tidied, true);
+  const entries = mi.parseIndex(fs.readFileSync(indexPath, 'utf8')).entries;
+  assert.deepEqual(entries[0], entry);
+  assert.equal(entries[1].text, 'Cutoff is noon');
 });
 
 test('an old free-form memory is migrated once: lessons kept, the original backed up', async (t) => {

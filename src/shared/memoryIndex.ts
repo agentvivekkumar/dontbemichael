@@ -195,8 +195,9 @@ export interface TidyOutcome {
 
 /** Apply checked ops to the entries. Stored procedures are identified by their
  *  full file headings, not the lossy slug or the shortened index label. Include
- *  files without an index entry too: a previous write may have stopped halfway. */
-export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string, procedureNames: ReadonlyMap<string, string> = new Map()): TidyOutcome {
+ *  files without an index entry too: a previous write may have stopped halfway.
+ *  A null name reserves a path whose identity is unknown; it cannot match an op. */
+export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string, procedureNames: ReadonlyMap<string, string | null> = new Map()): TidyOutcome {
   let next = entries.map((e) => ({ ...e }));
   const names = new Map(procedureNames);
   const usedSlugs = new Set(names.keys());

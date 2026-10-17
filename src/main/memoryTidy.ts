@@ -158,7 +158,7 @@ export class MemoryTidy {
       return null;
     }
 
-    let procedureNames: Map<string, string>;
+    let procedureNames: Map<string, string | null>;
     try { procedureNames = readProcedureNames(memDir, entries); }
     catch (e) { return this.abort(id, 'write-failed', String(e)); }
 
@@ -239,7 +239,8 @@ export class MemoryTidy {
     return { id, tidied: false, reason };
   }
 
-  private async askModel(home: string, entries: MemoryEntry[], notes: string[], overBudget: boolean, procedureNames: ReadonlyMap<string, string>): Promise<unknown> {
+  private async askModel(home: string, entries: MemoryEntry[], notes: string[], overBudget: boolean, procedureNames: ReadonlyMap<string, string | null>): Promise<unknown> {
+    const knownProcedures = [...procedureNames].filter(([, name]) => name !== null);
     const prompt = [
       TIDY_SYSTEM,
       '',
@@ -247,7 +248,7 @@ export class MemoryTidy {
       entries.length ? entriesBlock(entries) : '(none yet)',
       '',
       '--- STORED PROCEDURES ---',
-      procedureNames.size ? [...procedureNames].map(([slug, name]) => JSON.stringify({ name, path: `memory/procedures/${slug}.md` })).join('\n') : '(none yet)',
+      knownProcedures.length ? knownProcedures.map(([slug, name]) => JSON.stringify({ name, path: `memory/procedures/${slug}.md` })).join('\n') : '(none yet)',
       '',
       '--- NEW NOTES ---',
       notes.length ? notes.map((n) => `- ${n}`).join('\n') : '(none)',
@@ -287,24 +288,24 @@ function readText(path: string): string | null {
 }
 
 /** Full names already live in the app-written procedure headings. Read them
- *  before choosing any paths, including files left by a partial write. If an
- *  identity is missing or unreadable, retain the notes rather than guess. */
-function readProcedureNames(memDir: string, entries: MemoryEntry[]): Map<string, string> {
+ *  before choosing any paths, including files left by a partial write. A null
+ *  identity reserves a damaged or missing file without blocking other notes.
+ *  Directory enumeration errors still propagate: occupied paths are unknown. */
+function readProcedureNames(memDir: string, entries: MemoryEntry[]): Map<string, string | null> {
   const dir = join(memDir, 'procedures');
-  const names = new Map<string, string>();
+  const names = new Map<string, string | null>();
   for (const file of existsSync(dir) ? readdirSync(dir) : []) {
     if (!file.endsWith('.md')) continue;
     const slug = file.slice(0, -3);
     if (!isProcedureSlug(slug)) continue;
     const text = readText(join(dir, file));
     const name = text && /^# ([^\r\n]+)\r?\n/.exec(text)?.[1].trim();
-    if (!name) throw new Error(`Cannot read procedure identity: ${file}`);
-    names.set(slug, name);
+    names.set(slug, name || null);
   }
   for (const entry of entries) {
     if (entry.kind !== 'procedure') continue;
     const pointer = procedurePointer(entry.text);
-    if (!pointer || !names.has(pointer.slug)) throw new Error(`Cannot read procedure identity: ${entry.id}`);
+    if (pointer && !names.has(pointer.slug)) names.set(pointer.slug, null);
   }
   return names;
 }
