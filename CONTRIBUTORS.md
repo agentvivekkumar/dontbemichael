@@ -7,7 +7,7 @@ It is generated from the pull requests themselves rather than from commit metada
 dropped because their git email does not happen to match their GitHub account. It is regenerated
 from merged pull requests, so you appear without having to ask.
 
-**97 people** have contributed so far.
+**103 people** have contributed so far.
 
 <a href="https://github.com/agentvivekkumar/dontbemichael/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=agentvivekkumar/dontbemichael" alt="Contributor avatars">
@@ -23,7 +23,7 @@ requests, and a pull request always has a real account behind it.
 | Contributor | Contributions | First | Most recent |
 |---|---:|---|---|
 | [@agentvivekkumar](https://github.com/agentvivekkumar) | 52 | 2026-09-15 | 2026-10-16 |
-| [@amartya1523](https://github.com/amartya1523) | 21 | 2026-10-10 | 2026-10-14 |
+| [@amartya1523](https://github.com/amartya1523) | 23 | 2026-10-10 | 2026-10-17 |
 | [@SantoshMalana](https://github.com/SantoshMalana) | 9 | 2026-10-12 | 2026-10-13 |
 | [@dhruvpuri](https://github.com/dhruvpuri) | 7 | 2026-10-10 | 2026-10-10 |
 | [@Kartikey1306](https://github.com/Kartikey1306) | 6 | 2026-10-12 | 2026-10-12 |
@@ -35,6 +35,7 @@ requests, and a pull request always has a real account behind it.
 | [@shrinivas-sn](https://github.com/shrinivas-sn) | 2 | 2026-10-11 | 2026-10-11 |
 | [@Shreyas652](https://github.com/Shreyas652) | 2 | 2026-10-13 | 2026-10-14 |
 | [@manognyachindam-14](https://github.com/manognyachindam-14) | 2 | 2026-10-16 | 2026-10-17 |
+| [@ThanishaDewangan](https://github.com/ThanishaDewangan) | 2 | 2026-10-17 | 2026-10-17 |
 | [@josephzhang0602](https://github.com/josephzhang0602) | 1 | 2026-10-10 | 2026-10-10 |
 | [@rajukancharla21](https://github.com/rajukancharla21) † | 1 | 2026-10-10 | 2026-10-10 |
 | [@Junaid522](https://github.com/Junaid522) | 1 | 2026-10-10 | 2026-10-10 |
@@ -119,8 +120,13 @@ requests, and a pull request always has a real account behind it.
 | [@kimtour](https://github.com/kimtour) | 1 | 2026-10-17 | 2026-10-17 |
 | [@Olamilekan2580](https://github.com/Olamilekan2580) | 1 | 2026-10-17 | 2026-10-17 |
 | [@klaxman0554-lab](https://github.com/klaxman0554-lab) | 1 | 2026-10-17 | 2026-10-17 |
+| [@Johanofcourse](https://github.com/Johanofcourse) | 1 | 2026-10-17 | 2026-10-17 |
+| [@nightrdr](https://github.com/nightrdr) | 1 | 2026-10-17 | 2026-10-17 |
+| [@Yash-Nimkar0](https://github.com/Yash-Nimkar0) | 1 | 2026-10-17 | 2026-10-17 |
+| [@kksrini89](https://github.com/kksrini89) | 1 | 2026-10-17 | 2026-10-17 |
+| [@fayzan-cbr](https://github.com/fayzan-cbr) | 1 | 2026-10-17 | 2026-10-17 |
 
-_200 pull requests from 97 people._
+_209 pull requests from 103 people._
 
 ## † Contributions that never got the merged badge
 
