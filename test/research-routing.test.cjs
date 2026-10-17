@@ -694,13 +694,21 @@ test('an owner note whose check never finished, because the app closed, is told 
   assert.ok(!fs.existsSync(path.join(home, 'private', 'research-pending.json')));
 });
 
-test('an owner note whose check finished leaves nothing pending', async (t) => {
-  // Value: protects=a normal restart tells Michael nothing; fails_when=finished checks stay in the pending file; why_new=Codex adversarial pass 2; seam=fake layer
+test('an owner note that passed its check but could not be delivered is told to Michael, not dropped', async (t) => {
+  // Value: protects=a disk or git error while handing a checked note to Research leaves a trace; fails_when=the pending row is removed before delivery and a delivery error is only logged; why_new=TODOS "A checked message for Pete is never dropped"; seam=delivery throws
   const { hive } = await office(t);
+  const quiet = console.error;
+  console.error = () => {};
+  t.after(() => { console.error = quiet; });
+  hive.deliverToResearch = () => { throw new Error('disk full'); };
   hive.rememberOwnerNote('research', 'Focus on flour');
   await tick();
+  const [note] = msgsIn(hive, 'god').filter((m) => m.subject === R.NOT_SENT_SUBJECT);
+  assert.ok(note, 'Michael is told');
+  assert.match(note.body, /^A note from the owner for Pete \("A note from the owner"\) was not sent: .*could not be delivered/);
+  assert.equal(note.from, R.PRIVACY_CHECK_SENDER);
   const file = path.join(path.dirname(hive.root()), 'private', 'research-pending.json');
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), [], 'told once, so a restart does not tell it again');
 });
 
 test('the notice of a lost owner note waits until Michael\'s inbox takes it', async (t) => {

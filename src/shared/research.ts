@@ -94,6 +94,7 @@ export const REFUSAL_UNSURE = `Not sent to ${RESEARCH_NAME}: the privacy check c
 /** The check itself could not run (no answer, an answer it could not read,
  *  too slow, settings it could not read): still not sent, and not the wording. */
 export const REFUSAL_CHECK_FAILED = `Not sent to ${RESEARCH_NAME}: the privacy check could not run. This is not about the wording, so send it again later.`;
+export const REFUSAL_NOT_DELIVERED = `Not sent to ${RESEARCH_NAME}: it passed the privacy check but could not be delivered. This is an app problem, so send it again later.`;
 export const REFUSAL_TOO_LONG = `Not sent to ${RESEARCH_NAME}: it is too long to check. Send the question, not the whole text.`;
 
 /** The subject of the note telling a sender what Research was asked. */
