@@ -256,6 +256,69 @@ export function researchFolderPolicy(walled: string[], own: string[], home?: str
   return { sandbox: { denyWrite: [], denyRead: clean(walled), allowRead: clean(own) }, deny: risky, sandboxOnly: true };
 }
 
+/**
+ * Paths a shell command names that could reach the disk (issue #442): absolute
+ * paths, home shortcuts, and anything that climbs with `..`. Quoted and
+ * unquoted forms. Used on Windows where Claude Code has no OS sandbox, so
+ * Research's Bash would otherwise open office files the file-tool wall keeps out.
+ */
+export function researchShellTargets(command: string, cwd: string | undefined): string[] {
+  if (!command || typeof command !== 'string') return [];
+  const found: string[] = [];
+  const add = (raw: string) => {
+    const p = raw.trim();
+    if (!p || p.length < 2) return;
+    // URLs and flags are not folder paths.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(p) && !/^[A-Za-z]:[\\/]/.test(p)) return;
+    if (p.startsWith('-')) return;
+    const looksAbsolute = isAbsolute(p) || p.startsWith('~/') || p.startsWith('~\\') || p === '~'
+      || /^[A-Za-z]:[\\/]/.test(p) || p.startsWith('\\\\');
+    const climbs = /(^|[\\/])\.\.([\\/]|$)/.test(p);
+    if (!looksAbsolute && !climbs) return;
+    let resolved: string | null = null;
+    if (typeof process !== 'undefined') {
+      const home = process.env.HOME || process.env.USERPROFILE
+        || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null);
+      if (home && (p === '~' || p.startsWith('~/') || p.startsWith('~\\'))) {
+        resolved = p === '~' ? resolve(home) : resolve(home, p.slice(2));
+      }
+    }
+    if (!resolved) {
+      if (isAbsolute(p) || /^[A-Za-z]:[\\/]/.test(p) || p.startsWith('\\\\')) resolved = resolve(p);
+      else if (cwd) resolved = resolve(cwd, p);
+    }
+    if (resolved) found.push(resolved);
+  };
+  // Double, single or backtick quoted strings first, then bare path-like tokens.
+  const re = /"([^"\n]*)"|'([^'\n]*)'|`([^`\n]*)`|(?:(?:[A-Za-z]:\\|\\\\|~[\\/]|\.{1,2}[\\/]|\/)[^\s"'`;|&<>]*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(command)) !== null) {
+    const raw = m[1] ?? m[2] ?? m[3] ?? m[0];
+    // `https://host/path` and `host/path` must not count as folders. UNC shares
+    // use backslashes on Windows (`\\server\share`) and are kept below.
+    if (raw.startsWith('//')) continue;
+    if (raw.startsWith('/') && m.index > 0 && /[A-Za-z0-9.:/]/.test(command[m.index - 1]!)) continue;
+    add(raw);
+  }
+  return Array.from(new Set(found));
+}
+
+/** Research's shell on a platform without an OS sandbox (Windows, issue #442):
+ *  each path the command names is judged like a Read through researchFolderDecision. */
+export function researchShellDecision(
+  command: string,
+  cwd: string | undefined,
+  walled: string[],
+  own: string[],
+  caseInsensitive: boolean
+): { deny: boolean; reason?: string } {
+  for (const target of researchShellTargets(command, cwd)) {
+    const r = researchFolderDecision(walled, own, 'Read', target, caseInsensitive, own);
+    if (r.deny) return r;
+  }
+  return { deny: false };
+}
+
 /** One file tool call by Research: it writes only its own folders (an
  *  allowlist, ship review D2.6), and reads its own folders or anything outside
  *  and above no wall (the home folder is walled, D2.5). */

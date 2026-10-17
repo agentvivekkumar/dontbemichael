@@ -84,7 +84,7 @@ export const ASK_TOOL_REFUSAL =
   "Don't ask the owner here: nobody answers your terminal. File it as one new file in the hive's triage folder (your questions as one \"ask\", what you were doing in \"description\"). Michael checks it and puts it on the owner's ASK ME board.";
 
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
-import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, agentTmpDecision, agentTmpName, folderDecision, folderToolTarget, AGENT_TMP_DIR, isSharedTempSave, researchFolderDecision, sharedTempWriteDecision, tempFolders, researchWallDecision } from '../shared/folderAccess';
+import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, agentTmpDecision, agentTmpName, folderDecision, folderToolTarget, AGENT_TMP_DIR, isSharedTempSave, researchFolderDecision, researchShellDecision, sharedTempWriteDecision, tempFolders, researchWallDecision } from '../shared/folderAccess';
 import { REFUSAL_WEB_TOOL, REFUSAL_WEB_TOOL_OFF, RESEARCH_DESK_DIR, RESEARCH_ID, RESEARCH_NAME, RESEARCH_SANDBOX_ONLY, RESEARCH_UNCHECKED_TOOL, researchText } from '../shared/research';
 import { folderLayoutFor } from './officeFile';
 import { expandTilde } from './fs';
@@ -687,6 +687,24 @@ export class HookServer {
         }
       };
     }
+    // Research's shell on Windows (issue #442): Claude Code has no OS sandbox
+    // there, so a Bash call would otherwise open office files the file-tool
+    // wall keeps out. Judge every path the command names like a Read.
+    if (event === 'PreToolUse' && agentId === RESEARCH_ID && p.tool_name === 'Bash' && process.platform === 'win32') {
+      let d: { deny: boolean; reason?: string };
+      try { d = this.researchShellCheck(p.tool_input, p.cwd); }
+      catch { d = { deny: true, reason: RESEARCH_UNCHECKED_TOOL }; }
+      if (d.deny) {
+        this.emitRefused(agentId, event, p, 'folder');
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: d.reason
+          }
+        };
+      }
+    }
     if (event === 'PreToolUse' && agentId && WEB_TOOLS.has(p.tool_name ?? '')) {
       // Unreadable settings fail closed, like the connector gate (D8).
       let d: ReturnType<typeof webAccess>;
@@ -1117,6 +1135,26 @@ export class HookServer {
    *  internal id: Michael's id is `god` and nobody in the office is called that
    *  (2026-09-24). Michael's name follows a rename; an agent the registry does
    *  not know is announced as the app. */
+  /** Research's Bash on Windows: the same walls as its file tools (issue #442). */
+  private researchShellCheck(input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
+    const command = input && typeof input === 'object' && typeof (input as { command?: unknown }).command === 'string'
+      ? (input as { command: string }).command
+      : '';
+    if (!command.trim()) return { deny: false };
+    const cfg = this.getConfig();
+    const home = cfg.harnessHome ? expandTilde(cfg.harnessHome) : undefined;
+    const hiveRoot = this.hive.root();
+    const reg = this.hive.registry();
+    const ci = process.platform !== 'linux';
+    const own = [hiveRoot ? join(hiveRoot, 'agents', RESEARCH_ID) : '', home ? join(home, RESEARCH_DESK_DIR) : ''].filter(Boolean);
+    const walled = [homedir(), home ?? '', cfg.businessFolder ?? '', this.getKnowledge?.().root ?? '', claudeProjectsRoot(),
+      ...(cfg.businessTeam ?? []).map((m) => m.folder),
+      ...Object.values(reg.agents).filter((a) => a.id !== RESEARCH_ID && a.cwd).map((a) => a.cwd),
+      ...tempFolders(process.platform, tmpdir())].filter(Boolean);
+    const withReal = (l: string[]): string[] => Array.from(new Set(l.flatMap((d) => [d, realPathOf(d) ?? d])));
+    return researchShellDecision(command, cwd, withReal(walled), withReal(own), ci);
+  }
+
   /** One file tool call judged against the office's folder rules. Offices
    *  without a business folder (older installs) have no rules to apply. */
   private folderCheck(agentId: string, tool: string, input: unknown, cwd: string | undefined): { deny: boolean; reason?: string } {
