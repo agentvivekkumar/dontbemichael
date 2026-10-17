@@ -40,13 +40,14 @@ export function OnboardingStudio({ picked, unpicked, businessName }: {
   }, []);
   // The platform spans roughly x 70..1020, y 150..760 of the stage.
   const cropX = 40; const cropY = 150; const cropW = 1010; const cropH = 610;
-  const k = Math.min(box.w / cropW, (box.h - 70) / cropH);
+  const titleTop = 24; const headH = titleTop + 70;
+  const k = Math.min(box.w / cropW, (box.h - headH) / cropH);
   const ox = (box.w - cropW * k) / 2 - cropX * k;
-  const oy = 70 + Math.max(0, (box.h - 70 - cropH * k) / 2) - cropY * k;
+  const oy = headH + Math.max(0, (box.h - headH - cropH * k) / 2) - cropY * k;
 
   return (
     <div ref={hostRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, textAlign: 'center' }}>
+      <div style={{ position: 'absolute', top: titleTop, left: 0, right: 0, textAlign: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--cth-ink)' }}>{businessName || t('onboarding.studio.yourBusiness')}</div>
         <div style={{ fontSize: 12.5, color: 'var(--cth-ink-3)', marginTop: 2 }}>{t('onboarding.studio.yourOffice')}</div>
       </div>
