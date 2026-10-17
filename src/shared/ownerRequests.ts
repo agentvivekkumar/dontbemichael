@@ -226,7 +226,8 @@ export function michaelCardState(createdAt: string, now: number, days: readonly 
  *  conversation. */
 export type OwnerCardChange =
   | { kind: 'closed'; reason?: string }
-  | { kind: 'moved'; from: string; to: string; reason?: string };
+  | { kind: 'moved'; from: string; to: string; reason?: string }
+  | { kind: 'reassigned'; from: string; to: string; fromName: string; toName: string; reason?: string };
 
 const STATUS_WORDS: Record<string, string> = { triage: 'Triage', todo: 'To do', doing: 'Doing', waiting: 'Waiting', blocked: 'Blocked', done: 'Done' };
 
@@ -238,6 +239,19 @@ export function ownerChangeNote(task: { id: string; title?: string }, change: Ow
       body: [
         `The owner closed ${card} as Done.${change.reason ? ` Reason: ${change.reason}` : ''}`,
         'This is the owner\'s decision, not finished work. Treat the card as closed: stop work on it and tell whoever has it. Do not reopen it unless the owner asks.'
+      ].join('\n')
+    };
+  }
+  if (change.kind === 'reassigned') {
+    const toWho = cardText(change.toName || change.to, 60);
+    const fromWho = change.from
+      ? cardText(change.fromName || change.from, 60)
+      : 'nobody';
+    return {
+      subject: `OWNER REASSIGNED card ${cardText(task.id, 60)} to ${toWho}`,
+      body: [
+        `The owner moved ${card} from ${fromWho} to ${toWho}.${change.reason ? ` Reason: ${cardText(change.reason, 500)}` : ''}`,
+        'A routing note was added to your memory. Follow it when similar work comes in. Tell the new assignee what to do, and do not send the old one more work on this card.'
       ].join('\n')
     };
   }
