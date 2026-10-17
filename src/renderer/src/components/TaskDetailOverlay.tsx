@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { RESEARCH_ID } from '@shared/research';
 import { useStore } from '@/store/store';
 import { TaskDetail, parseTasks, type HiveTask } from './TasksKanban';
 
@@ -81,13 +82,30 @@ export function TaskDetailOverlay() {
     closeTaskDetail();
   };
 
+  const reassign = async (assigneeId: string, reason?: string) => {
+    setTasks(tasks.map((t) => (t.id === task.id
+      ? { ...t, assignee: assigneeId, assignReason: reason || t.assignReason }
+      : t)));
+    try {
+      const result = await window.cth.hiveReassignTask(task.id, assigneeId, reason);
+      if (!result.ok) void refresh();
+      else void refresh();
+    } catch { void refresh(); }
+  };
+
+  const teammates = agents
+    .filter((a) => !a.isGod && a.id !== RESEARCH_ID && !a.archived)
+    .map((a) => ({ id: a.id, name: a.name || a.id }));
+
   return (
     <TaskDetail
       task={task}
       all={tasks}
       assigneeName={nameFor(task.assignee)}
+      teammates={teammates}
       onMove={(s) => void move(s)}
       onReopen={(reason) => void reopen(reason)}
+      onReassign={(id, reason) => void reassign(id, reason)}
       onAssign={assign}
       onClose={closeTaskDetail}
     />
