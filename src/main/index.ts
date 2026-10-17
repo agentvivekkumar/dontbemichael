@@ -122,7 +122,7 @@ import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { pastesDir, savePaste, sweepOldPastes } from './pastes';
-import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
+import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData, savePendingResetCleanup, sweepPendingResetCleanup } from './factoryReset';
 import { buildWorkerLaunch } from './workerLaunch';
 import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
@@ -6372,7 +6372,10 @@ ipcMain.handle('app:resetAll', () => {
     // Company knowledge the owner moved out of the app's data folder.
     knowledgeRoot: resolve(kgRoot) !== resolve(join(userData, 'knowledge')) ? kgRoot : null
   });
-  if (failed.length) console.error('[reset] could not remove:', failed);
+  if (failed.length) {
+    console.error('[reset] could not remove:', failed);
+    savePendingResetCleanup(userData, failed);
+  }
   // Back to first-run defaults, then relaunch clean so all in-memory services
   // re-bootstrap from scratch and the renderer lands on onboarding.
   resetConfig();
@@ -8060,6 +8063,19 @@ function onSystemResume(reason: string): void {
 }
 
 app.whenReady().then(() => {
+  // Clear any leftovers a previous Reset & start over could not remove (TODOS.md).
+  const { swept, stillFailed } = sweepPendingResetCleanup(app.getPath('userData'));
+  if (swept.length) console.log('[reset cleanup] swept on startup:', swept);
+  if (stillFailed.length) {
+    console.error('[reset cleanup] could not remove on startup:', stillFailed);
+    void dialog.showMessageBox({
+      type: 'warning',
+      title: 'Reset leftovers',
+      message: 'Some files from a previous office could not be removed automatically.',
+      detail: stillFailed.join('\n')
+    }).catch(() => { /* non-fatal */ });
+  }
+
   // Realtime Michael mic-gate hygiene (rt-8 / Pam rt-10 nit): the voice session
   // opens the mic permission gate by persisting realtimeVoiceEnabled=true and
   // closes it on disconnect — but a hard crash/reload mid-session skips that

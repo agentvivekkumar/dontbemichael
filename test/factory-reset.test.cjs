@@ -14,7 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
-const { eraseOfficeData, isKnowledgeStore, OFFICE_FOLDER_ENTRIES, PRIVATE_ENTRIES, APP_DATA_ENTRIES, APP_DATA_KEPT } = loadTs('src/main/factoryReset.ts');
+const { eraseOfficeData, isKnowledgeStore, isAppOwnedPath, savePendingResetCleanup, sweepPendingResetCleanup, PENDING_RESET_CLEANUP, OFFICE_FOLDER_ENTRIES, PRIVATE_ENTRIES, APP_DATA_ENTRIES, APP_DATA_KEPT } = loadTs('src/main/factoryReset.ts');
 const { writeOfficeRecord } = loadTs('src/main/officeFile.ts');
 
 function seed(dir, names) {
@@ -178,6 +178,8 @@ test('app:resetAll erases the office data before it resets the config', () => {
   assert.match(body, /knowledgeRoot: resolve\(kgRoot\) !== resolve\(join\(userData, 'knowledge'\)\) \? kgRoot : null/);
   assert.ok(body.indexOf('const kgRoot') < body.indexOf('\n  resetConfig();'));
   assert.ok(body.indexOf('hive.stopAllProxyBridges()') > 0 && body.indexOf('stopWebhookServer()') > 0, 'proxy sidecars and the webhook server stop, as on quit');
+  assert.match(body, /savePendingResetCleanup\(userData, failed\)/, 'failed paths are saved for next launch');
+  assert.match(src, /sweepPendingResetCleanup\(app\.getPath\('userData'\)\)/, 'swept at next launch');
   assert.doesNotMatch(body, /hive\.root\(\)|memory\.palacePath\(\)|researchFolders\(\)/, 'office folder paths come only through the office check');
 });
 
@@ -242,4 +244,71 @@ test('a moved knowledge store is erased only when it really is one, and a damage
   assert.equal(fs.existsSync(path.join(damaged, 'agent-settings')), false, 'no registry, but the reset just archived its roster');
   assert.equal(fs.existsSync(path.join(damaged, 'worktrees', 'pam')), false, 'an agent\'s worktree goes');
   assert.ok(fs.existsSync(path.join(damaged, 'worktrees', 'my-repo', '.git')), 'a real repository the owner keeps there stays');
+});
+
+test('leftover paths from a reset are saved and swept on the next launch, refusing broad or outside paths', (t) => {
+  // Value: protects=failed deletes during reset are cleaned up at next startup without touching owner or system files; fails_when=pending cleanup is not saved, not swept, or deletes outside paths; why_new=TODOS.md line 150; seam=fs
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-pending-'));
+  const userData = path.join(root, 'userData');
+  const home = path.join(root, 'office');
+  fs.mkdirSync(userData, { recursive: true });
+  fs.mkdirSync(home, { recursive: true });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // App-owned targets
+  const appFile = path.join(userData, 'harness.db');
+  fs.writeFileSync(appFile, 'db');
+  seed(home, ['hive']);
+  fs.writeFileSync(path.join(home, 'hive', 'registry.json'), '{}');
+  const hiveDir = path.join(home, 'hive');
+
+  // Outside / unsafe targets that must be refused
+  const outsideFile = path.join(root, 'outside-document.txt');
+  fs.writeFileSync(outsideFile, 'owner text');
+  const homeFolder = os.homedir();
+
+  // 1. savePendingResetCleanup saves valid app-owned failed paths and ignores broad ones
+  savePendingResetCleanup(userData, [appFile, hiveDir, outsideFile, homeFolder]);
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  assert.ok(fs.existsSync(pendingFile), 'pending cleanup file was written');
+  const saved = JSON.parse(fs.readFileSync(pendingFile, 'utf8'));
+  assert.ok(saved.includes(appFile));
+  assert.ok(saved.includes(hiveDir));
+  assert.ok(!saved.includes(outsideFile), 'outside file was filtered out');
+  assert.ok(!saved.includes(homeFolder), 'home directory was filtered out');
+
+  // 2. sweepPendingResetCleanup deletes the app targets, leaves outside intact, and removes pending file
+  const res = sweepPendingResetCleanup(userData);
+  assert.equal(fs.existsSync(appFile), false, 'app file swept');
+  assert.equal(fs.existsSync(hiveDir), false, 'hive dir swept');
+  assert.equal(fs.existsSync(outsideFile), true, 'outside file untouched');
+  assert.ok(res.swept.includes(appFile));
+  assert.ok(res.swept.includes(hiveDir));
+  assert.deepEqual(res.stillFailed, []);
+  assert.equal(fs.existsSync(pendingFile), false, 'pending cleanup file cleared after success');
+});
+
+test('sweepPendingResetCleanup preserves stillFailed paths in the pending file for retry', (t) => {
+  if (process.platform === 'win32' || (process.getuid && process.getuid() === 0)) return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-stuck-'));
+  const userData = path.join(root, 'userData');
+  const locked = path.join(userData, 'locked');
+  fs.mkdirSync(locked, { recursive: true });
+  const stuck = path.join(locked, 'stuck.txt');
+  fs.writeFileSync(stuck, 'stuck');
+  fs.chmodSync(locked, 0o555);
+  t.after(() => {
+    fs.chmodSync(locked, 0o755);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  savePendingResetCleanup(userData, [stuck]);
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  assert.ok(fs.existsSync(pendingFile));
+
+  const res = sweepPendingResetCleanup(userData);
+  assert.deepEqual(res.stillFailed, [stuck]);
+  assert.ok(fs.existsSync(pendingFile), 'pending file kept when paths still failed');
+  const saved = JSON.parse(fs.readFileSync(pendingFile, 'utf8'));
+  assert.deepEqual(saved, [stuck]);
 });
