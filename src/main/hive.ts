@@ -1868,6 +1868,8 @@ export class HiveManager {
         SubagentStop: [entry()],
         PreToolUse: [entry('*')],
         PostToolUse: [entry('*')],
+        // A call that failed: the floor ends it by its id, like a finished one.
+        PostToolUseFailure: [entry('*')],
         UserPromptSubmit: [entry()],
         Notification: [entry()],
         SessionStart: [entry()],
