@@ -692,8 +692,8 @@ const OWNER_READ_SKEW_MS = 5 * 60 * 1000;
 
 /** A folder as Gemini CLI's --include-directories can carry it. The flag splits
  *  every value on commas, so a path with one ("Acme, LLC") goes relative to
- *  the agent's cwd, which Gemini resolves against. Undefined when that still
- *  holds a comma; the per-agent settings file names the folder either way. */
+ *  the agent's cwd, which Gemini resolves against. Undefined when the relative
+ *  path still contains a comma, so the caller can report that limitation. */
 export function geminiIncludeDirArg(cwd: string, dir: string): string | undefined {
   if (!dir.includes(',')) return dir;
   const rel = cwd ? relative(cwd, dir) : '';
@@ -1386,7 +1386,8 @@ export class HiveManager {
               // Point only this worker at a per-agent system settings file so
               // the bridge is trusted and ~/.gemini/settings.json stays untouched.
               const writable = this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs);
-              env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = this.installGeminiHooks(dir, writable);
+              this.installGeminiHooks();
+              env.GEMINI_CLI_TRUST_WORKSPACE = 'true';
               // The agent folder and hive root join its workspace, the folders
               // codex gets with --add-dir above. On argv too: Gemini CLI 0.60
               // and later skip a system settings file in a folder the user owns.
@@ -4591,31 +4592,55 @@ export class HiveManager {
     }
   }
 
-  /** Official Google Gemini CLI lifecycle bridge. Gemini's hook payload is
-   *  already snake_case; the shim maps event names into HookServer's common
-   *  vocabulary and translates deny/steering replies back to Gemini.
+  /** Official Google Gemini CLI lifecycle bridge.
    *
-   *  The system settings path is per agent. Gemini merges object and array
-   *  settings across layers, so auth and user settings remain in their normal
-   *  GEMINI_CLI_HOME while this trusted bridge stays isolated.
+   * Gemini CLI 0.60+ rejects a user-owned path supplied as
+   * GEMINI_CLI_SYSTEM_SETTINGS_PATH. Keep the hook settings in the normal
+   * user settings layer instead. The hook shim is runtime-scoped by
+   * AGENT_ID/HIVE_SOCK, so it no-ops for ordinary Gemini sessions. Existing
+   * user settings and hooks are preserved, and the working folders are passed
+   * to this worker through --include-directories rather than global settings.
    *
-   *  `writableDirs` become `context.includeDirectories`. Gemini's file tools
-   *  refuse any path outside the workspace ("Path not in workspace"), and the
-   *  agent folder and hive root sit outside cwd, so without them write_file
-   *  and replace cannot touch memory.md or anything else in the agent folder
-   *  or the hive. The codex counterpart is `--add-dir`. Gemini concatenates
-   *  this array with the owner's own, so theirs still apply.
-   *
-   *  Gemini CLI 0.60 and later read a system settings file only from a folder
-   *  owned by root or an administrator, and skip this one (hooks included).
-   *  The spawn also passes the folders as --include-directories for them. */
-  private installGeminiHooks(dir: string, writableDirs: string[] = []): string {
-    const home = join(dir, '.gemini-hive');
-    const settingsPath = join(home, 'system-settings.json');
+   * Hook commands in user settings run for all Gemini sessions, but without
+   * the two hive environment variables the shim exits immediately. This mirrors
+   * the Antigravity bridge's existing user-level hook strategy. */
+  private installGeminiHooks(): void {
+    const root = this.root();
+    if (!root) return;
+    const geminiHome = process.env.GEMINI_CLI_HOME?.trim() || homedir();
+    const settingsDir = join(geminiHome, '.gemini');
+    const settingsPath = join(settingsDir, 'settings.json');
+    const shim = join(root, 'bin', 'gemini-hook.cjs');
     try {
-      mkdirSync(home, { recursive: true });
-      const shim = join(home, 'gemini-hook.cjs');
+      mkdirSync(dirname(shim), { recursive: true });
       writeFileSync(shim, GEMINI_HOOK_SHIM, 'utf8');
+      mkdirSync(settingsDir, { recursive: true });
+
+      const isRecord = (value: unknown): value is Record<string, unknown> =>
+        value !== null && typeof value === 'object' && !Array.isArray(value);
+      let settings: Record<string, unknown> = {};
+      if (existsSync(settingsPath)) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(readFileSync(settingsPath, 'utf8'));
+        } catch (e) {
+          // Never replace a user's malformed settings file with a partial one.
+          console.error('[hive] installGeminiHooks skipped: user settings.json is not valid JSON:', e);
+          return;
+        }
+        if (!isRecord(parsed)) {
+          console.error('[hive] installGeminiHooks skipped: user settings.json is not an object');
+          return;
+        }
+        settings = parsed;
+      }
+
+      const currentHooks = settings.hooks;
+      if (currentHooks !== undefined && !isRecord(currentHooks)) {
+        console.error('[hive] installGeminiHooks skipped: user hooks setting is not an object');
+        return;
+      }
+      const mergedHooks: Record<string, unknown> = { ...(isRecord(currentHooks) ? currentHooks : {}) };
       const hook = (name: string, matcher?: string) => ({
         ...(matcher ? { matcher } : {}),
         sequential: true,
@@ -4628,20 +4653,38 @@ export class HiveManager {
           timeout: 30000
         }]
       });
-      const settings = {
-        hooksConfig: { enabled: true, notifications: false },
-        hooks: {
-          SessionStart: [hook('session-start')],
-          BeforeAgent: [hook('before-agent')],
-          BeforeTool: [hook('before-tool', '.*')],
-          AfterTool: [hook('after-tool', '.*')],
-          AfterAgent: [hook('after-agent')]
-        },
-        ...(writableDirs.length ? { context: { includeDirectories: writableDirs } } : {})
+      const managed: Record<string, unknown[]> = {
+        SessionStart: [hook('session-start')],
+        BeforeAgent: [hook('before-agent')],
+        BeforeTool: [hook('before-tool', '.*')],
+        AfterTool: [hook('after-tool', '.*')],
+        AfterAgent: [hook('after-agent')]
       };
-      writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
-    } catch (e) { console.error('[hive] installGeminiHooks failed:', e); }
-    return settingsPath;
+      const withoutManagedHooks = (entry: unknown): unknown[] => {
+        if (!isRecord(entry)) return [entry];
+        if (typeof entry.name === 'string' && entry.name.startsWith('munder-hive-')) return [];
+        if (!Array.isArray(entry.hooks)) return [entry];
+        const retainedHooks = entry.hooks.filter((item) =>
+          !(isRecord(item) && typeof item.name === 'string' && item.name.startsWith('munder-hive-'))
+        );
+        if (retainedHooks.length === entry.hooks.length) return [entry];
+        if (retainedHooks.length === 0) return [];
+        return [{ ...entry, hooks: retainedHooks }];
+      };
+      for (const [event, entries] of Object.entries(managed)) {
+        const previous = mergedHooks[event];
+        if (previous !== undefined && !Array.isArray(previous)) {
+          console.error(`[hive] installGeminiHooks skipped: user hooks.${event} is not an array`);
+          return;
+        }
+        const retained = (Array.isArray(previous) ? previous : []).flatMap(withoutManagedHooks);
+        mergedHooks[event] = [...retained, ...entries];
+      }
+      settings.hooks = mergedHooks;
+      this.atomicWriteJson(settingsPath, settings);
+    } catch (e) {
+      console.error('[hive] installGeminiHooks failed:', e);
+    }
   }
 
   /** Codex lifecycle-hook bridge → full hive parity for a `codex` worker (live

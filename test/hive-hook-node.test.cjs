@@ -200,17 +200,20 @@ test('every hook installer routes through the launcher — none left on bare nod
   // rather than write into the developer's real ~/.gemini / ~/.grok.
   const realHome = process.env.HOME;
   const realProfile = process.env.USERPROFILE;
+  const realGeminiHome = process.env.GEMINI_CLI_HOME;
   process.env.HOME = home;
   process.env.USERPROFILE = home;
+  process.env.GEMINI_CLI_HOME = home;
   t.after(() => {
     if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
     if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
+    if (realGeminiHome === undefined) delete process.env.GEMINI_CLI_HOME; else process.env.GEMINI_CLI_HOME = realGeminiHome;
   });
   assert.equal(os.homedir(), home, 'home redirect failed — aborting before touching the real home');
 
   hive.installAgyHooks();
   hive.installGrokHooks();
-  hive.installGeminiHooks(path.join(home, 'hive/agents/a1'));
+  hive.installGeminiHooks();
   hive.installCodexHooks(path.join(home, 'hive/agents/a1'), 'a1');
 
   const launcher = launcherIn(home);
@@ -444,28 +447,92 @@ test('reset cleanup removes only exposed Munder rollouts', (t) => {
   assert.equal(fs.readFileSync(personal, 'utf8'), 'personal\n', 'reset touched a personal Codex session');
 });
 
-test('Gemini gets isolated lifecycle settings and an interactive protocol seed', async (t) => {
-  const home = tmpHome();
-  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
-  const hive = new HiveManager(() => home);
-  const injection = await hive.ensureAgent({
-    id: 'gemini-1',
-    name: 'Gemini',
-    provider: 'gemini',
-    cwd: home
-  });
+test('Gemini 0.60+ uses user-scoped lifecycle hooks and trusts the worker workspace', async (t) => {
+  const base = tmpHome();
+  const harness = path.join(base, 'harness');
+  const userHome = path.join(base, 'user');
+  fs.mkdirSync(harness, { recursive: true });
+  fs.mkdirSync(userHome, { recursive: true });
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
 
-  const settingsPath = injection.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
-  assert.equal(typeof settingsPath, 'string');
-  assert.ok(settingsPath.startsWith(path.join(home, 'hive', 'agents', 'gemini-1')));
+  const realHome = process.env.HOME;
+  const realProfile = process.env.USERPROFILE;
+  const realGeminiHome = process.env.GEMINI_CLI_HOME;
+  const geminiConfigRoot = path.join(base, 'custom-gemini-home');
+  process.env.HOME = userHome;
+  process.env.USERPROFILE = userHome;
+  process.env.GEMINI_CLI_HOME = geminiConfigRoot;
+  t.after(() => {
+    if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
+    if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
+    if (realGeminiHome === undefined) delete process.env.GEMINI_CLI_HOME; else process.env.GEMINI_CLI_HOME = realGeminiHome;
+  });
+  assert.equal(os.homedir(), userHome, 'home redirect failed — aborting before touching the real home');
+
+  const settingsPath = path.join(geminiConfigRoot, '.gemini', 'settings.json');
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({
+    context: { includeDirectories: ['/keep/user/directory'] },
+    hooks: {
+      AfterAgent: [{ hooks: [{ name: 'personal-after-agent', type: 'command', command: 'echo personal' }] }],
+      Notification: [{ hooks: [{ name: 'personal-notification', type: 'command', command: 'echo notification' }] }]
+    }
+  }, null, 2), 'utf8');
+
+  const hive = new HiveManager(() => harness);
+  const meta = { id: 'gemini-1', name: 'Gemini', provider: 'gemini', cwd: harness };
+  const injection = await hive.ensureAgent(meta);
+
+  assert.equal(injection.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH, undefined,
+    'user-owned settings must not be passed as system settings on Gemini 0.60+');
+  assert.equal(injection.env.GEMINI_CLI_TRUST_WORKSPACE, 'true',
+    'Gemini CLI must trust the app-managed workspace in this non-interactive spawn');
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  assert.deepEqual(
-    Object.keys(settings.hooks),
-    ['SessionStart', 'BeforeAgent', 'BeforeTool', 'AfterTool', 'AfterAgent']
-  );
-  assert.equal(settings.hooksConfig.enabled, true);
-  assert.equal(settings.hooks.BeforeTool[0].matcher, '.*');
-  assert.ok(settings.hooks.AfterAgent[0].hooks[0].command.includes('gemini-hook.cjs'));
+  assert.deepEqual(settings.context.includeDirectories, ['/keep/user/directory'],
+    'existing user context settings must remain unchanged');
+  assert.ok(settings.hooks.Notification.some((group) =>
+    group.hooks.some((item) => item.name === 'personal-notification')),
+    'unrelated user hooks must remain unchanged');
+
+  const managed = {
+    SessionStart: 'munder-hive-session-start',
+    BeforeAgent: 'munder-hive-before-agent',
+    BeforeTool: 'munder-hive-before-tool',
+    AfterTool: 'munder-hive-after-tool',
+    AfterAgent: 'munder-hive-after-agent'
+  };
+  for (const [event, name] of Object.entries(managed)) {
+    assert.ok(Array.isArray(settings.hooks[event]), `${event} hooks should be configured`);
+    assert.equal(settings.hooks[event].flatMap((group) => group.hooks || [])
+      .filter((item) => item.name === name).length, 1, `${event} should have one hive hook`);
+  }
+  assert.ok(settings.hooks.AfterAgent.some((group) =>
+    group.hooks.some((item) => item.name === 'personal-after-agent')),
+    'existing hooks for a managed event must be preserved');
+  assert.ok(fs.existsSync(path.join(harness, 'hive', 'bin', 'gemini-hook.cjs')));
+  assert.equal(fs.existsSync(path.join(userHome, '.gemini', 'settings.json')), false,
+    'respect GEMINI_CLI_HOME instead of writing to the default home');
+  assert.equal(fs.existsSync(path.join(harness, 'hive', 'agents', 'gemini-1', '.gemini-hive', 'system-settings.json')), false,
+    'do not create a user-owned file that Gemini will reject as a system settings file');
+
+  // A user may add a personal hook to the same event group; refreshing ours must not delete it.
+  const editedByUser = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const afterAgentGroup = editedByUser.hooks.AfterAgent.find((group) =>
+    (group.hooks || []).some((item) => item.name === 'munder-hive-after-agent'));
+  afterAgentGroup.hooks.push({ name: 'personal-co-located-hook', type: 'command', command: 'echo keep me' });
+  fs.writeFileSync(settingsPath, JSON.stringify(editedByUser, null, 2), 'utf8');
+
+  // Re-spawning the same agent must replace only our own entries, never append duplicates.
+  await hive.ensureAgent(meta);
+  const again = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.ok(again.hooks.AfterAgent.some((group) =>
+    group.hooks.some((item) => item.name === 'personal-co-located-hook')),
+    'a user hook in the same group as ours must survive refresh');
+  for (const [event, name] of Object.entries(managed)) {
+    assert.equal(again.hooks[event].flatMap((group) => group.hooks || [])
+      .filter((item) => item.name === name).length, 1, `${event} must remain idempotent after respawn`);
+  }
+
   // The seed comes after Gemini's own flags (its workspace folders).
   const seed = injection.args.indexOf('-i');
   assert.ok(seed >= 0, 'gemini spawn carries -i');
