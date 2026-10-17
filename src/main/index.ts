@@ -121,7 +121,7 @@ import { quickbooksAccessToSave } from '../shared/quickbooks';
 import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
-import { pastesDir, savePaste, sweepOldPastes } from './pastes';
+import { PASTE_KEEP_MS, pastesDir, savePaste, sweepOldPastes } from './pastes';
 import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
 import { buildWorkerLaunch } from './workerLaunch';
 import { ControlRegistry } from './control';
@@ -7712,7 +7712,8 @@ function bootstrapHiveServices(): void {
   }
   hive.ensureHive();
   try { sweepOrphanAgentMcp(); } catch (e) { console.error('[mail] orphan agent-mcp sweep failed', e); }
-  sweepOldPastes(pastesDir(app.getPath('userData')));
+  // A screenshot a queued message still points at stays, however long it waits.
+  sweepOldPastes(pastesDir(app.getPath('userData')), PASTE_KEEP_MS, Date.now(), JSON.stringify(roster.read()?.queues ?? {}));
   // Read the Claude account's connectors in the background (D11).
   void refreshClaudeConnectors('start');
   // Waiting schedule requests reach Michael, and ones he leaves undecided
