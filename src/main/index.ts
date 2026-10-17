@@ -843,6 +843,7 @@ function researchFolders(): string[] {
 const integrationBroker = new IntegrationBroker({
   getRecord: integrations.getRecord,
   getSecret: integrations.getSecret,
+  writeJournalPath: join(app.getPath('userData'), 'broker-write-journal.json'),
   mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line) }, agentId, op, body) : undefined
 });
 
