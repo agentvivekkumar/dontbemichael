@@ -290,19 +290,33 @@ export class TelemetryProcessor {
     });
   }
 
-  /** Cards finished or reopened since a time, with time held Blocked or Waiting. */
+  /** Cards finished or reopened since a time, with time held Blocked or Waiting.
+   *  A card's whole history counts: a reopen or hold before the time too. */
   cards(office: string, since: number): CardFact[] {
-    const by = new Map<string, CardFact & { heldFrom: number | null }>();
-    for (const r of this.rows(office, ['card-status', 'card-reopen'], since)) {
+    const kinds = ['card-status', 'card-reopen'];
+    const recent = this.rows(office, kinds, since);
+    // These cards, and when each was made (0 when unknown).
+    const made = new Map<string, number>();
+    for (const r of recent) {
       const id = String(r.attrs?.id ?? '');
-      if (!id) continue;
+      if (id) made.set(id, Math.max(made.get(id) ?? 0, Number(r.attrs?.createdAt) || 0));
+    }
+    // No card has events before it was made, so the earlier ones are read
+    // from the oldest card on (all of them when one's time is unknown).
+    let from = since;
+    for (const t of made.values()) from = Math.min(from, t);
+    const by = new Map<string, CardFact & { heldFrom: number | null }>();
+    for (const r of from < since ? this.rows(office, kinds, from) : recent) {
+      const id = String(r.attrs?.id ?? '');
+      if (!made.has(id)) continue;
       const c = by.get(id) ?? { id, assignee: r.agentId ?? '', createdAt: Number(r.attrs?.createdAt ?? r.ts) || r.ts, heldMs: 0, reopened: false, excluded: false, heldFrom: null };
       if (r.agentId) c.assignee = r.agentId;
       if (r.kind === 'card-reopen') { c.reopened = true; by.set(id, c); continue; }
       const to = String(r.attrs?.to ?? '');
       if (c.heldFrom !== null && to !== 'blocked' && to !== 'waiting') { c.heldMs += r.ts - c.heldFrom; c.heldFrom = null; }
       if ((to === 'blocked' || to === 'waiting') && c.heldFrom === null) c.heldFrom = r.ts;
-      if (to === 'done') c.doneAt = r.ts;
+      // Only a finish since the time is one: an earlier one is in an earlier period.
+      if (to === 'done' && r.ts >= since) c.doneAt = r.ts;
       if (r.attrs?.excluded) c.excluded = true;
       by.set(id, c);
     }
