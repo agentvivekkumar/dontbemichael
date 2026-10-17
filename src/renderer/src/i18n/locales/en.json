@@ -1215,6 +1215,7 @@
     "closedGroup": "{{name}} (closed)",
     "closedNote": "{{name}} is closed, so these are paused.",
     "relayHint": "{{godName}} hands this job to the team.",
+    "cannotCheckEmail": "{{name}} cannot check email, so this job reads nothing. Turn on Email on their Access tab.",
     "approvedBy": "approved by {{name}}",
     "everyInterval": "every {{interval}}",
     "focus": "Focus area",

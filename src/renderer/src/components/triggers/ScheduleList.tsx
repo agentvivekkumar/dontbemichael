@@ -15,6 +15,8 @@ import { WhenLines, fieldsFromLines, linesFromMission, sameLines, type LineDraft
 import { cleanFocus, FOCUS_MAX, GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { useRtl } from '@/i18n/useDirection';
+import { useHarnessConfig } from '@/hooks/useHarnessConfig';
+import { cannotCheckEmailNote } from '@shared/scheduleEmail';
 
 /**
  * SCHEDULES, per agent (docs/designs/per-agent-schedules.md).
@@ -228,6 +230,8 @@ function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowPr
   const { t, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
+  const godId = useGodId();
+  const config = useHarnessConfig();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState(mission.label);
   const [intervalMs, setIntervalMs] = useState(mission.intervalMs);
@@ -371,6 +375,13 @@ function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowPr
         )}
       </div>
       {mission.relay && <Hint>{t('schedulesSection.relayHint', { godName })}</Hint>}
+      {/* A mail check on an agent without email still nudges it and the check
+          is refused (multi-mailbox.md, Section 4), so say so here. */}
+      {cannotCheckEmailNote(config, ownerOf(mission, godId), mission) && (
+        <div data-cannot-check-email style={{ fontSize: 13, lineHeight: '18px', marginTop: 3, color: 'var(--cth-amber-text)' }}>
+          {t('schedulesSection.cannotCheckEmail', { name: ownerName })}
+        </div>
+      )}
       {failed && !open && <Line tone="error">{t('schedulesSection.saveFailed')}</Line>}
 
       {open && !readOnly && (

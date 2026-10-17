@@ -363,16 +363,6 @@
 **Effort:** S
 **Priority:** P1
 
-### Say "cannot check email" beside a schedule
-
-**What:** When a schedule's agent has email off, show a short note on that schedule ("Pam cannot check email") in the On a schedule section and the office schedule.
-
-**Why:** Plan CEO Section 4. A mail check schedule on an agent without email is silently ignored.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
-
-**Effort:** S
-**Priority:** P1
 
 ### Read one email without downloading its attachments
 
