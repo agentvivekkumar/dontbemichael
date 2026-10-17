@@ -19,9 +19,10 @@
  */
 
 import { existsSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { AGENT_TMP_DIR, agentTmpName } from '../shared/folderAccess';
 import { ALLOW_TEMP_WORKERS } from '../shared/buildFeatures';
+import { expandTilde } from './fs';
 import { isSameOrInside } from './pathInside';
 
 /** Claude's tools that write a file at a path given in their input. */
@@ -42,12 +43,12 @@ export interface HarnessWriteInput {
 
 export function harnessWriteDecision(i: HarnessWriteInput): { deny: boolean; reason?: string } {
   if (!GUARDED_TOOLS.has(i.tool)) return { deny: false };
-  const target = targetPath(i.toolInput, i.cwd, i.harnessHome);
+  const target = targetPath(i.toolInput, i.cwd);
   if (!target) return { deny: false };
 
   const norm = (p: string) => (i.caseInsensitive ? p.toLowerCase() : p);
-  const harnessHome = expandHome(i.harnessHome);
-  const hiveRoot = expandHome(i.hiveRoot);
+  const harnessHome = expandTilde(i.harnessHome);
+  const hiveRoot = expandTilde(i.hiveRoot);
 
   if (!isSameOrInside(norm(harnessHome), norm(target))) return { deny: false };
   // Its own scratch folder, where its Claude session keeps temp files (ship
@@ -96,40 +97,17 @@ function isPlumbing(rel: string, agentId: string, isGod: boolean, tool: string, 
   return false;
 }
 
-function expandHome(p: string): string {
-  if (p === '~' || p.startsWith('~/') || p.startsWith('~\\')) {
-    const home = typeof process !== 'undefined'
-      ? process.env.HOME || process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null)
-      : null;
-    if (home) return p === '~' ? home : resolve(home, p.slice(1).replace(/^[/\\]+/, ''));
-  }
-  return p;
-}
-
 /** The absolute path a tool call would write, or null if it names none. */
-function targetPath(input: unknown, cwd: string | undefined, harnessHome?: string): string | null {
+function targetPath(input: unknown, cwd: string | undefined): string | null {
   if (!input || typeof input !== 'object') return null;
   const o = input as Record<string, unknown>;
   // Trimmed first, as Claude Code reads a path (its expandPath trims, then
   // expands ~): " /Users/x" is the folder /Users/x, never one inside the
   // agent's own (red team, ship review pass 3).
   const str = (k: string) => (typeof o[k] === 'string' && (o[k] as string).trim().length > 0 ? (o[k] as string).trim() : null);
-  let p = str('file_path') ?? str('notebook_path') ?? str('path');
-  if (!p) return null;
-  if (p === '~' || p.startsWith('~/') || p.startsWith('~\\')) {
-    let home = typeof process !== 'undefined'
-      ? process.env.HOME || process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : null)
-      : null;
-    if (harnessHome) {
-      const normHome = resolve(expandHome(harnessHome));
-      const base = basename(normHome);
-      const rel = p.slice(1).replace(/^[/\\]+/, '').split(/[\\/]/)[0];
-      if (rel && (rel.toLowerCase() === base.toLowerCase() || normHome.toLowerCase().includes(rel.toLowerCase()))) {
-        home = dirname(normHome);
-      }
-    }
-    if (home) p = p === '~' ? home : resolve(home, p.slice(1).replace(/^[/\\]+/, ''));
-  }
+  const raw = str('file_path') ?? str('notebook_path') ?? str('path');
+  if (!raw) return null;
+  const p = expandTilde(raw);
   // resolve() also collapses `..`, so `outbox/../../board.md` is judged as board.md.
   return isAbsolute(p) ? resolve(p) : cwd ? resolve(cwd, p) : null;
 }

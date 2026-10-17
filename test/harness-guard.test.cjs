@@ -11,6 +11,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const os = require('node:os');
+const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 const { posixOnly } = require('./platform.cjs');
 
@@ -173,13 +175,27 @@ test('a path with whitespace, tilde or using path property is judged as Claude C
   // Value: protects=agents cannot bypass harness folder boundaries with leading spaces, tilde expansion, or path property; fails_when=the guard resolves padded or tilde paths relative to cwd or ignores path property; why_new=security audit parity with folderAccess; seam=harnessWriteDecision
   assert.equal(decide(`  ${HOME}/roster.json  `).deny, true, 'padded with whitespace');
   assert.equal(decide(`\t${HIVE}/tasks.json`).deny, true, 'leading tab');
-  assert.equal(decide('~/HarnessAgents/roster.json').deny, true, 'tilde path into harness home');
-  assert.equal(decide('~/HarnessAgents/hive/tasks.json').deny, true, 'tilde path into hive root');
-  assert.equal(decide('~\\HarnessAgents\\roster.json').deny, true, 'windows tilde path');
   assert.equal(harnessWriteDecision({
     tool: 'Write', toolInput: { path: `${HOME}/roster.json` }, cwd: FOLDER,
     agentId: 'oscar', isGod: false, harnessHome: HOME, hiveRoot: HIVE, caseInsensitive: true
   }).deny, true, 'input using path property');
   assert.equal(decide('   ').deny, false, 'whitespace-only path names no file');
-  assert.equal(decide('~/HarnessAgents/hive/agents/oscar/memory/inbox.md').deny, false, 'protocol files with tilde still pass');
+
+  const realHome = os.homedir();
+  const realHarness = path.join(realHome, 'HarnessAgents');
+  const realHive = path.join(realHarness, 'hive');
+  const realDecide = (file_path) => harnessWriteDecision({
+    tool: 'Write', toolInput: { file_path }, cwd: path.join(realHome, 'Documents', 'Pho', 'Finance'),
+    agentId: 'oscar', isGod: false, harnessHome: realHarness, hiveRoot: realHive, caseInsensitive: true
+  });
+  assert.equal(realDecide('~/HarnessAgents/roster.json').deny, true, 'tilde path into harness home');
+  assert.equal(realDecide('~/HarnessAgents/hive/tasks.json').deny, true, 'tilde path into hive root');
+  assert.equal(realDecide('~\\HarnessAgents\\roster.json').deny, true, 'windows tilde path');
+  assert.equal(realDecide('~/HarnessAgents/hive/agents/oscar/memory/inbox.md').deny, false, 'protocol files with tilde still pass');
+
+  const tildeDecide = (file_path) => harnessWriteDecision({
+    tool: 'Write', toolInput: { file_path }, cwd: path.join(realHome, 'Documents', 'Pho', 'Finance'),
+    agentId: 'oscar', isGod: false, harnessHome: '~/HarnessAgents', hiveRoot: '~/HarnessAgents/hive', caseInsensitive: true
+  });
+  assert.equal(tildeDecide('~/HarnessAgents/roster.json').deny, true, 'harnessHome with tilde');
 });
