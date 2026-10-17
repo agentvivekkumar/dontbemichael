@@ -21,7 +21,7 @@ import type { HarnessConfig } from './config';
 import type { ControlRegistry } from './control';
 import type { CircuitBreaker } from './breaker';
 import { estimateCostUsd } from './pricing';
-import { claudeProjectsRoot, projectDir } from './transcript';
+import { claudeHistoryFile, claudeProjectsRoot, projectDir } from './transcript';
 import { HOOK_PATH_UNCHECKED, HOOK_SENDER_UNCHECKED, MAX_HOOK_FRAME_BYTES, TERMINAL_PROMPT_TYPES, isTerminalPrompt, validateHookEvent } from '../shared/hookEvents';
 export { TERMINAL_PROMPT_TYPES, isTerminalPrompt };
 import { resolveGodName } from '../shared/godIdentity';
@@ -1154,8 +1154,8 @@ export class HookServer {
     // it reads nothing in the home folder or the office but its own folders,
     // and writes only those (D2.5, D2.6).
     if (agentId === RESEARCH_ID) {
-      // Claude Code's projects folder too, wherever CLAUDE_CONFIG_DIR puts it.
-      const walled = [homedir(), home ?? '', cfg.businessFolder ?? '', this.getKnowledge?.().root ?? '', claudeProjectsRoot(),
+      // Claude Code's projects folder and history too, wherever CLAUDE_CONFIG_DIR puts them.
+      const walled = [homedir(), home ?? '', cfg.businessFolder ?? '', this.getKnowledge?.().root ?? '', claudeProjectsRoot(), claudeHistoryFile(),
         ...(cfg.businessTeam ?? []).map((m) => m.folder),
         ...Object.values(reg.agents).filter((a) => a.id !== agentId && a.cwd).map((a) => a.cwd),
         // Every temporary folder; its own session files are in its desk (D6.1).

@@ -17,6 +17,7 @@ import {
   type RegistryAgentFields
 } from '../shared/officeRecord';
 import { homeFolderStatus } from './homeFolder';
+import { claudeHistoryFile, claudeProjectsRoot } from './transcript';
 import type { FolderLayout } from '../shared/folderAccess';
 
 export function officeRecordPath(home: string): string {
@@ -169,8 +170,10 @@ export function folderLayoutFor(businessFolder: string | undefined, folders: str
   }
   // The app's private folder (issue #63), whatever the layout: nobody opens it.
   // Its program and settings folders (issue 100): nobody changes them.
+  // Claude Code's transcripts and prompt history: nobody opens them either.
   return {
     business, teamFolders,
+    claudeProjects: onDisk(claudeProjectsRoot()), claudeHistory: onDisk(claudeHistoryFile()),
     ...(app ? { appPrivate: join(app, 'private'), appLocked: [join(app, 'hive', 'bin'), join(app, 'agent-settings')] } : {})
   };
 }
