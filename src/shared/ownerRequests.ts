@@ -20,6 +20,8 @@ export interface MessageLike {
   subject?: string;
   created_at: string;
   to?: string;
+  /** The answer an owner's answer request carries (askMeRouting answeredAtOf). */
+  answeredAt?: string;
 }
 
 /** Most cards listed in one context block; the rest are counted. */
@@ -102,18 +104,24 @@ export interface CardLike {
  * Michael sent on that card since: the launch catch-up's candidates
  * (card-lifecycle.md section 5). Every answered, timed entry counts, not only
  * the newest on a Blocked card, because a card can hold several questions and
- * an answered card often leaves Blocked. catchUpRequests keeps only the
- * answers the app recorded itself.
+ * an answered card often leaves Blocked. A request that names its answer
+ * covers that answer only, so a failed send stays caught up after the owner
+ * answers another question on the card; an older request without one covers
+ * every answer before it. catchUpRequests keeps only the answers the app
+ * recorded itself.
  */
 export function answersWithoutRequest(
   tasks: CardLike[],
   toMichael: MessageLike[]
 ): Array<{ task: CardLike; q: string; a: string; raisedBy?: string; answeredAt?: string }> {
   const lastRequestAt = new Map<string, string>();
+  const requested = new Set<string>();
   for (const m of toMichael) {
     if (m.from !== 'human' || m.act !== 'request') continue;
     const taskId = cardOfConversation(m.conversation);
-    if (taskId && (!lastRequestAt.has(taskId) || m.created_at > lastRequestAt.get(taskId)!)) lastRequestAt.set(taskId, m.created_at);
+    if (!taskId) continue;
+    if (m.answeredAt) requested.add(`${taskId}|${m.answeredAt}`);
+    else if (!lastRequestAt.has(taskId) || m.created_at > lastRequestAt.get(taskId)!) lastRequestAt.set(taskId, m.created_at);
   }
   const out: Array<{ task: CardLike; q: string; a: string; raisedBy?: string; answeredAt?: string }> = [];
   for (const t of tasks) {
@@ -121,7 +129,7 @@ export function answersWithoutRequest(
     const sent = lastRequestAt.get(t.id);
     for (const e of t.humanQA) {
       if (!e || typeof e.q !== 'string' || !isAnswered(e) || isWithdrawn(e) || typeof e.answeredAt !== 'string') continue;
-      if (sent && sent >= e.answeredAt) continue;
+      if (requested.has(`${t.id}|${e.answeredAt}`) || (sent && sent >= e.answeredAt)) continue;
       out.push({ task: t, q: e.q, a: e.a as string, raisedBy: e.raisedBy, answeredAt: e.answeredAt });
     }
   }
@@ -153,7 +161,7 @@ export function catchUpRequests(
   for (const { task, q, a, raisedBy, answeredAt } of candidates) {
     if (!answeredAt || !recorded.has(answerKey(task.id, answeredAt, digest(q, a)))) continue;
     const raiser = raiserOf({ raisedBy }, { assignee: typeof task.assignee === 'string' ? task.assignee : undefined }, known);
-    const m = answerMessages({ raiser, raiserName: agents[raiser]?.name ?? raiser, taskId: task.id, title: task.title ?? task.id, q, a }).find((x) => x.to === MICHAEL_ID);
+    const m = answerMessages({ raiser, raiserName: agents[raiser]?.name ?? raiser, taskId: task.id, title: task.title ?? task.id, q, a, answeredAt }).find((x) => x.to === MICHAEL_ID);
     if (m) out.push(m);
   }
   return out;

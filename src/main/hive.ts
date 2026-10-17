@@ -56,7 +56,7 @@ import {
   type AgentProvider
 } from '../shared/agentProvider';
 import { MCP_CATALOG } from '../shared/mcpCatalog';
-import { cardConversation, openAskIndexes } from '../shared/askMeRouting';
+import { answeredAtOf, cardConversation, openAskIndexes } from '../shared/askMeRouting';
 import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
@@ -3920,7 +3920,7 @@ export class HiveManager {
           // An agent's own outbox file often has no created_at (the router adds
           // it in memory; the archived copy keeps the raw file): use its time.
           const at = typeof raw.created_at === 'string' && raw.created_at ? raw.created_at : new Date(statSync(p).mtimeMs).toISOString();
-          m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to };
+          m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to, answeredAt: answeredAtOf(raw.body) };
           // The owner's conversation needs the words (michael-replies.md); other
           // mail keeps only its envelope in memory.
           const ownerSide = raw.from === 'human' || OWNER_ALIASES.has(String(raw.to ?? '').toLowerCase()) || !!ownerQuestionOf(raw.conversation);
