@@ -226,7 +226,8 @@ export function michaelCardState(createdAt: string, now: number, days: readonly 
  *  conversation. */
 export type OwnerCardChange =
   | { kind: 'closed'; reason?: string }
-  | { kind: 'moved'; from: string; to: string; reason?: string };
+  | { kind: 'moved'; from: string; to: string; reason?: string }
+  | { kind: 'finished'; result: string; withdrew: number };
 
 const STATUS_WORDS: Record<string, string> = { triage: 'Triage', todo: 'To do', doing: 'Doing', waiting: 'Waiting', blocked: 'Blocked', done: 'Done' };
 
@@ -238,6 +239,15 @@ export function ownerChangeNote(task: { id: string; title?: string }, change: Ow
       body: [
         `The owner closed ${card} as Done.${change.reason ? ` Reason: ${change.reason}` : ''}`,
         'This is the owner\'s decision, not finished work. Treat the card as closed: stop work on it and tell whoever has it. Do not reopen it unless the owner asks.'
+      ].join('\n')
+    };
+  }
+  if (change.kind === 'finished') {
+    return {
+      subject: `OWNER FINISHED card ${cardText(task.id, 60)}`,
+      body: [
+        `The owner marked ${card} Done with a result: ${cardText(change.result, 500)}`,
+        `That withdrew ${change.withdrew === 1 ? 'its open question' : `its ${change.withdrew} open questions`} from Ask me, unanswered. Tell whoever raised ${change.withdrew === 1 ? 'it' : 'them'}. If one still needs an answer, ask it again on a new card.`
       ].join('\n')
     };
   }
