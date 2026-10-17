@@ -23,7 +23,7 @@ require.cache[electron] = {
   exports: { Notification: class { show() {} static isSupported() { return false; } } }
 };
 
-const { folderPolicy, folderDecision, folderToolTarget } = loadTs('src/shared/folderAccess.ts');
+const { folderPolicy, folderDecision, folderToolTarget, researchShellTargets, researchShellDecision } = loadTs('src/shared/folderAccess.ts');
 const { folderLayoutFor } = loadTs('src/main/officeFile.ts');
 const { HiveManager } = loadTs('src/main/hive.ts');
 
@@ -233,4 +233,21 @@ test('an agent whose folder is reached through a link still opens its own files'
   const real = realPathOf(path.join(linkedCwd, 'june.pdf'));
   assert.equal(folderDecision({ isGod: false, cwd: realPathOf(linkedCwd) }, l, 'Read', real, true).deny, false);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Research\'s shell paths name office folders and climbs, not URLs or flags (#442)', () => {
+  // Value: protects=a Windows Research Bash that names the business folder is caught; fails_when=path extraction skips quoted paths, drive letters or `..`; why_new=Windows has no OS sandbox for Bash; seam=none
+  const desk = abs('/Users/me/.dontbemichael/research-desk');
+  const biz = abs('/Users/me/Documents/Biz');
+  const own = [desk];
+  const walled = [abs('/Users/me'), biz, abs('/Users/me/Documents/Biz/Finance')];
+  assert.deepEqual(researchShellTargets('curl https://example.com/a', desk), []);
+  assert.ok(researchShellTargets(`type "${path.join(biz, 'ledger.csv')}"`, desk).some((p) => p === path.resolve(path.join(biz, 'ledger.csv'))));
+  assert.ok(researchShellTargets('Get-Content ..\\Finance\\secret.txt', path.join(biz, 'Sales')).length >= 1);
+  assert.equal(researchShellDecision(`type "${path.join(biz, 'ledger.csv')}"`, desk, walled, own, true).deny, true);
+  assert.equal(researchShellDecision('curl https://example.com', desk, walled, own, true).deny, false);
+  assert.equal(researchShellDecision(`type "${path.join(desk, 'notes.md')}"`, desk, walled, own, true).deny, false);
+  const hooks = fs.readFileSync(path.resolve(__dirname, '../src/main/hooks.ts'), 'utf8');
+  assert.match(hooks, /agentId === RESEARCH_ID && p\.tool_name === 'Bash' && process\.platform === 'win32'/);
+  assert.match(hooks, /researchShellCheck/);
 });
