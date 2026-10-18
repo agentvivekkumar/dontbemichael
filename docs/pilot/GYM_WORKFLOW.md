@@ -29,7 +29,7 @@ sequenceDiagram
     Kelly->>Harness: Tool Call: propose_email(to, subject, draft_body)
     Harness->>Harness: Store Proposal in mail-proposals.json
     Harness->>Owner: Render Approval Card on "Needs you" Board
-    Note over Owner: Owner spends 15s reading draft.<br/>Clicks "Approve" (or edits text)
+    Note over Owner: Owner reviews proposed draft.<br/>Clicks "Approve" (or edits text)
     Owner->>Harness: Approve Proposal
     Harness->>Mail: SMTP Dispatch with Dedup Message-ID
     Mail-->>Customer: Outbound Reply Sent
@@ -124,7 +124,7 @@ Kelly's scheduled inbox check detects the unread message. Because Kelly holds th
 
 ### Step 2: Knowledge Retrieval & Drafting
 Kelly searches company knowledge for `membership rates` and `try class / trial pass`.
-* Basic: $59, Class: $89, All-Inclusive: $89.
+* Basic: $59, Class: $89, All-Inclusive: $129.
 * Free 1-day pass for local residents with photo ID.
 
 Kelly formulates the draft:
@@ -169,5 +169,5 @@ The owner views the card on their desktop:
 | :--- | :--- | :--- |
 | **Inquiry demands unauthorized discount** | Kelly's work style explicitly forbids granting custom discounts. Kelly formulates standard rates and raises a question to Michael for owner review. | [Tested in simulation] |
 | **Network disconnection mid-send** | `mail.ts` checks SQLite `sendJournal` before and after connection. No duplicate dispatch occurs. | [Verified] Tested in `mail-service.test.cjs`. |
-| **Prompt injection attempt in email body** | Kelly has no tool execution privileges outside drafting; cannot run shell commands or delete files. | [Verified] Confined by `harnessGuard.ts`. |
+| **Adversarial prompt injection attempting direct send** | An agent configured in `Send on approval` mode cannot bypass human review; direct `send` requests without an approved proposal are rejected with `HTTP 403 Forbidden` by `mailAccess` in `src/shared/mailboxes.ts` and `src/main/mail.ts`. Tested in simulation; does not claim universal prompt-injection immunity or arbitrary tool containment. | [Tested in simulation] |
 | **AI engine unavailable or rate-limited** | Inbound emails remain safely unread in the IMAP mailbox; the owner can open their standard email client at any time. | [Verified] |
