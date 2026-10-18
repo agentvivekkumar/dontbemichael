@@ -480,3 +480,10 @@ test('a Claude member\'s transcript total never reaches Pulse cost; an engine wi
   assert.match(src, /if \(sample && \(sample\.sessionId \|\| \(a\.provider \?\? 'claude'\) !== 'claude'\)\) \{\s*pulseTelemetry\.cost\(id, sample\.sessionId \|\| `transcript:\$\{hive\.lastSession\(id\) \?\? ''\}`/);
   assert.doesNotMatch(src, /pulseTelemetry\.cost\(id, sample\.sessionId \|\| 'transcript'/);
 });
+
+test('pulse:snapshot starts the backfill so opening Pulse within 30 s still populates past weeks', () => {
+  // Value: protects=first Pulse open shows history; fails_when=backfill only runs on the 30 s beat; why_new=Codex adversarial review 2, TODOS.md; seam=none (source pin)
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src/main/index.ts'), 'utf8');
+  const handler = src.slice(src.indexOf("handle('pulse:snapshot'"), src.indexOf("handle('pulse:apply'"));
+  assert.match(handler, /pulseBackfillOnce\(office\)/);
+});
