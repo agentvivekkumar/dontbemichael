@@ -293,6 +293,8 @@ export interface HarnessConfig {
   /** Mailboxes connected in Settings (docs/designs/multi-mailbox.md). Metadata
    *  only; each app password lives in the secret store under `mail:<id>`. */
   mailboxes?: MailboxRecord[];
+  /** WhatsApp Business numbers connected in Settings. */
+  whatsappAccounts?: import('../shared/whatsapp').WhatsAppAccountRecord[];
   /** Per-agent Capabilities, keyed by agent id (Michael included). Missing means
    *  no capabilities: every agent starts with email off (MB-6). */
   agentCapabilities?: { [agentId: string]: AgentCapabilities };

@@ -91,6 +91,7 @@ import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
 import { accessLine, agentAccessSummary } from '../shared/agentAccess';
 import { MAIL_TOOL_OPS, mailAccess } from '../shared/mailboxes';
+import { WHATSAPP_TOOL_OPS, whatsAppAccess } from '../shared/whatsapp';
 import { WEB_SETTINGS_UNREADABLE, WEB_TOOLS, webAccess } from '../shared/webAccess';
 import { isQuickBooksConnectorTool, isQuickBooksResourceCall, quickbooksAccess, quickbooksCapability } from '../shared/quickbooks';
 import { handoffContext } from '../shared/safeClear';
@@ -662,6 +663,21 @@ export class HookServer {
       const named = (v: unknown): boolean => !!v && typeof v === 'object';
       const refs = { forward: named(input.forward), attachFrom: Array.isArray(input.attach_from) && input.attach_from.some(named) };
       const d = op ? mailAccess(cfg, agentId, typeof input.mailbox === 'string' ? input.mailbox : undefined, op, proposal, { refs, present: this.memberPresent }) : { ok: false as const, reason: 'Unknown mail tool.' };
+      if (!d.ok) {
+        this.emitRefused(agentId, event, p, 'mail');
+        return mcpDeny(d.reason);
+      }
+    }
+
+    // WhatsApp Business added in Settings (md-whatsapp)
+    if (event === 'PreToolUse' && agentId && /^mcp__md-whatsapp__/.test(p.tool_name ?? '')) {
+      const cfg = mcpConfig();
+      const mdWa = /^mcp__md-whatsapp__([a-z_]+)$/.exec(p.tool_name ?? '');
+      const op = mdWa ? WHATSAPP_TOOL_OPS[mdWa[1]] : undefined;
+      const input = (p.tool_input ?? {}) as { accountId?: unknown; proposalId?: unknown };
+      const d = op
+        ? whatsAppAccess(cfg, agentId, typeof input.accountId === 'string' ? input.accountId : undefined, op, typeof input.proposalId === 'string' ? input.proposalId : undefined)
+        : { ok: false as const, reason: 'Unknown WhatsApp tool.' };
       if (!d.ok) {
         this.emitRefused(agentId, event, p, 'mail');
         return mcpDeny(d.reason);

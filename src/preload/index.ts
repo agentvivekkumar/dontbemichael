@@ -322,6 +322,7 @@ export interface HarnessConfig {
    *  src/main/config.ts. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
+  whatsappAccounts?: import('../shared/whatsapp').WhatsAppAccountRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
   /** The QuickBooks row's switch under Settings > Connections > Claude connectors.
    *  Off or absent refuses everyone. Mirrors src/main/config.ts. */
@@ -980,6 +981,15 @@ const api = {
    *  remove it (docs/designs/shared-mailboxes.md). */
   mailSetSendOnly: (agentId: string, grant: { mailbox: string; sending: 'send' | 'approval' | 'draft' } | null): Promise<{ ok: boolean; restartNeeded: boolean }> =>
     ipcRenderer.invoke('mail:setSendOnly', agentId, grant),
+  // WhatsApp Business Cloud API connections & capabilities
+  whatsappSave: (input: { id?: string; phoneNumberId: string; wabaId?: string; displayPhoneNumber?: string; label: string; token: string }): Promise<{ ok: true; record: import('../shared/whatsapp').WhatsAppAccountRecord } | { ok: false; kind: string; reason: string }> =>
+    ipcRenderer.invoke('whatsapp:save', input),
+  whatsappTest: (input: { phoneNumberId: string; token: string }): Promise<{ ok: true; displayPhoneNumber: string; verifiedName?: string } | { ok: false; kind: string; reason: string }> =>
+    ipcRenderer.invoke('whatsapp:test', input),
+  whatsappRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> =>
+    ipcRenderer.invoke('whatsapp:remove', id),
+  whatsappSetCapabilities: (agentId: string, caps: { whatsapp?: import('../shared/whatsapp').WhatsAppCapability; move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
+    ipcRenderer.invoke('whatsapp:setCapabilities', agentId, caps),
   /** Read the connectors on the owner's Claude account again (a few seconds). */
   connectorsRefresh: (why?: string): Promise<void> => ipcRenderer.invoke('connectors:refresh', why),
   /** Whether a read is running now. */
