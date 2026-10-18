@@ -1480,6 +1480,7 @@
   "memoryGraph": {
     "refresh": "刷新",
     "loadingMemory": "正在加载记忆…",
+    "messageLink": "{{count}} 条消息连接",
     "messageLinks": "{{count}} 条消息连接",
     "noMemory": "尚未记录记忆。",
     "rangeLabel": "时间范围",
@@ -1495,6 +1496,7 @@
     },
     "noMessagesInRange": "这段时间内团队之间没有消息。",
     "pair": "{{a}} 和 {{b}}",
+    "messageCount": "{{count}} 条消息",
     "messagesCount": "{{count}} 条消息",
     "last": "最近：{{subject}}",
     "legendPerson": "成员",
