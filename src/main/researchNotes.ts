@@ -50,7 +50,10 @@ function readOwnIn(root: string, file: string): string | null {
     const real = realpathSync(file);
     if (!real.startsWith(root + sep)) return null;
     const now = statSync(real);
-    if (now.ino !== st.ino || now.dev !== st.dev) return null;
+    // Windows 11 24H2 with libuv 1.49 or later stats a path without asking
+    // for its volume, so `dev` comes back 0 there while the open file's is
+    // set; the file id alone then names the file.
+    if (now.ino !== st.ino || (now.dev !== 0 && now.dev !== st.dev)) return null;
     // Read to its size from this open file, into a buffer one byte past it:
     // a file that grew since the check is skipped (ship review pass 2).
     const buf = Buffer.allocUnsafe(st.size + 1);
