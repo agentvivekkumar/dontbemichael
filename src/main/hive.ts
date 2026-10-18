@@ -3897,6 +3897,39 @@ export class HiveManager {
             routed++;
             continue;
           }
+          if (typeof msg.to === 'string' && msg.to.toLowerCase() === 'triage') {
+            // A triage filing: create the file in triage/ exclusively with flag 'wx'
+            // so concurrent writes never overwrite an existing filing (TODOS.md line 334).
+            const triageDir = join(root, 'triage');
+            mkdirSync(triageDir, { recursive: true });
+            const title = (partial as { title?: unknown }).title;
+            const filingPayload = {
+              ...partial,
+              title: typeof title === 'string' && title.trim() ? title : (msg.subject || f),
+              filedBy: id,
+              filedAt: (partial as { filedAt?: unknown }).filedAt || msg.created_at
+            };
+            const content = JSON.stringify(filingPayload, null, 2);
+            const base = f.endsWith(`-${id}.json`) ? f.slice(0, -5) : `${msg.created_at.replace(/[-:]/g, '').slice(0, 15)}-${id}`;
+            let filingName = `${base}.json`;
+            let counter = 1;
+            while (true) {
+              try {
+                writeFileSync(join(triageDir, filingName), content, { flag: 'wx' });
+                break;
+              } catch (e: unknown) {
+                if (e && typeof e === 'object' && (e as { code?: string }).code === 'EEXIST') {
+                  filingName = `${base}-${counter++}.json`;
+                } else {
+                  throw e;
+                }
+              }
+            }
+            this.appendLog({ kind: 'triage-filing', from: id, file: filingName });
+            this.archiveOutboxFile(full, join(outbox, '.sent'), f);
+            routed++;
+            continue;
+          }
           // Everything to and from Research passes its trust layer first.
           const toResearch = id !== RESEARCH_ID && addressedToResearch(partial.to, (reg ??= this.registry()).agents, researchName ??= this.researchName());
           if (toResearch || id === RESEARCH_ID) {
