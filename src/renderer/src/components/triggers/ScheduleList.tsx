@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { PixelButton } from '../PixelButton';
 import { useStore } from '@/store/store';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
+import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { isComposingKey } from '@shared/imeGuard';
 import {
   Disclosure, Field, Hint, MiniButton, SchedulePicker, Toggle, fmtInterval, inputStyle, textareaStyle,
@@ -12,6 +13,7 @@ import {
 import { formatWeekly } from '@shared/weeklySchedule';
 import { formatTimes, normalizeTimes } from '@shared/scheduleTimes';
 import { WhenLines, fieldsFromLines, linesFromMission, sameLines, type LineDraft } from './WhenLines';
+import { noEmailNote } from './scheduleEmail';
 import { cleanFocus, FOCUS_MAX, GOD_ALIAS, missionsFor, nextRunAt, ownerOf, OWNER, type ScheduledMission } from '@shared/missions';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { useRtl } from '@/i18n/useDirection';
@@ -222,9 +224,12 @@ interface RowProps {
   ownerName: string;
   /** For the focus area check on save; absent on read only rows. */
   focusOwner?: FocusOwner;
+  /** "Pam cannot check email" on a mail check whose agent has no email
+   *  (scheduleEmail.ts), else null. */
+  noEmail?: string | null;
 }
 
-function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowProps) {
+function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner, noEmail }: RowProps) {
   const { t, i18n } = useTranslation();
   const rtl = useRtl();
   const godName = useResolvedGodName();
@@ -371,6 +376,7 @@ function ScheduleRow({ mission, nameOf, readOnly, ownerName, focusOwner }: RowPr
         )}
       </div>
       {mission.relay && <Hint>{t('schedulesSection.relayHint', { godName })}</Hint>}
+      {noEmail && <Hint>{noEmail}</Hint>}
       {failed && !open && <Line tone="error">{t('schedulesSection.saveFailed')}</Line>}
 
       {open && !readOnly && (
@@ -534,6 +540,7 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
   const godId = useGodId();
   const nameOf = useNameOf();
   const agents = useStore((s) => s.agents);
+  const config = useHarnessConfig();
   const mine = useMemo(() => missionsFor(missions, agentId, godId), [missions, agentId, godId]);
   const isGod = agentId === godId;
   // Michael's schedules keep the 'god' alias the router understands.
@@ -569,6 +576,7 @@ export function AgentSchedules({ agentId, agentName }: { agentId: string; agentN
             nameOf={nameOf}
             ownerName={agentName}
             focusOwner={focusOwner}
+            noEmail={noEmailNote(m, config, agentId, agentName, t)}
           />
         ))}
       </div>
@@ -584,6 +592,7 @@ export function OfficeSchedules() {
   const godId = useGodId();
   const nameOf = useNameOf();
   const agents = useStore((s) => s.agents);
+  const config = useHarnessConfig();
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   useEffect(() => {
     window.cth.hiveRegistry()
@@ -626,6 +635,7 @@ export function OfficeSchedules() {
                   nameOf={nameOf}
                   ownerName={name}
                   readOnly
+                  noEmail={noEmailNote(m, config, owner, name, t)}
                 />
               ))}
             </div>

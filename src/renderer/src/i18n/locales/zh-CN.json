@@ -1215,6 +1215,7 @@
     "closedGroup": "{{name}}（已关闭）",
     "closedNote": "{{name}} 已关闭，所以这些已暂停。",
     "relayHint": "{{godName}} 会把这项工作分给团队。",
+    "cannotCheckEmail": "{{name}} 无法查看邮件。",
     "approvedBy": "由 {{name}} 批准",
     "everyInterval": "每 {{interval}}",
     "focus": "重点",
