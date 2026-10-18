@@ -82,7 +82,7 @@ import { backfilled, runBackfill } from './pulseBackfill';
 import { readTeamMemory } from './teamMemory';
 import { readClaudePlan } from './claudeAccount';
 import { planPrice, PLAN_LABELS, PLAN_PRICES } from '../shared/claudePlan';
-import { claudeProjectsRoot, projectDir, projectDirs, readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
+import { claudeHistoryFile, claudeProjectsRoot, projectDir, projectDirs, readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
 import { SlackWebhookServer, SlackReplyServer, postSlackReply, type SlackEventFile } from './slack';
 import {
@@ -3859,8 +3859,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           // So is every temporary folder but /tmp, which Claude Code's shell
           // needs; no office agent keeps its session files there (D6.1).
           folderPolicy: researchFolderPolicy(
-            // Claude Code's projects folder too, wherever CLAUDE_CONFIG_DIR puts it.
-            [homedir(), home, businessFolder ?? '', knowledge.env().KG_ROOT ?? '', memory.env().MEMPALACE_PALACE_PATH ?? '', claudeProjectsRoot(), ...teamFolders,
+            // Claude Code's projects folder and history too, wherever CLAUDE_CONFIG_DIR puts them.
+            [homedir(), home, businessFolder ?? '', knowledge.env().KG_ROOT ?? '', memory.env().MEMPALACE_PALACE_PATH ?? '', claudeProjectsRoot(), claudeHistoryFile(), ...teamFolders,
               ...shellTempWalls(process.platform, tmpdir())],
             researchFolders(),
             homedir()

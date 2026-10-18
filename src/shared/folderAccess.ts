@@ -45,6 +45,12 @@ export interface FolderLayout {
    *  (`<harnessHome>/agent-settings`), which set its sandbox at its next start
    *  (issue 100). Any agent may read them; none, Michael included, changes them. */
   appLocked?: string[];
+  /** Claude Code's own records of every session (under CLAUDE_CONFIG_DIR or
+   *  ~/.claude): its projects folder, which holds every member's transcripts,
+   *  and its prompt history file. No agent, Michael included, opens them with
+   *  its tools or shell; the app reads them itself. */
+  claudeProjects?: string;
+  claudeHistory?: string;
 }
 
 export interface AgentFolderPolicy {
@@ -84,6 +90,18 @@ export function folderPolicy(agent: FolderAgent, layout: FolderLayout, caseInsen
   for (const f of layout.appLocked ?? []) {
     policy.sandbox.denyWrite.push(f);
     policy.deny.push(rule('Edit', f));
+  }
+  // Nor Claude Code's records: a teammate's conversation, or a hidden check's
+  // prompt quoting what was asked of Pete, sits there.
+  if (layout.claudeProjects) {
+    policy.sandbox.denyRead.push(layout.claudeProjects);
+    policy.sandbox.denyWrite.push(layout.claudeProjects);
+    policy.deny.push(rule('Read', layout.claudeProjects), rule('Edit', layout.claudeProjects));
+  }
+  if (layout.claudeHistory) {
+    policy.sandbox.denyRead.push(layout.claudeHistory);
+    policy.sandbox.denyWrite.push(layout.claudeHistory);
+    policy.deny.push(rule('Read', layout.claudeHistory, true), rule('Edit', layout.claudeHistory, true));
   }
 
   if (agent.isGod) {
@@ -132,6 +150,9 @@ export function folderDecision(
 
   if (layout.appPrivate && inside(layout.appPrivate, target)) {
     return { deny: true, reason: 'That folder is the app\'s own and holds private settings. Nobody on the team opens it.' };
+  }
+  if ((layout.claudeProjects && inside(layout.claudeProjects, target)) || (layout.claudeHistory && same(layout.claudeHistory, target))) {
+    return { deny: true, reason: `That is Claude Code's own record of the team's conversations. Nobody on the team opens it. If you need something from an earlier conversation, ask ${godName}.` };
   }
   if (writes && (layout.appLocked ?? []).some((f) => inside(f, target))) {
     return { deny: true, reason: 'That folder holds the app\'s own program and settings. You can read it, but nobody on the team changes it.' };
@@ -331,10 +352,10 @@ export function researchWallDecision(researchFolders: string[], tool: string, ta
 }
 
 /** A Claude Code permission rule for everything under an absolute folder. */
-function rule(tool: 'Read' | 'Edit', folder: string): string {
+function rule(tool: 'Read' | 'Edit', folder: string, file = false): string {
   const p = resolve(folder).replace(/\\/g, '/');
   // Absolute paths are written with a leading `//` in permission rules.
-  return `${tool}(/${p.startsWith('/') ? p : `/${p}`}/**)`;
+  return `${tool}(/${p.startsWith('/') ? p : `/${p}`}${file ? '' : '/**'})`;
 }
 
 /** Team folders, each once, never Michael's folder itself. */
