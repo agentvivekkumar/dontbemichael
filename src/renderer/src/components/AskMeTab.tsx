@@ -302,14 +302,16 @@ export function AskMeTab() {
           <section key={row.key} data-askme-id={t.id} aria-label={rowLabel(row)} style={expanded ? cardOpen : card} className={expanded ? 'cth-askme-card is-open' : 'cth-askme-card'}>
             {/* The header folds and unfolds the card. */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <div
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 aria-expanded={expanded}
                 onClick={toggle}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
                 className="cth-askme-head"
-                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                style={{
+                  flex: 1, minWidth: 0, cursor: 'pointer',
+                  padding: 0, border: 0, background: 'transparent',
+                  color: 'inherit', font: 'inherit', textAlign: 'start'
+                }}
               >
                 <div className="cth-askme-title" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
                   {askTitle(t.title)}
@@ -332,7 +334,7 @@ export function AskMeTab() {
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
                   }}>{askHeadline(open.q)}</div>
                 )}
-              </div>
+              </button>
               {/* An ask is cleared by answering it, never dismissed (owner,
                   2026-10-01). The chevron shows the card folds and opens. */}
               <div style={{ flexShrink: 0, marginTop: -3, marginInlineEnd: -5 }}>
