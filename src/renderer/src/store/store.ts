@@ -40,7 +40,7 @@ export interface PendingRestart {
   at: number;
   /** engine: Claude Code was just set up (docs/designs/get-michael-ready.md).
    *  stuck: the session stopped on a prompt (hooks.ts stuckOnPrompt). */
-  reason: 'email' | 'connectors' | 'engine' | 'stuck';
+  reason: 'email' | 'whatsapp' | 'connectors' | 'engine' | 'stuck';
   /** The owner pressed Restart now: do not wait for idle. */
   now?: boolean;
   /** The last restart attempt failed; it is tried again on the next tick. */

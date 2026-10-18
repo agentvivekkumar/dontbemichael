@@ -19,6 +19,10 @@ export function mdMailMcpPath(harnessHome: string, agentId: string): string {
   return join(agentMcpDir(harnessHome, agentId), 'md-mail.mcp.json');
 }
 
+export function mdWhatsAppMcpPath(harnessHome: string, agentId: string): string {
+  return join(agentMcpDir(harnessHome, agentId), 'md-whatsapp.mcp.json');
+}
+
 /** Legacy hive path that sibling agents (and Michael) could read. */
 export function legacyMdMailMcpPath(hiveRoot: string, agentId: string): string {
   return join(hiveRoot, 'agents', agentId, 'md-mail.mcp.json');
