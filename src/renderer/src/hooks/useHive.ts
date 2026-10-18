@@ -1432,7 +1432,7 @@ export function useHive(config: HarnessConfig | null): void {
     const CEILING_MS = 10 * 60_000;
     const POLL_MS = 5_000;
     const BUSY = new Set(['thinking', 'working', 'compacting', 'looping']);
-    const WHY = { email: 'turn on email', connectors: 'apply its connectors', engine: 'start on Claude Code', stuck: 'clear a stuck prompt' } as const;
+    const WHY = { email: 'turn on email', whatsapp: 'turn on WhatsApp', connectors: 'apply its connectors', engine: 'start on Claude Code', stuck: 'clear a stuck prompt' } as const;
     const inFlight = new Set<string>();
     const tick = (): void => {
       const { pendingRestart, agents, setPendingRestart, updateAgent } = useStore.getState();

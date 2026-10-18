@@ -1,6 +1,7 @@
 import { ResearchPrivacySettings } from './ResearchPrivacySettings';
 import { cleanDataClassOverrides } from '../../../shared/dataClasses';
 import { MailboxesSettings } from './MailboxesSettings';
+import { WhatsAppSettings } from './WhatsAppSettings';
 import { ClaudeConnectorsSettings } from './ClaudeConnectorsSettings';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useDialog } from '@/shell/useDialog';
@@ -1694,6 +1695,10 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           Hidden with SHOW_MAILBOXES. */}
                       {SHOW_MAILBOXES && (<>
                         <MailboxesSettings />
+
+                        <div style={sectionRule} />
+
+                        <WhatsAppSettings />
 
                         <div style={sectionRule} />
                       </>)}
