@@ -391,6 +391,8 @@ export class IntegrationBroker {
     const result = await this.writes.run(key, () => sendWrite(upstream, method, headers, body));
     if (result.kind === 'error') return IntegrationBroker.sendError(res, result.status, result.code, result.message);
     const { answer, repeated } = result;
+    // A rate limit on a write holds the app's next calls too.
+    if (!repeated) this.throttle.note(integrationId, answer.status, new Headers(answer.headers));
     if (res.headersSent) return;
     if (!answer.body) {
       // Made before a restart: this run never heard its answer.
