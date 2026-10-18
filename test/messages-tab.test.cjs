@@ -88,6 +88,9 @@ test('routine, verbs and the quoted gist', () => {
   assert.equal(verbKey('whatever'), 'other');
   assert.equal(gist({ subject: '', body: '\n\nFirst line\nsecond' }), 'First line');
   assert.equal(gist({ subject: 'x'.repeat(200), body: '' }).length, 160);
+  // An emoji astride the cut is dropped whole, never split into a broken half.
+  assert.equal(gist({ subject: `${'a'.repeat(158)}😀 tail`, body: '' }), `${'a'.repeat(158)}…`);
+  assert.equal(gist({ subject: `${'a'.repeat(157)}😀 tail`, body: '' }), `${'a'.repeat(157)}😀…`);
 });
 
 test('no accordion bars: light rows, day headings, one notices line, plain verbs', () => {
