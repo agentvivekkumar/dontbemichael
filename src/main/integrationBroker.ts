@@ -65,6 +65,9 @@ interface Capability {
  *  authenticated the token, so `agentId` is trusted. */
 export type MailRouteHandler = (agentId: string, op: string, body: Record<string, unknown>) => Promise<{ status: number; body: Record<string, unknown> }>;
 
+/** WhatsApp route handler (injected; src/main/whatsapp.ts). */
+export type WhatsAppRouteHandler = (agentId: string, op: string, body: Record<string, unknown>) => Promise<{ status: number; body: Record<string, unknown> }>;
+
 const MAIL_BODY_MAX = 1_000_000;
 
 export interface IntegrationBrokerDeps {
@@ -74,6 +77,8 @@ export interface IntegrationBrokerDeps {
   getSecret: (secretRef: string | undefined) => string | undefined;
   /** md-mail tool calls, `POST /mail/<tool>` (docs/designs/multi-mailbox.md). */
   mail?: MailRouteHandler;
+  /** md-whatsapp tool calls, `POST /whatsapp/<tool>`. */
+  whatsapp?: WhatsAppRouteHandler;
 }
 
 /** True for IPv4 loopback (127.0.0.0/8) and IPv6 ::1 (incl. v4-mapped). Mirrors slack.ts. */
@@ -210,6 +215,14 @@ export class IntegrationBroker {
       void this.mail(req, res, cap.agentId ?? cap.workerId, mailMatch[1]);
       return;
     }
+    // 3b) WhatsApp tools: POST /whatsapp/<tool> with a JSON body.
+    const waMatch = /^\/whatsapp\/([a-z_]{1,32})$/.exec(rawUrl);
+    if (waMatch) {
+      if (!this.deps.whatsapp) return IntegrationBroker.sendError(res, 404, 'not_found', 'whatsapp is not available');
+      if (req.method !== 'POST') return IntegrationBroker.sendError(res, 405, 'method', 'use POST');
+      void this.whatsapp(req, res, cap.agentId ?? cap.workerId, waMatch[1]);
+      return;
+    }
     // 3) Parse /i/<integrationId>/<path...>.
     const m = /^\/i\/([^/?#]+)(?:\/([^?#]*))?(\?[^#]*)?$/.exec(rawUrl);
     if (!m) return IntegrationBroker.sendError(res, 404, 'not_found', 'expected /i/<integrationId>/<path>');
@@ -271,6 +284,26 @@ export class IntegrationBroker {
       res.end(JSON.stringify(out.body));
     } catch (e) {
       IntegrationBroker.sendError(res, 500, 'mail_error', e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  private async whatsapp(req: IncomingMessage, res: ServerResponse, agentId: string, op: string): Promise<void> {
+    let raw = '';
+    let tooBig = false;
+    req.setEncoding('utf8');
+    req.on('data', (d: string) => { raw += d; if (raw.length > MAIL_BODY_MAX) { tooBig = true; req.destroy(); } });
+    await new Promise<void>((resolve) => { req.on('end', resolve); req.on('close', resolve); req.on('error', resolve); });
+    if (tooBig) return IntegrationBroker.sendError(res, 413, 'too_large', 'request too large');
+    let body: Record<string, unknown> = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch { return IntegrationBroker.sendError(res, 400, 'bad_request', 'body must be JSON'); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return IntegrationBroker.sendError(res, 400, 'bad_request', 'body must be a JSON object');
+    try {
+      const out = await this.deps.whatsapp!(agentId, op, body);
+      if (res.headersSent) return;
+      res.writeHead(out.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(out.body));
+    } catch (e) {
+      IntegrationBroker.sendError(res, 500, 'whatsapp_error', e instanceof Error ? e.message : String(e));
     }
   }
 
