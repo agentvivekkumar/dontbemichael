@@ -313,10 +313,10 @@ export function AskMeTab() {
                   color: 'inherit', font: 'inherit', textAlign: 'start'
                 }}
               >
-                <div className="cth-askme-title" style={{ fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
+                <span className="cth-askme-title" style={{ display: 'block', fontFamily: 'var(--cth-font-ui)', fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>
                   {askTitle(t.title)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6, flexWrap: 'wrap' }}>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6, flexWrap: 'wrap' }}>
                   {who && (
                     <span style={{ ...personChip, ...(fam ? { background: fam.l, boxShadow: `inset 0 0 0 1px ${fam.m}` } : {}) }}>
                       <AgentAvatar id={typeof t.assignee === 'string' ? t.assignee : undefined} name={who} size={16} />
@@ -326,13 +326,13 @@ export function AskMeTab() {
                   {ago && <span style={{ fontSize: 11, color: 'var(--cth-ink-3)' }}>{ago}</span>}
                   {isReport(open) && <span style={reportTag}>{translate('askMe.report')}</span>}
                   {!expanded && hasDraft && <span style={draftTag}>{translate('askMe.draft')}</span>}
-                </div>
+                </span>
                 {/* Folded: the ask itself, in a line or two. */}
                 {!expanded && (
-                  <div dir={rtl ? 'auto' : undefined} style={{
+                  <span dir={rtl ? 'auto' : undefined} style={{
                     marginTop: 7, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)',
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                  }}>{askHeadline(open.q)}</div>
+                  }}>{askHeadline(open.q)}</span>
                 )}
               </button>
               {/* An ask is cleared by answering it, never dismissed (owner,
