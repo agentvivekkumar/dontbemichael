@@ -29,6 +29,12 @@ import { APP_NAME } from '../shared/appName';
 
 /** The same terminal prompt is relayed to Michael at most once in this window. */
 const PROMPT_RELAY_DEDUPE_MS = 10 * 60_000;
+/** Refused hook frames: how long the team list behind their names is reused,
+ *  the most names counted, and the most impostor points Pulse takes a minute,
+ *  so a process without a secret can't grow them without end. */
+const MEMBER_IDS_TTL_MS = 5_000;
+const REFUSED_NAMES_MAX = 100;
+const IMPOSTOR_POINTS_PER_MINUTE = 20;
 /** Prompts within this long after an automatic restart are the same prompt,
  *  still on screen while the restart runs, not a new one. */
 export const STUCK_SETTLE_MS = 60_000;
@@ -360,6 +366,30 @@ export class HookServer {
   }
   private readonly rejected = new Map<string, number>();
   private readonly rejectLogged = new Map<string, number>();
+  /** Team member ids for naming refused frames, reread every few seconds so a
+   *  flood of frames never reads the registry once per frame. */
+  private memberIds: { at: number; ids: Set<string> } | null = null;
+  /** Impostor points sent to Pulse in the current minute. */
+  private impostorWindow = { start: 0, sent: 0 };
+
+  /** The name a refused frame counts under: the agent it names when that agent
+   *  is on the team, else "unknown", so made up names never grow the counts. */
+  private refusedName(claimed: string | null, now: number): string {
+    if (!claimed) return 'unknown';
+    if (!this.memberIds || now - this.memberIds.at > MEMBER_IDS_TTL_MS) {
+      let ids = new Set<string>();
+      try { ids = new Set(Object.keys(this.hive.registry().agents)); } catch { /* none known */ }
+      this.memberIds = { at: now, ids };
+    }
+    if (!this.memberIds.ids.has(claimed)) return 'unknown';
+    return this.rejected.has(claimed) || this.rejected.size < REFUSED_NAMES_MAX ? claimed : 'unknown';
+  }
+
+  /** Whether Pulse may take another impostor point this minute. */
+  private impostorAllowed(now: number): boolean {
+    if (now - this.impostorWindow.start >= 60_000) this.impostorWindow = { start: now, sent: 0 };
+    return ++this.impostorWindow.sent <= IMPOSTOR_POINTS_PER_MINUTE;
+  }
 
   /** Whether a frame came from the agent it names, by its hook secret. On
    *  success the frame names that agent and the secret is removed; on failure
@@ -373,14 +403,14 @@ export class HookServer {
       p.agent_id = owner;
       return true;
     }
-    const who = claimed ?? 'unknown';
+    const now = Date.now();
+    const who = this.refusedName(claimed, now);
     this.rejected.set(who, (this.rejected.get(who) ?? 0) + 1);
     // No secret, or another member's: something is speaking for someone it is
     // not. A secret this start never made is a process left from an earlier
     // start, shutting down: refused, but not a protection worth showing.
     const reason = owner ? 'wrong-sender' : typeof token === 'string' && token ? 'old-secret' : 'no-secret';
-    if (reason !== 'old-secret') { try { this.onRefused?.(claimed ?? undefined, 'impostor'); } catch { /* counting never blocks a refusal */ } }
-    const now = Date.now();
+    if (reason !== 'old-secret' && this.impostorAllowed(now)) { try { this.onRefused?.(who === 'unknown' ? undefined : who, 'impostor'); } catch { /* counting never blocks a refusal */ } }
     if (now - (this.rejectLogged.get(who) ?? 0) > 10 * 60_000) {
       this.rejectLogged.set(who, now);
       try { this.hive.appendLog({ kind: 'hook-frame-rejected', reason, agentId: who, event: p.hook_event_name ?? null }); } catch { /* best-effort */ }

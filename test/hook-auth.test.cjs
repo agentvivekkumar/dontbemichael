@@ -34,9 +34,16 @@ function office(t) {
   return { home, hive: new HiveManager(() => home) };
 }
 
+/** Puts these ids on the team, so a refused frame naming them counts under them. */
+function team(hive, ids) {
+  fs.mkdirSync(hive.root(), { recursive: true });
+  fs.writeFileSync(path.join(hive.root(), 'registry.json'), JSON.stringify({ godId: 'god', agents: Object.fromEntries(ids.map((id) => [id, { name: id }])) }));
+}
+
 test('a frame is its secret owner\'s; a missing, wrong, cross agent or retired secret is refused and counted', (t) => {
   // Value: protects=no agent can speak as another or as nobody; fails_when=the server trusts the frame's agent_id or keeps an old secret alive; why_new=#61; seam=none; no_claim=none beyond protects
   const { hive } = office(t);
+  team(hive, ['god', 'pam', 'dwight']);
   const server = new HookServer(hive, () => null, () => ({}));
   const pam = hive.mintHookToken('pam');
   const dwight = hive.mintHookToken('dwight');
@@ -71,12 +78,13 @@ test('every refused frame and every gated step reaches Pulse with its gate; a qu
   for (const g of ['paused', 'connector', 'quickbooks', 'mail', 'sandbox', 'internet', 'office-files', 'folder']) assert.match(src, new RegExp(`this\\.emitRefused\\(agentId, event, p, '${g}'\\)`), g);
   assert.match(src, /permissionDecisionReason: ASK_TOOL_REFUSAL/);
   assert.match(src, /this\.emitRefused\(agentId, event, p\);\n\s+return \{\n\s+hookSpecificOutput: \{\n\s+hookEventName: 'PreToolUse',\n\s+permissionDecision: 'deny',\n\s+permissionDecisionReason: ASK_TOOL_REFUSAL/, 'the question tool passes no gate');
-  assert.match(src, /if \(reason !== 'old-secret'\) \{ try \{ this\.onRefused\?\.\(claimed \?\? undefined, 'impostor'\)/);
+  assert.match(src, /if \(reason !== 'old-secret' && this\.impostorAllowed\(now\)\) \{ try \{ this\.onRefused\?\.\(who === 'unknown' \? undefined : who, 'impostor'\)/);
 });
 
 test('a frame with no secret or another member\'s is reported to Pulse; one from a leftover process is not', (t) => {
   // Value: protects=Kept safe sender count; fails_when=authenticate stops reporting; why_new=owner proposal 3; seam=none; no_claim=none beyond protects
   const { hive } = office(t);
+  team(hive, ['god', 'pam']);
   const server = new HookServer(hive, () => null, () => ({}));
   const seen = [];
   server.onRefused = (agentId, gate) => seen.push([agentId, gate]);
@@ -85,6 +93,24 @@ test('a frame with no secret or another member\'s is reported to Pulse; one from
   server.authenticate({ hook_event_name: 'Stop', agent_id: 'god', hook_token: pam });      // Pam's secret
   server.authenticate({ hook_event_name: 'Status', agent_id: 'pam', hook_token: 'from-an-earlier-start' }); // a leftover process
   assert.deepEqual(seen, [['god', 'impostor'], ['god', 'impostor']], 'a leftover process is refused but not counted');
+});
+
+test('made up names never grow the refusal counts, and a flood adds at most a few impostor points a minute', (t) => {
+  // Value: protects=a local process without a secret can't grow the counts, the log or the Kept safe tile without end; fails_when=refused frames are counted under any name they claim, or every one reaches Pulse; why_new=TODOS "Bound the refused hook frame counters"; seam=none; no_claim=the log's own 10 minute limit (above)
+  const { hive } = office(t);
+  team(hive, ['god', 'pam']);
+  const server = new HookServer(hive, () => null, () => ({}));
+  const seen = [];
+  server.onRefused = (agentId, gate) => seen.push([agentId, gate]);
+  for (let i = 0; i < 500; i++) server.authenticate({ hook_event_name: 'Stop', agent_id: `ghost-${i}` });
+  server.authenticate({ hook_event_name: 'Stop', agent_id: 'pam' });
+  assert.deepEqual([...server.rejectedFrames().keys()].sort(), ['pam', 'unknown'], 'only team members are named');
+  assert.equal(server.rejectedFrames().get('unknown'), 500);
+  assert.equal(seen.length, 20, 'Pulse takes at most 20 impostor points a minute');
+  assert.ok(seen.every(([agentId]) => agentId === undefined), 'no made up name reaches Pulse');
+  const logged = fs.readFileSync(path.join(hive.root(), 'log.jsonl'), 'utf8').split('\n').filter((l) => l.includes('hook-frame-rejected'));
+  assert.equal(logged.length, 2, 'one line for the made up names, one for Pam');
+  assert.ok(!logged.some((l) => l.includes('ghost-')), 'no made up name reaches the log');
 });
 
 test('over the socket, a tool check without a valid secret is refused and nothing else reaches a consumer', { skip: process.platform === 'win32' ? 'unix socket paths' : false }, async (t) => {
