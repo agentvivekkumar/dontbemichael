@@ -28,9 +28,12 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import {
   type IntegrationRecord,
+  type PostReads,
   buildAuthHeaders,
   resolveUpstreamUrl,
-  authTypeNeedsSecret
+  authTypeNeedsSecret,
+  isPostRead,
+  postReadsFor
 } from '../shared/integrations';
 import { WriteJournal, writeKey, type WriteOutcome } from './writeOnce';
 
@@ -78,6 +81,9 @@ export interface IntegrationBrokerDeps {
   mail?: MailRouteHandler;
   /** Where recent writes are recorded, so one is never sent twice (writeOnce.ts). */
   writeJournalPath?: string;
+  /** The POSTs that only read for a connector; the catalog's, by its host
+   *  (postReadsFor). Tests point a catalog connector at a local server with it. */
+  postReads?: (rec: IntegrationRecord) => PostReads[];
 }
 
 /** True for IPv4 loopback (127.0.0.0/8) and IPv6 ::1 (incl. v4-mapped). Mirrors slack.ts. */
@@ -299,7 +305,9 @@ export class IntegrationBroker {
       delete outHeaders[k]; // ensure the worker can't shadow an injected header
       outHeaders[k] = v;
     }
-    if (body) return this.forwardWrite(res, writer, rec.id, method, upstream, outHeaders, body);
+    // A write goes out once. A POST the connector only reads with (a search, a
+    // GraphQL query) goes the read way: streamed, and free to ask again.
+    if (body && !this.onlyReads(rec, method, upstream, body)) return this.forwardWrite(res, writer, rec.id, method, upstream, outHeaders, body);
 
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), UPSTREAM_TIMEOUT_MS);
@@ -335,6 +343,14 @@ export class IntegrationBroker {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** Whether a POST only reads, by its connector's catalog rules. A custom
+   *  REST API has none, so its POSTs stay writes. */
+  private onlyReads(rec: IntegrationRecord, method: string, upstream: URL, body: Buffer): boolean {
+    if (method !== 'POST') return false;
+    const rules = this.deps.postReads ? this.deps.postReads(rec) : postReadsFor(rec.baseUrl);
+    return rules.length > 0 && isPostRead(rules, upstream, body.toString('utf8'));
   }
 
   /** A write goes upstream once (writeOnce.ts): the same write again gets the
