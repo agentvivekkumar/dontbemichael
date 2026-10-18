@@ -56,7 +56,7 @@ import {
   type AgentProvider
 } from '../shared/agentProvider';
 import { MCP_CATALOG } from '../shared/mcpCatalog';
-import { cardConversation, openAskIndexes } from '../shared/askMeRouting';
+import { answeredAtOf, cardConversation, openAskIndexes } from '../shared/askMeRouting';
 import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
@@ -3381,9 +3381,10 @@ export class HiveManager {
     // What the app writes is what the guard knows: Done cards and where each
     // open card stands, so a restore never brings back a copy from before it.
     const guard = this.guardState();
+    const now = new Date().toISOString();
     for (const t of merged as HiveTask[]) {
       if (!t || typeof t.id !== 'string') continue;
-      if (t.status === 'done') { guard.done[t.id] = t as unknown as GuardCard; delete guard.placed[t.id]; }
+      if (t.status === 'done') { guard.done[t.id] = t as unknown as GuardCard; delete guard.placed[t.id]; (guard.doneAt ??= {})[t.id] ??= now; }
       else if (t.status && t.status !== 'triage') guard.placed[t.id] = { ...(t as unknown as GuardCard), status: t.status };
     }
     this.saveGuard();
@@ -3423,6 +3424,7 @@ export class HiveManager {
     // Forgotten as Done only once the move is on disk.
     if (patch.status && patch.status !== 'done' && tasks[index].status === 'done') {
       delete this.guardState().done[id];
+      delete this.guardState().doneAt?.[id];
       this.saveGuard();
     }
     return true;
@@ -3882,10 +3884,11 @@ export class HiveManager {
     try { this.tasksObserver?.(tasks); } catch (e) { console.error('[hive] tasks observer:', e); }
     // A card that has ended (Done, or closed by the owner) needs no routing,
     // unless the owner answered after it closed: an open question stays on Ask
-    // me on a Done card, and that answer is still Michael's to route. Only an
-    // owner's close is timed (closedAt; a card keeps no other update time), so
-    // a request on a card Michael or the app marked Done is taken as settled.
-    const closedAt = new Map(tasks.filter((t) => t?.status === 'done').map((t) => [t.id, (t as { closedAt?: unknown }).closedAt]));
+    // me on a Done card, and that answer is still Michael's to route. The time
+    // is the owner's close (closedAt), else when the app first saw the card
+    // Done, so a card Michael marked Done keeps an answer given after it.
+    const doneAt = this.guardState().doneAt ?? {};
+    const closedAt = new Map(tasks.filter((t) => t?.status === 'done').map((t) => [t.id, (t as { closedAt?: unknown }).closedAt ?? doneAt[t.id]]));
     this.ownerRequestsCache = openOwnerRequests(toMichael, fromMichael, aliases).filter((r) => {
       if (!closedAt.has(r.taskId)) return true;
       const at = closedAt.get(r.taskId);
@@ -3920,7 +3923,7 @@ export class HiveManager {
           // An agent's own outbox file often has no created_at (the router adds
           // it in memory; the archived copy keeps the raw file): use its time.
           const at = typeof raw.created_at === 'string' && raw.created_at ? raw.created_at : new Date(statSync(p).mtimeMs).toISOString();
-          m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to };
+          m = { id: String(raw.id ?? ''), from: String(raw.from ?? ''), act: String(raw.act ?? ''), conversation: raw.conversation, in_reply_to: raw.in_reply_to, subject: raw.subject, created_at: at, to: raw.to, answeredAt: answeredAtOf(raw.body) };
           // The owner's conversation needs the words (michael-replies.md); other
           // mail keeps only its envelope in memory.
           const ownerSide = raw.from === 'human' || OWNER_ALIASES.has(String(raw.to ?? '').toLowerCase()) || !!ownerQuestionOf(raw.conversation);
