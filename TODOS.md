@@ -346,15 +346,6 @@
 **Effort:** M
 **Priority:** P2
 
-### Compare To do reminder times by the instant
-
-**What:** `dueReminders` and `guardCards` in `src/shared/cardGuards.ts` compare `nextAt` as text. Compare by `Date.parse`, as `waitingChecks` now does.
-
-**Why:** Rewriting a past due time in another spelling (Z or +00:00) sends the Next step due reminder again and resets Michael's backstop.
-
-**Effort:** S
-**Priority:** P3
-
 ### Keep a schedule decision for Pete while he isn't reporting
 
 **What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.

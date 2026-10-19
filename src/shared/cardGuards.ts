@@ -93,6 +93,12 @@ export function isNextAt(v: unknown): v is string {
   return typeof v === 'string' && ISO_WITH_OFFSET.test(v) && !Number.isNaN(Date.parse(v));
 }
 
+/** Whether two next step times are the same moment: the same time written
+ *  another way (Z or +00:00, another offset, a seconds field) is no change. */
+export function sameNextAt(a: unknown, b: unknown): boolean {
+  return a === b || (isNextAt(a) && isNextAt(b) && Date.parse(a) === Date.parse(b));
+}
+
 /** A Done card put back as it was Done (D3). Its question history is the
  *  saved one; only a question asked since, still open and new by its wording,
  *  is added after it, so the owner still sees it. A field the reopen added is
@@ -142,7 +148,7 @@ export function guardCards(raw: unknown[], before: GuardState, at = new Date().t
     // A reminder is kept only while its card is parked in To do on that time,
     // so a card that moves on and comes back is reminded again.
     const r = before.reminders[t.id];
-    if (r && t.status === 'todo' && t.nextAt === r.nextAt) state.reminders[t.id] = r;
+    if (r && t.status === 'todo' && sameNextAt(t.nextAt, r.nextAt)) state.reminders[t.id] = r;
   }
   return { changed: Object.keys(fixes).length > 0 || restored.length > 0, fixes, reopened, restored, untriaged, state };
 }
@@ -177,7 +183,7 @@ export function dueReminders(
     const when = Date.parse(t.nextAt);
     if (when > now) continue;
     const r = out[t.id];
-    if (!r || r.nextAt !== t.nextAt) {
+    if (!r || !sameNextAt(r.nextAt, t.nextAt)) {
       due.push(t);
       out[t.id] = { nextAt: t.nextAt, dueSentAt: at };
     } else if (r.dueSentAt && !r.backstopSentAt && now - Date.parse(r.dueSentAt) >= backstopMs) {
