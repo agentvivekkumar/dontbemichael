@@ -32,7 +32,7 @@ import { join, dirname } from 'node:path';
 import { runHiddenModel, type HiddenModelEngine } from './hiddenModel';
 import {
   INDEX_BUDGET_TOKENS, INDEX_PRUNE_AT, applyOps, archiveLines, entriesBlock, estimateTokens,
-  legacyNotes, parseInbox, parseIndex, renderIndex, validateOps, type MemoryEntry
+  legacyNotes, parseInbox, parseIndex, renderIndex, validateOpsWithStats, type MemoryEntry, type TidyOutcome, type OpRejections
 } from '../shared/memoryIndex';
 import { localDay } from '../shared/messageView';
 
@@ -64,7 +64,7 @@ export interface TidyResult {
   id: string;
   tidied: boolean;
   reason: string;
-  stats?: { added: number; updated: number; deleted: number; procedures: number; repeats: number };
+  stats?: TidyOutcome['stats'] & { rejected: OpRejections };
 }
 
 /** A held notes file whose notes are now elsewhere (the index or the inbox):
@@ -203,8 +203,9 @@ export class MemoryTidy {
       restore();
       return this.abort(id, 'model-failed', 'no list of changes in the response');
     }
-    const ops = validateOps(raw, entries);
+    const { ops, rejected } = validateOpsWithStats(raw, entries);
     const outcome = applyOps(entries, ops, today);
+    const stats = { ...outcome.stats, rejected };
 
     try {
       const stamp = utcStamp();
@@ -240,10 +241,10 @@ export class MemoryTidy {
     try {
       this.appendLog({
         kind: 'memory-tidy', agentId: id, notes: notes.length, migrated: migrating,
-        entries: outcome.entries.length, tokens, overBudget: tokens > INDEX_BUDGET_TOKENS, ...outcome.stats
+        entries: outcome.entries.length, tokens, overBudget: tokens > INDEX_BUDGET_TOKENS, ...stats
       });
     } catch { /* logging is best-effort */ }
-    return { id, tidied: true, reason: migrating ? 'migrated' : 'tidied', stats: outcome.stats };
+    return { id, tidied: true, reason: migrating ? 'migrated' : 'tidied', stats };
   }
 
   private abort(id: string, reason: string, detail?: string): TidyResult {
