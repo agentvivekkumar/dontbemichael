@@ -1,7 +1,9 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, powerMonitor, powerSaveBlocker, screen, shell, Notification } from 'electron';
 import { ownerLedger } from '../shared/taskLedger';
 import { ownValue } from '../shared/ownValue';
+import { cutText } from '../shared/cutText';
 import { copyableLink, DEFAULT_COPY_LINK_LABEL, menuLabel } from '../shared/linkMenu';
+import { readCodexContext } from './codexUsage';
 import { execFile, spawn } from 'node:child_process';
 import {
   rmSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync,
@@ -42,7 +44,7 @@ import {
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
-  armPlan, catchUpFloor, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf,
+  armPlan, catchUpFloor, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf, runNowCheck,
   migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock
 } from '../shared/missions';
 import { MICHAEL_WORK_STYLE } from '../shared/michaelWorkStyle';
@@ -2858,7 +2860,7 @@ function handleWebhookMessage(msg: WebhookInbound, endpoint: WebhookEndpointRef)
   // communication only mode takes its title from the message: a caller's title
   // could otherwise carry the instruction to Michael (ship review, 2026-10-14).
   const full = mode === 'communication-only' && isAutoAllowed(mode, kind) ? msg.message : (msg.title ?? msg.message);
-  const title = full.length > 80 ? `${full.slice(0, 79)}…` : full;
+  const title = cutText(full, 80);
   const peer = msg.from?.trim() || endpoint.name || endpoint.id;
   // Minted here, not derived from the task id, because a HELD message has no task
   // id yet and must still be pairable with the reply it eventually earns.
@@ -3615,7 +3617,9 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // this id, so when the install PTY exits teardownPty is a harmless no-op (the agent
   // isn't archived and no worktree is torn down) before the relaunch takes over.
   {
-    const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+    // Already the bare executable (callers split args off), and it may hold a
+    // space: `C:\Users\John Smith\...\claude.exe`. Probe what pty.spawn runs.
+    const bin = opts.command.trim();
     // Claude is set up where the owner can see it: the Ready step at the end of
     // setup, or the Get Michael ready card on Ask me (engineSetup.ts). Its
     // installer used to run here, in a terminal the owner never sees, behind a
@@ -3984,7 +3988,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
       const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
       const requested = at < 0 ? undefined : args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);
       if (requested && CLAUDE_MODEL_CLI_FLOOR[requested]) {
-        const bin = opts.command.trim().split(/\s+/)[0] || opts.command;
+        const bin = opts.command.trim();
         const pick = modelForCli(requested, await claudeCliVersion(ptyManager.commandPath(bin)));
         if (pick.downgraded) {
           if (args[at] === '--model') args[at + 1] = pick.model; else args[at] = `--model=${pick.model}`;
@@ -4220,7 +4224,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // Record the Claude Code version this agent starts on, only once its terminal
   // is really running: a failed spawn must not count as an agent to upgrade.
   if (res.ok && opts.hive?.id && claudeProvider) {
-    const binPath = ptyManager.commandPath(opts.command.trim().split(/\s+/)[0] || opts.command);
+    const binPath = ptyManager.commandPath(opts.command.trim());
     void claudeCliVersion(binPath).then((started) => {
       if (!binPath || !started || !ptyToAgent.has(opts.id)) return;
       ptyCli.set(opts.id, { bin: binPath, started });
@@ -4403,7 +4407,7 @@ ipcMain.handle('integrations:remove', (_evt, payload: unknown) => {
 // URLs are non-secret and ride HarnessConfig.providerBaseUrls (normal config save).
 ipcMain.handle('providerKey:set', (_evt, payload: unknown) => {
   const p = (payload ?? {}) as { backend?: unknown; key?: unknown };
-  if (typeof p.backend !== 'string' || !(p.backend in BACKEND_KEY_ENV)) return { ok: false, error: 'unknown backend' };
+  if (typeof p.backend !== 'string' || !ownValue(BACKEND_KEY_ENV, p.backend)) return { ok: false, error: 'unknown backend' };
   if (typeof p.key !== 'string' || !p.key) return { ok: false, error: 'key required' };
   // A key this computer cannot encrypt is never saved, so say so (and what to do
   // about it) before anything else touches it.
@@ -4420,7 +4424,7 @@ ipcMain.handle('providerKey:set', (_evt, payload: unknown) => {
 ipcMain.handle('providerKey:has', (_evt, backend: unknown) =>
   typeof backend === 'string' ? integrations.hasSecret(providerKeyRef(backend)) : false);
 ipcMain.handle('providerKey:clear', (_evt, backend: unknown) => {
-  if (typeof backend !== 'string' || !(backend in BACKEND_KEY_ENV)) return { ok: false, error: 'unknown backend' };
+  if (typeof backend !== 'string' || !ownValue(BACKEND_KEY_ENV, backend)) return { ok: false, error: 'unknown backend' };
   try {
     // deleteSecret never throws: false means the key may still be stored.
     if (!integrations.deleteSecret(providerKeyRef(backend))) return { ok: false, error: 'The saved key could not be removed. Try again; if it keeps failing, the saved secrets file needs repair.' };
@@ -5480,7 +5484,7 @@ hive.onOwnerReply((msg) => {
   if (inFront || !hive.ownerNotify(msg.in_reply_to, msg.id)) return;
   const first = (msg.body || msg.subject || '').replace(/\s+/g, ' ').trim();
   const text = msg.act === 'query' ? `Has a question about: ${first}` : first;
-  ownerToastOpening(text.length > 120 ? `${text.slice(0, 119)}…` : text, msg.in_reply_to);
+  ownerToastOpening(cutText(text, 120), msg.in_reply_to);
 });
 
 ipcMain.handle('owner:ask', (_evt, p: unknown) => {
@@ -6228,11 +6232,19 @@ ipcMain.handle('hive:agentUsage', (_evt, cwd: unknown) =>
 // spawn), so this works even when several agents share one cwd. Null until the
 // first hook fires; a known-but-empty transcript reads as 0 so a freshly
 // (re)started session zeroes the gauge instead of leaving a stale value up.
+// `limit` is the window size, sent only when the session names it (Codex).
 ipcMain.handle('hive:agentContext', (_evt, agentId: unknown) => {
   if (typeof agentId !== 'string') return null;
+  // A Codex agent writes rollouts, not Claude transcripts: read its session's
+  // rollout in its own CODEX_HOME, as the usage fallback does (telemetry.ts).
+  const codexHome = hive.codexHome(agentId);
+  if (codexHome) {
+    const sessionId = hive.lastSession(agentId);
+    return sessionId ? readCodexContext(codexHome, sessionId) : null;
+  }
   const tp = hookServer.transcriptPath(agentId);
   if (!tp) return null;
-  return readContextTokens(tp) ?? 0;
+  return { tokens: readContextTokens(tp) ?? 0 };
 });
 
 // A consolidated, NON-SENSITIVE per-agent directory for the voice read-layer
@@ -6410,6 +6422,26 @@ ipcMain.handle('missions:delete', (_evt, id: unknown): MissionOpResult =>
   typeof id === 'string' ? applyMissions((list) => deleteMission(list, id)) : { ok: false, error: 'invalid id' });
 ipcMain.handle('missions:setEnabled', (_evt, id: unknown, on: unknown): MissionOpResult =>
   typeof id === 'string' ? applyMissions((list) => setMissionEnabled(list, id, on === true, Date.now())) : { ok: false, error: 'invalid id' });
+// Run one job now (docs/designs/schedule-run-now.md): the same send and stamp
+// as its clock (sendMission), read from the config as it is NOW. The timers
+// are re-armed after, because an interval job counts from its last run: left
+// armed, it would fire at the old time while its row says the new one.
+ipcMain.handle('missions:runNow', (_evt, id: unknown): MissionOpResult => {
+  if (typeof id !== 'string') return { ok: false, error: 'invalid id' };
+  // Without an office the send is dropped, so the run must not be stamped.
+  if (!hive.enabled()) return { ok: false, error: 'office not open' };
+  try {
+    const check = runNowCheck(readConfig().missions ?? [], id, Date.now());
+    if (!check.ok) return check;
+    sendMission(check.mission);
+  } catch (e) {
+    console.error('[missions] run now failed', e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  // The job is sent from here on; a failed re-arm is logged, not reported.
+  try { syncMissions(); } catch (e) { console.error('[missions] re-arm failed after run now', e); }
+  return { ok: true };
+});
 
 // ─── IPC: schedule requests (an agent asked, the owner decides in ASK ME) ────
 ipcMain.handle('scheduleRequests:list', () => {
@@ -6755,7 +6787,7 @@ ipcMain.handle('triggerHistory:decide', (_evt, arg: unknown) => {
 
   const taskId = `webhook-${randomBytes(8).toString('hex')}`;
   const tokenHash = heldTokenHashFor(id);
-  const title = entry.title ?? (entry.body.length > 80 ? `${entry.body.slice(0, 79)}…` : entry.body);
+  const title = entry.title ?? cutText(entry.body, 80);
   if (!dispatchWebhookWork({ taskId, title, message: entry.body, tokenHash, origin: entry.source })) {
     // The card is what the caller polls and what god works from. Leave the entry
     // pending so the operator can approve again once the hive is writable.
