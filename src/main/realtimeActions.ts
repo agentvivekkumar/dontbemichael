@@ -719,11 +719,15 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
     const missions = deps.listMissions();
     if (!missions.length) return { ok: false, spoken: 'There are no scheduled missions to edit.' };
     const ref = norm(str(a.missionId) || str(a.schedule) || str(a.label) || str(a.target));
+    // An empty ref is in every name, so ask rather than take the first one.
+    if (!ref) return { ok: false, spoken: 'Which schedule should I edit?' };
+    // The ref has no punctuation, so the names are compared the same way: a
+    // job called "Inbox: morning sweep" is found by its own name.
     const m =
-      missions.find((x) => x.id.toLowerCase() === ref) ||
-      missions.find((x) => (x.label || '').toLowerCase() === ref) ||
-      missions.find((x) => (x.label || '').toLowerCase().includes(ref) || x.id.toLowerCase().includes(ref));
-    if (!m) return { ok: false, spoken: ref ? `I couldn't find a schedule matching "${str(a.label) || ref}".` : 'Which schedule should I edit?' };
+      missions.find((x) => norm(x.id) === ref) ||
+      missions.find((x) => norm(x.label || '') === ref) ||
+      missions.find((x) => norm(x.label || '').includes(ref) || norm(x.id).includes(ref));
+    if (!m) return { ok: false, spoken: `I couldn't find a schedule matching "${str(a.label) || ref}".` };
     const raw = norm(str(a.action) || str(a.op));
     const action: 'enable' | 'disable' | 'delete' =
       raw.includes('delete') || raw.includes('remove') ? 'delete' : raw.includes('disable') || raw.includes('off') || raw.includes('pause') ? 'disable' : 'enable';
