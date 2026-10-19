@@ -124,6 +124,13 @@ const SECRETS: RegExp[] = [
   /\b(?:password|passwd|pwd|api[_ -]?key|secret|token)\s*[:=]\s*\S{6,}/i
 ];
 const LONG_DIGITS = /\b\d{9,}\b/;
+// A money amount: digits with a currency sign or code before or after them, in
+// the groupings people write ("Rs 1,35,000", "₹5,000", "$2,000.50", "45 EUR").
+// A code must stand on its own, so "hrs" or "euros" is not one. Years, counts
+// and percentages carry no currency and pass.
+const CURRENCY = String.raw`(?:[$€£¥₹]|\b(?:rs|inr|usd|eur|gbp|aud|cad|sgd|aed|jpy|chf)(?![a-z])\.?)`;
+const AMOUNT = String.raw`\d[\d,]*(?:\.\d+)?`;
+const MONEY = new RegExp(`${CURRENCY}\\s?${AMOUNT}|${AMOUNT}\\s?${CURRENCY}`, 'i');
 
 /**
  * The private data fixed patterns can see, each tied to its class so a
@@ -142,6 +149,9 @@ export function patternHits(text: string): PatternHit[] {
     const digits = m[0].replace(/\D/g, '');
     if (digits.length >= 13 && digits.length <= 19 && luhn(digits)) { hits.push({ classId: 'money' }); break; }
   }
+  // Business figures are private by default; without this a rewrite that kept
+  // "Rs 1,35,000" relied on the model alone to drop it.
+  if (!hits.some((h) => h.classId === 'money') && MONEY.test(t)) hits.push({ classId: 'money' });
   if (IBAN.test(t)) hits.push({ classId: 'accounts' });
   if (US_SSN.test(t)) hits.push({ classId: 'accounts' });
   // Shapes that look like digits but are not contact details: dates and
