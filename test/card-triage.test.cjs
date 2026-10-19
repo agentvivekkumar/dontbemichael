@@ -340,6 +340,28 @@ test('the owner can still correct a card an agent reopened before the app put it
   assert.match(moved.body, /from Done to To do\. Reason: Marked done by mistake/);
 });
 
+test('a next step time written another way is the same reminder, not a new one', () => {
+  // Value: protects=rewriting a past due time in another spelling neither sends Next step due again nor resets Michael's backstop; fails_when=reminder times are compared as text; why_new=TODOS "Compare To do reminder times by the instant"; seam=dueReminders and guardCards
+  const { dueReminders, guardCards, emptyGuardState, sameNextAt, NEXT_BACKSTOP_MS } = loadTs('src/shared/cardGuards.ts');
+  const now = Date.parse('2026-10-12T09:00:00Z');
+  const parked = card('p', { assignee: 'dwight', nextAt: '2026-10-12T08:00:00+00:00' });
+  const first = dueReminders([parked], {}, now);
+  assert.deepEqual(first.due.map((c) => c.id), ['p']);
+  for (const nextAt of ['2026-10-12T08:00:00Z', '2026-10-12T08:00Z', '2026-10-12T13:30:00+05:30', '2026-10-12T08:00:00.000Z']) {
+    const respelled = { ...parked, nextAt };
+    const kept = guardCards([respelled], { ...emptyGuardState('x'), reminders: first.reminders }).state.reminders;
+    assert.ok(kept.p, `${nextAt}: the guard keeps the reminder`);
+    const again = dueReminders([respelled], kept, now + 60000);
+    assert.deepEqual(again.due, [], `${nextAt}: not sent again`);
+    const back = dueReminders([respelled], again.reminders, now + NEXT_BACKSTOP_MS);
+    assert.deepEqual(back.backstop.map((c) => c.id), ['p'], `${nextAt}: the backstop still comes on the first reminder's clock`);
+  }
+  assert.deepEqual(dueReminders([{ ...parked, nextAt: '2026-10-12T08:00:01Z' }], first.reminders, now).due.map((c) => c.id), ['p'], 'a different moment is still a new reminder');
+  assert.equal(sameNextAt(undefined, undefined), true);
+  assert.equal(sameNextAt('2026-10-12T08:00:00Z', 'not a time'), false);
+  assert.equal(sameNextAt('2026-10-12T08:00:00', '2026-10-12T08:00:00Z'), false, 'a time with no offset is not a moment');
+});
+
 test('reminders reach the right person, skip times the board cannot show, and the backstop reaches Michael', async (t) => {
   // Value: protects=a reminder goes to someone who reads it, says whose step it is, and the backstop really arrives; fails_when=an archived or unknown person is reminded, Michael is told to tell himself, a loose time fires, or the backstop is only computed; why_new=review cycle 2; seam=the fleet tick plus the private guard file
   const { dueReminders } = loadTs('src/shared/cardGuards.ts');
