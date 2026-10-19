@@ -44,6 +44,14 @@ test('a department comes from the hired job card, then the character, then the r
   for (const c of ['creed', 'meredith', 'darryl']) assert.equal(L.departmentOf({ id: c, character: c }), 'operations', c);
 });
 
+test('the word it in a role line is not the IT department', () => {
+  const dept = (description) => L.departmentOf({ id: 'z', character: 'nobody', description });
+  assert.equal(dept('Makes the tea and keeps it hot'), 'team');
+  assert.equal(dept('Books appointments and makes sure it all runs on time'), 'team');
+  assert.equal(dept('Head of IT'), 'it');
+  assert.equal(dept('IT help for the office'), 'it');
+});
+
 test('pods are departments on a nine slot ring; Michael is never a pod', () => {
   const team = ['pam', 'kelly', 'dwight', 'oscar', 'ryan', 'toby', 'nick'].map((c) => ({ id: c, character: c }));
   const plan = L.planStudio([{ id: 'god', character: 'michael', isGod: true }, ...team, { id: 'erin', character: 'erin', sourceCard: 'x/kelly' }]);

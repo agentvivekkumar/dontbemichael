@@ -19,7 +19,9 @@ const KEYWORDS: [RegExp, DepartmentName][] = [
   [/\b(financ|accountan|accounting|bookkeep|billing|payroll|cfo|controller)/i, 'finance'],
   [/\b(market|social|content|brand|seo|community)/i, 'marketing'],
   [/\b(hr\b|human resources|people|recruit|talent)/i, 'people'],
-  [/\b(it\b|engineer|security|developer|devops|systems)/i, 'it'],
+  // Capital IT only: a lower case "it" in a role line is the pronoun.
+  [/\bIT\b/, 'it'],
+  [/\b(engineer|security|developer|devops|systems)/i, 'it'],
   [/\b(supply|inventory|shipping|logistic|quality|warehouse|procure|purchas)/i, 'operations']
 ];
 
