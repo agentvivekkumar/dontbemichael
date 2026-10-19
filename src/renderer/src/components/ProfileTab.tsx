@@ -13,6 +13,7 @@ import { agentAccessSummary, type AccessItem } from '@shared/agentAccess';
 import { SENDING_LABEL_KEY } from './sendingLabels';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { ScheduledJobsList, useScheduledJobs } from './ScheduledJobs';
+import { TrialShiftModal } from './trialShift/TrialShiftModal';
 
 /**
  * PROFILE: who this agent is, the first tab on every agent (owner, 2026-09-25;
@@ -70,6 +71,7 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const agents = useStore((s) => s.agents);
   const [showInstructions, setShowInstructions] = useState(false);
   const [folderError, setFolderError] = useState(false);
+  const [trialOpen, setTrialOpen] = useState(false);
   /** The agent's work folder in Finder (or the OS file browser), looked up by
    *  main from the registry (fs:openAgentFolder). */
   const openFolder = () => {
@@ -192,6 +194,11 @@ export function ProfileTab({ agent }: { agent: Agent }) {
                 <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 13, wordBreak: 'break-all' }}>{agent.cwd}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                   <PixelButton variant="secondary" size="sm" onClick={openFolder}>{t('profile.openFolder')}</PixelButton>
+                  {!god && (
+                    <PixelButton variant="secondary" size="sm" onClick={() => setTrialOpen(true)}>
+                      {t('trialShift.button', 'Trial Shift')}
+                    </PixelButton>
+                  )}
                   {folderError && <span role="alert" style={{ fontSize: 13, color: 'var(--cth-coral)' }}>! {t('profile.openFolderFailed')}</span>}
                 </span>
               </Fact>
@@ -234,6 +241,7 @@ export function ProfileTab({ agent }: { agent: Agent }) {
         {/* Each scheduled job with its focus area, read only (FA1). */}
         <ScheduledJobsSection agentId={agent.id} title={t('scheduledJobs.title')} />
       </div>
+      {trialOpen && <TrialShiftModal agent={agent} onClose={() => setTrialOpen(false)} />}
     </div>
   );
 }

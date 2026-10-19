@@ -29,6 +29,7 @@ import { canDeleteTeamMember, deleteTeamMember } from '@/shell/deleteTeamMember'
 import { releaseBindingsOf } from '@/shell/releaseBindings';
 import { disposeTerminal } from './terminalPool';
 import { deleteConfirmText } from './triggers/ScheduleList';
+import { TrialShiftModal } from './trialShift/TrialShiftModal';
 
 export interface EditAgentModalProps {
   agent: Agent;
@@ -53,6 +54,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const [nameError, setNameError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [trialOpen, setTrialOpen] = useState(false);
   const [config, setConfig] = useState<HarnessConfig | null>(null);
 
   const [name, setName] = useState(agent.name);
@@ -221,9 +223,7 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
   const providerLabel = AGENT_PROVIDER_PRESETS.find((p) => p.id === provider)?.label ?? provider;
   const modelLabel = preset.supportsModel && model ? (modelsForProvider(provider).find((m) => m.id === model)?.label ?? model) : '';
   return (
-    // One column (D3): name, job, work style, then the engine folded away, so
-    // what they handle and the work style get the room (owner, 2026-10-02).
-    // Field labels only; explanations sit behind info icons.
+    <>
     <Dialog
       title={t('editAgent.title')}
       onClose={onClose}
@@ -236,6 +236,11 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
       footer={(
         <>
           <PixelButton variant="ghost" size="md" onClick={onClose}>{t('editAgent.cancel')}</PixelButton>
+          {!agent.isGod && (
+            <PixelButton variant="secondary" size="md" onClick={() => setTrialOpen(true)} disabled={saving || writing || deleting}>
+              {t('trialShift.button', 'Trial Shift')}
+            </PixelButton>
+          )}
           <div style={{ flex: 1 }} />
           <PixelButton variant="primary" size="md" onClick={() => { void save(); }} disabled={saving || writing || deleting}>{writing ? t('editAgent.writing') : t('editAgent.save')}</PixelButton>
         </>
@@ -416,6 +421,20 @@ export function EditAgentModal({ agent, onClose }: EditAgentModalProps) {
         )}
       </div>
     </Dialog>
+    {trialOpen && (
+      <TrialShiftModal
+        agent={{
+          ...agent,
+          name: who,
+          goal,
+          description: joinAgentRole(role, roleDescription),
+          provider,
+          model
+        }}
+        onClose={() => setTrialOpen(false)}
+      />
+    )}
+    </>
   );
 }
 
