@@ -37,6 +37,8 @@ import type {
 export type {
   ContextRule, ContextTriggerConfig, OrgTriggerConfig, TriggerHistoryEntry, WebhookTrigger
 } from '../shared/triggers';
+import type { TrialScenario, TrialReport, TrialAgentInput } from '../shared/trialShift/types';
+export type { TrialScenario, TrialReport, TrialAgentInput } from '../shared/trialShift/types';
 
 /** Renderer-visible integration record: the secretRef handle is redacted to a
  *  presence boolean. Matches main `integrations.listRecordsRedacted()` — the
@@ -657,6 +659,11 @@ const api = {
     problems: Array<{ file: string; reason: string }>;
     core?: OfficePack;
   }> => ipcRenderer.invoke('packs:list'),
+
+  // ─── Employee Trial Shifts ────────────────────────────────────────────────
+  trialShiftListScenarios: (): Promise<TrialScenario[]> => ipcRenderer.invoke('trialShift:listScenarios'),
+  trialShiftRun: (scenarioId: string, agent: TrialAgentInput): Promise<TrialReport> =>
+    ipcRenderer.invoke('trialShift:run', { scenarioId, agent }),
 
   // ─── Agent folders (Decisions 44, 45) ───────────────────────────────────
   /** Default `~/Documents/<Business>/<Folder>` paths for the team screen, or

@@ -58,6 +58,8 @@ import { HookServer, type PlanSignal } from './hooks';
 import { OfficeBreak, type OfficeBreakState } from './officeBreak';
 import { heldByBreak, type OfficeStopReason } from '../shared/officeBreak';
 import { loadBundledPacks, packsResourceDir } from './packs';
+import { STARTER_SCENARIOS } from '../shared/trialShift/scenarios';
+import { runTrialShift, type TrialAgentInput } from './trialShift/trialRunner';
 import { businessFolderRoot, ensureFolder, safeFolderName } from './agentFolders';
 import { CircuitBreaker, breakerMessages, type BreakerInput } from './breaker';
 import type { UsageProvider } from './usage';
@@ -5596,6 +5598,20 @@ ipcMain.handle('packs:list', () => {
     console.error('[packs] load failed:', e);
     return { packs: [], problems: [{ file: packsDir(), reason: String(e) }] };
   }
+});
+
+// ─── Employee Trial Shifts ──────────────────────────────────────────────────
+ipcMain.handle('trialShift:listScenarios', () => STARTER_SCENARIOS);
+ipcMain.handle('trialShift:run', async (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { scenarioId?: unknown; agent?: unknown };
+  if (typeof p.scenarioId !== 'string' || !p.agent || typeof p.agent !== 'object') {
+    throw new Error('Invalid trial shift request parameters');
+  }
+  const cfg = readConfig();
+  return runTrialShift(p.scenarioId, p.agent as TrialAgentInput, {
+    engine: cfg.godProvider ?? 'claude',
+    engineModel: cfg.godModel
+  });
 });
 
 /** Default folders for the onboarding team screen (Decisions 44, 45):
