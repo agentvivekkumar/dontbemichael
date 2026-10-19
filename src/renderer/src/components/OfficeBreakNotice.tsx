@@ -20,6 +20,9 @@ import { Icon } from './Icon';
 import { PixelButton } from './PixelButton';
 import { GetMichaelReady, Spinner } from './GetMichaelReady';
 
+import { providerPreset, inferAgentProvider } from '@shared/agentProvider';
+import { useHarnessConfig } from '@/hooks/useHarnessConfig';
+
 let view: OfficeBreakView | null = null;
 /** Main has answered once (or pushed): until then delivery assumes a break. */
 let known = false;
@@ -74,6 +77,13 @@ function OfficeStopCard({ view }: { view: OfficeBreakView }) {
   const { t } = useTranslation();
   const godName = useResolvedGodName();
   const { engineSetup } = useNeedsYou();
+  const config = useHarnessConfig();
+  const activeProvider = config?.godProvider ?? (config?.defaultCommand ? inferAgentProvider(config.defaultCommand) : 'claude');
+  const preset = providerPreset(activeProvider);
+  const engineName = preset.label;
+  const providerName = activeProvider === 'claude' ? 'Anthropic' : activeProvider === 'gemini' || activeProvider === 'antigravity' ? 'Google' : activeProvider === 'codex' ? 'OpenAI' : activeProvider === 'grok' ? 'xAI' : engineName;
+  const i18nParams = { engineName, providerName };
+
   const [fix, setFix] = useState<'signin' | 'key' | null>(null);
   const [ready, setReady] = useState(false);
   const credit = view.reason === 'credit';
@@ -81,9 +91,9 @@ function OfficeStopCard({ view }: { view: OfficeBreakView }) {
   const key = !credit && engineSetup?.method === 'apiKey';
   const title = t('officeStop.title');
   const line = view.checking ? null
-    : credit ? (view.again ? t('officeStop.creditAgain') : t('officeStop.credit'))
-    : key ? t('officeStop.keyStopped') : t('officeStop.signIn');
-  const info = credit ? t('officeStop.creditInfo') : key ? t('officeStop.keyInfo') : t('officeStop.signInInfo');
+    : credit ? (view.again ? t('officeStop.creditAgain', i18nParams) : t('officeStop.credit', i18nParams))
+    : key ? t('officeStop.keyStopped', i18nParams) : t('officeStop.signIn', i18nParams);
+  const info = credit ? t('officeStop.creditInfo', i18nParams) : key ? t('officeStop.keyInfo', i18nParams) : t('officeStop.signInInfo', i18nParams);
   const closeFix = (): void => {
     // A finished sign in moves the stop to checking; a saved key does so in
     // main, with the terminals' restart (owner, B1).
@@ -141,6 +151,9 @@ const stopCard: CSSProperties = {
 /** The plan limit: quiet, it ends on its own (issue 124). */
 function LimitBreakCard({ view: b }: { view: OfficeBreakView }) {
   const { t, i18n } = useTranslation();
+  const config = useHarnessConfig();
+  const activeProvider = config?.godProvider ?? (config?.defaultCommand ? inferAgentProvider(config.defaultCommand) : 'claude');
+  const engineName = providerPreset(activeProvider).label;
   const title = t('officeBreak.title');
   return (
     <section data-office-break aria-label={title} style={{
@@ -149,10 +162,10 @@ function LimitBreakCard({ view: b }: { view: OfficeBreakView }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, lineHeight: '18px', color: 'var(--cth-ink)' }}>
         {title}
-        <span style={{ marginInlineStart: 'auto', display: 'inline-flex' }}><InfoTip text={t('officeBreak.info')} align="end" /></span>
+        <span style={{ marginInlineStart: 'auto', display: 'inline-flex' }}><InfoTip text={t('officeBreak.info', { engineName })} align="end" /></span>
       </div>
       <div role="status" style={{ marginTop: 2, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)' }}>
-        {b.until ? t('officeBreak.body', { time: clock(b.until, i18n.language) }) : t('officeBreak.bodyUnknown')}
+        {b.until ? t('officeBreak.body', { time: clock(b.until, i18n.language), engineName }) : t('officeBreak.bodyUnknown', { engineName })}
       </div>
     </section>
   );

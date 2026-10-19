@@ -241,6 +241,13 @@ export class OfficeBreak {
     return { step: 'over', ended: s };
   }
 
+  /** Whether new work can fail over to a backup engine. True when the office
+   *  is in a waiting state and not held for a manual owner action. */
+  shouldFailover(): boolean {
+    const s = this.state;
+    return !!s && s.phase === 'waiting' && !s.manual;
+  }
+
   private set(next: OfficeBreakState | null): void {
     this.saved = next;
     try { this.store.save(next); } catch { /* the break still runs this session */ }

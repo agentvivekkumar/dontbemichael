@@ -31,6 +31,7 @@ import { Icon } from './Icon';
 import { McpDefaultsSettings } from './McpDefaultsSettings';
 import { IntegrationsRegistry } from './IntegrationsRegistry';
 import { AiEnginesSettings } from './AiEnginesSettings';
+import { OfficeEngineSettings } from './OfficeEngineSettings';
 import { REALTIME_MODEL } from '@shared/realtimePricing';
 import { RealtimeDevicePicker } from '@/realtime/DevicePicker';
 import { CostHud } from '@/realtime/CostHud';
@@ -165,7 +166,7 @@ webhook's Format row, above.`;
 // snapshotLocalState / restoreLocalState / clearLocalState live in
 // store/localState.ts (re-exported here for existing importers).
 export { clearLocalState, restoreLocalState, snapshotLocalState } from '@/store/localState';
-import { showByokSettings } from '@shared/agentProvider';
+import { showByokSettings, isClaudeProvider, inferAgentProvider, type AgentProvider } from '@shared/agentProvider';
 
 // v0.3.4 redesign: six tabs, one topic each. 'AI Engines' folded into
 // Agents (once Agents & Models, now also autonomy and budgets); MCP + Slack + webhook + REST live together in Connections;
@@ -278,6 +279,8 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
    * disconnect live rather than storing a preference.
    */
   const [pending, setPending] = useState<Partial<HarnessConfig>>({});
+  const mergedConfig = { ...config, ...pending } as HarnessConfig;
+  const currentGodProvider = (mergedConfig.godProvider ?? inferAgentProvider(mergedConfig.defaultCommand)) as AgentProvider;
   /** Auto-compact lives inside the missions array, so it is resolved at save
    *  time against the config on disk rather than staged as a whole array. */
   const [autoCompactPending, setAutoCompactPending] = useState<boolean | null>(null);
@@ -340,6 +343,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   const [detectedPlan, setDetectedPlan] = useState<{ label: string | null; listMonthly: number | null } | null>(null);
   useEffect(() => { void window.cth.claudePlan().then(setDetectedPlan).catch(() => setDetectedPlan(null)); }, []);
   const planPricePatch = (): Partial<HarnessConfig> => {
+    if (!isClaudeProvider(currentGodProvider)) return {};
     const n = planPriceVal.trim() === '' ? undefined : Number(planPriceVal);
     return { planPriceMonthly: Number.isFinite(n as number) && (n as number) > 0 ? Math.round((n as number) * 100) / 100 : undefined } as Partial<HarnessConfig>;
   };
@@ -1334,35 +1338,12 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   {/* AGENTS: the model, autonomy, and the limits that stop them. */}
                   {activeSection === 'Agents' && (
                     <>
-                      <div>
-                        <div style={sectionHead}>
-                          {t('settings.agentsModels.defaultModel')}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <span style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cth-ink-500)' }}>
-                            {t('settings.agentsModels.defaultModelDesc', { godName })}
-                          </span>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {agentModels().map((m) => (
-                              <button
-                                key={m.label}
-                                onClick={() => { if (m.id) void saveDefaultModel(m.id); }}
-                                style={{
-                                  borderRadius: 'var(--cth-r-md)',
-                                  padding: '3px 8px 1px', border: 'none', cursor: 'pointer',
-                                  fontFamily: 'var(--cth-font-ui)', fontSize: 12, color: 'var(--cth-ink-900)',
-                                  background: defaultModelSel === m.id ? 'var(--cth-sky-light)' : 'var(--cth-cream-100)',
-                                  boxShadow: defaultModelSel === m.id ? 'inset 0 0 0 1.5px var(--cth-indigo)' : 'inset 0 0 0 1px var(--cth-ink-100)'
-                                }}
-                              >{m.label}</button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      <OfficeEngineSettings config={mergedConfig} stage={stage} godName={godName} />
+
 
                       {/* The Claude plan's price (owner, 2026-10-15): Pulse splits it
-                          across the team by share of the work. Not on an API key. */}
-                      {cfgX.claudeAuth !== 'apiKey' && (
+                          across the team by share of the work. Not on an API key. Only shown when running Claude. */}
+                      {isClaudeProvider(currentGodProvider) && cfgX.claudeAuth !== 'apiKey' && (
                         <>
                           <div style={{ height: 1, background: 'var(--cth-line)' }} />
                           <div>

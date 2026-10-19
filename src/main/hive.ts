@@ -1577,6 +1577,28 @@ export class HiveManager {
     }
   }
 
+  /** Update provider for all agents in registry.json. */
+  syncAllAgentsProvider(provider: AgentProvider): { ok: boolean; count: number; error?: string } {
+    const root = this.root();
+    if (!root) return { ok: false, count: 0, error: 'hive disabled' };
+    try {
+      const reg = this.registry();
+      let count = 0;
+      for (const agent of Object.values(reg.agents)) {
+        if (agent) {
+          agent.provider = provider;
+          count++;
+        }
+      }
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
+      this.appendLog({ kind: 'provider_sync', provider, count });
+      this.commit(`hive: sync provider ${provider} for ${count} agents`);
+      return { ok: true, count };
+    } catch (e) {
+      return { ok: false, count: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
   /**
    * Flip an agent's archived flag and persist the registry. Closing a terminal
    * tab archives the agent (retained + flagged, NOT deleted); a (re)spawn clears

@@ -102,14 +102,22 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
       const restoredInOrder = await Promise.all([...restorableAgents].map(async (a): Promise<Agent | null> => {
         // Per-agent guard: one agent's failure (or a rejected IPC call) must NEVER
         // abort the others — an unhandled rejection here used to make the
-        // entire restore a silent no-op after the first bad agent.
         try {
-          const provider = inferAgentProvider(a.command, a.provider);
-          const command = (a.command ?? '').trim() || (config ? buildSpawnCommand(config, a.model, provider) : '');
+          const officeProvider = config?.godProvider ?? (config?.defaultCommand ? inferAgentProvider(config.defaultCommand) : 'antigravity');
+          // If agent was saved on Claude but the office runs on a non-Claude engine, align agent to office engine:
+          const provider = (a.provider === 'claude' && officeProvider !== 'claude')
+            ? officeProvider
+            : inferAgentProvider(a.command, a.provider);
+          const model = (provider === officeProvider && config?.godModel) ? config.godModel : a.model;
+          const commandNeedsRebuild =
+            provider !== a.provider ||
+            (Boolean(model) && a.model !== model) ||
+            (provider === 'antigravity' && (/3\.1/i.test(a.command ?? '') || /pro/i.test(a.command ?? '') || /3\.7/i.test(a.command ?? ''))) ||
+            !(a.command ?? '').trim();
+          const command = commandNeedsRebuild
+            ? (config ? buildSpawnCommand(config, model, provider) : (a.command ?? ''))
+            : (a.command ?? '');
           if (!command || !a.cwd) {
-            // No spawn recipe (an old entry persisted before `command`, with no
-            // config to rebuild one). Keep it restorable and SAY why rather than
-            // silently dropping it — silent removal read as "nothing happened".
             failures.push(`${a.name}: no saved command`);
             return null;
           }
@@ -159,6 +167,7 @@ export function useRestoreTeam(config?: HarnessConfig | null): RestoreTeamState 
             return {
                 ...a,
                 provider,
+                model: model ?? a.model,
                 ptyId,
                 archived: false,
                 status: 'idle',

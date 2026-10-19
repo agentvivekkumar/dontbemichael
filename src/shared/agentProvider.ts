@@ -168,10 +168,9 @@ export interface AgentProviderPreset {
   resumeSubcommand?: string; // CLIs that resume via a subcommand instead of a flag (Codex: `codex resume [OPTIONS] [SESSION_ID]`)
 }
 
-/** The engines this build offers the owner. Only Claude Code is supported for
- *  now; every other preset stays below, fully wired, so bringing one back means
- *  adding its id here and nothing else. Setup's manager step reads this. */
-export const BUILD_ENGINES: readonly AgentProvider[] = ['claude'];
+/** The engines this build offers the owner. Every preset below is fully wired.
+ *  Setup's manager step and hiring wizards read this. */
+export const BUILD_ENGINES: readonly AgentProvider[] = ['claude', 'codex', 'grok', 'gemini', 'antigravity', 'cursor'];
 
 /** Engines that read the owner's own API keys and local endpoints (Settings →
  *  Agents, AI engine providers). Claude Code and Codex use their own
@@ -342,8 +341,12 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
     hookBridge: 'agy', // installAgyHooks() → ~/.gemini/.../hooks.json (translating shim)
     canReceiveInbox: true, // via the agy-hook bridge (Stop→drain); verified agy honors hook decisions
     initialPromptFlag: '-i', // agy --prompt-interactive: orient the session, then continue
-    recommendedOrchestratorModel: 'Gemini 3.1 Pro (High)', // agy takes the display-name label
+    recommendedOrchestratorModel: 'Gemini 3.8 Flash (High)', // agy takes the display-name label
     resumeFlag: '--conversation', // agy: resume a previous conversation by ID
+    nativeInstallCommand: {
+      posix: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+      win32: 'irm https://antigravity.google/cli/install.ps1 | iex'
+    },
     // agy is a native binary with no npm package; manual install from the docs.
     docsUrl: 'https://antigravity.google/docs/getting-started?tab=cli'
   },

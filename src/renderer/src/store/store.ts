@@ -1054,17 +1054,20 @@ export const useStore = create<State>((set, get) => ({
       // The pty parser calls this on every chunk of output, mostly with what
       // is already there: no change means no new state, so the studio and
       // everything else subscribed to `agents` skip the render.
-      const current = s.agents.find((a) => a.id === id) as Record<string, unknown> | undefined;
+      const current = (s.agents.find((a) => a.id === id) ?? s.restorableAgents.find((a) => a.id === id) ?? s.archivedAgents.find((a) => a.id === id)) as Record<string, unknown> | undefined;
       if (!current || Object.entries(patch).every(([k, v]) => Object.is(current[k], v))) return s;
-      const agents = s.agents.map(a => a.id === id ? { ...a, ...patch } : a);
-      // Persist only when something DURABLE changed. `updateAgent` is also the
-      // pty parser's per-chunk write (status/action/progress), so persisting
-      // unconditionally would rewrite localStorage on every burst of terminal
-      // output. Persisting nothing was worse: a model or command change lived
-      // only in memory, so the selector snapped back to the old model on reload
-      // and restore relaunched the old command.
-      if (touchesDurableAgentField(patch)) persistAgents(agents, s.selectedId);
-      return { agents };
+      const inLive = s.agents.some((a) => a.id === id);
+      const inRestorable = s.restorableAgents.some((a) => a.id === id);
+      const inArchived = s.archivedAgents.some((a) => a.id === id);
+      const agents = inLive ? s.agents.map((a) => a.id === id ? { ...a, ...patch } : a) : s.agents;
+      const restorableAgents = inRestorable ? s.restorableAgents.map((a) => a.id === id ? { ...a, ...patch } : a) : s.restorableAgents;
+      const archivedAgents = inArchived ? s.archivedAgents.map((a) => a.id === id ? { ...a, ...patch } : a) : s.archivedAgents;
+      if (touchesDurableAgentField(patch)) {
+        if (inLive) persistAgents(agents, s.selectedId);
+        if (inRestorable) persistRestorable(restorableAgents);
+        if (inArchived) persistArchived(archivedAgents);
+      }
+      return { agents, restorableAgents, archivedAgents };
     }),
   syncDescriptionsFromRoles: (roles) =>
     set((s) => {

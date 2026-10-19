@@ -17,8 +17,8 @@ const loadTs = require('./load-ts.cjs');
 
 const read = (rel) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
 
-test('this build offers Claude Code only', () => {
-  assert.deepEqual([...loadTs('src/shared/agentProvider.ts').BUILD_ENGINES], ['claude']);
+test('this build offers supported engines (Claude, Codex, Grok, Gemini, Antigravity, Cursor)', () => {
+  assert.deepEqual([...loadTs('src/shared/agentProvider.ts').BUILD_ENGINES], ['claude', 'codex', 'grok', 'gemini', 'antigravity', 'cursor']);
 });
 
 test('the hire dialog lists this build\'s engines, plus an imported hire\'s', () => {

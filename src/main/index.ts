@@ -2071,7 +2071,13 @@ function breakClock(at: number): string {
 }
 
 function publishOfficeBreak(): void {
-  try { liveWebContents()?.send('office:break', officeBreak.view()); } catch { /* window gone */ }
+  try {
+    const v = officeBreak.view();
+    const cfg = readConfig();
+    const godProv = cfg.godProvider ?? inferAgentProvider(cfg.defaultCommand);
+    const view = !isClaudeProvider(godProv) ? null : v;
+    liveWebContents()?.send('office:break', view);
+  } catch { /* window gone */ }
 }
 
 function armOfficeBreak(): void {
@@ -2223,7 +2229,14 @@ function endOfficeBreak(ended: OfficeBreakState): void {
   publishOfficeBreak();
 }
 
-ipcMain.handle('office:breakView', () => officeBreak.view());
+ipcMain.handle('office:breakView', () => {
+  const v = officeBreak.view();
+  if (!v) return null;
+  const cfg = readConfig();
+  const godProv = cfg.godProvider ?? inferAgentProvider(cfg.defaultCommand);
+  if (!isClaudeProvider(godProv)) return null;
+  return v;
+});
 // Try again on the stop card: check now instead of at the next recheck.
 ipcMain.handle('office:retry', () => ({ ok: ownerRetryOffice() }));
 /** Where the owner adds Anthropic credit (checked 2026-10-12: the old
@@ -4258,6 +4271,22 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // handled in the Claude-only block above; this generic flag path covers the
   // other CLIs (it must not blindly attach `--resume` when the seed failed).
   if (opts.hive && !claudeProvider) {
+    if (provider === 'antigravity') {
+      const args = opts.args ? [...opts.args] : [];
+      const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
+      if (at >= 0) {
+        const requested = args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);
+        if (requested && (/pro/i.test(requested) || /3\.1/i.test(requested) || /3\.7/i.test(requested) || /3\.5/i.test(requested))) {
+          const replacement = 'Gemini 3.8 Flash (High)';
+          if (args[at] === '--model') args[at + 1] = replacement;
+          else args[at] = `--model=${replacement}`;
+        }
+      }
+      opts.args = args;
+      if (typeof opts.command === 'string' && (/3\.1/i.test(opts.command) || /pro/i.test(opts.command) || /3\.7/i.test(opts.command) || /3\.5/i.test(opts.command))) {
+        opts.command = opts.command.replace(/Gemini 3\.[157] (Pro|Flash) \([^)]+\)/gi, 'Gemini 3.8 Flash (High)');
+      }
+    }
     const preset = providerPreset(provider);
     const rf = preset.resumeFlag;
     const rsub = preset.resumeSubcommand;
@@ -5144,6 +5173,14 @@ ipcMain.handle('roster:backup', (_evt, reason: unknown) =>
 
 // ─── IPC: hive (multi-agent coordination) ───────────────────────────────────
 ipcMain.handle('hive:registry', () => hive.registry());
+ipcMain.handle('hive:syncAllProviders', (_evt, provider: unknown) => {
+  const p = typeof provider === 'string' ? (provider as AgentProvider) : 'antigravity';
+  if (p !== 'claude') {
+    claudeBlocked.clear();
+    noticeEngineSetup('sync');
+  }
+  return hive.syncAllAgentsProvider(p);
+});
 ipcMain.handle('hive:renameAgent', (_evt, id: unknown, name: unknown) => {
   if (typeof id !== 'string' || typeof name !== 'string') {
     return { ok: false, error: 'Invalid rename request' };
@@ -6053,7 +6090,8 @@ const claudeAuth = makeClaudeAuthReader((path, done) => {
 });
 ipcMain.handle('engineSetup:status', async (_e, provider?: unknown): Promise<EngineSetupStatus> => {
   const cfg = readConfig();
-  const p = typeof provider === 'string' && provider ? provider : (cfg.godProvider ?? 'claude');
+  const godProv = cfg.godProvider ?? inferAgentProvider(cfg.defaultCommand);
+  const p = typeof provider === 'string' && provider ? provider : godProv;
   const isClaude = isClaudeProvider(inferAgentProvider('claude', p));
   const teamNeedsClaude = [...claudeBlocked.values()].some((b) => !b.god);
   const status = await readEngineSetupStatus({

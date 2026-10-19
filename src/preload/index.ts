@@ -322,6 +322,9 @@ export interface HarnessConfig {
    *  'claude' / 'claude-opus-5-5'. Mirrors src/main/config.ts. */
   godProvider?: AgentProvider;
   godModel?: string;
+  secondaryEngine?: AgentProvider;
+  secondaryModel?: string;
+  autoFailover?: boolean;
   /** Per-server consent for the default MCP bundle, keyed by catalog id. Mirrors
    *  src/main/config.ts. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
@@ -945,6 +948,9 @@ const api = {
   /** Persist a hire/job role to hive registry.json + identity.md (no respawn). */
   hivePatchAgentRole: (id: string, role: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:patchAgentRole', id, role),
+  /** Update the AI provider for all agents in registry.json. */
+  hiveSyncAllProviders: (provider: AgentProvider): Promise<{ ok: boolean; count: number; error?: string }> =>
+    ipcRenderer.invoke('hive:syncAllProviders', provider),
   /** A hire's first task: its card, and a request to Michael to hand it out.
    *  Once per hire; `sent` is false when there was nothing to send. With
    *  `edited`, the words are an owner's edited First task from an older Work

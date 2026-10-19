@@ -150,7 +150,6 @@ export const SHOW_MCP_DEFAULTS = false;
  *  member is the form alone. The import code stays for when it comes back. */
 export const SHOW_IMPORT_HIRE = false;
 
-/** The hire wizard's engine chips and raw command line: developer options. A
- *  business owner picks only Best or Fast (hire redesign D3, owner 2026-09-27);
- *  every hire runs on the engine set in Settings. */
-export const SHOW_ENGINE_PICKER = false;
+/** The hire wizard's engine chips and raw command line: developer options.
+ *  Surfaces engine selection across presets for multi-engine offices. */
+export const SHOW_ENGINE_PICKER = true;

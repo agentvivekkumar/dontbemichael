@@ -4,6 +4,8 @@ import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import type { EngineSetupStatus } from '@shared/engineSetup';
 import { Dialog } from '@/shell/Dialog';
 import { refreshNeedsYou } from '@/shell/useNeedsYou';
+import { useHarnessConfig } from '@/hooks/useHarnessConfig';
+import { inferAgentProvider, providerPreset } from '@shared/agentProvider';
 import { PixelButton } from './PixelButton';
 import { GetMichaelReady } from './GetMichaelReady';
 
@@ -20,12 +22,15 @@ export function EngineSetupCard({ status }: { status: EngineSetupStatus | null }
   const godName = useResolvedGodName();
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const config = useHarnessConfig();
   if (!status?.applies || (!status.needed && !open)) return null;
 
   const done = () => {
     setOpen(false);
     refreshNeedsYou();
   };
+  const activeProvider = config?.godProvider ?? (config?.defaultCommand ? inferAgentProvider(config.defaultCommand) : 'claude');
+  const engineName = providerPreset(activeProvider).label;
   // Michael on another engine: the card speaks for the team members on Claude.
   const title = status.forTeam ? t('engineSetup.cardTitleTeam') : t('engineSetup.cardTitle', { godName });
 
@@ -37,7 +42,7 @@ export function EngineSetupCard({ status }: { status: EngineSetupStatus | null }
       }}>
         <div style={{ fontSize: 13, fontWeight: 600, lineHeight: '18px', color: 'var(--cth-ink)' }}>{title}</div>
         <div style={{ marginTop: 2, fontSize: 12.5, lineHeight: '18px', color: 'var(--cth-ink-2)' }}>
-          {status.installed ? t('engineSetup.cardSignedOut') : t('engineSetup.cardNotInstalled')}
+          {status.installed ? t('engineSetup.cardSignedOut', { engineName }) : t('engineSetup.cardNotInstalled', { engineName })}
         </div>
         <div style={{ marginTop: 10 }}>
           <PixelButton variant="primary" size="sm" onClick={() => setOpen(true)}>{t('engineSetup.cardAction', { godName })}</PixelButton>

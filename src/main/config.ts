@@ -296,6 +296,12 @@ export interface HarnessConfig {
   /** The model GOD runs on. Unset falls back to the provider preset's
    *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-5-5'. */
   godModel?: string;
+  /** Standby secondary backup AI engine for the office. */
+  secondaryEngine?: AgentProvider;
+  /** Model for the secondary backup engine. */
+  secondaryModel?: string;
+  /** Automatically switch to the secondary engine if the primary engine stops. */
+  autoFailover?: boolean;
   /** Per-server consent state for the default MCP bundle, keyed by catalog id.
    *  Seeded from MCP_CATALOG (safe-readonly ON, write/secret OFF); the user flips
    *  these in Settings. A server is wired into an agent only when enabled here. */
@@ -711,6 +717,13 @@ function normalizeStoredHomes(cfg: HarnessConfig): HarnessConfig {
       .filter((h): h is string => typeof h === 'string' && !!h.trim())
       .map((h) => expandTilde(h))
       .filter((h) => (seen.has(h) ? false : (seen.add(h), true)));
+  }
+  const inferred = inferAgentProvider(cfg.defaultCommand);
+  if (inferred !== 'claude' && cfg.godProvider === 'claude') {
+    cfg.godProvider = inferred;
+    if (cfg.godModel === 'claude-opus-5-5') {
+      cfg.godModel = providerPreset(inferred).recommendedOrchestratorModel;
+    }
   }
   return cfg;
 }

@@ -375,7 +375,7 @@ async function startBusinessTeam(config: HarnessConfig): Promise<void> {
   }
   const reg = await window.cth.hiveRegistry().catch(() => null);
 
-  const provider = inferAgentProvider(config.defaultCommand);
+  const provider = config.godProvider ?? inferAgentProvider(config.defaultCommand);
   // Same seed as the hire dialog: Claude reads defaultModel, other engines their
   // own entry (setup writes whichever Michael's pick needs).
   const model = isClaudeProvider(provider) ? config.defaultModel : config.providerDefaultModels?.[provider];
@@ -635,8 +635,8 @@ export function useHive(config: HarnessConfig | null): void {
       const reg = await window.cth.hiveRegistry().catch(() => null);
       const godName = resolveGodName(reg?.agents?.[GOD_ID]?.name);
 
-      const godProvider = config.godProvider ?? 'claude';
-      const godModel = config.godModel;
+      const godProvider = config.godProvider ?? inferAgentProvider(config.defaultCommand);
+      const godModel = config.godModel ?? (isClaudeProvider(godProvider) ? config.defaultModel : config.providerDefaultModels?.[godProvider]);
       const command = buildSpawnCommand(config, godModel, godProvider);
       const [exe, ...args] = tokenizeCommand(command.trim());
       // Decision 44: on a business install Michael works in the business folder,

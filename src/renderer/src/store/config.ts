@@ -123,6 +123,9 @@ export interface HarnessConfig {
   /** The owner's monthly Claude plan price in USD; unset uses the detected plan's (mirrors src/main/config.ts). */
   planPriceMonthly?: number;
   godModel?: string;
+  secondaryEngine?: AgentProvider;
+  secondaryModel?: string;
+  autoFailover?: boolean;
   /** Per-server consent for the default MCP bundle, keyed by catalog id (mirrors
    *  src/main/config.ts; seeded from MCP_CATALOG). */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
