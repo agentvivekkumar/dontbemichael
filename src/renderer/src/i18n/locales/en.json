@@ -2635,5 +2635,26 @@
     },
     "questionsAnswered": "questions, answered in {{time}} on average",
     "asksBefore": "{{n}} {{before}}"
+  },
+  "trialShift": {
+    "button": "Trial Shift",
+    "dialogTitle": "Employee Trial Shift",
+    "passedAll": "Passed all checks",
+    "needsAttention": "Needs attention",
+    "failedChecks": "Failed critical checks",
+    "evidenceBreakdown": "Evidence checklist",
+    "toolActivity": "Simulated tool calls",
+    "noToolsCalled": "No simulated tools were called.",
+    "recommendations": "Tips for the owner",
+    "testAnother": "Test another scenario",
+    "done": "Done",
+    "evaluating": "Running trial shift in safe sandbox...",
+    "evaluatingDetail": "Simulating customer interactions and testing employee responses against company policy.",
+    "intro": "Test this employee against a simulated business situation before letting them work with real customers and systems.",
+    "chooseScenario": "Choose a test scenario",
+    "customerPrompt": "Incoming request",
+    "toolsAllowed": "Simulated tools available",
+    "fictionalDocs": "Sandbox documents",
+    "runButton": "Start Trial Shift"
   }
 }

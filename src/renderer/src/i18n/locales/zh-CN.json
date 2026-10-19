@@ -2635,5 +2635,26 @@
     },
     "questionsAnswered": "个问题，平均 {{time}} 内回答",
     "asksBefore": "{{before}}：{{n}} 个"
+  },
+  "trialShift": {
+    "button": "试岗评估",
+    "dialogTitle": "员工试岗评估",
+    "passedAll": "通过所有检查",
+    "needsAttention": "需要关注",
+    "failedChecks": "未通过关键检查",
+    "evidenceBreakdown": "证据清单",
+    "toolActivity": "模拟工具调用",
+    "noToolsCalled": "未调用任何模拟工具。",
+    "recommendations": "给店主的建议",
+    "testAnother": "测试其他场景",
+    "done": "完成",
+    "evaluating": "正在安全沙箱中运行试岗...",
+    "evaluatingDetail": "模拟客户互动并对照公司政策检查员工响应。",
+    "intro": "在让员工接触真实客户和业务数据前，先在模拟情境中进行测试。",
+    "chooseScenario": "选择测试场景",
+    "customerPrompt": "收到的请求",
+    "toolsAllowed": "可用模拟工具",
+    "fictionalDocs": "沙箱业务文档",
+    "runButton": "开始试岗"
   }
 }
