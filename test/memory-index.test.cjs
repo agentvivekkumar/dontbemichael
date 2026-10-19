@@ -68,7 +68,7 @@ test('changes are itemised: add, update, delete, procedure; replaced entries are
   assert.deepEqual(out.archived.map((a) => a.entry.text), ['Price list is v1'], 'the replaced fact is kept in the archive');
   assert.equal(out.procedures[0].slug, 'weekly-money-summary');
   assert.equal(out.entries[3].text, 'Weekly money summary: steps in memory/procedures/weekly-money-summary.md');
-  assert.deepEqual(out.stats, { added: 1, updated: 2, deleted: 0, procedures: 1, repeats: 1 });
+  assert.deepEqual(out.stats, { added: 1, updated: 2, deleted: 0, procedures: 1, repeats: 1, duplicateAdds: 0 });
   const del = mi.applyOps(out.entries, [{ op: 'delete', id: 'm3', reason: 'moved' }], '2026-09-26');
   assert.equal(del.entries.length, 3);
   assert.match(mi.archiveLines(del.archived, '2026-09-26'), /archived 2026-09-26: moved$/);
@@ -286,4 +286,94 @@ test('a pass whose index write fails reports no new notes', { skip: process.plat
   fs.chmodSync(f.dir, 0o700);
   assert.equal(r.tidied, false, 'the index could not be written');
   assert.deepEqual(f.reported, []);
+});
+
+test('validation reports each rejection once while retaining valid operations', () => {
+  const entries = [e('m1', 'fact', 'Existing')];
+  const raw = { ops: [
+    null, [], {}, { op: 'rewrite' },
+    { op: 'update', id: 'm99', kind: 'secret' },
+    { op: 'delete' },
+    { op: 'add', kind: 'secret', text: '' },
+    { op: 'update', id: 'm1', kind: 'procedure' },
+    { op: 'add', kind: 'fact', text: ' ' },
+    { op: 'procedure', name: 'Steps' },
+    { op: 'procedure', steps: '1. do it' },
+    { op: 'update', id: 'm1', text: '' },
+    { op: 'add', kind: 'fact', text: 'Accepted', source: 'task' },
+    { op: 'update', id: 'm1', repeat: true },
+    { op: 'delete', id: 'm1' }
+  ] };
+  const result = mi.validateOpsWithStats(raw, entries);
+  assert.deepEqual(result.rejected, { invalidShape: 4, unknownOperation: 1, unknownEntryId: 1, invalidKind: 2, missingRequiredFields: 4 });
+  assert.deepEqual(result.ops.map(o => o.op), ['add', 'update', 'delete']);
+  assert.deepEqual(mi.validateOps(raw, entries), result.ops);
+  assert.equal(mi.validateOpsWithStats({ ops: 'bad' }, entries).rejected.invalidShape, 1);
+});
+
+test('duplicate additions normalize casing and whitespace without changing accepted wording', () => {
+  const add = text => ({ op: 'add', kind: 'fact', text, source: 'task' });
+  const out = mi.applyOps([], [add('  Payroll   runs Friday '), add('payroll runs friday'), add('Payroll\t runs\nFriday')], '2026-10-18');
+  assert.equal(out.entries.length, 1);
+  assert.equal(out.entries[0].text, '  Payroll   runs Friday ');
+  assert.equal(out.stats.added, 1);
+  assert.equal(out.stats.duplicateAdds, 2);
+  assert.deepEqual(out.added, [{ id: 'm1', source: 'task' }]);
+  const again = mi.applyOps(out.entries, [add('PAYROLL RUNS FRIDAY')], '2026-10-19');
+  assert.deepEqual(again.entries, out.entries);
+  assert.equal(again.stats.duplicateAdds, 1);
+  assert.deepEqual(again.added, []);
+});
+
+test('deduplication preserves source, kind and expiry semantics in either trust order', () => {
+  for (const source of ['owner', 'task', 'tool', 'michael']) {
+    const base = e('m7', 'preference', 'Use bullet points', source);
+    const ops = ['owner', 'task', 'tool', 'michael'].map(s => ({ op: 'add', kind: 'preference', text: 'USE BULLET POINTS', source: s }));
+    ops.push({ op: 'add', kind: 'fact', text: 'Use bullet points', source });
+    ops.push({ op: 'add', kind: 'preference', text: 'Use bullet points', source, expires: '2026-12-31' });
+    const out = mi.applyOps([base], ops, '2026-10-18');
+    assert.deepEqual(out.entries[0], base);
+    assert.equal(out.entries.length, 6);
+    assert.equal(out.entries.filter(x => x.source === 'owner' && x.kind === 'preference' && !x.expires).length, 1);
+    assert.equal(out.stats.duplicateAdds, 1);
+    assert.equal(out.stats.added, 5);
+    assert.equal(out.added.length, 5);
+    assert.deepEqual(out.archived, []);
+  }
+});
+
+test('duplicate checks follow updates and deletes and count only skipped additions', () => {
+  const add = text => ({ op: 'add', kind: 'fact', text, source: 'task' });
+  const out = mi.applyOps([e('m4', 'fact', 'Old')], [
+    { op: 'update', id: 'm4', text: 'New' }, add('NEW'),
+    { op: 'delete', id: 'm4', reason: 'gone' },
+    { op: 'delete', id: 'm4', reason: 'again' },
+    { op: 'update', id: 'm4', repeat: true },
+    add('New'), add(' new '), add('NEW')
+  ], '2026-10-18');
+  assert.deepEqual(out.entries.map(x => [x.id, x.text]), [['m5', 'New']]);
+  assert.deepEqual(out.stats, { added: 1, updated: 1, deleted: 1, procedures: 0, repeats: 0, duplicateAdds: 3 });
+  assert.deepEqual(out.archived.map(x => x.entry.text), ['Old', 'New']);
+  assert.deepEqual(out.added, [{ id: 'm5', source: 'task' }]);
+});
+
+test('tidy result and log include rejection and duplicate counts without rejected content', async (t) => {
+  const f = office(t);
+  fs.writeFileSync(path.join(f.dir, 'memory.md'), mi.renderIndex('Oscar', 'oscar', [e('m1', 'fact', 'Existing')]));
+  fs.writeFileSync(path.join(f.dir, 'memory', 'inbox.md'), '- candidate\n');
+  f.setReply({ ops: [null, { op: 'rewrite', text: 'sensitive rejected text' },
+    { op: 'update', id: 'm99' }, { op: 'add', kind: 'secret' },
+    { op: 'procedure', name: 'missing steps' },
+    { op: 'add', kind: 'fact', text: 'existing', source: 'task' },
+    { op: 'add', kind: 'fact', text: 'New', source: 'task' },
+    { op: 'add', kind: 'fact', text: ' NEW ', source: 'task' }
+  ] });
+  const [result] = await f.tidy.tidyNow('oscar');
+  const expected = { added: 1, updated: 0, deleted: 0, procedures: 0, repeats: 0, duplicateAdds: 2,
+    rejected: { invalidShape: 1, unknownOperation: 1, unknownEntryId: 1, invalidKind: 1, missingRequiredFields: 1 } };
+  assert.equal(result.tidied, true);
+  assert.deepEqual(result.stats, expected);
+  for (const [key, value] of Object.entries(expected)) assert.deepEqual(f.log[0][key], value);
+  assert.doesNotMatch(JSON.stringify(f.log), /sensitive rejected text|missing steps/);
+  assert.deepEqual(mi.parseIndex(fs.readFileSync(path.join(f.dir, 'memory.md'), 'utf8')).entries.map(x => x.id), ['m1', 'm2']);
 });

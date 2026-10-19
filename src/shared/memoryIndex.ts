@@ -151,36 +151,67 @@ const oneLine = (v: unknown): string | undefined => {
 };
 const dateOr = (v: unknown): string | undefined => (typeof v === 'string' && DATE.test(v) ? v : undefined);
 
-/** The model's ops, checked: unknown ops, ids and kinds are dropped. */
+/** One reason per rejected operation, checked in shape/type/id/kind/fields order. */
+export interface OpRejections {
+  invalidShape: number;
+  unknownOperation: number;
+  unknownEntryId: number;
+  invalidKind: number;
+  missingRequiredFields: number;
+}
+
+/** Compatibility wrapper for callers that only need accepted operations. */
 export function validateOps(raw: unknown, entries: MemoryEntry[]): MemoryOp[] {
-  const list = raw && typeof raw === 'object' && Array.isArray((raw as { ops?: unknown }).ops) ? (raw as { ops: unknown[] }).ops : [];
+  return validateOpsWithStats(raw, entries).ops;
+}
+
+/** Diagnostics contain counts only, never model content or memory text. */
+export function validateOpsWithStats(raw: unknown, entries: MemoryEntry[]): { ops: MemoryOp[]; rejected: OpRejections } {
+  const rejected: OpRejections = { invalidShape: 0, unknownOperation: 0, unknownEntryId: 0, invalidKind: 0, missingRequiredFields: 0 };
+  const out: MemoryOp[] = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray((raw as { ops?: unknown }).ops)) {
+    rejected.invalidShape++;
+    return { ops: out, rejected };
+  }
+  const list = (raw as { ops: unknown[] }).ops;
   const ids = new Set(entries.map((e) => e.id));
   const kind = (v: unknown): MemoryKind | undefined => ((MEMORY_KINDS as readonly string[]).includes(v as string) ? v as MemoryKind : undefined);
   const source = (v: unknown): MemorySource => ((MEMORY_SOURCES as readonly string[]).includes(v as string) ? v as MemorySource : 'task');
-  const out: MemoryOp[] = [];
   for (const o of list) {
-    if (!o || typeof o !== 'object') continue;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) { rejected.invalidShape++; continue; }
     const r = o as Record<string, unknown>;
+    if (typeof r.op !== 'string') { rejected.invalidShape++; continue; }
+    if (!['add', 'update', 'delete', 'procedure'].includes(r.op)) { rejected.unknownOperation++; continue; }
+    if (r.op === 'update' || r.op === 'delete') {
+      if (typeof r.id !== 'string') { rejected.invalidShape++; continue; }
+      if (!ids.has(r.id)) { rejected.unknownEntryId++; continue; }
+    }
+    if (r.op === 'add' || (r.op === 'update' && r.kind !== undefined)) {
+      if (!kind(r.kind) || r.kind === 'procedure') { rejected.invalidKind++; continue; }
+    }
     if (r.op === 'add') {
-      const k = kind(r.kind); const text = oneLine(r.text);
-      if (k && k !== 'procedure' && text) out.push({ op: 'add', kind: k, text, source: source(r.source), ...(dateOr(r.expires) ? { expires: dateOr(r.expires) } : {}) });
-    } else if (r.op === 'update' && typeof r.id === 'string' && ids.has(r.id)) {
+      const text = oneLine(r.text);
+      if (!text) { rejected.missingRequiredFields++; continue; }
+      out.push({ op: 'add', kind: kind(r.kind)!, text, source: source(r.source), ...(dateOr(r.expires) ? { expires: dateOr(r.expires) } : {}) });
+    } else if (r.op === 'update') {
+      if (r.text !== undefined && !oneLine(r.text)) { rejected.missingRequiredFields++; continue; }
       out.push({
-        op: 'update', id: r.id,
+        op: 'update', id: r.id as string,
         ...(oneLine(r.text) ? { text: oneLine(r.text) } : {}),
-        ...(kind(r.kind) && r.kind !== 'procedure' ? { kind: kind(r.kind) } : {}),
+        ...(kind(r.kind) ? { kind: kind(r.kind) } : {}),
         ...(dateOr(r.expires) ? { expires: dateOr(r.expires) } : {}),
         ...(r.repeat === true ? { repeat: true } : {})
       });
-    } else if (r.op === 'delete' && typeof r.id === 'string' && ids.has(r.id)) {
-      out.push({ op: 'delete', id: r.id, reason: oneLine(r.reason) ?? 'replaced' });
-    } else if (r.op === 'procedure') {
+    } else if (r.op === 'delete') {
+      out.push({ op: 'delete', id: r.id as string, reason: oneLine(r.reason) ?? 'replaced' });
+    } else {
       const name = oneLine(r.name);
       const steps = typeof r.steps === 'string' ? r.steps.trim().slice(0, MAX_PROCEDURE_CHARS) : '';
-      if (name && steps) out.push({ op: 'procedure', name, steps, source: source(r.source) });
+      if (!name || !steps) { rejected.missingRequiredFields++; continue; }
+      out.push({ op: 'procedure', name, steps, source: source(r.source) });
     }
   }
-  return out;
+  return { ops: out, rejected };
 }
 
 export interface TidyOutcome {
@@ -192,7 +223,7 @@ export interface TidyOutcome {
   /** Entries that are new to the index, not edits of one already there, for
    *  Pulse's Learning count (owner, 2026-10-18: an edit is not a new note). */
   added: Array<{ id: string; source: MemorySource }>;
-  stats: { added: number; updated: number; deleted: number; procedures: number; repeats: number };
+  stats: { added: number; updated: number; deleted: number; procedures: number; repeats: number; duplicateAdds: number };
 }
 
 /** Apply checked ops to the entries. Deterministic; the model never writes the file. */
@@ -201,12 +232,20 @@ export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string)
   const archived: TidyOutcome['archived'] = [];
   const procedures: TidyOutcome['procedures'] = [];
   const added: TidyOutcome['added'] = [];
-  const stats = { added: 0, updated: 0, deleted: 0, procedures: 0, repeats: 0 };
+  const stats = { added: 0, updated: 0, deleted: 0, procedures: 0, repeats: 0, duplicateAdds: 0 };
   let n = next.reduce((max, e) => Math.max(max, Number(e.id.slice(1)) || 0), 0);
   const newId = () => `m${++n}`;
 
   for (const op of ops) {
     if (op.op === 'add') {
+      // Never merge authority or expiry semantics. Compare current entries so
+      // earlier adds, updates and deletes in this batch are reflected as well.
+      const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase();
+      if (next.some((e) => e.kind === op.kind && e.source === op.source
+        && e.expires === op.expires && normalized(e.text) === normalized(op.text))) {
+        stats.duplicateAdds++;
+        continue;
+      }
       const id = newId();
       next.push({ id, kind: op.kind, text: op.text, source: op.source, date: today, ...(op.expires ? { expires: op.expires } : {}) });
       added.push({ id, source: op.source });
