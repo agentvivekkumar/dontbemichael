@@ -4,6 +4,7 @@
  * office's own notices (closing time, scheduled runs) counted on one line
  * instead of filling the tab. Pure: no React, no fs.
  */
+import { cutText } from './cutText';
 
 export interface HistoryItem {
   id: string;
@@ -108,5 +109,5 @@ export function verbKey(act: string): string {
 /** What a row quotes: the subject, else the body's first line. */
 export function gist(m: Pick<HistoryItem, 'subject' | 'body'>, max = 160): string {
   const text = (m.subject?.trim() || m.body?.split('\n').find((l) => l.trim()) || '').replace(/\s+/g, ' ').trim();
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  return cutText(text, max);
 }
