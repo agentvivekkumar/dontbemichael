@@ -188,6 +188,23 @@ function scoreChunk(rec, queryTerms, queryRaw) {
   return score;
 }
 
+/** Length of the longest end of `a` that `b` starts with, up to the chunk overlap. */
+function sharedEdge(a, b) {
+  for (let k = Math.min(a.length, b.length, DEFAULT_CHUNK_OVERLAP); k > 0; k--) if (a.endsWith(b.slice(0, k))) return k;
+  return 0;
+}
+
+/** `text` without what it shares with the chunk before and the chunk after it.
+ *  A word the shared edge cuts through stays whole on the unshared side. */
+function unsharedText(text, before, after) {
+  const inWord = (i) => i > 0 && i < text.length && /\S/.test(text[i - 1]) && /\S/.test(text[i]);
+  let start = before ? sharedEdge(before, text) : 0;
+  let end = after ? text.length - sharedEdge(text, after) : text.length;
+  while (inWord(start)) start--;
+  while (inWord(end)) end++;
+  return start < end ? text.slice(start, end) : '';
+}
+
 /** A short snippet of `text` centred on the first query-term hit. */
 function makeSnippet(text, queryTerms) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
@@ -314,7 +331,8 @@ function ingest(kgRoot, input = {}) {
 /** Keyword-search the index. Returns ranked { docId, title, source, modality, chunkIdx, score, snippet }. */
 function search(kgRoot, query, opts = {}) {
   const limit = clampLimit(opts.limit, DEFAULT_SEARCH_LIMIT);
-  const queryTerms = tokenize(query);
+  // A word typed twice is one term, so repeating it can't outweigh the rest.
+  const queryTerms = [...new Set(tokenize(query))];
   if (!queryTerms.length) return [];
   const idxPath = path.join(kgRoot, 'index.jsonl');
   if (!fs.existsSync(idxPath)) return [];
@@ -334,7 +352,21 @@ function search(kgRoot, query, opts = {}) {
     || String(a.rec.docId).localeCompare(String(b.rec.docId))
     || (a.rec.chunkIdx - b.rec.chunkIdx));
 
-  return scored.slice(0, limit).map(({ rec, score }) => ({
+  // Adjacent chunks share their overlap, so a match inside it would come back
+  // twice. Skip a chunk when a better ranked neighbour from the same doc is kept
+  // and nothing outside the text they share matches.
+  const kept = new Map();
+  for (const hit of scored) {
+    if (kept.size >= limit) break;
+    const { rec } = hit;
+    const text = String(rec.text || '');
+    const before = kept.get(`${rec.docId}:${rec.chunkIdx - 1}`)?.text;
+    const after = kept.get(`${rec.docId}:${rec.chunkIdx + 1}`)?.text;
+    if ((before || after) && scoreChunk({ text: unsharedText(text, before, after) }, queryTerms, query) === 0) continue;
+    kept.set(`${rec.docId}:${rec.chunkIdx}`, { rec, score: hit.score, text });
+  }
+
+  return [...kept.values()].map(({ rec, score }) => ({
     docId: rec.docId, title: rec.title, source: rec.source, modality: rec.modality,
     chunkIdx: rec.chunkIdx, score: Math.round(score * 1000) / 1000,
     snippet: makeSnippet(rec.text, queryTerms)

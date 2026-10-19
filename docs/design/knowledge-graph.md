@@ -135,10 +135,12 @@ The store comes from `--root`, else `KG_ROOT`. `kg-core.cjs` is found through `K
 beside the CLI (packaged), then the repo layout (dev). With no store configured it prints one
 line and exits 0.
 
-**Scoring (`scoreChunk`):** the query is lowercased and tokenized, stop words dropped. For each
-query term found in a chunk, add `1 + ln(1 + count)`; add 2 when the term is in the title; add
-0.5 per distinct term matched; add 5 when the whole query appears as written. Results come back
-highest first with a snippet around the first hit. The app's own search calls the same code, so
+**Scoring (`scoreChunk`):** the query is lowercased and tokenized, stop words and repeated words
+dropped. For each query term found in a chunk, add `1 + ln(1 + count)`; add 2 when the term is in
+the title; add 0.5 per distinct term matched; add 5 when the whole query appears as written.
+Results come back highest first with a snippet around the first hit. A chunk is left out when a
+better ranked neighbour from the same doc is already in the results and it matches only inside
+the overlap they share, so one passage never comes back twice. The app's own search calls the same code, so
 results match what agents see.
 
 ### 5.2 What agents are told

@@ -190,6 +190,51 @@ function writeFixture(dir, name, content) {
     assert.deepStrictEqual(kg.search(root, '   '), [], 'blank query');
   });
 
+  test('a word typed twice in the query counts once', () => {
+    const root = tmpRoot();
+    const ship = kg.ingest(root, { text: 'Shipping takes five days. Shipping is free over fifty dollars.', title: 'Shipping notes' }).docId;
+    const refund = kg.ingest(root, { text: 'Refunds are paid within 30 days to the original card.', title: 'Payments' }).docId;
+    const scores = (q) => Object.fromEntries(kg.search(root, q).map((h) => [h.docId, h.score]));
+    const once = scores('shipping refunds');
+    assert.ok(once[ship] && once[refund], 'both docs match');
+    assert.deepStrictEqual(scores('shipping shipping shipping refunds'), once, 'repeating shipping changes nothing');
+  });
+
+  // Filler that splits the doc into two chunks with `middle` in their overlap.
+  const filler = (n) => Array.from({ length: n }, (_, i) => `Line ${i} covers general office matters.`).join(' ');
+  const twoChunks = (middle) => filler(28) + ' ' + middle + ' ' + filler(22);
+
+  test('a passage in the overlap between two chunks comes back once', () => {
+    const root = tmpRoot();
+    const text = twoChunks('The warehouse door code is 4471.');
+    const chunks = kg.chunkText(text);
+    assert.strictEqual(chunks.length, 2);
+    assert.ok(chunks.every((c) => c.includes('warehouse door code')), 'the sentence sits in both chunks');
+    const { docId } = kg.ingest(root, { text, title: 'Office handbook' });
+    const hits = kg.search(root, 'warehouse door code');
+    assert.strictEqual(hits.length, 1);
+    assert.strictEqual(hits[0].docId, docId);
+  });
+
+  test('neighbouring chunks that match in their own text both come back', () => {
+    const root = tmpRoot();
+    const text = 'The warehouse opens at six. ' + twoChunks('Nothing to see here.') + ' The warehouse closes at ten.';
+    const chunks = kg.chunkText(text);
+    assert.strictEqual(chunks.length, 2);
+    kg.ingest(root, { text, title: 'Office handbook' });
+    assert.deepStrictEqual(kg.search(root, 'warehouse').map((h) => h.chunkIdx).sort(), [0, 1]);
+  });
+
+  test('a word the next chunk starts partway through still counts for the chunk that holds it whole', () => {
+    const root = tmpRoot();
+    const words = (n, p) => Array.from({ length: n }, (_, i) => p + i).join(' ');
+    const text = words(192, 'zz') + ' warehouse ' + words(40, 'yy') + ' ledger ledger ledger ' + words(200, 'ww');
+    const chunks = kg.chunkText(text);
+    assert.ok(/^house /.test(chunks[1]) && !chunks[0].includes('ledger'), 'chunk 1 starts inside warehouse');
+    kg.ingest(root, { text, title: 'Stock notes' });
+    assert.deepStrictEqual(kg.search(root, 'warehouse ledger').map((h) => h.chunkIdx).sort(), [0, 1]);
+  });
+
   // ─── the real agent CLI (out-of-process retrieval path) ─────────────────
   console.log('knowledge-graph agent CLI (kg.cjs) tests');
 
