@@ -1952,8 +1952,8 @@ scrolls sideways, also at 320 px with a scrollbar.
 
 Under the setup inset (§9.12), a second quiet inset with the same fill, inset line, radius and
 padding, for what comes after setup (Company foundations, §7.27a): Michael's avatar, "Then the
-team learns your business" (600, 14/20), two inline items with 16 px icons ("Asks you once, only
-when work needs an answer" and "Learns the rest from your answers and the team's work") and an
+team learns your business" (600, 14/20), two inline items with 16 px icons ("One question to you,
+only when work needs the answer" and "Learns the rest from your answers and the team's work") and an
 `ink-3` line under them. Beside the text, a read only picture of one foundation card (§7.27a) in
 the story's cast, at the story's app scale: the question "Financial year" as its title; Oscar's
 Finance raiser chip and "needs this, 2h ago" in `ink-3`; Michael's one bold evidence line, example
