@@ -37,17 +37,6 @@
 **Effort:** S
 **Priority:** P2
 
-### Catch money amounts in the privacy check's pattern recheck
-
-**What:** Add a pattern for money amounts to the recheck in `src/shared/dataClasses.ts`: digits with a currency mark or code before or after them (Rs, INR, ₹, $, USD, €, £ and the like, with the groupings people write, such as `1,35,000` or `2,000.50`). Today the only money pattern is the card number check.
-
-**Why:** Found by PR 411 (Tejashree0405), confirmed on main 2026-10-18: when the model's cleaned rewrite of a message to Pete keeps "Rs 1,35,000", "₹5,000" or "$2,000", the recheck lets it through, so business figures (private by default) rely on the model alone. In the contributor's live runs, one of 30 private messages kept a payroll figure.
-
-**Behavior change:** Pete gets more messages refused or trimmed: a message to Pete that names an amount is cleaned or refused even when the model passed it. Tests should keep years, counts and percentages passing.
-
-**Effort:** S
-**Priority:** P2
-
 ### Give Pete mail folders it can only read
 
 **What:** Keep the Research team member's inbox and the outbox the app reads in folders only the app writes, and give Pete a way to mark a message handled and to hand in an answer that does not need its shell to write there.

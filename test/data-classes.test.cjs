@@ -54,10 +54,22 @@ test('patterns name the class of what they find', () => {
   assert.ok(cls('call 5125550142').includes('contact'), 'a bare phone length run counts as contact too');
 });
 
+test('an amount with a currency sign or code counts as money', () => {
+  // Value: protects=a business figure the model's rewrite kept never reaches the internet; fails_when=an amount with a currency mark or code passes the recheck; why_new=TODOS (PR 411 saw a payroll figure kept in 1 of 30 private messages); seam=none
+  const isMoney = (t) => dc.patternHits(t).some((h) => h.classId === 'money');
+  for (const t of ['payroll this month is Rs 1,35,000', 'we owe ₹5,000 to the supplier', 'revenue was $2,000.50', 'invoice of INR 45000',
+    'the quote came to 1,200 EUR', 'rent is £950', 'an advance of Rs.12,500', 'paid USD5000', 'around $25 a bag', 'a ＄300 deposit']) {
+    assert.ok(isMoney(t), t);
+  }
+  assert.equal(dc.privatePatternHit('payroll is Rs 1,35,000', dc.dataClassSettings(undefined)).classId, 'money');
+  assert.equal(dc.privatePatternHit('flour is around $25 a bag', dc.dataClassSettings({ money: 'allowed' })), null, 'the owner can allow money');
+});
+
 test('plain research questions trip no pattern', () => {
-  // Value: protects=ordinary asks reach Research; fails_when=years, prices or counts read as private; why_new=new feature; seam=none
-  for (const t of ['pizza suppliers in Austin', 'food safety rules for 2026', 'average price of flour per 50 lb bag, around $25', 'how many restaurants opened in Texas in 2025',
-    'Is the exchange open on 2026-10-13 10:30 Eastern?', 'sales tax for 2022 2023 2024', 'ISBN 978-0-13-468599-1', 'compare 1.234.567.890 units']) {
+  // Value: protects=ordinary asks reach Research; fails_when=years, counts or percentages read as private; why_new=new feature; seam=none
+  for (const t of ['pizza suppliers in Austin', 'food safety rules for 2026', 'average price of flour per 50 lb bag', 'how many restaurants opened in Texas in 2025',
+    'Is the exchange open on 2026-10-13 10:30 Eastern?', 'sales tax for 2022 2023 2024', 'ISBN 978-0-13-468599-1', 'compare 1.234.567.890 units',
+    'did bakery sales grow 15% in 2025', 'shops with 3 locations and 40 staff', 'stores open 9 hrs a day', 'price of 25 kg of rice in euros']) {
     assert.deepEqual(dc.patternHits(t), [], t);
   }
 });
