@@ -125,6 +125,8 @@ src/
   shared/                    code both processes use
     buildFeatures.ts         switches for surfaces hidden in this build (git, IDE, temp workers, org trigger)
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
+    engineCapabilities.ts    what each engine can do for an office member (yes, no or unknown, per OS where it
+                             differs) and engineGaps, what an engine lacks for a job (issue #531)
     officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles, business profile, team plan
     agentDefinition.ts       each agent's levels and outward capabilities
     mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule,
