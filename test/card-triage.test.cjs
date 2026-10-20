@@ -309,6 +309,21 @@ test('a parked step wakes its person at nextAt once, and Michael gets one backst
   assert.equal(inboxOf(hive, 'dwight').filter((m) => m.subject.startsWith('Next step due')).length, 1, 'not again after a restart');
 });
 
+test('a due time written another way is the same reminder, and Michael\'s backstop keeps its clock', () => {
+  // Value: protects=one due time sends one reminder and one backstop; fails_when=rewriting the time from Z to +00:00 or another offset sends the reminder again and resets the backstop; why_new=TODOS (message times and upkeep); seam=dueReminders and guardCards
+  const { dueReminders, guardCards, emptyGuardState, NEXT_BACKSTOP_MS } = loadTs('src/shared/cardGuards.ts');
+  const now = Date.parse('2026-10-12T09:00:00Z');
+  const first = dueReminders([card('p', { nextAt: '2026-10-12T08:00:00Z' })], {}, now);
+  assert.deepEqual(first.due.map((c) => c.id), ['p']);
+  for (const nextAt of ['2026-10-12T08:00:00+00:00', '2026-10-12T13:30:00+05:30', '2026-10-12T08:00:00.000Z']) {
+    const respelled = card('p', { nextAt });
+    assert.deepEqual(dueReminders([respelled], first.reminders, now + 60000).due, [], `not sent again for ${nextAt}`);
+    assert.deepEqual(dueReminders([respelled], first.reminders, now + NEXT_BACKSTOP_MS).backstop.map((c) => c.id), ['p'], `backstop still on time for ${nextAt}`);
+    const st = guardCards([respelled], { ...emptyGuardState('x'), reminders: first.reminders }).state;
+    assert.deepEqual(st.reminders, first.reminders, `kept by the guard for ${nextAt}`);
+  }
+});
+
 
 test('a guard fix leaves every other entry on the board alone, ids that are not text included', async (t) => {
   // Value: protects=no card is lost when the app puts one back; fails_when=the fix writes only the cards it understood; why_new=review cycle 2 found entries with a numeric or missing id deleted; seam=the fleet tick
