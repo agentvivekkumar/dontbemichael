@@ -29,7 +29,8 @@ export function inboxNudgeText(ids: string[]): string {
   // how to work the inbox, so the nudge only says what arrived.
   // The text is typed into a live terminal, so strip control characters and
   // newlines from each id: a crafted id must never submit keystrokes to the agent.
-  const clean = ids.map((id) => id.replace(/[\x00-\x1f\x7f]/g, ''));
+  // \p{Cc} covers C0, DEL and the C1 range (0x80-0x9f), where 0x9b is an 8-bit CSI.
+  const clean = ids.map((id) => id.replace(/\p{Cc}/gu, ''));
   const named = clean.length ? `: ${clean.join(', ')}` : '';
   return `${NUDGE_HEAD}${named}. Work everything still pending in your inbox; an id already in inbox/.done/ was handled earlier.`;
 }
