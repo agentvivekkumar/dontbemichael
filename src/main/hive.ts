@@ -3979,8 +3979,8 @@ export class HiveManager {
   }
 
   /** The owner moves a card to another team member (issue #248): the assignee
-   *  changes, the old one is told, Michael hears, and a routing note lands in
-   *  his memory so similar work goes to the right place next time. */
+   *  changes, Michael hears, and an owner-given routing reason lands in his
+   *  memory so similar work goes to the right place next time. */
   ownerReassignTask(id: string, assignee: string, reason?: string): boolean {
     const why = reason?.trim().slice(0, 500) || undefined;
     const ledger = this.tasks() as { tasks?: HiveTask[] };
@@ -3997,25 +3997,14 @@ export class HiveManager {
       || `Owner moved this to ${toName}: ${from ? `was with ${fromName}` : 'was unassigned'}.`;
     if (!this.patchTask(id, { assignee: next, assignReason })) return false;
     this.tellGodOwnerChange(card, { kind: 'reassigned', from: from || '', to: next, fromName, toName, reason: why });
-    // A short routing note Michael keeps: the tidy up merges duplicates later.
-    const titleBit = (card.title || id).trim().slice(0, 80);
+    // Only owner-supplied text becomes a routing rule in Michael's memory.
+    // Card titles can have come from an email, webhook, or another outsider.
     const rule = why
-      ? `Routing: work like "${titleBit}" goes to ${toName}, not ${fromName}. ${why}`
-      : `Routing: work like "${titleBit}" goes to ${toName}, not ${fromName}.`;
+      ? `Routing (from the owner): ${why}. Goes to ${toName}, not ${fromName}.`
+      : undefined;
     const godId = reg.godId;
-    if (godId) {
+    if (godId && rule) {
       try { this.rememberOwnerNote(godId, `- ${rule}\n`); } catch { /* the move stands */ }
-    }
-    if (from && from !== next && reg.agents[from]) {
-      try {
-        this.send({
-          to: from,
-          act: 'inform',
-          subject: 'Card moved',
-          body: `The owner moved card ${id}${card.title ? ` ("${card.title}")` : ''} to ${toName}. Stop work on it unless you are asked again.${why ? ` Reason: ${why}` : ''}`,
-          conversation: cardConversation(id)
-        }, 'human');
-      } catch { /* Michael still has the note */ }
     }
     this.appendLog({ kind: 'card-reassign', id, from: from ?? null, to: next, by: 'owner' });
     return true;
