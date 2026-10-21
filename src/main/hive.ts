@@ -91,6 +91,12 @@ import { HOUSE_RULES_CHANGED_SUBJECT, houseRulesNoticeBody, houseRulesToTell } f
 import { applyGuardFixes, restoreDone, dueReminders, guardSignature, emptyGuardState, guardCards, waitingChecks, type GuardCard, type GuardState } from '../shared/cardGuards';
 import { sleepSync } from './atomicFile';
 import { TELEMETRY_TOKEN_HEADER } from './telemetry';
+import {
+  compilePolicy,
+  type CompiledProviderPolicy,
+  type PolicyDowngradeResult,
+  type UnifiedAccessPolicy
+} from '../shared/policyCompiler';
 
 /** A thread id an agent wrote, kept only when it is a plain token. */
 function safeConversation(v: unknown): v is string {
@@ -497,6 +503,7 @@ export interface RegistryAgent extends AgentMeta {
    *  (e.g. "ClaudeTerminalHarness") spawns into a nonexistent dir and fails; this
    *  flag makes that visible instead of letting it slip through silently. */
   cwdValid?: boolean;
+  downgrade?: PolicyDowngradeResult;
 }
 
 export interface Registry {
@@ -517,6 +524,7 @@ export interface SpawnInjection {
    *  (today: the proxy-bridge sidecar never bound after retries, so a proxy-tier
    *  agent such as Crush runs without hive events). Human-readable, one line. */
   degraded?: string;
+  downgrade?: PolicyDowngradeResult;
 }
 
 const HOP_CAP = 12;
@@ -1338,6 +1346,21 @@ export class HiveManager {
     // the roster (cwdValid) rather than silently spawning into a nonexistent dir.
     // Store the EXPANDED cwd, never the raw `~/…` the user typed — the registry is
     // read by hooks, the roster and the worker watcher, none of which run a shell.
+    const writableDirs = this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs);
+    const unifiedPolicy: UnifiedAccessPolicy = {
+      agentId: meta.id,
+      isGod: !!meta.isGod,
+      cwd: meta.cwd,
+      writableDirs,
+      folderPolicy: opts.folderPolicy,
+      connectors: {
+        allowed: opts.connectors?.strip === false ? ['granted'] : [],
+        deny: opts.connectors?.deny ?? []
+      },
+      network: opts.network
+    };
+    const compiledPolicy = compilePolicy(unifiedPolicy, (meta.provider ?? 'claude') as AgentProvider, process.platform);
+
     const cwd = this.cwdValidity(meta.cwd);
     reg.agents[meta.id] = {
       ...prev,
@@ -1353,6 +1376,7 @@ export class HiveManager {
       role,
       status: 'idle',
       cwdValid: cwd.valid,
+      downgrade: compiledPolicy.downgrade,
       // A (re)spawn always means a live terminal — clear any prior archived flag.
       archived: false,
       closedByOwner: false,
@@ -1558,11 +1582,12 @@ export class HiveManager {
       // carries only the short shift seed prompt instead of the full protocol (#298).
       const userPrompt = preset.instructionsDelivery === 'system-level' ? ON_SHIFT_PROMPT : prompt;
       const deg = degraded ? { degraded } : {};
-      if (preset.seedDelivery === 'type-into-tui') return { args: [...preArgs], env, seedPrompt: userPrompt, ...deg };
+      const down = compiledPolicy.downgrade ? { downgrade: compiledPolicy.downgrade } : {};
+      if (preset.seedDelivery === 'type-into-tui') return { args: [...preArgs], env, seedPrompt: userPrompt, ...deg, ...down };
       // If a provider somehow exposes neither a flag nor a positional prompt, spawn bare.
-      if (flag) return { args: [...preArgs, flag, userPrompt], env, ...deg };
-      if (preset.positionalInitialPrompt) return { args: [...preArgs, userPrompt], env, ...deg };
-      return { args: preArgs, env, ...deg };
+      if (flag) return { args: [...preArgs, flag, userPrompt], env, ...deg, ...down };
+      if (preset.positionalInitialPrompt) return { args: [...preArgs, userPrompt], env, ...deg, ...down };
+      return { args: preArgs, env, ...deg, ...down };
     }
 
     // Stage 7A — first-party Claude Code telemetry → the embedded loopback OTLP
@@ -1599,6 +1624,7 @@ export class HiveManager {
     // env reaches its child processes too.
     const settingsWritten = !!(sock && shim);
     const stripConnectors = !opts.connectors || opts.connectors.strip || !settingsWritten;
+    const connectorsDisabled = stripConnectors || compiledPolicy.downgrade.connectorsOff;
     if (sock && shim) {
       env.HIVE_SOCK = sock;
       // The shell Claude Code runs the hooks and status line in (hookShell.ts).
@@ -1612,7 +1638,7 @@ export class HiveManager {
       const settingsPath = this.settingsPathFor(dir);
       rmSync(join(dir, 'settings.json'), { force: true });
       mkdirSync(dirname(settingsPath), { recursive: true });
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell, opts.network, meta.isResearch ? this.researchShellWrite(dir, meta.cwd) : undefined));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, connectorsDisabled ? [] : opts.connectors?.deny ?? [], shell.shell, opts.network, meta.isResearch ? this.researchShellWrite(dir, meta.cwd) : undefined));
       args.push('--settings', settingsPath);
       if (opts.folderPolicy?.walledMembers) this.walledAtStart.set(meta.id, opts.folderPolicy.walledMembers);
       else this.walledAtStart.delete(meta.id);
@@ -1627,11 +1653,11 @@ export class HiveManager {
         env.CLAUDE_ENV_FILE = envFile;
       }
     }
-    if (stripConnectors) {
+    if (connectorsDisabled) {
       env.ENABLE_CLAUDEAI_MCP_SERVERS = 'false';
       args.push('--strict-mcp-config');
     }
-    return { args, env };
+    return { args, env, downgrade: compiledPolicy.downgrade };
   }
 
   /** Update the durable job string (hire role) without respawning. Refreshes

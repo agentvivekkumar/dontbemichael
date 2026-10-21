@@ -4,6 +4,7 @@ import type { AccentColorName } from '@/design/tokens';
 import type { OfficeCharacterName } from '@/scene/office/cast';
 import type { StatusKind } from '@/components/PixelBadge';
 import type { AgentProvider } from '@shared/agentProvider';
+import type { PolicyDowngradeResult } from '@shared/policyCompiler';
 import type { HireManifest } from '@shared/hire';
 import { ownValue } from '@shared/ownValue';
 import {
@@ -133,6 +134,8 @@ export interface Agent {
    *  does, asks first and connections. Setup's pack members need none, since
    *  their id is their card's. */
   sourceCard?: string;
+  /** Result of policy downgrade evaluation if engine cannot enforce boundaries (Issue #48) */
+  downgrade?: PolicyDowngradeResult;
   /** When git isolation is enabled, the dedicated worktree path the agent runs
    *  in (its own `agent/<id>` branch); undefined for shared-cwd agents. */
   worktreePath?: string;

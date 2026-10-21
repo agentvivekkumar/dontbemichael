@@ -42,7 +42,9 @@ const BAR = {
     p.instructionsDelivery === 'system-level' ||
     p.instructionsDelivery === 're-injected on compact'
       ? ''
-      : 'no instructionsDelivery of system-level or re-injected on compact'
+      : 'no instructionsDelivery of system-level or re-injected on compact',
+  'has a policy enforcement capability record': (p) =>
+    ap.providerEnforcementFor(p.id) ? '' : 'no providerEnforcementFor record'
 };
 
 function gaps(id) {

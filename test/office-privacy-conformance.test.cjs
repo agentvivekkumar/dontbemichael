@@ -101,6 +101,54 @@ function claudeView(settings, cwd) {
   };
 }
 
+/**
+ * What the configuration the app writes for one Codex agent lets it do.
+ * In auto mode Codex runs with `-a never -s workspace-write`.
+ * Added directories pass via `--add-dir`.
+ * Workspace-write fences writes to cwd and --add-dir.
+ * However, Codex workspace-write does NOT restrict shell reads outside the workspace.
+ */
+function codexView(inj, cwd) {
+  const addDirs = [];
+  for (let i = 0; i < inj.args.length; i++) {
+    if (inj.args[i] === '--add-dir' && inj.args[i + 1]) {
+      addDirs.push(inj.args[i + 1]);
+    }
+  }
+  const writeDirs = [cwd, ...addDirs];
+  return {
+    sandboxOnly: true,
+    toolsMayRead: () => true,
+    toolsMayWrite: (p) => anyUnder(writeDirs, p),
+    toolsMayWriteAllowList: (p) => anyUnder(addDirs, p),
+    shellMayRead: () => true, // Gap: Codex workspace-write does not restrict shell reads
+    shellMayWrite: (p) => anyUnder(writeDirs, p),
+    sandboxDeniesWrite: (p) => !anyUnder(writeDirs, p)
+  };
+}
+
+/**
+ * What the configuration the app writes for one Gemini agent lets it do.
+ * Gemini runs with `--yolo` and no sandbox today.
+ */
+function geminiView(inj, cwd) {
+  const includeDirs = [];
+  for (let i = 0; i < inj.args.length; i++) {
+    if (inj.args[i] === '--include-directories' && inj.args[i + 1]) {
+      includeDirs.push(inj.args[i + 1]);
+    }
+  }
+  return {
+    sandboxOnly: false,
+    toolsMayRead: () => true,
+    toolsMayWrite: () => true,
+    toolsMayWriteAllowList: (p) => anyUnder(includeDirs, p),
+    shellMayRead: () => true,
+    shellMayWrite: () => true,
+    sandboxDeniesWrite: () => false
+  };
+}
+
 // `claude mcp list` lines, as claude-connectors.test.cjs has them.
 const MCP_LIST = [
   'claude.ai HubSpot: https://mcp.hubspot.com/anthropic - ✔ Connected',
@@ -123,7 +171,7 @@ const CONNECTORS = {
 const GRANTS = { oscar: ['Intuit QuickBooks'], pam: ['HubSpot'], kelly: [] };
 const readsBooks = (id) => id === 'oscar';
 
-async function buildOffice(t) {
+async function buildOffice(t, provider = 'claude') {
   // Real paths: folderLayoutFor resolves links (macOS /var is /private/var).
   const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-privacy-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
@@ -154,15 +202,24 @@ async function buildOffice(t) {
   for (const [id, a] of Object.entries(agents)) {
     // What index.ts passes to ensureAgent: the folder policy and the connector plan.
     const inj = await hive.ensureAgent(
-      { id, name: a.name, provider: 'claude', cwd: a.cwd, isGod: !!a.isGod },
+      { id, name: a.name, provider, cwd: a.cwd, isGod: !!a.isGod },
       {
         businessFolder: business,
         folderPolicy: folderPolicy({ isGod: !!a.isGod, cwd: a.cwd }, layout, CASE_INSENSITIVE),
         connectors: C.spawnConnectorPlan(cfg, id, readsBooks(id))
       }
     );
-    const settings = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8'));
-    spawned[id] = { inj, settings, view: claudeView(settings, a.cwd) };
+    let settings = null;
+    let view = null;
+    if (provider === 'claude') {
+      settings = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8'));
+      view = claudeView(settings, a.cwd);
+    } else if (provider === 'codex') {
+      view = codexView(inj, a.cwd);
+    } else if (provider === 'gemini') {
+      view = geminiView(inj, a.cwd);
+    }
+    spawned[id] = { inj, settings, view };
   }
 
   const server = new HookServer(
@@ -171,7 +228,7 @@ async function buildOffice(t) {
   );
   const hook = (agent_id, tool_name, tool_input) =>
     server.handle({ agent_id, session_id: 's1', hook_event_name: 'PreToolUse', tool_name, tool_input, cwd: agents[agent_id].cwd });
-  return { base, business, agents, spawned, hook };
+  return { base, business, agents, spawned, hook, hive, layout, cfg };
 }
 
 const denied = (r) => !!(r && r.hookSpecificOutput && r.hookSpecificOutput.permissionDecision === 'deny');
@@ -269,4 +326,93 @@ test('office privacy conformance: folders, shell writes and connectors hold for 
       }
     }
   });
+});
+
+test('office privacy conformance (Codex): shell write sandbox holds, shell read gap triggers downgrade', async (t) => {
+  const o = await buildOffice(t, 'codex');
+  const team = ['oscar', 'pam', 'kelly'];
+  const ownOf = (id) => o.agents[id].cwd;
+  const peersOf = (id) => team.filter((x) => x !== id);
+  const file = (dir, name = 'notes.md') => path.join(dir, name);
+
+  await t.test('1. shell write sandboxing holds via --add-dir', () => {
+    for (const id of team) {
+      const { view } = o.spawned[id];
+      const who = `${id}: `;
+      for (const peer of peersOf(id)) {
+        assert.ok(!view.shellMayWrite(file(ownOf(peer))), `${who}shell must not write ${file(ownOf(peer))}`);
+      }
+      assert.ok(view.shellMayWrite(file(ownOf(id))), `${who}shell writes its own folder`);
+    }
+  });
+
+  await t.test('2. shell read gap and missing connector deny trigger automatic downgrade', () => {
+    for (const id of team) {
+      const { inj } = o.spawned[id];
+      assert.ok(inj.downgrade, `${id}: must have downgrade result`);
+      assert.equal(inj.downgrade.downgraded, true, `${id}: must be downgraded`);
+      assert.equal(inj.downgrade.mailDraftOnly, true, `${id}: mail must be downgraded to Draft only`);
+      assert.equal(inj.downgrade.connectorsOff, true, `${id}: connectors must be switched off`);
+      assert.ok(inj.downgrade.reasons.length > 0, `${id}: must have human-readable downgrade reasons`);
+      assert.ok(
+        inj.downgrade.reasons.some((r) => r.includes('shell read isolation')),
+        `${id}: reasons must cite shell read isolation`
+      );
+    }
+  });
+});
+
+test('office privacy conformance (Gemini): unsandboxed execution triggers downgrade', async (t) => {
+  const o = await buildOffice(t, 'gemini');
+  const team = ['oscar', 'pam', 'kelly'];
+  for (const id of team) {
+    const { inj } = o.spawned[id];
+    assert.ok(inj.downgrade, `${id}: must have downgrade result`);
+    assert.equal(inj.downgrade.downgraded, true, `${id}: must be downgraded`);
+    assert.equal(inj.downgrade.mailDraftOnly, true, `${id}: mail must be downgraded to Draft only`);
+    assert.equal(inj.downgrade.connectorsOff, true, `${id}: connectors must be switched off`);
+  }
+});
+
+test('policy compiler and downgrade matrix evaluate engine and layout conditions', () => {
+  const { providerEnforcementFor, evaluatePolicyDowngrade } = loadTs('src/shared/policyCompiler.ts');
+
+  // 1. Claude on POSIX enforces all boundaries
+  const claudePosix = providerEnforcementFor('claude', 'darwin');
+  assert.equal(claudePosix.shellRead, true);
+  assert.equal(claudePosix.shellWrite, true);
+  assert.equal(claudePosix.connectorDeny, true);
+
+  // 2. Claude on Windows lacks shell sandbox
+  const claudeWin = providerEnforcementFor('claude', 'win32');
+  assert.equal(claudeWin.shellRead, false);
+  assert.equal(claudeWin.shellWrite, false);
+  assert.equal(claudeWin.connectorDeny, true);
+
+  // 3. Codex enforces shellWrite, but not shellRead or connectorDeny
+  const codex = providerEnforcementFor('codex', 'linux');
+  assert.equal(codex.shellRead, false);
+  assert.equal(codex.shellWrite, true);
+  assert.equal(codex.connectorDeny, false);
+
+  // 4. Standalone Michael (no peers, isGod: true) is not downgraded for shellRead
+  const michaelEval = evaluatePolicyDowngrade(
+    { isGod: true, hasPeersOrSensitive: false, requestedConnectorsCount: 0 },
+    codex,
+    'codex',
+    'linux'
+  );
+  assert.equal(michaelEval.downgraded, false);
+
+  // 5. Team member with peers is downgraded for shellRead under Codex
+  const teamEval = evaluatePolicyDowngrade(
+    { isGod: false, hasPeersOrSensitive: true, requestedConnectorsCount: 1 },
+    codex,
+    'codex',
+    'linux'
+  );
+  assert.equal(teamEval.downgraded, true);
+  assert.equal(teamEval.mailDraftOnly, true);
+  assert.equal(teamEval.connectorsOff, true);
+  assert.equal(teamEval.reasons.length, 2);
 });

@@ -142,14 +142,21 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const stopWatching = (): void => { void save({ enabled: false, mailboxes: [], send: false, sending: 'draft' }); };
   const movingHolder = moving ? holderOf(moving) : undefined;
   const movingAddress = moving ? addressOf(moving) : '';
-  // Can send, Send on approval or Draft only (send-on-approval.md); `send` stays in step.
-  const sending = sendingMode(email);
-  const setSending = (next: SendingMode): void => { if (next !== sending) void save({ ...email, send: next === 'send', sending: next }); };
-  const grantSending: SendingMode = sendFrom ? asSendingMode(sendFrom.sending) : 'draft';
+  const downgrade = agent.downgrade ?? config.agentCapabilities?.[agent.id]?.downgrade;
+  const isMailDraftOnly = !!downgrade?.mailDraftOnly;
+  const sending = isMailDraftOnly ? 'draft' : sendingMode(email);
+  const setSending = (next: SendingMode): void => {
+    if (isMailDraftOnly && next !== 'draft') return;
+    if (next !== sending) void save({ ...email, send: next === 'send', sending: next });
+  };
+  const grantSending: SendingMode = isMailDraftOnly ? 'draft' : (sendFrom ? asSendingMode(sendFrom.sending) : 'draft');
   const grantHolder = sendFrom ? mailboxHolder(config.agentCapabilities, sendFrom.mailbox, agent.id) : undefined;
   const grantPausedNow = !!sendFrom && (!(grantHolder && reads(grantHolder)) || mailboxes.find((m) => m.id === sendFrom.mailbox)?.status === 'needs-attention');
   const sendingLabel = (m: SendingMode): string => t(SENDING_LABEL_KEY[m]);
   const sendingOptions = (['send', 'approval', 'draft'] as const).map((m) => ({ value: m, label: sendingLabel(m) }));
+  const activeSendingOptions = isMailDraftOnly
+    ? sendingOptions.map((opt) => (opt.value === 'draft' ? opt : { ...opt, disabled: true, label: `${opt.label} (disabled by policy)` }))
+    : sendingOptions;
   const sendingInfo = [`${t('capabilities.canSend')}: ${t('capabilities.canSendDesc')}`, `${t('capabilities.sendOnApproval')}: ${t('capabilities.sendOnApprovalDesc')}`, `${t('capabilities.draftOnly')}: ${t('capabilities.draftOnlyDesc')}`].join(' ');
   // The owner's side (E3): who else sends from the mailbox this member watches.
   const senders = current ? sendersFrom(config.agentCapabilities, current).filter((x) => x.agentId !== agent.id && reads(x.agentId)) : [];
@@ -225,6 +232,19 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
       <div style={{ maxWidth: '72ch' }}>
         <div style={hint}>{t('capabilities.intro', { name })}</div>
 
+        {downgrade?.downgraded && (
+          <div role="status" style={{ ...notice, background: 'var(--cth-amber-soft)', border: '1px solid var(--cth-amber)', color: 'var(--cth-amber-text)', marginTop: 10, marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Engine Policy Restrictions ({agent.provider ?? 'AI engine'})
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {downgrade.reasons.map((r: string, i: number) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div style={{ height: 8 }} />
         {/* Email: hidden in this build when SHOW_MAILBOXES is off. */}
         {SHOW_MAILBOXES && <TriggerCard
@@ -246,7 +266,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                   <span style={factValue}><Dot on />{t('capabilities.inboxWatches', { name })}</span>
                   <span style={factKey}>{t('capabilities.sending')}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    <RadioRows inline label={t('capabilities.sendingFrom', { address: addressOf(current) })} value={sending} options={sendingOptions} onChange={(v) => setSending(v as SendingMode)} />
+                    <RadioRows inline label={t('capabilities.sendingFrom', { address: addressOf(current) })} value={sending} options={activeSendingOptions} onChange={(v) => setSending(v as SendingMode)} />
                     <InfoTip label={t('capabilities.sending')} text={sendingInfo} />
                   </span>
                 </div>
@@ -281,7 +301,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
                   </span>
                   <span style={factKey}>{t('capabilities.sending')}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    <RadioRows inline label={t('capabilities.sendingFrom', { address: addressOf(sendFrom.mailbox) })} value={grantSending} options={sendingOptions} onChange={(v) => { if (v !== grantSending) void saveGrant({ mailbox: sendFrom.mailbox, sending: v as SendingMode }); }} />
+                    <RadioRows inline label={t('capabilities.sendingFrom', { address: addressOf(sendFrom.mailbox) })} value={grantSending} options={activeSendingOptions} onChange={(v) => { if (v !== grantSending) void saveGrant({ mailbox: sendFrom.mailbox, sending: v as SendingMode }); }} />
                     <InfoTip label={t('capabilities.sending')} text={sendingInfo} />
                   </span>
                 </div>

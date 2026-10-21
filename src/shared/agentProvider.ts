@@ -204,6 +204,16 @@ export function showByokSettings(engines: readonly AgentProvider[] = BUILD_ENGIN
   return engines.some((e) => BYOK_ENGINES.includes(e));
 }
 
+export {
+  providerEnforcementFor,
+  evaluatePolicyDowngrade,
+  compilePolicy,
+  type PolicyEnforcementCapabilities,
+  type PolicyDowngradeResult,
+  type UnifiedAccessPolicy,
+  type CompiledProviderPolicy
+} from './policyCompiler';
+
 export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
   {
     id: 'claude',
