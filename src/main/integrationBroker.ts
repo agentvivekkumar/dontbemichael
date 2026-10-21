@@ -29,10 +29,14 @@ import { Readable } from 'node:stream';
 import { ConnectionThrottle, HOLD_MAX_MS } from './brokerThrottle';
 import {
   type IntegrationRecord,
+  type PostReads,
   buildAuthHeaders,
   resolveUpstreamUrl,
-  authTypeNeedsSecret
+  authTypeNeedsSecret,
+  isPostRead,
+  postReadsFor
 } from '../shared/integrations';
+import { WriteJournal, writeKey, type WriteOutcome } from './writeOnce';
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB request-body cap
 const UPSTREAM_TIMEOUT_MS = 30_000;
@@ -52,6 +56,8 @@ const STRIP_REQUEST = new Set([
 const STRIP_RESPONSE = new Set([
   'content-encoding', 'content-length', 'set-cookie', ...HOP_BY_HOP
 ]);
+/** Connection errors where the request never reached the provider. */
+const NEVER_REACHED = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']);
 
 interface Capability {
   workerId: string;
@@ -74,6 +80,11 @@ export interface IntegrationBrokerDeps {
   getSecret: (secretRef: string | undefined) => string | undefined;
   /** md-mail tool calls, `POST /mail/<tool>` (docs/designs/multi-mailbox.md). */
   mail?: MailRouteHandler;
+  /** Where recent writes are recorded, so one is never sent twice (writeOnce.ts). */
+  writeJournalPath?: string;
+  /** The POSTs that only read for a connector; the catalog's, by its host
+   *  (postReadsFor). Tests point a catalog connector at a local server with it. */
+  postReads?: (rec: IntegrationRecord) => PostReads[];
 }
 
 /** True for IPv4 loopback (127.0.0.0/8) and IPv6 ::1 (incl. v4-mapped). Mirrors slack.ts. */
@@ -92,9 +103,11 @@ export class IntegrationBroker {
   private readonly byToken = new Map<string, Capability>();
   /** workerId -> token, for revoke. */
   private readonly byWorker = new Map<string, string>();
+  private readonly writes: WriteJournal;
 
   constructor(deps: IntegrationBrokerDeps) {
     this.deps = deps;
+    this.writes = new WriteJournal(deps.writeJournalPath);
   }
 
   /** Bind a loopback port (0 ⇒ OS-assigned). Resolves the bound port. */
@@ -251,7 +264,7 @@ export class IntegrationBroker {
       if (!secret) return IntegrationBroker.sendError(res, 503, 'no_secret', 'no secret configured for this integration');
     }
 
-    void this.forward(req, res, rec, upstream, secret);
+    void this.forward(req, res, rec, upstream, secret, cap.agentId ?? cap.workerId);
   }
 
   private async mail(req: IncomingMessage, res: ServerResponse, agentId: string, op: string): Promise<void> {
@@ -279,7 +292,8 @@ export class IntegrationBroker {
     res: ServerResponse,
     rec: IntegrationRecord,
     upstream: URL,
-    secret: string | undefined
+    secret: string | undefined,
+    writer: string
   ): Promise<void> {
     // Buffer the request body with a hard cap (write methods).
     const method = (req.method ?? 'GET').toUpperCase();
@@ -311,6 +325,9 @@ export class IntegrationBroker {
       delete outHeaders[k]; // ensure the worker can't shadow an injected header
       outHeaders[k] = v;
     }
+    // A write goes out once. A POST the connector only reads with (a search, a
+    // GraphQL query) goes the read way: streamed, and free to ask again.
+    if (body && !this.onlyReads(rec, method, upstream, body)) return this.forwardWrite(res, writer, rec.id, method, upstream, outHeaders, body);
 
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), UPSTREAM_TIMEOUT_MS);
@@ -349,6 +366,65 @@ export class IntegrationBroker {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** Whether a POST only reads, by its connector's catalog rules. A custom
+   *  REST API has none, so its POSTs stay writes. */
+  private onlyReads(rec: IntegrationRecord, method: string, upstream: URL, body: Buffer): boolean {
+    if (method !== 'POST') return false;
+    const rules = this.deps.postReads ? this.deps.postReads(rec) : postReadsFor(rec.baseUrl);
+    return rules.length > 0 && isPostRead(rules, upstream, body.toString('utf8'));
+  }
+
+  /** A write goes upstream once (writeOnce.ts): the same write again gets the
+   *  first answer, marked with x-md-repeated. The key also goes upstream as
+   *  Idempotency-Key, for providers that honour one. */
+  private async forwardWrite(
+    res: ServerResponse,
+    writer: string,
+    integrationId: string,
+    method: string,
+    upstream: URL,
+    headers: Record<string, string>,
+    body: Buffer
+  ): Promise<void> {
+    const key = writeKey(writer, integrationId, method, upstream.href, body);
+    if (!headers['idempotency-key']) headers['idempotency-key'] = key;
+    const result = await this.writes.run(key, () => sendWrite(upstream, method, headers, body));
+    if (result.kind === 'error') return IntegrationBroker.sendError(res, result.status, result.code, result.message);
+    const { answer, repeated } = result;
+    // A rate limit on a write holds the app's next calls too.
+    if (!repeated) this.throttle.note(integrationId, answer.status, new Headers(answer.headers));
+    if (res.headersSent) return;
+    if (!answer.body) {
+      // Made before a restart: this run never heard its answer.
+      res.writeHead(answer.status, { 'content-type': 'application/json', 'x-md-repeated': '1' });
+      res.end(JSON.stringify({ repeated: true, note: 'This change was already made a few minutes ago, before the app restarted. It was not sent again.' }));
+      return;
+    }
+    res.writeHead(answer.status, repeated ? { ...answer.headers, 'x-md-repeated': '1' } : answer.headers);
+    res.end(answer.body);
+  }
+}
+
+/** One write sent upstream, its whole answer read, for the write journal. */
+async function sendWrite(upstream: URL, method: string, headers: Record<string, string>, body: Buffer): Promise<WriteOutcome> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const r = await fetch(upstream, { method, headers, body: body as BodyInit, redirect: 'manual', signal: ac.signal });
+    const answer = Buffer.from(await r.arrayBuffer());
+    const kept: Record<string, string> = {};
+    r.headers.forEach((value, key) => { if (!STRIP_RESPONSE.has(key.toLowerCase())) kept[key] = value; });
+    return { kind: 'answer', answer: { status: r.status, headers: kept, body: answer } };
+  } catch (e) {
+    const code = (e as { cause?: { code?: unknown } }).cause?.code;
+    const message = `upstream request failed: ${(e as Error).message}`;
+    return typeof code === 'string' && NEVER_REACHED.has(code)
+      ? { kind: 'not-sent', status: 502, code: 'bad_gateway', message }
+      : { kind: 'unknown', status: 502, code: 'may_have_gone', message };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

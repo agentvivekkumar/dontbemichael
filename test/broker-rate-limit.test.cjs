@@ -57,7 +57,10 @@ async function office(t, answers) {
   t.after(() => b.stop());
   const token = b.grant('pty-pam', ['books', 'crm'], 'pam');
   const call = (id, p) => fetch(`${b.url()}/i/${id}/${p}`, { headers: { authorization: `Bearer ${token}` } });
-  return { seen, call };
+  const write = (id, p, body) => fetch(`${b.url()}/i/${id}/${p}`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body
+  });
+  return { seen, call, write };
 }
 
 test('a short wait is held in the broker, then the call goes through', async (t) => {
@@ -85,4 +88,14 @@ test('a long wait is answered at once, without calling the app, and other apps a
   assert.deepEqual(await held.json(), { error: `Books asked the app to slow down. Try again in ${retry} seconds.`, code: 'rate_limited' });
   assert.equal(app.seen.length, 1, 'the app saw one call');
   assert.equal((await app.call('crm', 'contacts')).status, 200, 'another app is called as normal');
+});
+
+test('a write the app rate limits holds the next call too', async (t) => {
+  const app = await office(t, (n) => (n === 1 ? [429, { 'retry-after': '120' }] : [200, {}]));
+  const first = await app.write('books', 'invoices', JSON.stringify({ amount: 400 }));
+  assert.equal(first.status, 429, 'the app\'s own answer reaches the agent');
+  const next = await app.call('books', 'invoices');
+  assert.equal(next.status, 429);
+  assert.equal((await next.json()).code, 'rate_limited', 'answered by the broker');
+  assert.equal(app.seen.length, 1, 'the app saw only the write');
 });

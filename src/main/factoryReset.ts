@@ -76,6 +76,7 @@ export const APP_DATA_ENTRIES = [
   'knowledge',
   'integration-secrets.json',
   'mail-send-journal.json',
+  'broker-write-journal.json',
   'mail-proposals.json',
   'trigger-history.json',
   'owner-dock-keys.json',
