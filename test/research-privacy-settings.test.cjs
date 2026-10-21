@@ -65,6 +65,15 @@ test('Windows owners are told Research is not walled off there', () => {
   assert.equal(en.research.windows, 'On Windows, {{name}} can still reach your office files.');
 });
 
+test('Windows owners are told the team\'s commands still reach the internet there', () => {
+  // Value: protects=an owner on Windows does not believe only Research uses the internet; fails_when=the line is missing, shown off Windows, or softened; why_new=TODOS "Take the internet from team members' shells on Windows" (say it on the Research screen); seam=source
+  // It sits right under the Research Windows line, in the top section.
+  assert.match(ui, /text=\{t\('research\.windowsTip', \{ name: researchName \}\)\} \/>\s*<\/div>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*\{win && \(\s*<div style=\{\{ \.\.\.hint, marginTop: 8, paddingInlineStart: 16,[^>]*>\s*\{t\('research\.windowsTeam'\)\}<InfoTip label=\{t\('research\.windowsTeam'\)\} text=\{t\('research\.windowsTeamTip', \{ name: researchName \}\)\} \/>/);
+  assert.ok(ui.indexOf("t('research.windowsTeam')") < ui.indexOf("t('research.sendTitle'"), 'above the send section');
+  assert.equal(en.research.windowsTeam, 'On Windows, your team\'s commands can still reach the internet.');
+  assert.match(en.research.windowsTeamTip, /only their web tools are refused there\. On a Mac, only \{\{name\}\} uses the internet\.$/);
+});
+
 test('the update card is a quiet report, once, that opens the section', () => {
   // Value: protects=updated owners learn the team lost the internet without a false alarm; fails_when=the card turns coral, repeats, or misses the deep link; why_new=design review D9 and D20; seam=source
   const ask = read('src/renderer/src/components/AskMeTab.tsx');
@@ -97,7 +106,7 @@ test('Research copy has no dashes', () => {
 });
 
 test('the Research member reads as Research everywhere the owner sees it, under the name they gave it', () => {
-  // Value: protects=the setup card shows its role, its locked engine stays labelled for screen readers, its name is the owner's to edit, and the floor never calls it Ryan; fails_when=the card drops the role, the name locks again, or it joins the in character banter; why_new=design review, owner ship 2 D17; seam=source
+  // Value: protects=the setup card shows its role, its locked engine stays labelled for screen readers, its name is the owner's to edit, and Pete, in his own face, takes part in the studio's idle talk; fails_when=the card drops the role, the name locks again, or the floor filters Research out of idle talk again; why_new=design review, owner ship 2 D17, owner 2026-10-13 (Pete joins idle time fun); seam=source
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
   assert.match(wiz, /name=\{`\$\{researchName\} · \$\{t\('research\.title'\)\}`\}/, 'its current name (third ship)');
   assert.match(wiz, /character="pete"/, 'Pete, its own face, not Ryan (owner, third ship D4)');
@@ -105,6 +114,6 @@ test('the Research member reads as Research everywhere the owner sees it, under 
   assert.doesNotMatch(modal, /readOnly value=\{agent\.name\}/, 'the name is editable (ship 2 D17)');
   assert.match(modal, /info=\{isResearch \? t\('editAgent\.researchName', \{ name: researchName \}\) : undefined\}/);
   assert.match(modal, /<input readOnly value=\{providerLabel\} aria-label=\{t\('editAgent\.provider'\)\} style=\{lockedValueStyle\} \/>/);
-  assert.match(read('src/renderer/src/scene/studio/StudioStage.tsx'), /\.filter\(\(p\) => p\.id !== RESEARCH_ID\)/);
+  assert.doesNotMatch(read('src/renderer/src/scene/studio/StudioStage.tsx'), /\.filter\(\(p\) => p\.id !== RESEARCH_ID\)/, 'Pete joins idle talk (owner, 2026-10-13)');
   // The hook program's big call handling is driven for real in test/hook-frame-paths.test.cjs.
 });
