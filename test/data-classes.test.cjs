@@ -52,12 +52,19 @@ test('patterns name the class of what they find', () => {
   assert.ok(cls('pass' + 'word: ' + 'hunter22x').includes('secrets'));
   assert.ok(cls('customer 123456789012').includes('accounts'));
   assert.ok(cls('call 5125550142').includes('contact'), 'a bare phone length run counts as contact too');
+  // A card grouped by dots is the same card: the Luhn and digit-count gates,
+  // not the separator set, keep version strings out, so dots are safe to read.
+  assert.ok(cls('paid 4111.1111.1111.1111').includes('money'), 'a dot-grouped card is still a card');
+  assert.ok(!cls('release 4.111.1111').includes('money'), 'a dotted version string is not a card');
+  // An IBAN is the same account whether its letters are upper or lower case.
+  assert.ok(cls('iban gb82 west 1234 5698 7654 32').includes('accounts'), 'a lowercase IBAN is still an IBAN');
 });
 
 test('plain research questions trip no pattern', () => {
   // Value: protects=ordinary asks reach Research; fails_when=years, prices or counts read as private; why_new=new feature; seam=none
   for (const t of ['pizza suppliers in Austin', 'food safety rules for 2026', 'average price of flour per 50 lb bag, around $25', 'how many restaurants opened in Texas in 2025',
-    'Is the exchange open on 2026-10-13 10:30 Eastern?', 'sales tax for 2022 2023 2024', 'ISBN 978-0-13-468599-1', 'compare 1.234.567.890 units']) {
+    'Is the exchange open on 2026-10-13 10:30 Eastern?', 'sales tax for 2022 2023 2024', 'ISBN 978-0-13-468599-1', 'compare 1.234.567.890 units',
+    'upgrade to version 4.111.1111 of the tool', 'the ratio was 3.14.159 in the report']) {
     assert.deepEqual(dc.patternHits(t), [], t);
   }
 });
