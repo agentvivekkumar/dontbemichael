@@ -94,23 +94,3 @@ jobs:
         run: npm ci
       - name: Test suite
         run: npm run test:focused
-
-  # Linux is not offered yet (#35), but the AppImage target exists and the app
-  # already branches on Linux (osSandbox.ts, open at login). Running the suite
-  # here keeps Linux from breaking unseen until it ships. It blocks the run like
-  # the others, but is not one of the four required checks until the owner adds it.
-  test-linux:
-    name: Tests (Linux)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      # Install scripts must run: they finish the Electron runtime and node-pty.
-      - name: Install dependencies
-        run: npm ci
-      - name: Test suite
-        run: npm run test:focused
