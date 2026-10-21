@@ -4,11 +4,12 @@
  * Whether Claude Code's shell sandbox starts on this computer
  * (src/main/osSandbox.ts), and what the spawn settings do when it does not.
  *
- * The shell lock (`allowUnsandboxedCommands: false`) and the network list are
- * only safe where the sandbox starts: where it cannot, the lock makes Claude
- * Code refuse every shell command (the Windows failure, owner 2026-10-09).
- * Linux can be in that state too: no bubblewrap or socat, or AppArmor blocking
- * bubblewrap on Ubuntu 24.04 and later.
+ * Where the sandbox cannot start, the shell lock (`allowUnsandboxedCommands:
+ * false`) makes Claude Code refuse every shell command. Windows has no sandbox
+ * at all, so it goes without the lock (owner 2026-10-09). Linux can be in that
+ * state too (no bubblewrap or socat, or AppArmor blocking bubblewrap on Ubuntu
+ * 24.04 and later), but the owner can fix it, so Linux keeps the lock and fails
+ * closed (owner 2026-10-18), and the log says what to install.
  */
 
 const test = require('node:test');
@@ -124,18 +125,28 @@ test('where the sandbox starts, a member is locked to it and kept off the intern
   assert.deepEqual(s.sandbox.network, { allowedDomains: [], strictAllowlist: true });
 });
 
-test('on a Linux where the sandbox cannot start, a member keeps its shell and its file tools stay held', async (t) => {
-  // Value: protects=team members on a Linux without a working bubblewrap can still clear their inbox and read files, as on Windows; fails_when=the lock or network list is written where the sandbox cannot start (Claude Code then refuses every command), or the file tool deny rules go with it; why_new=the lock keyed on process.platform !== 'win32', so Linux always got it; seam=setOsSandboxProbe
+test('on a Linux where the sandbox cannot start, a member keeps the lock and the network list, so its shell fails closed', async (t) => {
+  // Value: protects=only Research reaches the internet, in every office, even on a Linux without a working bubblewrap; fails_when=the lock or network list is dropped where the owner can still fix the sandbox, so shell commands run open; why_new=owner review of #423 (fail closed on Linux); seam=setOsSandboxProbe
   for (const status of [
     sb.classifyOsSandbox(linux({ has: () => false })),
-    sb.classifyOsSandbox(linux({ apparmorRestrictsUserns: () => true, bwrapStarts: () => ({ ok: false, error: 'denied' }) }))
+    sb.classifyOsSandbox(linux({ apparmorRestrictsUserns: () => true, bwrapStarts: () => ({ ok: false, error: 'denied' }) })),
+    sb.classifyOsSandbox(linux({ bwrapStarts: () => ({ ok: false, error: 'mount proc' }) }))
   ]) {
     const s = await settingsWith(t, status);
-    assert.equal(s.sandbox.allowUnsandboxedCommands, undefined, `${status.state}: no lock where the sandbox cannot start`);
-    assert.equal(s.sandbox.network, undefined, `${status.state}: no network list either`);
-    assert.equal(s.sandbox.enabled, true, `${status.state}: the sandbox is still asked for, so it applies once fixed`);
+    assert.equal(s.sandbox.allowUnsandboxedCommands, false, `${status.state}: the lock stays`);
+    assert.deepEqual(s.sandbox.network, { allowedDomains: [], strictAllowlist: true }, `${status.state}: the network list stays`);
     assert.ok(s.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))), `${status.state}: the file tools stay held`);
+    assert.match(sb.osSandboxReason(status), /can't run shell commands on this computer/, `${status.state}: the reason says commands are refused`);
   }
+});
+
+test('Windows alone goes without the lock and the network list, and its file tools stay held', async (t) => {
+  // Value: protects=a Windows member can still run commands (no sandbox exists there, #187); fails_when=the Windows state gets the lock; why_new=the lock now keys on the sandbox state; seam=setOsSandboxProbe
+  const status = sb.classifyOsSandbox({ platform: 'win32', has: () => true, apparmorRestrictsUserns: () => null, bwrapStarts: () => ({ ok: true }) });
+  const s = await settingsWith(t, status);
+  assert.equal(s.sandbox.allowUnsandboxedCommands, undefined);
+  assert.equal(s.sandbox.network, undefined);
+  assert.ok(s.permissions.deny.includes(ruleFor('Read', path.join(B, 'Admin'))));
 });
 
 test('the real probe on Linux answers quickly with a known state', { skip: process.platform !== 'linux' && 'Linux only: runs bubblewrap' }, () => {

@@ -1854,8 +1854,11 @@ export class HiveManager {
 
   private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash', network?: SandboxNetwork, shellWrite?: string[]): unknown {
     // Whether Claude Code's shell sandbox starts on this computer, asked of the
-    // machine rather than read off the OS name (osSandbox.ts).
-    const sandboxHolds = osSandboxStatus().holds;
+    // machine rather than read off the OS name (osSandbox.ts). Only Windows has
+    // none, so only Windows goes without the lock (#187). A Linux whose sandbox
+    // can't start keeps it, so its shell commands are refused rather than run
+    // open, and the log says what to install (owner, 2026-10-18).
+    const shellLocked = osSandboxStatus().state !== 'no-sandbox-on-windows';
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through a shell with a stripped PATH, where `node` is often absent.
     // On Windows that shell is PowerShell when there is no Git Bash, which can't
@@ -1935,13 +1938,13 @@ export class HiveManager {
               enabled: true,
               // A member without the internet is held to the sandbox even
               // without a business folder, or a rerun outside it would reach
-              // the internet (issue #230). Only where the sandbox starts: on
-              // Windows (#187), and on a Linux without bubblewrap or with
-              // AppArmor blocking it, the lock refuses every command (osSandbox.ts).
-              ...((folders?.sandboxOnly || network) && sandboxHolds ? { allowUnsandboxedCommands: false } : {}),
+              // the internet (issue #230). Not on Windows: no sandbox there
+              // (#187). On a Linux whose sandbox can't start, the lock refuses
+              // every command until the owner fixes it (osSandbox.ts).
+              ...((folders?.sandboxOnly || network) && shellLocked ? { allowUnsandboxedCommands: false } : {}),
               // No host for the shell of anyone but Research. strictAllowlist
               // makes the empty list a rule, not a prompt saver, in auto mode.
-              ...(network && sandboxHolds ? { network } : {}),
+              ...(network && shellLocked ? { network } : {}),
               filesystem: {
                 allowWrite: shellWrite ?? writableDirs,
                 // The hook program runs outside the sandbox on every tool call,

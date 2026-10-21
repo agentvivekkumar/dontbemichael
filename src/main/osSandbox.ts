@@ -9,12 +9,14 @@
  * ("Shell command execution is blocked by policy"): the Windows failure fixed
  * on 2026-10-09 by leaving the lock off there.
  *
- * That fix keyed on the OS name, but Linux can be in the same state: Claude
- * Code's Linux sandbox needs `bubblewrap` and `socat`, neither installed on a
- * stock desktop, and on Ubuntu 24.04 and later AppArmor stops bubblewrap from
- * creating the user namespaces it needs (Claude Code docs, "Configure the
- * sandboxed Bash tool"). So this module asks the machine instead of the OS
- * name, and says in plain words what is missing and how to fix it.
+ * Linux can be in the same state: Claude Code's Linux sandbox needs
+ * `bubblewrap` and `socat`, neither installed on a stock desktop, and on Ubuntu
+ * 24.04 and later AppArmor stops bubblewrap from creating the user namespaces
+ * it needs (Claude Code docs, "Configure the sandboxed Bash tool"). Unlike
+ * Windows, the owner can fix that, so a Linux office keeps the lock and fails
+ * closed: shell commands are refused until the sandbox starts (owner,
+ * 2026-10-18). This module asks the machine, and says in plain words what is
+ * missing and how to fix it.
  *
  * Mac: Seatbelt ships with macOS, so the sandbox holds. Windows: Claude Code
  * has no sandbox, so it never holds. Linux: probed once and cached.
@@ -28,7 +30,7 @@ import { delimiter, join } from 'node:path';
 import { userShellPath } from './shellEnv';
 
 export type OsSandboxState =
-  /** The sandbox starts here: the shell lock and the network rule are safe to set. */
+  /** The sandbox starts here: the shell lock and the network rule hold the shell. */
   | 'ready'
   /** Native Windows: Claude Code runs shell commands unsandboxed. */
   | 'no-sandbox-on-windows'
@@ -107,11 +109,11 @@ export function osSandboxReason(status: OsSandboxStatus): string {
     case 'no-sandbox-on-windows':
       return 'Windows has no shell sandbox, so team members\' shell commands are not limited to their folders. Their file tools still are.';
     case 'missing-tools':
-      return `This computer is missing ${status.missing.join(' and ')}, which the shell sandbox needs, so team members' shell commands are not limited to their folders. Their file tools still are. Install ${status.missing.length > 1 ? 'them' : 'it'}, then close and reopen the app.`;
+      return `This computer is missing ${status.missing.join(' and ')}, which the shell sandbox needs, so team members can't run shell commands on this computer. Install ${status.missing.length > 1 ? 'them' : 'it'}, then close and reopen the app.`;
     case 'blocked-by-apparmor':
-      return 'This computer\'s AppArmor settings stop the shell sandbox from starting, so team members\' shell commands are not limited to their folders. Their file tools still are. Allow bubblewrap in AppArmor, then close and reopen the app.';
+      return 'This computer\'s AppArmor settings stop the shell sandbox from starting, so team members can\'t run shell commands on this computer. Allow bubblewrap in AppArmor, then close and reopen the app.';
     case 'cannot-start':
-      return 'The shell sandbox does not start on this computer, so team members\' shell commands are not limited to their folders. Their file tools still are.';
+      return 'The shell sandbox does not start on this computer, so team members can\'t run shell commands on this computer until it does and the app is reopened.';
   }
 }
 
