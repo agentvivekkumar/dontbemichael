@@ -40,3 +40,15 @@ test('a universal Mac dmg serves both chips when no per-arch dmg exists', () => 
   assert.match(pickDownloadAsset([...assets, ...universal], 'darwin', 'arm64'), /mac-arm64\.dmg$/, 'a per-arch dmg still wins');
   assert.equal(pickDownloadAsset(universal, 'win32', 'x64'), null, 'a release without Windows offers Windows nothing (R8)');
 });
+
+test('on Debian/Ubuntu-family Linux, prefers the deb over the AppImage', () => {
+  const withDeb = [...assets, { name: 'Dont-Be-Michael-0.5.0-linux-x86_64.deb', browser_download_url: 'https://github.com/x/y/releases/download/v0.5.0/Dont-Be-Michael-0.5.0-linux-x86_64.deb' }];
+  assert.match(pickDownloadAsset(withDeb, 'linux', 'x64', true), /\.deb$/);
+});
+test('off Debian/Ubuntu-family Linux, still picks the AppImage even when a deb exists', () => {
+  const withDeb = [...assets, { name: 'Dont-Be-Michael-0.5.0-linux-x86_64.deb', browser_download_url: 'https://github.com/x/y/releases/download/v0.5.0/Dont-Be-Michael-0.5.0-linux-x86_64.deb' }];
+  assert.match(pickDownloadAsset(withDeb, 'linux', 'x64', false), /AppImage$/);
+});
+test('on Debian/Ubuntu-family Linux, falls back to the AppImage when no deb asset exists in the release', () => {
+  assert.match(pickDownloadAsset(assets, 'linux', 'x64', true), /AppImage$/);
+});
