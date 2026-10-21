@@ -11,10 +11,13 @@
  *
  * The journal lives beside the mail send journal, under the app's own data
  * folder, mode 0600. It is not in the hive folder agents can read. It stores
- * the answer, never the credential.
+ * the answer, never the credential. Only a write that worked is kept: a
+ * refusal or an error may go again, with the same key. A damaged journal is set
+ * aside and a fresh one started, as mail does.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync } from 'node:fs';
+import { basename } from 'node:path';
 import { writeFileAtomic } from './atomicFile';
 
 /** How long a finished write is replayed. Same window as a sent email. */
@@ -28,8 +31,6 @@ export const WRITE_UNCERTAIN =
   'This change may already have gone out. Sending it was interrupted, and this app cannot check whether the other service kept it. Do not send it again. Tell Michael, so the owner can check.';
 export const WRITE_NOT_SENT =
   'Not sent. The other service could not be reached. Try again in a moment.';
-export const JOURNAL_UNREADABLE =
-  'The record of earlier changes could not be read, so this was not sent. Tell Michael.';
 export const JOURNAL_UNSAVED =
   'This was not sent. The app could not record it before sending. Try again in a moment.';
 export const WRITE_TOO_LARGE =
@@ -108,7 +109,6 @@ interface WriteRow {
 
 export type WriteLookup =
   | { kind: 'fresh' }
-  | { kind: 'unreadable' }
   | { kind: 'uncertain' }
   | { kind: 'truncated'; status: number }
   | { kind: 'replay'; status: number; contentType: string; body: Buffer };
@@ -125,7 +125,6 @@ function validRow(v: unknown): v is WriteRow {
 
 export class BrokerWriteOnce {
   private readonly rows = new Map<string, WriteRow>();
-  private unreadable = false;
 
   constructor(
     private readonly journalPath: string,
@@ -134,10 +133,7 @@ export class BrokerWriteOnce {
     this.load();
   }
 
-  /** A damaged journal refuses every write. Forgetting a pending row and
-   *  sending again is the failure this exists to prevent. */
   lookup(storageKey: string): WriteLookup {
-    if (this.unreadable) return { kind: 'unreadable' };
     if (this.prune()) this.save();
     const row = this.rows.get(storageKey);
     if (!row) return { kind: 'fresh' };
@@ -155,7 +151,6 @@ export class BrokerWriteOnce {
 
   /** Record the write before it is sent. False means nothing should go out. */
   begin(storageKey: string, idempotencyKey: string): boolean {
-    if (this.unreadable) return false;
     this.rows.set(storageKey, { at: this.now(), idempotencyKey, pending: true });
     if (this.save()) return true;
     this.rows.delete(storageKey);
@@ -187,26 +182,33 @@ export class BrokerWriteOnce {
   }
 
   private load(): void {
+    if (!existsSync(this.journalPath)) return;
+    let raw: unknown;
     try {
-      if (!existsSync(this.journalPath)) return;
-      const raw = JSON.parse(readFileSync(this.journalPath, 'utf8'));
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        this.unreadable = true;
-        return;
-      }
-      for (const [key, value] of Object.entries(raw)) {
-        if (!validRow(value)) {
-          this.unreadable = true;
-          this.rows.clear();
-          return;
-        }
-        this.rows.set(key, value);
-      }
-      if (this.prune()) this.save();
+      raw = JSON.parse(readFileSync(this.journalPath, 'utf8'));
     } catch {
-      this.unreadable = true;
-      this.rows.clear();
-      console.error('[broker] write journal could not be read; writes are refused');
+      this.setAside();
+      return;
+    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Object.values(raw).every(validRow)) {
+      this.setAside();
+      return;
+    }
+    for (const [key, value] of Object.entries(raw as Record<string, WriteRow>)) this.rows.set(key, value);
+    if (this.prune()) this.save();
+  }
+
+  /** Nothing in the app could recover a journal that blocked every write, so
+   *  a damaged one is moved aside, where it can still be looked at, and a
+   *  fresh one starts. Its pending rows are lost with it, as with mail. */
+  private setAside(): void {
+    this.rows.clear();
+    const aside = `${this.journalPath.replace(/\.json$/, '')}.damaged-${this.now()}.json`;
+    try {
+      renameSync(this.journalPath, aside);
+      console.error(`[broker] write journal could not be read; set aside as ${basename(aside)}, starting a fresh one`);
+    } catch {
+      console.error('[broker] write journal could not be read or set aside; starting a fresh one');
     }
   }
 
@@ -226,7 +228,6 @@ export class BrokerWriteOnce {
   }
 
   private save(): boolean {
-    if (this.unreadable) return false;
     try {
       const data: Record<string, WriteRow> = {};
       for (const [key, row] of this.rows) data[key] = row;

@@ -215,7 +215,7 @@ test('a write the app stopped in the middle of is refused after a restart, and a
   assert.equal(retried.text, '{"id":"inv_3"}');
 });
 
-test('QuickBooks gets a stable requestid, reads are not recorded, and a damaged or unsavable journal sends nothing', async (t) => {
+test('QuickBooks gets a stable requestid, reads are not recorded, a damaged journal is set aside, and an unsavable one sends nothing', async (t) => {
   const { dir, file } = journalFile();
   const seen = [];
   const broker = await startBroker(t, {
@@ -248,10 +248,14 @@ test('QuickBooks gets a stable requestid, reads are not recorded, and a damaged 
     getRecord: () => record('books', 'https://api.example.com/'),
     fetchImpl: async () => { seen.push({ damaged: true }); return jsonResponse('{"no":true}'); }
   });
-  const refusedWrite = await request(blocked.url(), blocked.grant('pty-oscar', ['books'], 'oscar'), 'POST', '/i/books/invoice', '{"n":9}');
-  assert.equal(refusedWrite.status, 503);
-  assert.match(refusedWrite.text, /could not be read/);
-  assert.equal(seen.some((s) => s.damaged), false);
+  const token2 = blocked.grant('pty-oscar', ['books'], 'oscar');
+  assert.equal((await request(blocked.url(), token2, 'POST', '/i/books/invoice', '{"n":9}')).status, 201);
+  assert.equal((await request(blocked.url(), token2, 'POST', '/i/books/bill', '{"n":10}')).status, 201);
+  assert.equal(seen.filter((s) => s.damaged).length, 2, 'writes go through after a damaged journal');
+  const aside = fs.readdirSync(path.dirname(damaged)).filter((n) => /^damaged\.damaged-\d+\.json$/.test(n));
+  assert.equal(aside.length, 1, 'the damaged file is kept to look at');
+  assert.equal(fs.readFileSync(path.join(path.dirname(damaged), aside[0]), 'utf8'), '{');
+  assert.equal(Object.keys(JSON.parse(fs.readFileSync(damaged, 'utf8'))).length, 2, 'a fresh journal records the new writes');
 
   const unsaved = await startBroker(t, {
     journalPath: path.join(dir, 'missing', 'journal.json'),
@@ -320,7 +324,7 @@ test('identity, QuickBooks requestid, and failure class stay stable', () => {
   assert.equal(classifyUpstreamFailure(new Error('socket hang up')), 'uncertain');
 });
 
-test('a pending row and a finished answer age out on their own clocks, and a damaged file is not rewritten', () => {
+test('a pending row and a finished answer age out on their own clocks, and a damaged file is set aside', () => {
   const { dir, file } = journalFile();
   try {
     let now = 1_000;
@@ -344,10 +348,15 @@ test('a pending row and a finished answer age out on their own clocks, and a dam
 
     const damaged = path.join(dir, 'with space', 'bad.json');
     fs.writeFileSync(damaged, '{', 'utf8');
-    const blocked = new BrokerWriteOnce(damaged, () => now);
-    assert.equal(blocked.lookup('anything').kind, 'unreadable');
-    assert.equal(blocked.begin('anything', 'key'), false);
-    assert.equal(fs.readFileSync(damaged, 'utf8'), '{');
+    const fresh = new BrokerWriteOnce(damaged, () => now);
+    assert.equal(fresh.lookup('anything').kind, 'fresh');
+    assert.equal(fresh.begin('anything', 'key'), true);
+    assert.equal(fs.readFileSync(path.join(dir, 'with space', `bad.damaged-${now}.json`), 'utf8'), '{');
+    // A file of the wrong shape is set aside too.
+    fs.writeFileSync(damaged, '{"k":{"at":"soon"}}', 'utf8');
+    now += 1;
+    assert.equal(new BrokerWriteOnce(damaged, () => now).lookup('k').kind, 'fresh');
+    assert.ok(fs.existsSync(path.join(dir, 'with space', `bad.damaged-${now}.json`)));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -361,4 +370,60 @@ test('the app keeps the journal beside the mail journal and does not open a card
   for (const message of [WRITE_UNCERTAIN]) {
     assert.doesNotMatch(message, DASH);
   }
+});
+
+test('only a write that worked is replayed: a retry after a rate limit or a server error reaches the service again', async (t) => {
+  // Value: protects=a 429 or 5xx does not block that write for ten minutes; fails_when=a failed answer is kept and replayed, or the retry carries a new key; why_new=owner review on #212; seam=fetchImpl
+  const { dir, file } = journalFile();
+  const answers = [
+    () => new Response('{"error":"slow down"}', { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '1' } }),
+    () => jsonResponse('{"id":"inv-1"}', 201),
+    () => jsonResponse('{"error":"try later"}', 500),
+    () => jsonResponse('{"id":"bill-1"}', 201)
+  ];
+  const keys = [];
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    getRecord: () => record('books', 'https://api.example.com/'),
+    fetchImpl: async (_url, init) => { keys.push(init.headers['idempotency-key']); return answers[keys.length - 1](); }
+  });
+  const token = broker.grant('pty-oscar', ['books'], 'oscar');
+  assert.equal((await request(broker.url(), token, 'POST', '/i/books/invoice', '{"n":1}')).status, 429);
+  // The broker holds the retry until the app's second is up, then sends it.
+  const second = await request(broker.url(), token, 'POST', '/i/books/invoice', '{"n":1}');
+  assert.equal(second.status, 201);
+  assert.equal(keys.length, 2, 'the retry reached the service');
+  assert.equal(keys[0], keys[1], 'with the same key, so the service can still dedupe');
+  assert.equal((await request(broker.url(), token, 'POST', '/i/books/bill', '{"n":2}')).status, 500);
+  assert.equal((await request(broker.url(), token, 'POST', '/i/books/bill', '{"n":2}')).status, 201);
+  assert.equal(keys.length, 4);
+  // A write that worked is still answered from the journal.
+  assert.equal((await request(broker.url(), token, 'POST', '/i/books/bill', '{"n":2}')).status, 201);
+  assert.equal(keys.length, 4);
+});
+
+test('a write answer cut partway drops the connection and is not sent again', async (t) => {
+  // Value: protects=a cut answer never reads as whole, and the write it answered is not repeated; fails_when=the write path ends the reply cleanly after a stream error (main's #433 rule), or the retry is forwarded; why_new=main added cut handling after this PR; seam=fetchImpl
+  const { dir, file } = journalFile();
+  let calls = 0;
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    getRecord: () => record('books', 'https://api.example.com/'),
+    fetchImpl: async () => {
+      calls += 1;
+      const body = new ReadableStream({
+        start(c) { c.enqueue(new TextEncoder().encode('{"id":"inv-')); },
+        pull(c) { c.error(new Error('socket hang up')); }
+      });
+      return new Response(body, { status: 201, headers: { 'content-type': 'application/json' } });
+    }
+  });
+  const token = broker.grant('pty-oscar', ['books'], 'oscar');
+  await assert.rejects(request(broker.url(), token, 'POST', '/i/books/invoice', '{"n":1}'));
+  const retry = await request(broker.url(), token, 'POST', '/i/books/invoice', '{"n":1}');
+  assert.equal(retry.status, 409);
+  assert.match(retry.text, /already went through/);
+  assert.equal(calls, 1);
 });

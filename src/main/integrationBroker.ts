@@ -26,6 +26,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { ConnectionThrottle, HOLD_MAX_MS } from './brokerThrottle';
 import {
   type IntegrationRecord,
   buildAuthHeaders,
@@ -34,7 +35,6 @@ import {
 } from '../shared/integrations';
 import {
   BrokerWriteOnce,
-  JOURNAL_UNREADABLE,
   JOURNAL_UNSAVED,
   WRITE_BODY_KEEP,
   WRITE_NOT_SENT,
@@ -110,6 +110,8 @@ type WriteOutcome =
 export class IntegrationBroker {
   private server: Server | null = null;
   private port = 0;
+  /** When each connected app may be called again (brokerThrottle.ts). */
+  private readonly throttle = new ConnectionThrottle();
   private readonly deps: IntegrationBrokerDeps;
   /** token -> capability. In-memory only; NEVER persisted. */
   private readonly byToken = new Map<string, Capability>();
@@ -198,6 +200,14 @@ export class IntegrationBroker {
     return undefined;
   }
 
+  /** A call to an app that is still rate limiting: answered now with when to
+   *  try again, so the agent waits instead of retrying blind. */
+  private static sendThrottled(res: ServerResponse, label: string, waitMs: number): void {
+    const seconds = Math.ceil(waitMs / 1000);
+    res.writeHead(429, { 'content-type': 'application/json', 'retry-after': String(seconds) });
+    res.end(JSON.stringify({ error: `${label} asked the app to slow down. Try again in ${seconds} seconds.`, code: 'rate_limited' }));
+  }
+
   private static sendError(res: ServerResponse, status: number, code: string, message: string): void {
     if (res.headersSent) { try { res.end(); } catch { /* noop */ } return; }
     res.writeHead(status, { 'content-type': 'application/json' });
@@ -256,6 +266,15 @@ export class IntegrationBroker {
     const rec = this.deps.getRecord(integrationId);
     if (!rec) return IntegrationBroker.sendError(res, 404, 'not_found', 'unknown integration');
     if (!rec.enabled) return IntegrationBroker.sendError(res, 403, 'forbidden', 'integration is disabled');
+    // 5b) An app that asked to slow down is not called until its time is up: a
+    //     short wait is held here (the call runs again then), a long one is
+    //     answered now.
+    const wait = this.throttle.waitFor(integrationId);
+    if (wait > HOLD_MAX_MS) return IntegrationBroker.sendThrottled(res, rec.label || integrationId, wait);
+    if (wait > 0) {
+      setTimeout(() => { if (!req.destroyed && !res.writableEnded) this.handle(req, res); }, wait);
+      return;
+    }
 
     // 6) Confine the upstream URL under the integration origin (NOT an open proxy).
     const upstream = resolveUpstreamUrl(rec.baseUrl, path + query);
@@ -353,6 +372,7 @@ export class IntegrationBroker {
       // The message could in theory contain the URL but never the secret.
       return IntegrationBroker.sendError(res, 502, 'bad_gateway', `upstream request failed: ${(e as Error).message}`);
     }
+    this.throttle.note(rec.id, upstreamRes.status, upstreamRes.headers);
 
     // Stream the response back (status + sanitized headers + body).
     const respHeaders: Record<string, string> = {};
@@ -367,7 +387,9 @@ export class IntegrationBroker {
         res.end();
       }
     } catch {
-      try { res.end(); } catch { /* socket gone */ }
+      // The status is already sent and the body has no length, so a clean end
+      // would read to the agent as a whole answer. Drop the connection instead.
+      res.destroy();
     } finally {
       clearTimeout(timer);
     }
@@ -395,10 +417,6 @@ export class IntegrationBroker {
       return;
     }
     const looked = journal.lookup(identity.storageKey);
-    if (looked.kind === 'unreadable') {
-      this.deliver(res, { type: 'error', status: 503, code: 'write_record', message: JOURNAL_UNREADABLE });
-      return;
-    }
     if (looked.kind === 'uncertain') {
       this.deliver(res, { type: 'error', status: 409, code: 'may_have_applied', message: WRITE_UNCERTAIN });
       return;
@@ -421,7 +439,7 @@ export class IntegrationBroker {
     delete headers['idempotency-key'];
     headers['idempotency-key'] = identity.idempotencyKey;
     const target = withQuickBooksRequestId(upstream, identity.idempotencyKey);
-    const attempt = this.executeWrite(res, target, headers, method, body, identity.storageKey);
+    const attempt = this.executeWrite(res, target, headers, method, body, identity.storageKey, integrationId);
     this.writes.set(identity.storageKey, attempt);
     try {
       await attempt;
@@ -436,7 +454,8 @@ export class IntegrationBroker {
     headers: Record<string, string>,
     method: string,
     body: Buffer,
-    storageKey: string
+    storageKey: string,
+    integrationId: string
   ): Promise<WriteOutcome> {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), this.upstreamTimeoutMs);
@@ -453,6 +472,8 @@ export class IntegrationBroker {
       } catch (e) {
         return this.failWrite(res, storageKey, e);
       }
+      // A rate limit on a write pushes the app's next call back, as for a read.
+      this.throttle.note(integrationId, upstreamRes.status, upstreamRes.headers);
       return await this.relayWrite(res, upstreamRes, storageKey);
     } finally {
       clearTimeout(timer);
@@ -502,10 +523,15 @@ export class IntegrationBroker {
     } catch {
       truncated = true;
       chunks.length = 0;
-      try { if (!res.writableEnded) res.end(); } catch { /* caller gone */ }
+      // The status is already sent and the body has no length, so a clean end
+      // would read to the agent as a whole answer. Drop the connection instead.
+      res.destroy();
     }
     const kept = truncated ? undefined : Buffer.concat(chunks);
-    this.journal?.settle(storageKey, status, contentType, kept, truncated);
+    // Only a write that worked is kept. A refusal, a rate limit or a server
+    // error may go again; the same key goes up, so the service can still dedupe.
+    if (status >= 200 && status < 300) this.journal?.settle(storageKey, status, contentType, kept, truncated);
+    else this.journal?.forget(storageKey);
     if (truncated) return { type: 'truncated', status };
     return { type: 'http', status, contentType, body: kept ?? Buffer.alloc(0) };
   }
