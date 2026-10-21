@@ -13,8 +13,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
+const { onWindows, posixOnly } = require('./platform.cjs');
 
-const { eraseOfficeData, isKnowledgeStore, OFFICE_FOLDER_ENTRIES, PRIVATE_ENTRIES, APP_DATA_ENTRIES, APP_DATA_KEPT } = loadTs('src/main/factoryReset.ts');
+const { eraseOfficeData, isKnowledgeStore, isAppOwnedPath, savePendingResetCleanup, sweepPendingResetCleanup, dropPendingResetCleanup, PENDING_RESET_CLEANUP, OFFICE_FOLDER_ENTRIES, PRIVATE_ENTRIES, APP_DATA_ENTRIES, APP_DATA_KEPT } = loadTs('src/main/factoryReset.ts');
 const { writeOfficeRecord } = loadTs('src/main/officeFile.ts');
 
 function seed(dir, names) {
@@ -198,6 +199,8 @@ test('app:resetAll erases the office data before it resets the config', () => {
     assert.ok(helper.includes(call), `the shared stops include ${call}`);
   }
   assert.match(helper, /if \(!opts\.keepPersist\) step\('persist\.close', \(\) => persist\.close\(\)\);/, 'the full reset closes the store');
+  assert.match(body, /savePendingResetCleanup\(userData, failed\)/, 'failed paths are saved for next launch');
+  assert.match(src, /sweepPendingResetCleanup\(app\.getPath\('userData'\), !!readConfig\(\)\.onboardingComplete\)/, 'swept at next launch');
   assert.doesNotMatch(body, /hive\.root\(\)|memory\.palacePath\(\)|researchFolders\(\)/, 'office folder paths come only through the office check');
 });
 
@@ -263,3 +266,151 @@ test('a moved knowledge store is erased only when it really is one, and a damage
   assert.equal(fs.existsSync(path.join(damaged, 'worktrees', 'pam')), false, 'an agent\'s worktree goes');
   assert.ok(fs.existsSync(path.join(damaged, 'worktrees', 'my-repo', '.git')), 'a real repository the owner keeps there stays');
 });
+
+test('leftover paths from a reset are saved and swept on the next launch, refusing broad or outside paths', (t) => {
+  // Value: protects=failed deletes during reset are cleaned up at next startup without touching owner or system files; fails_when=pending cleanup is not saved, not swept, or deletes outside paths; why_new=TODOS.md "Clear what a reset could not remove on the next launch"; seam=fs
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-pending-'));
+  const userData = path.join(root, 'userData');
+  const home = path.join(root, 'office');
+  fs.mkdirSync(userData, { recursive: true });
+  fs.mkdirSync(home, { recursive: true });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // App-owned targets
+  const appFile = path.join(userData, 'harness.db');
+  fs.writeFileSync(appFile, 'db');
+  seed(home, ['hive']);
+  fs.writeFileSync(path.join(home, 'hive', 'registry.json'), '{}');
+  const hiveDir = path.join(home, 'hive');
+
+  // Outside / unsafe targets that must be refused
+  const outsideFile = path.join(root, 'outside-document.txt');
+  fs.writeFileSync(outsideFile, 'owner text');
+  const homeFolder = os.homedir();
+
+  // 1. savePendingResetCleanup saves valid app-owned failed paths and ignores broad ones
+  savePendingResetCleanup(userData, [appFile, hiveDir, outsideFile, homeFolder]);
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  assert.ok(fs.existsSync(pendingFile), 'pending cleanup file was written');
+  const saved = JSON.parse(fs.readFileSync(pendingFile, 'utf8'));
+  assert.ok(saved.includes(appFile));
+  assert.ok(saved.includes(hiveDir));
+  assert.ok(!saved.includes(outsideFile), 'outside file was filtered out');
+  assert.ok(!saved.includes(homeFolder), 'home directory was filtered out');
+
+  // 2. sweepPendingResetCleanup deletes the app targets, leaves outside intact, and removes pending file
+  const res = sweepPendingResetCleanup(userData);
+  assert.equal(fs.existsSync(appFile), false, 'app file swept');
+  assert.equal(fs.existsSync(hiveDir), false, 'hive dir swept');
+  assert.equal(fs.existsSync(outsideFile), true, 'outside file untouched');
+  assert.ok(res.swept.includes(appFile));
+  assert.ok(res.swept.includes(hiveDir));
+  assert.deepEqual(res.stillFailed, []);
+  assert.equal(fs.existsSync(pendingFile), false, 'pending cleanup file cleared after success');
+});
+
+test('sweepPendingResetCleanup preserves stillFailed paths in the pending file for retry', posixOnly('read-only directory permissions'), (t) => {
+  if (process.getuid && process.getuid() === 0) return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-stuck-'));
+  const userData = path.join(root, 'userData');
+  const home = path.join(root, 'office');
+  fs.mkdirSync(userData, { recursive: true });
+  fs.mkdirSync(home, { recursive: true });
+  seed(home, ['hive', 'roster-backups']);
+  const stuck = path.join(home, 'hive');
+  fs.chmodSync(home, 0o555);
+  t.after(() => {
+    fs.chmodSync(home, 0o755);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  savePendingResetCleanup(userData, [stuck]);
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  assert.ok(fs.existsSync(pendingFile));
+
+  const res = sweepPendingResetCleanup(userData, false);
+  assert.deepEqual(res.stillFailed, [stuck]);
+  assert.ok(fs.existsSync(pendingFile), 'pending file kept when paths still failed');
+  const saved = JSON.parse(fs.readFileSync(pendingFile, 'utf8'));
+  assert.deepEqual(saved, [stuck]);
+});
+
+test('pending reset cleanup is retried while setup is unfinished and dropped once an office is set up', (t) => {
+  // Value: protects=leftovers failing twice never delete a new office set up in the same folder; fails_when=cleanup retries after onboardingComplete or deletes new files; why_new=review feedback; seam=fs
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-new-office-'));
+  const userData = path.join(root, 'userData');
+  const home = path.join(root, 'office');
+  fs.mkdirSync(userData, { recursive: true });
+  fs.mkdirSync(home, { recursive: true });
+  seed(home, ['hive', 'roster-backups']);
+  t.after(() => {
+    try { fs.chmodSync(home, 0o755); } catch { /* ignore */ }
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  savePendingResetCleanup(userData, [path.join(home, 'hive')]);
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  assert.ok(fs.existsSync(pendingFile));
+
+  // 1. When held at relaunch during onboarding (onboardingComplete is false), stillFailed is written back
+  if (!onWindows && (!process.getuid || process.getuid() !== 0)) {
+    fs.chmodSync(home, 0o555);
+    const res = sweepPendingResetCleanup(userData, false);
+    assert.deepEqual(res.stillFailed, [path.join(home, 'hive')]);
+    assert.ok(fs.existsSync(pendingFile), 'stillFailed is kept while setup is unfinished');
+    fs.chmodSync(home, 0o755);
+  }
+
+  // 2. The owner sets up a new office in the same folder; its hive has work in it
+  fs.mkdirSync(path.join(home, 'hive'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'hive', 'tasks.json'), '{"tasks":["new office work"]}');
+
+  // 3. Once office is set up (onboardingComplete is true), leftovers are dropped and new work is preserved
+  const res = sweepPendingResetCleanup(userData, true);
+  assert.deepEqual(res.swept, []);
+  assert.deepEqual(res.stillFailed, []);
+  assert.equal(fs.existsSync(pendingFile), false, 'pending cleanup list dropped once office is set up');
+  assert.ok(fs.existsSync(path.join(home, 'hive', 'tasks.json')), 'new office work is preserved');
+});
+
+test('isAppOwnedPath allows only reset targets and refuses APP_DATA_KEPT, broad paths, and arbitrary files', () => {
+  // Value: protects=startup cleanup never touches kept config, broad paths or arbitrary files; fails_when=config.json or arbitrary files pass; why_new=review feedback; seam=none
+  const userData = '/fake/userData';
+  // Refuses APP_DATA_KEPT
+  assert.equal(isAppOwnedPath(path.join(userData, 'config.json'), userData), false, 'config.json is kept');
+  assert.equal(isAppOwnedPath(path.join(userData, 'hero.json'), userData), false, 'hero.json is kept');
+  assert.equal(isAppOwnedPath(path.join(userData, 'telemetry-install-id'), userData), false, 'telemetry is kept');
+  assert.equal(isAppOwnedPath(path.join(userData, 'arbitrary-file.txt'), userData), false, 'arbitrary file in userData is refused');
+
+  // Allows APP_DATA_ENTRIES directly in userData
+  assert.equal(isAppOwnedPath(path.join(userData, 'harness.db'), userData), true, 'harness.db is an app data entry');
+  assert.equal(isAppOwnedPath(path.join(userData, 'knowledge'), userData), true, 'knowledge is an app data entry');
+  assert.equal(isAppOwnedPath(path.join(userData, 'standing-check'), userData), true, 'standing-check is an app data entry');
+
+  // Refuses broad paths
+  assert.equal(isAppOwnedPath(userData, userData), false, 'userData root is refused');
+  assert.equal(isAppOwnedPath(os.homedir(), userData), false, 'home directory is refused');
+});
+
+test('sweepPendingResetCleanup checks the list itself, leaving kept or outside files untouched even if listed by hand', (t) => {
+  // Value: protects=a forged or stale pending list cannot delete config.json or files outside the app; fails_when=sweep deletes paths not allowed by isAppOwnedPath; why_new=review feedback; seam=fs
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'md-reset-sweep-check-'));
+  const userData = path.join(root, 'userData');
+  fs.mkdirSync(userData, { recursive: true });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const configJson = path.join(userData, 'config.json');
+  fs.writeFileSync(configJson, '{"kept":true}');
+  const outsideFile = path.join(root, 'outside-document.txt');
+  fs.writeFileSync(outsideFile, 'owner text');
+
+  const pendingFile = path.join(userData, PENDING_RESET_CLEANUP);
+  fs.writeFileSync(pendingFile, JSON.stringify([configJson, outsideFile]), 'utf8');
+
+  const res = sweepPendingResetCleanup(userData, false);
+  assert.equal(fs.existsSync(configJson), true, 'config.json is left alone');
+  assert.equal(fs.existsSync(outsideFile), true, 'file outside userData is left alone');
+  assert.deepEqual(res.stillFailed, []);
+  assert.equal(fs.existsSync(pendingFile), false, 'pending list was cleaned up');
+});
+

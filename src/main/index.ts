@@ -137,7 +137,7 @@ import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { PASTE_KEEP_MS, pastesDir, savePaste, sweepOldPastes } from './pastes';
-import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
+import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData, savePendingResetCleanup, sweepPendingResetCleanup, dropPendingResetCleanup } from './factoryReset';
 import { autoMemoryFolders, eraseMemoryTargets, foldersFromRoster, gitTopOf, idsFromCostRows, idsFromRecord, memberIdsIn, memoryResetTargets } from './memoryReset';
 import { groupMembers, hardKillTree, isAlive, KILL_GRACE_MS, snapshotRemains } from './procKill';
 import { buildWorkerLaunch } from './workerLaunch';
@@ -4875,6 +4875,7 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   // the launch → first-agent funnel. `provider` is the engine chosen in the wizard.
   // Fired here (main), not in the renderer, so it rides the same allowlist as the rest.
   if (!wasOnboarded && next.onboardingComplete) {
+    dropPendingResetCleanup(app.getPath('userData'));
     analytics.track('onboarding_completed', { provider: next.godProvider ?? 'claude' });
   }
   // Keep the hive's mirror of the spawn gate current. The queue itself reads
@@ -6645,7 +6646,10 @@ ipcMain.handle('app:resetAll', () => {
     // Company knowledge the owner moved out of the app's data folder.
     knowledgeRoot: resolve(kgRoot) !== resolve(join(userData, 'knowledge')) ? kgRoot : null
   });
-  if (failed.length) console.error('[reset] could not remove:', failed);
+  if (failed.length) {
+    console.error('[reset] could not remove:', failed);
+    savePendingResetCleanup(userData, failed);
+  }
   // Back to first-run defaults, then relaunch clean so all in-memory services
   // re-bootstrap from scratch and the renderer lands on onboarding.
   resetConfig();
@@ -8485,6 +8489,11 @@ function onSystemResume(reason: string): void {
 }
 
 app.whenReady().then(() => {
+  // Clear any leftovers a previous Reset & start over could not remove (TODOS.md).
+  const { swept, stillFailed } = sweepPendingResetCleanup(app.getPath('userData'), !!readConfig().onboardingComplete);
+  if (swept.length) console.log('[reset cleanup] swept on startup:', swept);
+  if (stillFailed.length) console.error('[reset cleanup] could not remove on startup:', stillFailed);
+
   // Realtime Michael mic-gate hygiene (rt-8 / Pam rt-10 nit): the voice session
   // opens the mic permission gate by persisting realtimeVoiceEnabled=true and
   // closes it on disconnect — but a hard crash/reload mid-session skips that
