@@ -64,12 +64,32 @@ const LOOKALIKES: Readonly<Record<string, string>> = {
 };
 const LOOKALIKE = new RegExp(`[${Object.keys(LOOKALIKES).join('')}]`, 'g');
 
-/** A line as it reads, for the check: invisible characters dropped,
+/** Unicode tag characters (U+E0020 to U+E007E) shadow printable ASCII one to
+ *  one. No font draws them, but a model reads them as the letters they shadow,
+ *  so a whole instruction can ride in an email the owner sees as empty. Their
+ *  one real use is an emoji subdivision flag (England, Scotland, Wales): a
+ *  black flag, tag letters or digits, then CANCEL TAG. */
+const TAG_TEXT = /[\u{E0020}-\u{E007E}]/gu;
+const FLAG_SEQUENCE = /\u{1F3F4}[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]{1,7}\u{E007F}/gu;
+const untag = (c: string): string => String.fromCharCode(c.codePointAt(0)! - 0xE0000);
+
+/** The text a line carries in tag characters outside an emoji flag, decoded. */
+function hiddenText(line: string): string {
+  return (line.replace(FLAG_SEQUENCE, '').match(TAG_TEXT) ?? []).map(untag).join('');
+}
+
+/** A line as it reads, for the check: tag characters decoded into the text
+ *  they carry (emoji flags kept as flags), invisible characters dropped,
  *  compatibility forms folded (NFKC), so fullwidth "ｉｇｎｏｒｅ" and bold
  *  math "𝐢𝐠𝐧𝐨𝐫𝐞" are the plain word the patterns know, and look-alike
  *  letters read as the Latin ones they copy. */
 function readable(line: string): string {
-  return line.replace(INVISIBLE, '').normalize('NFKC').replace(LOOKALIKE, (c) => LOOKALIKES[c]);
+  return line
+    .replace(FLAG_SEQUENCE, '\u{1F3F4}')
+    .replace(TAG_TEXT, untag)
+    .replace(INVISIBLE, '')
+    .normalize('NFKC')
+    .replace(LOOKALIKE, (c) => LOOKALIKES[c]);
 }
 
 export const UNTRUSTED_NOTE =
@@ -105,7 +125,9 @@ function findMarker(raw: string): string | undefined {
       if (m) return piece.slice(m.index);
     }
   }
-  return undefined;
+  // Text nobody can see is written for a model, whatever it says.
+  const hidden = hiddenText(raw).trim();
+  return hidden ? `Hidden text: ${hidden}` : undefined;
 }
 
 /** A read message with the untrusted label added; the original fields are unchanged. */
