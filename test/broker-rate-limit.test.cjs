@@ -99,3 +99,22 @@ test('a long wait is answered at once, without calling the app, and other apps a
   assert.equal(app.seen.length, 1, 'the app saw one call');
   assert.equal((await app.call('crm', 'contacts')).status, 200, 'another app is called as normal');
 });
+
+test('GitHub\'s 403 for an exhausted limit holds the next call; a 403 refusal does not', async (t) => {
+  const reset = String(Math.floor(Date.now() / 1000) + 300);
+  const app = await office(t, (n) => (n === 1
+    ? [403, { 'x-ratelimit-limit': '5000', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': reset }]
+    : [403, {}]));
+  const first = await app.call('books', 'repos/acme/shop/issues');
+  assert.equal(first.status, 403, 'the app\'s own answer reaches the agent');
+  const held = await app.call('books', 'repos/acme/shop/issues');
+  assert.equal(held.status, 429, 'answered by the broker until the reset');
+  const retry = Number(held.headers.get('retry-after'));
+  assert.ok(retry > 250 && retry <= 300, `retry-after ${retry}`);
+  assert.equal(app.seen.length, 1, 'GitHub saw one call');
+
+  // A plain 403 (a missing scope) is passed back, and the next call still goes out.
+  assert.equal((await app.call('crm', 'private')).status, 403);
+  assert.equal((await app.call('crm', 'private')).status, 403);
+  assert.equal(app.seen.length, 3, 'both calls reached the app');
+});
