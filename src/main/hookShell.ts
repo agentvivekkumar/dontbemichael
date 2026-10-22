@@ -68,9 +68,22 @@ export function hookShell(platform: NodeJS.Platform = process.platform, env: Nod
 let lastShell: { key: string; value: { gitBash: string } } | undefined;
 
 /**
+ * One word for bash or sh, single quoted. Inside double quotes bash still
+ * expands `$name`, `$(...)` and backticks and eats a backslash before `$`, so
+ * a hive under a folder named `Cash$Flow` ran a script under `Cash` that does
+ * not exist: the hook failed, and Claude Code goes on with a tool call when a
+ * hook fails. Nothing inside single quotes is special; a single quote itself
+ * closes the quote, is escaped, and opens it again.
+ */
+export function posixQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * One command line in that shell: the executable and script quoted (paths may
  * hold spaces), then plain flags. PowerShell needs the call operator before a
- * quoted path, and single quotes so `$` and backticks in a path stay literal.
+ * quoted path, and single quotes so `$` and backticks in a path stay literal;
+ * bash gets single quotes for the same reason (posixQuote).
  */
 export function shellCommand(shell: HookShell, exe: string, script: string, ...args: string[]): string {
   if (shell === 'powershell') {
@@ -79,5 +92,5 @@ export function shellCommand(shell: HookShell, exe: string, script: string, ...a
     const q = (s: string): string => `'${s.replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'`;
     return ['&', q(exe), q(script), ...args].join(' ');
   }
-  return [`"${exe}"`, `"${script}"`, ...args].join(' ');
+  return [posixQuote(exe), posixQuote(script), ...args].join(' ');
 }

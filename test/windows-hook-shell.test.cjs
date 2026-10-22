@@ -40,13 +40,13 @@ test('Git Bash is found the way Claude Code finds it, and decides the shell', ()
   assert.deepEqual(hookShell('win32', {}, has('C:\\Program Files\\Git\\bin\\bash.exe')), { shell: 'bash', gitBash: 'C:\\Program Files\\Git\\bin\\bash.exe' });
 });
 
-test('a PowerShell command calls the quoted launcher; bash keeps its form', () => {
+test('a PowerShell command calls the quoted launcher; bash gets single quotes', () => {
   // Value: protects=hooks run under PowerShell; fails_when=the call operator or single quotes are dropped, or the bash form changes; why_new=two quoted paths in a row are a PowerShell parse error; seam=none
   assert.equal(shellCommand('powershell', LAUNCHER, SHIM), `& '${LAUNCHER}' '${SHIM}'`);
   assert.equal(shellCommand('powershell', LAUNCHER, SHIM, '--status'), `& '${LAUNCHER}' '${SHIM}' --status`);
   assert.equal(shellCommand('powershell', "C:\\O'Brien $x\\n.cmd", SHIM), `& 'C:\\O''Brien $x\\n.cmd' '${SHIM}'`, 'a quote doubled, $ literal');
   assert.equal(shellCommand('powershell', 'C:\\Joe\u2019s \u2018Biz\u201B\u201A\\n.cmd', SHIM), `& 'C:\\Joe\u2019\u2019s \u2018\u2018Biz\u201B\u201B\u201A\u201A\\n.cmd' '${SHIM}'`, 'typographic single quotes are quote marks to PowerShell too');
-  assert.equal(shellCommand('bash', '/h/hive/bin/hive-node', '/h/hive/bin/cth-hook.cjs', '--status'), '"/h/hive/bin/hive-node" "/h/hive/bin/cth-hook.cjs" --status');
+  assert.equal(shellCommand('bash', '/h/hive/bin/hive-node', '/h/hive/bin/cth-hook.cjs', '--status'), "'/h/hive/bin/hive-node' '/h/hive/bin/cth-hook.cjs' --status");
   // Where PowerShell is installed, it parses the command (here the error came from).
   const pwsh = ['pwsh', 'powershell'].find((c) => spawnSync(c, ['-NoProfile', '-Command', 'exit 0']).status === 0);
   if (pwsh) {
@@ -55,6 +55,27 @@ test('a PowerShell command calls the quoted launcher; bash keeps its form', () =
     assert.notEqual(parse(shellCommand('bash', LAUNCHER, SHIM)), '0', 'the old form does not parse');
     assert.equal(parse(shellCommand('powershell', "C:\\O'Brien $x\\n.cmd", SHIM)), '0', 'an apostrophe and $ in a path');
     assert.equal(parse(shellCommand('powershell', 'C:\\Joe\u2019s \u2018Biz\u201B\u201A\\n.cmd', SHIM, '--status')), '0', 'typographic quotes in a path');
+  }
+});
+
+test('bash reads a hook path back exactly as written, whatever the folder is called', { skip: process.platform === 'win32' && 'needs a POSIX bash' }, () => {
+  // Value: protects=hooks keep running when the hive sits under a folder with $, a backtick, a quote or a backslash in its name; fails_when=bash expands or eats part of the path, so the hook runs a script that is not there and Claude Code carries on without it; why_new=the bash form was double quoted; seam=none
+  for (const dir of [
+    '/Users/sam/Cash$Flow/hive',
+    '/Users/sam/$(touch pwned)/hive',
+    '/Users/sam/`id`/hive',
+    "/Users/sam/Joe's Bakery/hive",
+    '/Users/sam/say "hi"/hive',
+    '/Users/sam/back\\$lash/hive',
+    'C:\\Users\\sam\\$Money\\hive',
+    '/Users/sam/Ünïcødé ✓/hive'
+  ]) {
+    const exe = path.join(dir, 'bin', 'hive-node');
+    const script = path.join(dir, 'bin', 'cth-hook.cjs');
+    // printf in front: each word bash would run comes back on its own line.
+    const r = spawnSync('bash', ['-c', `printf '%s\\n' ${shellCommand('bash', exe, script, '--status')}`], { encoding: 'utf8', cwd: os.tmpdir() });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.stdout.split('\n').slice(0, -1), [exe, script, '--status'], dir);
   }
 });
 
@@ -81,7 +102,7 @@ test('on Windows, every Claude hook and the status line are written for the shel
     if (realBash === undefined) delete process.env.CLAUDE_CODE_GIT_BASH_PATH; else process.env.CLAUDE_CODE_GIT_BASH_PATH = realBash;
   }
   if (process.platform !== 'win32') assert.equal(expected.shell, 'powershell', 'a Mac or Linux host has no Git Bash');
-  const form = expected.shell === 'powershell' ? /^& '.+' '.+cth-hook\.cjs'$/ : /^".+" ".+cth-hook\.cjs"$/;
+  const form = expected.shell === 'powershell' ? /^& '.+' '.+cth-hook\.cjs'$/ : /^'.+' '.+cth-hook\.cjs'$/;
   const settings = JSON.parse(fs.readFileSync(path.join(home, 'agent-settings/a1.json'), 'utf8'));
   const hooks = Object.values(settings.hooks).flatMap((matchers) => matchers.flatMap((m) => m.hooks));
   assert.ok(hooks.length > 0);
@@ -101,7 +122,7 @@ test('on Windows, every Claude hook and the status line are written for the shel
     await new HiveManager(() => posix).ensureAgent({ id: 'a1', name: 'A', provider: 'claude', cwd: posix });
     const first = Object.values(JSON.parse(fs.readFileSync(path.join(posix, 'agent-settings/a1.json'), 'utf8')).hooks)[0][0].hooks[0];
     assert.equal(first.shell, undefined);
-    assert.match(first.command, /^".+" ".+cth-hook\.cjs"$/);
+    assert.match(first.command, /^'.+' '.+cth-hook\.cjs'$/);
   }
 });
 
@@ -129,9 +150,9 @@ test('on Windows with Git Bash found, hooks name bash, keep the quoted form, and
   assert.ok(hooks.length > 0);
   for (const h of hooks) {
     assert.equal(h.shell, 'bash');
-    assert.match(h.command, /^".+" ".+cth-hook\.cjs"$/, h.command);
+    assert.match(h.command, /^'.+' '.+cth-hook\.cjs'$/, h.command);
   }
-  assert.match(settings.statusLine.command, /^".+" ".+cth-hook\.cjs" --status$/);
+  assert.match(settings.statusLine.command, /^'.+' '.+cth-hook\.cjs' --status$/);
 });
 
 test('a found Git Bash is reused between spawns only while it exists, and none is looked for again', (t) => {
