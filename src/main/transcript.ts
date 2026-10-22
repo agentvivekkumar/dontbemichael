@@ -319,15 +319,17 @@ function readFileUsage(dir: string, file: string): FileUsageEntry | null {
       if (len > 0) {
         const buf = Buffer.alloc(len);
         const read = readSync(fd, buf, 0, len, entry.offset);
-        const text = buf.subarray(0, read).toString('utf8');
         // Consume only up to the last complete line; a torn trailing line
         // stays unparsed (offset holds at the newline) until the writer
-        // finishes it — it is then counted exactly once.
-        const lastNl = text.lastIndexOf('\n');
+        // finishes it — it is then counted exactly once. The newline is found
+        // in the bytes, so the offset moves by what the file holds, not by
+        // the length of a decoded and re-encoded copy (a stray invalid byte
+        // decodes to U+FFFD, three bytes long, and would push it into the
+        // middle of the next line).
+        const lastNl = read > 0 ? buf.lastIndexOf(0x0a, read - 1) : -1;
         if (lastNl !== -1) {
-          const complete = text.slice(0, lastNl + 1);
-          parseUsageLines(complete, entry);
-          entry.offset += Buffer.byteLength(complete, 'utf8');
+          parseUsageLines(buf.toString('utf8', 0, lastNl + 1), entry);
+          entry.offset += lastNl + 1;
         }
       }
     } finally { closeSync(fd); }

@@ -110,6 +110,17 @@ test('a partial trailing line is not counted until completed', () => {
   assert.equal(readAgentUsage(cwd).outputTokens, 600, 'completed line counts exactly once');
 });
 
+test('a byte that is not UTF-8 does not push the next read into a line', () => {
+  const { cwd, dir } = makeProject();
+  const f = path.join(dir, 'a.jsonl');
+  // A tool result with a raw 0xFF byte decodes to U+FFFD, which is 3 bytes.
+  const odd = Buffer.concat([Buffer.from('{"type":"user","text":"'), Buffer.from([0xff]), Buffer.from('"}\n')]);
+  fs.writeFileSync(f, Buffer.concat([odd, Buffer.from(rec(100) + '\n')]));
+  assert.equal(readAgentUsage(cwd).outputTokens, 100);
+  fs.appendFileSync(f, rec(200) + '\n');
+  assert.equal(readAgentUsage(cwd).outputTokens, 300, 'the appended record is read whole');
+});
+
 test('a rewritten (shrunk) file is re-parsed from scratch', () => {
   const { cwd, dir } = makeProject();
   const f = path.join(dir, 'a.jsonl');
