@@ -4,7 +4,7 @@ import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { PixelButton } from './PixelButton';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useRtl } from '@/i18n/useDirection';
-import { parseRoleLine, workStyleBody } from '@shared/agentProfile';
+import { parseRoleLine, profileDuties, workStyleBody } from '@shared/agentProfile';
 import { fillBusiness } from '@shared/teamPlan';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import { useStore, type Agent } from '@/store/store';
@@ -16,9 +16,9 @@ import { ScheduledJobsList, useScheduledJobs } from './ScheduledJobs';
 
 /**
  * PROFILE: who this agent is, the first tab on every agent (owner, 2026-09-25;
- * docs/designs/agent-profile.md). The job title and what the job is, what to
- * send them and what goes elsewhere, what they do and what they ask you about
- * first, the key facts, and the full instructions they follow.
+ * docs/designs/agent-profile.md). The job title and what the job is, what they
+ * do and what they ask you about first (from the saved work style, or the
+ * Office Pack when none is saved), the key facts, and the full instructions.
  *
  * Everything comes from what the app already stores: the agent's role line and
  * work style, and its card in the office's business pack (read once per launch).
@@ -97,8 +97,16 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   // Michael has no pack card: his profile says what his instructions tell him
   // to do (hive.ts godPrompt), in the owner's words.
   const summary = god ? t('profile.god.summary', { name }) : (role.summary || card?.summary || '');
-  const does = god ? (t('profile.god.does', { returnObjects: true, name }) as string[]) : (card?.does ?? []);
-  const asksFirst = god ? (t('profile.god.asksFirst', { returnObjects: true }) as string[]) : (card?.wontDo ?? []);
+  // A saved work style is what this person follows. The pack lists are only
+  // the template, used when nothing has been saved yet. Michael's lists are
+  // his own, not a pack card and not this parse.
+  const duties = god ? undefined : profileDuties(effectiveWorkStyle(agent));
+  const does = god
+    ? (t('profile.god.does', { returnObjects: true, name }) as string[])
+    : (duties?.found ? duties.does : (card?.does ?? []));
+  const asksFirst = god
+    ? (t('profile.god.asksFirst', { returnObjects: true }) as string[])
+    : (duties?.found ? duties.asksFirst : (card?.wontDo ?? []));
   const team = god ? agents.filter((a) => !a.isGod && !a.isAssistant && !a.archived) : [];
   const businessLine = office?.business.name
     ? [office.business.name, office.business.city].filter(Boolean).join(t('profile.listJoiner'))
@@ -141,13 +149,13 @@ export function ProfileTab({ agent }: { agent: Agent }) {
             parseRoleLine still takes the routing sentences out of the summary. */}
         {does.length > 0 && (
           <Section title={t('profile.does', { name })}>
-            <List items={does} mark="✓" markColor="var(--cth-mint)" />
+            <List items={does} mark="✓" markColor="var(--cth-mint)" rows={!!duties?.found} />
           </Section>
         )}
 
         {asksFirst.length > 0 && (
           <Section title={t('profile.asksFirst')}>
-            <List items={asksFirst} mark="?" markColor="var(--cth-peach)" />
+            <List items={asksFirst} mark="?" markColor="var(--cth-peach)" rows={!!duties?.found} />
           </Section>
         )}
 
@@ -254,12 +262,25 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function List({ items, mark, markColor }: { items: string[]; mark: string; markColor: string }) {
+function List({ items, mark, markColor, rows }: { items: string[]; mark: string; markColor: string; rows?: boolean }) {
   const rtl = useRtl();
+  // Row chrome only for duties read from a saved work style. Michael's lists
+  // and the Office Pack template stay a plain list. The tokens are in tokens.css.
+  const row = rows ? {
+    alignItems: 'flex-start' as const,
+    margin: 0,
+    padding: '8px 10px',
+    borderRadius: 'var(--cth-r-md)',
+    background: 'var(--cth-paper-100)',
+    boxShadow: 'inset 0 0 0 1px var(--cth-line-2)'
+  } : { alignItems: 'baseline' as const };
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
       {items.map((it, i) => (
-        <li key={`${i}:${it}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)' }}>
+        <li key={`${i}:${it}`} style={{
+          display: 'flex', gap: 8, ...row,
+          fontSize: 14, lineHeight: '20px', color: 'var(--cth-ink-900)'
+        }}>
           <span aria-hidden style={{ width: 12, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: markColor }}>{mark}</span>
           <span dir={rtl ? 'auto' : undefined}>{it}</span>
         </li>

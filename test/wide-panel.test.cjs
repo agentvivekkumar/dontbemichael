@@ -182,7 +182,8 @@ test('Edit agent: wide in two columns with who it is in the title, the question 
   assert.match(src, /<PixelButton variant="primary" size="md" onClick=\{keepEditing\} autoFocus>\{t\('editAgent\.keepEditing'\)\}/, 'Keep editing is the default');
   assert.match(src, /const discard = \(\): void => \{ const leaving = asking === 'leave'; setAsking\(null\); onClose\(\); if \(leaving\) answerLeave\(true\); \};/);
   assert.match(src, /readText: CSSProperties = wide \? \{ fontSize: 14, lineHeight: '22px' \} : \{\}/, 't-read in wide panels (WD11)');
-  assert.equal((src.match(/dir="auto"/g) ?? []).length, 4, 'every text box (WD13)');
+  assert.equal((src.match(/dir="auto"/g) ?? []).length, 3, 'name, role, and what they handle (WD13)');
+  assert.equal((read('src/renderer/src/components/WorkStyleList.tsx').match(/dir="auto"/g) ?? []).length, 2, 'the job note and each duty line (WD13)');
   assert.match(read('src/renderer/src/components/FullscreenTerminal.tsx'), /<EditAgentModal agent=\{agent\} onClose=\{\(\) => setEditAgentOpen\(false\)\} docked=\{false\} \/>/);
   assert.match(read('src/renderer/src/shell/PanelChrome.tsx'), /<WideButton \/>\s*<button onClick=\{\(\) => \{ const f = getNeedsYouFeed\(\);/, 'beside close on every panel header');
 });

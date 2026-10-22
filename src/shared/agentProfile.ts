@@ -72,3 +72,158 @@ export function parseRoleLine(description: string | undefined): RoleLine {
 export function workStyleBody(goal: string | undefined): string {
   return (goal ?? '').replace(/^The owner set this work style for your role[^\n]*\n+/, '').trim();
 }
+
+/** What the Profile lists for a team member who has a saved work style.
+ *  `found` is false when the text has neither section, so the caller can keep
+ *  the Office Pack lists. An empty section still counts as found: the owner
+ *  left it out, and the pack's old line must not fill it back in. */
+export interface ProfileDuties {
+  found: boolean;
+  /** "How the work is done", one line each. A paragraph of older duties is one sentence each. */
+  does: string[];
+  /** "Asks the owner first", one line each. A paragraph of older duties is one sentence each. */
+  asksFirst: string[];
+}
+
+/** The work style as the owner edits it: one note for the job, then a line
+ *  each for how the work is done and what asks the owner first. */
+export interface WorkStyleDraft {
+  job: string;
+  does: string[];
+  asksFirst: string[];
+  /** True when a how-to-work or asks-first heading was in the text, even if
+   *  that part was left empty. */
+  listed: boolean;
+}
+
+/** A heading the work style uses, in either form the app stores: the plain
+ *  labels the owner edits, or the house headings the agent is given. */
+function dutyHeading(line: string): { section: 'job' | 'does' | 'asks'; rest: string } | null {
+  const text = line.trim().replace(/^#{1,6}\s+/, '');
+  // A colon, or nothing else on the line. A sentence that merely starts
+  // with the words ("How to work the dough takes practice.") is not a heading.
+  const rules: Array<{ section: 'job' | 'does' | 'asks'; re: RegExp }> = [
+    { section: 'does', re: /^(?:how the work is done|how to work|what you do)\s*(?::\s*(.*)|\s*)$/i },
+    { section: 'asks', re: /^(?:asks (?:you|the owner) first|needs the owner'?s approval(?:\s*\([^)]*\))?)\s*(?::\s*(.*)|\s*)$/i },
+    { section: 'job', re: /^the job\s*(?::\s*(.*)|\s*)$/i }
+  ];
+  for (const rule of rules) {
+    const hit = rule.re.exec(text);
+    if (hit) return { section: rule.section, rest: (hit[1] ?? '').trim() };
+  }
+  return null;
+}
+
+function blankEdges(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end);
+}
+
+function bulletLine(line: string): boolean {
+  return /^[•*\-]\s+/.test(line.trim());
+}
+
+function stripBullet(line: string): string {
+  return line.trim().replace(/^[•*\-]\s+/, '').trim();
+}
+
+/** One duty per line: a bullet, or several lines with nothing blank between them.
+ *  A single paragraph, or paragraphs split by a blank line, is the older shape. */
+function isDutyList(lines: string[]): boolean {
+  const body = blankEdges(lines);
+  const items = body.map((line) => line.trim()).filter(Boolean);
+  if (items.some(bulletLine)) return true;
+  return items.length >= 2 && body.every((line) => line.trim());
+}
+
+/** Keep each written line. Split into sentences only for a paragraph of duties,
+ *  and only when this work style has no section that is already a list of lines. */
+function dutyLines(lines: string[], keepLines: boolean): string[] {
+  const body = blankEdges(lines);
+  const items = body.map((line) => line.trim()).filter(Boolean);
+  if (!items.length) return [];
+  if (keepLines || isDutyList(body)) return items.map(stripBullet).filter(Boolean);
+  const paras: string[] = [];
+  let cur: string[] = [];
+  const flush = (): void => {
+    const text = cur.join(' ').trim();
+    if (text) paras.push(text);
+    cur = [];
+  };
+  for (const line of body) {
+    if (!line.trim()) flush();
+    else cur.push(stripBullet(line));
+  }
+  flush();
+  return paras.flatMap((para) => sentences(para));
+}
+
+function jobText(lines: string[]): string {
+  return blankEdges(lines).join('\n').trim();
+}
+
+/** Split a work style into the job note and the two lists. A job keeps its
+ *  paragraphs. A line already written stays whole, including an unknown
+ *  heading or markdown. Text with neither list heading stays one job note. */
+export function parseWorkStyleDraft(goal: string | undefined): WorkStyleDraft {
+  const body = workStyleBody(goal).replace(/\r/g, '');
+  const chunks: Array<{ section: 'job' | 'does' | 'asks'; lines: string[] }> = [];
+  let section: 'job' | 'does' | 'asks' = 'job';
+  let lines: string[] = [];
+  let listed = false;
+  let sawHeading = false;
+  const flush = (): void => {
+    chunks.push({ section, lines });
+    lines = [];
+  };
+  for (const raw of body.split('\n')) {
+    const heading = dutyHeading(raw);
+    if (heading) {
+      flush();
+      sawHeading = true;
+      if (heading.section === 'does' || heading.section === 'asks') listed = true;
+      section = heading.section;
+      lines = heading.rest ? [heading.rest] : [];
+      continue;
+    }
+    lines.push(raw);
+  }
+  flush();
+  if (!sawHeading) return { job: body.trim(), does: [], asksFirst: [], listed: false };
+
+  const keepLines = chunks.some((c) => (c.section === 'does' || c.section === 'asks') && isDutyList(c.lines));
+  const jobs: string[] = [];
+  const does: string[] = [];
+  const asksFirst: string[] = [];
+  for (const chunk of chunks) {
+    if (chunk.section === 'job') {
+      const text = jobText(chunk.lines);
+      if (text) jobs.push(text);
+    } else if (chunk.section === 'does') does.push(...dutyLines(chunk.lines, keepLines));
+    else asksFirst.push(...dutyLines(chunk.lines, keepLines));
+  }
+  return { job: jobs.join('\n\n'), does, asksFirst, listed };
+}
+
+/** The plain labels the owner edits, and the form the rewrite reads back. */
+export function formatWorkStyleDraft(draft: Pick<WorkStyleDraft, 'job' | 'does' | 'asksFirst'>): string {
+  const blocks: string[] = [];
+  const job = draft.job.trim();
+  if (job) blocks.push(`The job:\n${job}`);
+  const does = draft.does.map((line) => line.trim()).filter(Boolean);
+  if (does.length) blocks.push(`How the work is done:\n${does.join('\n')}`);
+  const asks = draft.asksFirst.map((line) => line.trim()).filter(Boolean);
+  if (asks.length) blocks.push(`Asks the owner first:\n${asks.join('\n')}`);
+  return blocks.join('\n\n');
+}
+
+/** The two lists an owner scans, read from the saved work style rather than
+ *  the Office Pack card. Michael is not passed here: his lists are written
+ *  for him in the app. */
+export function profileDuties(goal: string | undefined): ProfileDuties {
+  const draft = parseWorkStyleDraft(goal);
+  return { found: draft.listed, does: draft.does, asksFirst: draft.asksFirst };
+}

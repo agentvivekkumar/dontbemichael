@@ -18,7 +18,7 @@ From what the app already stores: the agent's role line (`description`, the regi
    the role line by `parseRoleLine` (`src/shared/agentProfile.ts`).
 2. ~~Send {{name}}~~: removed (owner, 2026-09-25: "overall it's Michael who decides and
    drives"). The routing sentences are still kept out of the summary.
-3. **What {{name}} does** (pack `does`, mint ✓) and **Asks you first** (pack `wontDo`).
+3. **What {{name}} does** and **Asks you first**. When the team member has a saved work style, these are read from it: "How the work is done" (also the house heading "How to work", or "What you do") and "Asks the owner first" (also "Needs the owner's approval"). Each written line is one row. A work style that still writes those duties as one paragraph is split into sentences, one row each. The row styling is only these saved lists. The Office Pack's `does` and `wontDo` show only when that work style has neither section, so a template never outlives an edit, and they stay a plain list. A job the owner wrote has no pack card; its lists come from the work style alone. Michael has no pack card; his two lists stay the ones written for him in the app, as a plain list.
 4. **Key facts**: folder, what it uses (pack connections), first job, model.
 5. **{{name}}'s instructions**: the work style as markdown, collapsed by default; its first
    line (addressed to the agent) is dropped.

@@ -23,6 +23,7 @@ import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
 import { firstTaskSection, roleLabel, plainFallback } from '@shared/workStyleText';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { ScheduledJobsList } from './ScheduledJobs';
+import { WorkStyleList } from './WorkStyleList';
 import { sendTypedFirstTask } from '@/shell/typedFirstTask';
 import { useResearchName } from '@/shell/research';
 import { canDeleteTeamMember, deleteTeamMember } from '@/shell/deleteTeamMember';
@@ -316,15 +317,10 @@ export function EditAgentModal({ agent, onClose, docked = true, engineOpen: open
       label={t('editAgent.workStyle')}
       info={t('editAgent.workStyleInfo', { name: who })}
     >
-      <textarea
+      <WorkStyleList
         value={goal}
-        onChange={(e) => { describeSeq.current++; setDescribing(false); setGoal(e.target.value); if (e.target.value.trim()) setGoalError(false); }}
-        aria-invalid={goalError || undefined}
-        placeholder={t('editAgent.workStylePlaceholder', { name: who })}
-        rows={4}
-        className="cth-input"
-        dir="auto"
-        style={{ ...inputStyle, ...readText, fontFamily: 'var(--cth-font-ui)', resize: 'none', minHeight: 320, flex: 1 }}
+        invalid={goalError}
+        onChange={(next) => { describeSeq.current++; setDescribing(false); setGoal(next); if (next.trim()) setGoalError(false); }}
       />
     </Row>
   );
