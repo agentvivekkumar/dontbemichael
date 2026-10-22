@@ -291,15 +291,6 @@
 **Effort:** S
 **Priority:** P3
 
-### Keep a schedule decision for Pete while he isn't reporting
-
-**What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.
-
-**Why:** A decline carries Michael's or the owner's reason; dropped, Research may ask for the same change again.
-
-**Effort:** S
-**Priority:** P3
-
 ### Retry closing time's wait after all note to Michael
 
 **What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
