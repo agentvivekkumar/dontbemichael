@@ -48,11 +48,28 @@ const MAX_FLAG_CHARS = 120;
  *  a pattern ("ig" U+200B "nore") while a person, and the model, still read it. */
 const INVISIBLE = /\p{Default_Ignorable_Code_Point}/gu;
 
-/** A line as it reads, for the check: invisible characters dropped and
+/** Cyrillic and Greek letters drawn the same as a Latin one in common fonts.
+ *  "ignоre" with a Cyrillic о reads as the English word to a person and to the
+ *  model, but is a different string to a pattern. Only exact look-alikes are
+ *  here, so real Russian or Greek text never turns into an English marker. */
+const LOOKALIKES: Readonly<Record<string, string>> = {
+  // Cyrillic
+  а: 'a', в: 'b', е: 'e', ё: 'e', һ: 'h', і: 'i', ї: 'i', ј: 'j', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p',
+  с: 'c', ѕ: 's', т: 't', у: 'y', х: 'x', ԁ: 'd', ԛ: 'q', ԝ: 'w', ӏ: 'l',
+  А: 'A', В: 'B', Е: 'E', Ѕ: 'S', І: 'I', Ј: 'J', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T',
+  У: 'Y', Х: 'X', Ү: 'Y', Ԁ: 'D', Ԛ: 'Q', Ԝ: 'W', Ӏ: 'I',
+  // Greek
+  ο: 'o', ν: 'v', ι: 'i', κ: 'k', ρ: 'p', τ: 't', υ: 'u', χ: 'x', α: 'a',
+  Α: 'A', Β: 'B', Ε: 'E', Ζ: 'Z', Η: 'H', Ι: 'I', Κ: 'K', Μ: 'M', Ν: 'N', Ο: 'O', Ρ: 'P', Τ: 'T', Υ: 'Y', Χ: 'X'
+};
+const LOOKALIKE = new RegExp(`[${Object.keys(LOOKALIKES).join('')}]`, 'g');
+
+/** A line as it reads, for the check: invisible characters dropped,
  *  compatibility forms folded (NFKC), so fullwidth "ｉｇｎｏｒｅ" and bold
- *  math "𝐢𝐠𝐧𝐨𝐫𝐞" are the plain word the patterns know. */
+ *  math "𝐢𝐠𝐧𝐨𝐫𝐞" are the plain word the patterns know, and look-alike
+ *  letters read as the Latin ones they copy. */
 function readable(line: string): string {
-  return line.replace(INVISIBLE, '').normalize('NFKC');
+  return line.replace(INVISIBLE, '').normalize('NFKC').replace(LOOKALIKE, (c) => LOOKALIKES[c]);
 }
 
 export const UNTRUSTED_NOTE =
