@@ -29,6 +29,19 @@ test('the wait comes from Retry-After, then the reset headers, within sane bound
   assert.equal(backoffMs(429, h({ 'retry-after': '0' }), NOW), 1000);
 });
 
+test('a 403 that is a rate limit waits like a 429; a 403 that is a refusal does not', () => {
+  // GitHub's primary limit: 403, nothing left, reset as a Unix time.
+  const primary = { 'x-ratelimit-limit': '5000', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(NOW / 1000 + 600) };
+  assert.equal(backoffMs(403, h(primary), NOW), 600_000);
+  // GitHub's secondary limit: 403 with Retry-After.
+  assert.equal(backoffMs(403, h({ 'retry-after': '60', 'x-ratelimit-remaining': '4321' }), NOW), 60_000);
+  // Nothing left but no reset named: the default wait.
+  assert.equal(backoffMs(403, h({ 'ratelimit-remaining': '0' }), NOW), DEFAULT_BACKOFF_MS);
+  // A missing scope or a private repo: answered as it is, no wait.
+  assert.equal(backoffMs(403, h({}), NOW), undefined);
+  assert.equal(backoffMs(403, h({ 'x-ratelimit-remaining': '4999', 'x-ratelimit-reset': String(NOW / 1000 + 600) }), NOW), undefined);
+});
+
 test('each app has its own wait, and a later limit never shortens it', () => {
   let now = NOW;
   const th = new ConnectionThrottle(() => now);
