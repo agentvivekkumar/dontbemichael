@@ -273,6 +273,36 @@ test('Codex hook commands survive a hive path containing spaces', { skip: !POSIX
   assert.ok(received.length > 0, 'the quoted hook command never reached HIVE_SOCK');
 });
 
+test('Codex hook commands survive a hive under a folder with $ and a quote in its name', { skip: !POSIX, timeout: 10_000 }, async (t) => {
+  // Value: protects=hooks reach the app when the hive folder name holds $, a backtick or a quote; fails_when=sh expands $Flow to nothing or a quote ends the path, the hook runs a script that is not there and the engine carries on without it; why_new=nodeRun double quoted the paths; seam=none
+  const isolated = isolatedHomes(t, undefined, '/tmp');
+  const harness = `${isolated.harness}/C$F'\`x\``;
+  const hive = new HiveManager(() => harness);
+  hive.ensureHive();
+  const codexHome = hive.installCodexHooks(path.join(harness, 'hive', 'agents', 'a1'), 'a1');
+  const config = fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8');
+  const command = [...config.matchAll(/^command\s*=\s*(.+)$/gm)].map((m) => {
+    const literal = m[1].trim();
+    return literal.startsWith('"') ? JSON.parse(literal) : literal.slice(1, -1);
+  })[0];
+  const sock = path.join(harness, 'hive', 'hooks.sock');
+  const received = [];
+  const server = net.createServer((conn) => {
+    let buf = '';
+    conn.on('error', () => { /* the shim may hang up first */ });
+    conn.on('data', (d) => { buf += d; });
+    conn.on('close', () => { if (buf) received.push(buf); });
+    conn.write(JSON.stringify({ ok: true }) + '\n', () => conn.end());
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(sock, resolve); });
+  t.after(() => server.close());
+
+  const r = await run(command, { PATH: STRIPPED_PATH, HIVE_SOCK: sock, AGENT_ID: 'a1', HOME: isolated.home });
+  assert.equal(r.code, 0, `the hook failed from ${harness}: ${r.stderr}`);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.ok(received.length > 0, 'the hook command never reached HIVE_SOCK');
+});
+
 /** Run `command` the way Codex runs a hook on Windows: ComSpec, `/C`, then the
  *  command. `raw` is today's Codex (codex-rs command_runner.rs wraps it in one
  *  pair of quotes, unescaped); otherwise it goes as an ordinary escaped
