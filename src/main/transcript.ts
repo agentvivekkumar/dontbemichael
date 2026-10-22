@@ -285,6 +285,47 @@ function parseUsageLines(text: string, entry: FileUsageEntry): void {
   }
 }
 
+/** New bytes are read this many at a time. A first read of a long session
+ *  transcript used to take all of it in one buffer and one string: hundreds
+ *  of MB held at once on the main process, and past V8's longest string
+ *  (about 512 MB) toString threw, the error was swallowed, the offset never
+ *  moved, and the file's usage read zero from then on while every refresh
+ *  read it all again. */
+let readChunkBytes = 8 * 1024 * 1024;
+
+/** Parse the complete lines between `entry.offset` and `size`, a chunk at a
+ *  time, moving the offset past each chunk's last newline. A torn trailing
+ *  line stays unparsed (offset holds at the newline) until the writer
+ *  finishes it — it is then counted exactly once. The newline is found in the
+ *  bytes, so the offset moves by what the file holds, not by the length of a
+ *  decoded and re-encoded copy (a stray invalid byte decodes to U+FFFD, three
+ *  bytes long, and would push it into the middle of the next line). */
+function readNewLines(fd: number, size: number, entry: FileUsageEntry): void {
+  let window = readChunkBytes;
+  while (entry.offset < size) {
+    const len = Math.min(window, size - entry.offset);
+    const buf = Buffer.alloc(len);
+    const read = readSync(fd, buf, 0, len, entry.offset);
+    if (read <= 0) return;
+    const lastNl = buf.lastIndexOf(0x0a, read - 1);
+    if (lastNl === -1) {
+      // The rest of the file is one torn line: wait for the writer.
+      if (entry.offset + read >= size) return;
+      // One line longer than the window: look further for its end.
+      window *= 2;
+      continue;
+    }
+    parseUsageLines(buf.toString('utf8', 0, lastNl + 1), entry);
+    entry.offset += lastNl + 1;
+    window = readChunkBytes;
+  }
+}
+
+/** Test seam: a small chunk, so tests cross chunk edges with small files. */
+export function __setUsageReadChunkForTest(bytes: number): void {
+  readChunkBytes = bytes;
+}
+
 /** Cached totals for one transcript file, refreshed incrementally: unchanged
  *  size+mtime → cache hit (no read at all); grown → parse only the appended
  *  tail; shrunk (rewritten) → full re-parse. Null when the file vanished.
@@ -315,23 +356,7 @@ function readFileUsage(dir: string, file: string): FileUsageEntry | null {
   try {
     const fd = openSync(full, 'r');
     try {
-      const len = st.size - entry.offset;
-      if (len > 0) {
-        const buf = Buffer.alloc(len);
-        const read = readSync(fd, buf, 0, len, entry.offset);
-        // Consume only up to the last complete line; a torn trailing line
-        // stays unparsed (offset holds at the newline) until the writer
-        // finishes it — it is then counted exactly once. The newline is found
-        // in the bytes, so the offset moves by what the file holds, not by
-        // the length of a decoded and re-encoded copy (a stray invalid byte
-        // decodes to U+FFFD, three bytes long, and would push it into the
-        // middle of the next line).
-        const lastNl = read > 0 ? buf.lastIndexOf(0x0a, read - 1) : -1;
-        if (lastNl !== -1) {
-          parseUsageLines(buf.toString('utf8', 0, lastNl + 1), entry);
-          entry.offset += lastNl + 1;
-        }
-      }
+      readNewLines(fd, st.size, entry);
     } finally { closeSync(fd); }
   } catch {
     // Unreadable right now — keep what we have; totals refresh on the next call.
