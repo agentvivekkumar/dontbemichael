@@ -248,8 +248,8 @@ test('missing project dir yields zeros', () => {
 });
 
 /** Run `fn` with new bytes read `bytes` at a time, then put the default back. */
-function withChunk(bytes, fn) {
-  __setUsageReadChunkForTest(bytes);
+function withChunk(bytes, fn, lineMax) {
+  __setUsageReadChunkForTest(bytes, lineMax);
   try { fn(); } finally { __setUsageReadChunkForTest(8 * 1024 * 1024); }
 }
 
@@ -276,6 +276,20 @@ test('a line longer than a chunk is still read whole', () => {
     fs.appendFileSync(f, long + '\n' + rec(400) + '\n');
     assert.equal(readAgentUsage(cwd).outputTokens, 700);
   });
+});
+
+test('a line too long to parse is stepped over, and the records after it count', () => {
+  withChunk(64, () => {
+    const { cwd, dir } = makeProject();
+    const f = path.join(dir, 'a.jsonl');
+    const huge = JSON.stringify({ type: 'user', text: 'x'.repeat(20000) });
+    fs.writeFileSync(f, rec(100) + '\n' + huge.slice(0, 9000));
+    assert.equal(readAgentUsage(cwd).outputTokens, 100, 'its end is not written yet: wait');
+    fs.appendFileSync(f, huge.slice(9000) + '\n' + rec(200) + '\n');
+    assert.equal(readAgentUsage(cwd).outputTokens, 300);
+    fs.appendFileSync(f, rec(400) + '\n');
+    assert.equal(readAgentUsage(cwd).outputTokens, 700, 'and the offset keeps moving after it');
+  }, 1024);
 });
 
 process.exit(failures ? 1 : 0);

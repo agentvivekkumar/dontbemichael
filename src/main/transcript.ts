@@ -292,6 +292,10 @@ function parseUsageLines(text: string, entry: FileUsageEntry): void {
  *  moved, and the file's usage read zero from then on while every refresh
  *  read it all again. */
 let readChunkBytes = 8 * 1024 * 1024;
+/** The longest line the window grows to hold. No usage record comes near it;
+ *  a longer line is one huge tool result, stepped over unparsed, since a
+ *  window growing to fit it would hit the same string limit. */
+let lineMaxBytes = 128 * 1024 * 1024;
 
 /** Parse the complete lines between `entry.offset` and `size`, a chunk at a
  *  time, moving the offset past each chunk's last newline. A torn trailing
@@ -312,7 +316,12 @@ function readNewLines(fd: number, size: number, entry: FileUsageEntry): void {
       // The rest of the file is one torn line: wait for the writer.
       if (entry.offset + read >= size) return;
       // One line longer than the window: look further for its end.
-      window *= 2;
+      if (window < lineMaxBytes) { window = Math.min(window * 2, lineMaxBytes); continue; }
+      // Too long to parse: step past it, or wait if its end is not written yet.
+      const end = nextNewline(fd, entry.offset + read, size);
+      if (end === -1) return;
+      entry.offset = end + 1;
+      window = readChunkBytes;
       continue;
     }
     parseUsageLines(buf.toString('utf8', 0, lastNl + 1), entry);
@@ -321,9 +330,24 @@ function readNewLines(fd: number, size: number, entry: FileUsageEntry): void {
   }
 }
 
-/** Test seam: a small chunk, so tests cross chunk edges with small files. */
-export function __setUsageReadChunkForTest(bytes: number): void {
+/** The position of the first newline at or after `from`, or -1. */
+function nextNewline(fd: number, from: number, size: number): number {
+  const buf = Buffer.alloc(Math.min(readChunkBytes, Math.max(1, size - from)));
+  for (let at = from; at < size;) {
+    const read = readSync(fd, buf, 0, Math.min(buf.length, size - at), at);
+    if (read <= 0) return -1;
+    const nl = buf.indexOf(0x0a);
+    if (nl !== -1 && nl < read) return at + nl;
+    at += read;
+  }
+  return -1;
+}
+
+/** Test seam: a small chunk and line cap, so tests cross chunk edges and
+ *  meet an overlong line with small files. */
+export function __setUsageReadChunkForTest(bytes: number, lineMax = 128 * 1024 * 1024): void {
   readChunkBytes = bytes;
+  lineMaxBytes = lineMax;
 }
 
 /** Cached totals for one transcript file, refreshed incrementally: unchanged
