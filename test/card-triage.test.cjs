@@ -395,18 +395,14 @@ test('the owner dragging a just reopened card to Done puts it back, not as the o
   const again = new HiveManager(() => home);
   assert.doesNotThrow(() => again.refreshOwnerRequests(), 'an entry with no id never stops the tick');
   assert.equal(again.tasks().tasks.find((c) => c.id === 'd').result, 'v2', 'the latest copy');
-  // Value (extension): protects=a filing is written once, as a new JSON file; fails_when=a team member may edit filings or claim the .done name; why_new=review cycle 3; seam=harnessWriteDecision
+  // Value (extension): protects=the triage folder is the app's alone; team members send to triage via outbox and Michael alone manages triage; seam=harnessWriteDecision
   const { harnessWriteDecision } = loadTs('src/main/harnessGuard.ts');
-  const guard = (tool, file) => harnessWriteDecision({ tool, toolInput: { file_path: path.join(hive.root(), 'triage', file) }, cwd: home, agentId: 'pam', isGod: false, harnessHome: home, hiveRoot: hive.root(), caseInsensitive: false }).deny;
-  assert.equal(guard('Write', '20261011T143000-pam.json'), false);
-  assert.equal(guard('Edit', '20261011T143000-pam.json'), true, 'never changed once written');
+  const guard = (tool, file, isGod = false) => harnessWriteDecision({ tool, toolInput: { file_path: path.join(hive.root(), 'triage', file) }, cwd: home, agentId: isGod ? 'god' : 'pam', isGod, harnessHome: home, hiveRoot: hive.root(), caseInsensitive: false }).deny;
+  assert.equal(guard('Write', '20261011T143000-pam.json'), true, 'direct write to triage by team member is refused');
+  assert.equal(guard('Write', '20261011T143000-pam.json', true), false, 'Michael can write in triage');
+  assert.equal(guard('Write', '.done/20261011T143000-pam.json', true), false, 'Michael can file away in .done');
   assert.equal(guard('Write', 'notes.md'), true);
   assert.equal(guard('Write', '.done'), true);
-  // Value (extension): protects=no filing is overwritten, by its writer or another agent; fails_when=Write may replace an existing filing or use another agent's name; why_new=Codex adversarial review; seam=harnessWriteDecision with a real file
-  assert.equal(guard('Write', '20261011T143000-erin.json'), true, 'only under its own id');
-  fs.mkdirSync(path.join(hive.root(), 'triage'), { recursive: true });
-  fs.writeFileSync(path.join(hive.root(), 'triage', '20261011T150000-pam.json'), '{}');
-  assert.equal(guard('Write', '20261011T150000-pam.json'), true, 'never over a filing already there');
 });
 
 test('a board that cannot be read at the moment of a fix is left alone, never written as empty', async (t) => {

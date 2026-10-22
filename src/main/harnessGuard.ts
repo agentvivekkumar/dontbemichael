@@ -217,7 +217,7 @@ export function harnessWriteDecision(i: HarnessWriteInput): { deny: boolean; rea
   return {
     deny: true,
     reason:
-      `The hive folder is only for coordination: your memory/inbox.md, your inbox and outbox, ${i.isGod ? 'tasks.json, board.md and the triage folder' : 'and one new file per filing in the triage folder; Michael alone writes tasks.json, so tell him what changed'}. Your memory index (memory.md) is kept by the app: add notes to memory/inbox.md instead. ` +
+      `The hive folder is only for coordination: your memory/inbox.md, your inbox and outbox, ${i.isGod ? 'tasks.json, board.md and the triage folder' : 'and filings sent to triage in your outbox; Michael alone writes tasks.json, so tell him what changed'}. Your memory index (memory.md) is kept by the app: add notes to memory/inbox.md instead. ` +
       `Save documents, drafts and other work in your own folder${workHere} instead.`
   };
 }
@@ -234,13 +234,10 @@ function isPlumbing(rel: string, agentId: string, isGod: boolean, tool: string, 
   // The handoff it writes before its conversation is cleared (safeClearer.ts).
   if (rel === `${own}memory/handoff.md`) return true;
   if (rel.startsWith(`${own}outbox/`) || rel.startsWith(`${own}inbox/`)) return true;
-  // A team member files what its work needs as one new file in triage/
-  // (card-lifecycle.md section 10); Michael files them away in triage/.done/.
-  // Written once: a new JSON file named with the agent's own id, never an
-  // edit, never over a filing already there (its own or another agent's).
-  const filing = rel.startsWith('triage/') ? rel.slice('triage/'.length) : '';
-  if (tool === 'Write' && filing.endsWith(`-${agentId}.json`) && !filing.includes('/') && !filing.startsWith('.') && !exists()) return true;
-  if (isGod && rel.startsWith('triage/.done/')) return true;
+  // The triage folder is the app's alone (TODOS.md, ship review D11): team
+  // members file by sending an outbox message to "triage", which the router
+  // creates with exclusive create; Michael alone manages triage/.
+  if (isGod && rel.startsWith('triage/')) return true;
   // Michael alone writes the board (ship review D8).
   if (isGod && rel === 'tasks.json') return true;
   // Michael is the board's sole scribe, and the only one who files spawn
