@@ -188,7 +188,8 @@ export function validateOps(raw: unknown, entries: MemoryEntry[]): ValidatedOps 
       if (typeof r.id !== 'string' || !ids.has(r.id)) { drop('unknown-id'); continue; }
       out.push({ op: 'delete', id: r.id, reason: oneLine(r.reason) ?? 'replaced' });
     } else if (r.op === 'procedure') {
-      const name = oneLine(r.name);
+      // Clipping can leave a trailing space; reusing the stored name must be stable.
+      const name = oneLine(r.name)?.trim();
       const steps = typeof r.steps === 'string' ? r.steps.trim().slice(0, MAX_PROCEDURE_CHARS) : '';
       if (!name || !steps) { drop('missing-text'); continue; }
       out.push({ op: 'procedure', name, steps, source: source(r.source) });
@@ -211,6 +212,12 @@ export interface TidyOutcome {
   stats: { added: number; updated: number; deleted: number; procedures: number; repeats: number; dupes: number };
 }
 
+/** Apply checked ops to the entries. Stored procedures are identified by their
+ *  full file headings, not the lossy slug or the shortened index label. Include
+ *  files without an index entry too: a previous write may have stopped halfway.
+ *  A null name reserves a path whose identity is unknown; it cannot match an op.
+ *  A path with no name given falls back to its index entry's name. */
+export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string, procedureNames: ReadonlyMap<string, string | null> = new Map()): TidyOutcome {
 /** Apply checked ops to the entries. Deterministic; the model never writes the file.
  *  An add whose text matches an entry already in the index at that point in the
  *  batch (including earlier adds), ignoring case and extra whitespace, is
@@ -218,6 +225,16 @@ export interface TidyOutcome {
  *  delete or an update that moves text away leaves room for that text again. */
 export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string): TidyOutcome {
   let next = entries.map((e) => ({ ...e }));
+  const names = new Map(procedureNames);
+  const usedSlugs = new Set(names.keys());
+  for (const entry of entries) {
+    const pointer = entry.kind === 'procedure' ? procedurePointer(entry.text) : null;
+    if (!pointer) continue;
+    usedSlugs.add(pointer.slug);
+    // No heading read for this path: the index's own name stands in. A
+    // shortened one never matches a full name, so its path stays reserved.
+    if (!names.has(pointer.slug)) names.set(pointer.slug, pointer.name);
+  }
   const archived: TidyOutcome['archived'] = [];
   const procedures: TidyOutcome['procedures'] = [];
   const added: TidyOutcome['added'] = [];
@@ -256,12 +273,22 @@ export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string)
       next = next.filter((_, j) => j !== i);
       stats.deleted++;
     } else if (op.op === 'procedure') {
-      const slug = procedureSlug(op.name);
+      const base = procedureSlug(op.name);
+      let slug = [...names].find(([, name]) => name === op.name)?.[0];
+      if (!slug) {
+        slug = base;
+        for (let n = 2; usedSlugs.has(slug); n++) {
+          const suffix = `-${n}`;
+          slug = base.slice(0, 60 - suffix.length).replace(/-$/, '') + suffix;
+        }
+      }
+      names.set(slug, op.name);
+      usedSlugs.add(slug);
       const path = `memory/procedures/${slug}.md`;
       procedures.push({ slug, name: op.name, content: `# ${op.name}\n\n${op.steps}\n\nUpdated ${today}.\n` });
       // Shorten the name, never the path: the agent needs the path to find it.
       const pointer = `${op.name.slice(0, Math.max(1, MAX_ENTRY_CHARS - path.length - 11))}: steps in ${path}`;
-      const i = next.findIndex((e) => e.kind === 'procedure' && e.text.includes(path));
+      const i = next.findIndex((e) => e.kind === 'procedure' && procedurePointer(e.text)?.slug === slug);
       if (i >= 0) next[i] = { ...next[i], text: pointer, date: today };
       else {
         const id = newId();
