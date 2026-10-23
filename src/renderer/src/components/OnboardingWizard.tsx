@@ -1357,7 +1357,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
           </div>
         </div>
         {hasStudio && (
-          <div className="cth-onboarding-studio cth-onb-studio-in" style={{ gridColumn: 3, gridRow: 1, minWidth: 0, marginInlineStart: 32, minHeight: 480, height: 'calc(100vh - 110px)', position: 'sticky', top: 0, alignSelf: 'start' }}>
+          <div className="cth-onboarding-studio cth-onb-studio-in" style={{ gridColumn: 3, gridRow: 1, minWidth: 0, marginInlineStart: 32, minHeight: 480, height: 'calc(100vh - 110px)', position: 'sticky', top: 24, alignSelf: 'start' }}>
             <OnboardingStudio picked={studioPicked.map(toSeat)} unpicked={studioUnpicked.map(toSeat)} businessName={businessName} />
           </div>
         )}
