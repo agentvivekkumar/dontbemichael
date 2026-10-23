@@ -791,6 +791,11 @@ export function writeConfig(patch: Partial<HarnessConfig>): HarnessConfig {
     next.harnessHome = home;
     next.recentHives = recentHives;
   }
+  // A new engine for Michael without a model gets that engine's own model, not
+  // the old one: a Claude model name stops Codex (or any other engine) starting.
+  if (patch.godProvider && patch.godProvider !== current.godProvider && !('godModel' in patch)) {
+    next.godModel = providerPreset(patch.godProvider).recommendedOrchestratorModel;
+  }
   return persistConfig(next);
 }
 

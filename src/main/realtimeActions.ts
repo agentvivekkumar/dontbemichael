@@ -37,7 +37,7 @@
 import { ipcMain } from 'electron';
 import type { HiveMessage, HiveTask, Registry } from './hive';
 import type { ScheduledMission } from './config';
-import { inferAgentProvider, BUILD_ENGINES, type AgentProvider } from '../shared/agentProvider';
+import { inferAgentProvider, BUILD_ENGINES, isAgentProvider, canReceiveInbox, type AgentProvider } from '../shared/agentProvider';
 import { ALLOW_VOICE_HIRE } from '../shared/buildFeatures';
 import { clearCommandForProvider } from '../shared/providerAutomation';
 import { resolveGodName } from '../shared/godIdentity';
@@ -794,6 +794,9 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
       if (policy.values && !policy.values.includes(value as string)) {
         return { ok: false, spoken: `${key} must be one of: ${policy.values.join(', ')}.` };
       }
+    }
+    if (key === 'godProvider' && !(isAgentProvider(value) && canReceiveInbox(value))) {
+      return { ok: false, spoken: `"${value}" can't run the office.` };
     }
     const oldValue = deps.getConfigValue(key);
     const describe = (v: unknown): string => typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v ?? 'unset');
