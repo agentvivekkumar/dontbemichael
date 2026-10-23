@@ -293,6 +293,16 @@ test('in every office no other agent runs a command outside its sandbox', async 
   assert.match(main, /return \{ \.\.\.walled, sandboxOnly: true \};/);
 });
 
+test('on Windows, Research Bash is refused outright', () => {
+  // Value: protects=Research cannot bypass its file-tool walls through cd, an
+  // environment variable, a script it wrote, or an encoded PowerShell command;
+  // fails_when=Windows starts scanning Bash text again; why_new=issue #442;
+  // seam=the host platform is fixed for this test process.
+  const hooks = fs.readFileSync(path.join(__dirname, '..', 'src/main/hooks.ts'), 'utf8');
+  assert.match(hooks, /agentId === RESEARCH_ID && p\.tool_name === 'Bash' && process\.platform === 'win32'/);
+  assert.match(hooks, /permissionDecisionReason: RESEARCH_WINDOWS_BASH/);
+});
+
 test('while Research is on, agents save scratch work in their own folder, not the shared temp folders', posixOnly('temporary folder paths'), async (t) => {
   // Value: protects=a draft with office data never lands where Research's shell can read it, and the agent is told where to save instead so it carries on; fails_when=the hook lets a write into /tmp through while Research is on, or blocks an agent's own folders; why_new=security review pass 3, owner D7.2; seam=none; no_claim=shell writes to /tmp (a documented limit)
   const o = await office(t);

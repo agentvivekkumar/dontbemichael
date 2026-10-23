@@ -11,6 +11,7 @@
  */
 
 import { classPhrase, type DataClassId } from './dataClasses';
+import { flagInstructionLike } from './untrustedText';
 
 /** Research's agent id. Reserved: no other hire takes it. */
 export const RESEARCH_ID = 'research';
@@ -23,7 +24,7 @@ export const RESEARCH_ROLE = 'Research';
 
 /** Words the hive routes by, and the app's own senders: never a name for
  *  Research, or messages meant for them would go its way (ship review). */
-export const ROUTING_WORDS: readonly string[] = ['human', 'owner', 'god', 'michael', 'broadcast', 'all', 'everyone', 'team', 'scheduler', 'heartbeat', 'mail', 'system', 'privacy-check', 'app'];
+export const ROUTING_WORDS: readonly string[] = ['human', 'owner', 'god', 'michael', 'broadcast', 'all', 'everyone', 'team', 'scheduler', 'heartbeat', 'mail', 'system', 'privacy-check', 'app', 'foundations'];
 
 /** A name the owner may give Research, or undefined: one short line of
  *  letters (any language), digits, spaces and . ' -, never a routing word.
@@ -94,6 +95,9 @@ export const REFUSAL_UNSURE = `Not sent to ${RESEARCH_NAME}: the privacy check c
 /** The check itself could not run (no answer, an answer it could not read,
  *  too slow, settings it could not read): still not sent, and not the wording. */
 export const REFUSAL_CHECK_FAILED = `Not sent to ${RESEARCH_NAME}: the privacy check could not run. This is not about the wording, so send it again later.`;
+/** The check passed, but the app could not write the clean copy to Research's
+ *  inbox (a disk error) on any of its tries: not the wording either. */
+export const REFUSAL_NOT_DELIVERED = `Not sent to ${RESEARCH_NAME}: the app could not deliver it after its privacy check. This is not about the wording, so send it again later.`;
 export const REFUSAL_TOO_LONG = `Not sent to ${RESEARCH_NAME}: it is too long to check. Send the question, not the whole text.`;
 
 /** The subject of the note telling a sender what Research was asked. */
@@ -109,6 +113,8 @@ export const NOT_SENT_SUBJECT_OUT = 'Not sent';
 export const RESEARCH_ONLY_ASKERS = 'Not sent: you write only to a teammate whose question you are answering, or to Michael ("to": "michael"). Never to the whole team.';
 /** A command an agent asked to run outside its sandbox (every office, ship 2 D16). */
 export const RESEARCH_SANDBOX_ONLY = `In this office, commands run only inside your sandbox, which reaches no website. For something from the internet, ask ${RESEARCH_NAME}; otherwise do it another way.`;
+/** Windows has no Claude Code OS sandbox, so Research's shell cannot safely run. */
+export const RESEARCH_WINDOWS_BASH = 'Research Bash is unavailable on Windows because it could reach office files. Use your file tools in your own folders instead.';
 /** When the app could not check a tool call, any agent's: Research's file
  *  tools, a shared temp save, or a folder or app folder check that failed. */
 export const RESEARCH_UNCHECKED_TOOL = 'The app could not check this step, so it did not run. Try again shortly.';
@@ -163,18 +169,10 @@ export function hasAttachments(partial: unknown): boolean {
 }
 
 /** Classic prompt injection markers in text from the web (owner, 2026-10-12:
- *  only a very high confidence flag, and only to Michael). */
-const INJECTION_MARKERS: RegExp[] = [
-  /\bignore (?:all |any )?(?:the )?(?:previous|prior|above|earlier) (?:instructions|prompts|messages)\b/i,
-  /\bdisregard (?:all |any )?(?:the )?(?:previous|prior|above|earlier) (?:instructions|prompts)\b/i,
-  /\byou are now (?:in )?(?:developer|dan|jailbreak) mode\b/i,
-  /<\s*\/?\s*system\s*>/i,
-  /\[\s*system\s*\]\s*:/i,
-  /\breveal (?:your|the) (?:system prompt|hidden instructions)\b/i
-];
-
+ *  only a very high confidence flag, and only to Michael). The same markers
+ *  as email an agent reads, so web and mail catch the same attacks. */
 export function looksLikeInjection(text: string): boolean {
-  return INJECTION_MARKERS.some((re) => re.test(text));
+  return flagInstructionLike(text).length > 0;
 }
 
 /** The line put before every answer Research sends a teammate (eng A3): the
