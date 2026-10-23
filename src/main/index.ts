@@ -48,6 +48,7 @@ import {
   agentMcpDir, legacyMdMailMcpPath, mdMailMcpPath, privateRoot
 } from '../shared/agentPrivatePaths';
 import { CHECKED_FILE } from '../shared/checkedRecord';
+import { ORGANIZED_FILE } from '../shared/organizedRecord';
 import { HELD_FILE } from '../shared/heldRecord';
 import { ensureCheckedBackfill } from './checkedBackfill';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
@@ -81,6 +82,7 @@ import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { TelemetryStore } from './telemetryStore';
 import { TelemetryProcessor } from './telemetryProcessor';
+import { PulseHealth } from '../shared/pulseHealth';
 import { PulseService } from './pulse';
 import { knownPrice } from './pricing';
 import bakedModelCatalog from '../shared/modelCatalog.json';
@@ -133,6 +135,8 @@ import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, IN
 import { RosterStore } from './roster';
 import { PASTE_KEEP_MS, pastesDir, savePaste, sweepOldPastes } from './pastes';
 import { CHECK_FOLDERS, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
+import { autoMemoryFolders, eraseMemoryTargets, foldersFromRoster, gitTopOf, idsFromCostRows, idsFromRecord, memberIdsIn, memoryResetTargets } from './memoryReset';
+import { groupMembers, hardKillTree, isAlive, KILL_GRACE_MS, snapshotRemains } from './procKill';
 import { buildWorkerLaunch } from './workerLaunch';
 import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
@@ -477,18 +481,18 @@ const hookServer = new HookServer(
   control,
   breaker,
   standingGoalFor,
-  (agentId, event, message, toolName) => {
+  (agentId, event, message, toolName, subagent) => {
     // Pulse: turns and tool uses (authenticated frames only, #61).
     if (agentId) {
       if (event === 'UserPromptSubmit') pulseTelemetry.record({ agentId, kind: 'prompt', ts: Date.now() });
       else if (event === 'PostToolUse') pulseTelemetry.record({ agentId, kind: 'tool', ts: Date.now(), attrs: { tool: toolName ?? '' } });
       else if (event === 'Stop') pulseTelemetry.record({ agentId, kind: 'stop', ts: Date.now() });
     }
-    workerWake.noteHook(agentId, event, message);
+    workerWake.noteHook(agentId, event, message, Date.now(), subagent);
     // Any event, a Claude status tick included, is a check in (issue #326);
     // the event name tells it when a long tool call starts and ends.
     silentWatch?.noteHook(agentId, event);
-    safeClearer.noteHook(agentId, event, message);
+    safeClearer.noteHook(agentId, event, message, subagent);
     if (agentId && event === 'UserPromptSubmit') promptSubmits.note(agentId);
     if (agentId && (event === 'Notification' || event === 'PermissionRequest')) promptSubmits.noteAttention(agentId);
   },
@@ -772,6 +776,18 @@ function foundationsForAgent(agentId: string): string | null {
   if (agentId === team.godId || agentId === 'god') return michaelFoundations(foundations.read(), team.office, team.nameOf);
   return sectionFor(foundations.read(), team.jobs[agentId] ?? [], team.nameOf);
 }
+// Whether points are flowing, for telemetry:health and the stall warning (T9).
+const pulseHealth = new PulseHealth();
+pulseTelemetry.onRecord = (office) => pulseHealth.point(office);
+/** One processor pass, noted for the health readout; a pass that read
+ *  something logs one line. */
+function pulseTick(office: string): number {
+  const started = Date.now();
+  const n = pulseProcessor.tick(office);
+  const line = pulseHealth.batch(n, Date.now() - started);
+  if (line) console.log(line);
+  return n;
+}
 /** Pulse's backfill (proposal 3): once per office, the weeks before Pulse began,
  *  read in the background from the office log, members' sessions and the cost
  *  ledger. The view refreshes when it lands. */
@@ -785,7 +801,7 @@ function pulseBackfillOnce(office: string): void {
   void runBackfill({ db, office, hiveRoot: root, projectsRoot: claudeProjectsRoot(), members: new Set(Object.keys(hive.registry().agents ?? {})), now: Date.now() })
     .then((n) => {
       console.log(`[pulse] backfill wrote ${n} points for ${office}`);
-      if (n > 0 && pulseProcessor.tick(office) > 0) liveWebContents()?.send('pulse:updated');
+      if (n > 0 && pulseTick(office) > 0) liveWebContents()?.send('pulse:updated');
     })
     .catch((e) => console.error('[pulse] backfill:', e))
     .finally(() => { if (pulseBackfilling === office) pulseBackfilling = null; });
@@ -854,6 +870,12 @@ const pulse = new PulseService({
     // No file yet is an empty record; any other failure is the list's error (DD5).
     // Read without blocking the main process (ship review 2026-10-17).
     return fsPromises.readFile(join(privateRoot(home), CHECKED_FILE), 'utf8').catch((e: unknown) => { if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return ''; throw e; });
+  },
+  readOrganized: () => {
+    const home = readConfig().harnessHome;
+    if (!home) return '';
+    // No file yet is an empty record; any other failure is the list's error.
+    return fsPromises.readFile(join(privateRoot(home), ORGANIZED_FILE), 'utf8').catch((e: unknown) => { if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return ''; throw e; });
   }
 });
 // The office log kinds Pulse counts, and the board each tick reads.
@@ -1086,7 +1108,7 @@ const integrationBroker = new IntegrationBroker({
   getSecret: integrations.getSecret,
   // Same folder as the mail send journal, never the hive agents can read.
   journalPath: join(app.getPath('userData'), 'broker-write-journal.json'),
-  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line), tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'mail'); } }, agentId, op, body) : undefined
+  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, organized: (moved) => hive.recordOrganized(moved), proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line), tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'mail'); } }, agentId, op, body) : undefined
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
@@ -3573,36 +3595,29 @@ function createWindow(): BrowserWindow {
     return true;
   });
 
-  // The window persists its geometry (kv `window.bounds`). Skip while
-  // maximized/minimized so a restore doesn't save the fullscreen rect.
+  // The window keeps its smaller size (kv `window.bounds`) for when it is not
+  // filling the screen. Skip while maximized, minimized or full screen so a
+  // restore never saves the screen's own rect.
   {
+    const unsized = (): boolean => win.isDestroyed() || win.isMinimized() || win.isMaximized() || win.isFullScreen();
     const saveBounds = debounce(() => {
-      if (win.isDestroyed() || win.isMinimized() || win.isMaximized()) return;
+      if (unsized()) return;
       try { persist.setKv('window.bounds', win.getBounds()); } catch { /* DB best-effort */ }
     }, 400);
     win.on('resized', saveBounds);
     win.on('moved', saveBounds);
-    // Whether it was left filling the screen (kv `window.maximized`), so the
-    // next launch opens the same way.
-    const saveMaximized = () => {
-      if (win.isDestroyed() || win.isMinimized()) return;
-      try { persist.setKv('window.maximized', win.isMaximized()); } catch { /* DB best-effort */ }
-    };
-    win.on('maximize', saveMaximized);
-    win.on('unmaximize', saveMaximized);
     win.on('close', () => {
-      saveMaximized();
-      if (win.isDestroyed() || win.isMinimized() || win.isMaximized()) return;
+      if (unsized()) return;
       try { persist.setKv('window.bounds', win.getBounds()); } catch { /* DB best-effort */ }
     });
   }
 
-  // The office opens filling the screen (owner, 2026-10-03: it always came
-  // back at about 70%), unless the owner last left it at a smaller size.
-  let openMaximized = true;
-  try { openMaximized = persist.getKv('window.maximized') !== false; } catch { /* DB best-effort: fill the screen */ }
+  // Every launch opens filling the screen (owner, 2026-10-03 and 2026-10-20:
+  // it kept coming back smaller). It no longer follows how the last run was
+  // left: a dragged title bar, a display change or quitting from full screen
+  // all read as "not maximized", and that one moment stuck for every launch.
   win.once('ready-to-show', () => {
-    if (openMaximized) win.maximize();
+    win.maximize();
     win.show();
   });
 
@@ -4685,7 +4700,10 @@ ipcMain.handle('terminal:openAtFolder', async (_evt, cwd: unknown) => {
 // returned over IPC. `list` redacts secretRef to a `hasSecret` boolean.
 ipcMain.handle('integrations:list', () => integrations.listRecordsRedacted());
 ipcMain.handle('integrations:templates', () => INTEGRATION_TEMPLATES);
-ipcMain.handle('integrations:upsert', (_evt, record: unknown) => integrations.upsertRecord(record));
+// The form says whether this is a new integration: a new one never replaces
+// one already registered under its id (upsertRecord).
+ipcMain.handle('integrations:upsert', (_evt, record: unknown, opts: unknown) =>
+  integrations.upsertRecord(record, { isNew: (opts as { isNew?: unknown } | null | undefined)?.isNew === true }));
 ipcMain.handle('integrations:canStoreSecrets', () =>
   integrations.canStoreSecrets() ? { ok: true as const } : { ok: false as const, error: cannotStoreReason() });
 ipcMain.handle('integrations:setSecret', (_evt, payload: unknown) => {
@@ -6503,29 +6521,48 @@ ipcMain.handle('app:cancelClosingTime', () => closingTime.cancel());
 /** The closing-time dialog's Remind and Close without them (owner, 2026-09-29). */
 ipcMain.handle('app:closingTimeRemind', (_evt, id: unknown) => closingTime.remind(id));
 ipcMain.handle('app:closingTimeExcuse', (_evt, id: unknown) => closingTime.excuse(id));
+// The last thing each waiting agent said and when, so the owner can tell a
+// long job from a stuck one (closing time rows).
+ipcMain.handle('app:closingTimeSaid', (_evt, ids: unknown) => {
+  const said: Record<string, { text: string; at?: number }> = {};
+  if (!Array.isArray(ids)) return said;
+  for (const id of ids.slice(0, 50)) {
+    const line = typeof id === 'string' ? hookServer.latestLine(id) : undefined;
+    if (line) said[id] = line;
+  }
+  return said;
+});
+
+/** What both resets stop first, so nothing writes back into what they erase
+ *  (Reset & start over and Reset memory, reset-agent-memory.md). Reset memory
+ *  keeps the store open: it reads Pulse's records, then closes it itself. */
+function stopForReset(tag: string, opts: { keepPersist?: boolean } = {}): void {
+  const step = (name: string, fn: () => void): void => { try { fn(); } catch (e) { console.error(`[${tag}] ${name}:`, e); } };
+  step('clearMissionTimers', () => clearMissionTimers());
+  step('clearContextTimers', () => clearContextTimers());
+  step('stopWebhookDoneObserver', () => stopWebhookDoneObserver());
+  step('stopWorkerWatcher', () => stopEphemeralWorkerWatcher());
+  step('broker.stop', () => integrationBroker.stop());
+  step('mail.closeAll', () => mailService.closeAll());
+  step('stopRouter', () => hive.stopRouter());
+  step('hookServer.stop', () => hookServer.stop());
+  step('telemetry.stop', () => telemetry.stop());
+  step('slack.stop', () => stopSlackServer());
+  step('memory.stop', () => memory.stop());
+  step('memoryTidy.stop', () => memoryTidy.stop());
+  if (!opts.keepPersist) step('persist.close', () => persist.close());
+  // The same stops as quitting (teardownAndQuit): proxy sidecars and the
+  // webhook server would otherwise outlive the relaunch.
+  step('stopAllProxyBridges', () => hive.stopAllProxyBridges());
+  step('webhook.stop', () => stopWebhookServer());
+  step('killAll', () => ptyManager.killAll());
+}
 
 // ─── IPC: full reset (wipe data + config, relaunch into onboarding) ──────────
 ipcMain.handle('app:resetAll', () => {
   allowQuit = true;
   // Tear everything down first so nothing writes back into the dirs we wipe.
-  try { clearMissionTimers(); } catch (e) { console.error('[reset] clearMissionTimers:', e); }
-  try { clearContextTimers(); } catch (e) { console.error('[reset] clearContextTimers:', e); }
-  try { stopWebhookDoneObserver(); } catch (e) { console.error('[reset] stopWebhookDoneObserver:', e); }
-  try { stopEphemeralWorkerWatcher(); } catch (e) { console.error('[reset] stopWorkerWatcher:', e); }
-  try { integrationBroker.stop(); } catch (e) { console.error('[reset] broker.stop:', e); }
-  try { mailService.closeAll(); } catch (e) { console.error('[reset] mail.closeAll:', e); }
-  try { hive.stopRouter(); } catch (e) { console.error('[reset] stopRouter:', e); }
-  try { hookServer.stop(); } catch (e) { console.error('[reset] hookServer.stop:', e); }
-  try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
-  try { stopSlackServer(); } catch (e) { console.error('[reset] slack.stop:', e); }
-  try { memory.stop(); } catch (e) { console.error('[reset] memory.stop:', e); }
-  try { memoryTidy.stop(); } catch (e) { console.error('[reset] memoryTidy.stop:', e); }
-  try { persist.close(); } catch (e) { console.error('[reset] persist.close:', e); }
-  // The same stops as quitting (teardownAndQuit): proxy sidecars and the
-  // webhook server would otherwise outlive the relaunch.
-  try { hive.stopAllProxyBridges(); } catch (e) { console.error('[reset] stopAllProxyBridges:', e); }
-  try { stopWebhookServer(); } catch (e) { console.error('[reset] webhook.stop:', e); }
-  try { ptyManager.killAll(); } catch (e) { console.error('[reset] killAll:', e); }
+  stopForReset('reset');
   try { hive.removeExposedCodexData(); } catch (e) { console.error('[reset] removeExposedCodexData:', e); }
   // The roster is the renderer's half of the same state, so it retires with the
   // hive — archived into roster-backups/ rather than deleted, and cleared as the
@@ -6560,6 +6597,84 @@ ipcMain.handle('app:resetAll', () => {
   // re-bootstrap from scratch and the renderer lands on onboarding.
   resetConfig();
   restartApp(app);
+});
+
+/** Each member's working folders, from the roster only (memory reset R5). */
+function memoryResetFolders(): Map<string, string[]> {
+  return foldersFromRoster(roster.read());
+}
+
+// The folders whose Claude Code notes a memory reset erases (R2), named in
+// its confirm.
+ipcMain.handle('app:memoryResetFolders', () => autoMemoryFolders(memoryResetFolders(), gitTopOf));
+
+// ─── IPC: memory reset (every member starts as on its first day) ─────────────
+// docs/designs/reset-agent-memory.md: notes, handled messages, recorded
+// conversations and Claude Code's auto memory go; the team, cards, waiting
+// messages, schedules, settings and Company knowledge stay. Then a relaunch.
+ipcMain.handle('app:resetMemory', async () => {
+  const home = readConfig().harnessHome;
+  const hiveRoot = hive.root();
+  if (!home || !hiveRoot) return { ok: false };
+  allowQuit = true;
+  // A tidy pass waiting on its model writes nothing when it returns.
+  try { memoryTidy.halt(); } catch (e) { console.error('[memory reset] memoryTidy.halt:', e); }
+  // Buffered cost samples reach the store before their ids are read.
+  try { pulseTelemetry.flush(); } catch (e) { console.error('[memory reset] pulse flush:', e); }
+  // killAll forgets each terminal as it signals it, so the wait watches the
+  // processes themselves, snapshotted first (Codex adversarial, ship).
+  const trees = ptyManager.list().map((s) => ({ id: s.id, pid: s.pid, before: process.platform === 'win32' ? null : groupMembers(s.pid) }));
+  stopForReset('memory reset', { keepPersist: true });
+  // Members still stopping could write a note back: wait past the kill grace,
+  // when the sweep reaps a tree that ignored the hangup. A tree that can't be
+  // told apart from a recycled pid (no snapshot, `ps` failing) waits the whole
+  // grace and is never forced; one still holding its own processes is.
+  const until = Date.now() + KILL_GRACE_MS + 2000;
+  const running = (t: (typeof trees)[number]): boolean => snapshotRemains(t.pid, t.before) ?? (Date.now() < until || isAlive(t.pid));
+  let left = trees;
+  while ((left = left.filter(running)).length && Date.now() < until) await new Promise((r) => setTimeout(r, 200));
+  for (const t of left) if (snapshotRemains(t.pid, t.before) === true) hardKillTree(t.pid);
+  const stillRunning = left.map((t) => t.id);
+
+  // Session ids only from records members can't write (R5): Pulse's cost
+  // samples for this office and the private session record.
+  const sessions = idsFromRecord(hive.privateSessionsText());
+  try {
+    const db = persist.database();
+    const office = pulseOffice();
+    if (db && office) {
+      idsFromCostRows(db.prepare(
+        "SELECT agent_id, json_extract(attrs, '$.s') AS s FROM telemetry_events WHERE office = ? AND kind = 'cost' GROUP BY agent_id, s"
+      ).all(office) as Array<{ agent_id: unknown; s: unknown }>, sessions);
+    }
+  } catch (e) { console.error('[memory reset] reading session ids:', e); }
+  try { persist.close(); } catch (e) { console.error('[memory reset] persist.close:', e); }
+
+  const memberIds = memberIdsIn(hiveRoot);
+  const targets = memoryResetTargets({
+    hiveRoot,
+    memberIds,
+    folders: memoryResetFolders(),
+    sessions,
+    projectDirsOf: projectDirs,
+    gitTop: gitTopOf,
+    research: { id: RESEARCH_ID, desk: researchDesk() }
+  });
+  // Marked before the erase, so a reset cut short (the app killed, power lost)
+  // still shows in the log.
+  hive.appendLog({ kind: 'memory-reset-start', members: memberIds, targets: targets.length });
+  const result = eraseMemoryTargets(targets, [hiveRoot, claudeProjectsRoot()]);
+  if (result.failed.length) console.error('[memory reset] could not remove:', result.failed);
+  if (result.refused.length) console.error('[memory reset] refused (outside its folders):', result.refused);
+  hive.forgetSessions({
+    members: memberIds,
+    removed: result.removed,
+    failed: result.failed.length,
+    refused: result.refused.length,
+    stillRunning
+  });
+  restartApp(app);
+  return { ok: true };
 });
 
 // ─── IPC: token telemetry (real usage + est. cost from CC transcripts) ───────
@@ -6760,6 +6875,11 @@ ipcMain.handle('pulse:learned', (_evt, from: unknown, to: unknown) => {
 // checked here. A record that can't be read rejects, so the list says so.
 ipcMain.handle('pulse:checked', (_evt, fromMs: unknown, toMs: unknown, way: unknown) =>
   (typeof fromMs === 'number' && typeof toMs === 'number' && Number.isFinite(fromMs) && Number.isFinite(toMs) && (way === 'in' || way === 'out') ? pulse.checked(fromMs, toMs, way) : { rows: [], since: null }));
+// The emails organized list (owner, 2026-10-21): two times and, for one
+// member's list, their id, checked here. A record that can't be read rejects.
+ipcMain.handle('pulse:organized', (_evt, fromMs: unknown, toMs: unknown, agentId: unknown) =>
+  (typeof fromMs === 'number' && typeof toMs === 'number' && Number.isFinite(fromMs) && Number.isFinite(toMs)
+    ? pulse.organized(fromMs, toMs, typeof agentId === 'string' && agentId ? agentId : undefined) : { rows: [], since: null }));
 // Company foundations (office-foundations.md): the foundation card reads the
 // record and writes the owner's answer, a draft request or Not now.
 ipcMain.handle('foundations:get', () => foundations.view());
@@ -6770,8 +6890,14 @@ ipcMain.handle('pulse:snapshot', (_evt, period: unknown, compare: unknown) => {
   // Opening Pulse starts the backfill too, not only the 30 s beat, so a first
   // look right after an update gets the past weeks (the view refreshes when
   // they land).
-  try { pulseTelemetry.flush(); const office = pulseOffice(); if (office) { pulseBackfillOnce(office); pulseProcessor.tick(office); } } catch (e) { console.error('[pulse] snapshot tick', e); }
+  try { pulseTelemetry.flush(); const office = pulseOffice(); if (office) { pulseBackfillOnce(office); pulseTick(office); } } catch (e) { console.error('[pulse] snapshot tick', e); }
   return pulse.snapshot(isPeriod(period) ? period : 'this-week', compare === true);
+});
+// Whether Pulse's points are flowing (T9): the last batch, failed writes by
+// day and hook frames refused per member.
+ipcMain.handle('telemetry:health', () => {
+  const office = pulseOffice();
+  return pulseHealth.view(office, office ? pulseTelemetry.failedWrites(office) : {}, hookServer.rejectedFrames());
 });
 ipcMain.handle('pulse:apply', (_evt, id: unknown, expected: unknown) => (typeof id === 'string' ? pulse.apply(id, expected) : { ok: false, error: 'stale' }));
 ipcMain.handle('pulse:modelApplied', (_evt, id: unknown, agentId: unknown, from: unknown, to: unknown) =>
@@ -8197,11 +8323,15 @@ function armAlwaysOnBeats(): void {
   pulseFlushTimer = setInterval(() => { try { pulseTelemetry.flush(); } catch (e) { console.error('[pulse] flush', e); } }, 1_000);
   if (pulseTickTimer) clearInterval(pulseTickTimer);
   pulseTickTimer = setInterval(() => {
+    let office: string | null = null;
     try {
-      const office = pulseOffice();
+      office = pulseOffice();
       if (office) pulseBackfillOnce(office);
-      if (office && pulseProcessor.tick(office) > 0) liveWebContents()?.send('pulse:updated');
+      if (office && pulseTick(office) > 0) liveWebContents()?.send('pulse:updated');
     } catch (e) { console.error('[pulse] tick', e); }
+    // Points unread for 5 minutes: warned once, until a batch reads them.
+    const stalled = pulseHealth.stallWarning(office);
+    if (stalled) console.warn(stalled);
   }, 30_000);
   if (pulsePresenceTimer) clearInterval(pulsePresenceTimer);
   pulsePresenceTimer = setInterval(() => { try { pulseTelemetry.presence(powerMonitor.getSystemIdleTime(), false); } catch { /* presence is best-effort */ } }, 60_000);

@@ -16,15 +16,6 @@
 
 ## Research agent (deferred from the third ship of mit/named-links, 2026-10-13)
 
-### A checked message for Pete is never dropped when delivery fails
-
-**What:** `queueForResearch()` in `src/main/hive.ts` removes the message's row from `research-pending.json` before `deliverToResearch()` and the commit succeed, and a delivery error is only logged. Keep the row until delivery succeeds, requeue it on failure, and tell Michael when it can't be delivered.
-
-**Why:** Found by the Codex adversarial review of the mit/named-links ship (2026-10-14). A disk or git error drops an owner or app message for Pete with no trace, and the record that would have recovered it is already gone.
-
-**Effort:** S
-**Priority:** P2
-
 ### Catch money amounts in the privacy check's pattern recheck
 
 **What:** Add a pattern for money amounts to the recheck in `src/shared/dataClasses.ts`: digits with a currency mark or code before or after them (Rs, INR, ₹, $, USD, €, £ and the like, with the groupings people write, such as `1,35,000` or `2,000.50`). Today the only money pattern is the card number check.
@@ -48,21 +39,9 @@
 **Priority:** P1
 **Depends on:** None
 
-### Keep Claude Code's transcripts and history out of agents' reach
-
-**What:** Wall every agent's file tools and shell from Claude Code's projects folder and `history.jsonl` (under `CLAUDE_CONFIG_DIR` or `~/.claude`), apart from what the app itself needs.
-
-**Why:** Any team member can read the other team members' Claude Code conversations there, and the prompts hidden checks send, which can quote what a teammate asked Pete before the trust layer cleaned it. The trust layer now removes each check's transcript as it ends and sweeps leftovers at launch (`src/main/hiddenClaude.ts` dropTranscript), but a check's prompt may also be kept in Claude Code's history.
-
-**Context:** Found by the security review and Codex in the third ship. Pete is already walled from both. Adding `claudeProjectsRoot()` to every agent's read walls needs care: Michael reads his own transcript through the app, not his tools.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
-
 ### Take the internet from team members' shells on Windows
 
-**What:** Hold team members' shell commands off the internet on Windows, where Claude Code has no sandbox, or say on the Research screen that it only holds on a Mac.
+**What:** Hold team members' shell commands off the internet on Windows, where the engine has no sandbox. Until then, the Research screen says so on Windows (done 2026-10-18).
 
 **Why:** On Windows only the web tools are refused; a shell command can still reach the internet, so the rule that only Pete uses the internet is not enforced there. The CHANGELOG names this.
 
@@ -118,19 +97,6 @@
 **Priority:** P2
 **Depends on:** The team performance build
 
-### A health readout for the Pulse telemetry (T9)
-
-**What:** Add `telemetry:health` (last batch time, events per batch, failed writes, refused hook frames per member from `HookServer.rejectedFrames()`), one log line per processor batch, and a single warning when the processor stalls.
-
-**Why:** When a Pulse number looks wrong there is no way to see whether points stopped flowing, writes failed or frames were refused; today nothing reads `rejectedFrames()`.
-
-**Context:** Deferred from plan: docs/designs/team-performance.md (T9, E3), owner choice at /ship of mit/delete-team-member, 2026-10-16. The store already counts failed writes per day (D15); the processor runs every 30 s from `index.ts`.
-
-**Effort:** S (human) / S (CC)
-**Priority:** P1
-**Depends on:** None
-
-### Keep Pulse's heavy reads off the main thread
 
 **What:** Read transcripts for the backfill line by line with a yield every few hundred lines, skip lines before the window before parsing tool results, and let the 30 s tick drain backfilled points instead of folding up to 100,000 at once; prune `telemetry_runs` with the events.
 
@@ -175,18 +141,6 @@
 **Context:** From the /ship red team review, 2026-10-16. `pulseOffice()` in `index.ts` returns `expandTilde(harnessHome)`.
 
 **Effort:** M (human) / S (CC)
-**Priority:** P2
-**Depends on:** None
-
-### Let only the main session release a prompt hold
-
-**What:** Pass whether a hook frame is a subagent's to the worker wake watchdog, and let only the main session's events (or the denial of the prompted tool) end the hold; give the hold a long ceiling.
-
-**Why:** A Task subagent's PostToolUse can end the hold while a permission prompt is still on screen, and a prompt escaped with no follow up event keeps the member from ever being nudged.
-
-**Context:** From the /ship testing and red team reviews, 2026-10-16. The stuck restart now restarts a member on a permission prompt within seconds, which makes both cases rare. `workerWake.ts` MOVED_ON_EVENTS.
-
-**Effort:** S (human) / S (CC)
 **Priority:** P2
 **Depends on:** None
 
@@ -273,6 +227,30 @@
 **Effort:** M
 **Priority:** P3
 
+### A memory reset clears each other engine's own history before that engine ships
+
+**What:** Before Codex, Grok, Antigravity, Crush, OpenCode or Pi joins `BUILD_ENGINES`, Reset memory deletes that engine's own conversation history for each member (Codex `sessions` and `archived_sessions` and its state database; `.gemini-hive`, `.pi-agent`, `.opencode`, `.crush-data`), never the engine's sign in or settings.
+
+**Why:** Reset memory clears Claude members fully; a member on another engine gets a new conversation but its old history stays in its own folder, where it can look back (owner, 2026-10-22, D8).
+
+**Context:** `docs/designs/reset-agent-memory.md` row R4. History locations: `src/main/hive.ts:5204`, `:5336`, `:5455`, `:5492`, `:5540`. Add it to each engine's ship checklist with a test that the history goes and the sign in stays.
+
+**Effort:** S (human) / S (CC) per engine
+**Priority:** P3
+**Depends on:** The memory reset; the engine joining BUILD_ENGINES
+
+### A memory reset also clears a member's conversations from earlier working folders
+
+**What:** Reset memory deletes a member's recorded Claude Code conversations and auto memory only in the working folders the roster names today (current, restorable and archived, worktrees included). A member moved to another folder earlier keeps its old conversations and auto memory in the old folder's Claude Code project.
+
+**Why:** If the owner points that member back at the old folder, Claude Code's auto memory for it loads again, so the member is not on its first day there (Codex adversarial pass at ship, 2026-10-22). Its old conversations can't be resumed (the session ids are cleared), so the risk is the auto memory.
+
+**Context:** `src/main/memoryReset.ts` `foldersFromRoster` and `memoryResetTargets`. Options: record each member's past working folders in the private record beside its sessions, or delete `<sid>.jsonl` under every project folder for the trusted session ids. Either way, nothing a member can write may name a folder (R5).
+
+**Effort:** S (human) / S (CC)
+**Priority:** P2
+**Depends on:** The memory reset
+
 ## Attachments (from the Codex adversarial review of design/studio-v2, 2026-10-01)
 
 ### Keep each agent's mail pass out of other agents' reach
@@ -280,17 +258,6 @@
 **What:** Move each agent's `md-mail.mcp.json` (it holds that agent's broker token) out of the shared hive folder, or block other agents from reading `<hive>/agents/<other>/md-mail.mcp.json`, and delete it when the agent's terminal closes.
 
 **Why:** Sandboxed team agents cannot reach the broker, but Michael runs unsandboxed and could read a Can send agent's token and send from its mailbox. Found in the pre-landing security review (`src/main/index.ts`, the md-mail block before `ptyManager.spawn`).
-
-**Effort:** S
-**Priority:** P1
-
-### Say "cannot check email" beside a schedule
-
-**What:** When a schedule's agent has email off, show a short note on that schedule ("Pam cannot check email") in the On a schedule section and the office schedule.
-
-**Why:** Plan CEO Section 4. A mail check schedule on an agent without email is silently ignored.
-
-**Context:** Deferred from plan: docs/designs/multi-mailbox.md
 
 **Effort:** S
 **Priority:** P1
@@ -409,34 +376,7 @@
 **Effort:** M
 **Priority:** P1
 
-### Base the QuickBooks default on the role, not the agent id
-
-**What:** Give hired agents with a books role the on + Read only default.
-
-**Why:** Only an agent whose id is literally `oscar` gets it (`booksReadRoleIds` in `src/main/index.ts`); a bookkeeper hired later starts off.
-
-**Effort:** S
-**Priority:** P3
-
-### Show a locally added QuickBooks server in the status
-
-**What:** Read non-`claude.ai` QuickBooks servers from `claude mcp list` too.
-
-**Why:** A QuickBooks server added with `claude mcp add` is gated but Settings says it is not connected.
-
-**Effort:** S
-**Priority:** P3
-
 ## Closing time (deferred from ship of feat/closing-time-progress, 2026-09-29)
-
-### Feed each row's latest line from the agent's transcript
-
-**What:** Show the last thing each agent said under its row, read from its Claude transcript.
-
-**Why:** The row's "latest line" was removed before release because `recentAssistantText` is only set by `src/renderer/src/mocks/mockEvents.ts`; real agents never fill it. The owner asked for it to tell a long process from a stuck one.
-
-**Effort:** M
-**Priority:** P2
 
 ### Rows in a second window
 
@@ -498,18 +438,6 @@
 **Depends on:** None
 
 ## Schedules
-
-### Starter jobs in an agent's empty Schedules tab
-
-**What:** Show up to three suggested jobs from the office pack's `starterMissions` in an agent's empty Schedules tab, each added paused with one click (design decision 5A in `docs/designs/per-agent-schedules.md`).
-
-**Why:** An empty tab is where an owner first learns an agent can run jobs on its own. A suggestion turns that into one click instead of inventing a job.
-
-**Context:** Deferred while building per-agent schedules (2026-09-25) because no shipped pack in `resources/packs/` has `starterMissions`, and its `schedule` field is a free string with no defined format (`src/shared/officePack.ts:76`). The empty tab ships with its copy and add button. To build: define the schedule format (reuse `parseWhen` in `src/shared/missions.ts`), write starters into the packs, map pack agent ids to hive agent ids, and add the suggestion rows.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** starter jobs written into the shipped packs.
 
 ### Michael turns repeated work into a routine (issue #41)
 
@@ -1028,6 +956,24 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ## Watch list (no issue seen yet; act only if the symptom shows up)
 
+### The dock scroll test failed once on the macOS runner
+
+**Watch for:** `test/dock-scroll.electron.test.cjs` failing at "bottom follows incoming replies" again, on main or on an unrelated PR.
+
+**What happened:** on PR #209's head 673af795 (CI run 39532678039, first attempt), the non reduced motion run failed at that step: after two replies arrive, the list was not at the bottom, or the new replies button showed. The rerun of the job passed, as did 28 local runs (18 with every core busy). Not reproduced, cause unknown.
+
+**If it shows up:** add the list's `scrollTop`, `scrollHeight`, `clientHeight` and the hook's `following` to that check's message, then look for a scroll event that `useDockScroll` reads as the owner's (`src/renderer/src/shell/useDockScroll.ts`, `onScroll`), for example from a late font swap or a fold measured after the reply arrived.
+
+**Seen again:** on PR #291 (CI run 39539334994, first attempt), same step, again only the normal motion run; the reduced motion run passed. 2 of 3 macOS CI runs.
+
+**Tried (running branch, 2026-10-20, not yet proven on CI):** `useDockScroll` now treats a scroll change under a pixel as layout rounding, and the clamp check (content shrank under the reader) allows a pixel, so a fractional `scrollTop` is no longer read as the owner scrolling up. Every failed check in the dock test page now prints the list's `scrollTop`, `scrollHeight`, `clientHeight` and the catch-up button. If it fails again after 0.2.5 lands, read those numbers first.
+
+**Context:** owner chose to merge #209 and track this, 2026-10-20; on its second failure, chose to fix it on the running branch rather than through a draft PR.
+
+**Effort:** S (CC)
+**Priority:** P3 (watch)
+**Depends on:** nothing.
+
 ### Agents skip their folder or company knowledge
 
 **Watch for:** an agent answers a policy, price or "how we do it" question from memory or the internet when the answer is in the company knowledge store; an agent asks the owner for a document already in its folder; this happens more late in a long session or after a compaction.
@@ -1130,7 +1076,7 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 ### Trust boundaries Codex raised on Ask me (2026-10-05)
 
 **What:** Codex adversarial pass 2 raised these items. Each one either already exists on main or needs a design decision:
-1. **Question text in Michael's request.** The question is copied verbatim into Michael's `from: human` request, and an agent writes that question. Label it as card text and fold it to one line, or send only the card id plus the owner's answer.
+1. ~~**Question text in Michael's request.**~~ Done 2026-10-18: the question goes in as one line labelled as card text, through cardText, which also folds C1 line breaks and drops format characters.
 2. **Who closed the question.** Open or closed is decided by whether a string is present, so a worker that writes tasks.json can set `a` or `dismissedAt` and hide a question. Give answers and withdrawals provenance: the recorded owner answer keys for answers, plus a trusted withdrawal marker.
 3. ~~**The 30-day window.**~~ Done 2026-10-06 (michael-replies.md): a fixed floor replaces the rolling window.
 4. ~~**Reply alias.**~~ Done 2026-10-06 (michael-replies.md): any name that reaches the owner closes a request.

@@ -64,7 +64,9 @@ export interface TidyResult {
   id: string;
   tidied: boolean;
   reason: string;
-  stats?: { added: number; updated: number; deleted: number; procedures: number; repeats: number };
+  stats?: { added: number; updated: number; deleted: number; procedures: number; repeats: number; dupes: number };
+  /** Model ops the checks dropped, by reason. Absent when none were dropped. */
+  dropped?: Record<string, number>;
 }
 
 /** A held notes file whose notes are now elsewhere (the index or the inbox):
@@ -79,6 +81,7 @@ function dropHeld(file: string): void {
 export class MemoryTidy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private halted = false;
 
   /**
    * @param getHome      harnessHome, read lazily so the tidy-up follows the office.
@@ -113,11 +116,19 @@ export class MemoryTidy {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
   }
 
+  /** For a memory reset: stop, and make a pass still waiting on its model
+   *  write nothing when it returns, not even the notes it held, so no old
+   *  note lands after the erase (reset-agent-memory.md). Until the relaunch. */
+  halt(): void {
+    this.halted = true;
+    this.stop();
+  }
+
   /** Tidy every agent that is due (or just `onlyId`, which is tidied if it has
    *  anything to tidy). One at a time; a pass never overlaps the next. */
   async tidyNow(onlyId?: string): Promise<TidyResult[]> {
     const home = this.getHome();
-    if (!home || this.running) return [];
+    if (!home || this.running || this.halted) return [];
     const agentsDir = join(home, 'hive', 'agents');
     let ids: string[] = [];
     try { if (existsSync(agentsDir)) ids = readdirSync(agentsDir); } catch { return []; }
@@ -130,6 +141,7 @@ export class MemoryTidy {
     const results: TidyResult[] = [];
     try {
       for (const id of ids) {
+        if (this.halted) break;
         const r = await this.tidyAgent(home, id, !!onlyId);
         if (r) results.push(r);
       }
@@ -198,9 +210,13 @@ export class MemoryTidy {
     try {
       raw = await this.askModel(home, entries, notes, overBudget, procedureNames);
     } catch (e) {
+      if (this.halted) return null;
       restore();
       return this.abort(id, 'model-failed', String(e));
     }
+    // Halted for a memory reset while the model ran: the memory is gone, so
+    // nothing is written back.
+    if (this.halted) return null;
     // A reply with no list of changes is a failed reply, not "keep nothing":
     // the notes go back to the inbox instead of being dropped.
     if (!(raw && typeof raw === 'object' && Array.isArray((raw as { ops?: unknown }).ops))) {
@@ -209,6 +225,8 @@ export class MemoryTidy {
     }
     const ops = validateOps(raw, entries);
     let outcome: ReturnType<typeof applyOps>;
+    const { ops, dropped } = validateOps(raw, entries);
+    const outcome = applyOps(entries, ops, today);
 
     try {
       // Refresh after the model call in case a procedure file changed meanwhile.
@@ -244,13 +262,15 @@ export class MemoryTidy {
     dropHeld(processing);
 
     const tokens = estimateTokens(entriesBlock(outcome.entries));
+    const droppedCount = Object.keys(dropped).length;
     try {
       this.appendLog({
         kind: 'memory-tidy', agentId: id, notes: notes.length, migrated: migrating,
-        entries: outcome.entries.length, tokens, overBudget: tokens > INDEX_BUDGET_TOKENS, ...outcome.stats
+        entries: outcome.entries.length, tokens, overBudget: tokens > INDEX_BUDGET_TOKENS, ...outcome.stats,
+        ...(droppedCount ? { dropped } : {})
       });
     } catch { /* logging is best-effort */ }
-    return { id, tidied: true, reason: migrating ? 'migrated' : 'tidied', stats: outcome.stats };
+    return { id, tidied: true, reason: migrating ? 'migrated' : 'tidied', stats: outcome.stats, ...(droppedCount ? { dropped } : {}) };
   }
 
   private abort(id: string, reason: string, detail?: string): TidyResult {

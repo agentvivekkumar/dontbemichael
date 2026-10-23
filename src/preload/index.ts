@@ -2,8 +2,10 @@ import type { Period } from '../shared/teamPerformance';
 import type { HeldRow } from '../shared/heldRecord';
 import type { LearnedNote } from '../shared/teamLearning';
 import type { CheckedList } from '../shared/checkedRecord';
+import type { OrganizedList } from '../shared/organizedRecord';
 import type { PulseView } from '../shared/pulseView';
 import type { FoundationsView } from '../shared/foundations';
+import type { PulseHealthView } from '../shared/pulseHealth';
 import type { ResearchConfig } from '../shared/research';
 import type { DataClassId, DataClassSetting } from '../shared/dataClasses';
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
@@ -1315,6 +1317,8 @@ const api = {
   closingTimeRemind: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeRemind', id),
   /** Close without one team member: stop waiting on it; it is back tomorrow. */
   closingTimeExcuse: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('app:closingTimeExcuse', id),
+  /** The last thing each of these agents said, one safe line each, and when (ms). */
+  closingTimeSaid: (ids: string[]): Promise<Record<string, { text: string; at?: number }>> => ipcRenderer.invoke('app:closingTimeSaid', ids),
   /** Progress events for the quit dialog: started → progress → complete (the
    *  app tears down moments later) | timeout | cancelled. Each carries the ACK
    *  counts and the rows: who confirmed, who is still waited on, who the owner
@@ -1330,6 +1334,10 @@ const api = {
   /** Wipe all hive data + the memory palace, reset config, and relaunch the app
    *  into onboarding. The process exits, so this promise never resolves. */
   resetAll: (): Promise<void> => ipcRenderer.invoke('app:resetAll'),
+  /** Every team member forgets and starts as on its first day; the app relaunches. */
+  resetMemory: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:resetMemory'),
+  /** The folders whose Claude Code notes a memory reset erases, for its confirm. */
+  memoryResetFolders: (): Promise<string[]> => ipcRenderer.invoke('app:memoryResetFolders'),
 
   // ─── Token telemetry (real usage + est. cost from CC transcripts) ──────────
   /** Sum input/output/cache tokens + estimated USD cost for an agent from its
@@ -1434,6 +1442,8 @@ const api = {
   /** The new notes behind Learning's number, for two local days (YYYY-MM-DD). */
   pulseLearned: (from: string, to: string): Promise<LearnedNote[]> => ipcRenderer.invoke('pulse:learned', from, to),
   pulseChecked: (fromMs: number, toMs: number, way: 'in' | 'out'): Promise<CheckedList> => ipcRenderer.invoke('pulse:checked', fromMs, toMs, way),
+  /** The emails organized in a span, all members or one (owner, 2026-10-21). */
+  pulseOrganized: (fromMs: number, toMs: number, agentId?: string): Promise<OrganizedList> => ipcRenderer.invoke('pulse:organized', fromMs, toMs, agentId),
   /** The Claude plan found in the owner's Claude account, and its list price a month. */
   claudePlan: (): Promise<{ label: string | null; listMonthly: number | null }> => ipcRenderer.invoke('claude:plan'),
   /** The owner's Apply on a way to save. A model change comes back for the store to make. */
@@ -1445,6 +1455,8 @@ const api = {
   pulseUndo: (appliedId: number): Promise<{ ok: true; kind: 'schedule' } | { ok: true; kind: 'model'; agentId: string; to: string | null } | { ok: false; error: 'stale' | 'unavailable' }> =>
     ipcRenderer.invoke('pulse:undo', appliedId),
   pulseDismiss: (id: string): Promise<boolean> => ipcRenderer.invoke('pulse:dismiss', id),
+  /** Whether Pulse's points are flowing: the last batch, failed writes, refused hook frames. */
+  telemetryHealth: (): Promise<PulseHealthView> => ipcRenderer.invoke('telemetry:health'),
   /** Fires when new telemetry was folded, so an open Pulse view refreshes. */
   onPulseUpdated: (cb: () => void): (() => void) => {
     const listener = (): void => cb();
@@ -1703,8 +1715,8 @@ const api = {
     ipcRenderer.invoke('integrations:list'),
   integrationsTemplates: (): Promise<IntegrationTemplate[]> =>
     ipcRenderer.invoke('integrations:templates'),
-  integrationsUpsert: (record: IntegrationRecord): Promise<{ ok: true; record: IntegrationRecord } | { ok: false; error: string }> =>
-    ipcRenderer.invoke('integrations:upsert', record),
+  integrationsUpsert: (record: IntegrationRecord, opts?: { isNew?: boolean }): Promise<{ ok: true; record: IntegrationRecord } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('integrations:upsert', record, opts),
   integrationsCanStoreSecrets: (): Promise<{ ok: true } | { ok: false; error: string }> =>
     ipcRenderer.invoke('integrations:canStoreSecrets'),
   integrationsSetSecret: (req: { id: string; secret: string }): Promise<{ ok: boolean; error?: string }> =>
