@@ -3901,6 +3901,39 @@ export class HiveManager {
             routed++;
             continue;
           }
+          if (typeof msg.to === 'string' && msg.to.toLowerCase() === 'triage') {
+            // A triage filing: create the file in triage/ exclusively with flag 'wx'
+            // so concurrent writes never overwrite an existing filing (TODOS.md line 334).
+            const triageDir = join(root, 'triage');
+            mkdirSync(triageDir, { recursive: true });
+            const title = (partial as { title?: unknown }).title;
+            const filingPayload = {
+              ...partial,
+              title: typeof title === 'string' && title.trim() ? title : (msg.subject || f),
+              filedBy: id,
+              filedAt: (partial as { filedAt?: unknown }).filedAt || msg.created_at
+            };
+            const content = JSON.stringify(filingPayload, null, 2);
+            const base = f.endsWith(`-${id}.json`) ? f.slice(0, -5) : `${msg.created_at.replace(/[-:]/g, '').slice(0, 15)}-${id}`;
+            let filingName = `${base}.json`;
+            let counter = 1;
+            while (true) {
+              try {
+                writeFileSync(join(triageDir, filingName), content, { flag: 'wx' });
+                break;
+              } catch (e: unknown) {
+                if (e && typeof e === 'object' && (e as { code?: string }).code === 'EEXIST') {
+                  filingName = `${base}-${counter++}.json`;
+                } else {
+                  throw e;
+                }
+              }
+            }
+            this.appendLog({ kind: 'triage-filing', from: id, file: filingName });
+            this.archiveOutboxFile(full, join(outbox, '.sent'), f);
+            routed++;
+            continue;
+          }
           // Everything to and from Research passes its trust layer first.
           const toResearch = id !== RESEARCH_ID && addressedToResearch(partial.to, (reg ??= this.registry()).agents, researchName ??= this.researchName());
           if (toResearch || id === RESEARCH_ID) {
@@ -6328,7 +6361,7 @@ There are two shared surfaces, both in the hive root:
 - \`board.md\` — the freeform narrative plan. The god agent is its sole scribe; others \`propose\` edits.
 - \`tasks.json\` — the structured task ledger (a kanban: \`todo / doing / waiting / blocked / done\`, with title,
   assignee, priority, deps). The god agent is its only writer: tell god when your work moves and it moves
-  the card. File what your work needs as one new file in \`triage/\`, written once; god works the filings
+  the card. File what your work needs as an outbox message to "triage"; god works the filings
   oldest first.
 
 ## Asking the human (the ASK ME card)
@@ -6370,7 +6403,7 @@ options (roughly 700 characters) is a report, not a question. Cut the narrative 
 When the ask originates in another agent's report, REWRITE it into that shape. Never paste the report
 body in as the question, and never make the human read the investigation to find the decision. Put the
 background (what led to the question and why it matters) in a sentence or two in the card's
-\`"description"\`, so the owner can read it under See full context. Do NOT park human questions in other files of your own (no \`HumanQuestion.md\`): a team member's filing in \`triage/\` is the only other place one waits,
+\`"description"\`, so the owner can read it under See full context. Do NOT park human questions in other files of your own (no \`HumanQuestion.md\`): an outbox message to \`triage\` is the only other place one waits,
 and never sit idle waiting for a reply — move on to other work and pick the answer up when it arrives.
 
 ## Guardrails: circuit breaker & token budgets
@@ -6435,7 +6468,7 @@ ${SCHEDULES_PROTOCOL}
 \`tasks.json\` in the hive folder holds the cards (todo, doing, waiting, blocked, done; waiting names who else in waitingOn, never the card\'s own person, a card that only waits for its own person\'s one off step at a set time is todo with nextAt set to that time, scheduled routines get no card, and cards carry no running notes), each with a title and the team member it is assigned to. Only Michael writes \`tasks.json\` and \`board.md\`: when your work moves (finished, waiting on someone, due again at a set time), tell Michael and he moves its card. A done card stays done: only the owner reopens one. At a To do card's \`nextAt\` the app sends its person a "Next step due" message. A Waiting card's \`nextAt\` is when to check back on who it waits on; when it comes the app tells Michael.
 
 ## Asking the owner
-Only Michael asks the owner, on the Ask me board. A team member files what its work needs as one new file in \`triage/\` in the hive folder, named by the time and its id, written once and never changed: \`{ "title": "...", "description": "...", "filedBy": "<your id>", "filedAt": "<time>" }\` with either \`"ask"\` (one activity's questions for the owner, one to a line) or \`"waitingOn"\` (someone outside the office), one filing per source of answers. Something only the owner can do on a website, such as signing in or accepting terms, carries the exact link for it from the email or page (the sender's own site, never a tracking or shortened link), and Michael keeps it in the ask. Michael works the filings oldest first: he answers, merges into a card, drops a duplicate or makes a card (blocked on Ask me, or waiting), then moves the file to \`triage/.done/\`. A question stays on Ask me until the owner answers it or it is withdrawn, so there is one open ask per card: to change it, Michael folds what still matters into one ask and withdraws the old one with \`"dismissedAt"\` and \`"dismissedReason"\`. When the owner leaves some questions of an ask unanswered, Michael sends them with the answers to whoever raised them, who settles what it can and files back only what it still needs; Michael asks the owner again only for that, on the same card, or on a new card when that card is done. The owner's answer goes into the raiser's memory and to Michael, who routes the follow-up: the owner talks only to Michael.
+Only Michael asks the owner, on the Ask me board. A team member files what its work needs as an outbox message to \`"to": "triage"\` with either \`"ask"\` (one activity's questions for the owner, one to a line) or \`"waitingOn"\` (someone outside the office), one filing per source of answers; the app creates the filing in \`triage/\`. Something only the owner can do on a website, such as signing in or accepting terms, carries the exact link for it from the email or page (the sender's own site, never a tracking or shortened link), and Michael keeps it in the ask. Michael works the filings oldest first: he answers, merges into a card, drops a duplicate or makes a card (blocked on Ask me, or waiting), then moves the file to \`triage/.done/\`. A question stays on Ask me until the owner answers it or it is withdrawn, so there is one open ask per card: to change it, Michael folds what still matters into one ask and withdraws the old one with \`"dismissedAt"\` and \`"dismissedReason"\`. When the owner leaves some questions of an ask unanswered, Michael sends them with the answers to whoever raised them, who settles what it can and files back only what it still needs; Michael asks the owner again only for that, on the same card, or on a new card when that card is done. The owner's answer goes into the raiser's memory and to Michael, who routes the follow-up: the owner talks only to Michael.
 `;
 
 // ─── cth-hook shim (written to <hive>/bin/cth-hook.cjs) ──────────────────────

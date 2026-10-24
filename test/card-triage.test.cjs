@@ -395,18 +395,14 @@ test('the owner dragging a just reopened card to Done puts it back, not as the o
   const again = new HiveManager(() => home);
   assert.doesNotThrow(() => again.refreshOwnerRequests(), 'an entry with no id never stops the tick');
   assert.equal(again.tasks().tasks.find((c) => c.id === 'd').result, 'v2', 'the latest copy');
-  // Value (extension): protects=a filing is written once, as a new JSON file; fails_when=a team member may edit filings or claim the .done name; why_new=review cycle 3; seam=harnessWriteDecision
+  // Value (extension): protects=the triage folder is the app's alone; team members send to triage via outbox and Michael alone manages triage; seam=harnessWriteDecision
   const { harnessWriteDecision } = loadTs('src/main/harnessGuard.ts');
-  const guard = (tool, file) => harnessWriteDecision({ tool, toolInput: { file_path: path.join(hive.root(), 'triage', file) }, cwd: home, agentId: 'pam', isGod: false, harnessHome: home, hiveRoot: hive.root(), caseInsensitive: false }).deny;
-  assert.equal(guard('Write', '20261011T143000-pam.json'), false);
-  assert.equal(guard('Edit', '20261011T143000-pam.json'), true, 'never changed once written');
+  const guard = (tool, file, isGod = false) => harnessWriteDecision({ tool, toolInput: { file_path: path.join(hive.root(), 'triage', file) }, cwd: home, agentId: isGod ? 'god' : 'pam', isGod, harnessHome: home, hiveRoot: hive.root(), caseInsensitive: false }).deny;
+  assert.equal(guard('Write', '20261011T143000-pam.json'), true, 'direct write to triage by team member is refused');
+  assert.equal(guard('Write', '20261011T143000-pam.json', true), false, 'Michael can write in triage');
+  assert.equal(guard('Write', '.done/20261011T143000-pam.json', true), false, 'Michael can file away in .done');
   assert.equal(guard('Write', 'notes.md'), true);
   assert.equal(guard('Write', '.done'), true);
-  // Value (extension): protects=no filing is overwritten, by its writer or another agent; fails_when=Write may replace an existing filing or use another agent's name; why_new=Codex adversarial review; seam=harnessWriteDecision with a real file
-  assert.equal(guard('Write', '20261011T143000-erin.json'), true, 'only under its own id');
-  fs.mkdirSync(path.join(hive.root(), 'triage'), { recursive: true });
-  fs.writeFileSync(path.join(hive.root(), 'triage', '20261011T150000-pam.json'), '{}');
-  assert.equal(guard('Write', '20261011T150000-pam.json'), true, 'never over a filing already there');
 });
 
 test('a board that cannot be read at the moment of a fix is left alone, never written as empty', async (t) => {
@@ -512,3 +508,60 @@ test('the guard keeps when a card was first seen Done, across ticks and from an 
   const older = { hive: 'x', done: {}, placed: {}, reminders: {} };
   assert.deepEqual(guardCards([card('d', { status: 'done' })], older, '2026-10-14T11:00:00.000Z').state.doneAt, { d: '2026-10-14T11:00:00.000Z' });
 });
+
+test('filings sent as outbox messages to triage are created exclusively with wx and never overwritten', async (t) => {
+  // Value: protects=concurrent filings never overwrite each other, and outbox filings reach Michael cleanly; fails_when=outbox messages to triage are not routed, fail to use exclusive create, or clobber identical file names; why_new=TODOS.md line 334; seam=HiveManager.routeOnce
+  const { home, hive } = await officeWith(t, 'md-triage-wx-');
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
+  await hive.ensureAgent({ id: 'erin', name: 'Erin', provider: 'claude', cwd: home });
+
+  const pamOutbox = path.join(hive.root(), 'agents', 'pam', 'outbox');
+  const erinOutbox = path.join(hive.root(), 'agents', 'erin', 'outbox');
+  fs.mkdirSync(pamOutbox, { recursive: true });
+  fs.mkdirSync(erinOutbox, { recursive: true });
+
+  // 1. Pam writes a filing to triage
+  fs.writeFileSync(
+    path.join(pamOutbox, '20261018T100000-pam.json'),
+    JSON.stringify({ to: 'triage', title: 'Need client signature', ask: '1. Can owner sign?' })
+  );
+
+  // 2. Erin writes a filing to triage with her own name
+  fs.writeFileSync(
+    path.join(erinOutbox, '20261018T100000-erin.json'),
+    JSON.stringify({ to: 'triage', title: 'Invoice approval', ask: '1. Approve invoice?' })
+  );
+
+  const routed = hive.routeOnce();
+  assert.equal(routed, 2, 'both outbox messages routed');
+
+  const triageDir = path.join(hive.root(), 'triage');
+  const files = fs.readdirSync(triageDir).filter((f) => f.endsWith('.json'));
+  assert.equal(files.length, 2, 'both filings created in triage folder');
+
+  // Verify none was overwritten
+  const contents = files.map((f) => JSON.parse(fs.readFileSync(path.join(triageDir, f), 'utf8')));
+  const titles = contents.map((c) => c.title).sort();
+  assert.deepEqual(titles, ['Invoice approval', 'Need client signature'], 'neither filing was overwritten');
+
+  // 3. Outbox copies were archived to .sent
+  assert.equal(fs.existsSync(path.join(pamOutbox, '20261018T100000-pam.json')), false);
+  assert.equal(fs.existsSync(path.join(pamOutbox, '.sent', '20261018T100000-pam.json')), true);
+
+  // 4. Filings are read by Michael in stuckCards / pendingFilings
+  hive.refreshOwnerRequests();
+  const filings = hive.stuckCards().filter((c) => c.issue === 'filing');
+  assert.equal(filings.length, 2);
+
+  // 5. If another filing is submitted with a colliding filename, exclusive create (wx) appends counter and never overwrites
+  fs.writeFileSync(
+    path.join(pamOutbox, '20261018T100000-pam.json'),
+    JSON.stringify({ to: 'triage', title: 'Second client signature request', ask: '2. Contract signed?' })
+  );
+  const routed2 = hive.routeOnce();
+  assert.equal(routed2, 1, 'colliding filing routed');
+  const filesAfter = fs.readdirSync(triageDir).filter((f) => f.endsWith('.json'));
+  assert.equal(filesAfter.length, 3, 'three distinct filings exist');
+  assert.ok(filesAfter.includes('20261018T100000-pam-1.json'), 'collision resolved with counter');
+});
+

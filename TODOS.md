@@ -459,20 +459,6 @@
 **Effort:** S
 **Priority:** P3
 
-## Task board (deferred from ship of mit/local-app-version-stuck-ee4e87, 2026-10-12)
-
-### A triage filing the app creates itself, so none is ever overwritten
-
-**What:** Team members send a filing as an outbox message to "triage", and the router creates the file in `triage/` with an exclusive create, instead of each agent writing there itself.
-
-**Why:** The write guard refuses an edit, another agent's name and a file that already exists (`src/main/harnessGuard.ts`, `isPlumbing`), but the check runs before the write, so two writes of the very same filing name at the same instant could still lose the first. Codex adversarial pass 2 found it; the owner accepted the risk for this release (ship D11), since agents do not write the same name twice at once.
-
-**Context:** The router already moves every outbox file (`HiveManager.routeOnce`); open the new file with `wx` there and archive the outbox copy, as messages do. Then the triage folder can be the app's alone in the write guard.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ## Schedules
 
 ### Michael turns repeated work into a routine (issue #41)

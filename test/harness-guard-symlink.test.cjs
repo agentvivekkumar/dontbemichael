@@ -302,7 +302,7 @@ test('writing to own outbox (real non-symlink path) is allowed',
   }
 );
 
-test('writing a brand-new triage filing (real non-symlink path) is allowed',
+test('writing a triage filing directly is denied for team members, allowed for Michael',
   posixOnly('symlinks are POSIX'),
   (t) => {
     const tree = makeTree(t, 'normal-triage-');
@@ -314,7 +314,17 @@ test('writing a brand-new triage filing (real non-symlink path) is allowed',
       harnessHome: tree.harness,
       hiveRoot: tree.hive,
     });
-    assert.equal(res.deny, false, 'writing a new triage filing should be allowed');
+    assert.equal(res.deny, true, 'direct triage write from team member should be denied');
+
+    const resGod = decide({
+      file_path: path.join(tree.triage, 'filing-1-dwight.json'),
+      cwd: tree.workspace,
+      agentId: 'god',
+      isGod: true,
+      harnessHome: tree.harness,
+      hiveRoot: tree.hive,
+    });
+    assert.equal(resGod.deny, false, 'Michael writing to triage should be allowed');
   }
 );
 
