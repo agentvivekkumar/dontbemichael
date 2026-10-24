@@ -3,7 +3,7 @@
 /**
  * Pulse's ways to save (docs/designs/team-performance.md, Recommendations): each
  * rule at and just below its minimum, no data no advice, never a cheaper model for
- * Michael, never across providers, Fable (no tier) gets none, gap days are left
+ * Michael, never across providers, an untiered model gets none, gap days are left
  * out, and a dismissed suggestion returns only at the next evidence band (D13).
  */
 
@@ -17,9 +17,11 @@ const H = 3600_000;
 
 const ladder = [
   { provider: 'claude', id: 'claude-opus-5-5', label: 'Opus 5.5', tier: 'top' },
-  { provider: 'claude', id: 'claude-fable-5-1', label: 'Fable 5.1' },
+  { provider: 'claude', id: 'claude-fable-5-1', label: 'Fable 5.1', tier: 'top' },
   { provider: 'claude', id: 'claude-sonnet-5', label: 'Sonnet 5', tier: 'middle' },
-  { provider: 'claude', id: 'claude-haiku-4-5', label: 'Haiku 4.5', tier: 'small' }
+  { provider: 'claude', id: 'claude-haiku-4-5', label: 'Haiku 4.5', tier: 'small' },
+  // A deliberately untiered model for the "no tier, no advice" assertion.
+  { provider: 'claude', id: 'claude-unknown-preview', label: 'Unknown Preview' }
 ];
 const prices = { 'claude-opus-5-5': 75, 'claude-sonnet-5': 15 };
 const base = { now: NOW, missions: [], members: [], runs: [], ladder, gapDays: [], priceOf: (m) => prices[m] };
@@ -73,7 +75,7 @@ test('a cheaper model needs 10 mail decisions, 90% kept and no reopens; never fo
   assert.equal(A.adviceFor({ ...base, members: [member({ isGod: true })] }).length, 0, 'never a cheaper Michael');
   assert.equal(A.adviceFor({ ...base, members: [member({ mailDecisions: 9 })] }).length, 0, 'not enough quality evidence');
   assert.equal(A.adviceFor({ ...base, members: [member({ reopens: 1 })] }).length, 0);
-  assert.equal(A.adviceFor({ ...base, members: [member({ model: 'claude-fable-5-1' })] }).length, 0, 'no tier, no advice');
+  assert.equal(A.adviceFor({ ...base, members: [member({ model: 'claude-unknown-preview' })] }).length, 0, 'no tier, no advice');
   assert.equal(A.adviceFor({ ...base, members: [member({ provider: 'codex', model: 'gpt-5' })] }).length, 0, 'Claude only');
   assert.equal(A.adviceFor({ ...base, members: [member({ model: 'claude-haiku-4-5' })] }).length, 0, 'nothing below small');
 });
