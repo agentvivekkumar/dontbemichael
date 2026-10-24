@@ -1,6 +1,7 @@
 /**
  * Rate limits from connected apps (TODOS: "Third-party rate-limit backoff in
- * the broker"). When an app answers 429, or 503 with Retry-After, the broker
+ * the broker"). When an app answers 429, 503 with Retry-After, or a 403 that
+ * says it is a rate limit (GitHub), the broker
  * stops calling it until the app's time is up, instead of every agent retrying
  * blind and burning quota. A short wait is held in the broker; a long one is
  * answered at once with when to try again.
@@ -18,12 +19,24 @@ export const BACKOFF_CAP_MS = 15 * 60_000;
 
 type HeaderSource = { get(name: string): string | null };
 
-/** How long a 429 or 503 answer asks callers to wait, in ms, or undefined when
- *  it is not a rate limit. Reads Retry-After (seconds or a date), then the
- *  common reset headers (seconds left, or a Unix time). A 503 that names no
- *  time is an outage, not a limit. */
+/** True when a 403 is a rate limit, not a refusal. GitHub, the first app the
+ *  broker connects, answers its limits with 403 as often as 429: the primary
+ *  limit with `x-ratelimit-remaining: 0`, a secondary limit with Retry-After
+ *  (docs.github.com, "Rate limits for the REST API"). A 403 with neither is
+ *  a missing scope or permission, and waiting would not change it. */
+function isRateLimited403(headers: HeaderSource): boolean {
+  if (headers.get('retry-after')?.trim()) return true;
+  const remaining = (headers.get('x-ratelimit-remaining') ?? headers.get('ratelimit-remaining'))?.trim();
+  return remaining === '0';
+}
+
+/** How long a 429 or 503 answer (or a 403 that is a rate limit) asks callers
+ *  to wait, in ms, or undefined when it is not a rate limit. Reads
+ *  Retry-After (seconds or a date), then the common reset headers (seconds
+ *  left, or a Unix time). A 503 that names no time is an outage, not a limit. */
 export function backoffMs(status: number, headers: HeaderSource, now: number): number | undefined {
-  if (status !== 429 && status !== 503) return undefined;
+  if (status === 403 && !isRateLimited403(headers)) return undefined;
+  if (status !== 429 && status !== 503 && status !== 403) return undefined;
   let ms: number | undefined;
   const retryAfter = headers.get('retry-after')?.trim();
   if (retryAfter) {
@@ -38,7 +51,7 @@ export function backoffMs(status: number, headers: HeaderSource, now: number): n
       ms = n > 1e9 ? n * 1000 - now : n * 1000;
     }
   }
-  if (ms === undefined) return status === 429 ? DEFAULT_BACKOFF_MS : undefined;
+  if (ms === undefined) return status === 503 ? undefined : DEFAULT_BACKOFF_MS;
   return Math.min(Math.max(ms, 1000), BACKOFF_CAP_MS);
 }
 
