@@ -14,9 +14,11 @@
   <img src="./branding/reference/studio/home-light.png" alt="The office: a pod for each department around Michael's glass office, and the Needs you board on the right with what waits on you" width="1240">
 </picture>
 
-Pick your kind of business, pick your team, and Michael, your office manager, runs the office
-while you run the business. Every team member is an AI agent with a job, its own folder and its
-own memory, working on your computer.
+Pick your kind of business and choose your team. Michael, your office manager, runs the office
+while you run the business.
+
+Every team member is an AI agent with a clear job, its own folder, and its own memory. Everything
+runs on your computer.
 
 <p>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF6B6B.svg?style=flat-square&labelColor=1A1320"></a>
@@ -61,19 +63,21 @@ own memory, working on your computer.
 ## What it is
 
 Don't Be Michael is a desktop app that runs a small office of AI team members for your business.
-Each team member is a [Claude Code](https://claude.com/claude-code) agent with a role: finance,
-customer support, sales, marketing and so on. Michael is the office manager. You talk to him; he
-routes the work, answers the team's questions, and asks you only when something needs your
-decision.
+
+Each team member is a [Claude Code](https://claude.com/claude-code) agent with a specific role
+(finance, customer support, sales, marketing, and more). Michael is the office manager. You talk
+to him. He routes the work, answers the team's questions, and only brings you the decisions that
+need your attention.
 
 Everything runs on your computer, on the Claude plan you already have. Each team member has a
-desk in an office you can watch, a pod for each department around Michael's glass office, so you
-can see who is working on what.
+desk in an office you can watch, with a pod for each department around Michael's glass office, so
+you can see who is working on what.
 
 ## Your team
 
-Setup asks for your business and your kind of business, then suggests a team from that business's
-Office Pack. You pick who joins, and you can hire more later.
+During setup, you tell the app your business name and the kind of business you run. It then
+suggests a starting team from that business type's Office Pack. You choose who joins, and you can
+hire more team members later.
 
 | Kind of business | Suggested team |
 |---|---|
@@ -286,12 +290,11 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 
 1. Download the `.dmg` from the [latest release](https://github.com/agentvivekkumar/dontbemichael/releases/latest).
 2. Open it and drag **Don't Be Michael** into your Applications folder.
-3. Open it from Applications. The first time, macOS says it could not verify the app. Click
-   **Done**, then open **System Settings → Privacy & Security**, scroll to the message about Don't
-   Be Michael and click **Open Anyway**.
+3. Open it from Applications. The first time, macOS asks if you're sure you want to open an app
+   downloaded from the internet. Click **Open**.
 
-You only do step 3 once. macOS asks because this early build is not yet signed with an Apple
-Developer ID. Setup takes it from there.
+You only do step 3 once. The app is signed with an Apple Developer ID and notarized by Apple.
+Setup takes it from there.
 
 **On Windows 11**
 

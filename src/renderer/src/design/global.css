@@ -657,7 +657,8 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-askme-q p:first-child { margin-top: 0; }
 .cth-askme-q p:last-child { margin-bottom: 0; }
 .cth-splitter .cth-splitter-grip { opacity: 0; transition: opacity 120ms var(--cth-ease); }
-.cth-splitter:hover .cth-splitter-grip { opacity: .9; }
+.cth-splitter:hover .cth-splitter-grip,
+.cth-splitter:focus-visible .cth-splitter-grip { opacity: .9; }
 
 /* Talk to Michael (DESIGN.md 7.19): its ring, and a focus ring around the whole
    composer while its message box has focus. */
@@ -666,6 +667,12 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 /* In the wide 1:1 the box sits inside the sheet: its ring only, no shadow. */
 .cth-dock-sheet .cth-composer { box-shadow: inset 0 0 0 1px var(--cth-line-2); }
 .cth-dock-sheet .cth-composer:focus-within { box-shadow: inset 0 0 0 2px var(--cth-indigo); }
+
+/* The program mark on the studio platform's side (StudioStage): quiet at rest,
+   full and underlined under the pointer or keyboard focus. */
+.cth-st-mark { text-decoration: none; cursor: pointer; opacity: var(--mark-op, 0.9); }
+.cth-st-mark:hover, .cth-st-mark:focus-visible { opacity: 1; text-decoration: underline; }
+.cth-st-mark:focus-visible { outline: 2px solid var(--cth-indigo); outline-offset: 2px; border-radius: 2px; }
 
 /* Michael's conversation dock (docs/designs/michael-replies.md, 21A): slides
    180 ms up from the composer's top edge; reduced motion snaps. */
