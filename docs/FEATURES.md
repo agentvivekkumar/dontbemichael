@@ -111,7 +111,7 @@ moving, and brings you only the decisions that need you.
   office fills the window.
 - Private folders: each team member opens only its own; Michael can read the team's work but not
   change it. Enforced by Claude Code's sandbox on a Mac. On Windows, the app checks Claude's file
-  tools and refuses Research's Bash outright; other team members' shell commands are not limited yet.
+  tools and refuses Research's commands outright; other team members' shell commands are not limited yet.
 - House rules for every agent: say where a fact came from, say when it doesn't know, never make up
   people, customers or quotes. A looping agent is steered, then held, then stopped.
 - A team member stuck on a prompt only a person could answer is restarted by the app, never
@@ -121,7 +121,7 @@ moving, and brings you only the decisions that need you.
   pages or searches, in every office. A trust layer checks every message to Pete against the kinds
   of data you keep private and cleans Pete's answers. Pete is off until you turn them on, and sees
   none of your files. On a Mac nobody else's commands reach the internet. On Windows, Research's
-  Bash is refused outright.
+  commands are refused outright.
 
 ### 7. An office you can watch
 - A pod for each department around Michael's glass office, each with a plate in front of the

@@ -293,14 +293,21 @@ test('in every office no other agent runs a command outside its sandbox', async 
   assert.match(main, /return \{ \.\.\.walled, sandboxOnly: true \};/);
 });
 
-test('on Windows, Research Bash is refused outright', () => {
+test('on Windows, Research command tools are refused outright', async (t) => {
   // Value: protects=Research cannot bypass its file-tool walls through cd, an
   // environment variable, a script it wrote, or an encoded PowerShell command;
-  // fails_when=Windows starts scanning Bash text again; why_new=issue #442;
-  // seam=the host platform is fixed for this test process.
-  const hooks = fs.readFileSync(path.join(__dirname, '..', 'src/main/hooks.ts'), 'utf8');
-  assert.match(hooks, /agentId === RESEARCH_ID && p\.tool_name === 'Bash' && process\.platform === 'win32'/);
-  assert.match(hooks, /permissionDecisionReason: RESEARCH_WINDOWS_BASH/);
+  // fails_when=Windows allows either command tool; why_new=issue #442;
+  // seam=the real hook, with its platform set to Windows.
+  const o = await office(t);
+  const hook = hookFor(o);
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+  assert.ok(platform, 'process.platform has a descriptor');
+  t.after(() => Object.defineProperty(process, 'platform', platform));
+  Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
+  for (const tool of ['Bash', 'PowerShell']) {
+    const r = hook(R.RESEARCH_ID, 'PreToolUse', { tool_name: tool, tool_input: { command: `Get-Content ${path.join(o.business, 'private.txt')}` } });
+    assert.equal(reason(r), R.RESEARCH_WINDOWS_COMMANDS, tool);
+  }
 });
 
 test('while Research is on, agents save scratch work in their own folder, not the shared temp folders', posixOnly('temporary folder paths'), async (t) => {

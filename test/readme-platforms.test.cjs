@@ -89,8 +89,8 @@ for (const [feature, pattern] of [
   });
 }
 
-test('Windows folder privacy states that Research Bash is refused outright', () => {
+test('Windows folder privacy states that Research commands are refused outright', () => {
   for (const file of ['README.md', 'docs/FEATURES.md']) {
-    assert.match(current(file).replace(/\s+/g, ' '), /On Windows, the app checks Claude's file tools and refuses Research's Bash outright; other team members' shell commands are not limited yet\./, file);
+    assert.match(current(file).replace(/\s+/g, ' '), /On Windows, the app checks Claude's file tools and refuses Research's commands outright; other team members' shell commands are not limited yet\./, file);
   }
 });

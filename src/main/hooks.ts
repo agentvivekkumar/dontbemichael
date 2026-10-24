@@ -88,7 +88,7 @@ export const ASK_TOOL_REFUSAL =
 
 import { GUARDED_TOOLS, harnessWriteDecision } from './harnessGuard';
 import { FOLDER_READ_TOOLS, FOLDER_WRITE_TOOLS, agentTmpDecision, agentTmpName, folderDecision, folderToolTarget, AGENT_TMP_DIR, isSharedTempSave, researchFolderDecision, sharedTempWriteDecision, tempFolders, researchWallDecision, memberWallDecision } from '../shared/folderAccess';
-import { REFUSAL_WEB_TOOL, REFUSAL_WEB_TOOL_OFF, RESEARCH_DESK_DIR, RESEARCH_ID, RESEARCH_NAME, RESEARCH_SANDBOX_ONLY, RESEARCH_UNCHECKED_TOOL, RESEARCH_WINDOWS_BASH, researchText } from '../shared/research';
+import { REFUSAL_WEB_TOOL, REFUSAL_WEB_TOOL_OFF, RESEARCH_DESK_DIR, RESEARCH_ID, RESEARCH_NAME, RESEARCH_SANDBOX_ONLY, RESEARCH_UNCHECKED_TOOL, RESEARCH_WINDOWS_COMMANDS, researchText } from '../shared/research';
 import { folderLayoutFor } from './officeFile';
 import { expandTilde } from './fs';
 import { CONNECTOR_UNDECIDED, connectorAccess, MCP_RESOURCE_TOOLS } from '../shared/claudeConnectors';
@@ -728,14 +728,14 @@ export class HookServer {
 
     // Windows has no Claude Code OS sandbox. Research's file tools already
     // have their own walls, but a command can escape any text scan (issue #442).
-    // Keep its Bash closed until the engine offers a real Windows sandbox.
-    if (event === 'PreToolUse' && agentId === RESEARCH_ID && p.tool_name === 'Bash' && process.platform === 'win32') {
+    // Keep its command tools closed until the engine offers a real Windows sandbox.
+    if (event === 'PreToolUse' && agentId === RESEARCH_ID && ['Bash', 'PowerShell'].includes(p.tool_name ?? '') && process.platform === 'win32') {
       this.emitRefused(agentId, event, p, 'folder');
       return {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: RESEARCH_WINDOWS_BASH
+          permissionDecisionReason: RESEARCH_WINDOWS_COMMANDS
         }
       };
     }
