@@ -28,6 +28,10 @@ const OPUS: ModelPrice = { inputPerM: 15, outputPerM: 75, cacheReadPerM: 1.5, ca
 const SONNET: ModelPrice = { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3, cacheWritePerM: 3.75 };
 const HAIKU: ModelPrice = { inputPerM: 0.8, outputPerM: 4, cacheReadPerM: 0.08, cacheWritePerM: 1.0 };
 
+// Fable (and Mythos) list prices. Fable 5.1 and Fable 5 differ only in cache reads.
+const FABLE_5_1: ModelPrice = { inputPerM: 10, outputPerM: 50, cacheReadPerM: 0.25, cacheWritePerM: 12.5 };
+const FABLE_5: ModelPrice = { inputPerM: 10, outputPerM: 50, cacheReadPerM: 1, cacheWritePerM: 12.5 };
+
 // OpenAI list prices for the GPT-5 family Codex runs on. OpenAI bills no cache
 // writes, and a cached input token costs a tenth of a fresh one. Newer point
 // releases (gpt-5.x, gpt-5-codex) are priced as their family until listed here.
@@ -54,6 +58,9 @@ export function priceFor(model: string | undefined | null): ModelPrice {
   if (m.includes('opus')) return OPUS;
   if (m.includes('haiku')) return HAIKU;
   if (m.includes('sonnet')) return SONNET;
+  if (m.includes('fable') || m.includes('mythos')) {
+    return /(fable|mythos)-5[-.]1(?:\D|$)/.test(m) ? FABLE_5_1 : FABLE_5;
+  }
   if (m.startsWith('gpt-') || m.includes('codex')) {
     if (m.includes('nano')) return GPT5_NANO;
     if (m.includes('mini')) return GPT5_MINI;
@@ -68,7 +75,7 @@ export function priceFor(model: string | undefined | null): ModelPrice {
 export function knownPrice(model: string | undefined | null): number | undefined {
   const m = normalizeModel(model).toLowerCase();
   if (!m) return undefined;
-  if (m.includes('opus') || m.includes('haiku') || m.includes('sonnet') || m.startsWith('gpt-') || m.includes('codex')) return priceFor(m).outputPerM;
+  if (m.includes('opus') || m.includes('haiku') || m.includes('sonnet') || m.includes('fable') || m.includes('mythos') || m.startsWith('gpt-') || m.includes('codex')) return priceFor(m).outputPerM;
   return undefined;
 }
 
