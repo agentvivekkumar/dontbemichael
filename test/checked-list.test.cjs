@@ -135,16 +135,27 @@ test('an upkeep stamp on words that are not the app\'s fixed note is checked, an
   assert.deepEqual(lines(hive, 'trust-checked'), []);
 });
 
-test('upkeep for a Pete who isn\'t reporting is dropped quietly, never held for Michael; an owner note is still held', async (t) => {
-  // Value: protects=Michael is never asked to pass on the app's own note (which would make it a listed question); fails_when=the hold check runs before the upkeep rule; why_new=red team, ship review; seam=memberMail stub
-  const { hive } = await office(t, layerWith());
+test('upkeep for a Pete who isn\'t reporting is dropped quietly, schedule decisions are held, and an owner note is held for Michael', async (t) => {
+  // Value: protects=Michael is never asked to pass on the app's own note, schedule decisions are delivered once Pete reports again, and owner notes wait with Michael; fails_when=the hold check runs before the upkeep rule, or a schedule decision is lost or sent to Michael; why_new=red team, ship review; seam=memberMail stub
+  const { hive, home } = await office(t, layerWith());
   hive.memberMail = (id) => (id === 'research' ? 'hold' : null);
   hive.send({ to: 'research', act: 'inform', subject: O.OFFICE_OPEN_SUBJECT, body: O.officeOpenBody() }, 'human', 'office-open');
   hive.send({ to: 'research', act: 'inform', subject: 'Schedule change approved', body: 'Michael approved: News scan.' }, 'scheduler', 'schedule-decision');
   await settle();
   assert.equal(msgsIn(hive, 'god').length, 0, 'Michael is not asked to resend them');
   assert.equal(msgsIn(hive, 'research').length, 0);
-  assert.deepEqual(lines(hive, 'drop').map((e) => [e.reason, e.upkeep]), [['research-held', 'office-open'], ['research-held', 'schedule-decision']]);
+  assert.deepEqual(lines(hive, 'drop').map((e) => [e.reason, e.upkeep]), [['research-held', 'office-open']]);
+
+  // Pete reports again: the held schedule decision reaches his inbox with its upkeep kind and is never listed.
+  hive.memberMail = () => null;
+  hive.routeOnce();
+  await settle();
+  assert.equal(msgsIn(hive, 'research').length, 1);
+  assert.equal(msgsIn(hive, 'research')[0].subject, 'Schedule change approved');
+  assert.equal(msgsIn(hive, 'god').length, 0, 'Michael never hears of the upkeep');
+  assert.deepEqual(rows(home), [], 'upkeep is never listed');
+
+  hive.memberMail = (id) => (id === 'research' ? 'hold' : null);
   hive.send({ to: 'research', act: 'inform', subject: 'Focus', body: 'Look at flour prices' }, 'human');
   await settle();
   assert.equal(msgsIn(hive, 'god').filter((m) => /^\[held:/.test(m.subject)).length, 1, 'the owner\'s note waits with Michael as before');
