@@ -575,6 +575,37 @@ test('a card finished just before a quit or crash still counts: the next launch 
   assert.equal(points().length, 1, 'another office starts from its own first read');
 });
 
+test('an empty read of the board, mid run or just before a quit, never counts the Done cards again', (t) => {
+  // Value: protects=Tasks done when tasks.json is caught mid write; fails_when=an empty read replaces a board with cards, in memory or in kv, so the next good read counts every Done card again; why_new=review on #512; seam=a new TelemetryStore on the same harness.db stands in for a relaunch
+  const { store, clock, persist } = setup(t);
+  const db = persist.database();
+  const t0 = clock.now();
+  const points = () => db.prepare("SELECT COUNT(*) AS n FROM telemetry_events WHERE kind = 'card-status'").get().n;
+  const board = [{ id: 'a', status: 'done', assignee: 'pam' }, { id: 'b', status: 'doing', assignee: 'pam' }];
+  store.tasks(board, t0);
+  store.tasks([], t0 + 8000);
+  store.tasks(board, t0 + 16_000);
+  store.flush();
+  assert.equal(points(), 0, 'within one run');
+  store.tasks([], t0 + 24_000);
+  store.flush();
+  assert.deepEqual(JSON.parse(db.prepare('SELECT value FROM kv WHERE key = ?').get('pulse:board:/office').value), { a: 'done', b: 'doing' }, 'the saved board keeps its cards');
+  const relaunched = new TelemetryStore(() => persist.database(), () => '/office', clock.now);
+  relaunched.tasks(board, t0 + 60_000);
+  relaunched.flush();
+  assert.equal(points(), 0, 'after the relaunch');
+});
+
+test('a saved board with no card statuses is ignored, so the first read only remembers', (t) => {
+  // Value: protects=Tasks done from a damaged or foreign kv row; fails_when=any JSON object is taken as a saved board, so every card counts as moved; why_new=review on #512; seam=the kv row written directly
+  const { store, clock, persist } = setup(t);
+  const db = persist.database();
+  db.prepare('INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)').run('pulse:board:/office', JSON.stringify({ a: 5, b: null, c: { status: 'done' } }), 1);
+  store.tasks([{ id: 'a', status: 'done', assignee: 'pam' }, { id: 'c', status: 'done', assignee: 'pam' }], clock.now());
+  store.flush();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM telemetry_events WHERE kind = 'card-status'").get().n, 0);
+});
+
 test('plan headroom keeps the most constrained live window at its own length, and an API key shows none', (t) => {
   // Value: protects=the plan pace warning; fails_when=an expired or unreadable window is taken, a five hour window is measured as a week (or the reverse), a reading with no window clears the last one, or an API key shows plan headroom; why_new=PulseService.noteRateLimits had no test (OfficeBreak's reader has its own); seam=none; no_claim=Claude Code's status line shape beyond rate_limits
   const H = 3_600_000, D = 86_400_000;

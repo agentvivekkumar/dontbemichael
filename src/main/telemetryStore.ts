@@ -168,6 +168,13 @@ export class TelemetryStore {
     const office = this.office();
     if (!office) return;
     const prev = this.lastCards.get(office) ?? this.savedBoard(office);
+    // Cards never leave the board, so an empty read after one with cards is a
+    // bad read (tasks.json caught mid write): skip it and keep the last board,
+    // or the next good read counts every Done card again.
+    if (prev?.size && !cards.some((c) => c && typeof c.id === 'string' && typeof c.status === 'string')) {
+      this.lastCards.set(office, prev);
+      return;
+    }
     const next = new Map<string, string>();
     let changed = false;
     for (const c of cards) {
@@ -187,12 +194,16 @@ export class TelemetryStore {
     if (!prev || changed || next.size !== prev.size) this.boards.set(office, next);
   }
 
-  /** The board an earlier launch saved for this office, if any. */
+  /** The board an earlier launch saved for this office, if any. Only a card
+   *  with a status is kept; with none left it is a new office, whose first
+   *  read only remembers. */
   private savedBoard(office: string): Map<string, string> | undefined {
     try {
       const row = this.db()?.prepare('SELECT value FROM kv WHERE key = ?').get(boardKey(office)) as { value: string } | undefined;
-      const cards = row ? JSON.parse(row.value) : null;
-      return cards && typeof cards === 'object' ? new Map(Object.entries(cards as Record<string, string>)) : undefined;
+      const cards: unknown = row ? JSON.parse(row.value) : null;
+      if (!cards || typeof cards !== 'object' || Array.isArray(cards)) return undefined;
+      const board = new Map(Object.entries(cards).filter((e): e is [string, string] => typeof e[1] === 'string'));
+      return board.size ? board : undefined;
     } catch { return undefined; }
   }
 
