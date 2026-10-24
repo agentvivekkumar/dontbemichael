@@ -3830,6 +3830,13 @@ export class HiveManager {
           // from the sent copy, so the conversation read every reply as "".
           const msg = this.normalize({ ...partial, id: undefined }, id);
           msg.from = id; // sender is authoritative — the owning directory
+          // Each time the router delivers a message it increments the hop
+          // counter, so the loop guard in routeMessage can fire. An agent
+          // leaves `hops` out (PROTOCOL.md says "the harness fills it in"),
+          // so normalize defaults to 0; adding 1 here makes the 13th routed
+          // reply in a chain carry hops === 13, which exceeds HOP_CAP (12)
+          // and is dropped with a notice to Michael (#605).
+          msg.hops = (typeof partial.hops === 'number' ? partial.hops : 0) + 1;
           // The time is the app's too: a time an agent typed, later or earlier,
           // could close the owner's next question or hide a message (Codex
           // review, ship 2026-10-18).
