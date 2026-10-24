@@ -229,6 +229,8 @@ src/
                              the owner's questions in Michael's conversation dock (docs/designs/michael-replies.md)
     mailProposals.ts         Send on approval's rules: proposals and their states, what an approved send may carry,
                              standing approvals and the fit check's prompt, threading from a Send only member's own sends
+    standingFacts.ts         the fit check's countable half (#490): money a standing send names that the approval and the
+                             message it answers don't goes to the owner unasked; such dates and times go to the model as a list
     starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
     firstTask.ts             a hire's first task card and Michael's request to hand it out (docs/designs/first-task-card.md);
                              legacyFirstTasks.ts holds the old First task texts the one-time cleanup matches

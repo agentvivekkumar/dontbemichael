@@ -241,13 +241,13 @@ test('a send under a standing approval goes out only when the separate check say
   assert.equal(out.checks[0].kind, 'order status replies');
   assert.equal(approvals.getStanding(rule.id).sends.length, 1, 'kept for the Access tab');
 
-  verdict = { fits: false, reason: 'It also offers a discount.' };
-  const held = await call('pam', 'send', { ...email, body: 'It ships Monday, and here is 20% off.' });
+  verdict = { fits: false, reason: 'It also offers a gift.' };
+  const held = await call('pam', 'send', { ...email, body: 'It ships Monday, and here is a free gift.' });
   assert.equal(held.body.sent, false);
-  assert.match(held.body.why, /also offers a discount/);
+  assert.match(held.body.why, /also offers a gift/);
   assert.equal(out.sends.length, 1, 'not sent');
   assert.equal(approvals.waiting().length, 1, 'on Ask me instead');
-  assert.equal(approvals.waiting()[0].body, 'It ships Monday, and here is 20% off.');
+  assert.equal(approvals.waiting()[0].body, 'It ships Monday, and here is a free gift.');
 
   verdict = null;
   assert.equal((await call('pam', 'send', { ...email, subject: 'Order 10' })).body.sent, false, 'a check that could not run counts as no');
