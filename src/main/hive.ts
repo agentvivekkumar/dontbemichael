@@ -29,7 +29,7 @@ import { FOUNDATION_CAP, foundationAsk } from '../shared/foundations';
 /** A card ask as foundationAsk reads it (the ledger's asks carry kind and foundation). */
 type FoundationAskShape = { kind?: unknown; foundation?: unknown };
 
-import { hookShell, shellCommand, type HookShell } from './hookShell';
+import { hookShell, posixQuote, shellCommand, type HookShell } from './hookShell';
 import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
@@ -1101,10 +1101,13 @@ export class HiveManager {
   }
 
   /** Build a hook command string that runs `script` under the guaranteed node,
-   *  DOUBLE-QUOTED (safe for paths with spaces). */
+   *  quoted (safe for paths with spaces). On a Mac and Linux the engines run it
+   *  with sh, so each path is single quoted and a `$` or backtick in a folder
+   *  name stays literal (posixQuote); elsewhere it stays DOUBLE-QUOTED. */
   private nodeRun(script: string, ...args: string[]): string {
     const launcher = this.nodeLauncher();
-    return [launcher ? `"${launcher}"` : 'node', `"${script}"`, ...args].join(' ');
+    const q = process.platform === 'win32' ? (s: string) => `"${s}"` : posixQuote;
+    return [launcher ? q(launcher) : 'node', q(script), ...args].join(' ');
   }
 
   /** Same, but UNQUOTED — only for configs or platforms that cannot preserve
