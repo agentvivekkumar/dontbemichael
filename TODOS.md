@@ -110,18 +110,6 @@
 **Priority:** P2
 **Depends on:** None
 
-### Pulse reads a card's whole history, not the period's slice
-
-**What:** Keep card lifecycle state (reopened, held time) per card as events arrive, instead of rebuilding it from the period's events only.
-
-**Why:** A card reopened or held before the period and finished in it counts as kept as is and as faster than it was.
-
-**Context:** From the second Codex adversarial review, 2026-10-16. `telemetryProcessor.ts` cards().
-
-**Effort:** S (human) / S (CC)
-**Priority:** P3
-**Depends on:** None
-
 ### Pulse keeps a card finished just before a quit
 
 **What:** Record card status changes where Michael's board write lands (or persist the last seen board) instead of only diffing the 8 s poll in memory.

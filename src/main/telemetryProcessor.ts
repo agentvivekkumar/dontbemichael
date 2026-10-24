@@ -352,23 +352,24 @@ export class TelemetryProcessor {
   cards(office: string, since: number): CardFact[] {
     const kinds = ['card-status', 'card-reopen'];
     const recent = this.rows(office, kinds, since);
-    // These cards, and when each was made (0 when unknown).
+    // These cards, and when each was made (0 when unknown, as on a reopen row).
     const made = new Map<string, number>();
     for (const r of recent) {
       const id = String(r.attrs?.id ?? '');
       if (id) made.set(id, Math.max(made.get(id) ?? 0, Number(r.attrs?.createdAt) || 0));
     }
     // No card has events before it was made, so the earlier ones are read
-    // from the oldest card on (all of them when one's time is unknown).
+    // from the oldest card on. A card whose time is unknown adds nothing
+    // earlier than the period start.
     let from = since;
-    for (const t of made.values()) from = Math.min(from, t);
+    for (const t of made.values()) if (t > 0) from = Math.min(from, t);
     const by = new Map<string, CardFact & { heldFrom: number | null }>();
     for (const r of from < since ? this.rows(office, kinds, from) : recent) {
       const id = String(r.attrs?.id ?? '');
       if (!made.has(id)) continue;
       const c = by.get(id) ?? { id, assignee: r.agentId ?? '', createdAt: Number(r.attrs?.createdAt ?? r.ts) || r.ts, heldMs: 0, reopened: false, excluded: false, heldFrom: null };
       if (r.agentId) c.assignee = r.agentId;
-      if (r.kind === 'card-reopen') { c.reopened = true; by.set(id, c); continue; }
+      if (r.kind === 'card-reopen') { c.reopened = true; c.reopenedAt = Math.max(c.reopenedAt ?? 0, r.ts); by.set(id, c); continue; }
       const to = String(r.attrs?.to ?? '');
       if (c.heldFrom !== null && to !== 'blocked' && to !== 'waiting') { c.heldMs += r.ts - c.heldFrom; c.heldFrom = null; }
       if ((to === 'blocked' || to === 'waiting') && c.heldFrom === null) c.heldFrom = r.ts;

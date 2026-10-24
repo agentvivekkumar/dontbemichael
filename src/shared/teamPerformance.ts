@@ -45,6 +45,9 @@ export interface CardFact {
   /** Time spent Blocked or Waiting before it was done. */
   heldMs: number;
   reopened: boolean;
+  /** When it was last reopened. `reopened` covers the card's whole history
+   *  (kept as is); a window's count of reopens reads this instead. */
+  reopenedAt?: number;
   /** A report card (humanQA kind report) or one the owner closed: left out. */
   excluded: boolean;
 }
@@ -220,6 +223,13 @@ export function costForWork(member: Record<WorkKind, number>, perPiece: Partial<
   const verdict: CostVerdict = ratio < 0.85 ? 'cheaper' : ratio > 1.15 ? 'pricier' : 'usual';
   const position = 0.5 + 0.4 * Math.max(-1, Math.min(1, Math.log2(Math.max(ratio, 1e-6))));
   return { kind, perPiece: mine, usual, verdict, position };
+}
+
+/** A member's cards reopened since a time: the advice's evidence. A card
+ *  reopened long ago that only moved again now is not one of them, though it
+ *  still isn't kept as is (`reopened` covers its whole history). */
+export function reopensSince(agentId: string, cards: CardFact[], since: number): number {
+  return cards.filter((c) => c.assignee === agentId && (c.reopenedAt ?? -Infinity) >= since).length;
 }
 
 /** Kept as is (E2): drafts approved without edits plus finished cards never
