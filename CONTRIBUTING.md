@@ -100,9 +100,12 @@ required.
 
 ## Before you open a PR
 
-1. **Keep the type-checker green:** `npm run typecheck` (runs both the node and
+1. **Run the linter:** `npm run lint`. The rule set grows in batches, one
+   already-passing rule at a time (see [Linting](#linting)). Do not add an
+   `eslint-disable` just to get a change through.
+2. **Keep the type-checker green:** `npm run typecheck` (runs both the node and
    web TS projects).
-2. **Run the tests:** `npm run test:focused`. If you changed behaviour, add a
+3. **Run the tests:** `npm run test:focused`. If you changed behaviour, add a
    test for it — a bug fix with no test is a bug fix that comes back. The suite
    also runs on Windows in CI. A test runs only on the platforms its behaviour
    exists on: skip a Mac or POSIX only test on Windows (and a Windows only test
@@ -110,14 +113,15 @@ required.
    `test/platform.cjs`, always with a reason. Build paths with `path.join` or
    `path.resolve` instead of POSIX literals, so the test runs everywhere, and
    never skip a test to hide a real Windows bug.
-3. **Confirm a production build works:** `npm run build`.
-4. **Match the aesthetic.** Any new UI **must** derive from the design tokens in
-   [`branding/DESIGN.md`](./branding/DESIGN.md) / `src/renderer/src/design/tokens.ts` — no ad-hoc
+4. **Confirm a production build works:** `npm run build`.
+5. **Match the aesthetic.** Any new UI **must** derive from the design tokens in
+   [`branding/DESIGN.md`](./branding/DESIGN.md) / `src/renderer/src/design/tokens.ts`
+   — no ad-hoc
    colors, spacing, or fonts. `tokens.ts` and `tokens.css` are mirrored; if you
    change one, change both.
-5. **Read your own diff.** Every line of it. Debug logging, commented-out code,
+6. **Read your own diff.** Every line of it. Debug logging, commented-out code,
    and reformatting of files you didn't otherwise touch all get a PR sent back.
-6. **Run your coding agent over your own PR, and paste what it found.** We ship
+7. **Run your coding agent over your own PR, and paste what it found.** We ship
    an agent harness; use one. Ask it to check specifically for cross-platform
    behaviour, paths with spaces, whether the change stays provider neutral
    across the supported CLIs, performance in hot paths, and obvious security
