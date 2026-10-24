@@ -2490,7 +2490,7 @@ export class HiveManager {
     // content stamp the sweep checks (eng R2).
     if (toId === RESEARCH_ID && !this.researchCleared.has(msg.id)) {
       this.appendLog({ kind: 'drop', reason: 'research-unchecked', from: msg.from, id: msg.id });
-      return true;
+      return false;
     }
     const out = toId === RESEARCH_ID ? { ...msg, stamp: this.researchStamp(msg) } : msg;
     this.atomicWriteJson(join(inbox, `${msg.id}.json`), out);
