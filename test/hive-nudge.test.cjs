@@ -70,3 +70,11 @@ test('a nudge with no ids is still a well-formed nudge', () => {
   assert.equal(isInboxNudge(text), true);
   assert.doesNotMatch(text, /: \./);
 });
+
+test('control characters in an id never reach the terminal', () => {
+  // The nudge is typed into a live PTY: a newline would submit, and an escape
+  // (7 bit ESC or the 8 bit C1 CSI) would start a terminal sequence.
+  const text = inboxNudgeText(['a\r\nb', 'c\x1b[2Jd', 'e\x7ff', 'g\x9b2Jh', 'i\x85j']);
+  assert.doesNotMatch(text, /\p{Cc}/u);
+  assert.match(text, /: ab, c\[2Jd, ef, g2Jh, ij\./);
+});
