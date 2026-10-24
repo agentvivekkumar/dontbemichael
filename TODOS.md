@@ -379,20 +379,6 @@
 **Priority:** P2
 **Depends on:** None
 
-## Mail approvals and Michael replies (deferred from ship of feat/mail-approvals-michael-replies, 2026-10-07)
-
-### Rebuild Michael's owner requests from open items only
-
-**What:** Bound the 8 second rebuild of Michael's owner requests to messages newer than the oldest open item, and keep message bodies out of the never evicted cache.
-
-**Why:** Since the fixed floor replaced the 30 day window, the work and the cached bodies grow with all conversation history.
-
-**Context:** Deferred by the owner (ship D5). `src/main/hive.ts` `refreshOwnerRequests` and `ownerMessages`.
-
-**Effort:** M
-**Priority:** P2
-**Depends on:** None
-
 ## Update notices (deferred from ship of feat/claude-code-update-notice, 2026-09-30)
 
 ## Secret store (deferred from ship of fix/atomic-secret-store, 2026-09-30)

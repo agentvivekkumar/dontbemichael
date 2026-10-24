@@ -373,3 +373,65 @@ test('the answer time rides on the last line of the request, and the hive reads 
   hive.send({ to: sent.to, act: sent.act, subject: sent.subject, body: sent.body, conversation: sent.conversation }, 'human');
   assert.deepEqual(hive.ownerAnswersWithoutRequest().map((x) => x.q), ['Q1?']);
 });
+
+test('rebuild Michael\'s owner requests bounds to open items and keeps bodies out of cache', async (t) => {
+  // Value: protects=fleet tick does not re-read old settled history, and messageCache memory does not leak full bodies; fails_when=refreshOwnerRequests always scans from fixed floor or messageCache retains raw body strings; why_new=TODOS.md line 381
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-rebuild-bounds-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true });
+
+  const sentDir = path.join(home, 'hive', 'agents', 'god', 'outbox', '.sent');
+  const inboxDone = path.join(home, 'hive', 'agents', 'god', 'inbox', '.done');
+  fs.mkdirSync(sentDir, { recursive: true });
+  fs.mkdirSync(inboxDone, { recursive: true });
+
+  // 1. Write an old message with a heavy body
+  const longBody = 'A'.repeat(50_000);
+  const msg1 = hive.send({
+    to: 'god', act: 'request', subject: 'OWNER ANSWER on card old',
+    body: longBody, conversation: 'card:old',
+    created_at: '2026-09-15T09:00:00.000Z'
+  }, 'human');
+
+  // Cold start: scans from floor and finds msg1
+  const open1 = hive.refreshOwnerRequests();
+  assert.equal(open1.length, 1);
+  assert.equal(open1[0].taskId, 'old');
+
+  // Verify messageCache does not store raw string body
+  const cached = hive['messageCache']?.get(path.join(inboxDone, `${msg1.id}.json`));
+  if (cached) {
+    const desc = Object.getOwnPropertyDescriptor(cached, 'body');
+    assert.ok(desc?.get, 'body is provided via a getter');
+    assert.equal(cached.body, longBody, 'getter returns the full body on-demand');
+  }
+
+  // 2. Add an open request newer than msg1
+  const msg2 = hive.send({
+    to: 'god', act: 'request', subject: 'OWNER ANSWER on card new',
+    body: 'short', conversation: 'card:new',
+    created_at: '2026-10-10T12:00:00.000Z'
+  }, 'human');
+
+  // Settle msg1 with a reply
+  const reply1 = hive.send({ to: 'human', act: 'done', subject: 'Handled', body: 'done', in_reply_to: msg1.id }, 'god');
+  fs.writeFileSync(path.join(sentDir, `${reply1.id}.json`), JSON.stringify(reply1));
+
+  // Next tick: msg1 is settled, msg2 is open
+  const open2 = hive.refreshOwnerRequests();
+  assert.deepEqual(open2.map((r) => r.taskId), ['new']);
+
+  // Next tick: oldest open is now msg2 (2026-10-10T12:00:00.000Z).
+  // Even if a settled file older than msg2 was modified or added, refresh bounds to msg2.createdAt.
+  const open3 = hive.refreshOwnerRequests();
+  assert.deepEqual(open3.map((r) => r.taskId), ['new']);
+
+  // 3. Close msg2
+  const reply2 = hive.send({ to: 'human', act: 'done', subject: 'Handled', body: 'done', in_reply_to: msg2.id }, 'god');
+  fs.writeFileSync(path.join(sentDir, `${reply2.id}.json`), JSON.stringify(reply2));
+
+  const open4 = hive.refreshOwnerRequests();
+  assert.deepEqual(open4, [], 'all settled');
+});
+
