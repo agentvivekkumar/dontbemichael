@@ -354,13 +354,35 @@ Rules:
 | `t-view` | 20 / 26 | 600 | View title on the stage ("Office", "Tasks") |
 | `t-panel` | 15 / 20 | 600 | Right column heading, person name in the panel header |
 | `t-ui` | 13 / 18 | 400 to 600 | Base UI: tabs, buttons, inputs, body |
-| `t-read` | 14 / 22 | 400 | Long text boxes in a wide panel only (what a person handles, their work style), and the wide 1:1's questions and replies (§7.19) |
+| `t-read` | 14 / 22 | 400 | Long text boxes in a wide panel only (what a person handles, their work style), and the wide 1:1's questions and replies (§7.19); read only text under a field label is `ink-2` |
 | `t-body` | 12 / 16.5 | 400 | Card body text, Michael's questions, descriptions |
 | `t-meta` | 11 / 15 | 400 to 600 | Captions, chips, meta lines, hints |
 | `t-micro` | 10 / 13 | 600 | Uppercase micro labels, status pills, badges |
 
 Floor: nothing below 10 px, and 10 px only for uppercase micro labels, pills and
 badges.
+
+A field label outranks what it labels (owner, 2026-10-23,
+`docs/designs/edit-agent-hierarchy.md`): in forms and read only fields the ramp is a
+field label `t-ui` 600 `ink` over the text `t-read` (wide) or `t-ui` (side) 400 `ink-2`;
+groups sit on soft panels, not under headings. One source: `components/fieldText.tsx`.
+
+The whole app uses that style (owner, 2026-10-23, `docs/designs/app-style-rollout.md`):
+
+| Piece | Style | From fieldText |
+|---|---|---|
+| Group name | `t-panel` 15/20 600 `ink`, -0.02em, an `h3` at the top of its panel | `groupName`, `Panel title` |
+| Field label | `t-ui` 13/18 600 `ink`, sentence case | `fieldLabel`, `Field` |
+| Text under a label | `t-read` or `t-ui` 400 `ink-2` | `readBody` |
+| Hint | 12/17 400 `ink-3`, under the field or group name | `hint`, `Field note`, `Panel note` |
+| Required | the word "required" in 400 `ink-3` beside the label, not an asterisk | `requiredMark` |
+| Group | the soft panel: `bg`, r-xl, 14 by 16, no border or shadow | `panelStyle`, `Panel` |
+
+Panels sit only on white surfaces (dialogs, the person and Michael panels and their tab
+bodies, Settings, setup), never on the stage. Small grey capitals, 10 to 14 px grey 600
+labels and white ringed group cards are retired; `test/field-style-guard.test.cjs` fails
+on them outside fieldText. Cards, chat, the floor and the terminal keep their own type;
+a pill or badge elsewhere that needs `t-micro` carries a `style-guard: micro` comment.
 
 ### 4.3 Web scale [Web]
 
@@ -815,8 +837,10 @@ mouse wheel moves it, and each edge with tabs hidden past it fades out over 28 p
 
 ### 7.12 Tab contents
 
-**Access** (CapabilitiesTab). Grouped rows in cards (`card`, `line`, `r-xl`). Only what is
-enforced today:
+**Access** (CapabilitiesTab). Each group is a soft panel (§4.2; owner, 2026-10-23,
+`docs/designs/app-style-rollout.md`): its name in the group name style with one `hint` line
+under it and its fold; the Command Center's Advanced cards and Office schedule groups are
+the same panels, on a white tab body. Only what is enforced today:
 
 | Group | Controls |
 |---|---|
@@ -1199,22 +1223,72 @@ of a blank window. Nothing else: no stack, no codes (they go to the log).
 ### 7.26 Settings and the hire wizard
 
 Keep every section, control and save rule from v1 (see the functional map in
-`docs/designs/studio-home.md`), restyled with §7.7 buttons, §7.12 row groups and §7.23
-dialogs. The hire wizard's steps are numbered circles (done `green` with a check, current
+`docs/designs/studio-home.md`), restyled with §7.7 buttons and §7.23 dialogs. Every Settings
+section is a soft panel with its group name at the top, and the panels' gap replaces the
+hairlines between sections; labels, hints and the required word come from fieldText (§4.2,
+`docs/designs/app-style-rollout.md`). The company profile groups (address, contact, how you
+operate, money) and the Add a mailbox login sit on panels too. The hire wizard's steps are numbered circles (done `green` with a check, current
 `ink`), its character tiles and job rows use the `indigo` soft selection, and its strings
 are sentence case. Closing time is the closing bar (§7.23), not a dialog.
 
-**Edit agent** (`docs/designs/edit-agent.md`, owner 2026-10-02) changes only what can change on
+**Edit agent** (`docs/designs/edit-agent.md`, owner 2026-10-02; sections since
+`docs/designs/edit-agent-hierarchy.md`, owner 2026-10-23) changes only what can change on
 someone already hired, in one column, laid exactly over the person's panel it edits (its
 box and radius, kept in step on resize; with no panel, 640 wide, full height, on the right,
-left in RTL): Name, Role,
-What they handle, Work style (it takes the height left over), then a folded "Engine" line
-that names the provider and model and opens to change them. Under the engine, for anyone
+left in RTL). Its groups sit on soft panels (owner, 2026-10-23, `docs/designs/edit-agent-hierarchy.md`
+H1): the `bg` ground color, r-xl, 14 by 16 padding, no border or shadow, 14 px apart. Wide:
+left, a panel with Name and Role, the Scheduled jobs panel, the Engine line, the Danger zone;
+right, the job panel (What they handle, How they work in its parts: each part's name 12 px 600
+over its words, folded to the first part) with What should change? under it. One column: Name
+and Role, the job, What should change?, Scheduled jobs, Engine. Older order, for reference: Name, Role,
+What they handle (read only text), How they work (read only, folded to four lines with Show
+all, Undo last change and "Last change, 22 Oct: ..."), What should change? under the job it
+changes (owner, 2026-10-23; wide, the same in the right column), the Scheduled jobs group
+(below; wide, in the left column under What they handle), then a folded "Engine" line
+that names the provider and model and opens to change them. Michael and his assistant have
+no What they handle. The footer is Close until Name, Role or the engine is edited, then
+Cancel and Save changes; the job saves only through the preview's Apply. Under the engine, for anyone
 who can be deleted (never Michael, his assistant or Pete), the Danger zone: one coral
 tinted row, r-xl corners and the 1.5 px coral ring of §6.3, its name with an info icon and
 the destructive Delete button. No section headings; field
-labels only, with explanations behind info icons. The character is chosen once, in the hire wizard, and a
+labels only, the groups on panels (owner, 2026-10-23), with explanations behind info icons. The character is chosen once, in the hire wizard, and a
 person's color is their department's, set by the job; Edit agent offers neither.
+
+**Scheduled jobs** (`ScheduledJobsList`, `docs/designs/edit-agent-scheduled-jobs.md`, owner
+2026-10-23), in Edit agent and on the Profile tab: a labelled group, never part of the duties
+text. Heading "Scheduled jobs" in the field label style (Profile: its section heading style),
+the count in ink 3, an info icon, and at the right a link style button "Change on Access" ("Add
+on Access" with no jobs; Michael's "Change on Office schedule"). It closes Edit agent through
+its Discard changes? question and opens the Access tab with On a schedule unfolded and in view.
+One row per job, `line` hairlines between: the name (13 px, 600, wraps whole) with the when
+line at the right (IBM Plex Mono 12 px, ink 2; it wraps only between its times and drops under
+a long name), then the focus (12.5 px, ink 2, two lines at most) or "No focus area" in ink 3.
+Paused: a `neutral-soft` "Paused" pill after the name, the row in ink 3; paused jobs last,
+the others soonest first. No jobs: "None yet". A failed read: "Couldn't read the schedules."
+with Try again (`role=alert`). Research has no group.
+
+**What should change?** (`JobChangeReview`, `docs/designs/work-style-change-request.md`, owner
+2026-10-23) is how a job changes: the owner never edits a job's text. A labelled box with an
+info icon, then a right aligned row with the shortcut (⌘ Enter, Ctrl Enter elsewhere, `ink-3`)
+and the secondary "See what changes". Running, the preview takes the box's place: `indigo-soft`
+fill, r-xl, no border or shadow, 12 by 14 padding. Each state has a 13 px 600 heading that takes
+focus. Working: "Working out what changes for Pam…", then its three real steps (Getting ready, Reading what you wrote, Writing Pam's job: a green check when done, the spinner on the current one, a grey dot ahead; the steps are the status, owner 2026-10-23), a white "So far" box with the summary lines and plain words as they are written (not announced), and Stop
+(`role=status`). Ready: "Here's what changes", up to six summary lines (plain text after a 6 px
+`indigo` dot) then Show all, a one-time task as one more line ("goes to Michael as a card"),
+"What Pam handles" with the new line or a `card` pill "Unchanged", a "See the whole new job"
+disclosure, and Cancel and Apply in a row that sticks to the preview's bottom. A clash: "One
+thing first", the question, two or three option rows (`cth-askme-opt`, one with a green
+"Suggested" pill) plus Something else with a text field, Cancel and Continue. An overlap:
+"Kelly already does part of this", the reason, Edit my change and Leave it with Kelly. Couldn't
+work out the change, and Pam's job changed meanwhile (the typed change shown on `card`), are
+`role=alert` with Cancel and Try again or See what changes again. After Apply or Undo the box
+comes back empty with one `role=status` line ("Pam's job is updated.") and takes focus. In the
+hire wizard the box reads "What will Jordan do?" with "See Jordan's job" until a job is applied,
+then "Anything to change?"; on Ask me the pack update card runs the same preview at once, its
+button "Use it".
+
+**Hire wizard, Role step** (DR12): name and role title, then the job as above, then the overlap
+check; Next turns on after Apply. Finalize keeps the folder and model only.
 
 **Mailboxes** (Settings, Connections; `docs/designs/mailboxes-fold.md`, owner 2026-10-01) folds so
 many mailboxes never mean a long scroll. One header line: the `Disclosure` caret, the title, the
@@ -1464,6 +1538,13 @@ D8, D10 to D13), listed after the decision cards and before reports, always open
 - **Company knowledge is always on** card (one time, a report like the Research notice): for an
   owner who had turned company knowledge off and has documents in it. Got it, and Open the list
   (Settings, Memory & Knowledge).
+- **A file** (owner, 2026-10-22, `docs/designs/foundation-card-upload.md`): an "Add a file" quiet
+  link (11 px, `indigo-text`) under the box, or a file dropped on the card, picks one file, shown
+  as a `neutral-soft` chip with its name and a remove × with a 24 px target. Save is on with words,
+  a file or both; while the file is checked Save reads "Checking the file", and the box, Draft and
+  Not now are held until it is done. A refusal is one `coral-text` line naming the file and why
+  ("doesn't look like the answer", "Couldn't read", "Save this picture as PNG or JPEG", "Pictures
+  can be checked only on Claude", "Couldn't find", "Couldn't check this file"); nothing is added.
 
 ## 8. The studio illustration [Both]
 
@@ -1764,10 +1845,16 @@ fact per line so the shell commands caveat is not buried).
 
 ### 9.10 Install dialog drawings
 
-Drawn, not screenshotted: the macOS "Not Opened" sheet and the Windows SmartScreen sheet
-("Windows protected your PC", one `ink-3` line, "More info" ringed in `indigo`, then "Run
-anyway" highlighted like Done) as `card` with `shadow-lg` and `r-lg`, beside a `card-2`
-"This is normal" panel. Under 640 px the drawing stacks under the panel.
+Drawn, not screenshotted: the macOS sheet for an app downloaded from the Internet and the
+Windows SmartScreen sheet, as `card` with `shadow-lg` and `r-lg`, each beside a `card-2` panel.
+The Mac app is signed and notarized from v0.2.6 (owner, 2026-10-23), so the Mac drawing uses
+the sheet's own words, “Don't Be Michael” is an app downloaded from the Internet. Are you sure
+you want to open it?, with curly quotes and a capital I, then Cancel and Open with Open
+highlighted, beside a "Checked by Apple" panel; the Mac install has
+two steps (drag it into Applications; open it, then click Open). The Windows drawing is
+"Windows protected your PC", one `ink-3` line, "More info" ringed in `indigo`, then "Run anyway"
+highlighted, beside a "This is normal" panel, until the installer is signed. Under 640 px the
+drawing stacks under the panel.
 
 ### 9.11 Sending switch (web)
 
@@ -2245,6 +2332,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-20 | Web: Setup foundations inset (§9.18), a second Setup inset after Then Michael gets ready: Then the team learns your business, with a read only foundation card (§7.27a) for Oscar's Financial year question, its buttons drawn, nothing clickable. |
 | 2026-10-20 | Web: privacy wording that holds on Windows: Pete does the team's web research and the rest of the team is told to ask Pete; the app turns off the web tools for everyone else, gives Pete questions only, and the trust layer checks what passes through it both ways; /security's first section is Who is given what; data kept on the computer (§9.15, §9.16). |
 | 2026-10-19 | Web: Pulse (web), a read only picture of Pulse after the file tabs with three notes (§9.17); the Ask Michael tile names picking Michael's choices with a click (§9.5); the board's Waiting note names Michael asking whether to keep waiting (§9.13); /security names the memory wall and Pulse's lists, and who is told when a message is held (§9.16); the file tabs picture shows the Pulse tab (§9.14). |
+| 2026-10-23 | Web: install dialog drawings for the signed Mac build (§9.10): the downloaded from the Internet sheet in its own words with Open highlighted, a Checked by Apple panel, and two Mac install steps; Windows unchanged. |
 
 ---
 
