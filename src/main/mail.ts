@@ -21,6 +21,7 @@ import { resolveMx } from 'node:dns/promises';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer';
+import addressparser from 'nodemailer/lib/addressparser';
 import { simpleParser } from 'mailparser';
 import { writeFileAtomic } from './atomicFile';
 import { SECRETS_FILE_UNREADABLE } from '../shared/secretStore';
@@ -324,6 +325,18 @@ function addrText(a: any): string {
   if (a.address) return a.name ? `${a.name} <${a.address}>` : a.address;
   if (Array.isArray(a.value)) return a.value.map(addrText).join(', ');
   return '';
+}
+
+/** Whether a To field names at least one mailbox (something@domain), read the way
+ *  the mail library reads it when it picks who an email goes to. A Cc alone must
+ *  never carry an email whose To names nobody. */
+function namesARecipient(to: unknown): boolean {
+  if (typeof to !== 'string') return false;
+  return addressparser(to, { flatten: true }).some((a) => {
+    const address = a.address ?? '';
+    const at = address.lastIndexOf('@');
+    return at > 0 && at < address.length - 1;
+  });
 }
 
 export interface MailRef { mailbox: string; id: string }
@@ -1311,6 +1324,13 @@ async function runMailRequest(
         deps.proposals.cancel({ id: p!.id }, refused);
         return { status: 403, body: { error: `${refused} The email was withdrawn; write it again without that.` } };
       }
+      // An approved card whose To names nobody is withdrawn, never sent: a Cc
+      // alone must not carry an email nobody addressed to anyone.
+      if (!namesARecipient(p!.to)) {
+        const noTo = 'It has no valid To address, so it can\'t be sent.';
+        deps.proposals.cancel({ id: p!.id }, noTo);
+        return { status: 403, body: { error: `${noTo} The email was withdrawn; write it again with a To address.` } };
+      }
       const approved: ComposeInput = { to: p!.to, cc: p!.cc, subject: p!.approved?.subject ?? p!.subject, body: p!.approved?.body ?? p!.body, replyTo: p!.replyTo, forward: p!.forward, attachFrom: p!.attachFrom, thread: p!.thread };
       // Recorded as sending first: if that can't be saved nothing goes out, and
       // a restart after the send never sends it again.
@@ -1352,6 +1372,9 @@ async function runMailRequest(
       const problem = standingProblem(rule, agentId, mailbox!, input);
       if (problem) return { status: 409, body: { error: problem } };
       if (!input.to || !input.subject || !input.body.trim()) return { status: 400, body: { error: 'send needs "to", "subject" and "body".' } };
+      // Same rule as every other operation below: a To with no real address
+      // never reaches the fit check, a card on Ask me or the mail server.
+      if (!namesARecipient(input.to)) return { status: 400, body: { error: 'send needs an email address in "to", such as name@example.com.' } };
       // The same email sent again while the first is still being checked or sent
       // waits for nothing and never goes out twice.
       const sendKey = JSON.stringify([agentId, mailbox, input.to, input.cc ?? '', input.subject, input.body, input.replyTo ?? null, input.thread?.inReplyTo ?? null]);
@@ -1454,6 +1477,10 @@ async function runMailRequest(
       return { status: 200, body: done };
     }
     if (!input.to || !input.subject) return { status: 400, body: { error: `${op} needs "to" and "subject".` } };
+    // A To with no real address in it (a description such as "the customer") is
+    // refused here, before a draft is saved, a card reaches the owner or an
+    // email goes out with only its Cc.
+    if (!namesARecipient(input.to)) return { status: 400, body: { error: `${op} needs an email address in "to", such as name@example.com.` } };
     if (op === 'draft') return { status: 200, body: await svc.draft(mailbox!, input) };
     if (op === 'propose') {
       if (!deps.proposals) return { status: 503, body: { error: 'Approvals are not available right now. Tell Michael.' } };

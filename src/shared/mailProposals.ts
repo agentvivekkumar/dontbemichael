@@ -260,7 +260,9 @@ export function proposalSendProblem(p: MailProposal | undefined, agentId: string
   // Only an approved email (or one already sent, which repeats) goes; any
   // other state is refused, so a new state can never fall through (EV2).
   if (p.state === 'sent') return null;
-  if (p.state === 'approved' && p.approved) return null;
+  // Approved text is a subject and a body, both text, or the email is not sent:
+  // a damaged one must never fall back to the agent's own draft.
+  if (p.state === 'approved' && p.approved && typeof p.approved.subject === 'string' && typeof p.approved.body === 'string') return null;
   if (p.state === 'waiting') return 'The owner has not decided this email yet. You will get a message when they do.';
   if (p.state === 'changes') return 'The owner asked for changes to this email. Write a new version and propose it again.';
   if (p.state === 'declined') return 'The owner chose not to send this email. Do not send it another way.';

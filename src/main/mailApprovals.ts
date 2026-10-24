@@ -112,7 +112,16 @@ export class MailApprovals implements ProposalStore {
         if (typeof since === 'number' && Number.isFinite(since) && since <= now && typeof told === 'boolean') paused[key] = { since, told };
       }
     }
-    return { ...raw, proposals: ok<MailProposal>(raw.proposals), standing: ok<StandingApproval>(raw.standing), sends, paused };
+    // A damaged proposal keeps its id, state and times, so a card that may
+    // already have gone out stays on record. Its text fields read as empty, so
+    // no reader trips on one, and one that names no member or mailbox is
+    // dropped: nothing could act on it.
+    const proposals = ok<MailProposal>(raw.proposals)
+      .filter((p) => typeof p.agentId === 'string' && p.agentId !== '' && typeof p.mailbox === 'string' && p.mailbox !== '')
+      .map((p) => (typeof p.to === 'string' && typeof p.subject === 'string' && typeof p.body === 'string'
+        ? p
+        : { ...p, to: typeof p.to === 'string' ? p.to : '', subject: typeof p.subject === 'string' ? p.subject : '', body: typeof p.body === 'string' ? p.body : '' }));
+    return { ...raw, proposals, standing: ok<StandingApproval>(raw.standing), sends, paused };
   }
 
   private stamp(): { mtimeMs: number; size: number } | null {
@@ -365,6 +374,9 @@ export class MailApprovals implements ProposalStore {
     }
     const subject = typeof edit.subject === 'string' && edit.subject.trim() ? edit.subject.slice(0, SUBJECT_MAX) : p.subject;
     const body = typeof edit.body === 'string' && edit.body.trim() ? edit.body.slice(0, BODY_MAX) : p.body;
+    // A card with no subject or body of its own (a damaged one) can be approved
+    // only once the owner has written them: nothing blank is ever approved.
+    if (decision === 'approve' && (!subject.trim() || !body.trim())) return { ok: false, error: 'subject and body needed' };
     const edits = decision === 'approve' ? describeEdits({ subject: p.subject, body: p.body }, { subject, body }) : '';
     // The owner ticked the agent's offer: this kind goes out without asking
     // from now on, in the words the owner left on the card.
