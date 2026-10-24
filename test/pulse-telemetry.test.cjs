@@ -163,6 +163,79 @@ test('a failed write is counted for its day and the day is reported; records kee
   assert.deepEqual([day.tasks, day.emails, day.awayPieces], [1, 2, 3], 'the owner was away for all of it');
 });
 
+test('a card reopened or held before the period and finished in it keeps its reopen and its held time', (t) => {
+  // Value: protects=kept as is and speed for a card older than the period; fails_when=cards() folds only the period's events, so an earlier reopen, a hold that began before the period, or an earlier finish is counted wrong; why_new=Codex adversarial review 2026-10-16; seam=none; no_claim=none beyond protects
+  const { store, proc, clock } = setup(t);
+  const H = 3600_000, D = 86_400_000;
+  const t0 = clock.now();
+  const made = t0 - 10 * D;
+  const since = t0 - 2 * D;
+  const board = (c1, c2, ts) => store.tasks([
+    { id: 'c1', status: c1, assignee: 'nick', createdAt: new Date(made).toISOString() },
+    { id: 'c2', status: c2, assignee: 'nick', createdAt: new Date(made).toISOString() }
+  ], ts);
+  board('todo', 'doing', made);              // the first read only remembers
+  board('blocked', 'doing', made + H);
+  board('done', 'done', made + 3 * H);
+  store.record({ agentId: 'nick', kind: 'card-reopen', ts: made + 4 * H, attrs: { id: 'c1' } });
+  board('todo', 'done', made + 4 * H);
+  board('waiting', 'done', made + 5 * H);    // held into the period
+  store.record({ agentId: 'nick', kind: 'card-reopen', ts: t0 - 4 * H, attrs: { id: 'c2' } });
+  board('doing', 'todo', t0 - 3 * H);
+  board('done', 'todo', t0 - H);
+  proc.tick('/office');
+  const cards = proc.cards('/office', since);
+  const c1 = cards.find((c) => c.id === 'c1');
+  assert.equal(c1.reopened, true, 'the reopen before the period counts');
+  assert.equal(c1.heldMs, 2 * H + (t0 - 3 * H) - (made + 5 * H), 'both holds count, the one across the period start whole');
+  assert.deepEqual([c1.createdAt, c1.doneAt], [made, t0 - H]);
+  assert.equal(cards.find((c) => c.id === 'c2').doneAt, undefined, 'a finish before the period is not one in it');
+  const { keptAsIs } = loadTs('src/shared/teamPerformance.ts');
+  assert.deepEqual(keptAsIs('nick', [], cards), { kept: 0, decisions: 1, share: null });
+});
+
+test('the advice counts only the reopens inside its window; kept as is still sees every one', (t) => {
+  // Value: protects=the stronger model suggestion; fails_when=reopens are counted over a card's whole history, so three cards reopened 40 days ago that only moved this week read as "3 of their cards reopened in two weeks"; why_new=review on #513; seam=none
+  const { store, proc, clock } = setup(t);
+  const D = 86_400_000;
+  const t0 = clock.now();
+  const since = t0 - 14 * D;
+  for (const id of ['a', 'b', 'c']) {
+    store.record({ agentId: 'pam', kind: 'card-status', ts: t0 - 50 * D, attrs: { id, from: null, to: 'doing', createdAt: t0 - 50 * D } });
+    store.record({ agentId: 'pam', kind: 'card-status', ts: t0 - 45 * D, attrs: { id, from: 'doing', to: 'done', createdAt: t0 - 50 * D } });
+    store.record({ agentId: 'pam', kind: 'card-reopen', ts: t0 - 40 * D, attrs: { id } });
+    store.record({ agentId: 'pam', kind: 'card-status', ts: t0 - 2 * D, attrs: { id, from: 'todo', to: 'doing', createdAt: t0 - 50 * D } });
+  }
+  store.record({ agentId: 'pam', kind: 'card-status', ts: t0 - 20 * D, attrs: { id: 'd', from: null, to: 'done', createdAt: t0 - 20 * D } });
+  store.record({ agentId: 'pam', kind: 'card-reopen', ts: t0 - D, attrs: { id: 'd' } });
+  store.flush();
+  proc.tick('/office');
+  const cards = proc.cards('/office', since);
+  const { reopensSince } = loadTs('src/shared/teamPerformance.ts');
+  assert.deepEqual(cards.filter((c) => c.reopened).map((c) => c.id).sort(), ['a', 'b', 'c', 'd'], 'every reopen still counts against kept as is');
+  assert.equal(cards.find((c) => c.id === 'a').reopenedAt, t0 - 40 * D);
+  assert.equal(reopensSince('pam', cards, since), 1, 'only d was reopened in the two weeks');
+  assert.equal(reopensSince('kelly', cards, since), 0);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'src/main/pulse.ts'), 'utf8'), /reopens: reopensSince\(m\.agentId, cards, since\),/);
+});
+
+test('a card whose only row in the period is a reopen is read from the period start, not the whole office history', (t) => {
+  // Value: protects=cards() stays a bounded read; fails_when=a reopen row, which has no creation time, makes cards() read every card event the office ever had; why_new=review on #513; seam=the processor's row reader, wrapped to see where it starts
+  const { store, proc, clock } = setup(t);
+  const D = 86_400_000;
+  const t0 = clock.now();
+  const since = t0 - 7 * D;
+  store.record({ agentId: 'pam', kind: 'card-status', ts: t0 - 300 * D, attrs: { id: 'x', from: null, to: 'done', createdAt: t0 - 300 * D } });
+  store.record({ agentId: 'pam', kind: 'card-reopen', ts: t0 - D, attrs: { id: 'x' } });
+  store.flush();
+  const starts = [];
+  const rows = proc.rows.bind(proc);
+  proc.rows = (office, kinds, from) => { starts.push(from); return rows(office, kinds, from); };
+  const [x] = proc.cards('/office', since);
+  assert.deepEqual(starts, [since]);
+  assert.equal(x.reopenedAt, t0 - D);
+});
+
 const { PulseService, earliest } = loadTs('src/main/pulse.ts');
 
 function service(t, opts = {}) {
