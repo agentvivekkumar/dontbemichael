@@ -542,6 +542,70 @@ test('the board and the owner\'s presence feed Tasks done and work while away: o
   assert.deepEqual([day.tasks, day.emails, day.sent, day.awayPieces], [1, 5, 1, 3]);
 });
 
+test('a card finished just before a quit or crash still counts: the next launch reads the board against the one last saved, and a new office only remembers', (t) => {
+  // Value: protects=Tasks done across a relaunch; fails_when=the first read after a launch is taken as the new baseline, the board is saved without the points it was read with, a quiet read rewrites it, or a new office's first read records its cards; why_new=TODOS.md P3 (adversarial review 2026-10-16); seam=a new TelemetryStore on the same harness.db stands in for a relaunch; no_claim=the time a card reached done while the app was closed (it counts at the first read after)
+  const { store, clock, persist } = setup(t);
+  const db = persist.database();
+  const t0 = clock.now();
+  const points = () => db.prepare("SELECT agent_id, ts, attrs FROM telemetry_events WHERE kind = 'card-status' ORDER BY id").all()
+    .map((r) => { const a = JSON.parse(r.attrs); return [r.agent_id, r.ts, a.id, a.from, a.to]; });
+  store.tasks([{ id: 'old', status: 'done', assignee: 'pam' }, { id: 'a', status: 'doing', assignee: 'pam' }], t0);
+  store.flush();
+  assert.deepEqual(points(), [], 'a new office only remembers');
+  store.tasks([{ id: 'old', status: 'done', assignee: 'pam' }, { id: 'a', status: 'done', assignee: 'pam' }], t0 + 8000);
+  // The app crashes before its next write: the point and the board are lost together.
+  let office = '/office';
+  const relaunched = new TelemetryStore(() => persist.database(), () => office, clock.now);
+  const board = [{ id: 'old', status: 'done', assignee: 'pam' }, { id: 'a', status: 'done', assignee: 'pam' }];
+  clock.at(t0 + 60_000);
+  relaunched.tasks(board);
+  relaunched.flush();
+  assert.deepEqual(points(), [['pam', t0 + 60_000, 'a', 'doing', 'done']], 'the card counts once, at the first read after the launch');
+  const proc = new TelemetryProcessor(() => persist.database(), relaunched, clock.now);
+  proc.tick('/office');
+  assert.equal(proc.days('/office', '2026-01-01').find((d) => d.agentId === 'pam').tasks, 1);
+  const saved = () => db.prepare('SELECT updated_at FROM kv WHERE key = ?').get('pulse:board:/office').updated_at;
+  clock.at(t0 + 68_000);
+  relaunched.tasks(board);
+  relaunched.flush();
+  assert.equal(saved(), t0 + 60_000, 'an unchanged board is not written again');
+  office = '/other';
+  relaunched.tasks([{ id: 'x', status: 'done', assignee: 'kelly' }]);
+  relaunched.flush();
+  assert.equal(points().length, 1, 'another office starts from its own first read');
+});
+
+test('an empty read of the board, mid run or just before a quit, never counts the Done cards again', (t) => {
+  // Value: protects=Tasks done when tasks.json is caught mid write; fails_when=an empty read replaces a board with cards, in memory or in kv, so the next good read counts every Done card again; why_new=review on #512; seam=a new TelemetryStore on the same harness.db stands in for a relaunch
+  const { store, clock, persist } = setup(t);
+  const db = persist.database();
+  const t0 = clock.now();
+  const points = () => db.prepare("SELECT COUNT(*) AS n FROM telemetry_events WHERE kind = 'card-status'").get().n;
+  const board = [{ id: 'a', status: 'done', assignee: 'pam' }, { id: 'b', status: 'doing', assignee: 'pam' }];
+  store.tasks(board, t0);
+  store.tasks([], t0 + 8000);
+  store.tasks(board, t0 + 16_000);
+  store.flush();
+  assert.equal(points(), 0, 'within one run');
+  store.tasks([], t0 + 24_000);
+  store.flush();
+  assert.deepEqual(JSON.parse(db.prepare('SELECT value FROM kv WHERE key = ?').get('pulse:board:/office').value), { a: 'done', b: 'doing' }, 'the saved board keeps its cards');
+  const relaunched = new TelemetryStore(() => persist.database(), () => '/office', clock.now);
+  relaunched.tasks(board, t0 + 60_000);
+  relaunched.flush();
+  assert.equal(points(), 0, 'after the relaunch');
+});
+
+test('a saved board with no card statuses is ignored, so the first read only remembers', (t) => {
+  // Value: protects=Tasks done from a damaged or foreign kv row; fails_when=any JSON object is taken as a saved board, so every card counts as moved; why_new=review on #512; seam=the kv row written directly
+  const { store, clock, persist } = setup(t);
+  const db = persist.database();
+  db.prepare('INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)').run('pulse:board:/office', JSON.stringify({ a: 5, b: null, c: { status: 'done' } }), 1);
+  store.tasks([{ id: 'a', status: 'done', assignee: 'pam' }, { id: 'c', status: 'done', assignee: 'pam' }], clock.now());
+  store.flush();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM telemetry_events WHERE kind = 'card-status'").get().n, 0);
+});
+
 test('plan headroom keeps the most constrained live window at its own length, and an API key shows none', (t) => {
   // Value: protects=the plan pace warning; fails_when=an expired or unreadable window is taken, a five hour window is measured as a week (or the reverse), a reading with no window clears the last one, or an API key shows plan headroom; why_new=PulseService.noteRateLimits had no test (OfficeBreak's reader has its own); seam=none; no_claim=Claude Code's status line shape beyond rate_limits
   const H = 3_600_000, D = 86_400_000;

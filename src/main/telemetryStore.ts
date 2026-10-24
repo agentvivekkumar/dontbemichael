@@ -62,12 +62,16 @@ export interface CardLite {
 export const AWAY_AFTER_SEC = 30 * 60;
 const MAX_BUFFER = 5000;
 
+const boardKey = (office: string): string => `pulse:board:${office}`;
+
 export class TelemetryStore {
   private buf: Array<TelemetryEvent & { office: string }> = [];
   /** office \t day -> failed writes not yet saved (D15). */
   private failed = new Map<string, number>();
   private lastCost = new Map<string, string>();
   private lastCards = new Map<string, Map<string, string>>();
+  /** office -> a board that changed, saved with the next flush's points. */
+  private boards = new Map<string, Map<string, string>>();
   private away: boolean | null = null;
   private loggedFailure = false;
   /** Told of each point queued, for the health readout (telemetry:health). */
@@ -91,7 +95,7 @@ export class TelemetryStore {
   /** Write the queued points in one transaction. A failure is counted for the
    *  day of each point it lost, and those days are left out of advice (D15). */
   flush(): void {
-    if (!this.buf.length && !this.failed.size) return;
+    if (!this.buf.length && !this.failed.size && !this.boards.size) return;
     const batch = this.buf;
     this.buf = [];
     const db = this.db();
@@ -100,11 +104,17 @@ export class TelemetryStore {
       const ins = db.prepare('INSERT INTO telemetry_events (office, agent_id, kind, ts, value, attrs) VALUES (?, ?, ?, ?, ?, ?)');
       const fail = db.prepare(`INSERT INTO telemetry_failures (office, day, count) VALUES (?, ?, ?)
         ON CONFLICT(office, day) DO UPDATE SET count = count + excluded.count`);
+      const board = db.prepare(`INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`);
+      // The board lands with the points read from it, so a crash in between
+      // loses both and the next launch finds the same changes again.
       db.transaction(() => {
         for (const e of batch) ins.run(e.office, e.agentId, e.kind, Math.round(e.ts), e.value ?? null, e.attrs ? JSON.stringify(e.attrs) : null);
         for (const [key, n] of this.failed) { const [office, day] = key.split('\t'); fail.run(office, day, n); }
+        for (const [office, cards] of this.boards) board.run(boardKey(office), JSON.stringify(Object.fromEntries(cards)), this.now());
       })();
       this.failed.clear();
+      this.boards.clear();
       this.loggedFailure = false;
     } catch (e) {
       this.countFailures(batch);
@@ -151,17 +161,28 @@ export class TelemetryStore {
   }
 
   /** The 8 s tick's tasks: one card-status point per change (doneAt is the
-   *  time a card reaches done). The first read of an office only remembers. */
+   *  time a card reaches done). The first read after a launch compares with
+   *  the board saved last time, so a card finished just before a quit or a
+   *  crash still counts; the first read of a new office only remembers. */
   tasks(cards: CardLite[], ts = this.now()): void {
     const office = this.office();
     if (!office) return;
-    const prev = this.lastCards.get(office);
+    const prev = this.lastCards.get(office) ?? this.savedBoard(office);
+    // Cards never leave the board, so an empty read after one with cards is a
+    // bad read (tasks.json caught mid write): skip it and keep the last board,
+    // or the next good read counts every Done card again.
+    if (prev?.size && !cards.some((c) => c && typeof c.id === 'string' && typeof c.status === 'string')) {
+      this.lastCards.set(office, prev);
+      return;
+    }
     const next = new Map<string, string>();
+    let changed = false;
     for (const c of cards) {
       if (!c || typeof c.id !== 'string' || typeof c.status !== 'string') continue;
       next.set(c.id, c.status);
       const was = prev?.get(c.id);
       if (!prev || was === c.status) continue;
+      changed = true;
       const excluded = c.closedBy === 'owner' || (Array.isArray(c.humanQA) && c.humanQA.some((e) => e?.kind === 'report'));
       this.record({
         agentId: c.assignee ?? null, kind: 'card-status', ts,
@@ -169,6 +190,21 @@ export class TelemetryStore {
       });
     }
     this.lastCards.set(office, next);
+    // Saved only when it changed (a card moved, came or went).
+    if (!prev || changed || next.size !== prev.size) this.boards.set(office, next);
+  }
+
+  /** The board an earlier launch saved for this office, if any. Only a card
+   *  with a status is kept; with none left it is a new office, whose first
+   *  read only remembers. */
+  private savedBoard(office: string): Map<string, string> | undefined {
+    try {
+      const row = this.db()?.prepare('SELECT value FROM kv WHERE key = ?').get(boardKey(office)) as { value: string } | undefined;
+      const cards: unknown = row ? JSON.parse(row.value) : null;
+      if (!cards || typeof cards !== 'object' || Array.isArray(cards)) return undefined;
+      const board = new Map(Object.entries(cards).filter((e): e is [string, string] => typeof e[1] === 'string'));
+      return board.size ? board : undefined;
+    } catch { return undefined; }
   }
 
   /** The owner's presence from the system idle time (D11): away after 30
