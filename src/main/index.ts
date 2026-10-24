@@ -5934,6 +5934,13 @@ ipcMain.handle('hive:moveTask', (_evt, id: unknown, status: unknown, reason: unk
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   return { ok: hive.ownerMoveTask(id, status as HiveTask['status'], typeof reason === 'string' ? reason : undefined) };
 });
+ipcMain.handle('hive:reassignTask', (_evt, id: unknown, assignee: unknown, reason: unknown) => {
+  if (typeof id !== 'string' || !id || typeof assignee !== 'string' || !assignee.trim()) {
+    return { ok: false, error: 'invalid task reassign' };
+  }
+  if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
+  return { ok: hive.ownerReassignTask(id, assignee, typeof reason === 'string' ? reason : undefined) };
+});
 ipcMain.handle('hive:closeTask', (_evt, id: unknown, reason: unknown) => {
   if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid task id' };
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
