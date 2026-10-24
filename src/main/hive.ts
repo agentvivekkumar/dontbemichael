@@ -4095,13 +4095,13 @@ export class HiveManager {
    *  changes, Michael hears, and an owner-given routing reason lands in his
    *  memory so similar work goes to the right place next time. */
   ownerReassignTask(id: string, assignee: string, reason?: string): boolean {
-    const why = reason?.trim().slice(0, 500) || undefined;
+    const why = reason?.replace(/\s+/g, ' ').trim().slice(0, 500).replace(/\.+$/, '').trim() || undefined;
     const ledger = this.tasks() as { tasks?: HiveTask[] };
     const card = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).find((t) => t?.id === id);
     if (!card || card.status === 'triage' || card.status === 'done') return false;
     const reg = this.registry();
     const next = assignee.trim();
-    if (!next || !reg.agents[next] || reg.agents[next].isAssistant || next === (reg.godId ?? 'god')) return false;
+    if (!next || !reg.agents[next] || reg.agents[next].isAssistant || reg.agents[next].archived || next === RESEARCH_ID || next === (reg.godId ?? 'god')) return false;
     if (card.assignee === next) return true;
     const from = card.assignee;
     const fromName = (from && reg.agents[from]?.name?.trim()) || from || 'nobody';
@@ -4113,7 +4113,7 @@ export class HiveManager {
     // Only owner-supplied text becomes a routing rule in Michael's memory.
     // Card titles can have come from an email, webhook, or another outsider.
     const rule = why
-      ? `Routing (from the owner): ${why}. Goes to ${toName}, not ${fromName}.`
+      ? `Routing (from the owner): ${why}. Goes to ${toName}${from ? `, not ${fromName}` : ''}.`
       : undefined;
     const godId = reg.godId;
     if (godId && rule) {

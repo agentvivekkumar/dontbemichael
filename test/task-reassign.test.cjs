@@ -46,6 +46,9 @@ test('ownerReassignTask moves the card and writes only the owner reason to Micha
   await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: home, isGod: true });
   await hive.ensureAgent({ id: 'kelly', name: 'Kelly', provider: 'claude', cwd: path.join(home, 'kelly') });
   await hive.ensureAgent({ id: 'dwight', name: 'Dwight', provider: 'claude', cwd: path.join(home, 'dwight') });
+  await hive.ensureAgent({ id: 'research', name: 'Research', provider: 'claude', cwd: path.join(home, 'research'), isResearch: true });
+  await hive.ensureAgent({ id: 'archived', name: 'Archived', provider: 'claude', cwd: path.join(home, 'archived') });
+  hive.setArchived('archived', true);
   hive.writeTasks([
     {
       id: 'card1', title: 'OUTSIDE TITLE: do not put this in Michael memory', assignee: 'dwight', status: 'doing',
@@ -54,6 +57,10 @@ test('ownerReassignTask moves the card and writes only the owner reason to Micha
     },
     {
       id: 'card2', title: 'ANOTHER OUTSIDE TITLE', assignee: 'dwight', status: 'doing',
+      dependsOn: [], priority: 3, createdAt: '2026-10-01T00:00:00Z'
+    },
+    {
+      id: 'card3', title: 'UNTRUSTED TITLE: never store this as an owner rule', status: 'doing',
       dependsOn: [], priority: 3, createdAt: '2026-10-01T00:00:00Z'
     }
   ]);
@@ -71,11 +78,19 @@ test('ownerReassignTask moves the card and writes only the owner reason to Micha
   assert.match(mem, /Kelly/);
   assert.match(mem, /Dwight/);
   assert.match(mem, /Refunds are support work/);
+  assert.match(mem, /Refunds are support work\. Goes to Kelly, not Dwight\./);
+  assert.doesNotMatch(mem, /work\.\./);
   assert.doesNotMatch(mem, /OUTSIDE TITLE: do not put this in Michael memory/);
   assert.equal(hive.ownerReassignTask('card2', 'kelly'), true);
   assert.equal(fs.readFileSync(memPath, 'utf8'), mem, 'no owner reason means no routing note');
   assert.equal(hive.ownerReassignTask('card1', 'nobody'), false, 'unknown id refused');
   assert.equal(hive.ownerReassignTask('card1', 'god'), false, 'Michael is not a Move to target');
+  assert.equal(hive.ownerReassignTask('card1', 'research'), false, 'Research is not a Move to target');
+  assert.equal(hive.ownerReassignTask('card1', 'archived'), false, 'an archived member is not a Move to target');
+  assert.equal(hive.ownerReassignTask('card3', 'kelly', 'Unassigned\nrequests.'), true);
+  const finalMemory = fs.readFileSync(memPath, 'utf8');
+  assert.match(finalMemory, /Routing \(from the owner\): Unassigned requests\. Goes to Kelly\./);
+  assert.doesNotMatch(finalMemory, /not nobody|UNTRUSTED TITLE/);
   const main = fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8');
   assert.match(main, /hive:reassignTask/);
   const preload = fs.readFileSync(path.resolve(__dirname, '../src/preload/index.ts'), 'utf8');
