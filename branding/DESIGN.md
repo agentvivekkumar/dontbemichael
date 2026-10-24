@@ -2119,9 +2119,9 @@ The home page answers the four questions an owner asks, in this order (owner, 20
 review Direction A): the hero (§9.3, unchanged, with its Privacy first badge and the live studio),
 then four sections, then "Questions owners ask", then the closing call to action. Each section has a
 mono eyebrow ("1 · What is it?", "2 · What does it take off my plate?", "3 · Can I trust it?", "4 ·
-How do I keep an eye on it?"), a `w-h2` heading and one picture or set of cards. The page's visible
-words, picture labels excluded, stay at 900 or fewer; the detail lives on How it works (§9.22) and
-/security (§9.16).
+How do I keep an eye on it?"), a `w-h2` heading and one picture or set of cards. The words a visitor
+sees when the page loads stay at 900 or fewer, not counting the board and Pulse pictures or the FAQ
+answers folded under their questions; the detail lives on How it works (§9.22) and /security (§9.16).
 
 1. What is it: "A small office of AI helpers, run by Michael." Three check points (pick your kind of
    business; Michael suggests the team and you pick who joins; ready in about three minutes, Setup
@@ -2151,13 +2151,14 @@ team's work, memory and mailbox passwords are kept on your computer, the app sen
 and the code is open); You approve what matters (check on `neutral-soft`, never coral: no one pays a bill, promises
 a refund or posts in public without you, and emails start as drafts); Built to stop agents going rogue
 (shield on `green` soft: Pete does the web research and the rest of the team is told to ask Pete,
-answers lose any instructions aimed at AI, and email is read as the sender's words, never orders).
+answers that come back through the trust layer lose any instructions aimed at AI, and email is read
+as the sender's words, never orders).
 Every sentence follows §9.16's rule: it says what the app keeps, gives or tells, never "can't".
 
 ### 9.21 Job cards and the flow line (web)
 
 The home page's second question. Three job cards (`card`, `r-xl`, `shadow-md`, padding 20) in a row
-at 980 px and up and one column below: the department avatar (34 px, §3.4), a `w-h3` title and one
+at 980 px and up and one column below: the department avatar (36 px, as on the setup team rows, in its §3.4 colours), a `w-h3` title and one
 line in `ink-2`. The inbox (Kelly: customer emails get answered, replies wait as drafts until you say
 they can go); The books (Oscar: invoices tracked, what's unpaid chased, a warning before filing
 deadlines); The follow ups (Dwight: leads and suppliers chased on a schedule, so nothing slips). Under
@@ -2173,8 +2174,8 @@ then these sections, each as its own spec section describes it: Setup (the setup
 the foundations inset, §9.18); One refund (the story's five steps and the Sending switch, §9.11);
 Privacy and the trust layer (§9.15); The board with its notes (§9.13); Files (§9.14); Pulse in full
 (§9.17); Everything else (§9.5); Open source (the facts and the contributors line); and the Reset
-memory question. Links shared before the move (`/#setup`, `/#story`, `/#privacy`, `/#files`,
-`/#pulse`, `/#handled`, `/#open-source`) land on the same section here. The page never scrolls
+memory question. Links shared before the move (`/#setup`, `/#story`, `/#sending`, `/#privacy`,
+`/#board`, `/#files`, `/#pulse`, `/#handled`, `/#open-source`) land on the same section here. The page never scrolls
 sideways, also at 320 px with a scrollbar.
 
 ---
