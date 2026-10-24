@@ -242,12 +242,17 @@ function resolveAgent(target: string, reg: Registry): ResolvedAgent | { error: s
   return { error: `I don't see an agent matching "${target}"` };
 }
 
+/** Words that turn a confirm into a refusal: "no, don't kill Jim" carries the
+ *  verb word but says not to. norm() has already turned ' into a space. */
+const NEGATION = /\b(no|nope|not|never|don t|dont|don\u2019t|cancel|stop|wait|abort)\b/;
+
 /** Distinct-token confirm check. Accept only if the phrase carries the verb word or
- *  the literal "confirm"; a bare affirmation ("yes", "ok") is rejected. */
+ *  the literal "confirm"; a bare affirmation ("yes", "ok") is rejected, and so is
+ *  any phrase that says no. */
 function confirmAccepted(phrase: string, confirmWord: string): boolean {
   const p = norm(phrase);
   if (!p) return false;
-  if (BARE_AFFIRMATIONS.has(p)) return false;
+  if (BARE_AFFIRMATIONS.has(p) || NEGATION.test(p)) return false;
   if (/\bconfirm(ed|s)?\b/.test(p)) return true;
   if (new RegExp(`\\b${escapeRegExp(confirmWord)}\\b`).test(p)) return true;
   return false;
