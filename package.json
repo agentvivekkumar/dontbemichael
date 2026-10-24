@@ -25,6 +25,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "node tools/run-tests.cjs",
     "test:focused": "node tools/run-tests.cjs",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "check:links": "node tools/check-release-links.cjs",
     "check:leadins": "node tools/check-release-leadins.cjs",
     "lab": "node tools/studio-lab/build.mjs",
@@ -79,6 +80,7 @@
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
     "@electron/rebuild": "^3.7.0",
+    "@playwright/test": "^1.64.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/mailparser": "^3.4.6",
     "@types/node": "^22.7.5",
