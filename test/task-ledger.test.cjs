@@ -170,3 +170,49 @@ test('hive.writeTasks can still empty the ledger', (t) => {
   hive.writeTasks([]);
   assert.deepEqual(ledger(), []);
 });
+
+// ── a ledger that does not parse ─────────────────────────────────────────────
+
+// Value: protects=every open card on the board; fails_when=addTask merges
+// against an empty board because tasks.json did not parse; why_new=a webhook
+// card added while Michael's edit left a trailing comma wiped the board down
+// to that one card; seam=HiveManager.addTask/patchTask/writeTasks on disk.
+test('a board that does not parse is never written over', (t) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md task ledger bad '));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  hive.ensureHive();
+  const file = path.join(home, 'hive', 'tasks.json');
+  const cards = [
+    { id: 't1', title: 'Refund for Northwind', status: 'blocked', humanQA: [{ q: 'Refund?', askedAt: '2026-10-25T10:00:00.000Z' }] },
+    { id: 't2', title: 'Payroll run', status: 'doing' }
+  ];
+  const good = JSON.stringify({ tasks: cards }, null, 2);
+  const broken = [
+    good.replace(/\}\n  \]/, '},\n  ]'), // a trailing comma left by an edit
+    good.slice(0, good.length >> 1), // a read landing halfway through a write
+    ''
+  ];
+  for (const text of broken) {
+    fs.writeFileSync(file, text);
+    assert.equal(hive.addTask({ id: 'webhook-1', title: 'New lead', status: 'todo' }), false);
+    assert.equal(hive.patchTask('t2', { status: 'done' }), false);
+    assert.equal(hive.writeTasks([{ id: 't2', title: 'Payroll run', status: 'done' }]), false);
+    assert.equal(fs.readFileSync(file, 'utf8'), text, 'the file is left exactly as it was');
+  }
+  // Once the board parses again, the same card goes on beside the others.
+  fs.writeFileSync(file, good);
+  assert.equal(hive.addTask({ id: 'webhook-1', title: 'New lead', status: 'todo' }), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).tasks.map((c) => c.id), ['t1', 't2', 'webhook-1']);
+});
+
+test('a card added with no tasks.json yet starts the board', (t) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md task ledger none '));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  hive.ensureHive();
+  const file = path.join(home, 'hive', 'tasks.json');
+  fs.rmSync(file);
+  assert.equal(hive.addTask({ id: 'first', title: 'First task', status: 'todo' }), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).tasks.map((c) => c.id), ['first']);
+});
