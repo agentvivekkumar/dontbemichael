@@ -488,8 +488,8 @@ export class TelemetryCollector {
    *  in for this agent this run — the true zero-usage case for a just-spawned
    *  agent), reports "no data" rather than someone else's history. `sessionId`
    *  stays '' on the returned sample regardless — deliberately, so it keeps
-   *  reading as "no live session" to the #56 cost-ledger dedup gate in
-   *  index.ts (`if (sample?.sessionId) appendCostLedger(...)`); the resolved id
+   *  reading as "no live session": the ledger is written only from live
+   *  sessions (sessionSamples, #56), never from this fallback; the resolved id
    *  is used only to filter the read, never surfaced as if it were live OTel. */
   private transcriptFallback(agentId: string): AgentUsageSample | null {
     const cwd = this.resolveCwd?.(agentId);
