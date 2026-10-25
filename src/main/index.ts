@@ -52,11 +52,11 @@ import { CHECKED_FILE } from '../shared/checkedRecord';
 import { ORGANIZED_FILE } from '../shared/organizedRecord';
 import { HELD_FILE } from '../shared/heldRecord';
 import { ensureCheckedBackfill } from './checkedBackfill';
-import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
-import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
+import { normalizeWeekly } from '../shared/weeklySchedule';
+import { normalizeTimes } from '../shared/scheduleTimes';
 import {
   armPlan, catchUpFloor, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf, runNowCheck,
-  migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock
+  migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock, nextSlotDelayMs, slotWaitMs
 } from '../shared/missions';
 import { MICHAEL_WORK_STYLE } from '../shared/michaelWorkStyle';
 import { makeScheduleRequests } from './scheduleRequests';
@@ -1642,24 +1642,31 @@ function syncMissions(): void {
       // because the gap between two slots varies (Fri to Mon is not Mon to Wed,
       // and the week the clocks change is not 168 hours long).
       //
-      // `justFired` is a spin guard, not a nicety. weeklyDelayMs returns 0 for a
-      // slot that was missed and not yet run, and it learns "already run" from
-      // the persisted lastFiredAt — so if fire()'s writeConfig ever failed, the
-      // next computation would return 0 again, forever. Passing `now` as the
-      // last-fired floor after a fire makes the catch-up branch unreachable, so
-      // the worst case is a lost stamp rather than a hot loop.
-      const rearm = (justFired: boolean): void => {
+      // Each timer is aimed at one slot (`due`). Node can wake it a hair before
+      // that slot by Date.now(); slotWaitMs then has it wait the rest and run
+      // nothing, because running early left the slot still ahead and the re-arm
+      // chose it again, so the job was sent twice. After a run, nextSlotDelayMs
+      // counts from the slot it ran and uses it as the catch up floor, so that
+      // slot can't come back even if fire()'s lastFiredAt write failed (a spin
+      // guard: weeklyDelayMs returns 0 for a missed slot it thinks has not run).
+      const arm = (due: number): void => {
+        entry.timeout = setTimeout(() => {
+          if (slotWaitMs(due, Date.now()) > 0) { arm(due); return; }
+          fire();
+          rearm(due);
+        }, slotWaitMs(due, Date.now()));
+      };
+      const rearm = (firedSlot?: number): void => {
         const now = Date.now();
         // The later of the last run and when its times took effect (catchUpFloor).
         const stored = (readConfig().missions ?? []).find((x) => x.id === m.id);
         const persisted = stored ? catchUpFloor(stored) : 0;
-        const floor = justFired ? Math.max(persisted, now) : persisted;
         // Several "when" lines re-arm the same way (src/shared/scheduleTimes.ts).
-        const delay = plan.type === 'times' ? timesDelayMs(plan.times, now, floor) : weeklyDelayMs(plan.weekly, now, floor);
+        const delay = nextSlotDelayMs(plan, now, persisted, firedSlot);
         if (delay === null) return;
-        entry.timeout = setTimeout(() => { fire(); rearm(true); }, delay);
+        arm(now + delay);
       };
-      rearm(false);
+      rearm();
       missionTimers.set(m.id, entry);
       continue;
     }
