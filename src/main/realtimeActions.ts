@@ -717,16 +717,23 @@ function proposeDestructive(deps: RealtimeActionDeps, verb: string, a: Record<st
   if (verb === 'edit_schedule') {
     const missions = deps.listMissions();
     if (!missions.length) return { ok: false, spoken: 'There are no scheduled missions to edit.' };
-    const ref = norm(str(a.missionId) || str(a.schedule) || str(a.label) || str(a.target));
-    // An empty ref is in every name, so ask rather than take the first one.
-    if (!ref) return { ok: false, spoken: 'Which schedule should I edit?' };
-    // The ref has no punctuation, so the names are compared the same way: a
-    // job called "Inbox: morning sweep" is found by its own name.
-    const m =
-      missions.find((x) => norm(x.id) === ref) ||
-      missions.find((x) => norm(x.label || '') === ref) ||
-      missions.find((x) => norm(x.label || '').includes(ref) || norm(x.id).includes(ref));
-    if (!m) return { ok: false, spoken: `I couldn't find a schedule matching "${str(a.label) || ref}".` };
+    // Names are compared by their letters and digits, in any script, so "Inbox:
+    // morning sweep", "Owner’s weekly report" or "Q&A digest" is found by the
+    // words said for it.
+    const key = (v: string): string => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const want = key(str(a.missionId) || str(a.schedule) || str(a.label) || str(a.target));
+    // An empty key is in every name, so ask rather than take the first one.
+    if (!want) return { ok: false, spoken: 'Which schedule should I edit?' };
+    const exact = missions.find((x) => key(x.id) === want) || missions.find((x) => key(x.label || '') === want);
+    const partial = exact ? [] : missions.filter((x) => key(x.label || '').includes(want) || key(x.id).includes(want));
+    // Several names hold the words: ask which, as an agent lookup does, rather
+    // than stage a delete for the first one.
+    if (partial.length > 1) {
+      const names = partial.map((x) => x.label || x.id);
+      return { ok: false, spoken: `Which one: ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?` };
+    }
+    const m = exact ?? partial[0];
+    if (!m) return { ok: false, spoken: `I couldn't find a schedule matching "${str(a.label) || want}".` };
     const raw = norm(str(a.action) || str(a.op));
     const action: 'enable' | 'disable' | 'delete' =
       raw.includes('delete') || raw.includes('remove') ? 'delete' : raw.includes('disable') || raw.includes('off') || raw.includes('pause') ? 'disable' : 'enable';
