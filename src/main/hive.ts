@@ -4012,7 +4012,9 @@ export class HiveManager {
       return false;
     }
     const merged = mergeTaskLedger(current.tasks, tasks);
-    this.writeJson(path, { tasks: merged });
+    // One rename over the old file, so Michael, the guard and the next card
+    // never read the board half written.
+    this.atomicWriteJson(path, { tasks: merged });
     // Cards the app itself marks Done count as seen Done.
     // What the app writes is what the guard knows: Done cards and where each
     // open card stands, so a restore never brings back a copy from before it.
