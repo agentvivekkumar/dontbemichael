@@ -16,6 +16,17 @@ let cachedPath: string | null = null;
  *  (shell failed / fence missing) stays retryable. */
 const shellCapture = new Map<string, string>();
 
+/** How long one login-shell capture may block the main process. */
+let captureTimeoutMs = 3000;
+
+/** Test seam: forget every cached capture and, optionally, shorten the capture
+ *  timeout so a slow-shell test does not have to wait the full 3 s. */
+export function __resetShellEnvForTest(opts: { timeoutMs?: number } = {}): void {
+  shellCapture.clear();
+  cachedPath = null;
+  captureTimeoutMs = opts.timeoutMs ?? 3000;
+}
+
 /** Run `script` in the user's INTERACTIVE login shell and return only what the
  *  script itself printed.
  *
@@ -39,10 +50,14 @@ export function captureFromLoginShell(script: string): string | null {
 function captureFromLoginShellUncached(script: string): string | null {
   const mark = '__MD_SHELL_FENCE__';
   try {
+    // SIGKILL, not the default SIGTERM: an INTERACTIVE zsh or bash ignores
+    // SIGTERM, so a timed-out shell kept running its rc files (nvm, conda, a
+    // cold network mount) and spawnSync blocked the whole main process until
+    // they finished, however long past the timeout that was.
     const res = spawnSync(
       process.env.SHELL ?? '/bin/zsh',
       ['-ilc', `printf %s ${mark}; ${script}; printf %s ${mark}`],
-      { encoding: 'utf8', timeout: 3000 }
+      { encoding: 'utf8', timeout: captureTimeoutMs, killSignal: 'SIGKILL' }
     );
     const out = res.stdout ?? '';
     const start = out.indexOf(mark);

@@ -1,0 +1,60 @@
+'use strict';
+
+// shellEnv.ts reads the user's PATH out of an interactive login shell with a
+// BLOCKING spawnSync on the Electron main process. These tests drive a real zsh
+// whose rc file can be made slow, the way nvm, conda or a cold network mount
+// make a real one slow at first launch.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const loadTs = require('./load-ts.cjs');
+const { posixOnly } = require('./platform.cjs');
+
+const shellEnv = loadTs('src/main/shellEnv.ts');
+
+const ZSH = ['/bin/zsh', '/usr/bin/zsh'].find((p) => fs.existsSync(p));
+const needsZsh = (reason) => {
+  const opts = posixOnly(reason);
+  return opts.skip ? opts : { skip: !ZSH && 'zsh is not installed' };
+};
+
+/** A ZDOTDIR (with a space in its path) whose .zshrc sleeps while `slow`
+ *  exists, then puts its own `my bin` folder on PATH so a real capture is
+ *  told apart from the process PATH it falls back to. */
+function slowShell(t, sleepSeconds) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell env '));
+  const slow = path.join(dir, 'slow');
+  fs.writeFileSync(
+    path.join(dir, '.zshrc'),
+    `[ -f "$ZDOTDIR/slow" ] && sleep ${sleepSeconds}\nexport PATH="$ZDOTDIR/mybin:$PATH"\n`
+  );
+  fs.writeFileSync(slow, '');
+  const saved = { SHELL: process.env.SHELL, ZDOTDIR: process.env.ZDOTDIR, PATH: process.env.PATH };
+  process.env.SHELL = ZSH;
+  process.env.ZDOTDIR = dir;
+  // What a Finder or Dock launched app inherits from launchd.
+  process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    shellEnv.__resetShellEnvForTest();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  return { dir, makeFast: () => fs.rmSync(slow) };
+}
+
+test('a slow login shell is killed at the timeout instead of blocking until its rc files finish', needsZsh('login shell capture'), (t) => {
+  // Value: protects=the main process is blocked at most about the capture timeout; fails_when=the timed-out shell gets the default SIGTERM, which an interactive zsh ignores; why_new=new; seam=__resetShellEnvForTest timeout; no_claim=bash or fish
+  slowShell(t, 4);
+  shellEnv.__resetShellEnvForTest({ timeoutMs: 500 });
+  const started = Date.now();
+  const value = shellEnv.captureFromLoginShell('printf %s "$PATH"');
+  const elapsed = Date.now() - started;
+  assert.equal(value, null, 'a timed-out capture yields nothing');
+  assert.ok(elapsed < 2500, `blocked ${elapsed} ms against a 500 ms timeout; the 4 s rc file ran to the end`);
+});
