@@ -17,6 +17,7 @@
  */
 
 import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { extname, posix } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
@@ -463,8 +464,9 @@ const TEXT_MIME: Record<string, string> = {
  * Excel and Notepad write on Windows. "Unicode Text (*.txt)" is UTF-16 with a
  * byte order mark: every other byte is NUL, so it looked binary and was
  * refused. A UTF-8 file saved by Notepad starts with a byte order mark that
- * would sit at the front of its text and its first line. Those are decoded
- * here and handed over as text; a plain UTF-8 file is still left to kg-core.
+ * would sit at the front of its text and its first line. A CSV saved by
+ * Excel on Windows is Windows-1252. Those are decoded here and handed over
+ * as text; a plain UTF-8 file is still left to kg-core.
  */
 function readPlainText(srcPath: string, ext: string): DocExtraction {
   const head = readHead(srcPath);
@@ -482,7 +484,28 @@ function readPlainText(srcPath: string, ext: string): DocExtraction {
   // way is exactly the junk this module exists to stop. A NUL byte means
   // binary; real text never has one outside UTF-16, handled above.
   if (head.includes(0)) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
-  return { kind: 'passthrough' };
+
+  // Valid UTF-8 (and so plain ASCII) is what kg-core reads well. Anything
+  // else is almost always Windows-1252: Excel on Windows saves "CSV (Comma
+  // delimited)" that way, and read as UTF-8 every accented letter became
+  // U+FFFD, so "José" or "Köln" could never be found. Every byte has a
+  // meaning in Windows-1252, so this never fails; at worst a file in another
+  // legacy encoding reads with the wrong accents rather than none at all.
+  const bytes = readWhole(srcPath);
+  if (!bytes) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
+  if (isUtf8(bytes)) return { kind: 'passthrough' };
+  return decodedText(windows1252(bytes), 'windows-1252', ext);
+}
+
+/** Windows-1252 is Latin-1 except for 0x80 to 0x9F, where it puts the euro
+ *  sign, curly quotes and dashes instead of control codes. Mapped here rather
+ *  than with TextDecoder: some Node versions decode the 'windows-1252' label
+ *  as plain Latin-1 and would turn those marks into invisible control codes. */
+const CP1252_HIGH = '\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f'
+  + '\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178';
+
+function windows1252(bytes: Buffer): string {
+  return bytes.toString('latin1').replace(/[\x80-\x9f]/g, (c) => CP1252_HIGH[c.charCodeAt(0) - 0x80]);
 }
 
 type Bom = 'utf-8' | 'utf-16le' | 'utf-16be';

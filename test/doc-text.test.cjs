@@ -422,6 +422,32 @@ test('a UTF-8 byte order mark is not kept at the front of the text or the title'
   assert.ok(!kg.getDoc(root, docId).text.startsWith('﻿'));
 });
 
+test('end to end: a Windows-1252 CSV from Excel is decoded, and its accented names are searchable', async () => {
+  // Value: protects=an Excel "CSV (Comma delimited)" export keeps its accents in the store; fails_when=a non-UTF-8 file is read as UTF-8 and every accent becomes U+FFFD; why_new=search for José or Köln found nothing; seam=none
+  const src = write('suppliers.csv', Buffer.from('Name,City\r\nJos\xe9 M\xfcller,K\xf6ln\r\nCaf\xe9 \x93Ren\xe9e\x94,S\xe3o Paulo \x80\r\n', 'latin1'));
+  const ex = await extractDocumentText(src);
+  assert.equal(ex.kind, 'text');
+  assert.equal(ex.text, 'Name,City\r\nJosé Müller,Köln\r\nCafé “Renée”,São Paulo €\r\n');
+  assert.equal(ex.extractor, 'text-windows-1252@1');
+
+  const root = path.join(tmp, 'kg-1252');
+  const { docId, meta } = kg.ingest(root, { srcPath: src, text: ex.text, modality: ex.modality, extractor: ex.extractor, mime: ex.mime });
+  for (const q of ['José', 'Köln', 'São Paulo']) {
+    const hits = kg.search(root, q);
+    assert.equal(hits.length, 1, q);
+    assert.equal(hits[0].docId, docId);
+  }
+  assert.equal(meta.modality, 'sheet');
+  assert.equal(meta.mime, 'text/csv');
+  assert.ok(!kg.getDoc(root, docId).text.includes('�'));
+});
+
+test('a UTF-8 file with accents is still left to the store, byte for byte', async () => {
+  // Value: protects=valid UTF-8 is never re-decoded as Windows-1252; fails_when=the fallback runs on files that were already UTF-8; why_new=the new decoder sits in front of every text file; seam=none
+  const src = write('cities.csv', 'Name,City\nJosé Müller,Köln\n東京,大阪\n');
+  assert.equal((await extractDocumentText(src)).kind, 'passthrough');
+});
+
 test('a missing file gets a plain reason, not a stack trace', async () => {
   const r = await extractDocumentText(path.join(tmp, 'gone.docx'));
   assert.equal(r.kind, 'unreadable');

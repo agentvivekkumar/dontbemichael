@@ -61,6 +61,13 @@ test('a UTF-16 text file prints as readable text, not refused or as raw bytes', 
   assert.equal(r.out, 'Flour\t12 kg\n');
 });
 
+test('a Windows-1252 CSV prints with its accents, not replacement characters', () => {
+  // Value: protects=an agent reading an Excel CSV from Windows sees the real names; fails_when=the CLI reads the file as UTF-8; why_new=accents printed as U+FFFD; seam=none
+  const r = docText(write('clients.csv', Buffer.from('Ren\xe9e,K\xf6ln', 'latin1')));
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out, 'Renée,Köln\n');
+});
+
 test('--json prints the whole result, for the app reading uploads in a process of its own', async () => {
   const file = docx('menu.docx', '<w:p><w:r><w:t>Soup of the day</w:t></w:r></w:p>');
   const r = docText('--json', file);
