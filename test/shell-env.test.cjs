@@ -58,3 +58,26 @@ test('a slow login shell is killed at the timeout instead of blocking until its 
   assert.equal(value, null, 'a timed-out capture yields nothing');
   assert.ok(elapsed < 2500, `blocked ${elapsed} ms against a 500 ms timeout; the 4 s rc file ran to the end`);
 });
+
+test('a timed-out PATH capture is not kept for the session: the shell is asked again after the backoff', needsZsh('login shell capture'), (t) => {
+  // Value: protects=agents get the real PATH once the shell answers, and a slow shell is not rerun on every spawn; fails_when=the launchd fallback is cached for the session, or the fallback retries at once; why_new=new; seam=__resetShellEnvForTest timeout and clock; no_claim=the exact 60 s backoff length
+  const { dir, makeFast } = slowShell(t, 4);
+  let clock = 1_000_000;
+  shellEnv.__resetShellEnvForTest({ timeoutMs: 500, now: () => clock });
+  const mybin = path.join(dir, 'mybin');
+
+  assert.equal(shellEnv.userShellPath(), '/usr/bin:/bin:/usr/sbin:/sbin', 'falls back to the process PATH');
+  makeFast();
+
+  // Inside the backoff the fallback is handed out without starting a shell.
+  clock += 1000;
+  const started = Date.now();
+  assert.equal(shellEnv.userShellPath(), '/usr/bin:/bin:/usr/sbin:/sbin');
+  assert.ok(Date.now() - started < 100, 'no shell is started inside the backoff');
+
+  // Past it, the now fast shell answers and that answer is what agents get.
+  clock += 60_000;
+  const real = shellEnv.userShellPath();
+  assert.ok(real.split(':').includes(mybin), `expected ${mybin} on ${real}`);
+  assert.equal(shellEnv.userShellPath(), real, 'the real answer is cached');
+});

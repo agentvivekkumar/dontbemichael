@@ -19,12 +19,24 @@ const shellCapture = new Map<string, string>();
 /** How long one login-shell capture may block the main process. */
 let captureTimeoutMs = 3000;
 
+/** After a failed PATH capture, how long userShellPath() hands out the process
+ *  PATH before it asks the shell again. Retrying on every spawn would make a
+ *  shell that keeps timing out freeze the main process on every spawn. */
+const PATH_RETRY_MS = 60_000;
+let pathRetryAt = 0;
+let now = (): number => Date.now();
+
 /** Test seam: forget every cached capture and, optionally, shorten the capture
- *  timeout so a slow-shell test does not have to wait the full 3 s. */
-export function __resetShellEnvForTest(opts: { timeoutMs?: number } = {}): void {
+ *  timeout so a slow-shell test does not have to wait the full 3 s, and swap
+ *  the clock that paces PATH retries. */
+export function __resetShellEnvForTest(
+  opts: { timeoutMs?: number; now?: () => number } = {}
+): void {
   shellCapture.clear();
   cachedPath = null;
+  pathRetryAt = 0;
   captureTimeoutMs = opts.timeoutMs ?? 3000;
+  now = opts.now ?? (() => Date.now());
 }
 
 /** Run `script` in the user's INTERACTIVE login shell and return only what the
@@ -69,7 +81,8 @@ function captureFromLoginShellUncached(script: string): string | null {
   }
 }
 
-/** The user's interactive-shell PATH, queried once and cached for the session. */
+/** The user's interactive-shell PATH, cached for the session once the shell
+ *  has answered. */
 export function userShellPath(): string {
   if (cachedPath !== null) return cachedPath;
   // Windows has no interactive login-shell PATH problem — use the process PATH directly.
@@ -77,12 +90,23 @@ export function userShellPath(): string {
     cachedPath = process.env.PATH || '';
     return cachedPath;
   }
+  // Only a real answer is cached. The process PATH is the fallback, and for a
+  // Finder or Dock launch it is launchd's bare /usr/bin:/bin:/usr/sbin:/sbin;
+  // caching it after one slow first launch left every agent, hidden call and
+  // MCP list without node, brew or uv for the whole session. Ask again after
+  // PATH_RETRY_MS instead.
+  const fallback = process.env.PATH || '';
+  if (now() < pathRetryAt) return fallback;
   const shellPath = captureFromLoginShell('printf %s "$PATH"')?.trim();
   // A PATH is a single colon-joined line. Anything multi-line is rc-file noise
   // that slipped the fence — fall back rather than hand the agent a corrupt
   // PATH it would carry into every subprocess it spawns.
-  cachedPath = shellPath && !shellPath.includes('\n') ? shellPath : process.env.PATH || '';
-  return cachedPath;
+  if (shellPath && !shellPath.includes('\n')) {
+    cachedPath = shellPath;
+    return cachedPath;
+  }
+  pathRetryAt = now() + PATH_RETRY_MS;
+  return fallback;
 }
 
 /** Resolve a bare command (e.g. 'claude') against the user's PATH + common
