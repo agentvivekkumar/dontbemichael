@@ -81,3 +81,20 @@ test('a timed-out PATH capture is not kept for the session: the shell is asked a
   assert.ok(real.split(':').includes(mybin), `expected ${mybin} on ${real}`);
   assert.equal(shellEnv.userShellPath(), real, 'the real answer is cached');
 });
+
+test('every blocking interactive shell lookup in the main process is killed with SIGKILL at its timeout', () => {
+  // Value: protects=no spawnSync of an interactive shell can outlive its timeout; fails_when=a `-ilc` spawnSync (shellEnv.ts, memory.ts) relies on the default SIGTERM; why_new=new; seam=none; no_claim=the shell actually dies (the first test proves that for shellEnv.ts)
+  const mainDir = path.resolve(__dirname, '..', 'src/main');
+  const found = [];
+  for (const name of fs.readdirSync(mainDir).filter((f) => f.endsWith('.ts'))) {
+    const src = fs.readFileSync(path.join(mainDir, name), 'utf8');
+    for (const m of src.matchAll(/spawnSync\(/g)) {
+      // The call through its options object: enough to see its args and opts.
+      const call = src.slice(m.index, src.indexOf(');', m.index) + 2);
+      if (!call.includes("'-ilc'")) continue;
+      found.push(name);
+      assert.match(call, /killSignal: 'SIGKILL'/, `${name}: an interactive shell spawnSync without killSignal: 'SIGKILL'`);
+    }
+  }
+  assert.deepEqual(found.sort(), ['memory.ts', 'shellEnv.ts'], 'the guard still sees both lookups');
+});
