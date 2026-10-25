@@ -504,6 +504,13 @@ export interface RegistryAgent extends AgentMeta {
   cwdValid?: boolean;
 }
 
+/** Who an agent was started as, from the app's own spawn (HiveManager.startedAs). */
+export interface StartedAs {
+  cwd: string;
+  isGod: boolean;
+  isAssistant: boolean;
+}
+
 export interface Registry {
   godId: string | null;
   agents: Record<string, RegistryAgent>;
@@ -869,6 +876,19 @@ export class HiveManager {
    *  every member's folder while someone hired since is not among them. */
   private walledAtStart = new Map<string, readonly string[]>();
   walledMembersOf(id: string): readonly string[] | null { return this.walledAtStart.get(id) ?? null; }
+  /** Per agent: who the app started it as in this launch (its folder, and
+   *  whether it is Michael or his assistant), as ensureAgent was given it. The
+   *  hook's folder walls judge an agent by this, never by registry.json: the
+   *  hive root is in every member's shell sandbox, so the registry is the
+   *  member's to rewrite. In memory only, like the hook secrets: every frame
+   *  the hook accepts comes from an agent started here. */
+  private readonly startedAgents = new Map<string, StartedAs>();
+  startedAs(id: string): StartedAs | null { return this.startedAgents.get(id) ?? null; }
+  /** The folders of the team members started in this launch: everyone but
+   *  Michael and his assistant, as the registry's own list was read. */
+  startedTeamFolders(): string[] {
+    return Array.from(this.startedAgents.values()).filter((a) => !a.isGod && !a.isAssistant && a.cwd).map((a) => a.cwd);
+  }
 
   /**
    * What a running agent should be told because the owner turned company
@@ -1313,6 +1333,9 @@ export class HiveManager {
     if (meta.cwd) meta = { ...meta, cwd: expandTilde(meta.cwd) };
     const role = preferredAgentRole(meta.role, prev?.role, !!meta.isGod);
     meta = { ...meta, role };
+    // Taken from what the app passed, before the registry's prior entry is
+    // merged in below: a flag a member wrote there must not ride along.
+    this.startedAgents.set(meta.id, { cwd: meta.cwd, isGod: !!meta.isGod, isAssistant: !!meta.isAssistant });
 
     // Research's folder is made safe first: nothing at its top is a link, a
     // pipe or a second name the app's writes below would go through (red
@@ -4134,6 +4157,9 @@ export class HiveManager {
       }
     }
     this.retireHookToken(id);
+    // Their folder is no longer a team member's, as their registry entry
+    // going would have made it before.
+    this.startedAgents.delete(id);
     if (godId && (theirs.length || withdrawn || setAside)) {
       const note = memberDeletedNote({ id, name: reg.agents[id]?.name }, theirs, withdrawn, setAside);
       try {
