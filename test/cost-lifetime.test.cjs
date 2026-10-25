@@ -175,3 +175,77 @@ test('lifetimeUsdFromLedger gives the same totals with or without a trailing new
   assert.equal(withoutNewline.get('a'), 14);
 });
 
+// ─── the breaker beat feeds the ledger and Pulse one session at a time ──────
+
+const { TelemetryCollector } = loadTs('src/main/telemetry.ts');
+const { SessionCostRecorder } = loadTs('src/main/sessionCost.ts');
+const { CostFold } = loadTs('src/shared/costFold.ts');
+
+function costBatch(agent, session, usd) {
+  return {
+    resourceMetrics: [{
+      resource: { attributes: [{ key: 'agent.id', value: { stringValue: agent } }] },
+      scopeMetrics: [{ metrics: [{ name: 'claude_code.cost.usage', sum: { dataPoints: [{ asDouble: usd, attributes: [
+        { key: 'session.id', value: { stringValue: session } },
+        { key: 'model', value: { stringValue: 'claude-opus-4-8[1m]' } }
+      ] }] } }] }]
+    }]
+  };
+}
+
+test('a session cleared mid run is counted once in the ledger and in Pulse', () => {
+  // safeClearer types /clear into the live PTY and Claude Code goes on under a
+  // new session id while the collector keeps the old session's totals. The
+  // beat used to write the aggregate ($10 + $1) under the new id, so lifetime
+  // cost and Pulse both came to $21 for $11 of spending.
+  const telemetry = new TelemetryCollector();
+  telemetry.tokenFor('a1');
+  const ingest = (session, usd) => telemetry.ingestMetrics(costBatch('a1', session, usd), 'a1');
+  const recorder = new SessionCostRecorder();
+  const ledger = [];
+  const pulse = new CostFold();
+  let pulseUsd = 0;
+  const sinks = {
+    // The row exactly as hive.appendCostLedger writes it.
+    ledger: (s) => ledger.push(JSON.stringify({
+      agent_id: s.agentId, session_id: s.sessionId, ts: s.ts, input: s.input, output: s.output,
+      cache_read: s.cacheRead, cache_creation: s.cacheCreation, model: s.model, usd: s.usd
+    })),
+    pulse: (agentId, session, usd) => { pulseUsd += pulse.add(`${agentId}\t${session}`, usd); }
+  };
+  const beat = () => recorder.record(telemetry.sessionSamples('a1'), sinks);
+
+  ingest('before-clear', 4); beat();
+  ingest('before-clear', 6); beat();
+  ingest('after-clear', 1); beat();
+  beat(); beat(); // idle beats
+
+  assert.equal(lifetimeUsdFromLedger(ledger.join('\n')).get('a1'), 11);
+  assert.equal(pulseUsd, 11);
+  // A late point for the old session grows only the old session.
+  ingest('before-clear', 2); beat();
+  assert.equal(lifetimeUsdFromLedger(ledger.join('\n')).get('a1'), 13);
+  assert.equal(pulseUsd, 13);
+  // A session whose totals did not move gets no new row: idle beats and the
+  // quiet session add nothing to a ledger that is never trimmed.
+  assert.equal(ledger.length, 4);
+  // The breaker and the cost cap still see the whole agent.
+  assert.equal(telemetry.getAgentUsage('a1').usd, 13);
+});
+
+test('the breaker beat records cost per session, not the aggregate', () => {
+  // index.ts cannot be loaded under plain Node, so check the beat's wiring in
+  // its source: the per session recorder is fed, and the aggregate sample is
+  // not written to the ledger or handed to Pulse under a live session id.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map((line) => line.replace(/\/\/.*$/, '')).join('\n');
+  const start = src.indexOf('function runBreakerBeat(');
+  const end = src.indexOf('breaker.tick(', start);
+  assert.ok(start !== -1 && end > start, 'runBreakerBeat not found in index.ts');
+  const beat = src.slice(start, end);
+  assert.match(beat, /sessionCost\.record\(telemetry\.sessionSamples\(id\)/);
+  assert.doesNotMatch(beat, /appendCostLedger\(sample\)/);
+  assert.doesNotMatch(beat, /pulseTelemetry\.cost\(id,\s*sample\.sessionId/);
+});
+

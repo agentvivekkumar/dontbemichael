@@ -119,6 +119,7 @@ import type { TaskCard, InboxMessage } from './realtimeCompletionWatcher';
 import { TelemetryCollector } from './telemetry';
 import { CostLedgerTotals } from './costLifetime';
 import { CostLedgerStore } from './costLedger';
+import { SessionCostRecorder, type SessionCostSinks } from './sessionCost';
 import { analytics, isRendererMessageSurface } from './analytics';
 import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
@@ -2377,6 +2378,13 @@ ipcMain.handle('office:retry', () => ({ ok: ownerRetryOffice() }));
 const ANTHROPIC_BILLING_URL = 'https://platform.claude.com/settings/billing';
 ipcMain.handle('office:addCredit', () => { void shell.openExternal(ANTHROPIC_BILLING_URL); return { ok: true }; });
 
+/** Each live session's cost, for the ledger and Pulse (sessionCost.ts). */
+const sessionCost = new SessionCostRecorder();
+const sessionCostSinks: SessionCostSinks = {
+  ledger: (s) => hive.appendCostLedger(s),
+  pulse: (agentId, session, usd, tokens, model) => pulseTelemetry.cost(agentId, session, usd, tokens, model)
+};
+
 /** One circuit-breaker beat: pull a fresh usage sample per active agent, append
  *  it to the durable cost ledger (the SOLE durable cost store), tick the breaker,
  *  emit each BreakerState on control:breakerState (Seam 2), and enforce any
@@ -2400,21 +2408,22 @@ function runBreakerBeat(progressWindowMs: number): void {
     if (a.isAssistant) continue;
     if (id !== reg.godId && !ptyForAgent(id)) continue;
     const sample = usageProvider.getAgentUsage(id);
-    // #56: only append a ledger row for a LIVE session sample. A dead/orphaned
-    // agent with a frozen transcript still yields a sample via the transcript
-    // fallback, but with an EMPTY sessionId (aggregateLive returns null → no live
-    // OTel session). Appending it every ~30s rewrote the identical row forever
-    // (2,417 dupes observed). A truthy sessionId is set only by a live session
-    // (aggregateLive picks the most-recent live session id), so this gates on
-    // "is there a live session" without changing any live-agent behavior.
-    if (sample?.sessionId) hive.appendCostLedger(sample); // ledger covers everyone incl. god
+    // #56: only a LIVE session gets ledger rows. A dead/orphaned agent with a
+    // frozen transcript still yields a sample via the transcript fallback, but
+    // with an EMPTY sessionId and no live sessions. Appending it every ~30s
+    // rewrote the identical row forever (2,417 dupes observed).
+    // The ledger and Pulse fold per (agent, session), so each live session is
+    // recorded under its own id, never the aggregate: after /clear the
+    // aggregate carries the old session's spend under the new id and counted
+    // it twice (sessionCost.ts). Ledger covers everyone incl. god.
+    sessionCost.record(telemetry.sessionSamples(id), sessionCostSinks);
     // Pulse keeps every engine's cost; a repeat of the last value is not stored.
     // A transcript fallback (no session id) is the whole session's total, so a
     // Claude member's is left out: its live numbers and the ledger's past days
     // already count that spend (ship review, 2026-10-16). An engine with no live
     // numbers keeps it, under its own session so one session folds as one.
-    if (sample && (sample.sessionId || (a.provider ?? 'claude') !== 'claude')) {
-      pulseTelemetry.cost(id, sample.sessionId || `transcript:${hive.lastSession(id) ?? ''}`, sample.usd, sample.input + sample.output + sample.cacheRead + sample.cacheCreation, sample.model);
+    if (sample && !sample.sessionId && (a.provider ?? 'claude') !== 'claude') {
+      pulseTelemetry.cost(id, `transcript:${hive.lastSession(id) ?? ''}`, sample.usd, sample.input + sample.output + sample.cacheRead + sample.cacheCreation, sample.model);
     }
     // Second source for the resume key. recordSession() is otherwise reachable
     // ONLY from the hook shim, so any window where hooks don't land leaves the
