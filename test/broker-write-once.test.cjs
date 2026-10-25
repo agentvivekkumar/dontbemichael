@@ -619,3 +619,42 @@ test('an agent that hangs up partway through the answer does not stall its retry
   assert.equal(broker.writes.size, 0);
   assert.equal(pendingRows(file).length, 0);
 });
+
+test('an agent that gives up before any answer gets the real one on retry, or the refusal when it was too large to keep', async (t) => {
+  // Value: protects=a write whose caller left before the service answered is settled with that answer, and a large one still refuses a repeat; fails_when=the relay stalls writing the head or body to a caller who already left, or a caller leaving is counted as a cut answer; why_new=the early hang up took the same stuck path as a hang up mid answer; seam=fetchImpl holds the answer until the caller has gone
+  const { dir, file } = journalFile();
+  let calls = 0;
+  const gates = [];
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    replayBodyMax: 32,
+    getRecord: () => record('books', 'https://api.example.com/'),
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      await new Promise((resolve) => gates.push(resolve));
+      return String(init.body).includes('big')
+        ? slowAnswer(['{"invoice":{"id":"INV-2",', '"lines":[1,2,3,4,5,6,7,8,9]}}'], 20)
+        : slowAnswer(['{"invoice":{"id":"INV-1"}}'], 20);
+    }
+  });
+  const token = broker.grant('pty-oscar', ['books'], 'oscar');
+
+  await hangUp(broker.url(), token, '/i/books/invoice', '{"n":"small"}', 100);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  gates.shift()();
+  const small = await requestWithin(2000, broker.url(), token, 'POST', '/i/books/invoice', '{"n":"small"}');
+  assert.equal(small.status, 201);
+  assert.equal(small.text, '{"invoice":{"id":"INV-1"}}');
+
+  await hangUp(broker.url(), token, '/i/books/invoice', '{"n":"big"}', 100);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  gates.shift()();
+  const big = await requestWithin(2000, broker.url(), token, 'POST', '/i/books/invoice', '{"n":"big"}');
+  assert.equal(big.status, 409);
+  assert.match(big.text, /already_applied/);
+
+  assert.equal(calls, 2);
+  assert.equal(broker.writes.size, 0);
+  assert.equal(pendingRows(file).length, 0);
+});
