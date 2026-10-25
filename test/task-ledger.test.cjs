@@ -206,6 +206,24 @@ test('a board that does not parse is never written over', (t) => {
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).tasks.map((c) => c.id), ['t1', 't2', 'webhook-1']);
 });
 
+// Value: protects=the board saved with a byte order mark; fails_when=JSON.parse
+// meets the leading U+FEFF and the board reads as unknown or empty;
+// why_new=PowerShell's Set-Content -Encoding UTF8 writes one, and the whole
+// board then read as empty; seam=HiveManager.tasks/addTask on disk.
+test('a board saved with a byte order mark still reads and takes a new card', (t) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md task ledger bom '));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  hive.ensureHive();
+  const file = path.join(home, 'hive', 'tasks.json');
+  const cards = [{ id: 't1', title: 'Refund for Northwind', status: 'blocked' }, { id: 't2', title: 'Payroll run', status: 'doing' }];
+  fs.writeFileSync(file, '﻿' + JSON.stringify({ tasks: cards }, null, 2));
+  assert.deepEqual(hive.tasks().tasks.map((c) => c.id), ['t1', 't2']);
+  assert.equal(hive.addTask({ id: 'webhook-1', title: 'New lead', status: 'todo' }), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).tasks.map((c) => c.id), ['t1', 't2', 'webhook-1']);
+  assert.equal(hive.patchTask('t2', { status: 'done' }), true);
+});
+
 test('a card added with no tasks.json yet starts the board', (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md task ledger none '));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));

@@ -553,6 +553,13 @@ function shortRand(): string {
   return randomBytes(3).toString('hex');
 }
 
+/** JSON.parse that tolerates a leading UTF-8 byte order mark. A file saved by
+ *  an editor or a Windows tool (PowerShell's Set-Content -Encoding UTF8) can
+ *  start with one, and JSON.parse refuses it though the rest is whole. */
+function parseJsonText(text: string): unknown {
+  return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+}
+
 /** Write over an agent's own file in place, only when it is a plain file
  *  with one name: never through a link or a second name it made for a file
  *  of someone else's (red team, third ship). Throws otherwise. */
@@ -3973,7 +3980,7 @@ export class HiveManager {
       return (e as NodeJS.ErrnoException)?.code === 'ENOENT' ? { tasks: [] } : null;
     }
     try {
-      const raw = JSON.parse(text) as { tasks?: unknown };
+      const raw = parseJsonText(text) as { tasks?: unknown };
       return Array.isArray(raw?.tasks) ? { tasks: raw.tasks } : null;
     } catch { return null; }
   }
@@ -4389,7 +4396,7 @@ export class HiveManager {
     // Read strictly: a board that does not parse is never taken as empty.
     const readBoard = (): unknown[] | null => {
       try {
-        const raw = JSON.parse(readFileSync(join(root, 'tasks.json'), 'utf8')) as { tasks?: unknown };
+        const raw = parseJsonText(readFileSync(join(root, 'tasks.json'), 'utf8')) as { tasks?: unknown };
         return Array.isArray(raw?.tasks) ? raw.tasks : null;
       } catch { return null; }
     };
@@ -6062,7 +6069,7 @@ export class HiveManager {
 
   // — json + atomic io —
   private readJson<T>(p: string, fallback: T): T {
-    try { return JSON.parse(readFileSync(p, 'utf8')) as T; } catch { return fallback; }
+    try { return parseJsonText(readFileSync(p, 'utf8')) as T; } catch { return fallback; }
   }
   private writeJson(p: string, data: unknown): void {
     writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');
