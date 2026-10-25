@@ -1118,11 +1118,12 @@ function str(v: unknown, max = 5000): string | undefined {
   return typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined;
 }
 
-/** The longest recipient list an agent's email may carry. A longer one is
- *  refused, never cut: a list cut at the limit can end inside the last
- *  address, so bob@example.com became bob@example.co and a different domain
- *  got the business's email. */
-const COMPOSE_MAX = { recipients: 2000 } as const;
+/** The most an agent's email may carry. Longer is refused, never cut: a
+ *  recipient list cut at the limit can end inside the last address, so
+ *  bob@example.com became bob@example.co and a different domain got the
+ *  business's email; a cut subject or body goes out missing its end, with
+ *  nobody told. */
+const COMPOSE_MAX = { recipients: 2000, subject: 500, body: 200_000 } as const;
 
 /** Why a draft, proposal or send is refused for its size, or null. */
 function composeTooLong(op: string, body: Record<string, unknown>): string | null {
@@ -1132,6 +1133,12 @@ function composeTooLong(op: string, body: Record<string, unknown>): string | nul
     if (typeof v === 'string' && v.length > COMPOSE_MAX.recipients) {
       return `"${field}" is longer than ${COMPOSE_MAX.recipients} characters, so nothing was ${done}. Cutting it could change an address, so split the recipients over several emails.`;
     }
+  }
+  if (typeof body.subject === 'string' && body.subject.length > COMPOSE_MAX.subject) {
+    return `"subject" is longer than ${COMPOSE_MAX.subject} characters, so nothing was ${done}. Shorten it.`;
+  }
+  if (typeof body.body === 'string' && body.body.length > COMPOSE_MAX.body) {
+    return `"body" is longer than ${COMPOSE_MAX.body} characters, so nothing was ${done}. Shorten it, or split it over several emails.`;
   }
   return null;
 }
@@ -1300,7 +1307,7 @@ async function runMailRequest(
   // proposal is held to it too, or an approved card could send the wrong
   // email from the sending mailbox (eng review ER4, D1).
   const input: ComposeInput = {
-    to: str(body.to, COMPOSE_MAX.recipients) ?? '', cc: str(body.cc, COMPOSE_MAX.recipients), subject: str(body.subject, 500) ?? '', body: str(body.body, 200_000) ?? '',
+    to: str(body.to, COMPOSE_MAX.recipients) ?? '', cc: str(body.cc, COMPOSE_MAX.recipients), subject: str(body.subject, COMPOSE_MAX.subject) ?? '', body: str(body.body, COMPOSE_MAX.body) ?? '',
     replyTo: ref(body.reply_to), forward: ref(body.forward), attachFrom: attachRefs
   };
   const refs = [input.replyTo, input.forward, ...(input.attachFrom ?? [])].filter(Boolean) as MailRef[];
@@ -1321,7 +1328,7 @@ async function runMailRequest(
   const recordGrantSend = (out: { messageId?: unknown }, email: ComposeInput): void => {
     if (!underGrant || !out?.messageId) return;
     try {
-      deps.proposals?.recordSend({ agentId, mailbox: mailbox!, messageId: String(out.messageId), references: email.thread ? [...email.thread.references] : [], to: email.to.slice(0, COMPOSE_MAX.recipients), subject: email.subject.slice(0, 500), sentAt: Date.now() });
+      deps.proposals?.recordSend({ agentId, mailbox: mailbox!, messageId: String(out.messageId), references: email.thread ? [...email.thread.references] : [], to: email.to.slice(0, COMPOSE_MAX.recipients), subject: email.subject.slice(0, COMPOSE_MAX.subject), sentAt: Date.now() });
     } catch (e) { console.error('[mail] send record not kept:', agentId, mailbox, String(out.messageId), e); }
   };
   const grantFlag = underGrant ? { grant: true } : {};

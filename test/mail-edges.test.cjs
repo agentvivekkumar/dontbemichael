@@ -293,6 +293,28 @@ test('a recipient list over the limit is refused, never cut into a different add
   assert.equal(state.sends[0].to, at, 'sent whole, last address intact');
 });
 
+test('a subject or body over the limit is refused, never sent cut short; one at the limit goes out whole', async () => {
+  // Value: protects=a long email never goes out missing its end; fails_when=the broker slices subject or body; why_new=the cut sent truncated mail with sent: true; seam=handleMailRequest with fake SMTP
+  const { call, state } = setup();
+  const long = await call('dwight', 'send', { mailbox: 'sales', to: 'a@b.com', subject: 's', body: 'x'.repeat(200_001) });
+  assert.equal(long.status, 400);
+  assert.match(long.body.error, /^"body" is longer than 200000 characters, so nothing was sent\. Shorten it/);
+  const draft = await call('dwight', 'draft', { mailbox: 'sales', to: 'a@b.com', subject: 's', body: 'x'.repeat(200_001) });
+  assert.equal(draft.status, 400);
+  assert.match(draft.body.error, /nothing was saved/);
+  const subject = await call('dwight', 'send', { mailbox: 'sales', to: 'a@b.com', subject: 's'.repeat(501), body: 'b' });
+  assert.equal(subject.status, 400);
+  assert.match(subject.body.error, /^"subject" is longer than 500 characters, so nothing was sent\. Shorten it\.$/);
+  assert.equal(state.sends.length, 0, 'nothing reached SMTP');
+  assert.equal(state.folders.Drafts.length, 0, 'no draft was saved');
+
+  const body = `${'x'.repeat(200_000 - 'The end'.length)}The end`;
+  const ok = await call('dwight', 'send', { mailbox: 'sales', to: 'a@b.com', subject: 's'.repeat(500), body });
+  assert.equal(ok.status, 200);
+  assert.equal(state.sends[0].subject, 's'.repeat(500));
+  assert.ok(state.sends[0].text.endsWith('The end'), 'the body goes out whole');
+});
+
 test('a send from a non Gmail mailbox files a copy in Sent; Gmail does not', async () => {
   const icloud = setup();
   const r = await icloud.call('pam', 'send', { mailbox: 'ceo', to: 'a@b.com', subject: 'Hi', body: 'Copy me' });
