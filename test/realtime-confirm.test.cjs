@@ -53,3 +53,30 @@ test('a plain confirm still runs it, and a bare yes still does not', async () =>
   assert.equal((await confirm('confirm')).ok, true);
   assert.deepEqual(killed, ['jim']);
 });
+
+test('every way of saying no refuses, and a refused confirm is dropped, not left armed', async () => {
+  // Value: protects=a no in any form ends a staged kill for good; fails_when=a n't word other than don't, cannot, a curly ‘ or nah, hold on or nevermind is accepted, or a refused kill still runs on the next phrase with the verb word; why_new=review on #541; seam=the real handlers through the ipcMain stub
+  const phrases = [
+    "I can't kill Jim", "I won't kill Jim", "I didn't mean kill jim", "you shouldn't kill jim", "I couldn't kill jim",
+    'I cannot kill Jim', 'cant kill jim', 'wont kill jim', 'don‘t kill jim',
+    'nah, kill Jim', 'hold on, kill Jim', 'hang on, kill jim', 'hold off, kill jim', 'nevermind, kill Jim'
+  ];
+  for (const phrase of phrases) {
+    killed.length = 0;
+    await act({ verb: 'kill', target: 'jim' });
+    const res = await confirm(phrase);
+    assert.deepEqual([res.ok, res.spoken], [false, 'Cancelled the kill.'], phrase);
+    assert.deepEqual(killed, [], phrase);
+  }
+  // The staged kill is gone: a later phrase with the verb word finds nothing to run.
+  killed.length = 0;
+  await act({ verb: 'kill', target: 'jim' });
+  assert.equal((await confirm('cancel the kill')).spoken, 'Cancelled the kill.');
+  assert.equal((await confirm('jim can kill that bug')).spoken, 'There\'s nothing waiting to confirm.');
+  assert.deepEqual(killed, []);
+  // A bare yes still keeps it staged, so a clear confirm after it works.
+  await act({ verb: 'kill', target: 'jim' });
+  assert.equal((await confirm('yes')).ok, false);
+  assert.equal((await confirm('kill jim')).ok, true);
+  assert.deepEqual(killed, ['jim']);
+});
