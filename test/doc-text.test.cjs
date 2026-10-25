@@ -387,6 +387,41 @@ test('plain text, markdown and CSV are left to the store, which already reads th
   }
 });
 
+test('Excel\'s "Unicode Text" (UTF-16 with a byte order mark) is read as text, not refused as binary', async () => {
+  // Value: protects=a UTF-16 export from Excel or Notepad is searchable; fails_when=the NUL bytes of UTF-16 trip the binary check again; why_new=Windows exports were refused as "isn't a document"; seam=none
+  const rows = 'Item\tPrice\r\nCroissant\t2.50\r\nCrème brûlée\t4.00\r\n';
+  const le = await extractDocumentText(write('price-list.txt', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(rows, 'utf16le')])));
+  assert.equal(le.kind, 'text');
+  assert.equal(le.text, rows);
+  assert.equal(le.extractor, 'text-utf-16le@1');
+  assert.equal(le.modality, kg.detectModality('price-list.txt'));
+  assert.equal(le.mime, 'text/plain');
+
+  const be = await extractDocumentText(write('price-list-be.tsv', Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(rows, 'utf16le').swap16()])));
+  assert.equal(be.kind, 'text');
+  assert.equal(be.text, rows);
+  assert.equal(be.modality, 'sheet');
+  assert.equal(be.mime, 'text/tab-separated-values');
+
+  const empty = await extractDocumentText(write('blank.txt', Buffer.from([0xff, 0xfe])));
+  assert.equal(empty.kind, 'unreadable', 'a byte order mark and nothing else has no text to store');
+});
+
+test('a UTF-8 byte order mark is not kept at the front of the text or the title', async () => {
+  // Value: protects=a Notepad-saved UTF-8 file is indexed and titled without U+FEFF; fails_when=the BOM file is passed through raw; why_new=the mark sat in text.md and the first CSV header; seam=none
+  const src = write('suppliers-bom.csv', Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('Name,City\nJosé Müller,Köln\n')]));
+  const ex = await extractDocumentText(src);
+  assert.equal(ex.kind, 'text');
+  assert.equal(ex.text, 'Name,City\nJosé Müller,Köln\n');
+
+  const root = path.join(tmp, 'kg-bom');
+  const { docId, meta } = kg.ingest(root, { srcPath: src, text: ex.text, modality: ex.modality, extractor: ex.extractor, mime: ex.mime });
+  assert.equal(meta.title, 'Name,City');
+  assert.equal(meta.modality, 'sheet');
+  assert.equal(meta.mime, 'text/csv');
+  assert.ok(!kg.getDoc(root, docId).text.startsWith('﻿'));
+});
+
 test('a missing file gets a plain reason, not a stack trace', async () => {
   const r = await extractDocumentText(path.join(tmp, 'gone.docx'));
   assert.equal(r.kind, 'unreadable');

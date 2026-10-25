@@ -54,6 +54,13 @@ test('text on stdout, newline-terminated, exit 0: Word converted, plain text pas
   assert.equal(txt.out, 'Deliveries on Tuesdays\n');
 });
 
+test('a UTF-16 text file prints as readable text, not refused or as raw bytes', () => {
+  // Value: protects=an agent reading an Excel "Unicode Text" export gets its words; fails_when=the CLI reads UTF-16 as UTF-8 or refuses it as binary; why_new=Windows exports were refused; seam=none
+  const r = docText(write('stock.txt', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Flour\t12 kg', 'utf16le')])));
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out, 'Flour\t12 kg\n');
+});
+
 test('--json prints the whole result, for the app reading uploads in a process of its own', async () => {
   const file = docx('menu.docx', '<w:p><w:r><w:t>Soup of the day</w:t></w:r></w:p>');
   const r = docText('--json', file);
