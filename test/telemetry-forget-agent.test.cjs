@@ -106,3 +106,63 @@ test('teardown resets telemetry when it forgets breaker state', () => {
 
   assert.match(afterBreakerReset, /telemetry\.forgetAgent\(agentId\)/);
 });
+
+function costBatch(agentId, sessionId, usd) {
+  return {
+    resourceMetrics: [{
+      resource: { attributes: [{ key: 'agent.id', value: { stringValue: agentId } }] },
+      scopeMetrics: [{
+        metrics: [{
+          name: 'claude_code.cost.usage',
+          sum: {
+            dataPoints: [{
+              asDouble: usd,
+              attributes: [
+                { key: 'session.id', value: { stringValue: sessionId } },
+                { key: 'model', value: { stringValue: 'claude-sonnet-5' } }
+              ]
+            }]
+          }
+        }]
+      }]
+    }]
+  };
+}
+
+test('sessionSamples keeps each session of one agent under its own id and total', async (t) => {
+  // After /clear Claude Code goes on in the same PTY under a new session id,
+  // so one agent holds two sessions. The aggregate sums them under the newest
+  // id, which is right for the breaker but double counts in anything keyed by
+  // (agent, session); those read each session on its own.
+  const telemetry = new TelemetryCollector({ host: '127.0.0.1', port: 0 });
+  await telemetry.start();
+  t.after(() => telemetry.stop());
+  const endpoint = telemetry.endpoint();
+  const token = telemetry.tokenFor('agent-1');
+
+  await postMetrics(endpoint, costBatch('agent-1', 'before-clear', 10), token);
+  await postMetrics(endpoint, tokenBatch('agent-1', 'before-clear', 400), token);
+  await postMetrics(endpoint, costBatch('agent-1', 'after-clear', 1), token);
+  await postMetrics(endpoint, tokenBatch('agent-1', 'after-clear', 30), token);
+  await postMetrics(endpoint, costBatch('agent-2', 'other', 5), telemetry.tokenFor('agent-2'));
+
+  const bySession = Object.fromEntries(telemetry.sessionSamples('agent-1').map((s) => [s.sessionId, s]));
+  assert.deepEqual(Object.keys(bySession).sort(), ['after-clear', 'before-clear']);
+  assert.equal(bySession['before-clear'].usd, 10);
+  assert.equal(bySession['before-clear'].output, 400);
+  assert.equal(bySession['after-clear'].usd, 1);
+  assert.equal(bySession['after-clear'].output, 30);
+  for (const s of Object.values(bySession)) {
+    assert.equal(s.agentId, 'agent-1');
+    assert.equal(s.model, 'claude-sonnet-5');
+  }
+
+  // The aggregate still sums them for the breaker and the cost cap.
+  assert.equal(telemetry.getAgentUsage('agent-1').usd, 11);
+
+  // No live telemetry, no session samples (the transcript fallback has no
+  // session to key by), and a forgotten agent has none left.
+  assert.deepEqual(telemetry.sessionSamples('nobody'), []);
+  telemetry.forgetAgent('agent-1');
+  assert.deepEqual(telemetry.sessionSamples('agent-1'), []);
+});
