@@ -319,6 +319,12 @@ test('identity, QuickBooks requestid, and failure class stay stable', () => {
   const refusedErr = new TypeError('fetch failed');
   refusedErr.cause = cause;
   assert.equal(classifyUpstreamFailure(refusedErr), 'never');
+  // fetch refuses a header it will not send before any socket opens.
+  for (const code of ['UND_ERR_NOT_SUPPORTED', 'UND_ERR_INVALID_ARG']) {
+    const invalid = new TypeError('fetch failed');
+    invalid.cause = Object.assign(new Error('expect header not supported'), { code });
+    assert.equal(classifyUpstreamFailure(invalid), 'never', code);
+  }
   const aborted = new Error('aborted');
   aborted.name = 'AbortError';
   assert.equal(classifyUpstreamFailure(aborted), 'uncertain');
