@@ -220,6 +220,36 @@ export function armPlan(m: ScheduledMission, now: number, ctx: ArmContext): ArmP
   return { type: 'interval', firstDelayMs, everyMs };
 }
 
+/** How long a weekly or "when" timer aimed at `due` must still wait at `now`:
+ *  0 once the slot has come. A timer is aimed at a wall clock instant, but
+ *  Node wakes it by its own loop clock, cut to whole milliseconds and not
+ *  slewed with the wall clock, so it can wake a millisecond (after days of
+ *  waiting, seconds) before `due` by Date.now(). Woken early, the timer waits
+ *  the rest and runs nothing: running then left the slot still ahead, so the
+ *  re-arm picked the same slot and the job was sent twice. Capped at the
+ *  longest wait a Node timer takes; a capped timer just wakes and waits again. */
+export function slotWaitMs(due: number, now: number): number {
+  return Math.min(MAX_TIMER_MS, Math.max(0, due - now));
+}
+
+/** The wait before a weekly or "when" schedule's next run, or null when it
+ *  never runs. `persisted` is catchUpFloor of the stored row. `firedSlot` is
+ *  the slot the timer just ran, if it just ran: the next slot is counted from
+ *  the later of it and `now`, so the slot just run is never chosen again, and
+ *  that is the catch up floor too, which keeps a failed lastFiredAt write from
+ *  bringing the same slot back as missed (a spin guard, not a nicety). */
+export function nextSlotDelayMs(
+  plan: Extract<ArmPlan, { type: 'weekly' | 'times' }>,
+  now: number,
+  persisted: number,
+  firedSlot?: number
+): number | null {
+  const from = firedSlot === undefined ? now : Math.max(now, firedSlot);
+  const floor = firedSlot === undefined ? persisted : Math.max(persisted, from);
+  const delay = plan.type === 'times' ? timesDelayMs(plan.times, from, floor) : weeklyDelayMs(plan.weekly, from, floor);
+  return delay === null ? null : delay + (from - now);
+}
+
 /** What one run sends, or null for a compaction-only mission (no dispatch). */
 export function firePayload(m: ScheduledMission): { to: string; subject: string; body: string } | null {
   if (m.kind === 'compact') return null;
