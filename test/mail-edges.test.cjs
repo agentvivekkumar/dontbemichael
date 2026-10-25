@@ -64,7 +64,8 @@ function setup(over = {}) {
       async verify() { if (state.verifyError) throw state.verifyError; },
       close() { state.smtpCloses = (state.smtpCloses ?? 0) + 1; }
     }),
-    log: over.log
+    log: over.log,
+    proposals: over.proposals
   };
   const svc = new MailService(deps);
   return { state, svc, config, call: (agent, op, body) => handleMailRequest(svc, deps, agent, op, body) };
@@ -249,6 +250,47 @@ test('a rejected recipient whose address holds 535 is not sent, and the mailbox 
   assert.match(r.body.error, /^Not sent\./);
   assert.doesNotMatch(r.body.error, /password/);
   assert.equal(state.statuses.some((s) => s.status === 'needs-attention'), false, 'the password is fine; only the recipient was refused');
+});
+
+// A recipient list of exactly `length` characters whose last address is bob@example.com.
+const recipients = (length) => {
+  const last = 'bob@example.com';
+  let list = '';
+  for (let n = 0; (list + `c${n}@shop.com, `).length + last.length <= length; n++) list += `c${n}@shop.com, `;
+  return `${'x'.repeat(length - list.length - last.length)}${list}${last}`;
+};
+
+test('a recipient list over the limit is refused, never cut into a different address, for send, draft and propose alike', async () => {
+  // Value: protects=an email never goes to an address the agent did not write; fails_when=the broker slices "to" or "cc" to 2000 characters; why_new=the cut made bob@example.com into bob@example.co and sent; seam=handleMailRequest with fake SMTP and a fake proposal store
+  const filed = [];
+  // Pam proposes: Send on approval on her mailbox.
+  const { call, state } = setup({
+    proposals: { file: (p) => { filed.push(p); return { id: 'p1' }; } },
+    config: { agentCapabilities: {
+      dwight: { email: { enabled: true, mailboxes: ['sales'], send: true } },
+      pam: { email: { enabled: true, mailboxes: ['ceo'], send: true, sending: 'approval' } }
+    } }
+  });
+  const over = recipients(2001);
+  assert.equal(over.length, 2001);
+  for (const [agent, mailbox, op] of [['dwight', 'sales', 'send'], ['dwight', 'sales', 'draft'], ['pam', 'ceo', 'propose']]) {
+    for (const field of ['to', 'cc']) {
+      const msg = { mailbox, to: 'a@b.com', subject: 's', body: 'b', [field]: over };
+      const r = await call(agent, op, msg);
+      assert.equal(r.status, 400, `${op} with a long ${field}`);
+      assert.match(r.body.error, new RegExp(`^"${field}" is longer than 2000 characters, so nothing was`));
+      assert.match(r.body.error, /split the recipients over several emails/);
+    }
+  }
+  assert.equal(state.sends.length, 0, 'nothing reached SMTP');
+  assert.equal(state.folders.Drafts.length, 0, 'no draft was saved');
+  assert.equal(filed.length, 0, 'no proposal was filed');
+
+  const at = recipients(2000);
+  const ok = await call('dwight', 'send', { mailbox: 'sales', to: at, subject: 's', body: 'b' });
+  assert.equal(ok.status, 200, 'a list exactly at the limit still sends');
+  assert.equal(state.sends.length, 1);
+  assert.equal(state.sends[0].to, at, 'sent whole, last address intact');
 });
 
 test('a send from a non Gmail mailbox files a copy in Sent; Gmail does not', async () => {
