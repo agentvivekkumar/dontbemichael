@@ -212,18 +212,16 @@ export interface TidyOutcome {
   stats: { added: number; updated: number; deleted: number; procedures: number; repeats: number; dupes: number };
 }
 
-/** Apply checked ops to the entries. Stored procedures are identified by their
- *  full file headings, not the lossy slug or the shortened index label. Include
- *  files without an index entry too: a previous write may have stopped halfway.
- *  A null name reserves a path whose identity is unknown; it cannot match an op.
- *  A path with no name given falls back to its index entry's name. */
-export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string, procedureNames: ReadonlyMap<string, string | null> = new Map()): TidyOutcome {
 /** Apply checked ops to the entries. Deterministic; the model never writes the file.
  *  An add whose text matches an entry already in the index at that point in the
  *  batch (including earlier adds), ignoring case and extra whitespace, is
  *  skipped and counted as a dupe. Checked against the index as it stands, so a
- *  delete or an update that moves text away leaves room for that text again. */
-export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string): TidyOutcome {
+ *  delete or an update that moves text away leaves room for that text again.
+ *  Stored procedures are identified by their full file headings, not the lossy slug or the shortened index label. Include
+ *  files without an index entry too: a previous write may have stopped halfway.
+ *  A null name reserves a path whose identity is unknown; it cannot match an op.
+ *  A path with no name given falls back to its index entry's name. */
+export function applyOps(entries: MemoryEntry[], ops: MemoryOp[], today: string, procedureNames: ReadonlyMap<string, string | null> = new Map()): TidyOutcome {
   let next = entries.map((e) => ({ ...e }));
   const names = new Map(procedureNames);
   const usedSlugs = new Set(names.keys());

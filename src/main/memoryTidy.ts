@@ -223,10 +223,8 @@ export class MemoryTidy {
       restore();
       return this.abort(id, 'model-failed', 'no list of changes in the response');
     }
-    const ops = validateOps(raw, entries);
-    let outcome: ReturnType<typeof applyOps>;
     const { ops, dropped } = validateOps(raw, entries);
-    const outcome = applyOps(entries, ops, today);
+    let outcome: ReturnType<typeof applyOps>;
 
     try {
       // Refresh after the model call in case a procedure file changed meanwhile.
