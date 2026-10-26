@@ -4,7 +4,7 @@ import { MarkdownPreview } from '@/markdown/MarkdownPreview';
 import { PixelButton } from './PixelButton';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useRtl } from '@/i18n/useDirection';
-import { parseRoleLine, workStyleBody } from '@shared/agentProfile';
+import { parseRoleLine, profileDuties, workStyleBody } from '@shared/agentProfile';
 import { fillBusiness } from '@shared/teamPlan';
 import type { AgentDefinitionV2 } from '@shared/agentDefinition';
 import { useStore, type Agent } from '@/store/store';
@@ -17,9 +17,9 @@ import { groupName } from './fieldText';
 
 /**
  * PROFILE: who this agent is, the first tab on every agent (owner, 2026-09-25;
- * docs/designs/agent-profile.md). The job title and what the job is, what to
- * send them and what goes elsewhere, what they do and what they ask you about
- * first, the key facts, and the full instructions they follow.
+ * docs/designs/agent-profile.md). The job title and what the job is, what they
+ * do and what they ask you about first (from the saved work style, or the
+ * Office Pack when none is saved), the key facts, and the full instructions.
  *
  * Everything comes from what the app already stores: the agent's role line and
  * work style, and its card in the office's business pack (read once per launch).
@@ -98,8 +98,16 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   // Michael has no pack card: his profile says what his instructions tell him
   // to do (hive.ts godPrompt), in the owner's words.
   const summary = god ? t('profile.god.summary', { name }) : (role.summary || card?.summary || '');
-  const does = god ? (t('profile.god.does', { returnObjects: true, name }) as string[]) : (card?.does ?? []);
-  const asksFirst = god ? (t('profile.god.asksFirst', { returnObjects: true }) as string[]) : (card?.wontDo ?? []);
+  // A saved work style is what this person follows. The pack lists are the
+  // template, used when that work style has neither section. Michael's lists
+  // are his own, not a pack card and not this parse.
+  const duties = god ? undefined : profileDuties(effectiveWorkStyle(agent));
+  const does = god
+    ? (t('profile.god.does', { returnObjects: true, name }) as string[])
+    : (duties?.found ? duties.does : (card?.does ?? []));
+  const asksFirst = god
+    ? (t('profile.god.asksFirst', { returnObjects: true }) as string[])
+    : (duties?.found ? duties.asksFirst : (card?.wontDo ?? []));
   const team = god ? agents.filter((a) => !a.isGod && !a.isAssistant && !a.archived) : [];
   const businessLine = office?.business.name
     ? [office.business.name, office.business.city].filter(Boolean).join(t('profile.listJoiner'))
