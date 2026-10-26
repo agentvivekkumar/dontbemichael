@@ -27,6 +27,12 @@ export interface ModelPrice {
 const OPUS: ModelPrice = { inputPerM: 15, outputPerM: 75, cacheReadPerM: 1.5, cacheWritePerM: 18.75 };
 const SONNET: ModelPrice = { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3, cacheWritePerM: 3.75 };
 const HAIKU: ModelPrice = { inputPerM: 0.8, outputPerM: 4, cacheReadPerM: 0.08, cacheWritePerM: 1.0 };
+// Claude Fable 5.1: Anthropic list prices, USD per million tokens.
+// Input 10, output 50, 5-minute cache write 12.5, cache read 0.25.
+const FABLE_5_1: ModelPrice = { inputPerM: 10, outputPerM: 50, cacheReadPerM: 0.25, cacheWritePerM: 12.5 };
+// Claude Fable 5: same family, slightly higher cache read rate.
+// Input 10, output 50, 5-minute cache write 12.5, cache read 1.0.
+const FABLE_5: ModelPrice = { inputPerM: 10, outputPerM: 50, cacheReadPerM: 1.0, cacheWritePerM: 12.5 };
 
 // OpenAI list prices for the GPT-5 family Codex runs on. OpenAI bills no cache
 // writes, and a cached input token costs a tenth of a fresh one. Newer point
@@ -51,6 +57,14 @@ export function normalizeModel(model: string | undefined | null): string {
 /** Resolve a model id to its price row by family, falling back to Sonnet. */
 export function priceFor(model: string | undefined | null): ModelPrice {
   const m = normalizeModel(model).toLowerCase();
+  // Fable must be checked before the generic 'opus'/'sonnet'/'haiku' branches
+  // so that model ids like `claude-fable-5-1` and `claude-fable-5-1[1m]` hit
+  // the right row instead of falling through to the Sonnet default (#556).
+  if (m.includes('fable')) {
+    // Fable 5.1 has a lower cache-read rate than Fable 5.
+    if (m.includes('fable-5-1') || m.includes('fable-5.1')) return FABLE_5_1;
+    return FABLE_5;
+  }
   if (m.includes('opus')) return OPUS;
   if (m.includes('haiku')) return HAIKU;
   if (m.includes('sonnet')) return SONNET;
@@ -68,7 +82,7 @@ export function priceFor(model: string | undefined | null): ModelPrice {
 export function knownPrice(model: string | undefined | null): number | undefined {
   const m = normalizeModel(model).toLowerCase();
   if (!m) return undefined;
-  if (m.includes('opus') || m.includes('haiku') || m.includes('sonnet') || m.startsWith('gpt-') || m.includes('codex')) return priceFor(m).outputPerM;
+  if (m.includes('fable') || m.includes('opus') || m.includes('haiku') || m.includes('sonnet') || m.startsWith('gpt-') || m.includes('codex')) return priceFor(m).outputPerM;
   return undefined;
 }
 
