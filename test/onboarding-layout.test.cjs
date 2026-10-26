@@ -47,6 +47,13 @@ test('the studio and the glow read the same flag', () => {
   assert.doesNotMatch(wizard, /radial-gradient\(900px 600px at 72%/, 'the glow no longer sits fixed at 72% in the page background');
 });
 
+test('the sticky studio column clears the title bar without shifting the studio itself', () => {
+  assert.match(wizard, /position: 'sticky', top: 24, alignSelf: 'start'/);
+  const studio = fs.readFileSync(path.join(root, 'src/renderer/src/scene/studio/OnboardingStudio.tsx'), 'utf8');
+  assert.match(studio, /position: 'absolute', top: 0, left: 0, right: 0/);
+  assert.doesNotMatch(studio, /titleTop|headH/);
+});
+
 test('the glow is centered alone and over the studio after, mirrored in right to left', () => {
   assert.match(css, /@property --cth-onb-glow-x \{[^}]*initial-value: 50%/);
   assert.match(css, /\.cth-onb-glow\.is-studio \{ --cth-onb-glow-x: 72%; \}/);
