@@ -6,8 +6,8 @@
   "providers": {
     "claude": [
       { "id": "claude-opus-5-5", "tier": "top", "label": "Opus 5.5 · 1M", "minAppVersion": null, "maxAppVersion": null },
-      { "id": "claude-fable-5-1", "label": "Fable 5.1", "minAppVersion": null, "maxAppVersion": null },
-      { "id": "claude-fable-5", "label": "Fable 5", "minAppVersion": null, "maxAppVersion": null },
+      { "id": "claude-fable-5-1", "tier": "top", "label": "Fable 5.1", "minAppVersion": null, "maxAppVersion": null },
+      { "id": "claude-fable-5", "tier": "top", "label": "Fable 5", "minAppVersion": null, "maxAppVersion": null },
       { "id": "claude-opus-5", "tier": "top", "label": "Opus 5 · 1M", "minAppVersion": null, "maxAppVersion": null },
       { "id": "claude-opus-4-8", "tier": "top", "label": "Opus 4.8", "minAppVersion": null, "maxAppVersion": null },
       { "id": "claude-opus-4-8[1m]", "tier": "top", "label": "Opus 4.8 · 1M", "minAppVersion": null, "maxAppVersion": null },
