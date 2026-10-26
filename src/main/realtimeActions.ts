@@ -243,12 +243,21 @@ function resolveAgent(target: string, reg: Registry): ResolvedAgent | { error: s
   return { error: `I don't see an agent matching "${target}"` };
 }
 
+/** Words that turn a confirm into a refusal: "no, don't kill Jim" carries the
+ *  verb word but says not to. norm() has already turned ' into a space, so any
+ *  n't word reads "can t"; a curly apostrophe is left as typed. */
+const NEGATION = /\b(no|nope|nah|not|never|nevermind|cannot|cancel|stop|wait|abort|hold on|hold off|hang on|dont|cant|wont|didnt|doesnt|isnt|wasnt|arent|werent|shouldnt|couldnt|wouldnt|havent|hasnt)\b|\b\w+n t\b|n[\u2018\u2019]t\b/;
+
+/** The phrase says not to go ahead. */
+const saysNo = (phrase: string): boolean => NEGATION.test(norm(phrase));
+
 /** Distinct-token confirm check. Accept only if the phrase carries the verb word or
- *  the literal "confirm"; a bare affirmation ("yes", "ok") is rejected. */
+ *  the literal "confirm"; a bare affirmation ("yes", "ok") is rejected, and so is
+ *  any phrase that says no. */
 function confirmAccepted(phrase: string, confirmWord: string): boolean {
   const p = norm(phrase);
   if (!p) return false;
-  if (BARE_AFFIRMATIONS.has(p)) return false;
+  if (BARE_AFFIRMATIONS.has(p) || NEGATION.test(p)) return false;
   if (/\bconfirm(ed|s)?\b/.test(p)) return true;
   if (new RegExp(`\\b${escapeRegExp(confirmWord)}\\b`).test(p)) return true;
   return false;
@@ -923,6 +932,12 @@ export function registerRealtimeActionIpc(deps: RealtimeActionDeps): void {
     const cur = pendingFresh();
     if (!cur) return { ok: false, spoken: 'There\'s nothing waiting to confirm.' } satisfies ActionResult;
     const phrase = str(p.phrase) || str(p.confirm) || str(p.text);
+    // A no drops the staged action, so a later phrase that happens to carry
+    // the verb word can't still run it. A bare yes keeps it, and asks again.
+    if (saysNo(phrase)) {
+      pending = null;
+      return { ok: false, spoken: `Cancelled the ${cur.verb}.` } satisfies ActionResult;
+    }
     if (!confirmAccepted(phrase, cur.confirmWord)) {
       return {
         ok: false,
