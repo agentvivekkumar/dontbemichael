@@ -16,7 +16,7 @@
 import type Database from 'better-sqlite3';
 import type { ScheduledMission } from '../shared/missions';
 import {
-  compareFrom, dayKey, keptAsIs, measuredSaving, MIN_DECISIONS, periodRange, planHeadroom, previousRange, pulseSnapshot,
+  compareFrom, dayKey, keptAsIs, measuredSaving, MIN_DECISIONS, periodRange, planHeadroom, previousRange, pulseSnapshot, reopensSince,
   type AskFact, type DayRange, type Period, type PlanReading, type PulseSnapshot
 } from '../shared/teamPerformance';
 import { adviceFor, visibleAdvice, ADVICE_WINDOW_MS, EARLY_SCALE, type Advice, type Dismissal, type EarlyMode, type LadderModel, type MissionFact } from '../shared/teamAdvice';
@@ -211,7 +211,7 @@ export class PulseService {
         pieces: mine.reduce((s, x) => s + x.emails + x.sent + x.tasks + x.checks, 0),
         mailDecisions: decisions.filter((x) => x.agentId === m.agentId && x.decision !== 'cancelled').length,
         keptShare: kept.share, keptDecisions: kept.decisions,
-        reopens: cards.filter((c) => c.assignee === m.agentId && c.reopened).length,
+        reopens: reopensSince(m.agentId, cards, since),
         usdPerWeek: mine.reduce((s, x) => s + x.usd, 0) / 2
       };
     });
