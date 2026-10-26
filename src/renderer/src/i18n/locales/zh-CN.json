@@ -152,6 +152,7 @@
       "askTeammates": "直接向掌握答案的同事询问，只有在同事无法帮忙时才找办公室经理。"
     },
     "mailTitle": "{{name}} 想发一封邮件",
+    "whatsAppTitle": "{{name}} 想发一条 WhatsApp 消息",
     "mailFrom": "发件人：{{from}}",
     "mailTo": "收件人：{{to}}",
     "mailCc": "抄送：{{cc}}",

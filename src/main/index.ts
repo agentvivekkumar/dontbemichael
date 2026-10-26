@@ -37,7 +37,7 @@ import { answerMessages, cardConversation, mergeHumanQA, MICHAEL_ID, raiserOf } 
 import { FIRST_TASK_EDITED_MAX, firstTaskCard, firstTaskCardFromText } from '../shared/firstTask';
 import { answerKey, catchUpRequests, ownerWorkOrder } from '../shared/ownerRequests';
 import {
-  agentMcpDir, legacyMdMailMcpPath, mdMailMcpPath, mdWhatsAppMcpPath, privateRoot
+  agentMcpDir, legacyMdMailMcpPath, mdMailMcpPath, privateRoot
 } from '../shared/agentPrivatePaths';
 import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
@@ -111,6 +111,8 @@ import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, cannotStoreReason, type AddMailboxInput } from './mail';
 import { WhatsAppService, saveWhatsAppAccount, removeWhatsAppAccount, setAgentWhatsAppCapabilities, testWhatsAppAccount, type AddWhatsAppInput, type WhatsAppAdminDeps } from './whatsapp';
 import { MailApprovals } from './mailApprovals';
+import { WhatsAppApprovals } from './whatsappApprovals';
+import { WhatsAppDrafts } from './whatsappDrafts';
 import { standingFitCheck } from './standingCheck';
 import { terminalOverflowEvent } from '../shared/terminalOverflow';
 import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
@@ -711,11 +713,30 @@ function closeMailboxCard(id: string, result: string): void {
   } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
+/** WhatsApp Business approvals store (Ask Me proposals). */
+const whatsAppApprovals = new WhatsAppApprovals({
+  path: join(app.getPath('userData'), 'whatsapp-proposals.json'),
+  send: (msg) => { if (!hive.enabled()) return false; hive.send(msg, 'whatsapp'); return true; },
+  remember: (agentId, line) => { hive.rememberOwnerNote(agentId, line); },
+  toast: (body) => ownerToast(michaelName(), body),
+  agentName: (id) => { try { return hive.registry().agents[id]?.name?.trim() || id; } catch { return id; } },
+  changed: () => { try { liveWebContents()?.send('whatsappProposals:updated'); } catch { /* window gone */ } }
+});
+
+/** WhatsApp Business drafts store (Draft only mode). */
+const whatsAppDrafts = new WhatsAppDrafts({
+  path: join(app.getPath('userData'), 'whatsapp-drafts.json'),
+  changed: () => { try { liveWebContents()?.send('whatsappDrafts:updated'); } catch { /* window gone */ } }
+});
+
 /** WhatsApp Business Cloud API Service and connection state. */
 const whatsAppService = new WhatsAppService({
   getConfig: () => readConfig(),
   getSecret: (ref) => integrations.getSecret(ref),
-  updateStatus: (id, status, reason) => markWhatsAppStatus(id, status, reason)
+  updateStatus: (id, status, reason) => markWhatsAppStatus(id, status, reason),
+  approvals: whatsAppApprovals,
+  drafts: whatsAppDrafts,
+  messagesPath: join(app.getPath('userData'), 'whatsapp-messages.json')
 });
 
 function markWhatsAppStatus(id: string, status: 'connected' | 'needs-attention', reason?: string): void {
@@ -928,14 +949,6 @@ function removeMdMailMcp(agentId: string | undefined): void {
   }
   if (root) {
     try { unlinkSync(legacyMdMailMcpPath(root, agentId)); } catch { /* gone */ }
-  }
-}
-
-function removeMdWhatsAppMcp(agentId: string | undefined): void {
-  if (!agentId || !/^[\w.-]+$/.test(agentId)) return;
-  const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
-  if (home) {
-    try { unlinkSync(mdWhatsAppMcpPath(home, agentId)); } catch { /* gone */ }
   }
 }
 
@@ -5100,6 +5113,22 @@ ipcMain.handle('whatsapp:setCapabilities', (_evt, agentId: unknown, caps: unknow
   if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
   if (agentId === RESEARCH_ID) return { ok: false, restartNeeded: false };
   return setAgentWhatsAppCapabilities(whatsAppAdmin, agentId, caps as Parameters<typeof setAgentWhatsAppCapabilities>[2]);
+});
+ipcMain.handle('whatsappProposals:list', () => whatsAppApprovals.waiting().filter((p) => memberPresent(p.agentId)));
+ipcMain.handle('whatsappProposals:decide', (_evt, id: unknown, decision: unknown, edit: unknown, note: unknown) => {
+  if (typeof id !== 'string' || (decision !== 'approve' && decision !== 'changes' && decision !== 'decline')) {
+    return { ok: false, error: 'invalid' };
+  }
+  const e = edit && typeof edit === 'object' ? (edit as { to?: unknown; text?: unknown }) : {};
+  return whatsAppApprovals.decide(id, decision, e, note);
+});
+ipcMain.handle('whatsappDrafts:list', (_evt, filter: unknown) => {
+  const f = filter && typeof filter === 'object' ? (filter as { accountId?: string; agentId?: string }) : undefined;
+  return whatsAppDrafts.list(f);
+});
+ipcMain.handle('whatsappDrafts:delete', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return false;
+  return whatsAppDrafts.deleteDraft(id);
 });
 /** Roles that may use QuickBooks, Read only, before the owner chooses. */
 ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);

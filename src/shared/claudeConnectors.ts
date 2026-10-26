@@ -59,6 +59,14 @@ export const MCP_RESOURCE_TOOLS: ReadonlySet<string> = new Set(['ListMcpResource
  *  follow the agent's Email capability, never the connector rules. */
 export const APP_MCP_SERVER = 'md-mail';
 
+/** The app's own MCP servers (`md-mail`, `md-whatsapp`). Their tools follow
+ *  the agent's capabilities, never the Claude connector rules. */
+export const APP_MCP_SERVERS: ReadonlySet<string> = new Set(['md-mail', 'md-whatsapp']);
+
+export function isAppMcpServer(server: string): boolean {
+  return APP_MCP_SERVERS.has(server);
+}
+
 const KEY_MAX = 80;
 const URL_MAX = 300;
 
@@ -186,7 +194,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
     // A list with no server would show every server the session connected:
     // deny rules hide a server's tools, not its resources (owner, 2026-10-02).
     if (typeof s !== 'string' || !s) return { kind: 'all-servers' };
-    if (s === APP_MCP_SERVER) return { kind: 'app' };
+    if (typeof s === 'string' && isAppMcpServer(s)) return { kind: 'app' };
     const c = /^claude\.ai (.+)$/.exec(s);
     if (c) {
       const key = knownKeys(cfg).find((k) => k === c[1].trim());
@@ -197,7 +205,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
   const m = /^mcp__(.+)$/.exec(toolName ?? '');
   if (!m) return { kind: 'none' };
   server = m[1];
-  if (server.startsWith(`${APP_MCP_SERVER}__`)) return { kind: 'app' };
+  if (server.startsWith(`${APP_MCP_SERVER}__`) || server.startsWith('md-whatsapp__')) return { kind: 'app' };
   // The longest matching prefix wins ("Google" vs "Google Drive"). Two names
   // that become the same tool prefix ("Foo Bar", "Foo_Bar") cannot be told
   // apart, so neither is (Codex adversarial review, 2026-10-02).

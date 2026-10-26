@@ -15,9 +15,9 @@
  *  shutting down, so it is refused but not counted (2026-10-15: Research's
  *  status line sent 20 such frames at each restart). */
 export type RefusalGate =
-  | 'paused' | 'connector' | 'quickbooks' | 'mail' | 'sandbox' | 'internet'
+  | 'paused' | 'connector' | 'quickbooks' | 'mail' | 'whatsapp' | 'sandbox' | 'internet'
   | 'office-files' | 'folder' | 'impostor';
-export const REFUSAL_GATES: readonly RefusalGate[] = ['connector', 'quickbooks', 'mail', 'internet', 'sandbox', 'folder', 'office-files', 'paused', 'impostor'];
+export const REFUSAL_GATES: readonly RefusalGate[] = ['connector', 'quickbooks', 'mail', 'whatsapp', 'internet', 'sandbox', 'folder', 'office-files', 'paused', 'impostor'];
 
 /** A trust layer log line as trustLayer.ts writes it. */
 export interface TrustDecision { way?: unknown; decision?: unknown; by?: unknown; flagged?: unknown }

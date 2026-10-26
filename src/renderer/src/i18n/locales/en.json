@@ -152,6 +152,7 @@
       "askTeammates": "Asks the teammate who has the answer directly, and the office manager only when they cannot help."
     },
     "mailTitle": "{{name}} wants to send an email",
+    "whatsAppTitle": "{{name}} wants to send a WhatsApp message",
     "mailFrom": "From: {{from}}",
     "mailTo": "To: {{to}}",
     "mailCc": "Cc: {{cc}}",

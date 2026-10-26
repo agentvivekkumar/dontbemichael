@@ -10,6 +10,8 @@
  * Dependency injection for fetch allows full offline unit testing.
  */
 
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import {
   type WhatsAppAccountRecord,
   type WhatsAppAccessConfig,
@@ -24,6 +26,9 @@ import {
   whatsAppToolsJustAttached
 } from '../shared/whatsapp';
 import { type SendingMode, sendingWords } from '../shared/mailboxes';
+import type { WhatsAppApprovals } from './whatsappApprovals';
+import type { WhatsAppDrafts } from './whatsappDrafts';
+import { whatsAppProposalSendProblem } from '../shared/whatsappProposals';
 
 export type WhatsAppErrorKind = 'auth' | 'rate-limit' | 'network' | 'not-found' | 'bad-request' | 'refused' | 'unknown';
 
@@ -43,6 +48,7 @@ export interface WhatsAppMessage {
   timestamp: number;
   direction: 'inbound' | 'outbound';
   status?: 'sent' | 'delivered' | 'read' | 'failed';
+  untrusted?: boolean;
 }
 
 export interface WhatsAppDeps {
@@ -50,6 +56,9 @@ export interface WhatsAppDeps {
   updateStatus?: (id: string, status: 'connected' | 'needs-attention', reason?: string) => Promise<void> | void;
   getConfig: () => WhatsAppAccessConfig;
   fetchFn?: typeof fetch;
+  approvals?: WhatsAppApprovals;
+  drafts?: WhatsAppDrafts;
+  messagesPath?: string;
 }
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v20.0';
@@ -121,11 +130,44 @@ export class WhatsAppService {
   constructor(deps: WhatsAppDeps) {
     this.deps = deps;
     this.fetch = deps.fetchFn ?? globalThis.fetch;
+    this.loadMessages();
+  }
+
+  private loadMessages(): void {
+    if (!this.deps.messagesPath) return;
+    try {
+      if (existsSync(this.deps.messagesPath)) {
+        const raw = readFileSync(this.deps.messagesPath, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          this.messages.length = 0;
+          this.messages.push(...data);
+        }
+      }
+    } catch (e) {
+      console.error('[whatsapp] failed to load messages from disk:', e);
+    }
+  }
+
+  private saveMessages(): void {
+    if (!this.deps.messagesPath) return;
+    try {
+      const dir = dirname(this.deps.messagesPath);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const capped = this.messages.slice(-1000);
+      writeFileSync(this.deps.messagesPath, JSON.stringify(capped, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[whatsapp] failed to save messages to disk:', e);
+    }
   }
 
   /** Record an inbound or outbound message in the local store. */
   recordMessage(msg: WhatsAppMessage): void {
     this.messages.push(msg);
+    if (this.messages.length > 1000) {
+      this.messages.shift();
+    }
+    this.saveMessages();
   }
 
   /** Handle an incoming tool request from the broker or agent. */
@@ -167,7 +209,8 @@ export class WhatsAppService {
           .filter((m) => m.accountId === accountId)
           .filter((m) => !query || m.text.toLowerCase().includes(query) || m.from.includes(query) || m.to.includes(query))
           .slice(-50)
-          .reverse();
+          .reverse()
+          .map((m) => (m.direction === 'inbound' ? { ...m, untrusted: true } : m));
         return { status: 200, body: { ok: true, messages: chats } };
       }
 
@@ -176,9 +219,25 @@ export class WhatsAppService {
         if (!contact) {
           return { status: 400, body: { ok: false, error: 'Parameter "contact" (phone number) is required.' } };
         }
+        const cleanContact = contact.replace(/[^0-9]/g, '');
         const thread = this.messages
-          .filter((m) => m.accountId === accountId && (m.from === contact || m.to === contact))
-          .sort((a, b) => a.timestamp - b.timestamp);
+          .filter((m) => {
+            if (m.accountId !== accountId) return false;
+            const fromClean = m.from.replace(/[^0-9]/g, '');
+            const toClean = m.to.replace(/[^0-9]/g, '');
+            return fromClean === cleanContact || toClean === cleanContact || m.from === contact || m.to === contact;
+          })
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .map((m) => {
+            if (m.direction === 'inbound') {
+              return {
+                ...m,
+                untrusted: true,
+                text: `<untrusted-customer-message from="${m.from}">\n${m.text}\n</untrusted-customer-message>`
+              };
+            }
+            return m;
+          });
         return { status: 200, body: { ok: true, contact, messages: thread } };
       }
 
@@ -188,8 +247,13 @@ export class WhatsAppService {
         if (!to || !text) {
           return { status: 400, body: { ok: false, error: 'Both "to" and "text" are required.' } };
         }
-        const draftId = `draft-${Date.now()}`;
-        return { status: 200, body: { ok: true, draftId, to, text, status: 'drafted' } };
+        if (!accountId) {
+          return { status: 400, body: { ok: false, error: 'accountId is required.' } };
+        }
+        const draft = this.deps.drafts
+          ? this.deps.drafts.saveDraft({ agentId, accountId, to, text })
+          : { id: `draft-${Date.now()}` };
+        return { status: 200, body: { ok: true, draftId: draft.id, to, text, status: 'drafted' } };
       }
 
       case 'propose_whatsapp_message': {
@@ -198,13 +262,19 @@ export class WhatsAppService {
         if (!to || !text) {
           return { status: 400, body: { ok: false, error: 'Both "to" and "text" are required.' } };
         }
-        const proposalId = `wa-prop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        if (!accountId) {
+          return { status: 400, body: { ok: false, error: 'accountId is required.' } };
+        }
+        const proposal = this.deps.approvals
+          ? this.deps.approvals.file({ agentId, accountId, to, text })
+          : { id: `wa-prop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
         return {
           status: 200,
           body: {
             ok: true,
-            proposalId,
-            message: 'Your message has been posted to Ask me for the business owner to review and approve.'
+            proposalId: proposal.id,
+            state: 'waiting for the owner on Ask me',
+            next: 'Nothing is sent yet. You will get a message when the owner decides: approved (then call send_whatsapp_message with this proposalId), changes asked, or not sent. Do not send it another way.'
           }
         };
       }
@@ -212,8 +282,36 @@ export class WhatsAppService {
       case 'send_whatsapp_message': {
         const to = typeof body.to === 'string' ? body.to.trim() : '';
         const text = typeof body.text === 'string' ? body.text.trim() : '';
-        if (!to || !text) {
-          return { status: 400, body: { ok: false, error: 'Both "to" and "text" are required.' } };
+        const wa = cfg.agentCapabilities?.[agentId]?.whatsapp;
+        const mode = wa ? whatsAppSendingMode(wa) : 'approval';
+
+        let targetTo = to;
+        let targetText = text;
+
+        if (mode === 'approval') {
+          if (!proposalId) {
+            return {
+              status: 403,
+              body: { ok: false, error: 'You send on approval. Propose each message first, then send with its proposalId.' }
+            };
+          }
+          if (this.deps.approvals) {
+            const prop = this.deps.approvals.get(proposalId);
+            const problem = whatsAppProposalSendProblem(prop, agentId, accountId ?? '');
+            if (problem) {
+              return { status: 409, body: { ok: false, error: problem } };
+            }
+            if (prop?.state === 'sent') {
+              return { status: 200, body: { ok: true, messageId: prop.messageId ?? `wa-${Date.now()}`, repeated: true, status: 'sent' } };
+            }
+            // Strict enforcement: dispatch ONLY the owner-approved recipient and text!
+            targetTo = prop?.approved?.to ?? prop?.to ?? to;
+            targetText = prop?.approved?.text ?? prop?.text ?? text;
+          }
+        } else {
+          if (!to || !text) {
+            return { status: 400, body: { ok: false, error: 'Both "to" and "text" are required.' } };
+          }
         }
 
         const account = (cfg.whatsappAccounts ?? []).find((a) => a.id === accountId);
@@ -227,20 +325,36 @@ export class WhatsAppService {
           return { status: 503, body: { ok: false, error: 'No access token found for this WhatsApp account.' } };
         }
 
-        const res = await this.sendViaCloudApi(account.phoneNumberId, token, to, text);
+        if (mode === 'approval' && this.deps.approvals && proposalId) {
+          try {
+            this.deps.approvals.markSending(proposalId);
+          } catch {
+            return { status: 409, body: { ok: false, error: 'This message cannot be sent right now.' } };
+          }
+        }
+
+        const res = await this.sendViaCloudApi(account.phoneNumberId, token, targetTo, targetText);
         if (!res.ok) {
+          if (mode === 'approval' && this.deps.approvals && proposalId) {
+            this.deps.approvals.unmarkSending(proposalId);
+          }
           if (res.kind === 'auth') {
             await this.deps.updateStatus?.(account.id, 'needs-attention', res.error);
           }
-          return { status: 502, body: { ok: false, error: res.error } };
+          const status = res.kind === 'refused' ? 422 : 502;
+          return { status, body: { ok: false, error: res.error, kind: res.kind } };
+        }
+
+        if (mode === 'approval' && this.deps.approvals && proposalId) {
+          this.deps.approvals.markSent(proposalId, res.messageId);
         }
 
         this.recordMessage({
           id: res.messageId,
           accountId: account.id,
           from: account.displayPhoneNumber,
-          to,
-          text,
+          to: targetTo,
+          text: targetText,
           timestamp: Date.now(),
           direction: 'outbound',
           status: 'sent'
@@ -288,6 +402,13 @@ export class WhatsAppService {
         const code = typeof err.code === 'number' ? err.code : res.status;
         if (code === 190 || res.status === 401) {
           return { ok: false, error: 'WhatsApp token expired or invalid.', kind: 'auth' };
+        }
+        if (code === 131047 || /24\s*hours|customer\s*service\s*window|re-engagement/i.test(msg)) {
+          return {
+            ok: false,
+            error: "Outside Meta's 24-hour customer service window, free-text messages cannot be sent. The customer has not sent a message in the last 24 hours; Meta requires an approved template message to initiate a conversation.",
+            kind: 'refused'
+          };
         }
         return { ok: false, error: `Meta Cloud API send error: ${msg}`, kind: 'unknown' };
       }

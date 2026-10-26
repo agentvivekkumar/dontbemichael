@@ -679,7 +679,7 @@ export class HookServer {
         ? whatsAppAccess(cfg, agentId, typeof input.accountId === 'string' ? input.accountId : undefined, op, typeof input.proposalId === 'string' ? input.proposalId : undefined)
         : { ok: false as const, reason: 'Unknown WhatsApp tool.' };
       if (!d.ok) {
-        this.emitRefused(agentId, event, p, 'mail');
+        this.emitRefused(agentId, event, p, 'whatsapp');
         return mcpDeny(d.reason);
       }
     }
