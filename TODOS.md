@@ -268,13 +268,13 @@
 
 ## Reset (deferred from the ship of mit/named-links, 2026-10-14)
 
-### Clear what a reset could not remove on the next launch
+### Tell the owner in the app when a reset leftover still can't go
 
-**What:** Reset & start over retries each delete for about a second, then logs what is left. Save what still could not be removed and erase it early on the next launch, telling the owner if it still cannot go.
+**What:** When startup cleanup (`sweepPendingResetCleanup`) cannot remove a leftover path from a previous Reset & start over, tell the owner in the app itself (the sweep currently logs to `console.error`).
 
-**Why:** The reset erases right after it stops the team without waiting for them to exit; a slow agent can write a file back, and on Windows a file still open can't be deleted, so a few leftovers can stay while setup looks fresh. A saved list of paths to delete at startup needs checks that it only names the app's own folders.
+**Why:** The startup sweep retries leftovers while setup is unfinished and drops the list once an office is set up. If a path still cannot be removed (e.g. held open or permissions locked), the owner should be told in the app rather than only in console logs.
 
-**Effort:** M
+**Effort:** S
 **Priority:** P3
 
 ### A memory reset clears each other engine's own history before that engine ships
