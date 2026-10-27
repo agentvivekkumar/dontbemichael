@@ -1233,7 +1233,11 @@ export class HookServer {
     const target = folderToolTarget(tool, input, cwd);
     if (!target) return { deny: false };
     const reg = this.hive.registry();
-    const me = reg.agents[agentId];
+    // Who the agent is, from the app's own start of it, never the registry:
+    // every member's shell may write registry.json, and one edit there (its
+    // folder set to "/", or itself marked the assistant) would open the
+    // whole office to its file tools.
+    const me = this.hive.startedAs?.(agentId) ?? null;
     const ci = process.platform !== 'linux';
     // Research's walls, and everyone else's guard on its folders (issue #230).
     const hiveRoot = this.hive.root();
@@ -1309,16 +1313,26 @@ export class HookServer {
         if (r.deny) return r;
       }
     }
-    if (!me?.cwd || me.isAssistant) return { deny: false };
-    const folders = cfg.businessFolder ? (cfg.businessTeam ?? []).map((m) => m.folder) : [];
-    if (cfg.businessFolder) {
+    // An agent this launch never started can't be judged; the hook's secret
+    // check already refuses its frames, so this only holds if that changes.
+    if (!me) return { deny: true, reason: HOOK_SENDER_UNCHECKED };
+    if (!me.cwd || me.isAssistant) return { deny: false };
+    // Team folders from the setup's team and the members started in this
+    // launch, so a registry entry can't add a folder or move one away.
+    const folders = cfg.businessFolder ? [...(cfg.businessTeam ?? []).map((m) => m.folder), ...(this.hive.startedTeamFolders?.() ?? [])] : [];
+    // A member is also walled from every folder the registry names: an
+    // archived member, or one not started yet, whose files are still theirs
+    // (as businessFolderLayout keeps them). For a member that can only add
+    // refusals, since its own folder is judged first. Michael keeps the list
+    // above, so a made up entry can't take a folder of his from him.
+    if (cfg.businessFolder && !me.isGod) {
       for (const a of Object.values(reg.agents)) {
         if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
       }
     }
     const layout = folderLayoutFor(cfg.businessFolder, folders, home);
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
-    const agent = { isGod: !!me.isGod, cwd: me.cwd };
+    const agent = { isGod: me.isGod, cwd: me.cwd };
     // Judge the path as asked and the file it really is: a link inside the
     // agent's own folder can point anywhere (review, 2026-09-25).
     const asked = folderDecision(agent, layout, tool, target, ci, godName);

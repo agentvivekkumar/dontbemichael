@@ -44,6 +44,8 @@ async function floor(t, config) {
   const finance = path.join(base, 'Documents', 'Pho', 'Finance');
   fs.mkdirSync(home, { recursive: true });
   const hive = new HiveManager(() => home);
+  // Michael is started too: the hook judges only agents this launch started.
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: path.dirname(office), isGod: true });
   await hive.ensureAgent({ id: 'oscar', name: 'Oscar', provider: 'claude', cwd: finance });
   const cfg = typeof config === 'function' ? config({ home, office }) : config;
   const sent = [];

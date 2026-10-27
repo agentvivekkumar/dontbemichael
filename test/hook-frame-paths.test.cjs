@@ -25,7 +25,7 @@ require.cache[electron] = {
 
 const { HiveManager } = loadTs('src/main/hive.ts');
 const { HookServer } = loadTs('src/main/hooks.ts');
-const { HOOK_PATH_UNCHECKED, MAX_HOOK_FRAME_BYTES } = loadTs('src/shared/hookEvents.ts');
+const { HOOK_PATH_UNCHECKED, HOOK_SENDER_UNCHECKED, MAX_HOOK_FRAME_BYTES } = loadTs('src/shared/hookEvents.ts');
 const F = loadTs('src/shared/folderAccess.ts');
 const R = loadTs('src/shared/research.ts');
 
@@ -223,4 +223,88 @@ test('every agent gets a scratch folder of its own, a long or odd id included', 
     assert.equal(F.agentTmpDecision(home, long, false, 'Read', `${home}/agent-tmp/${name}/a`, true).deny, false, 'its own');
     assert.deepEqual(F.withAgentTmpWall({ sandbox: { denyWrite: [], denyRead: [], allowRead: [] }, deny: [], sandboxOnly: true }, home, long, false).sandbox.allowRead, [`${home}/agent-tmp/${name}`]);
   }
+});
+
+test('the folder walls take who an agent is from the app, not from registry.json its shell can write', { skip: process.platform === 'win32' ? 'posix paths' : false }, async (t) => {
+  // Value: protects=a member can't open Michael's files or a teammate's folder by rewriting its own or a teammate's registry entry (its shell may write the hive root); fails_when=folderCheck reads cwd, isGod or isAssistant from the registry, or builds the team folders from it; why_new=security review (reproduced: isAssistant true or cwd "/" in registry.json let Pam's Read open Michael's files); seam=HookServer.handle
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-frame-who-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const home = path.join(base, 'HarnessAgents');
+  const business = path.join(base, 'Pho Bakery');
+  const pamDir = path.join(business, 'Admin');
+  const kellyDir = path.join(base, 'Dropbox', 'Sales'); // outside the business folder, not in the setup's team
+  for (const d of [home, pamDir, kellyDir]) fs.mkdirSync(d, { recursive: true });
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: business, isGod: true });
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: pamDir });
+  await hive.ensureAgent({ id: 'kelly', name: 'Kelly', provider: 'claude', cwd: kellyDir });
+  const cfg = { harnessHome: home, businessFolder: business, businessTeam: [{ agentId: 'pam', folder: pamDir }] };
+  const server = new HookServer(hive, () => null, () => cfg);
+  const call = (agent_id, tool_name, file_path) => server.handle({ agent_id, hook_event_name: 'PreToolUse', cwd: agent_id === 'god' ? business : pamDir, tool_name, tool_input: { file_path, content: 'x' } }).hookSpecificOutput ?? {};
+  const michaels = path.join(business, 'plan.md');
+  const kellys = path.join(kellyDir, 'leads.md');
+  const own = path.join(pamDir, 'notes.md');
+  const regPath = path.join(hive.root(), 'registry.json');
+  const tamper = (edit) => { const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')); edit(reg); fs.writeFileSync(regPath, JSON.stringify(reg)); };
+  const holds = (why) => {
+    assert.equal(call('pam', 'Read', michaels).permissionDecision, 'deny', `${why}: Michael's file`);
+    assert.equal(call('pam', 'Read', kellys).permissionDecision, 'deny', `${why}: Kelly's folder`);
+    assert.notEqual(call('pam', 'Read', own).permissionDecision, 'deny', `${why}: her own folder`);
+    assert.notEqual(call('pam', 'Write', own).permissionDecision, 'deny', `${why}: saving in her own folder`);
+    assert.notEqual(call('god', 'Read', michaels).permissionDecision, 'deny', `${why}: Michael reads his own`);
+    assert.notEqual(call('god', 'Read', own).permissionDecision, 'deny', `${why}: Michael reads Pam's`);
+  };
+  holds('as started');
+  tamper((r) => { r.agents.pam.isAssistant = true; });
+  holds('marked the assistant');
+  tamper((r) => { r.agents.pam.isAssistant = false; r.agents.pam.isGod = true; r.godId = 'pam'; });
+  holds('marked Michael');
+  tamper((r) => { r.agents.pam.isGod = false; r.godId = 'god'; r.agents.pam.cwd = '/'; });
+  holds('her folder set to /');
+  tamper((r) => { r.agents.pam.cwd = business; });
+  holds('her folder set to the business folder');
+  tamper((r) => { r.agents.pam.cwd = pamDir; r.agents.kelly.cwd = path.join(base, 'elsewhere'); });
+  holds('Kelly\'s folder moved away');
+  // A made up member can't take a folder of Michael's from him.
+  tamper((r) => { r.agents.fake = { id: 'fake', name: 'Fake', cwd: path.join(business, 'Plans') }; });
+  assert.notEqual(call('god', 'Write', path.join(business, 'Plans', 'q4.md')).permissionDecision, 'deny', 'Michael saves in his own folder');
+  // A restart passes no assistant flag; the one in the registry doesn't ride along.
+  tamper((r) => { r.agents.pam.isAssistant = true; });
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: pamDir });
+  holds('restarted over a tampered entry');
+  // An agent this launch never started is refused, never judged by its entry.
+  const stranger = call('fake', 'Read', path.join(business, 'Plans', 'q4.md'));
+  assert.equal(stranger.permissionDecision, 'deny');
+  assert.equal(stranger.permissionDecisionReason, HOOK_SENDER_UNCHECKED);
+});
+
+test('a member is still walled from a folder only the registry names, and Michael is not', { skip: process.platform === 'win32' ? 'posix paths' : false }, async (t) => {
+  // Value: protects=an archived member's files outside the business folder stay theirs, as the start time deny rules say; fails_when=the hook's team folders come only from members started in this launch; why_new=review on #637 (the backstop for archived and not yet started members); seam=HookServer.handle
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-frame-archived-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const home = path.join(base, 'HarnessAgents');
+  const business = path.join(base, 'Pho Bakery');
+  const pamDir = path.join(business, 'Admin');
+  const dwightDir = path.join(base, 'Dropbox', 'Warehouse'); // archived, outside the business folder
+  for (const d of [home, pamDir, dwightDir]) fs.mkdirSync(d, { recursive: true });
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: business, isGod: true });
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: pamDir });
+  const cfg = { harnessHome: home, businessFolder: business, businessTeam: [{ agentId: 'pam', folder: pamDir }] };
+  const server = new HookServer(hive, () => null, () => cfg);
+  const call = (agent_id, tool_name, file_path) => server.handle({ agent_id, hook_event_name: 'PreToolUse', cwd: agent_id === 'god' ? business : pamDir, tool_name, tool_input: { file_path, content: 'x' } }).hookSpecificOutput ?? {};
+  const regPath = path.join(hive.root(), 'registry.json');
+  const reg = JSON.parse(fs.readFileSync(regPath, 'utf8'));
+  // Dwight was hired once and archived: he is in the registry but not started now.
+  reg.agents.dwight = { id: 'dwight', name: 'Dwight', cwd: dwightDir };
+  // A made up entry claiming Pam's own folder, and one inside Michael's.
+  reg.agents.fake = { id: 'fake', name: 'Fake', cwd: pamDir };
+  reg.agents.fake2 = { id: 'fake2', name: 'Fake2', cwd: path.join(business, 'Plans') };
+  fs.writeFileSync(regPath, JSON.stringify(reg));
+
+  assert.equal(call('pam', 'Read', path.join(dwightDir, 'stock.md')).permissionDecision, 'deny', 'an archived member\'s folder outside the business folder');
+  assert.notEqual(call('pam', 'Read', path.join(pamDir, 'notes.md')).permissionDecision, 'deny', 'her own folder, even when an entry names it');
+  assert.notEqual(call('pam', 'Write', path.join(pamDir, 'notes.md')).permissionDecision, 'deny', 'saving in her own folder');
+  assert.notEqual(call('god', 'Write', path.join(business, 'Plans', 'q4.md')).permissionDecision, 'deny', 'a made up entry takes no folder from Michael');
+  assert.notEqual(call('god', 'Read', path.join(dwightDir, 'stock.md')).permissionDecision, 'deny', 'Michael still reads an archived member\'s folder');
 });

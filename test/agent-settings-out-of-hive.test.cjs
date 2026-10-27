@@ -45,6 +45,21 @@ test('agent settings live outside the hive, and the hook folder is denied to eve
   assert.ok(fs.existsSync(path.join(root, 'bin', 'cth-hook.cjs')), 'and the hook it protects is there');
 });
 
+test('no agent\'s shell may write the registry, Michael\'s included', async (t) => {
+  // Value: protects=a member can't rewrite who it is (its folder, or itself marked Michael or the assistant) in the file the app and the hook read; fails_when=registry.json leaves denyWrite; why_new=security review (reproduced: one shell edit to registry.json opened Michael's files to a member's Read); seam=settings only; no_claim=the OS sandbox enforcing a file rule (the hook's folder wall holds without it)
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md registry deny '));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  const registry = path.join(home, 'hive', 'registry.json');
+  for (const meta of [{ id: 'god', name: 'Michael', isGod: true }, { id: 'pam', name: 'Pam' }]) {
+    const inj = await hive.ensureAgent({ ...meta, provider: 'claude', cwd: home });
+    const fsx = JSON.parse(fs.readFileSync(inj.args[inj.args.indexOf('--settings') + 1], 'utf8')).sandbox.filesystem;
+    assert.ok(fsx.allowWrite.some((w) => inside(w, registry)), `${meta.name}: the hive stays writable`);
+    assert.ok(fsx.denyWrite.includes(registry), `${meta.name}: but not the registry`);
+  }
+  assert.ok(fs.existsSync(registry), 'the registry it protects is there');
+});
+
 test('Research gets its tools allowed in its own settings, since its session cannot use bypass mode', async (t) => {
   // Value: protects=Pete never stops on a permission prompt for his own tools; fails_when=the allow rules go or reach other members; why_new=owner 2026-10-15, Claude Code turns bypass into default without the owner's settings and Pete stopped on every shell command; seam=none
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-research-allow-'));
