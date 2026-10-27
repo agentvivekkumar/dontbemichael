@@ -106,6 +106,7 @@ business runs on, and each team member works from the one that matches its job.
 - **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
   saved, and the password stays encrypted on your computer, never in a file an agent can read.
+  Outlook and Microsoft 365 mailboxes are not supported yet.
 - **Hand it out per team member.** On a team member's Access tab, under Email, choose **Add a
   mailbox**, pick it, choose **Watch the inbox**, and set **Can send**, **Send on approval** or **Draft only**. Nobody gets a mailbox until you give it one,
   and each mailbox is watched by one team member: moving it to another asks you first.
