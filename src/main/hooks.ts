@@ -1320,6 +1320,16 @@ export class HookServer {
     // Team folders from the setup's team and the members started in this
     // launch, so a registry entry can't add a folder or move one away.
     const folders = cfg.businessFolder ? [...(cfg.businessTeam ?? []).map((m) => m.folder), ...(this.hive.startedTeamFolders?.() ?? [])] : [];
+    // A member is also walled from every folder the registry names: an
+    // archived member, or one not started yet, whose files are still theirs
+    // (as businessFolderLayout keeps them). For a member that can only add
+    // refusals, since its own folder is judged first. Michael keeps the list
+    // above, so a made up entry can't take a folder of his from him.
+    if (cfg.businessFolder && !me.isGod) {
+      for (const a of Object.values(reg.agents)) {
+        if (!a.isGod && !a.isAssistant && a.cwd) folders.push(a.cwd);
+      }
+    }
     const layout = folderLayoutFor(cfg.businessFolder, folders, home);
     const godName = resolveGodName(reg.agents[reg.godId ?? 'god']?.name);
     const agent = { isGod: me.isGod, cwd: me.cwd };

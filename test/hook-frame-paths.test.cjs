@@ -277,3 +277,34 @@ test('the folder walls take who an agent is from the app, not from registry.json
   assert.equal(stranger.permissionDecision, 'deny');
   assert.equal(stranger.permissionDecisionReason, HOOK_SENDER_UNCHECKED);
 });
+
+test('a member is still walled from a folder only the registry names, and Michael is not', { skip: process.platform === 'win32' ? 'posix paths' : false }, async (t) => {
+  // Value: protects=an archived member's files outside the business folder stay theirs, as the start time deny rules say; fails_when=the hook's team folders come only from members started in this launch; why_new=review on #637 (the backstop for archived and not yet started members); seam=HookServer.handle
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-frame-archived-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const home = path.join(base, 'HarnessAgents');
+  const business = path.join(base, 'Pho Bakery');
+  const pamDir = path.join(business, 'Admin');
+  const dwightDir = path.join(base, 'Dropbox', 'Warehouse'); // archived, outside the business folder
+  for (const d of [home, pamDir, dwightDir]) fs.mkdirSync(d, { recursive: true });
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'god', name: 'Michael', provider: 'claude', cwd: business, isGod: true });
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: pamDir });
+  const cfg = { harnessHome: home, businessFolder: business, businessTeam: [{ agentId: 'pam', folder: pamDir }] };
+  const server = new HookServer(hive, () => null, () => cfg);
+  const call = (agent_id, tool_name, file_path) => server.handle({ agent_id, hook_event_name: 'PreToolUse', cwd: agent_id === 'god' ? business : pamDir, tool_name, tool_input: { file_path, content: 'x' } }).hookSpecificOutput ?? {};
+  const regPath = path.join(hive.root(), 'registry.json');
+  const reg = JSON.parse(fs.readFileSync(regPath, 'utf8'));
+  // Dwight was hired once and archived: he is in the registry but not started now.
+  reg.agents.dwight = { id: 'dwight', name: 'Dwight', cwd: dwightDir };
+  // A made up entry claiming Pam's own folder, and one inside Michael's.
+  reg.agents.fake = { id: 'fake', name: 'Fake', cwd: pamDir };
+  reg.agents.fake2 = { id: 'fake2', name: 'Fake2', cwd: path.join(business, 'Plans') };
+  fs.writeFileSync(regPath, JSON.stringify(reg));
+
+  assert.equal(call('pam', 'Read', path.join(dwightDir, 'stock.md')).permissionDecision, 'deny', 'an archived member\'s folder outside the business folder');
+  assert.notEqual(call('pam', 'Read', path.join(pamDir, 'notes.md')).permissionDecision, 'deny', 'her own folder, even when an entry names it');
+  assert.notEqual(call('pam', 'Write', path.join(pamDir, 'notes.md')).permissionDecision, 'deny', 'saving in her own folder');
+  assert.notEqual(call('god', 'Write', path.join(business, 'Plans', 'q4.md')).permissionDecision, 'deny', 'a made up entry takes no folder from Michael');
+  assert.notEqual(call('god', 'Read', path.join(dwightDir, 'stock.md')).permissionDecision, 'deny', 'Michael still reads an archived member\'s folder');
+});
