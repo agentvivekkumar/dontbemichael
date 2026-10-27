@@ -1142,8 +1142,35 @@ const sentUnrecorded = new Map<string, string>();
 /** What Send only means, for a grant's list_mailboxes entry. */
 const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send follow its sending, below; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
 
+/** Cuts a search or filter word to size, where a shorter one does no harm.
+ *  Never for what an email carries: see COMPOSE_MAX. */
 function str(v: unknown, max = 5000): string | undefined {
   return typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined;
+}
+
+/** The most an agent's email may carry. Longer is refused, never cut: a
+ *  recipient list cut at the limit can end inside the last address, so
+ *  bob@example.com became bob@example.co and a different domain got the
+ *  business's email; a cut subject or body goes out missing its end, with
+ *  nobody told. */
+const COMPOSE_MAX = { recipients: 2000, subject: 500, body: 200_000 } as const;
+
+/** Why a draft, proposal or send is refused for its size, or null. */
+function composeTooLong(op: string, body: Record<string, unknown>): string | null {
+  const done = op === 'send' ? 'sent' : op === 'draft' ? 'saved' : 'proposed';
+  for (const field of ['to', 'cc'] as const) {
+    const v = body[field];
+    if (typeof v === 'string' && v.length > COMPOSE_MAX.recipients) {
+      return `"${field}" is longer than ${COMPOSE_MAX.recipients} characters, so nothing was ${done}. Cutting it could change an address, so split the recipients over several emails.`;
+    }
+  }
+  if (typeof body.subject === 'string' && body.subject.length > COMPOSE_MAX.subject) {
+    return `"subject" is longer than ${COMPOSE_MAX.subject} characters, so nothing was ${done}. Shorten it.`;
+  }
+  if (typeof body.body === 'string' && body.body.length > COMPOSE_MAX.body) {
+    return `"body" is longer than ${COMPOSE_MAX.body} characters, so nothing was ${done}. Shorten it, or split it over several emails.`;
+  }
+  return null;
 }
 
 function ref(v: unknown): MailRef | undefined {
@@ -1297,12 +1324,20 @@ async function runMailRequest(
     };
   }
 
+  // An email too long to go out whole is refused here, never cut (see
+  // COMPOSE_MAX). An approved proposal sends the version the owner saw, so
+  // the call's own text is not used then and not checked.
+  if ((op === 'draft' || op === 'propose' || op === 'send') && !proposalId) {
+    const tooLong = composeTooLong(op, body);
+    if (tooLong) return { status: 400, body: { error: tooLong } };
+  }
+
   // MB-8: forwards and attachments only by reference, and only from the mailbox
   // doing the sending. Pasted text is not traceable and is not checked. A
   // proposal is held to it too, or an approved card could send the wrong
   // email from the sending mailbox (eng review ER4, D1).
   const input: ComposeInput = {
-    to: str(body.to, 2000) ?? '', cc: str(body.cc, 2000), subject: str(body.subject, 500) ?? '', body: str(body.body, 200_000) ?? '',
+    to: str(body.to, COMPOSE_MAX.recipients) ?? '', cc: str(body.cc, COMPOSE_MAX.recipients), subject: str(body.subject, COMPOSE_MAX.subject) ?? '', body: str(body.body, COMPOSE_MAX.body) ?? '',
     replyTo: ref(body.reply_to), forward: ref(body.forward), attachFrom: attachRefs
   };
   const refs = [input.replyTo, input.forward, ...(input.attachFrom ?? [])].filter(Boolean) as MailRef[];
@@ -1323,7 +1358,7 @@ async function runMailRequest(
   const recordGrantSend = (out: { messageId?: unknown }, email: ComposeInput): void => {
     if (!underGrant || !out?.messageId) return;
     try {
-      deps.proposals?.recordSend({ agentId, mailbox: mailbox!, messageId: String(out.messageId), references: email.thread ? [...email.thread.references] : [], to: email.to.slice(0, 2000), subject: email.subject.slice(0, 500), sentAt: Date.now() });
+      deps.proposals?.recordSend({ agentId, mailbox: mailbox!, messageId: String(out.messageId), references: email.thread ? [...email.thread.references] : [], to: email.to.slice(0, COMPOSE_MAX.recipients), subject: email.subject.slice(0, COMPOSE_MAX.subject), sentAt: Date.now() });
     } catch (e) { console.error('[mail] send record not kept:', agentId, mailbox, String(out.messageId), e); }
   };
   const grantFlag = underGrant ? { grant: true } : {};
