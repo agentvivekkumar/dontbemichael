@@ -2429,8 +2429,8 @@ function runBreakerBeat(progressWindowMs: number): void {
     // ONLY from the hook shim, so any window where hooks don't land leaves the
     // registry with no sessionId and "Restart & Continue" refuses to continue —
     // while this very sample proves the app knew the live session id all along
-    // (it was already being written to the cost ledger one line above). Same id,
-    // same liveness gate; recordSession writes only on change, so this is a
+    // (the newest live session, whose cost sessionSamples records above). Same
+    // id, same liveness gate; recordSession writes only on change, so this is a
     // no-op once the hooks are flowing.
     if (sample?.sessionId) hive.recordSession(id, sample.sessionId);
     if (id === reg.godId) continue;            // breaker skips god
