@@ -4,6 +4,8 @@ import { PixelButton } from './PixelButton';
 import { Disclosure, MiniButton } from './triggers/ui';
 import { InfoTip } from './InfoTip';
 import { AddWhatsAppDialog } from './AddWhatsAppDialog';
+import { groupName } from './fieldText';
+import { WhatsAppDraftList } from './WhatsAppDraftList';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
 import { useStore } from '@/store/store';
 import type { WhatsAppAccountRecord } from '@shared/whatsapp';
@@ -71,16 +73,7 @@ export function WhatsAppSettings() {
           style={foldButton}
         >
           <Disclosure open={open} />
-          <span
-            style={{
-              fontFamily: 'var(--cth-font-display)',
-              fontSize: 10,
-              fontWeight: 600,
-              lineHeight: '12px',
-              color: 'var(--cth-ink-500)',
-              textTransform: 'uppercase'
-            }}
-          >
+          <span style={groupName}>
             {t('whatsapp.title', 'WhatsApp Business')}
           </span>
           <span style={hint}>
@@ -112,6 +105,8 @@ export function WhatsAppSettings() {
           </PixelButton>
         </span>
       </div>
+
+      <div style={hint}>{t('whatsapp.sendOnlyNote')}</div>
 
       {failed && (
         <div role="alert" style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>
@@ -154,6 +149,7 @@ export function WhatsAppSettings() {
                             ! {a.statusReason}
                           </div>
                         )}
+                        <WhatsAppDraftList accountId={a.id} nameOf={nameOf} />
                         {confirming === a.id && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 13 }}>

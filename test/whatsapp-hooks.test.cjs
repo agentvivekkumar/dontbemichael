@@ -57,7 +57,7 @@ test('claudeConnectors: recognizes md-whatsapp as app server and permits tool ac
   // 3. Resource calls to md-whatsapp are refused (app servers have tools, not resource URIs)
   const resAcc = connectorAccess(cfg, 'kelly', 'ReadMcpResourceTool', { server: 'md-whatsapp', uri: 'whatsapp://chat' }, false);
   assert.equal(resAcc.ok, false);
-  assert.match(resAcc.reason, /no resources/);
+  assert.match(resAcc.reason, /own WhatsApp server has no resources/);
 
   // 4. Calls without an agent are refused
   const noAgent = connectorAccess(cfg, undefined, 'mcp__md-whatsapp__send_whatsapp_message', {}, false);

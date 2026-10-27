@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PixelButton } from './PixelButton';
+import { fieldLabel } from './fieldText';
 import type { WhatsAppAccountRecord } from '@shared/whatsapp';
 
 export function AddWhatsAppDialog({
@@ -225,10 +226,10 @@ const backdropStyle: CSSProperties = {
 };
 
 const dialogCardStyle: CSSProperties = {
-  background: 'var(--cth-canvas-card, #FFFDF5)',
-  border: '1px solid var(--cth-ink-200, #E0DFDB)',
-  boxShadow: 'var(--cth-shadow-dialog, 0 16px 32px rgba(0,0,0,0.2))',
-  borderRadius: 'var(--cth-radius-card, 4px)',
+  background: 'var(--cth-card)',
+  border: '1px solid var(--cth-line-2)',
+  boxShadow: 'var(--cth-shadow-lg)',
+  borderRadius: 'var(--cth-r-2xl)',
   width: '100%',
   maxWidth: 500,
   padding: 24,
@@ -252,13 +253,7 @@ const introStyle: CSSProperties = {
   margin: 0
 };
 
-const labelStyle: CSSProperties = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  marginBottom: 4,
-  color: 'var(--cth-ink-700)'
-};
+const labelStyle: CSSProperties = { ...fieldLabel, display: 'block', marginBottom: 4 };
 
 const inputStyle: CSSProperties = {
   width: '100%',
@@ -266,14 +261,14 @@ const inputStyle: CSSProperties = {
   padding: '8px 10px',
   fontSize: 13,
   fontFamily: 'inherit',
-  border: '1px solid var(--cth-ink-200)',
+  border: '1px solid var(--cth-line-2)',
   borderRadius: 2,
-  background: 'var(--cth-canvas-input, #FFFFFF)',
+  background: 'var(--cth-card)',
   color: 'var(--cth-ink-900)'
 };
 
 const showBtnStyle: CSSProperties = {
-  border: '1px solid var(--cth-ink-200)',
+  border: '1px solid var(--cth-line-2)',
   background: 'transparent',
   padding: '0 10px',
   fontSize: 12,
@@ -286,7 +281,7 @@ const errorBannerStyle: CSSProperties = {
   padding: '8px 12px',
   fontSize: 13,
   background: 'var(--cth-coral-light, #FFE6E6)',
-  color: 'var(--cth-coral-dark, #A01010)',
+  color: 'var(--cth-coral-text)',
   borderRadius: 2
 };
 

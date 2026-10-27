@@ -2078,7 +2078,13 @@
     "connect": "测试并连接",
     "saveChanges": "保存并连接",
     "reconnect": "重新连接",
-    "tokenExpired": "永久访问令牌已过期或被撤销。请在“设置 > 连接 > WhatsApp”中更新令牌。"
+    "tokenExpired": "永久访问令牌已过期或被撤销。请在“设置 > 连接 > WhatsApp”中更新令牌。",
+    "drafts": "待处理草稿（{{count}}）",
+    "draftFrom": "来自 {{name}}，发给 {{to}}",
+    "draftSend": "发送",
+    "draftDiscard": "丢弃",
+    "draftFailed": "未发送：{{error}}",
+    "sendOnlyNote": "暂时还收不到客户的回复：团队成员可以用号码发送消息，但看不到收到的消息。"
   },
   "capabilities": {
     "addHow": "{{name}} 怎样使用它",
@@ -2163,7 +2169,7 @@
     "whatsappSummary": "WhatsApp：{{count}}",
     "removeWhatsApp": "移除",
     "whatsappChat": "聊天",
-    "whatsappWatches": "{{name}} 接收并关注消息",
+    "whatsappWatches": "{{name}} 用这个号码发送消息",
     "whatsappSendingFrom": "通过 {{number}} 发送",
     "whatsappNone": "{{name}} 尚未使用 WhatsApp。",
     "noWhatsAppAccounts": "尚未连接任何 WhatsApp 号码。",

@@ -94,3 +94,43 @@ test('restart detection: whatsAppToolsJustAttached', () => {
     false
   );
 });
+
+test('proposals are withdrawn when the line is removed, moved or set to Draft only, as mail does', () => {
+  const { removeWhatsAppAccount, setAgentWhatsAppCapabilities } = loadTs('src/main/whatsapp.ts');
+  const make = (caps) => {
+    let cfg = {
+      whatsappAccounts: [{ id: 'wa-support', phoneNumberId: '1', displayPhoneNumber: '+1', label: 'Support', status: 'connected', createdAt: 1, updatedAt: 1 }],
+      agentCapabilities: caps
+    };
+    const cancelled = [];
+    const dropped = [];
+    const admin = {
+      getConfig: () => cfg,
+      saveConfig: (patch) => { cfg = { ...cfg, ...patch }; },
+      setSecret: () => ({ ok: true }),
+      deleteSecret: () => true,
+      cancelFor: (agentId, accountId, reason) => cancelled.push([agentId, accountId, reason]),
+      dropDrafts: (accountId) => dropped.push(accountId)
+    };
+    return { admin, cancelled, dropped };
+  };
+  const approval = { enabled: true, accounts: ['wa-support'], send: false, sending: 'approval' };
+
+  const removed = make({ kelly: { whatsapp: approval } });
+  removeWhatsAppAccount(removed.admin, 'wa-support');
+  assert.deepEqual(removed.cancelled.map((c) => c.slice(0, 2)), [['kelly', 'wa-support']]);
+  assert.deepEqual(removed.dropped, ['wa-support']);
+
+  const moved = make({ kelly: { whatsapp: approval } });
+  setAgentWhatsAppCapabilities(moved.admin, 'pam', { whatsapp: approval, move: true });
+  assert.deepEqual(moved.cancelled.map((c) => c.slice(0, 2)), [['kelly', 'wa-support']]);
+
+  const drafted = make({ kelly: { whatsapp: approval } });
+  setAgentWhatsAppCapabilities(drafted.admin, 'kelly', { whatsapp: { ...approval, sending: 'draft' } });
+  assert.equal(drafted.cancelled.length, 1);
+  assert.match(drafted.cancelled[0][2], /Draft only/);
+
+  const same = make({ kelly: { whatsapp: approval } });
+  setAgentWhatsAppCapabilities(same.admin, 'kelly', { whatsapp: approval });
+  assert.deepEqual(same.cancelled, [], 'no change, nothing withdrawn');
+});

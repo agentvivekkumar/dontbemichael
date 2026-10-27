@@ -147,8 +147,9 @@ test('only Michael notifies: every desktop toast in main is his, or one of the a
   const titles = [...main.matchAll(/new Notification\(\{ title: ([^,]+),/g)].map((m) => m[1].trim());
   for (const t of titles) assert.ok(['michaelName()', 'title'].includes(t), `unexpected toast title ${t}`);
   const toasts = [...main.matchAll(/ownerToast\(([^,]+),/g)].map((m) => m[1].trim()).filter((t) => t !== 'title: string');
-  // Two of Michael's are the office break starting and ending (issue 124).
-  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()', 'michaelName()', 'michaelName()'].sort());
+  // Two of Michael's are the office break starting and ending (issue 124); one
+  // is a WhatsApp message to approve.
+  assert.deepEqual(toasts.sort(), ["'Agent running degraded'", "'Agents need a restart'", 'michaelName()', 'michaelName()', 'michaelName()', 'michaelName()', 'michaelName()'].sort());
   // Schedule requests (scheduleRequests.ts) toast only as Michael too.
   const requests = read('src/main/scheduleRequests.ts');
   assert.deepEqual([...requests.matchAll(/deps\.ownerToast\(([^,]+),/g)].map((m) => m[1].trim()), ['deps.michaelName()', 'deps.michaelName()']);

@@ -2078,7 +2078,13 @@
     "connect": "اختبار وربط",
     "saveChanges": "حفظ وربط",
     "reconnect": "إعادة الاتصال",
-    "tokenExpired": "انتهت صلاحية رمز الوصول الدائم أو تم إبطاله. يرجى تحديث الرمز من الإعدادات > الاتصالات > WhatsApp."
+    "tokenExpired": "انتهت صلاحية رمز الوصول الدائم أو تم إبطاله. يرجى تحديث الرمز من الإعدادات > الاتصالات > WhatsApp.",
+    "drafts": "مسودات بانتظارك ({{count}})",
+    "draftFrom": "من {{name}}، إلى {{to}}",
+    "draftSend": "إرسال",
+    "draftDiscard": "تجاهل",
+    "draftFailed": "لم تُرسل: {{error}}",
+    "sendOnlyNote": "لا تصل ردود العملاء بعد: يمكن لأعضاء الفريق الإرسال من الرقم، لكن لا يمكنهم قراءة ما يصل إليه."
   },
   "capabilities": {
     "addHow": "كيف يستخدمه {{name}}",
@@ -2163,7 +2169,7 @@
     "whatsappSummary": "واتساب: {{count}}",
     "removeWhatsApp": "إزالة",
     "whatsappChat": "المحادثة",
-    "whatsappWatches": "يتابع {{name}} الرسائل",
+    "whatsappWatches": "{{name}} يرسل من هذا الرقم",
     "whatsappSendingFrom": "الإرسال من {{number}}",
     "whatsappNone": "لا يستخدم {{name}} WhatsApp بعد.",
     "noWhatsAppAccounts": "لا توجد أرقام WhatsApp متصلة بعد.",

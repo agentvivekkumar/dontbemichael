@@ -1030,6 +1030,8 @@ const api = {
   },
   listWhatsAppDrafts: (filter?: { accountId?: string; agentId?: string }): Promise<WhatsAppDraft[]> =>
     ipcRenderer.invoke('whatsappDrafts:list', filter),
+  sendWhatsAppDraft: (id: string, text?: string): Promise<{ ok: true; messageId: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('whatsappDrafts:send', id, text),
   deleteWhatsAppDraft: (id: string): Promise<boolean> =>
     ipcRenderer.invoke('whatsappDrafts:delete', id),
   onWhatsAppDraftsUpdated: (cb: () => void): (() => void) => {

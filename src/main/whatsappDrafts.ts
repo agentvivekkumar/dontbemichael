@@ -103,6 +103,14 @@ export class WhatsAppDrafts {
     return draft;
   }
 
+  /** Drop every draft on a line, when the line is removed. */
+  dropFor(accountId: string): number {
+    const cur = this.load().drafts;
+    const next = cur.filter((d) => d.accountId !== accountId);
+    if (next.length !== cur.length) this.save({ drafts: next });
+    return cur.length - next.length;
+  }
+
   deleteDraft(id: string): boolean {
     const cur = this.load().drafts;
     const next = cur.filter((d) => d.id !== id);

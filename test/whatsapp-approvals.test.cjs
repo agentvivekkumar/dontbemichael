@@ -257,3 +257,67 @@ test('WhatsAppService integration: enforces Send on approval and approved copy d
   assert.equal(allDrafts.length, 1);
   assert.equal(allDrafts[0].text, 'A draft for Toby');
 });
+
+/** A service with fresh stores and a fetch that records what reaches Meta. */
+function rig(t, cfg) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-wa-rig-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const approvals = new WhatsAppApprovals({ path: path.join(tmpDir, 'whatsapp-proposals.json') });
+  const drafts = new WhatsAppDrafts({ path: path.join(tmpDir, 'whatsapp-drafts.json') });
+  const sent = [];
+  const service = new WhatsAppService({
+    getSecret: () => 'meta-secret-token',
+    getConfig: () => cfg,
+    fetchFn: async (_url, opts) => {
+      sent.push(JSON.parse(opts.body));
+      return { ok: true, status: 200, json: async () => ({ messages: [{ id: `wamid.${sent.length}` }] }) };
+    },
+    approvals,
+    drafts
+  });
+  return { approvals, drafts, sent, service };
+}
+
+const supportCfg = (sending) => ({
+  whatsappAccounts: [
+    { id: 'wa-support', phoneNumberId: '109988', displayPhoneNumber: '+15551111', label: 'Support', status: 'connected', createdAt: 1, updatedAt: 1 }
+  ],
+  agentCapabilities: { kelly: { whatsapp: { enabled: true, accounts: ['wa-support'], send: sending === 'send', sending } } }
+});
+
+test('Send on approval: a made-up id, or proposing and sending at once, reaches nothing (review point 2)', async (t) => {
+  const { sent, service } = rig(t, supportCfg('approval'));
+
+  const madeUp = await service.handleWhatsAppRequest('kelly', 'send_whatsapp_message', { accountId: 'wa-support', proposalId: 'anything', to: '+15559999', text: 'hi' });
+  assert.equal(madeUp.status, 409);
+  assert.match(madeUp.body.error, /No proposal of yours/);
+
+  const prop = await service.handleWhatsAppRequest('kelly', 'propose_whatsapp_message', { accountId: 'wa-support', to: '+15559999', text: 'hi' });
+  const atOnce = await service.handleWhatsAppRequest('kelly', 'send_whatsapp_message', { accountId: 'wa-support', proposalId: prop.body.proposalId, to: '+15559999', text: 'hi' });
+  assert.equal(atOnce.status, 409);
+  assert.match(atOnce.body.error, /not decided/);
+  assert.equal(sent.length, 0, 'nothing reached Meta');
+});
+
+test('Draft only: the owner sends a draft, as edited, and it leaves the list (review point 3)', async (t) => {
+  const { drafts, sent, service } = rig(t, supportCfg('draft'));
+  const res = await service.handleWhatsAppRequest('kelly', 'draft_whatsapp_message', { accountId: 'wa-support', to: '+15559999', text: 'Draft text' });
+  assert.equal(res.status, 200);
+  assert.match(res.body.next, /Nothing is sent/);
+  assert.equal(sent.length, 0);
+
+  const out = await service.sendDraft(res.body.draftId, 'Owner edit');
+  assert.equal(out.ok, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].text.body, 'Owner edit');
+  assert.equal(drafts.list().length, 0, 'a sent draft is gone');
+  assert.equal((await service.sendDraft(res.body.draftId)).ok, false, 'and cannot go twice');
+});
+
+test('an unknown or retired WhatsApp tool is refused', async (t) => {
+  const { service } = rig(t, supportCfg('send'));
+  for (const op of ['mark_whatsapp_read', 'list', '__proto__']) {
+    const res = await service.handleWhatsAppRequest('kelly', op, { accountId: 'wa-support' });
+    assert.equal(res.status, 404, op);
+  }
+});

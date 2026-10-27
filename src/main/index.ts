@@ -1028,7 +1028,8 @@ const whatsAppService = new WhatsAppService({
   updateStatus: (id, status, reason) => markWhatsAppStatus(id, status, reason),
   approvals: whatsAppApprovals,
   drafts: whatsAppDrafts,
-  messagesPath: join(app.getPath('userData'), 'whatsapp-messages.json')
+  messagesPath: join(app.getPath('userData'), 'whatsapp-messages.json'),
+  tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'whatsapp'); }
 });
 
 function markWhatsAppStatus(id: string, status: 'connected' | 'needs-attention', reason?: string): void {
@@ -1078,7 +1079,9 @@ const whatsAppAdmin: WhatsAppAdminDeps = {
   saveConfig: (patch) => writeConfig(patch),
   setSecret: (ref, val) => integrations.setSecret(ref, val),
   deleteSecret: (ref) => integrations.deleteSecret(ref),
-  canStoreSecrets: () => integrations.canStoreSecrets()
+  canStoreSecrets: () => integrations.canStoreSecrets(),
+  cancelFor: (agentId, accountId, reason) => { whatsAppApprovals.cancel({ agentId, accountId }, reason); },
+  dropDrafts: (accountId) => { whatsAppDrafts.dropFor(accountId); }
 };
 
 /** Send on approval (docs/designs/send-on-approval.md): proposals the owner
@@ -4646,9 +4649,9 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     const agentId = opts.hive.id;
     const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
     const root = hive.root();
-    const caps = readConfig().agentCapabilities?.[agentId];
-    const withMail = SHOW_MAILBOXES && hasMailTools(caps);
-    const withWhatsApp = hasWhatsAppTools(caps);
+    // A Send only grant alone gets the mail tools too (shared-mailboxes.md, item 1).
+    const withMail = SHOW_MAILBOXES && hasMailTools(readConfig().agentCapabilities?.[agentId]);
+    const withWhatsApp = hasWhatsAppTools(readConfig().agentCapabilities?.[agentId]);
     if (home && root && (withMail || withWhatsApp)) {
       try {
         const token = integrationBroker.grant(opts.id, [], agentId);
@@ -5521,6 +5524,11 @@ ipcMain.handle('whatsappProposals:decide', (_evt, id: unknown, decision: unknown
 ipcMain.handle('whatsappDrafts:list', (_evt, filter: unknown) => {
   const f = filter && typeof filter === 'object' ? (filter as { accountId?: string; agentId?: string }) : undefined;
   return whatsAppDrafts.list(f);
+});
+/** The owner sends an agent's draft, as written or edited (Settings > WhatsApp). */
+ipcMain.handle('whatsappDrafts:send', async (_evt, id: unknown, text: unknown) => {
+  if (typeof id !== 'string') return { ok: false, error: 'invalid' };
+  return whatsAppService.sendDraft(id, typeof text === 'string' ? text : undefined);
 });
 ipcMain.handle('whatsappDrafts:delete', (_evt, id: unknown) => {
   if (typeof id !== 'string') return false;

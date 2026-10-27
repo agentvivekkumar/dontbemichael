@@ -13,7 +13,7 @@
  *   and the integration broker for md-whatsapp tools.
  */
 
-import { type SendingMode, asSendingMode, sendingWords } from './mailboxes';
+import type { SendingMode } from './mailboxes';
 
 export interface WhatsAppAccountRecord {
   /** Stable slug; also the secret handle `whatsapp:<id>`. */
@@ -52,7 +52,7 @@ export function whatsAppSendingMode(wa: Pick<WhatsAppCapability, 'send' | 'sendi
   return wa?.send === true ? 'send' : 'draft';
 }
 
-export type WhatsAppOp = 'list' | 'search' | 'read' | 'draft' | 'propose' | 'send' | 'mark_read';
+export type WhatsAppOp = 'list' | 'search' | 'read' | 'draft' | 'propose' | 'send';
 
 /**
  * Each md-whatsapp tool and the access op it maps to.
@@ -64,8 +64,7 @@ export const WHATSAPP_TOOL_OPS: Record<string, WhatsAppOp> = Object.assign(Objec
   read_whatsapp_chat: 'read',
   draft_whatsapp_message: 'draft',
   propose_whatsapp_message: 'propose',
-  send_whatsapp_message: 'send',
-  mark_whatsapp_read: 'mark_read'
+  send_whatsapp_message: 'send'
 });
 
 export interface WhatsAppAccessConfig {
@@ -85,7 +84,9 @@ export type WhatsAppAccessResult = { ok: true } | { ok: false; reason: string };
  * 1. Agent has WhatsApp capability enabled.
  * 2. The account is assigned to this agent and exists in Settings.
  * 3. Propose is only allowed in 'approval' mode.
- * 4. Send is allowed in 'send' mode, or in 'approval' mode only when an approved proposal ID is provided.
+ * 4. Send is allowed in 'send' mode, or in 'approval' mode only with a proposal id. As with
+ *    mailAccess, this rule only sees the id: the service (main/whatsapp.ts) checks that the
+ *    proposal is this agent's, on this line, and approved, and sends only the approved copy.
  * 5. Draft only refuses sending or proposing.
  */
 export function whatsAppAccess(

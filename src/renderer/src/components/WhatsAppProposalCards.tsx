@@ -5,6 +5,7 @@ import { useStore } from '@/store/store';
 import { AgentAvatar } from './AgentAvatar';
 import { GrowingTextarea } from './GrowingTextarea';
 import { PixelButton } from './PixelButton';
+import { partLabel } from './fieldText';
 
 /**
  * Send on approval for WhatsApp Business:
@@ -45,11 +46,7 @@ const field: CSSProperties = {
   lineHeight: '18px'
 };
 
-const label: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--cth-ink-3)'
-};
+const label: CSSProperties = partLabel;
 
 const meta: CSSProperties = {
   fontSize: 11.5,
