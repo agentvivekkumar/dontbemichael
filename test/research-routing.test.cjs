@@ -496,11 +496,26 @@ test('a stamped file with an added field or under another name is swept', async 
 });
 
 test('the last wall: deliver() itself drops a message for Research the layer did not produce', async (t) => {
-  // Value: protects=a routing regression can't reach Research; fails_when=deliver() writes it; why_new=testing review pass 2; seam=none
+  // Value: protects=a routing regression can't reach Research; fails_when=deliver() writes it or reports success for a drop; why_new=testing review pass 2, contract fix (return false on drop); seam=none
   const { hive } = await office(t);
-  hive['deliver'](hive['normalize']({ to: 'research', act: 'inform', subject: 'x', body: 'y' }, 'system'), 'research');
+  const ok = hive['deliver'](hive['normalize']({ to: 'research', act: 'inform', subject: 'x', body: 'y' }, 'system'), 'research');
+  assert.equal(ok, false, 'deliver() must return false when it drops an uncleared Research message');
   assert.equal(msgsIn(hive, 'research').length, 0);
   assert.match(fs.readFileSync(path.join(hive.root(), 'log.jsonl'), 'utf8'), /research-unchecked/);
+});
+
+test('a message the layer did clear still reaches Research and reports success', async (t) => {
+  // Value: protects=the contract fix does not stop the trust layer's clean copies from arriving; fails_when=a cleared id is dropped or reports failure; why_new=contract fix regression guard; seam=none
+  const { hive } = await office(t);
+  const msg = hive['normalize']({ to: 'research', act: 'inform', subject: 'x', body: 'y' }, 'system');
+  hive['researchCleared'].add(msg.id);
+  try {
+    const ok = hive['deliver'](msg, 'research');
+    assert.equal(ok, true, 'deliver() reports success for a cleared Research message');
+    assert.equal(msgsIn(hive, 'research').length, 1, 'the cleared copy is delivered');
+  } finally {
+    hive['researchCleared'].delete(msg.id);
+  }
 });
 
 test('the app flags a steering answer to Michael even when the layer does not', async (t) => {
