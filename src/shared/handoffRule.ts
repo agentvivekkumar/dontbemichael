@@ -52,15 +52,29 @@ export function rerouteToMichael<M extends { from: string; to: string; subject: 
   };
 }
 
+/** How much of a dropped message's text its notice quotes: enough for Michael
+ *  to pick the work up without opening the thread, never the whole message. */
+export const HOP_DROP_EXCERPT_MAX = 300;
+
 /** The note Michael gets when the loop guard drops a runaway message, so a
- *  ping pong is never silent. */
+ *  ping pong is never silent. It quotes the start of the dropped message's
+ *  text on one line, cut at a word, so he can pick the work up from it. */
 export function hopDropNotice(
-  msg: { from: string; to: string; subject: string; hops: number },
+  msg: { from: string; to: string; subject: string; hops: number; body?: string },
   agents: Record<string, RosterEntry | undefined>
 ): { subject: string; body: string } {
   const name = (id: string) => agents[id]?.name?.trim() || id;
+  const text = typeof msg.body === 'string' ? msg.body.replace(/\s+/g, ' ').trim() : '';
+  let excerpt = text;
+  if (text.length > HOP_DROP_EXCERPT_MAX) {
+    const cut = text.slice(0, HOP_DROP_EXCERPT_MAX);
+    const space = cut.lastIndexOf(' ');
+    excerpt = `${(space > HOP_DROP_EXCERPT_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+  }
   return {
     subject: `Dropped a message going in circles: ${msg.subject}`.slice(0, 200),
-    body: `A message from ${name(msg.from)} to ${name(msg.to)} passed between agents ${msg.hops} times, so the app stopped it. Subject: "${msg.subject}". Decide who owns this and tell them once.`
+    body: `A message from ${name(msg.from)} to ${name(msg.to)} passed between agents ${msg.hops} times, so the app stopped it. Subject: "${msg.subject}".`
+      + (excerpt ? ` It said: "${excerpt}"` : '')
+      + ' Decide who owns this and tell them once.'
   };
 }

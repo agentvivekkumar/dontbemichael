@@ -3,7 +3,8 @@
 /**
  * Edges of the only-Michael-assigns rule (src/shared/handoffRule.ts) that
  * only-michael-assigns.test.cjs leaves out: unknown targets, broadcast wording,
- * names missing from the roster, and a long subject on a dropped message.
+ * names missing from the roster, and a long subject on a dropped message,
+ * and the dropped message's own text in Michael's notice.
  */
 
 const test = require('node:test');
@@ -48,4 +49,26 @@ test('a dropped message with a long subject keeps the notice subject short', () 
   const n = R.hopDropNotice({ from: 'ghost', to: 'pam', subject: 'S'.repeat(400), hops: 13 }, agents);
   assert.equal(n.subject.length, 200);
   assert.match(n.body, /^A message from ghost to Pam passed between agents 13 times/);
+});
+
+test("a dropped message's text is quoted in Michael's notice, on one line", () => {
+  const n = R.hopDropNotice({ from: 'pam', to: 'god', subject: 'Refund', hops: 13, body: 'Can you check\nthe  Northwind refund\tagain?' }, agents);
+  assert.match(n.body, /Subject: "Refund"\. It said: "Can you check the Northwind refund again\?" Decide who owns this and tell them once\.$/);
+});
+
+test('a long dropped message is cut at a word, never quoted whole', () => {
+  const words = Array.from({ length: 200 }, (_, i) => `word${i}`).join(' ');
+  const n = R.hopDropNotice({ from: 'pam', to: 'god', subject: 'Long', hops: 13, body: words }, agents);
+  const quoted = n.body.match(/It said: "(.*)" Decide/)[1];
+  assert.ok(quoted.length <= R.HOP_DROP_EXCERPT_MAX + 1, `excerpt is ${quoted.length} characters`);
+  assert.ok(quoted.endsWith('…'));
+  assert.match(quoted, /^word0 word1 word2 /);
+  assert.match(quoted, /word\d+…$/, 'ends on a whole word');
+});
+
+test('a dropped message with no text keeps the notice as it was', () => {
+  for (const body of [undefined, '', '   \n ']) {
+    const n = R.hopDropNotice({ from: 'pam', to: 'god', subject: 'Loop', hops: 13, body }, agents);
+    assert.equal(n.body, 'A message from Pam to Michael passed between agents 13 times, so the app stopped it. Subject: "Loop". Decide who owns this and tell them once.');
+  }
 });
