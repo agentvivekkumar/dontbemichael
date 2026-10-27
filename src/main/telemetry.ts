@@ -218,6 +218,27 @@ export class TelemetryCollector {
     return this.transcriptFallback(agentId);
   }
 
+  /** Each of an agent's live sessions as its own sample, under its own id. The
+   *  cost ledger and Pulse keep running totals per (agent, session), so they
+   *  must be fed one session at a time: after /clear one PTY carries two
+   *  session ids, and the aggregate (summed, labelled with the newest id)
+   *  written under the new id counts every dollar from before the clear a
+   *  second time. The breaker and the cost cap keep using getAgentUsage, where
+   *  the sum across sessions is the point. Live telemetry only: empty when the
+   *  agent has none, since the transcript fallback has no session to key by. */
+  sessionSamples(agentId: string): AgentUsageSample[] {
+    const out: AgentUsageSample[] = [];
+    for (const sid of this.agentSessions.get(agentId) ?? []) {
+      const a = this.sessions.get(sid);
+      if (!a) continue;
+      out.push({
+        agentId, sessionId: sid, ts: a.ts, input: a.input, output: a.output,
+        cacheRead: a.cacheRead, cacheCreation: a.cacheCreation, model: a.model, usd: a.usd
+      });
+    }
+    return out;
+  }
+
   /** Push (additive, OTel-only). Fires the agent's fresh aggregate whenever new
    *  telemetry lands. Returns an unsubscribe fn. */
   onAgentUsage(cb: (s: AgentUsageSample) => void): () => void {
@@ -433,7 +454,9 @@ export class TelemetryCollector {
   }
 
   /** Sum an agent's live sessions into one cumulative sample (sessionId/model =
-   *  the most recently active session). Null if the agent has no live data. */
+   *  the most recently active session). Null if the agent has no live data.
+   *  Never a per-session row: anything keyed by (agent, session) reads
+   *  sessionSamples instead. */
   private aggregateLive(agentId: string): AgentUsageSample | null {
     const set = this.agentSessions.get(agentId);
     if (!set || set.size === 0) return null;
@@ -465,8 +488,8 @@ export class TelemetryCollector {
    *  in for this agent this run — the true zero-usage case for a just-spawned
    *  agent), reports "no data" rather than someone else's history. `sessionId`
    *  stays '' on the returned sample regardless — deliberately, so it keeps
-   *  reading as "no live session" to the #56 cost-ledger dedup gate in
-   *  index.ts (`if (sample?.sessionId) appendCostLedger(...)`); the resolved id
+   *  reading as "no live session": the ledger is written only from live
+   *  sessions (sessionSamples, #56), never from this fallback; the resolved id
    *  is used only to filter the read, never surfaced as if it were live OTel. */
   private transcriptFallback(agentId: string): AgentUsageSample | null {
     const cwd = this.resolveCwd?.(agentId);

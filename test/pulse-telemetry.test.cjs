@@ -605,7 +605,10 @@ test('suggestions wait for 14 days of live records; a backfill never starts them
 test('a Claude member\'s transcript total never reaches Pulse cost; an engine with no live numbers keeps its own per session', () => {
   // Value: protects=Spent and each member's cost read the real spend; fails_when=a transcript fallback sample (the whole session's total, no session id) is stored for a Claude member beside its live numbers, or other engines lose their only cost source; why_new=ship review 2026-10-16, the fallback was counted again after each launch; seam=none; no_claim=the sampling loop itself runs in main (source pin)
   const src = fs.readFileSync(path.join(__dirname, '..', 'src/main/index.ts'), 'utf8');
-  assert.match(src, /if \(sample && \(sample\.sessionId \|\| \(a\.provider \?\? 'claude'\) !== 'claude'\)\) \{\s*pulseTelemetry\.cost\(id, sample\.sessionId \|\| `transcript:\$\{hive\.lastSession\(id\) \?\? ''\}`/);
+  // Live numbers go to Pulse per session (sessionCost.ts); the transcript
+  // total only for an engine with no live session, never a Claude member's.
+  assert.match(src, /sessionCost\.record\(telemetry\.sessionSamples\(id\), sessionCostSinks\)/);
+  assert.match(src, /if \(sample && !sample\.sessionId && \(a\.provider \?\? 'claude'\) !== 'claude'\) \{\s*pulseTelemetry\.cost\(id, `transcript:\$\{hive\.lastSession\(id\) \?\? ''\}`/);
   assert.doesNotMatch(src, /pulseTelemetry\.cost\(id, sample\.sessionId \|\| 'transcript'/);
 });
 
