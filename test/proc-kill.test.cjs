@@ -33,12 +33,18 @@ if (process.platform === 'win32') {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Live pids in process group `pgid` (empty when the group is gone). */
+/** Live pids in process group `pgid` (empty when the group is gone). A killed
+ *  member whose parent was the leader is a zombie until whatever adopts it reaps
+ *  it: at once under launchd or systemd, but a container's PID 1 can take a
+ *  second or more. A zombie holds no resources and cannot be killed again, so
+ *  it is dead for these tests, not a survivor (state Z in ps). */
 function groupPids(pgid) {
   try {
-    return execFileSync('pgrep', ['-g', String(pgid)], { encoding: 'utf8' })
-      .split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
-  } catch { return []; } // pgrep exits 1 when no match
+    return execFileSync('ps', ['-axo', 'pid=,pgid=,stat='], { encoding: 'utf8' })
+      .split('\n').map((l) => l.trim().split(/\s+/))
+      .filter(([pid, g, stat]) => pid && Number(g) === pgid && !String(stat).startsWith('Z'))
+      .map(([pid]) => Number(pid));
+  } catch { return []; }
 }
 
 /** Spawn a detached (own-process-group) leader that traps HUP, with a child. */
