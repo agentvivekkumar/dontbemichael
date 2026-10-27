@@ -564,7 +564,8 @@ export class PtyManager {
     const resolved = typeof opts.shellScript === 'string' ? opts.command : this.resolveCommand(opts.command).path;
     try {
       // Build a user-shell PATH so child can resolve subprocess deps. Cached
-      // for the session (shellEnv.userShellPath, fenced against rc-file noise) —
+      // once the shell answers (shellEnv.userShellPath, fenced against rc-file
+      // noise; a failed capture is asked again after a backoff) —
       // the interactive-shell launch it replaces cost ~1s of main-thread freeze
       // on EVERY spawn.
       const userPath = withHiveRuntimeFallback(
