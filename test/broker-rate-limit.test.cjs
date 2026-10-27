@@ -1,9 +1,10 @@
 'use strict';
 
 // A connected app that rate limits is not hammered (TODOS: "Third-party
-// rate-limit backoff in the broker"): after a 429, or a 503 with Retry-After,
-// the broker holds calls to that app until its time is up, and answers at once
-// when the wait is long. Runs the real broker in front of a local server.
+// rate-limit backoff in the broker"): after a 429, a 503 with Retry-After, or a
+// 403 that says it is a rate limit (GitHub), the broker holds calls to that app
+// until its time is up, and answers at once when the wait is long. Runs the
+// real broker in front of a local server.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -11,7 +11,8 @@
 
 /** Longest a call is held in the broker for a throttled app. */
 export const HOLD_MAX_MS = 20_000;
-/** A 429 that does not say how long to wait. */
+/** A rate limit that does not say how long to wait: a bare 429, or a 403
+ *  that says nothing is left but names no reset. */
 export const DEFAULT_BACKOFF_MS = 30_000;
 /** The longest wait the broker takes from an app. Past it, calls go again and
  *  a fresh 429 starts a new wait. */
