@@ -511,19 +511,19 @@ export class IntegrationBroker {
               chunks.push(buf);
             }
           }
-          if (!res.writableEnded) {
-            try {
-              if (!res.write(buf)) await waitForDrain(res);
-            } catch {
-              truncated = true;
-              chunks.length = 0;
-              node.destroy();
-              break;
-            }
+          // An agent that hung up (a curl timeout, Esc on the tool, a worker
+          // torn down) is not a cut answer. The write still happened, so the
+          // rest is read to the end and the journal gets the real answer for
+          // the retry that usually follows. The upstream timer still bounds it.
+          if (clientGone(res)) continue;
+          try {
+            if (!res.write(buf)) await waitForDrain(res);
+          } catch {
+            res.destroy();
           }
         }
       }
-      if (!res.writableEnded) res.end();
+      if (!clientGone(res)) res.end();
     } catch {
       truncated = true;
       chunks.length = 0;
@@ -579,8 +579,17 @@ function postOnlyReads(rec: IntegrationRecord, method: string, upstream: URL, bo
   return rules.length > 0 && isPostRead(rules, upstream, body.toString('utf8'));
 }
 
-/** Wait until the caller can take more bytes, or until they go away. */
+/** True once the caller can take no more bytes: they hung up, or the reply
+ *  was already finished. */
+function clientGone(res: ServerResponse): boolean {
+  return res.destroyed || res.writableEnded || res.closed;
+}
+
+/** Wait until the caller can take more bytes, or until they go away. A write
+ *  to a caller that already left returns false and emits nothing, and its
+ *  'close' has already fired, so that case answers at once. */
 function waitForDrain(res: ServerResponse): Promise<void> {
+  if (clientGone(res)) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const finish = (err?: Error): void => {
       res.off('drain', onDrain);
