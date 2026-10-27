@@ -2565,6 +2565,8 @@ export class HiveManager {
   /** Checked messages for Research whose delivery failed (a disk error), by
    *  id: each routing pass tries them again with the verdict they already have. */
   private readonly researchUndelivered = new Map<string, () => void>();
+  /** Schedule decisions held while Research was not reporting, delivered once it reports again (TODOS.md). */
+  private readonly researchHeldDecisions: Array<{ msg: HiveMessage; upkeep: UpkeepKind }> = [];
   /** About a minute of tries at the router's 1.5 s pace, so a disk that
    *  fills up or locks for a moment doesn't cost the owner a note. */
   static readonly RESEARCH_DELIVERY_TRIES = 40;
@@ -3463,6 +3465,12 @@ export class HiveManager {
     // through the trust layer first, in the background (ship review D2.1).
     // Research not reporting: its questions wait with Michael like anyone's (SD16).
     if (addressedToResearch(msg.to, reg.agents, this.researchName()) && msg.from !== RESEARCH_ID && this.memberMail?.(RESEARCH_ID) === 'hold') {
+      // A schedule decision for Research while it isn't reporting is kept
+      // (without Michael) and delivered with its upkeep kind once Research reports again (TODOS.md).
+      if (upkeep === 'schedule-decision') {
+        this.researchHeldDecisions.push({ msg, upkeep });
+        return;
+      }
       // The app's upkeep notes are not Michael's to pass on (his resend would
       // make them a listed question): dropped quietly, as with Research off.
       if (upkeep) { this.appendLog({ kind: 'drop', reason: 'research-held', from: msg.from, id: msg.id, upkeep }); return; }
@@ -3746,6 +3754,14 @@ export class HiveManager {
     for (const [id, retry] of [...this.researchUndelivered]) {
       this.researchUndelivered.delete(id);
       try { retry(); } catch { /* its pending row stays, so the next start tells Michael */ }
+    }
+    // Schedule decisions held while Research was not reporting get delivered once it reports.
+    if (this.memberMail?.(RESEARCH_ID) !== 'hold' && this.researchHeldDecisions.length) {
+      const held = [...this.researchHeldDecisions];
+      this.researchHeldDecisions.length = 0;
+      for (const item of held) {
+        try { this.routeMessage(item.msg, item.upkeep); } catch (e) { console.error('[research] delivering held schedule decision', e); }
+      }
     }
     try { this.sweepResearchInbox(researchOn); } catch { /* next tick */ }
     this.pruneTrustChecks();
