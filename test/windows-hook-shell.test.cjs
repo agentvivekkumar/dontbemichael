@@ -73,6 +73,17 @@ test('bash gets the launcher and script paths exactly as written', { skip: !fs.e
   }
 });
 
+test('bash also keeps $(...), double quotes, a backslash before $ and non-ASCII names literal', { skip: !fs.existsSync('/bin/bash') }, () => {
+  // Value: protects=hooks start under any folder name; fails_when=bash runs a $(...) in the path, drops a double quote, eats the backslash before $, or mangles non-ASCII; why_new=the cases above cover $name, a UNC share, a backtick and a single quote only; seam=real /bin/bash
+  for (const dir of ['/Users/sam/$(touch pwned)/hive', '/Users/sam/say "hi"/hive', 'C:\\Users\\sam\\$Money\\hive', '/Users/sam/Ünïcødé ✓/hive']) {
+    const exe = `${dir}/bin/hive-node`;
+    const script = `${dir}/bin/cth-hook.cjs`;
+    const r = spawnSync('/bin/bash', ['-c', `printf '%s\\n' ${shellCommand('bash', exe, script, '--status')}`], { encoding: 'utf8', cwd: os.tmpdir(), env: { PATH: '/usr/bin:/bin' } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.stdout.split('\n').slice(0, -1), [exe, script, '--status'], dir);
+  }
+});
+
 test('on Windows, every Claude hook and the status line are written for the shell Claude Code will use', async (t) => {
   // Value: protects=Michael's hooks run on a Windows office with or without Git for Windows; fails_when=hookSettings writes the bash form under PowerShell, a hook does not name its shell, the found Git Bash is not pinned, or POSIX settings change; why_new=the reported "Unexpected token" on every hook; seam=process.platform and PATH
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-hook-shell-'));

@@ -68,6 +68,15 @@ export function hookShell(platform: NodeJS.Platform = process.platform, env: Nod
 let lastShell: { key: string; value: { gitBash: string } } | undefined;
 
 /**
+ * One word for bash or sh, single quoted: double quotes still expand `$` and
+ * fold the `\\` of a UNC path. An embedded quote is closed, escaped and
+ * reopened.
+ */
+export function posixQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * One command line in that shell: the executable and script quoted (paths may
  * hold spaces), then plain flags. PowerShell needs the call operator before a
  * quoted path, and single quotes so `$` and backticks in a path stay literal.
@@ -79,8 +88,6 @@ export function shellCommand(shell: HookShell, exe: string, script: string, ...a
     const q = (s: string): string => `'${s.replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'`;
     return ['&', q(exe), q(script), ...args].join(' ');
   }
-  // Single quotes in bash too: double quotes still expand `$` and fold the `\\`
-  // of a UNC path. An embedded quote is closed, escaped and reopened.
-  const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
-  return [q(exe), q(script), ...args].join(' ');
+  // Single quotes in bash too (posixQuote).
+  return [posixQuote(exe), posixQuote(script), ...args].join(' ');
 }
