@@ -63,7 +63,9 @@ test('a timed-out PATH capture is not kept for the session: the shell is asked a
   // Value: protects=agents get the real PATH once the shell answers, and a slow shell is not rerun on every spawn; fails_when=the launchd fallback is cached for the session, or the fallback retries at once; why_new=new; seam=__resetShellEnvForTest timeout and clock; no_claim=the exact 60 s backoff length
   const { dir, makeFast } = slowShell(t, 4);
   let clock = 1_000_000;
-  shellEnv.__resetShellEnvForTest({ timeoutMs: 500, now: () => clock });
+  // Room for a login zsh to also read /etc/zprofile and /etc/zshrc on a busy
+  // runner once it is fast, still well under the 4 s sleep it times out on.
+  shellEnv.__resetShellEnvForTest({ timeoutMs: 1500, now: () => clock });
   const mybin = path.join(dir, 'mybin');
 
   assert.equal(shellEnv.userShellPath(), '/usr/bin:/bin:/usr/sbin:/sbin', 'falls back to the process PATH');
