@@ -236,6 +236,48 @@ test('a slot missed while the app was closed still runs once', () => {
   assert.equal(M.catchUpFloor(mk()), 0, 'a row from before this existed keeps the old rule');
 });
 
+/* ───────────── a timer that wakes before its slot (Node timers do) ───────────── */
+
+// A weekly and a "when" job for weekdays at 09:00, armed Tuesday 08:00. Node
+// wakes a timer by its loop clock, so Date.now() can read a millisecond (or,
+// after days, seconds) before the slot it was aimed at.
+const slotPlans = [
+  { type: 'weekly', weekly: weekdaysAt(9), firstDelayMs: 0 },
+  { type: 'times', times: [{ kind: 'at', days: [1, 2, 3, 4, 5], minute: 9 * 60 }], firstDelayMs: 0 }
+];
+
+for (const plan of slotPlans) {
+  test(`${plan.type}: a timer that fires at slot-1 ms re-arms for 1 ms without running`, () => {
+    const persisted = TUE(9) - 24 * HOUR;
+    const delay = M.nextSlotDelayMs(plan, TUE(8), persisted);
+    assert.equal(delay, HOUR);
+    const due = TUE(8) + delay;
+    assert.equal(M.slotWaitMs(due, due - 1), 1, 'early: wait the rest, run nothing');
+    assert.equal(M.slotWaitMs(due, due - 4000), 4000, 'seconds early after a long wait: the same');
+    assert.equal(M.slotWaitMs(due, due), 0, 'on time: run');
+    assert.equal(M.slotWaitMs(due, due + 3), 0, 'late: run');
+  });
+
+  test(`${plan.type}: after a run at the slot the next delay is the following slot (not 1 ms)`, () => {
+    const persisted = TUE(9) - 24 * HOUR;
+    const due = TUE(9);
+    assert.equal(M.nextSlotDelayMs(plan, due, persisted, due), 24 * HOUR, 'tomorrow 09:00');
+    assert.equal(M.nextSlotDelayMs(plan, due - 1, persisted, due), 24 * HOUR + 1, 'even if the clock still reads a hair before the slot');
+    assert.equal(M.nextSlotDelayMs(plan, due + 250, persisted, due), 24 * HOUR - 250, 'a slow run counts from now');
+  });
+
+  test(`${plan.type}: a caught up run is not caught up again when its lastFiredAt was not saved`, () => {
+    const now = TUE(9, 30);
+    const persisted = TUE(9) - 24 * HOUR; // the stamp the failed write left
+    assert.equal(M.nextSlotDelayMs(plan, now, persisted), 0, 'missed 30m ago: run now');
+    assert.equal(M.nextSlotDelayMs(plan, now + 5, persisted, now), at(2026, 10, 14, 9, 0) - now - 5, 'then tomorrow, not now again');
+  });
+}
+
+test('slotWaitMs never asks a Node timer for more than it can wait', () => {
+  assert.equal(M.slotWaitMs(TUE(9) + 40 * 24 * HOUR, TUE(9)), 2_147_483_647);
+});
+
 /* ─────────────────── agent schedule requests (R3, R6) ─────────────────── */
 
 test('parseWhen reads intervals and day lists', () => {

@@ -123,7 +123,8 @@ test('the timer plan, next run and fingerprint know about times', () => {
 test('main arms times like weekly, refuses bad lines, and agents are told how to ask', () => {
   const main = read('src/main/index.ts');
   assert.match(main, /if \(plan\.type === 'weekly' \|\| plan\.type === 'times'\) \{/);
-  assert.match(main, /plan\.type === 'times' \? timesDelayMs\(plan\.times, now, floor\) : weeklyDelayMs\(plan\.weekly, now, floor\)/);
+  assert.match(main, /const delay = nextSlotDelayMs\(plan, now, persisted, firedSlot\);/);
+  assert.match(read('src/shared/missions.ts'), /plan\.type === 'times' \? timesDelayMs\(plan\.times, from, floor\) : weeklyDelayMs\(plan\.weekly, from, floor\)/);
   assert.match(main, /if \(!times\) return \{ ok: false, error: 'invalid schedule times' \};/);
   assert.match(read('src/main/hive.ts'), /One job can have several: \\`"when": \[/);
   const list = read('src/renderer/src/components/triggers/ScheduleList.tsx');
