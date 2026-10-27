@@ -17,6 +17,7 @@
  */
 
 import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { extname, posix } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
@@ -32,7 +33,7 @@ function ocrFile(srcPath: string, kind: 'image' | 'pdf'): Promise<OcrResult> {
 export type DocExtraction =
   /** Converted here; index this text. */
   | { kind: 'text'; text: string; extractor: string; modality: string; mime: string }
-  /** A format kg-core already reads well (plain text, code, CSV, images). */
+  /** A format kg-core already reads well (UTF-8 text, code, CSV, images). */
   | { kind: 'passthrough' }
   /** Could not be read. `reason` is shown to the owner as-is, so it is plain English. */
   | { kind: 'unreadable'; reason: string };
@@ -101,11 +102,7 @@ export async function extractDocumentText(srcPath: string): Promise<DocExtractio
   if (TEXTUTIL.has(ext)) return await readWithTextutil(srcPath, ext);
   if (IMAGES.has(ext)) return readImage(srcPath, ext);
 
-  // Everything else kg-core reads as UTF-8. Only safe if it really is text: a
-  // binary file read that way is exactly the junk this module exists to stop.
-  return looksBinary(srcPath)
-    ? { kind: 'unreadable', reason: 'This isn\'t a document the app can read. Add it as Word, Excel, PowerPoint, PDF or plain text.' }
-    : { kind: 'passthrough' };
+  return readPlainText(srcPath, ext);
 }
 
 // ─── Office Open XML (Word / PowerPoint / Excel are zips of XML) ──────────────
@@ -447,22 +444,122 @@ async function readWithTextutil(srcPath: string, ext: string): Promise<DocExtrac
   return { kind: 'text', text, extractor: 'textutil@1', modality: 'doc', mime: ownValue(MIME, ext) ?? 'text/plain' };
 }
 
+// ─── Plain text, in whatever encoding it was saved ───────────────────────────
+
+const NOT_A_DOCUMENT = 'This isn\'t a document the app can read. Add it as Word, Excel, PowerPoint, PDF or plain text.';
+
+/** How kg-core files a text file it reads itself (its detectModality and
+ *  mimeFor), so text decoded here is filed the same way as its UTF-8 twin. */
+const SHEET_TEXT = new Set(['csv', 'tsv']);
+const CODE = new Set(['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'py', 'go', 'rs', 'java', 'rb',
+  'c', 'h', 'cc', 'cpp', 'hpp', 'cs', 'php', 'swift', 'kt', 'scala', 'sh', 'bash', 'zsh', 'sql']);
+const TEXT_MIME: Record<string, string> = {
+  md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', json: 'application/json',
+  csv: 'text/csv', tsv: 'text/tab-separated-values', yaml: 'application/yaml', yml: 'application/yaml',
+  html: 'text/html', htm: 'text/html'
+};
+
+/**
+ * kg-core reads text as UTF-8, which is right for most files but not for what
+ * Excel and Notepad write on Windows. "Unicode Text (*.txt)" is UTF-16 with a
+ * byte order mark: every other byte is NUL, so it looked binary and was
+ * refused. A UTF-8 file saved by Notepad starts with a byte order mark that
+ * would sit at the front of its text and its first line. A CSV saved by
+ * Excel on Windows is Windows-1252. Those are decoded here and handed over
+ * as text; a plain UTF-8 file is still left to kg-core.
+ */
+function readPlainText(srcPath: string, ext: string): DocExtraction {
+  const head = readHead(srcPath);
+  if (!head) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
+
+  const bom = byteOrderMark(head);
+  if (bom) {
+    const bytes = readWhole(srcPath);
+    if (!bytes) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
+    const text = decodeWithBom(bytes, bom);
+    return text.trim() ? decodedText(text, bom, ext) : { kind: 'unreadable', reason: 'This file has no text in it to read.' };
+  }
+
+  // Only safe to read as text if it really is text: a binary file read that
+  // way is exactly the junk this module exists to stop. A NUL byte means
+  // binary; real text never has one outside UTF-16, handled above.
+  if (head.includes(0)) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
+
+  // Valid UTF-8 (and so plain ASCII) is what kg-core reads well. Anything
+  // else is almost always Windows-1252: Excel on Windows saves "CSV (Comma
+  // delimited)" that way, and read as UTF-8 every accented letter became
+  // U+FFFD, so "José" or "Köln" could never be found. Every byte has a
+  // meaning in Windows-1252, so this never fails; at worst a file in another
+  // legacy encoding reads with the wrong accents rather than none at all.
+  const bytes = readWhole(srcPath);
+  if (!bytes) return { kind: 'unreadable', reason: NOT_A_DOCUMENT };
+  if (isUtf8(bytes)) return { kind: 'passthrough' };
+  return decodedText(windows1252(bytes), 'windows-1252', ext);
+}
+
+/** Windows-1252 is Latin-1 except for 0x80 to 0x9F, where it puts the euro
+ *  sign, curly quotes and dashes instead of control codes. Mapped here rather
+ *  than with TextDecoder: some Node versions decode the 'windows-1252' label
+ *  as plain Latin-1 and would turn those marks into invisible control codes. */
+const CP1252_HIGH = '\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f'
+  + '\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178';
+
+function windows1252(bytes: Buffer): string {
+  return bytes.toString('latin1').replace(/[\x80-\x9f]/g, (c) => CP1252_HIGH[c.charCodeAt(0) - 0x80]);
+}
+
+type Bom = 'utf-8' | 'utf-16le' | 'utf-16be';
+
+function byteOrderMark(head: Buffer): Bom | null {
+  if (head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf) return 'utf-8';
+  if (head[0] === 0xff && head[1] === 0xfe) return 'utf-16le';
+  if (head[0] === 0xfe && head[1] === 0xff) return 'utf-16be';
+  return null;
+}
+
+/** The text after the mark. Node reads UTF-16LE natively; big-endian is the
+ *  same with each pair of bytes swapped, which needs no ICU data either. */
+function decodeWithBom(bytes: Buffer, bom: Bom): string {
+  if (bom === 'utf-8') return bytes.subarray(3).toString('utf8');
+  // An odd trailing byte is half a character: drop it rather than fail.
+  const body = Buffer.from(bytes.subarray(2, 2 + ((bytes.length - 2) & ~1)));
+  return (bom === 'utf-16be' ? body.swap16() : body).toString('utf16le');
+}
+
+function decodedText(text: string, encoding: string, ext: string): DocExtraction {
+  return {
+    kind: 'text',
+    text,
+    extractor: `text-${encoding}@1`,
+    modality: SHEET_TEXT.has(ext) ? 'sheet' : CODE.has(ext) ? 'code' : 'text',
+    mime: ownValue(TEXT_MIME, ext) ?? 'text/plain'
+  };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** A NUL byte in the first 8 KB means binary. Real text files never contain one. */
-function looksBinary(srcPath: string): boolean {
+/** The first 8 KB, or null when the file can't be read. Only that much: a
+ *  text file here can be up to 100 MB. */
+function readHead(srcPath: string): Buffer | null {
   try {
-    // Read only the first 8 KB: a text file here can be up to 100 MB.
     const fd = openSync(srcPath, 'r');
     try {
       const head = Buffer.alloc(8192);
       const n = readSync(fd, head, 0, 8192, 0);
-      return head.subarray(0, n).includes(0);
+      return head.subarray(0, n);
     } finally {
       closeSync(fd);
     }
   } catch {
-    return true;
+    return null;
+  }
+}
+
+function readWhole(srcPath: string): Buffer | null {
+  try {
+    return readFileSync(srcPath);
+  } catch {
+    return null;
   }
 }
 
