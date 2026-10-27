@@ -16,6 +16,7 @@ import { useRtl } from '@/i18n/useDirection';
 import { ScheduleRequestCards } from './ScheduleRequestCards';
 import { WorkStyleUpdateCards } from './WorkStyleUpdateCards';
 import { MailProposalCards } from './MailProposalCards';
+import { QuickBooksApprovalCards } from './QuickBooksApprovalCards';
 import { EngineSetupCard } from './EngineSetupCard';
 import { OfficeBreakCard, useOfficeBreak } from './OfficeBreakNotice';
 import { SilentEngineCards } from './SilentEngine';
@@ -78,6 +79,7 @@ export function AskMeTab() {
   const agents = useStore((s) => s.agents);
   const restorable = useStore((s) => s.restorableAgents);
   // One shared read with the pill, the strip and the chips (D3, eng R4).
+  const { tasks, requests: scheduleRequests, offers, proposals, booksApprovals, engineSetup, stop, researchNotice, silent } = useNeedsYou();
   const { tasks, requests: scheduleRequests, offers, proposals, engineSetup, stop, researchNotice, knowledgeNotice, silent, foundations } = useNeedsYou();
   // Members whose engine isn't reporting (issue #326): their cards keep All clear away.
   const silentShown = silentCards(silent).length > 0;
@@ -272,6 +274,10 @@ export function AskMeTab() {
       <ScheduleRequestCards requests={scheduleRequests} refresh={refreshScheduleRequests} />
       <WorkStyleUpdateCards offers={offers} />
       <MailProposalCards proposals={proposals} refresh={refreshNeedsYou} />
+      <QuickBooksApprovalCards approvals={booksApprovals} refresh={refreshNeedsYou} />
+      {/* Nothing left (D4, D8): All clear, one light line, and what was just
+          answered. The column closes on the next click outside it. */}
+      {!engineCard && !onBreak && !researchNotice && !silentShown && waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && proposals.length === 0 && booksApprovals.length === 0 && (
       {/* Always mounted, so screen readers announce the line when it fills. */}
       <div key={foundationSaved?.at} role={foundationSaved?.how === 'failed' ? 'alert' : 'status'} className={foundationSaved ? undefined : 'cth-sr-only'}
         style={foundationSaved ? { fontSize: 12, lineHeight: '17px', color: foundationSaved.how === 'failed' ? 'var(--cth-coral-text)' : 'var(--cth-ink-3)', padding: '0 2px' } : undefined}>
@@ -285,7 +291,7 @@ export function AskMeTab() {
           <div style={{ marginTop: 4, fontSize: 13, lineHeight: '19px', color: 'var(--cth-ink-3)' }}>{translate(`shell.allClearLine${line}`, { godName })}</div>
         </div>
       )}
-      {!engineCard && !silentShown && waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && proposals.length === 0 && answeredHere.map((x) => (
+      {!engineCard && !silentShown && waiting.length === 0 && scheduleRequests.length === 0 && offers.length === 0 && proposals.length === 0 && booksApprovals.length === 0 && answeredHere.map((x) => (
         <section key={x.id} aria-label={askTitle(x.title)} style={card}>
           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.01em', color: 'var(--cth-ink)' }}>{askTitle(x.title)}</div>
           {x.who && <div style={{ marginTop: 6 }}><span style={personChip}><AgentAvatar id={x.whoId} name={x.who} size={16} />{x.who}</span></div>}
