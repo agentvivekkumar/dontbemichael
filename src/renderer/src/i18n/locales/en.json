@@ -224,13 +224,10 @@
     "killConfirmSchedulesPlural": "Close {{name}}? {{name}} has {{count}} schedules on. They'll pause."
   },
   "settingsHero": {
-    "beta": "Beta",
-    "betaInfo": "An early version. If something looks wrong, use Report a problem below.",
     "sponsoredBy": "Sponsored by",
     "visit": "visit",
     "whatsNew": "What's new",
-    "starOnGitHub": "Star on GitHub",
-    "reportProblem": "Report a problem"
+    "starOnGitHub": "Star on GitHub"
   },
   "settings": {
     "title": "Settings",
@@ -309,6 +306,7 @@
       "defaultModelDesc": "Every newly spawned Claude team member starts on this model unless another is picked for that member. {{godName}} has a separate model setting. Marked \"· default\" in the model pickers.",
       "advanced": "Advanced",
       "maxTurns": "Max turns per run",
+      "maxTurnsTip": "A turn is one tool call, so several tools called at once use several turns. A run starts when a team member gets a message and lasts until the next one.",
       "unlimited": "Unlimited",
       "blankUnlimited": "Blank = unlimited",
       "planPrice": "Your Claude plan",
@@ -729,7 +727,9 @@
     "deleteInfo": "Stops {{name}} now and takes them off the team for good. Their schedules pause and your office manager follows up on their cards. This can't be undone.",
     "deleteConfirm": "Delete {{name}} for good? They stop now and leave the team. This can't be undone.",
     "deleteConfirmSchedules": "Delete {{name}} for good? They stop now and leave the team, and their {{count}} schedule pauses. This can't be undone.",
-    "deleteConfirmSchedulesPlural": "Delete {{name}} for good? They stop now and leave the team, and their {{count}} schedules pause. This can't be undone."
+    "deleteConfirmSchedulesPlural": "Delete {{name}} for good? They stop now and leave the team, and their {{count}} schedules pause. This can't be undone.",
+    "getsFrom": "Gets from {{name}}:",
+    "getsFromInfo": "{{from}} sends these to {{name}} instead of doing them. Set in {{from}}'s job; change it there."
   },
   "onboarding": {
     "damagedConfig": "Your saved settings could not be read, so setup starts again. The old file is kept at",
@@ -1842,11 +1842,15 @@
     "close": "Close {{name}}",
     "office": "Office",
     "openInApp": "Open in app",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy",
     "reading": "Reading…",
     "empty": "Empty file",
     "tooLarge": "Too large to show here",
     "unreadable": "Can't show this file here",
-    "rows": "Showing {{shown}} of {{total}} rows"
+    "rows": "Showing {{shown}} of {{total}} rows",
+    "opened": "{{name}} opened"
   },
   "companyProfile": {
     "intro": "Key facts about your business. Every team member, {{godName}} included, works from them. Short answers only: anything longer goes in Memory & Knowledge.",
@@ -1960,6 +1964,7 @@
       "tool": "from a tool"
     },
     "sourceLine": "{{source}}, {{date}}",
+    "evidence": "What showed it",
     "checkAgain": "check again {{date}}",
     "outOfDate": "may be out of date ({{date}})",
     "stepsMissing": "The steps for this aren't saved yet.",
@@ -2002,6 +2007,18 @@
     "openFolderFailed": "Couldn't open the folder. It may have been moved or deleted."
   },
   "mailboxes": {
+    "google": {
+      "step1Title": "Turn on 2 Step Verification",
+      "step1Line": "Google sends a code to your phone when you sign in. Already on? Go to step 2.",
+      "step1Open": "Open Google's page",
+      "step2Title": "Create an app password",
+      "step2Line": "Type a name, such as My office, then copy the 16 letters Google shows.",
+      "step2Open": "Open app passwords",
+      "step2Admin": "On GSuite, if Google says app passwords aren't available, your admin has turned them off: ask them to allow it.",
+      "step3Title": "Paste it below",
+      "step3Line": "The 16 letters from step 2, as Google shows them. Spaces are fine."
+    },
+    "googleTile": "Gmail or GSuite",
     "title": "Mailboxes",
     "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Access tab.",
     "add": "Add a mailbox",
@@ -2040,8 +2057,6 @@
     "testing": "Testing {{address}}. One sec.",
     "tryAgain": "Try again",
     "help": {
-      "gmail": "Gmail needs an app password, not your normal one. Turn on 2 Step Verification, then create one at myaccount.google.com/apppasswords.",
-      "google-workspace": "Use an app password from myaccount.google.com/apppasswords. If that page is missing, your Workspace admin has turned app passwords off.",
       "icloud": "iCloud needs an app specific password. Create one at account.apple.com under Sign In and Security.",
       "yahoo": "Yahoo needs an app password. Create one in Account Security, then Generate app password.",
       "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
@@ -2231,7 +2246,9 @@
     "focus": "Focus mode",
     "exitFocus": "Exit focus mode (Esc)",
     "settings": "Settings",
-    "betaInfo": "An early version. If something looks wrong, use Report a problem in Settings.",
+    "reportProblem": "Report a problem",
+    "reportProblemTip": "Opens a bug report on GitHub (a free account). A picture of this window is saved in your Downloads to add to it. Reports are public: check the picture first.",
+    "reportProblemFailed": "Couldn't open",
     "briefPlaceholder": "Talk to {{godName}}…",
     "brief": "Talk to {{godName}}",
     "attach": "Attach files",
@@ -2524,6 +2541,7 @@
     "keyInfo": "Claude stopped the whole team because the Anthropic API key stopped working. Paste a new key and the team restarts and carries on. Scheduled jobs wait in the inbox until then."
   },
   "markdown": {
+    "openPlace": "Open {{place}}",
     "opensInBrowser": "opens in your browser",
     "opensInEmail": "opens your email app",
     "copyLinkAddress": "Copy link address",
@@ -2669,7 +2687,27 @@
       "capWork": "found work so far",
       "capKept": "kept as is so far",
       "capReopened": "cards you reopened so far",
-      "more": "More patterns show here as your team works."
+      "watchLabel": "What Pulse watches",
+      "watch": {
+        "runLess": "Schedules finding nothing",
+        "runLessTip": "Schedules whose runs mostly find nothing to do. Running them less often costs less.",
+        "runMore": "Schedules with more to do",
+        "runMoreTip": "Schedules that find work nearly every run, with more each week. Running them more often keeps up.",
+        "cheaper": "A cheaper model",
+        "cheaperTip": "Members on the top model whose work you keep as is nearly every time, with no card reopened and a few email drafts you decided on. Never {{godName}}.",
+        "stronger": "A stronger model",
+        "strongerTip": "Members whose work you often change, or whose cards you reopen.",
+        "soFar": "{{count}} so far",
+        "none": "None yet",
+        "fine": "Nothing worrying",
+        "closest": "{{name}}: {{kept}} of {{decisions}} kept as is"
+      },
+      "tag": {
+        "runLess": "Schedule finding nothing",
+        "runMore": "Schedule with more to do",
+        "cheaper": "Toward a cheaper model",
+        "stronger": "Toward a stronger model"
+      }
     },
     "nothingToChange": "Nothing to change this week.",
     "savedByChanges": "Saved by your changes",
@@ -2700,8 +2738,11 @@
     "yourTimeTip": "Questions the team brought you, the typical wait for your answer, and how many per 100 requests the team took: fewer as the team learns. Under 20 requests the rate shows ….",
     "questionsToYou": "Questions to you",
     "whileAway": "While you were away",
-    "awayTip": "Work done while you had not used this computer for 30 minutes, or it was asleep.",
-    "awayLine": "of the work happened then",
+    "awayTip": "Work done while you had not used this computer for 30 minutes, or it was asleep. Office ran: the time the app was open, the computer awake and the office not stopped.",
+    "awayLine": "of the work",
+    "officeRan": "office ran",
+    "officeRanSince": "office ran since {{day}}",
+    "youAway": "you away",
     "period": "Period",
     "periods": {
       "today": "Today",
@@ -3011,6 +3052,12 @@
       "byWho": "{{name}}: {{where}}",
       "none": "No emails organized in this period.",
       "earlier": "{{count}} more organized before the app kept their names."
+    },
+    "recs": {
+      "view": "View recommendations",
+      "hide": "Hide",
+      "title": "Pulse has suggestions for your team.",
+      "ready": "{{count}} ready"
     }
   },
   "foundations": {
@@ -3084,7 +3131,7 @@
       "needs": "needs this",
       "needsAgo": "needs this, {{ago}}",
       "yourAnswer": "Your answer",
-      "hint": "A few plain sentences, under {{n}} characters, or add a file.",
+      "hint": "A few plain sentences, under {{n}} characters, or add a file or folder.",
       "save": "Save answer",
       "draftBy": "Have {{name}} draft it",
       "notNow": "Not now",
@@ -3101,6 +3148,7 @@
       "failedGone": "Couldn't add your answer to Company foundations. Tell {{godName}}.",
       "drafted": "a draft, edit and save",
       "addFile": "Add a file",
+      "addFolder": "Add a folder",
       "removeFile": "Remove {{name}}",
       "checking": "Checking the file",
       "fileMisfit": "{{name}} doesn't look like the answer: {{reason}}",
@@ -3108,7 +3156,14 @@
       "fileUnchecked": "Couldn't check this file, try again.",
       "filePictureType": "Save this picture as PNG or JPEG and add it again.",
       "filePictureEngine": "Pictures can be checked only on Claude. Add this as a PDF or a document instead.",
-      "fileMissing": "Couldn't find {{name}}, add it again."
+      "fileMissing": "Couldn't find {{name}}, add it again.",
+      "folderChip": "{{name}} folder",
+      "folderMissing": "Couldn't find the folder {{name}}, add it again.",
+      "folderTooWide": "{{name}} holds too much. Pick the folder that has the records.",
+      "folderApp": "{{name}} is one of the app's own folders. Pick another.",
+      "folderMember": "{{name}} is inside a team member's folder. Pick another.",
+      "folderEmpty": "{{name}} has no files.",
+      "folderTooLong": "{{name}} sits too deep to name here. Move it higher and add it again."
     }
   },
   "knowledgeNotice": {
@@ -3159,6 +3214,10 @@
     "errorTitle": "Couldn't work out the change",
     "errorNote": "Try again in a moment. Your words are still in the box.",
     "errorNoteCard": "Try again in a moment. Nothing has changed.",
+    "errorNoName": "Type a name for them first, then try again.",
+    "errorNotStarted": "Claude didn't start. Check that Claude is signed in under Settings, Prerequisites, then try again.",
+    "errorSlow": "Claude took too long to answer. Try again in a moment.",
+    "errorUnreadable": "Claude's answer couldn't be read. Try again, or say the change in other words.",
     "tryAgain": "Try again",
     "movedTitle": "{{name}}'s job changed meanwhile",
     "movedNote": "Your change is still here. Run it again on the new job.",
@@ -3190,6 +3249,53 @@
       "reading": "Reading what you wrote",
       "writing": "Writing {{name}}'s job"
     },
-    "soFar": "So far"
+    "soFar": "So far",
+    "explain": "Explain how they split it",
+    "explainTitle": "How do {{names}} split it?",
+    "explainPlaceholder": "Say who does what, for example: {{other}} answers technical questions; {{who}} passes them on and tracks them.",
+    "back": "Back",
+    "goesToGroup": "Goes to a teammate",
+    "goesTo": "Goes to {{name}}: {{scope}}",
+    "noLongerGoesTo": "No longer goes to {{name}}: {{scope}}",
+    "noSplit_zero": "No split was written; {{names}} may still get this work.",
+    "noSplit_one": "No split was written; {{names}} may still get this work.",
+    "noSplit_two": "No split was written; {{names}} may still get this work.",
+    "noSplit_few": "No split was written; {{names}} may still get this work.",
+    "noSplit_many": "No split was written; {{names}} may still get this work.",
+    "noSplit_other": "No split was written; {{names}} may still get this work.",
+    "noAccess": "{{name}} can't use {{tool}} yet.",
+    "openAccess": "Open Access",
+    "homeFolder": "A sheet in {{name}}'s folder",
+    "homeTools": "Connected tools",
+    "homeOff": "Off",
+    "homeOffLabel": "{{tool}}, switched off",
+    "homeShowAll_zero": "Show all {{count}} tools",
+    "homeShowAll_one": "Show all {{count}} tool",
+    "homeShowAll_two": "Show all {{count}} tools",
+    "homeShowAll_few": "Show all {{count}} tools",
+    "homeShowAll_many": "Show all {{count}} tools",
+    "homeShowAll_other": "Show all {{count}} tools"
+  },
+  "runCompare": {
+    "cardsLabel": "{{godName}}'s suggested job changes",
+    "title": "{{godName}} suggests a change to {{name}}'s job \"{{job}}\"",
+    "titleNoJob": "{{godName}} suggests a change to {{name}}'s job",
+    "review": "Review the change",
+    "lastRun": "Last run {{when}}",
+    "wentWrong": "Went wrong",
+    "tryAgain": "Try again",
+    "claudeOnly": "Comparing runs works for members on Claude for now.",
+    "notePlaceholder": "What was wrong? (optional)",
+    "noteLabel": "What was wrong",
+    "compare": "Ask {{godName}}",
+    "cancel": "Cancel",
+    "working": "{{godName}} is comparing it with an earlier run that went well.",
+    "ready": "{{godName}}'s suggestion is in Pulse.",
+    "putOff": "You put this suggestion off.",
+    "held": "{{godName}} was told instead: the suggestion read like an outside message.",
+    "failed": "Couldn't compare these runs.",
+    "noGoodRun": "No earlier run of this job went well to compare with.",
+    "noTranscript": "This run's conversation is no longer on this computer.",
+    "noDifference": "The two runs show nothing to change in the job."
   }
 }

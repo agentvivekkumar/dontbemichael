@@ -2,6 +2,7 @@ import { ResearchPrivacySettings } from './ResearchPrivacySettings';
 import { cleanDataClassOverrides } from '../../../shared/dataClasses';
 import { MailboxesSettings } from './MailboxesSettings';
 import { WhatsAppSettings } from './WhatsAppSettings';
+import type { PlaceGroup } from '@shared/settingsPlaces';
 import { ClaudeConnectorsSettings } from './ClaudeConnectorsSettings';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { fieldLabel, groupName, hint, panelStyle } from './fieldText';
@@ -28,7 +29,8 @@ import { InfoTip } from './InfoTip';
 import { KnowledgeDocList } from './KnowledgeDocList';
 import { PixelButton } from './PixelButton';
 import { SettingsHeroCard } from './SettingsHeroCard';
-import { CompanyProfileSettings } from './CompanyProfileSettings';
+import { CompanyProfileSettings, type CompanyProfileDraft } from './CompanyProfileSettings';
+import { cityLine, cleanCompanyProfile, mergeEditedProfile } from '@shared/companyProfile';
 import { SetupPanel } from './SetupPanel';
 import { Icon } from './Icon';
 import { McpDefaultsSettings } from './McpDefaultsSettings';
@@ -53,7 +55,13 @@ export interface SettingsModalProps {
    *  elsewhere in the UI — "set it now" beside a disabled Talk button lands on
    *  the tab that actually holds the field, rather than making the user hunt. */
   initialSection?: Section;
+  /** A place named in agent text (settings-links-in-replies.md): the section,
+   *  a group to scroll to and highlight, and Mailboxes' Add form. A new seq
+   *  moves an open Settings too. */
+  place?: SettingsPlace;
 }
+
+export interface SettingsPlace { section?: Section; group?: PlaceGroup; add?: boolean; seq: number }
 
 /**
  * The triggers IPC surface. `src/preload/index.ts` is owned by another lane and
@@ -192,7 +200,7 @@ const NAV_SECTION_KEYS: Record<Section, string> = {
   'Memory & Knowledge': 'settings.nav.memoryKnowledge'
 };
 
-export function SettingsModal({ config, onClose, initialSection }: SettingsModalProps) {
+export function SettingsModal({ config, onClose, initialSection, place }: SettingsModalProps) {
   const { t, i18n } = useTranslation();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   // Esc and the focus trap (DESIGN.md 7.23). The close it runs is set below,
@@ -211,6 +219,26 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   const [memoryErr, setMemoryErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>(initialSection && VISIBLE_SECTIONS.includes(initialSection) ? initialSection : 'General');
+  // The group a place asked for: switched to, scrolled into view, unfolded
+  // (Mailboxes) and highlighted for 2 s, once per seq.
+  const [groupFocus, setGroupFocus] = useState<{ group: PlaceGroup; add?: boolean; seq: number } | null>(null);
+  useEffect(() => {
+    if (!place) return;
+    if (place.section && VISIBLE_SECTIONS.includes(place.section)) setActiveSection(place.section);
+    setGroupFocus(place.group ? { group: place.group, add: place.add, seq: place.seq } : null);
+  }, [place?.seq]);
+  useEffect(() => {
+    if (!groupFocus) return;
+    const el = dialogRef.current?.querySelector<HTMLElement>(`[data-settings-group="${groupFocus.group}"]`);
+    if (!el) return;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    el.classList.remove('cth-place-highlight');
+    void el.offsetWidth;
+    el.classList.add('cth-place-highlight');
+    const done = setTimeout(() => el.classList.remove('cth-place-highlight'), 2000);
+    return () => clearTimeout(done);
+  }, [groupFocus?.seq, activeSection]);
 
   // Change-home flow: null until the user picks a new folder, then the sub-modal
   // confirms move-vs-fresh. Pre-selects 'move' (recommended - keeps the data).
@@ -276,9 +304,19 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
   const [autoCompactPending, setAutoCompactPending] = useState<boolean | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveNote, setSaveNote] = useState('');
-  /** True once a control that USED to persist on click has been changed. Only
-   *  those need the close guard: the text fields always needed a Save. */
-  const dirty = Object.keys(pending).length > 0 || autoCompactPending !== null;
+  // Keep the raw profile draft across section changes. Cleaning on each key
+  // would eat spaces and blank lines while the owner is still typing.
+  const [companyDraft, setCompanyDraft] = useState<CompanyProfileDraft>(() => ({
+    name: config.businessName ?? '', profile: cleanCompanyProfile(config.companyProfile)
+  }));
+  const [savedCompanyDraft, setSavedCompanyDraft] = useState(companyDraft);
+  const companyProfileDirty = companyDraft !== savedCompanyDraft;
+  const editCompanyProfile = (next: CompanyProfileDraft): void => {
+    setCompanyDraft(next);
+    setSaveNote('');
+  };
+  /** Staged controls and the company profile share the close guard. */
+  const dirty = Object.keys(pending).length > 0 || autoCompactPending !== null || companyProfileDirty;
   const stage = (patch: Partial<HarnessConfig>): void =>
     setPending((prev) => ({ ...prev, ...patch }));
 
@@ -401,6 +439,17 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
         ...budgetPatch(),
         ...pending
       };
+      if (companyProfileDirty) {
+        // Apply only owner edits to the latest profile: foundations may have
+        // recorded other fields while Settings was open.
+        const latest = cleanCompanyProfile((await window.cth.getConfig()).companyProfile);
+        const clean = mergeEditedProfile(cleanCompanyProfile(savedCompanyDraft.profile), cleanCompanyProfile(companyDraft.profile), latest);
+        Object.assign(patch, {
+          businessName: companyDraft.name.trim() || config.businessName,
+          companyProfile: clean,
+          businessCity: cityLine(clean.address) ?? config.businessCity
+        });
+      }
       if (autoCompactPending !== null) {
         // Read-modify-write against disk, not against a stale copy: another
         // window (or main) may have edited a different mission meanwhile.
@@ -410,6 +459,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
         );
       }
       await window.cth.updateConfig(patch);
+      // Mark only the submitted draft saved. An edit made while the write
+      // was running must still be shown as unsaved and included next time.
+      if (companyProfileDirty) setSavedCompanyDraft(companyDraft);
       setPending({});
       setAutoCompactPending(null);
       setSaveNote(t('settings.saved'));
@@ -1092,7 +1144,7 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                       <button
                         key={section}
                         type="button"
-                        onClick={() => setActiveSection(section)}
+                        onClick={() => { setActiveSection(section); setGroupFocus(null); }}
                         aria-current={active ? 'page' : undefined}
                         style={{
                           display: 'block', width: '100%', textAlign: 'start',
@@ -1541,7 +1593,9 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           {t('settings.agentsModels.advanced')}
                         </h3>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 13, color: 'var(--cth-ink-900)' }}>{t('settings.agentsModels.maxTurns')}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--cth-ink-900)' }}>
+                            {t('settings.agentsModels.maxTurns')}<InfoTip text={t('settings.agentsModels.maxTurnsTip')} />
+                          </span>
                           <input
                             type="number" min="1" step="10" value={maxTurnsVal}
                             onChange={(e) => setMaxTurnsVal(e.target.value)}
@@ -1558,7 +1612,12 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                   {/* MEMORY & KNOWLEDGE */}
                   {/* COMPANY PROFILE: key facts every agent works from. */}
                   {activeSection === 'Company profile' && (
-                    <CompanyProfileSettings config={config} onOpenKnowledge={() => setActiveSection('Memory & Knowledge')} />
+                    <CompanyProfileSettings
+                      value={companyDraft}
+                      needsIndustry={!config.businessType}
+                      onChange={editCompanyProfile}
+                      onOpenKnowledge={() => setActiveSection('Memory & Knowledge')}
+                    />
                   )}
 
                   {activeSection === 'Memory & Knowledge' && (
@@ -1700,13 +1759,17 @@ export function SettingsModal({ config, onClose, initialSection }: SettingsModal
                           design D2): every connector on the owner's Claude account,
                           off until turned on here; who may use one is on each
                           agent's Access tab. QuickBooks and Gmail are rows in it. */}
-                      <ClaudeConnectorsSettings />
+                      <div data-settings-group="claude-connectors" style={{ scrollMarginTop: 8 }}>
+                        <ClaudeConnectorsSettings />
+                      </div>
 
 
                       {/* The mailboxes added here (docs/designs/multi-mailbox.md).
                           Hidden with SHOW_MAILBOXES. */}
                       {SHOW_MAILBOXES && (<>
-                        <MailboxesSettings />
+                        <div data-settings-group="mailboxes" style={{ scrollMarginTop: 8 }}>
+                          <MailboxesSettings focus={groupFocus?.group === 'mailboxes' ? groupFocus : undefined} />
+                        </div>
 
                       </>)}
 

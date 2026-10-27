@@ -1,5 +1,5 @@
-- **Change a job** by saying what should change.
-- **Add a file** right from a Company foundations card.
-- **One look** for every form in the app.
-- Hiring asks what the new person will do, once.
-- Safer background checks and messages to the team.
+- **Copy any file** that opens in a tab.
+- **Report a problem** sits in the top bar.
+- **Places in Settings** are buttons.
+- Add a whole folder to a foundations card.
+- Contributor fixes across the app.
