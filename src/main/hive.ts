@@ -4276,6 +4276,9 @@ export class HiveManager {
 
   /** Michael's open requests from the owner, as of the last refresh. */
   private ownerRequestsCache: OwnerRequest[] = [];
+  /** The oldest open item's creation time across requests and questions, or
+   *  the previous scan time when none were open. Undefined before first scan. */
+  private ownerScanFloor?: string;
   /** Blocked cards with nothing asked, as of the last refresh. */
   private stuckCardsCache: StuckCard[] = [];
   /** What the app keeps true about the board (shared/cardGuards.ts): the
@@ -4507,9 +4510,11 @@ export class HiveManager {
   refreshOwnerRequests(): OwnerRequest[] {
     if (!this.root()) return (this.ownerRequestsCache = []);
     const dir = this.agentDir(this.registry().godId ?? 'god');
-    // A fixed floor, not a rolling window, so an open request never ages out
-    // (TODOS.md; michael-replies.md); requests settled before it stay settled.
-    const since = OWNER_REQUESTS_FLOOR;
+    // Bound the rebuild to messages newer than the oldest open item (TODOS.md).
+    // On cold start, scan from OWNER_REQUESTS_FLOOR to discover any open items.
+    const openAts = [...this.ownerRequestsCache.map((r) => r.createdAt), ...this.ownerQuestionsCache.map((q) => q.createdAt)].filter(Boolean);
+    const oldestOpen = openAts.length ? openAts.reduce((min, at) => (at < min ? at : min)) : this.ownerScanFloor;
+    const since = oldestOpen && oldestOpen > OWNER_REQUESTS_FLOOR ? oldestOpen : OWNER_REQUESTS_FLOOR;
     const toMichael = [...this.ownerMessages(join(dir, 'inbox'), since), ...this.ownerMessages(join(dir, 'inbox', '.done'), since)];
     const fromMichael = [...this.ownerMessages(join(dir, 'outbox'), since), ...this.ownerMessages(join(dir, 'outbox', '.sent'), since)];
     const aliases = this.ownerAliases();
@@ -4530,6 +4535,10 @@ export class HiveManager {
       const at = closedAt.get(r.taskId);
       return typeof at === 'string' && r.createdAt > at;
     });
+    const nextOpen = [...this.ownerRequestsCache.map((r) => r.createdAt), ...this.ownerQuestionsCache.map((q) => q.createdAt)].filter(Boolean);
+    this.ownerScanFloor = nextOpen.length
+      ? nextOpen.reduce((min, at) => (at < min ? at : min))
+      : new Date(Date.now() - 60_000).toISOString();
     // The same tick finds Blocked cards nothing is moving (card-lifecycle.md
     // section 7): no open ask, no open owner request; and open questions held
     // the wrong way, off Blocked or several on one card.
@@ -4567,10 +4576,22 @@ export class HiveManager {
           const ownerSide = raw.from === 'human' || OWNER_ALIASES.has(String(raw.to ?? '').toLowerCase()) || !!ownerQuestionOf(raw.conversation);
           if (ownerSide) {
             const t = m as ThreadMessage;
-            if (typeof raw.body === 'string') t.body = raw.body;
             if (typeof raw.expect_by === 'string') t.expect_by = raw.expect_by;
             if (typeof raw.waiting_on === 'string') t.waiting_on = raw.waiting_on;
             if (raw.from_notes === true) t.from_notes = true;
+            if (typeof raw.body === 'string') {
+              Object.defineProperty(t, 'body', {
+                get() {
+                  try {
+                    return (JSON.parse(readFileSync(p, 'utf8')) as Partial<HiveMessage>).body;
+                  } catch {
+                    return undefined;
+                  }
+                },
+                enumerable: true,
+                configurable: true
+              });
+            }
           }
         } catch { m = null; }
         // A file still being written is read again next time.
