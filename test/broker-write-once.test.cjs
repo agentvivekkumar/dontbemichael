@@ -319,6 +319,12 @@ test('identity, QuickBooks requestid, and failure class stay stable', () => {
   const refusedErr = new TypeError('fetch failed');
   refusedErr.cause = cause;
   assert.equal(classifyUpstreamFailure(refusedErr), 'never');
+  // fetch refuses a header it will not send before any socket opens.
+  for (const code of ['UND_ERR_NOT_SUPPORTED', 'UND_ERR_INVALID_ARG']) {
+    const invalid = new TypeError('fetch failed');
+    invalid.cause = Object.assign(new Error('expect header not supported'), { code });
+    assert.equal(classifyUpstreamFailure(invalid), 'never', code);
+  }
   const aborted = new Error('aborted');
   aborted.name = 'AbortError';
   assert.equal(classifyUpstreamFailure(aborted), 'uncertain');
@@ -553,4 +559,42 @@ test('a GraphQL body reads only when every operation it runs is a query', () => 
   assert.ok(!graphqlReadsOnly(q('query A { a } mutation B { b }')), 'two operations and no name: unclear, so a write');
   assert.ok(!graphqlReadsOnly('not json'));
   assert.ok(!graphqlReadsOnly(q('subscription { issueUpdated { id } }')));
+});
+
+test('an upload that asks for 100-continue reaches the service once', async (t) => {
+  // Value: protects=a large upload from curl (which adds Expect: 100-continue past 1 MB) is sent, not locked as may_have_applied for a day; fails_when=the worker's expect header is forwarded and fetch refuses it before connecting; why_new=found by reproducing a PDF upload through the broker; seam=a real upstream server and the real fetch, since only undici refuses the header
+  const { dir, file } = journalFile();
+  let hits = 0;
+  const upstream = http.createServer((req, res) => {
+    hits += 1;
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(201, { 'content-type': 'application/json' });
+      res.end('{"id":"file_1"}');
+    });
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    getRecord: () => record('drive', `http://127.0.0.1:${upstream.address().port}/`)
+  });
+  const token = broker.grant('pty-oscar', ['drive'], 'oscar');
+  const payload = Buffer.alloc(64 * 1024, 0x61);
+  const answer = await new Promise((resolve, reject) => {
+    const req = http.request(new URL('/i/drive/files', broker.url()), {
+      method: 'POST',
+      headers: { 'x-md-broker-token': token, 'content-length': payload.length, expect: '100-continue' }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (d) => chunks.push(d));
+      res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('continue', () => req.end(payload));
+    req.on('error', reject);
+  });
+  assert.equal(answer.status, 201, answer.text);
+  assert.equal(answer.text, '{"id":"file_1"}');
+  assert.equal(hits, 1);
 });

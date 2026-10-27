@@ -57,9 +57,12 @@ const HOP_BY_HOP = new Set([
   'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
   'te', 'trailer', 'transfer-encoding', 'upgrade'
 ]);
-/** Request headers the worker is NEVER allowed to pass upstream. */
+/** Request headers the worker is NEVER allowed to pass upstream. `expect` is
+ *  here because this server already answered the worker's 100-continue and
+ *  holds the whole body, and fetch refuses the header outright: curl adds it
+ *  to any large upload, which then failed before reaching the service. */
 const STRIP_REQUEST = new Set([
-  'authorization', 'x-md-broker-token', 'host', 'cookie', 'content-length', ...HOP_BY_HOP
+  'authorization', 'x-md-broker-token', 'host', 'cookie', 'content-length', 'expect', ...HOP_BY_HOP
 ]);
 /** Response headers never forwarded back (fetch already decodes the body, so the
  *  upstream content-encoding/length would be wrong). */
