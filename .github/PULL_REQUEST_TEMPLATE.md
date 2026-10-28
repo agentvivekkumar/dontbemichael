@@ -46,6 +46,7 @@ X:
 
 ## Checklist
 
+- [ ] `npm run lint` passes.
 - [ ] `npm run typecheck` passes.
 - [ ] `npm run test:focused` passes.
 - [ ] `npm run build` succeeds.

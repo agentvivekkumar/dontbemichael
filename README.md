@@ -339,6 +339,7 @@ npm run dev        # the app with hot reload
 ```
 
 ```bash
+npm run lint          # ESLint, incremental rule set
 npm run typecheck     # main, preload and renderer
 npm run test:focused  # the node:test suite in test/
 npm run build         # production build
