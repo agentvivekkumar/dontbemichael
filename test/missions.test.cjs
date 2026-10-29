@@ -363,3 +363,15 @@ test('heartbeatFirstDelayMs: waits out the rest of the interval, within the time
   assert.equal(M.heartbeatFirstDelayMs(HOUR, now - 2 * HOUR, now), 0, 'overdue beats now');
   assert.equal(M.heartbeatFirstDelayMs(30 * 86_400_000, now, now), TIMER_MAX, 'a base past the ceiling still fits a timer');
 });
+
+test('armHeartbeat takes every wait from the clamped helpers', () => {
+  const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src/main/index.ts'), 'utf8');
+  const body = main.slice(main.indexOf('function armHeartbeat('), main.indexOf('function liveWebContents('));
+  assert.ok(body.length > 0, 'armHeartbeat found');
+  assert.match(body, /let next = heartbeatDelayMs\(base, 'normal'\);/);
+  assert.match(body, /next = heartbeatDelayMs\(base, 'reengaged'\);/);
+  assert.match(body, /next = heartbeatDelayMs\(base, 'stuck'\);/);
+  assert.match(body, /setTimeout\(beat, heartbeatFirstDelayMs\(base, m\.lastFiredAt, Date\.now\(\)\)\)/);
+  assert.match(body, /setTimeout\(beat, next\)/);
+  assert.doesNotMatch(body, /base \* 2\.5|base \/ 4/, 'no unclamped arithmetic left in main');
+});

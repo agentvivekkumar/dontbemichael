@@ -56,7 +56,8 @@ import { normalizeWeekly, weeklyDelayMs } from '../shared/weeklySchedule';
 import { normalizeTimes, timesDelayMs } from '../shared/scheduleTimes';
 import {
   armPlan, catchUpFloor, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf, runNowCheck,
-  migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock
+  migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock,
+  heartbeatDelayMs, heartbeatFirstDelayMs
 } from '../shared/missions';
 import { MICHAEL_WORK_STYLE } from '../shared/michaelWorkStyle';
 import { makeScheduleRequests } from './scheduleRequests';
@@ -2662,12 +2663,15 @@ function writeFleetSnapshot(): void {
  *  setTimeout instead of a fixed setInterval). Each beat runs the cost/breaker
  *  pass, re-engages a quiet floor, stamps lastFiredAt, then re-arms: ~base on a
  *  normal beat, base/4 (min 30s) when an agent looks stuck, base*2.5 right after
- *  a re-engage. Registered into missionTimers so shutdown tears it down. */
+ *  a re-engage. Registered into missionTimers so shutdown tears it down.
+ *  Every wait goes through heartbeatDelayMs, which holds it under the timer
+ *  limit: past it Node fires in 1 ms, and a long heartbeat that had just woken
+ *  Michael then woke him again every millisecond. */
 function armHeartbeat(m: ScheduledMission): void {
   const base = m.intervalMs;
   const quiet = m.quietThresholdMs ?? 300_000;
   const beat = (): void => {
-    let next = base;
+    let next = heartbeatDelayMs(base, 'normal');
     try {
       // (the breaker beat + cost ledger now run on their own always-on timer)
       // Re-engage god when the floor is quiet OR when real agent/human mail is
@@ -2678,9 +2682,9 @@ function armHeartbeat(m: ScheduledMission): void {
         // Read each beat, so an edit to the heartbeat box counts from the next one.
         const body = readConfig().missions?.find((x) => x.id === m.id)?.body;
         reengageGod(heartbeatMessage(body, buildHeartbeatDigest(quiet, actionable)));
-        next = Math.round(base * 2.5);            // back off after re-engaging
+        next = heartbeatDelayMs(base, 'reengaged'); // back off after re-engaging
       } else if (looksStuck(quiet)) {
-        next = Math.max(30_000, Math.round(base / 4)); // tighten when an agent is wedged
+        next = heartbeatDelayMs(base, 'stuck');     // tighten when an agent is wedged
       }
       const cur = readConfig().missions ?? [];
       writeConfig({ missions: cur.map((x) => (x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x)) });
@@ -2692,8 +2696,7 @@ function armHeartbeat(m: ScheduledMission): void {
     entry.timeout = setTimeout(beat, next);
     missionTimers.set(m.id, entry);
   };
-  const remaining = Math.max(0, base - (Date.now() - (m.lastFiredAt ?? 0)));
-  missionTimers.set(m.id, { timeout: setTimeout(beat, remaining) });
+  missionTimers.set(m.id, { timeout: setTimeout(beat, heartbeatFirstDelayMs(base, m.lastFiredAt, Date.now())) });
 }
 
 /** The live renderer webContents, or null if the window is gone/destroyed.
