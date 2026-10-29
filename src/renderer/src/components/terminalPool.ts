@@ -41,6 +41,7 @@ import {
 } from './terminalAutomation';
 import { sanitizeTerminalSelection } from './terminalSelection';
 import { watchOnlyData } from './watchOnlyInput';
+import { shortcutLetter } from './shortcutLetter';
 import '@xterm/xterm/css/xterm.css';
 
 export interface TerminalEntry {
@@ -262,7 +263,7 @@ export function acquireTerminal(ptyId: string, theme?: ThemeMap, fontSize = 14):
     void window.cth.readClipboard().then((t) => { if (t) term.paste(t); });
   };
   term.attachCustomKeyEventHandler((ev) => {
-    const key = ev.key.toLowerCase();
+    const key = shortcutLetter(ev);
     // Watch-only: copying a selection still works, every other key is dropped
     // before xterm turns it into input.
     if (entry.inputLocked) {
