@@ -170,23 +170,44 @@ export function isMissingChannelFile(err: unknown): boolean {
   return /Cannot find [\w.-]+\.yml in the latest release artifacts/.test(message);
 }
 
+/**
+ * True on Debian/Ubuntu-family Linux (checks /etc/os-release's ID and
+ * ID_LIKE). electron-builder v26 ships an AppArmor profile in the .deb
+ * postinstall that restores Chromium's sandbox on AppArmor-restricted
+ * kernels (Ubuntu 23.10+); the AppImage has no such mechanism and silently
+ * runs with --no-sandbox there instead of failing loudly. Fails closed to
+ * false (AppImage, the more universally-installable format) on any read
+ * error or non-Linux platform.
+ */
+function isDebianFamily(): boolean {
+  try {
+    const osRelease = readFileSync('/etc/os-release', 'utf8');
+    return /^ID=debian$/m.test(osRelease) || /^ID_LIKE=.*\bdebian\b/m.test(osRelease);
+  } catch {
+    return false;
+  }
+}
+
 /** The one asset in a release that installs on THIS machine, by the names
  *  electron-builder.yml produces: mac-{arch}.dmg (falling back to the
  *  mac-universal.dmg releases actually ship), win-x64-setup.exe,
- *  linux-x86_64.AppImage. Null when the release has no matching asset, and the
- *  caller falls back to the releases page. Download URLs live under
- *  github.com/REPO/releases/download/, so the openRelease prefix guard already
- *  admits them. */
+ *  linux-x86_64.AppImage, or — on Debian/Ubuntu-family Linux, where it
+ *  actually installs and gets a working sandbox — linux-x86_64.deb. Null
+ *  when the release has no matching asset, and the caller falls back to the
+ *  releases page. Download URLs live under
+ *  github.com/REPO/releases/download/, so the openRelease prefix guard
+ *  already admits them. */
 export function pickDownloadAsset(
   assets: ReadonlyArray<{ name?: string; browser_download_url?: string }> | undefined,
   platform: NodeJS.Platform = process.platform,
-  arch: string = process.arch
+  arch: string = process.arch,
+  isDebian: boolean = isDebianFamily()
 ): string | null {
   if (!Array.isArray(assets)) return null;
   // Releases ship one universal Mac dmg; a per-arch one wins when present.
   const wants = platform === 'darwin' ? [new RegExp(`-mac-${arch}\\.dmg$`), /-mac-universal\.dmg$/]
     : platform === 'win32' ? [/-win-x64-setup\.exe$/]
-    : platform === 'linux' ? [/-linux-x86_64\.AppImage$/]
+    : platform === 'linux' ? (isDebian ? [/-linux-x86_64\.deb$/, /-linux-x86_64\.AppImage$/] : [/-linux-x86_64\.AppImage$/])
     : [];
   for (const want of wants) {
     const hit = assets.find((a) => typeof a.name === 'string' && want.test(a.name) && typeof a.browser_download_url === 'string');
