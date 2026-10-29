@@ -12,6 +12,7 @@
  */
 
 import type { QuickBooksCapability } from './quickbooks';
+import type { PolicyDowngradeResult } from './policyCompiler';
 
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
 
@@ -94,6 +95,8 @@ export interface AgentCapabilities {
   /** Connectors on the owner's Claude account this agent may use, by key
    *  (shared/claudeConnectors.ts). QuickBooks is under `quickbooks`. */
   connectors?: string[];
+  /** Engine policy downgrade result (Issue #48). */
+  downgrade?: PolicyDowngradeResult;
 }
 
 export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'propose' | 'send';
