@@ -136,11 +136,15 @@ import type { SpawnFailReason } from './analytics';
 import { IntegrationBroker } from './integrationBroker';
 import * as integrations from './integrations';
 import { MailService, handleMailRequest, saveMailbox, removeMailbox, setAgentCapabilities, setSendOnly, cannotStoreReason, type AddMailboxInput } from './mail';
+import { WhatsAppService, saveWhatsAppAccount, removeWhatsAppAccount, setAgentWhatsAppCapabilities, testWhatsAppAccount, type AddWhatsAppInput, type WhatsAppAdminDeps } from './whatsapp';
 import { MailApprovals } from './mailApprovals';
+import { WhatsAppApprovals } from './whatsappApprovals';
+import { WhatsAppDrafts } from './whatsappDrafts';
 import { standingFitCheck } from './standingCheck';
 import { fileFitCheck } from './fileFitCheck';
 import { terminalOverflowEvent } from '../shared/terminalOverflow';
 import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
+import { hasWhatsAppTools, secretRefForWhatsApp } from '../shared/whatsapp';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
 import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
@@ -1111,6 +1115,85 @@ function closeMailboxCard(id: string, result: string): void {
   } catch (e) { console.error('[mail] ask me card:', e); }
 }
 
+/** WhatsApp Business approvals store (Ask Me proposals). */
+const whatsAppApprovals = new WhatsAppApprovals({
+  path: join(app.getPath('userData'), 'whatsapp-proposals.json'),
+  send: (msg) => { if (!hive.enabled()) return false; hive.send(msg, 'whatsapp'); return true; },
+  remember: (agentId, line) => { hive.rememberOwnerNote(agentId, line); },
+  toast: (body) => ownerToast(michaelName(), body),
+  agentName: (id) => { try { return hive.registry().agents[id]?.name?.trim() || id; } catch { return id; } },
+  changed: () => { try { liveWebContents()?.send('whatsappProposals:updated'); } catch { /* window gone */ } }
+});
+
+/** WhatsApp Business drafts store (Draft only mode). */
+const whatsAppDrafts = new WhatsAppDrafts({
+  path: join(app.getPath('userData'), 'whatsapp-drafts.json'),
+  changed: () => { try { liveWebContents()?.send('whatsappDrafts:updated'); } catch { /* window gone */ } }
+});
+
+/** WhatsApp Business Cloud API Service and connection state. */
+const whatsAppService = new WhatsAppService({
+  getConfig: () => readConfig(),
+  getSecret: (ref) => integrations.getSecret(ref),
+  updateStatus: (id, status, reason) => markWhatsAppStatus(id, status, reason),
+  approvals: whatsAppApprovals,
+  drafts: whatsAppDrafts,
+  messagesPath: join(app.getPath('userData'), 'whatsapp-messages.json'),
+  tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'whatsapp'); }
+});
+
+function markWhatsAppStatus(id: string, status: 'connected' | 'needs-attention', reason?: string): void {
+  const cfg = readConfig();
+  const list = cfg.whatsappAccounts ?? [];
+  const rec = list.find((a) => a.id === id);
+  if (!rec || (rec.status === status && rec.statusReason === reason)) return;
+  writeConfig({
+    whatsappAccounts: list.map((a) => (a.id === id ? { ...a, status, statusReason: status === 'needs-attention' ? reason : undefined, updatedAt: Date.now() } : a))
+  });
+  const cardId = `whatsapp-attention-${id}`;
+  try {
+    if (status === 'needs-attention') {
+      const card = {
+        id: cardId,
+        title: `${rec.label || rec.displayPhoneNumber} needs you`,
+        status: 'blocked' as const,
+        dependsOn: [],
+        priority: 1,
+        createdAt: new Date().toISOString(),
+        humanQA: [
+          {
+            q: `**WhatsApp connection stopped working: ${reason ?? 'the Meta Cloud API access token is invalid or expired'}**\n\nOpen Settings, Connections, WhatsApp and choose Fix to enter a new access token.`,
+            askedAt: new Date().toISOString(),
+            raisedBy: 'god'
+          }
+        ]
+      };
+      if (!hive.addTask(card)) hive.patchTask(cardId, { status: 'blocked', humanQA: card.humanQA });
+    } else if (rec.status === 'needs-attention') {
+      closeWhatsAppCard(id, `${rec.label || rec.displayPhoneNumber} is connected again.`);
+    }
+  } catch (e) { console.error('[whatsapp] ask me card:', e); }
+}
+
+function closeWhatsAppCard(id: string, result: string): void {
+  const cardId = `whatsapp-attention-${id}`;
+  try {
+    const ledger = hive.tasks() as { tasks?: HiveTask[] };
+    const open = (Array.isArray(ledger?.tasks) ? ledger.tasks : []).some((t) => t?.id === cardId && t.status !== 'done');
+    if (open) hive.patchTask(cardId, { status: 'done', result });
+  } catch (e) { console.error('[whatsapp] ask me card:', e); }
+}
+
+const whatsAppAdmin: WhatsAppAdminDeps = {
+  getConfig: () => readConfig(),
+  saveConfig: (patch) => writeConfig(patch),
+  setSecret: (ref, val) => integrations.setSecret(ref, val),
+  deleteSecret: (ref) => integrations.deleteSecret(ref),
+  canStoreSecrets: () => integrations.canStoreSecrets(),
+  cancelFor: (agentId, accountId, reason) => { whatsAppApprovals.cancel({ agentId, accountId }, reason); },
+  dropDrafts: (accountId) => { whatsAppDrafts.dropFor(accountId); }
+};
+
 /** Send on approval (docs/designs/send-on-approval.md): proposals the owner
  *  decides on Ask me, kept out of the hive so agents can't change them. */
 const mailApprovals = new MailApprovals({
@@ -1252,13 +1335,19 @@ const integrationBroker = new IntegrationBroker({
   getSecret: integrations.getSecret,
   // Same folder as the mail send journal, never the hive agents can read.
   journalPath: join(app.getPath('userData'), 'broker-write-journal.json'),
-  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, organized: (moved) => hive.recordOrganized(moved), proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line), tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'mail'); } }, agentId, op, body) : undefined
+  mail: SHOW_MAILBOXES ? (agentId, op, body) => handleMailRequest(mailService, { getConfig: () => readConfig(), audit: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }, organized: (moved) => hive.recordOrganized(moved), proposals: mailApprovals, fitCheck: standingFit, present: memberPresent, log: (line) => console.log(line), tellMichael: (subject, text) => { if (hive.enabled()) hive.send({ to: hiveGodId(), act: 'inform', subject, body: text }, 'mail'); } }, agentId, op, body) : undefined,
+  whatsapp: (agentId, op, body) => whatsAppService.handleWhatsAppRequest(agentId, op, body)
 });
 
 /** Absolute path to the bundled md-mail MCP server (same resolution as the
  *  Slack helper below). */
 function mdMailScriptPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'md-mail-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-mail-mcp.cjs');
+}
+
+/** Absolute path to the bundled md-whatsapp MCP server. */
+function mdWhatsAppScriptPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'md-whatsapp-mcp.cjs') : join(app.getAppPath(), 'resources', 'md-whatsapp-mcp.cjs');
 }
 
 /** Delete this agent's md-mail MCP file from the private dir and the legacy
@@ -4722,22 +4811,29 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // Revoked in teardownPty with the rest of this PTY's grants. `--mcp-config`
   // takes several values, so it must stay the last argument. Never while
   // SHOW_MAILBOXES is off, even with email saved earlier.
-  if (SHOW_MAILBOXES && claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
+  if (claudeProvider && opts.hive?.id && opts.hive.role !== 'worker' && integrationBroker.running()) {
     const agentId = opts.hive.id;
     const home = readConfig().harnessHome ? expandTilde(readConfig().harnessHome!) : null;
     const root = hive.root();
-    // A Send only grant alone gets the tools too (shared-mailboxes.md, item 1).
-    if (home && root && hasMailTools(readConfig().agentCapabilities?.[agentId])) {
+    // A Send only grant alone gets the mail tools too (shared-mailboxes.md, item 1).
+    const withMail = SHOW_MAILBOXES && hasMailTools(readConfig().agentCapabilities?.[agentId]);
+    const withWhatsApp = hasWhatsAppTools(readConfig().agentCapabilities?.[agentId]);
+    if (home && root && (withMail || withWhatsApp)) {
       try {
-        // Fresh token every spawn (#63 rotate on respawn); old path under agents/
-        // is removed so siblings cannot read a leftover broker token.
         const token = integrationBroker.grant(opts.id, [], agentId);
+        const servers: Record<string, unknown> = {};
+        if (withMail) {
+          servers['md-mail'] = { command: hive.nodeCommand(), args: [mdMailScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } };
+        }
+        if (withWhatsApp) {
+          servers['md-whatsapp'] = { command: hive.nodeCommand(), args: [mdWhatsAppScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } };
+        }
         const file = mdMailMcpPath(home, agentId);
         mkdirSync(dirname(file), { recursive: true });
-        writeFileSync(file, JSON.stringify({ mcpServers: { 'md-mail': { command: hive.nodeCommand(), args: [mdMailScriptPath()], env: { MD_BROKER_URL: integrationBroker.url(), MD_BROKER_TOKEN: token } } } }, null, 2), { mode: 0o600 });
+        writeFileSync(file, JSON.stringify({ mcpServers: servers }, null, 2), { mode: 0o600 });
         try { unlinkSync(legacyMdMailMcpPath(root, agentId)); } catch { /* none left */ }
         opts.args = [...(opts.args ?? []), '--mcp-config', file];
-      } catch (e) { console.error('[mail] md-mail config:', e); }
+      } catch (e) { console.error('[mcp] config:', e); }
     }
   }
   const res = ptyManager.spawn(opts, owner);
@@ -5622,6 +5718,54 @@ ipcMain.handle('mail:setSendOnly', (_evt, agentId: unknown, grant: unknown) => {
   if (typeof agentId !== 'string' || agentId === RESEARCH_ID) return { ok: false, restartNeeded: false };
   if (grant !== null && (!grant || typeof grant !== 'object')) return { ok: false, restartNeeded: false };
   return setSendOnly(mailAdmin, agentId, grant as { mailbox?: unknown; sending?: unknown } | null);
+});
+
+// ─── IPC: WhatsApp Business Cloud API ───────────────────────────────────────
+ipcMain.handle('whatsapp:save', async (_evt, input: unknown) => {
+  if (!input || typeof input !== 'object') return { ok: false, kind: 'invalid', reason: 'Nothing to save.' };
+  const fixId = (input as { id?: unknown }).id;
+  const before = typeof fixId === 'string' ? (readConfig().whatsappAccounts ?? []).find((a) => a.id === fixId) : undefined;
+  const res = await saveWhatsAppAccount(whatsAppAdmin, input as AddWhatsAppInput);
+  if (res.ok && before) closeWhatsAppCard(res.record.id, `${res.record.label || res.record.displayPhoneNumber} is connected again.`);
+  return res;
+});
+ipcMain.handle('whatsapp:test', async (_evt, input: unknown) => {
+  if (!input || typeof input !== 'object') return { ok: false, kind: 'bad-request', error: 'Invalid input' };
+  const { phoneNumberId, token } = input as { phoneNumberId?: string; token?: string };
+  return testWhatsAppAccount(phoneNumberId ?? '', token ?? '');
+});
+ipcMain.handle('whatsapp:remove', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return { ok: false, affected: [] };
+  const rec = (readConfig().whatsappAccounts ?? []).find((a) => a.id === id);
+  const res = removeWhatsAppAccount(whatsAppAdmin, id);
+  if (res.ok && rec?.status === 'needs-attention') closeWhatsAppCard(id, `${rec.label || rec.displayPhoneNumber} was removed in Settings.`);
+  return res;
+});
+ipcMain.handle('whatsapp:setCapabilities', (_evt, agentId: unknown, caps: unknown) => {
+  if (typeof agentId !== 'string' || !caps || typeof caps !== 'object') return { ok: false, restartNeeded: false };
+  if (agentId === RESEARCH_ID) return { ok: false, restartNeeded: false };
+  return setAgentWhatsAppCapabilities(whatsAppAdmin, agentId, caps as Parameters<typeof setAgentWhatsAppCapabilities>[2]);
+});
+ipcMain.handle('whatsappProposals:list', () => whatsAppApprovals.waiting().filter((p) => memberPresent(p.agentId)));
+ipcMain.handle('whatsappProposals:decide', (_evt, id: unknown, decision: unknown, edit: unknown, note: unknown) => {
+  if (typeof id !== 'string' || (decision !== 'approve' && decision !== 'changes' && decision !== 'decline')) {
+    return { ok: false, error: 'invalid' };
+  }
+  const e = edit && typeof edit === 'object' ? (edit as { to?: unknown; text?: unknown }) : {};
+  return whatsAppApprovals.decide(id, decision, e, note);
+});
+ipcMain.handle('whatsappDrafts:list', (_evt, filter: unknown) => {
+  const f = filter && typeof filter === 'object' ? (filter as { accountId?: string; agentId?: string }) : undefined;
+  return whatsAppDrafts.list(f);
+});
+/** The owner sends an agent's draft, as written or edited (Settings > WhatsApp). */
+ipcMain.handle('whatsappDrafts:send', async (_evt, id: unknown, text: unknown) => {
+  if (typeof id !== 'string') return { ok: false, error: 'invalid' };
+  return whatsAppService.sendDraft(id, typeof text === 'string' ? text : undefined);
+});
+ipcMain.handle('whatsappDrafts:delete', (_evt, id: unknown) => {
+  if (typeof id !== 'string') return false;
+  return whatsAppDrafts.deleteDraft(id);
 });
 /** Roles that may use QuickBooks, Read only, before the owner chooses. */
 ipcMain.handle('quickbooks:roleDefaults', () => [...booksReadRoleIds()]);

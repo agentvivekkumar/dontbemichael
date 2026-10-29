@@ -59,6 +59,14 @@ export const MCP_RESOURCE_TOOLS: ReadonlySet<string> = new Set(['ListMcpResource
  *  follow the agent's Email capability, never the connector rules. */
 export const APP_MCP_SERVER = 'md-mail';
 
+/** The app's own MCP servers (`md-mail`, `md-whatsapp`). Their tools follow
+ *  the agent's capabilities, never the Claude connector rules. */
+export const APP_MCP_SERVERS: ReadonlySet<string> = new Set(['md-mail', 'md-whatsapp']);
+
+export function isAppMcpServer(server: string): boolean {
+  return APP_MCP_SERVERS.has(server);
+}
+
 const KEY_MAX = 80;
 const URL_MAX = 300;
 
@@ -178,7 +186,7 @@ export function spawnConnectorPlan(cfg: ConnectorConfig, agentId: string, roleRe
  *  server, or nothing MCP at all. */
 export type McpTarget =
   | { kind: 'none' }
-  | { kind: 'app' }
+  | { kind: 'app'; server: string }
   | { kind: 'connector'; key: string }
   | { kind: 'unknown-connector'; server: string }
   | { kind: 'other'; server: string }
@@ -193,7 +201,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
     // A list with no server would show every server the session connected:
     // deny rules hide a server's tools, not its resources (owner, 2026-10-02).
     if (typeof s !== 'string' || !s) return { kind: 'all-servers' };
-    if (s === APP_MCP_SERVER) return { kind: 'app' };
+    if (isAppMcpServer(s)) return { kind: 'app', server: s };
     const c = /^claude\.ai (.+)$/.exec(s);
     if (c) {
       const key = knownKeys(cfg).find((k) => k === c[1].trim());
@@ -204,7 +212,8 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
   const m = /^mcp__(.+)$/.exec(toolName ?? '');
   if (!m) return { kind: 'none' };
   server = m[1];
-  if (server.startsWith(`${APP_MCP_SERVER}__`)) return { kind: 'app' };
+  const app = [...APP_MCP_SERVERS].find((a) => server.startsWith(`${a}__`));
+  if (app) return { kind: 'app', server: app };
   // The longest matching prefix wins ("Google" vs "Google Drive"). Two names
   // that become the same tool prefix ("Foo Bar", "Foo_Bar") cannot be told
   // apart, so neither is (Codex adversarial review, 2026-10-02).
@@ -256,7 +265,7 @@ export function connectorAccess(
   // It has no resources, and the mail gate checks tool names only, so a
   // resource call naming md-mail is refused (Codex adversarial review, 2026-10-02).
   if (target.kind === 'app') {
-    return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office mail server has no resources to read. ${TELL_MICHAEL}` } : { ok: true };
+    return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office's own ${target.server === 'md-whatsapp' ? 'WhatsApp' : 'mail'} server has no resources to read. ${TELL_MICHAEL}` } : { ok: true };
   }
   if (target.kind === 'other') {
     return { ok: false, reason: `"${target.server}" is not one of the office's connections, so you cannot use it. ${TELL_MICHAEL}` };

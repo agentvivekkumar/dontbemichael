@@ -16,9 +16,10 @@ import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { InfoTip } from './InfoTip';
 import { SHOW_MAILBOXES } from '@shared/buildFeatures';
 import { useResearchName } from '@/shell/research';
+import { type WhatsAppCapability, whatsAppHolder } from '@shared/whatsapp';
 import { fieldLabel } from './fieldText';
 
-type SectionKey = 'email' | 'connectors' | 'schedules';
+type SectionKey = 'email' | 'whatsapp' | 'connectors' | 'schedules';
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
@@ -65,7 +66,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { missions } = useMissions();
   const mine = missionsFor(missions, agent.id, godId);
   const schedulesOn = mine.filter((m) => m.enabled).length;
-  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, connectors: true, schedules: true });
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, whatsapp: true, connectors: true, schedules: true });
   // "Change on Access" from Edit agent or the Profile tab: On a schedule
   // opens unfolded and in view, once (edit-agent-scheduled-jobs.md, SJ3).
   const schedulesRequest = useStore((s) => s.schedulesRequest);
@@ -217,6 +218,85 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     closeAdd();
   };
   const inUse = (current ? 1 : 0) + (sendFrom ? 1 : 0);
+
+  const whatsappAccounts = config.whatsappAccounts ?? [];
+  const waCap: WhatsAppCapability = config.agentCapabilities?.[agent.id]?.whatsapp ?? {
+    enabled: false,
+    accounts: [],
+    send: false,
+    sending: 'draft'
+  };
+
+  const [waMoving, setWaMoving] = useState<string | null>(null);
+  const [waAdding, setWaAdding] = useState(false);
+  const [waAddId, setWaAddId] = useState('');
+
+  const saveWhatsApp = async (next: WhatsAppCapability, move = false): Promise<void> => {
+    setFailed(false);
+    try {
+      const res = await window.cth.whatsappSetCapabilities(agent.id, { whatsapp: next, ...(move ? { move: true } : {}) });
+      if (!res.ok && res.heldBy && next.accounts[0]) {
+        setWaMoving(next.accounts[0]);
+        return;
+      }
+      if (!res.ok) {
+        setFailed(true);
+        return;
+      }
+      setWaMoving(null);
+      if (res.restartNeeded && agent.ptyId) {
+        useStore.getState().setPendingRestart(agent.id, { at: Date.now(), reason: 'whatsapp' });
+      }
+      if (!next.enabled && pending?.reason === 'whatsapp') {
+        useStore.getState().setPendingRestart(agent.id, undefined);
+      }
+    } catch {
+      setFailed(true);
+    }
+  };
+
+  const waKnown = new Set(whatsappAccounts.map((a) => a.id));
+  const waCurrent = waCap.enabled ? whatsappAccounts.find((a) => waCap.accounts?.includes(a.id) && waKnown.has(a.id)) : undefined;
+  const waHolderOf = (id: string): string | undefined => {
+    const h = whatsAppHolder(config.agentCapabilities, id, agent.id);
+    return h && onTeam(h) ? h : undefined;
+  };
+  const waDisplayOf = (acc: { displayPhoneNumber?: string; phoneNumberId: string; label?: string }): string =>
+    acc.displayPhoneNumber ? `${acc.displayPhoneNumber} (${acc.label || acc.phoneNumberId})` : (acc.label || acc.phoneNumberId);
+
+  const watchWhatsApp = (id: string): void => {
+    if (waCurrent?.id === id) return;
+    if (waHolderOf(id)) {
+      setWaMoving(id);
+      return;
+    }
+    void saveWhatsApp({ enabled: true, accounts: [id], send: false, sending: 'draft' }, !!whatsAppHolder(config.agentCapabilities, id, agent.id));
+  };
+  const stopWatchingWhatsApp = (): void => {
+    void saveWhatsApp({ enabled: false, accounts: [], send: false, sending: 'draft' });
+  };
+  const waMovingHolder = waMoving ? waHolderOf(waMoving) : undefined;
+  const waMovingAccount = waMoving ? whatsappAccounts.find((a) => a.id === waMoving) : undefined;
+  const waMovingDisplay = waMovingAccount ? waDisplayOf(waMovingAccount) : waMoving || '';
+
+  const waSending: SendingMode = waCap.sending ?? (waCap.send ? 'send' : 'draft');
+  const setWaSending = (next: SendingMode): void => {
+    if (next !== waSending) {
+      void saveWhatsApp({ ...waCap, send: next === 'send', sending: next });
+    }
+  };
+
+  const canWatchWhatsApp = !waCurrent;
+  const waAddable = whatsappAccounts.filter((a) => a.id !== waCurrent?.id);
+  const closeWaAdd = (): void => {
+    setWaAdding(false);
+    setWaAddId('');
+  };
+  const confirmWaAdd = (): void => {
+    if (!waAddId) return;
+    watchWhatsApp(waAddId);
+    closeWaAdd();
+  };
 
   const books = quickbooksCapability(config.agentCapabilities?.[agent.id]?.quickbooks, booksDefault === true);
   const saveBooks = async (next: QuickBooksCapability): Promise<void> => {
@@ -410,6 +490,84 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           )}
         </TriggerCard></div>}
 
+        {/* WhatsApp Business */}
+        <TriggerCard
+          title={t('capabilities.whatsapp')}
+          blurb={t('capabilities.whatsappBlurb', { name })}
+          summary={waCurrent ? t('capabilities.whatsappSummary', { count: 1 }) : t('capabilities.whatsappSummaryNone')}
+          open={!collapsed.whatsapp}
+          onToggle={(open) => setFold('whatsapp', open)}
+        >
+          <div role="list">
+            {waCurrent && (
+              <div role="listitem" style={{ ...mailboxRow, borderTop: 'none' }}>
+                <div style={mailboxTop}>
+                  <span style={address}>{waDisplayOf(waCurrent)}</span>
+                  <MiniButton onClick={() => stopWatchingWhatsApp()}>{t('capabilities.removeWhatsApp')}</MiniButton>
+                </div>
+                <div style={facts}>
+                  <span style={factKey}>{t('capabilities.whatsappChat')}</span>
+                  <span style={factValue}><Dot on />{t('capabilities.whatsappWatches', { name })}</span>
+                  <span style={factKey}>{t('capabilities.sending')}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <RadioRows inline label={t('capabilities.whatsappSendingFrom', { number: waDisplayOf(waCurrent) })} value={waSending} options={sendingOptions} onChange={(v) => setWaSending(v as SendingMode)} />
+                    <InfoTip label={t('capabilities.sending')} text={sendingInfo} />
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          {!waCurrent && <div style={hint}>{t('capabilities.whatsappNone', { name })}</div>}
+
+          {whatsappAccounts.length === 0 ? (
+            <div style={{ ...notice, background: 'var(--cth-neutral-soft)' }}>
+              {t('capabilities.noWhatsAppAccounts')}{' '}
+              <button type="button" onClick={openSettings} style={link}>{t('capabilities.addInSettings')}</button>
+            </div>
+          ) : waAdding ? (
+            <div style={addPanel}>
+              <div style={{ ...h13, marginTop: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {t('capabilities.addWhatsAppUse')}
+                <InfoTip label={t('capabilities.addWhatsAppUse')} text={t('capabilities.addWhatsAppInfo', { name })} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <Select label={t('capabilities.addWhatsAppUse')} value={waAddId} onChange={(v) => setWaAddId(v)} style={{ maxWidth: '100%', fontFamily: 'var(--cth-font-mono)', fontSize: 12 }}>
+                  <option value="">{t('capabilities.pickWhatsApp')}</option>
+                  {waAddable.map((a) => {
+                    const holder = waHolderOf(a.id);
+                    const desc = [holder ? t('capabilities.heldBy', { name: nameOf(holder) }) : '', a.status === 'needs-attention' ? t('whatsapp.statusNeeds') : ''].filter(Boolean).join(t('profile.listJoiner'));
+                    return <option key={a.id} value={a.id}>{desc ? `${waDisplayOf(a)} (${desc})` : waDisplayOf(a)}</option>;
+                  })}
+                </Select>
+                <button type="button" onClick={openSettings} style={{ ...link, marginInlineStart: 'auto' }}>{t('capabilities.addWhatsApp')}</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <MiniButton onClick={confirmWaAdd} disabled={!waAddId}>{t('capabilities.addIt')}</MiniButton>
+                <MiniButton onClick={closeWaAdd}>{t('capabilities.cancelAdd')}</MiniButton>
+              </div>
+            </div>
+          ) : waAddable.length > 0 && canWatchWhatsApp ? (
+            <button type="button" onClick={() => { setWaAdding(true); setCollapsed({ ...collapsed, whatsapp: false }); }} style={{ ...link, display: 'block', marginTop: 10 }}>{t('capabilities.addWhatsAppUse')}</button>
+          ) : (
+            <div style={{ ...hint, marginTop: 10 }}>
+              <span style={{ opacity: 0.55 }}>{t('capabilities.addWhatsAppUse')}</span>{' '}
+              {waAddable.length === 0 ? (
+                <button type="button" onClick={openSettings} style={link}>{t('capabilities.addWhatsAppNoneLeft')}</button>
+              ) : t('capabilities.addWhatsAppUsed', { name })}
+            </div>
+          )}
+
+          {waMoving && (
+            <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap', fontSize: 13 }}>
+              <span>{waMovingHolder
+                ? t('capabilities.moveWhatsApp', { number: waMovingDisplay, from: nameOf(waMovingHolder), to: name })
+                : t('capabilities.moveWhatsAppFree', { number: waMovingDisplay })}</span>
+              <MiniButton autoFocus onClick={() => { void saveWhatsApp({ ...waCap, enabled: true, accounts: [waMoving] }, true); }}>{t('capabilities.moveIt')}</MiniButton>
+              <MiniButton onClick={() => setWaMoving(null)}>{t('capabilities.keepIt')}</MiniButton>
+            </div>
+          )}
+        </TriggerCard>
+
         <TriggerCard
           title={t('capabilities.connectors')}
           blurb={t('capabilities.connectorsBlurb', { name })}
@@ -466,12 +624,13 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
         {/* Outside the sections, so a closed Email section still shows them. */}
         <div aria-live="polite">
-          {pending && (pending.reason === 'connectors' || email.enabled || !!grant) && (
+          {pending && (pending.reason === 'connectors' || pending.reason === 'whatsapp' || email.enabled || !!grant || waCap.enabled) && (
             <div style={{ ...notice, background: 'var(--cth-amber-soft)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ flex: 1 }}>
                 {pending.failed ? t('capabilities.restartFailed', { name })
                   : pending.now ? t('capabilities.restarting', { name })
-                  : pending.reason === 'connectors' ? t('capabilities.connectorsPending', { name }) : t('capabilities.pending', { name })}
+                  : pending.reason === 'connectors' ? t('capabilities.connectorsPending', { name })
+                  : pending.reason === 'whatsapp' ? t('capabilities.whatsappPending', { name }) : t('capabilities.pending', { name })}
               </span>
               {!pending.now && <MiniButton onClick={restartNow}>{t('capabilities.restartNow')}</MiniButton>}
             </div>

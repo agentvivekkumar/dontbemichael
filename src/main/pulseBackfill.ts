@@ -53,6 +53,7 @@ export function gateOfTool(tool: string, reason: string): RefusalGate | null {
   if (/paused|gated by the operator|Denied by operator/i.test(reason)) return 'paused';
   if (/QuickBooks/i.test(tool)) return 'quickbooks';
   if (/^mcp__md-mail__/.test(tool)) return 'mail';
+  if (/^mcp__md-whatsapp__/.test(tool)) return 'whatsapp';
   if (/^mcp__/.test(tool)) return 'connector';
   if (tool === 'WebFetch' || tool === 'WebSearch') return 'internet';
   if (tool === 'Bash') return 'sandbox';

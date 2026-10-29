@@ -122,7 +122,7 @@ test('schedules live in Capabilities: Email and On a schedule fold separately, c
   assert.ok(cap.indexOf("title={t('capabilities.email')}") < cap.indexOf("title={t('capabilities.schedules')}"), 'Email first, then schedules');
   assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|connectors|schedules)', open\)\}/g) || []).length, 3, 'every section folds');
   assert.match(cap, /<AgentSchedules key=\{agent\.id\} agentId=\{agent\.id\} agentName=\{name\} businessType=\{config\.businessType\} sourceCard=\{agent\.sourceCard\} \/>/);
-  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, connectors: true, schedules: true \}\)/, 'all start closed');
+  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, whatsapp: true, connectors: true, schedules: true \}\)/, 'all start closed');
   assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /aria-expanded=\{open\}/);
   assert.doesNotMatch(read('src/renderer/src/components/SidebarTabs.tsx'), /key: 'schedules'/);
   assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);

@@ -88,6 +88,8 @@ export interface AgentCapabilities {
   email?: EmailCapability;
   /** Send only from another member's mailbox (SendOnlyGrant). */
   sendOnly?: SendOnlyGrant;
+  /** WhatsApp Business Cloud API capability. */
+  whatsapp?: import('./whatsapp').WhatsAppCapability;
   /** QuickBooks through the owner's Claude account (shared/quickbooks.ts).
    *  Absent until the owner chooses: the role default applies. */
   quickbooks?: QuickBooksCapability;

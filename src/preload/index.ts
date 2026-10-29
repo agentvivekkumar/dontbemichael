@@ -15,6 +15,8 @@ import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from 
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
+import type { WhatsAppProposal, WhatsAppProposalDecision } from '../shared/whatsappProposals';
+import type { WhatsAppDraft } from '../shared/whatsappDrafts';
 import type { OwnerDock } from '../shared/ownerRequests';
 import type { AgentProvider } from '../shared/agentProvider';
 import type { EngineSetupStatus } from '../shared/engineSetup';
@@ -261,6 +263,8 @@ export interface PtyExit { exitCode: number; signal?: number | undefined }
 /** A recurring schedule; the type lives in shared/missions.ts. */
 export type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 export type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
+export type { WhatsAppProposal, WhatsAppProposalDecision } from '../shared/whatsappProposals';
+export type { WhatsAppDraft } from '../shared/whatsappDrafts';
 export type { OwnerDock, DockItem, DockQuestion, DockReply } from '../shared/ownerRequests';
 
 /** Company knowledge config. Mirrors src/main/config.ts. */
@@ -330,6 +334,7 @@ export interface HarnessConfig {
    *  src/main/config.ts. */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
   mailboxes?: MailboxRecord[];
+  whatsappAccounts?: import('../shared/whatsapp').WhatsAppAccountRecord[];
   agentCapabilities?: { [agentId: string]: AgentCapabilities };
   /** The QuickBooks row's switch under Settings > Connections > Claude connectors.
    *  Off or absent refuses everyone. Mirrors src/main/config.ts. */
@@ -1039,6 +1044,34 @@ const api = {
    *  remove it (docs/designs/shared-mailboxes.md). */
   mailSetSendOnly: (agentId: string, grant: { mailbox: string; sending: 'send' | 'approval' | 'draft' } | null): Promise<{ ok: boolean; restartNeeded: boolean }> =>
     ipcRenderer.invoke('mail:setSendOnly', agentId, grant),
+  // WhatsApp Business Cloud API connections & capabilities
+  whatsappSave: (input: { id?: string; phoneNumberId: string; wabaId?: string; displayPhoneNumber?: string; label: string; token: string }): Promise<{ ok: true; record: import('../shared/whatsapp').WhatsAppAccountRecord } | { ok: false; kind: string; reason: string }> =>
+    ipcRenderer.invoke('whatsapp:save', input),
+  whatsappTest: (input: { phoneNumberId: string; token: string }): Promise<{ ok: true; displayPhoneNumber: string; verifiedName?: string } | { ok: false; kind: string; reason: string }> =>
+    ipcRenderer.invoke('whatsapp:test', input),
+  whatsappRemove: (id: string): Promise<{ ok: boolean; affected: string[] }> =>
+    ipcRenderer.invoke('whatsapp:remove', id),
+  whatsappSetCapabilities: (agentId: string, caps: { whatsapp?: import('../shared/whatsapp').WhatsAppCapability; move?: boolean }): Promise<{ ok: boolean; restartNeeded: boolean; heldBy?: string; movedFrom?: string }> =>
+    ipcRenderer.invoke('whatsapp:setCapabilities', agentId, caps),
+  listWhatsAppProposals: (): Promise<WhatsAppProposal[]> => ipcRenderer.invoke('whatsappProposals:list'),
+  decideWhatsAppProposal: (id: string, decision: WhatsAppProposalDecision, edit?: { to?: string; text?: string }, note?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('whatsappProposals:decide', id, decision, edit, note),
+  onWhatsAppProposalsUpdated: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('whatsappProposals:updated', listener);
+    return () => ipcRenderer.removeListener('whatsappProposals:updated', listener);
+  },
+  listWhatsAppDrafts: (filter?: { accountId?: string; agentId?: string }): Promise<WhatsAppDraft[]> =>
+    ipcRenderer.invoke('whatsappDrafts:list', filter),
+  sendWhatsAppDraft: (id: string, text?: string): Promise<{ ok: true; messageId: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('whatsappDrafts:send', id, text),
+  deleteWhatsAppDraft: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('whatsappDrafts:delete', id),
+  onWhatsAppDraftsUpdated: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('whatsappDrafts:updated', listener);
+    return () => ipcRenderer.removeListener('whatsappDrafts:updated', listener);
+  },
   /** Read the connectors on the owner's Claude account again (a few seconds). */
   connectorsRefresh: (why?: string): Promise<void> => ipcRenderer.invoke('connectors:refresh', why),
   /** Whether a read is running now. */

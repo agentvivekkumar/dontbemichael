@@ -1,6 +1,7 @@
 import { ResearchPrivacySettings } from './ResearchPrivacySettings';
 import { cleanDataClassOverrides } from '../../../shared/dataClasses';
 import { MailboxesSettings } from './MailboxesSettings';
+import { WhatsAppSettings } from './WhatsAppSettings';
 import type { PlaceGroup } from '@shared/settingsPlaces';
 import { ClaudeConnectorsSettings } from './ClaudeConnectorsSettings';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
@@ -1774,6 +1775,10 @@ export function SettingsModal({ config, onClose, initialSection, place }: Settin
                         </div>
 
                       </>)}
+
+                      {/* WhatsApp Business numbers. Not tied to SHOW_MAILBOXES:
+                          the Access tab and spawn offer WhatsApp in every build. */}
+                      <WhatsAppSettings />
 
                       {/* Connected-services registry (generic, registry-driven);
                           the hardcoded Slack/Webhook/Free Flow blocks below stay as-is. */}

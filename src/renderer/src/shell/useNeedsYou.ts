@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ScheduleRequest } from '@shared/missions';
 import type { MailProposal } from '@shared/mailProposals';
+import type { WhatsAppProposal } from '@shared/whatsappProposals';
 import type { OwnerRequest } from '@shared/ownerRequests';
 import type { WorkStyleOffer } from '@shared/workStyleUpdates';
 import type { EngineSetupStatus } from '@shared/engineSetup';
@@ -34,6 +35,8 @@ export interface NeedsYouFeed {
   offers: WorkStyleOffer[];
   /** Emails waiting for the owner's approval (send-on-approval.md). */
   proposals: MailProposal[];
+  /** WhatsApp messages waiting for the owner's approval. */
+  whatsAppProposals: WhatsAppProposal[];
   /** Where Michael's engine stands (get-michael-ready.md); null until read. */
   engineSetup: EngineSetupStatus | null;
   /** The office stop or break, if any (office-stopped-account.md). */
@@ -56,7 +59,7 @@ export interface NeedsYouFeed {
   foundations: FoundationsView | null;
 }
 
-let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], proposals: [], engineSetup: null, stop: null, silent: [], count: 0, reports: 0, researchNotice: false, knowledgeNotice: false, foundations: null };
+let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], ownerRequests: [], offers: [], proposals: [], whatsAppProposals: [], engineSetup: null, stop: null, silent: [], count: 0, reports: 0, researchNotice: false, knowledgeNotice: false, foundations: null };
 // The offers need the team and the packs, which this module does not import;
 // the app hands it the reader at start (App.tsx).
 let offersSource: (() => Promise<WorkStyleOffer[]>) | null = null;
@@ -103,7 +106,7 @@ let taskReads = 0;
 let requestReads = 0;
 let ownerReads = 0;
 
-function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers' | 'proposals' | 'engineSetup' | 'stop' | 'silent' | 'researchNotice' | 'knowledgeNotice' | 'foundations'>>): void {
+function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'ownerRequests' | 'offers' | 'proposals' | 'whatsAppProposals' | 'engineSetup' | 'stop' | 'silent' | 'researchNotice' | 'knowledgeNotice' | 'foundations'>>): void {
   // A poll that brings nothing new changes nothing, so nobody re-renders.
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
@@ -111,7 +114,7 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   const merged = { ...feed, ...next };
   feed = {
     ...merged,
-    count: merged.tasks.reduce((n, t) => n + shownQuestions(t, merged.foundations).length, 0) + merged.requests.length + merged.offers.length + merged.proposals.length,
+    count: merged.tasks.reduce((n, t) => n + shownQuestions(t, merged.foundations).length, 0) + merged.requests.length + merged.offers.length + merged.proposals.length + (merged.whatsAppProposals?.length ?? 0),
     reports: merged.tasks.reduce((n, t) => n + openReportIndexes(t.humanQA).length, 0) + (merged.researchNotice ? 1 : 0) + (merged.knowledgeNotice ? 1 : 0)
   };
   // One more while Michael cannot start for want of his engine (get-michael-ready.md),
@@ -207,6 +210,14 @@ function readProposals(): void {
     .catch(() => { /* keep the last value */ });
 }
 
+let whatsAppProposalReads = 0;
+function readWhatsAppProposals(): void {
+  const mine = ++whatsAppProposalReads;
+  void window.cth.listWhatsAppProposals?.()
+    .then((all) => { if (mine === whatsAppProposalReads) publish({ whatsAppProposals: Array.isArray(all) ? all : [] }); })
+    .catch(() => { /* keep the last value */ });
+}
+
 /** Whether the Get Michael ready card shows: Michael cannot start, and no sign
  *  in stop is already asking the owner the same thing (eng R3). */
 export function setupCardShown(f: Pick<NeedsYouFeed, 'engineSetup' | 'stop'>): boolean {
@@ -222,6 +233,8 @@ function readStop(): void {
     .catch(() => { /* keep the last value */ });
 }
 
+let offWhatsAppProposals: (() => void) | null = null;
+
 /** Listen for changes; the first listener starts the poll, the last stops it. */
 export function subscribeNeedsYou(listener: () => void): () => void {
   listeners.add(listener);
@@ -229,9 +242,11 @@ export function subscribeNeedsYou(listener: () => void): () => void {
     readTasks();
     readRequests();
     readProposals();
+    readWhatsAppProposals();
     timer = setInterval(readTasks, POLL_MS);
     offRequests = window.cth.onScheduleRequestsUpdated(readRequests);
     offProposals = window.cth.onMailProposalsUpdated?.(readProposals) ?? null;
+    offWhatsAppProposals = window.cth.onWhatsAppProposalsUpdated?.(readWhatsAppProposals) ?? null;
     offEngine = window.cth.onEngineSetupChanged?.(() => readEngine()) ?? null;
     readStop();
     offStop = window.cth.onOfficeBreak?.((v) => publish({ stop: v ?? null })) ?? null;
@@ -248,6 +263,8 @@ export function subscribeNeedsYou(listener: () => void): () => void {
       offRequests = null;
       offProposals?.();
       offProposals = null;
+      offWhatsAppProposals?.();
+      offWhatsAppProposals = null;
       offEngine?.();
       offEngine = null;
       offStop?.();
@@ -285,6 +302,7 @@ export function refreshNeedsYou(): void {
   readTasks();
   readRequests();
   readProposals();
+  readWhatsAppProposals();
   readOffers();
   readNotices();
   readFoundations();
