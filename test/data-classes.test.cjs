@@ -72,10 +72,29 @@ test('a card is found beside its expiry, its security code or another number', (
   assert.ok(!money('order 4111 1111 1111 1112 12/27'), 'fails Luhn: not a card');
 });
 
+test('a money amount is found whatever mark or grouping it is written with', () => {
+  // Value: protects=business figures stay private when the model's rewrite keeps one; fails_when=an amount with a currency mark passes as plain text; why_new=PR 411 found "Rs 1,35,000" passing the recheck; seam=none
+  const money = (t) => dc.patternHits(t).some((h) => h.classId === 'money');
+  for (const t of [
+    'payroll is Rs 1,35,000 a month', 'salary Rs. 135000', 'fee ₹5,000', 'paid $2,000', 'invoice $2,000.50 due',
+    'total 5,000 INR', 'rent 2000 USD', 'worth €12,500', 'cost £1,200', 'about $5k a month', 'Rs 2 lakh', '$2.5 million in sales',
+    'price ＄2,000'
+  ]) assert.ok(money(t), t);
+});
+
+test('small prices, years, counts and percentages are not money amounts', () => {
+  // Value: protects=ordinary asks reach Research; fails_when=a year, a count or a small price reads as a business figure; why_new=PR 411 recheck must not refuse plain questions; seam=none
+  const money = (t) => dc.patternHits(t).some((h) => h.classId === 'money');
+  for (const t of [
+    'flour at $25 a bag', 'lunch is $9.99', 'Rs 500 note', 'rules for 2026', 'opened in 2025', '1,200 restaurants in Texas', 'a 30% margin',
+    'sold 5,000 units', 'the 50 lb bag', 'path 10 m wide', 'Rs is short for rupees', 'users 1,000,000'
+  ]) assert.ok(!money(t), t);
+});
+
 test('the patterns stay quick on the longest text the check reads', () => {
   // Value: protects=the main process never stalls on a long message or web answer; fails_when=a pattern backtracks over a long run without spaces (the email pattern took 1.5 s on 60,000 digits); why_new=found reviewing PR 582; seam=none; no_claim=engine speed on other machines beyond the loose bound
   const n = 60_000; // TRUST_MAX_CHARS, the most the trust layer reads
-  const runs = { digits: '1'.repeat(n), letters: 'ab'.repeat(n / 2), dots: '1.'.repeat(n / 2), hyphens: '1-'.repeat(n / 2), at: 'a@'.repeat(n / 2), domain: `x@${'a.'.repeat(n / 2 - 1)}` };
+  const runs = { digits: '1'.repeat(n), letters: 'ab'.repeat(n / 2), dots: '1.'.repeat(n / 2), hyphens: '1-'.repeat(n / 2), at: 'a@'.repeat(n / 2), domain: `x@${'a.'.repeat(n / 2 - 1)}`, money: '$1,'.repeat(n / 3), codes: '1 rs '.repeat(n / 5) };
   for (const [name, text] of Object.entries(runs)) {
     const start = process.hrtime.bigint();
     dc.patternHits(text);
