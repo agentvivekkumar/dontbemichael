@@ -30,6 +30,15 @@ test('a Latin layout keeps its own letter', () => {
   assert.equal(shortcutLetter({ key: 'с' }), 'с', 'no code: nothing to fall back on');
 });
 
+test('an AltGr character keeps its own letter', () => {
+  // Value: protects=Polish, Hungarian and other AltGr typists on Windows, where AltGr arrives as Ctrl+Alt; fails_when=the physical-key fallback runs with Alt held; why_new=review fix; seam=none; no_claim=xterm's own AltGr handling
+  assert.equal(shortcutLetter({ key: 'ć', code: 'KeyC', altKey: true }), 'ć', 'Polish AltGr+C');
+  assert.equal(shortcutLetter({ key: 'Ć', code: 'KeyC', altKey: true }), 'ć', 'Polish AltGr+Shift+C');
+  assert.equal(shortcutLetter({ key: '&', code: 'KeyC', altKey: true }), '&', 'Hungarian AltGr+C');
+  assert.equal(shortcutLetter({ key: 'с', code: 'KeyC', altKey: false }), 'c', 'Russian Ctrl+C still copies');
+  assert.equal(shortcutLetter({ key: 'c', code: 'KeyC', altKey: true }), 'c', 'Cmd+Option+C keeps its Latin letter');
+});
+
 test('the terminal reads its copy and paste letter through shortcutLetter', () => {
   // Value: protects=the wiring of the helper into the terminal's key handler; fails_when=the handler goes back to ev.key; why_new=bug fix; seam=none; no_claim=none
   const src = fs.readFileSync(path.join(__dirname, '../src/renderer/src/components/terminalPool.ts'), 'utf8');

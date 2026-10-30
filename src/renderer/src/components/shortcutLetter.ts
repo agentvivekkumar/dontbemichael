@@ -7,10 +7,14 @@
  * program an interrupt, so the copy the owner asked for became a stop. When the
  * layout gives no Latin letter, the physical key (`code`) names it instead. A
  * Latin layout keeps its own letter, so Dvorak's C is still 'c'.
+ *
+ * Alt is never read from the physical key. On Windows AltGr arrives as
+ * Ctrl+Alt, so a character typed with AltGr (Polish 'ć', Hungarian '&') would
+ * otherwise turn into a copy or paste whenever it sits on the C or V key.
  */
-export function shortcutLetter(ev: { key: string; code?: string }): string {
+export function shortcutLetter(ev: { key: string; code?: string; altKey?: boolean }): string {
   const key = ev.key.toLowerCase();
   if (/^[a-z]$/.test(key)) return key;
-  const physical = /^Key([A-Z])$/.exec(ev.code ?? '');
+  const physical = ev.altKey ? null : /^Key([A-Z])$/.exec(ev.code ?? '');
   return physical ? physical[1].toLowerCase() : key;
 }
