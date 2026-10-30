@@ -43,6 +43,37 @@ export function modelForCli(model: string, cliVersion: string | null): ModelForC
   return { model: floor.fallback, downgraded: { from: model, need: floor.min, have: cliVersion } };
 }
 
+/**
+ * Hook events the app registers that an older Claude Code does not know, with
+ * the first version that takes each. An older one refuses the WHOLE settings
+ * file over a name it does not know: a Settings Error prompt, then no hooks, no
+ * sandbox and no deny rules, or an agent that never starts (owner, 2026-10-30).
+ * A hook new enough to be missing from a CLI still in use belongs in this list
+ * (claude-hook-floor.test.cjs fails until it is).
+ *
+ * PostToolBatch is in no changelog: 2.1.302 is the oldest version checked live,
+ * so it may be older. StopFailure and PostCompact are from the changelog.
+ */
+export const CLAUDE_HOOK_CLI_FLOOR: Readonly<Record<string, string>> = {
+  PostCompact: '2.1.76',
+  StopFailure: '2.1.78',
+  PostToolBatch: '2.1.302'
+};
+
+/** A version the probe could not read counts as this old: it loses the newest
+ *  hook, a small thing beside a refused file, and keeps the one that stops the
+ *  office on a usage limit. */
+const UNKNOWN_CLI = '2.1.78';
+
+/** The hooks this Claude Code takes, the rest left out. */
+export function hooksForCli<T>(hooks: Record<string, T>, cliVersion: string | null | undefined): Record<string, T> {
+  const have = cliVersion && /\d+\.\d+\.\d+/.test(cliVersion) ? cliVersion : UNKNOWN_CLI;
+  return Object.fromEntries(Object.entries(hooks).filter(([event]) => {
+    const min = CLAUDE_HOOK_CLI_FLOOR[event];
+    return !min || !isNewer(min, have);
+  }));
+}
+
 /** The long options `claude --help` lists ("--remote-control-session-name-prefix <prefix>"). */
 export function parseCliFlags(help: string): Set<string> {
   return new Set([...help.matchAll(/(?:^|[\s,])(--[a-zA-Z][a-zA-Z0-9-]*)/g)].map((m) => m[1]));

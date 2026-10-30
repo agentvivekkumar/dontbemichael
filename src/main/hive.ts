@@ -31,6 +31,7 @@ import { FOUNDATION_CAP, foundationAsk } from '../shared/foundations';
 type FoundationAskShape = { kind?: unknown; foundation?: unknown };
 
 import { hookShell, shellCommand, type HookShell } from './hookShell';
+import { hooksForCli } from '../shared/modelCliFloor';
 import { CLOSING_COMPLETE_RE } from '../shared/closingTime';
 import {
   entriesBlock, isProcedureSlug, MAX_PROCEDURE_CHARS, parseIndex, parseInbox, renderIndex, type MemoryEntry
@@ -1307,6 +1308,8 @@ export class HiveManager {
        *  everyone, Michael included (D9.1), in every office (ship 2 D16); absent
        *  for Research. */
       network?: SandboxNetwork;
+      /** The installed Claude Code: the settings carry only the hooks it takes. */
+      cliVersion?: string | null;
     } = {}
   ): Promise<SpawnInjection> {
     const root = this.root();
@@ -1639,7 +1642,7 @@ export class HiveManager {
       const settingsPath = this.settingsPathFor(dir);
       rmSync(join(dir, 'settings.json'), { force: true });
       mkdirSync(dirname(settingsPath), { recursive: true });
-      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell, opts.network, meta.isResearch ? this.researchShellWrite(dir, meta.cwd) : undefined));
+      this.writeJson(settingsPath, this.hookSettings(shim, meta.cwd, opts.mcpDefaults, opts.theme, this.sandboxWritableDirs(meta, dir, root, opts.extraWritableDirs), opts.folderPolicy, stripConnectors ? [] : opts.connectors?.deny ?? [], shell.shell, opts.network, meta.isResearch ? this.researchShellWrite(dir, meta.cwd) : undefined, opts.cliVersion));
       args.push('--settings', settingsPath);
       if (opts.folderPolicy?.walledMembers) this.walledAtStart.set(meta.id, opts.folderPolicy.walledMembers);
       else this.walledAtStart.delete(meta.id);
@@ -1954,7 +1957,7 @@ export class HiveManager {
     return [join(dir, 'inbox'), join(dir, 'outbox'), join(dir, 'memory'), ...(cwd ? [cwd] : [])];
   }
 
-  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash', network?: SandboxNetwork, shellWrite?: string[]): unknown {
+  private hookSettings(shim: string, cwd: string, cfg: McpDefaultsMap, theme?: 'light' | 'dark', writableDirs: string[] = [], folders?: AgentFolderPolicy, connectorDeny: string[] = [], shell: HookShell = 'bash', network?: SandboxNetwork, shellWrite?: string[], cliVersion?: string | null): unknown {
     // Bundled node, NOT bare `node` — see nodeLauncherPath(). Claude runs each of
     // these through a shell with a stripped PATH, where `node` is often absent.
     // On Windows that shell is PowerShell when there is no Git Bash, which can't
@@ -2064,7 +2067,7 @@ export class HiveManager {
             }
           }
         : connectorDeny.length ? { permissions: { deny: connectorDeny } } : {}),
-      hooks: {
+      hooks: hooksForCli({
         Stop: [entry()],
         SubagentStop: [entry()],
         PreToolUse: [entry('*')],
@@ -2084,7 +2087,7 @@ export class HiveManager {
         // A turn cut off by the usage limit, no credit or a sign in that no
         // longer works stops the office (issue 124, office-stopped-account.md).
         StopFailure: [entry(STOP_FAILURE_MATCHER)]
-      }
+      }, cliVersion)
     };
   }
 
