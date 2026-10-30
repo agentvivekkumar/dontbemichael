@@ -62,8 +62,7 @@ test('the version is read before the settings are written, for every member', ()
   const main = fs.readFileSync(path.join(root, 'src/main/index.ts'), 'utf8');
   assert.ok(main.indexOf('const cliVersion = await claudeCliVersion(cliBin);') < main.indexOf('const inj = await hive.ensureAgent('));
   const call = main.slice(main.indexOf('const inj = await hive.ensureAgent('), main.indexOf('opts.args = [...(opts.args ?? []), ...inj.args];'));
-  assert.equal(call.match(/^\s+cliVersion: hookCli,?$/gm)?.length, 2, 'Research and the rest of the team');
-  assert.match(main, /const hookCli = cliVersion \?\? lastClaudeCliVersion\(\);/);
+  assert.equal(call.match(/^\s+cliVersion,?$/gm)?.length, 2, 'Research and the rest of the team');
 });
 
 test('a start with no Claude binary runs no probe, and a missing one answers unknown', async () => {
@@ -72,4 +71,20 @@ test('a start with no Claude binary runs no probe, and a missing one answers unk
     assert.equal(await claudeCliVersion(bin), null);
     assert.equal(await claudeCliFlags(bin), null);
   }
+});
+
+test('a probe that fails takes the answer for its own install, and never another install\'s', { skip: process.platform === 'win32' ? 'shell-script fixtures' : false }, async (t) => {
+  // Value: protects=starts side by side share one good answer, and a failed read never borrows a newer version from another install; fails_when=a slow failed probe returns null though its install answered, or an unread binary gets another binary's version; why_new=ship review of the fallback; seam=none; no_claim=a real timeout
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-hook-probe-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const once = path.join(dir, 'once');
+  const shared = path.join(dir, 'claude-shared');
+  fs.writeFileSync(shared, `#!/bin/sh\nif mkdir "${once}" 2>/dev/null; then sleep 0.4; exit 3; fi\necho '2.1.314 (Claude Code)'\n`, { mode: 0o755 });
+  const slow = claudeCliVersion(shared);
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(await claudeCliVersion(shared), '2.1.314');
+  assert.equal(await slow, '2.1.314', 'the failed probe takes the answer for this install');
+  const broken = path.join(dir, 'claude-broken');
+  fs.writeFileSync(broken, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
+  assert.equal(await claudeCliVersion(broken), null, 'another install stays unread');
 });

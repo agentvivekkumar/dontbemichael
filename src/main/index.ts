@@ -4409,9 +4409,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // Both probes run at once and are cached per install, so only a first start waits.
   const cliFlags = claudeCliFlags(cliBin);
   const cliVersion = await claudeCliVersion(cliBin);
-  // A probe can time out on a busy machine; the last answer is still a good guide.
-  const hookCli = cliVersion ?? lastClaudeCliVersion();
-  if (cliBin && !hookCli) console.warn(`[spawn] ${opts.hive?.id}: Claude Code version unread, starting without the newer hooks`);
+  if (cliBin && !cliVersion) console.warn(`[spawn] ${opts.hive?.id}: Claude Code version unread, starting without the newer hooks`);
   let connectorsApplied = false;
   if (opts.hive && hive.enabled()) {
     try {
@@ -4459,7 +4457,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
             researchFolders(),
             homedir()
           ),
-          cliVersion: hookCli
+          cliVersion
         } : {
           knowledgeGraph: knowledge.hasDocuments(),
           // Bake the ABSOLUTE KG CLI path into the agent's prompt. The prompt used
@@ -4491,7 +4489,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           folderPolicy: memberPolicy(),
           docTextCliPath: docTextCliPath(),
           connectors: connectorPlan?.plan,
-          cliVersion: hookCli,
+          cliVersion,
           // Only Research uses the internet (shared/webAccess.ts): every other
           // team member's shell reaches no host, Michael included (D9.1), in
           // every office (owner, ship 2 D16: the Research agent is the app's one way
