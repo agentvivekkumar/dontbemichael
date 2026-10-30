@@ -22,7 +22,7 @@ import { BUILD_ENGINES } from '@shared/agentProvider';
 import { splitAgentRole, joinAgentRole } from '@shared/agentRole';
 import { roleLabel, plainFallback } from '@shared/workStyleText';
 import { addedOverlaps, applyJob, handoffsTo, handoffsWithout, jobBase, jobFingerprint, liveHandoffs, plainFor, undoJob } from '@shared/jobChange';
-import { connectorGranted, connectorOn, type ConnectorConfig } from '@shared/claudeConnectors';
+import { connectorGranted, connectorOn, offeredConnectors, type ConnectorConfig } from '@shared/claudeConnectors';
 import { JobChangeReview, type HomeChoice, type ReviseOk, type ReviseRun, type Teammate } from './JobChangeReview';
 import { Field, JobParts, Panel as SoftPanel, fieldLabel, hint, jobPartsFold, readBody } from './fieldText';
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
@@ -232,11 +232,11 @@ export function EditAgentModal({ agent, onClose, docked = true, engineOpen: open
     return { names: added, why: v.why, suggestion: v.suggestion, teammates: named };
   };
   /** Where tracked numbers can live (design D5): the member's own folder,
-   *  then every connector on the Claude account; switched off in Settings
+   *  then every connector on the Claude account but a mailbox; switched off in Settings
    *  greyed, on but not given to this member flagged in the preview. */
   const homeChoices = (): HomeChoice[] => {
     const cfg = (config ?? {}) as ConnectorConfig;
-    const tools = (cfg.claudeConnectors?.list ?? []).map((c): HomeChoice => {
+    const tools = offeredConnectors(cfg.claudeConnectors?.list).map((c): HomeChoice => {
       const on = connectorOn(cfg, c.key);
       return { label: c.key, tool: c.key, off: !on, noAccess: on && !connectorGranted(cfg, agent.id, c.key, readsBooks) };
     });

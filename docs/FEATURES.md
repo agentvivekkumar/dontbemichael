@@ -74,11 +74,14 @@ moving, and brings you only the decisions that need you.
   encrypted port to use instead.
 - Give each team member the one mailbox that fits its job: the Admin watches the CEO's inbox,
   Support answers support@, Sales follows up from sales@. One team member per mailbox.
-- Choose Can send, Send on approval or Draft only for each one. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. Can send never puts an email on Needs you, and moving a team member to it hands back the emails still waiting there, unless it sends only from a mailbox nobody on the team watches right now. A team member can't reach a mailbox you didn't give it.
+- Choose Can send, Send on approval or Draft only for each one; a newly added mailbox starts on Send on approval. Send on approval puts each email on Needs you to edit and approve; the team member then sends exactly what you approved. Can send never puts an email on Needs you, and moving a team member to it hands back the emails still waiting there, unless it sends only from a mailbox nobody on the team watches right now. A team member can't reach a mailbox you didn't give it.
 - When you keep approving the same kind of email unchanged, the team member can offer to send that
   kind without asking. You tick it on the card and can revoke it on its Access tab; a separate quick
   check reads each such email first, and anything that doesn't fit comes to you.
-- Let one more team member send from a mailbox without reading it (Send only), with its own Sending choice: Sales sends outreach from the CEO's address while the Admin keeps that inbox.
+- Let one more team member send from a mailbox without reading it (Only send email), with its own Sending choice: Sales sends outreach from the CEO's address while the Admin keeps that inbox.
+- Giving a team member a mailbox asks one plain question, Read and answer email or Only send email,
+  with a short line under each. Only send waits until someone reads that inbox, and with one mailbox
+  the app picks it for you.
 - The Executive Admin keeps the inbox at zero: every email is routed, tracked, filed or cleared and
   leaves the inbox. Archiving, marking read and marking junk never delete anything.
 - See the email a question or a reply is built on, as it came: an Email chip on the card opens it
@@ -127,9 +130,16 @@ moving, and brings you only the decisions that need you.
   words or with a file, which the app checks fits the question before the team can read it.
 
 ### 6. You stay in charge
-- Every connector on your Claude account (HubSpot, Google Drive, Gmail, QuickBooks and the rest)
-  shows up in Settings by itself, off. Turn one on, then give it to the team members who need it.
-  Nobody else can reach it, and your own Claude Code servers stay yours.
+- Pulse counts only the office's own share of a Claude plan: its work at the plan's rate, learned
+  from the plan's weekly usage meter, so your other Claude use is never charged to the office.
+- Opening the app is clear: a team member counts as in as soon as they have started, and the card
+  shows a running clock and who is slowest, or who has gone quiet. The floor and Ask me wait until
+  everyone is in, at most 70 seconds.
+- Every connector on your Claude account (HubSpot, Google Drive, QuickBooks and the rest) shows up
+  in Settings by itself, off. Turn one on, then give it to the team members who need it. Nobody
+  else can reach it, and your own Claude Code servers stay yours.
+- Email goes only through the mailboxes you connect in the app. Gmail, Outlook and other mail on
+  your Claude account never show as connectors, and no team member can use them.
 - Spending money, deleting things and anything public come to you first, on the Needs you board.
   While anything waits it stays open; when nothing at all waits it gets out of the way and the
   office fills the window.

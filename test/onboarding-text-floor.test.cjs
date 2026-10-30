@@ -37,8 +37,7 @@ function assertFloor(label, source) {
   }
 }
 
-test('Welcome and Permissions setup text stays at 14px', () => {
-  assertFloor('Welcome', between("{step === 'welcome' && (", "{step === 'home' && ("));
+test('Permissions setup text stays at 14px', () => {
   assertFloor('Permissions', between("{step === 'permissions' && (", '{error && ('));
   assertFloor('ToggleRow', between('function ToggleRow', 'function Dots'));
 });

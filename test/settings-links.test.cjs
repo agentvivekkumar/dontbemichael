@@ -175,7 +175,7 @@ test('Michael\'s rules: links for places, a query with Connect your email, follo
   const hive = read('src/main/hive.ts');
   assert.equal((hive.match(/' \+ PLACE_LINK_RULE \+ '/g) ?? []).length, 2, 'Ask me and the dock rules both carry it');
   assert.doesNotMatch(hive, /\$\{PLACE_LINK_RULE\}/, 'never left as literal text in a quoted string');
-  assert.match(hive, /needs email and no team member can read email \(no mailbox and no mail connector such as Gmail on the roster\)/);
+  assert.match(hive, /needs email and no team member can read email \(no mailbox on the roster\)/);
   assert.match(hive, /answer with "act": "query" saying so plainly and end with \[Connect your email\]\(dbm:settings\/connections\/mailboxes\/add\)/);
   assert.match(hive, /say nothing when none waited on email/);
   const main = read('src/main/index.ts');

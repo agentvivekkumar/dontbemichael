@@ -141,6 +141,8 @@ export interface HarnessConfig {
   connectorsOn?: { [key: string]: boolean };
   /** Connector keys the owner has seen in Settings. */
   connectorsSeen?: string[];
+  /** One-time guard for the connector carry-over (main config.ts); a new office sets it at setup. */
+  connectorsMigrated?: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
   opsStandupSeeded?: boolean;

@@ -60,6 +60,8 @@ function rendererSubmission(onPoll, breaker = 'healthy') {
     breakerLevel: { current: { alice: breaker } },
     ACTION_AT_PROMPT: 'at prompt',
     isTerminalPrompt,
+    engineStarted: () => false,
+    ACTION_CLOCKING_IN: 'clocking in…',
     pasteSafe,
     console: { warn: () => {} }
   };

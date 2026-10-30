@@ -190,7 +190,7 @@ test('a hire can be bound to one connection, and starts with only that connector
   const H = loadTs('src/shared/hireTemplates.ts');
   assert.deepEqual(H.bindingLines('the data in HubSpot', 'Creed'), { own: 'Only the data in HubSpot.', others: 'Not for the data in HubSpot; that goes to Creed.' });
   const modal = read('src/renderer/src/components/AddAgentModal.tsx');
-  assert.match(modal, /const bindConnectors = \(config\.claudeConnectors\?\.list \?\? \[\]\)\s*\.map\(\(c\) => \(\{ key: c\.key, on: connectorOn\(config, c\.key\), signIn: c\.status === 'needs-sign-in' \}\)\)/, 'every connector on the account is listed');
+  assert.match(modal, /const bindConnectors = offeredConnectors\(config\.claudeConnectors\?\.list\)\s*\.map\(\(c\) => \(\{ key: c\.key, on: connectorOn\(config, c\.key\), signIn: c\.status === 'needs-sign-in' \}\)\)/, 'every connector on the account is listed');
   assert.match(modal, /setConnectionScope\(key \? tr\('addAgent\.wizard\.connectionScope', \{ name: key \}\) : ''\);/, 'the scope starts as "the data in <connector>", editable');
   assert.match(modal, /onBindConnection=\{\(\) => \{ if \(bindConnector && bindConnectors\.some\(\(c\) => c\.key === bindConnector && c\.on\)\) applyBinding\(connectionScope, undefined, bindConnector\); \}\}/);
   const submit = modal.slice(modal.indexOf('const id = hireAgentId(name);'), modal.indexOf('const spawnRes = await window.cth.spawnPty'));

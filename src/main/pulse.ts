@@ -21,7 +21,7 @@ import {
 } from '../shared/teamPerformance';
 import { adviceFor, earlyWatch, visibleAdvice, ADVICE_WINDOW_MS, EARLY_SCALE, type Advice, type Dismissal, type EarlyMode, type EarlyWatch, type LadderModel, type MemberModelFact, type MissionFact } from '../shared/teamAdvice';
 import { keptSafe, type KeptSafe } from '../shared/pulseSafety';
-import { planCostFor, scaleSnapshot, type PlanPrice } from '../shared/claudePlan';
+import { METER_LOOKBACK_MS, planCostFor, planRate, scaleSnapshot, usdPerMeterPoint, type CostPoint, type MeterPoint, type PlanPrice } from '../shared/claudePlan';
 import { countFromDay, learnedNotes, learning, type AddedNote, type LearnedNote, type NoteFact } from '../shared/teamLearning';
 import { parseHeld, type HeldRow } from '../shared/heldRecord';
 import { parseChecked, type CheckedList, type CheckedRow } from '../shared/checkedRecord';
@@ -104,6 +104,7 @@ export class PulseService {
       const resets = typeof w?.resets_at === 'number' ? w.resets_at * 1000 : NaN;
       if (!(pct >= 0) || !(resets > at)) continue;
       live.push({ usedPct: pct, resetsAt: resets, windowMs: windowMs(name), at });
+      if (name === 'seven_day') this.d.store.meter(pct, resets, at);
     }
     if (live.length) this.readings = live;
   }
@@ -262,18 +263,21 @@ export class PulseService {
     const asks = this.asks();
     const gapDays = this.d.store.failureDays(office);
     const running = this.d.processor.running(office, from);
-    // On a plan, each member's dollars are their part of the plan's real cost
-    // for the period, split by share of the work (owner, 2026-10-15).
+    // On a plan, each member's dollars are what their own work cost of the
+    // plan, at the plan's rate (owner, 2026-10-29): the rest of the plan is
+    // the owner's other Claude use, never the office's.
     const price = billing === 'account' ? this.planPrice() : null;
+    const rate = price ? this.planRate(office, price) : null;
     const measure = (r: DayRange): { snapshot: PulseSnapshot; keptSafe: KeptSafe; periodCost: number; payPerUse: number } => {
       const raw = pulseSnapshot({
         period, now, range: r, days, cards, decisions, asks, members: ids, gapDays, running,
         sentAsWritten: decisions.filter((x) => x.decision === 'approve' && x.at >= r.fromMs && x.at <= r.toMs).length,
         ...(godId ? { michael: { agentId: godId, ...this.d.processor.michaelCounts(office, godId, r.fromMs, r.toMs) } } : {})
       });
-      const periodCost = price ? planCostFor(price.monthly, r.fromMs, r.toMs, now) : 0;
+      // Never more than the whole plan for the days so far.
+      const periodCost = rate !== null && price ? Math.min(raw.totalUsd * rate, planCostFor(price.monthly, r.fromMs, r.toMs, now)) : 0;
       return {
-        snapshot: price && raw.totalUsd > 0 ? scaleSnapshot(raw, periodCost / raw.totalUsd) : raw,
+        snapshot: rate !== null && raw.totalUsd > 0 ? scaleSnapshot(raw, periodCost / raw.totalUsd) : raw,
         keptSafe: keptSafe(this.d.processor.safetyRows(office, r.from, r.to)),
         periodCost,
         payPerUse: raw.totalUsd
@@ -281,7 +285,7 @@ export class PulseService {
     };
     const cur = measure(range);
     const prev = before ? measure(before) : null;
-    const plan = price ? { label: price.label, monthly: price.monthly, source: price.source, periodCost: cur.periodCost, payPerUse: cur.payPerUse } : null;
+    const plan = price && rate !== null ? { label: price.label, monthly: price.monthly, source: price.source, periodCost: cur.periodCost, payPerUse: cur.payPerUse } : null;
     const firstMs = live ? new Date(`${live}T00:00:00`).getTime() : now;
     const adviceReady = now - firstMs >= ADVICE_WINDOW_MS;
     const applied = this.appliedChanges(office);
@@ -298,11 +302,12 @@ export class PulseService {
       saved: this.saved(office, applied),
       headroom: billing === 'account' ? planHeadroom(this.reading) : null,
       applied,
-      trend: this.trend(office, ids, price),
+      trend: this.trend(office, ids, price, rate),
       keptSafe: cur.keptSafe,
       learning: this.learning(office, range, before, asks),
       foundations: this.foundations(office),
       plan,
+      ...(price && rate === null ? { planLearning: true } : {}),
       compare: prev ? { snapshot: prev.snapshot, keptSafe: prev.keptSafe } : null,
       compareReady,
       compareFrom: readyFrom
@@ -342,6 +347,35 @@ export class PulseService {
     try { return this.d.plan(); } catch { return null; }
   }
 
+  /** Plan dollars per pay per use dollar, from the weekly meter readings and
+   *  the office's cost samples of the last four weeks; null until learned. */
+  private planRate(office: string, price: PlanPrice): number | null {
+    const db = this.d.db();
+    if (!db) return null;
+    try {
+      const since = this.now() - METER_LOOKBACK_MS;
+      const meter: MeterPoint[] = (db.prepare("SELECT ts, value, attrs FROM telemetry_events WHERE office = ? AND kind = 'meter' AND ts >= ? ORDER BY ts")
+        .all(office, since) as Array<{ ts: number; value: number | null; attrs: string | null }>)
+        .map((r) => ({ at: r.ts, pct: Number(r.value), resetsAt: Number((r.attrs ? JSON.parse(r.attrs) as { r?: unknown } : {}).r) }))
+        .filter((m) => m.pct >= 0 && m.resetsAt > 0);
+      if (meter.length < 2) return null;
+      const from = meter[0].at;
+      const point = (r: { agent_id: string | null; ts: number; value: number | null; attrs: string | null }): CostPoint =>
+        ({ at: r.ts, key: `${r.agent_id}\t${String((r.attrs ? JSON.parse(r.attrs) as { s?: unknown } : {}).s ?? '')}`, usd: Number(r.value) });
+      const costs = (db.prepare("SELECT agent_id, ts, value, attrs FROM telemetry_events WHERE office = ? AND kind = 'cost' AND ts >= ?")
+        .all(office, from) as Array<{ agent_id: string | null; ts: number; value: number | null; attrs: string | null }>).map(point);
+      // Each session's last running total before the first reading.
+      const seed: Record<string, number> = {};
+      for (const r of db.prepare("SELECT agent_id, MAX(ts) AS ts, value, attrs FROM telemetry_events WHERE office = ? AND kind = 'cost' AND ts < ? AND ts >= ? GROUP BY agent_id, json_extract(attrs, '$.s')")
+        .all(office, from, from - METER_LOOKBACK_MS) as Array<{ agent_id: string | null; ts: number; value: number | null; attrs: string | null }>) {
+        const p = point(r);
+        seed[p.key] = p.usd;
+      }
+      const perPoint = usdPerMeterPoint(meter, costs, seed);
+      return perPoint === null ? null : planRate(price.monthly, perPoint);
+    } catch { return null; }
+  }
+
   /** Learning for the period and, with Compare, the span before. */
   private learning(office: string, range: DayRange, before: DayRange | null, asks: AskFact[]): PulseView['learning'] {
     const turns = new Map<string, number>();
@@ -372,8 +406,8 @@ export class PulseService {
   }
 
   /** Value per week, last four weeks (this week last), per member; on a plan,
-   *  each week's part of the plan's cost for that week. */
-  private trend(office: string, ids: string[], price: PlanPrice | null): Record<string, number[]> {
+   *  at the plan's rate, never more than the plan's cost for that week. */
+  private trend(office: string, ids: string[], price: PlanPrice | null, rate: number | null): Record<string, number[]> {
     const now = this.now();
     const monday = new Date(periodRange('this-week', now).fromMs);
     monday.setDate(monday.getDate() - 21);
@@ -385,12 +419,12 @@ export class PulseService {
       const w = Math.floor((new Date(`${d.day}T12:00:00`).getTime() - start) / (7 * 86_400_000));
       if (w >= 0 && w < 4) (out[d.agentId] ??= [0, 0, 0, 0])[w] += d.usd;
     }
-    if (price) {
+    if (price && rate !== null) {
       const week = 7 * 86_400_000;
       for (let w = 0; w < 4; w++) {
         const total = Object.values(out).reduce((s, v) => s + v[w], 0);
         if (total <= 0) continue;
-        const factor = planCostFor(price.monthly, start + w * week, start + (w + 1) * week - 1, now) / total;
+        const factor = Math.min(total * rate, planCostFor(price.monthly, start + w * week, start + (w + 1) * week - 1, now)) / total;
         for (const v of Object.values(out)) v[w] *= factor;
       }
     }

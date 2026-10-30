@@ -88,7 +88,7 @@ test('wide, the conversation and box are drawn outside the office, beside the ri
   assert.ok(host > app.indexOf('<BottomBar />') && host > app.indexOf('className="cth-wide-scrim"'), 'after the stage closes, beside the column');
   assert.match(app, /\.\.\.\(columnShown \? \{ insetInlineStart: 24, insetInlineEnd: sidebarWidth \+ 28 \} : \{ insetInlineStart: '10%', insetInlineEnd: '10%' \}\),\n\s*display: dockWide \? 'flex' : 'none'/, 'left of the column when it shows, else the wide panel frame');
   assert.match(app, /\.\.\.\(dockWide && columnShown \? \{ insetInlineEnd: sidebarWidth \+ 16 \} : \{\}\)/, 'the dimming stops at the column');
-  assert.doesNotMatch(app, /columnRef\.current\?\.toggleAttribute\('inert'/, 'the column stays live');
+  assert.equal((app.match(/columnRef\.current\?\.toggleAttribute\('inert', [^)]*\)/g) || []).join(), "columnRef.current?.toggleAttribute('inert', launchLock)", 'the column stays live: only the launch lock holds it');
   const bar = read('src/renderer/src/shell/BottomBar.tsx');
   assert.match(bar, /\{createPortal\(\n\s*<div ref=\{composerRef\}/);
   assert.match(bar, /<div aria-hidden="true" style=\{\{ \.\.\.slot, minHeight: 50 \}\} \/>/, 'the bar keeps the slot');

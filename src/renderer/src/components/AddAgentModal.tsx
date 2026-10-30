@@ -29,7 +29,7 @@ import { splitAgentRole } from '@shared/agentRole';
 import { FIRST_TASK_EDITED_MAX } from '@shared/firstTask';
 import { teamAccent } from '@shared/teamPlan';
 import { mailboxHolder } from '@shared/mailboxes';
-import { connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
+import { connectorOn, isQuickBooksKey, offeredConnectors } from '@shared/claudeConnectors';
 import { Select } from './triggers/ui';
 import {
   NEW_JOB_KEY,
@@ -458,10 +458,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const freeMailboxes = mailboxes.filter((m) => !mailboxHolder(config.agentCapabilities, m.id));
   // Every connector on the owner's Claude account is listed (owner, 2026-10-03:
   // "do not let system decide which connector make available ... nothing
-  // should be hidden"). Those switched on can be bound; those switched off
+  // should be hidden"), but a mailbox: mail goes only through the app's own
+  // (owner, 2026-10-30). Those switched on can be bound; those switched off
   // show greyed with where to turn them on. A binding grants its most
   // restrictive access: QuickBooks read only.
-  const bindConnectors = (config.claudeConnectors?.list ?? [])
+  const bindConnectors = offeredConnectors(config.claudeConnectors?.list)
     .map((c) => ({ key: c.key, on: connectorOn(config, c.key), signIn: c.status === 'needs-sign-in' }))
     .sort((a, b) => Number(b.on) - Number(a.on));
   const [bindConnector, setBindConnector] = useState('');
@@ -630,7 +631,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     };
     // A mailbox binding is set before the spawn, so the agent starts with it.
     if (binding?.mailboxId) {
-      const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false } }).catch(() => null);
+      // On Send on approval, as a mailbox added on the Access tab starts (owner, 2026-10-30).
+      const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false, sending: 'approval' } }).catch(() => null);
       if (!res?.ok) { setBusy(false); setError(tr('capabilities.saveFailed')); return; }
     }
     // So is a connection binding: the agent starts holding that one connector.

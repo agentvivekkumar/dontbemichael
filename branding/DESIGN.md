@@ -843,7 +843,7 @@ the same panels, on a white tab body. Only what is enforced today:
 
 | Group | Controls |
 |---|---|
-| Email | No switch (owner, 2026-10-07): the header chip says "Mailboxes: N" or "None". One row per address the member uses (mono address, Remove): an **Inbox** line, green dot "{name} watches it" or grey dot "{holder} watches it. {name} sends only." ("Nobody watches it. {name} sends only." when no one does), and a **Sending** segmented control [Can send, Send on approval, Draft only] with the meanings behind an info icon. Under the watched inbox: "Also sends from here: ..." (`ink-3`); removing it while others send from it asks first and names them. Under each row: "Sends without asking" (standing approvals, each with Revoke) and, for Send only, "Sent from here lately" (up to five). A paused Send only row shows an `amber-soft` note. **Add a mailbox** (link) opens a `card-2` panel: a mailbox select, then radio rows [Watch the inbox, Send only]; a choice that can't be made is greyed with its reason, never hidden; Add and Cancel (`docs/designs/shared-mailboxes.md`) |
+| Email | No switch (owner, 2026-10-07): the header chip says "Mailboxes: N" or "None". One row per address the member uses (mono address, Remove): an **Inbox** line, green dot "{name} reads and answers it" or grey dot "{holder} reads it. {name} only sends." ("Nobody reads it. {name} only sends." when no one does), and a **Sending** segmented control [Can send, Send on approval, Draft only] with the meanings behind an info icon. Under the watched inbox: "Also sends from here: ..." (`ink-3`); removing it while others send from it asks first and names them. Under each row: "Sends without asking" (standing approvals, each with Revoke) and, for Send only, "Sent from here lately" (up to five). A paused Send only row shows an `amber-soft` note. **Give {name} a mailbox** (link) opens a `card-2` panel: a mailbox select (already chosen when there is only one), the question "What should {name} do with it?", then radio rows [Read and answer email, Only send email], each with one visible line (the owner's exception to info icons, 2026-10-30); a choice that can't be made is greyed with its reason, never hidden, and Only send is greyed until someone reads the inbox; only the radio and name dim, never the reason; Give to {name} and Cancel (`docs/designs/mailbox-choice.md`) |
 | Claude connectors | One row and switch per connector the owner turned on in Settings, A to Z; "2 of 4" in the header. QuickBooks keeps radio rows [Read only, Can make changes] under its row, and an `ink-3` "on for bookkeeping roles" while the role default holds. None on: one `ink-3` line with a link to Settings. A pending restart shows under the groups with Restart now (`docs/designs/claude-connectors.md`) |
 | Files | Read only row: lock icon, "Own folder only", the folder name, "Open folder" link |
 | On a schedule | "+ Add" link. Rows (owner, 2026-10-01, three quiet lines): switch; the job name (14 px) with the next run on the right; the when line (14 px, `ink-2`); then the status line (last run, and who added it only when it was not the owner) in `t-meta` `ink-3` |
@@ -1143,11 +1143,16 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
   A card over Michael's pod says so (owner, 2026-10-17; design review 2026-10-18, the owner
   found the white card easy to miss among the name chips). It is the one colored card on the
   floor: `indigo-soft` fill, a 1.5 px `indigo` ring plus `shadow-lg`, `r-xl`, padding 14 × 16,
-  min(300 px, stage width less 32); the floor stays clickable under it
-  (`components/OpeningCard.tsx`). Rows: the 12 px `indigo` dot with the slow pulse, "Clocking
+  min(300 px, stage width less 32) (`components/OpeningCard.tsx`). At launch the floor and the right
+  column wait (`inert`) until the opening ends, Michael stops, or 70 s pass, whichever is first; the
+  lock happens once per launch, and the top bar, Settings and the message box stay usable
+  (owner, 2026-10-30, reversing the 2026-10-18 clickable floor; `docs/designs/clocking-in-clarity.md`).
+  A person is in once their engine reports it started, or on first output if it can't report. Rows: the 12 px `indigo` dot with the slow pulse, "Clocking
   in" at `t-view` 600, the mono count ("5 of 12 in", `t-ui`, `ink-2`) at the end; a 4 px bar
   (`indigo` on `indigo` 20%, `role=progressbar`); "Still coming: Toby, Ryan, Oscar and 4 more"
-  (`t-body`, `ink-2`, roster order). When the last person is in it turns `green-soft` with a
+  (`t-body`, `ink-2`, roster order); "18 seconds so far. Toby is the slowest.", from 30 s "Toby is
+  taking longer than usual." or, 15 s after their terminal last printed, "Toby has gone quiet.";
+  and at launch "The floor opens when everyone's in." Ask me shows the same waiting note. When the last person is in it turns `green-soft` with a
   `green` ring and a check, "Everyone's in", the full bar, for 2 s, then fades in 300 ms. If
   anyone is still out at the one minute cap it turns `amber-soft` with an `amber` ring and a
   still dot: "11 of 12 in" and "Toby hasn't clocked in." (or "Toby and 2 more haven't clocked
@@ -1170,8 +1175,8 @@ Centered overlay over the stage (never over the right column), 528 px wide, `r-2
 
 Full window, no app chrome.
 
-- Header: lockup left; step indicator center: eight labelled steps (Business, Details,
-  Meet, Team, Home, Manager, Permissions, Ready; seven when Michael's engine is not Claude) in a `card` pill container, each a 22 px circle
+- Header: lockup left; step indicator center: six labelled steps (Business, Details,
+  Team, Manager, Permissions, Ready; five when Michael's engine is not Claude) in a `card` pill container, each a 22 px circle
   (done: `green` with a check; current: `ink` with the number; next: `line-2` ring with the
   number) joined by 1 px `line-2` rules; "Step 4 of 8" right, `t-meta`.
 - Body: a 560 px card with the step's fields. While the studio isn't showing (Business,
@@ -2550,10 +2555,9 @@ guide PDF, which use them. Re-shoot after any visible change to these screens.
 | `michael-office-schedule.png` | Michael selected, Office schedule tab |
 | `tasks-detail.png` | Tasks view with a task detail open |
 | `who-talks-to-whom.png` | Who talks to whom |
-| `onboarding-team.png` | Onboarding step 4, Your team, Pro Services pack |
+| `onboarding-team.png` | Onboarding step 3, Your team, Pro Services pack |
 | `onboarding-business.png` | Onboarding step 1, Your business |
-| `onboarding-meet.png` | Onboarding step 3, Meet your office |
-| `onboarding-ready.png` | Onboarding step 8, Get Michael ready (installed, not signed in) |
+| `onboarding-ready.png` | Onboarding step 6, Get Michael ready (installed, not signed in) |
 | `kelly-memory.png` | A person selected, Memory tab |
 | `hire.png` | The hire wizard, step 1 (Who) |
 | `settings-autonomy.png` | Settings, Agents (the default model, autonomy and the circuit breaker) |

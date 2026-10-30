@@ -146,7 +146,7 @@ import { terminalOverflowEvent } from '../shared/terminalOverflow';
 import { PROVIDER_PRESETS, grantPaused, hasMailTools, mailAccess, mailboxAddress, secretRefForMailbox, sendOnlyGrant, sendingFor, sendingMode, sendingWords, type SendingMode } from '../shared/mailboxes';
 import { levelFor } from '../shared/agentDefinition';
 import { claudeBinFor, readClaudeMcpList } from './claudeMcpList';
-import { connectorCarryOver, isEmailCalendarKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
+import { connectorCarryOver, isEmailCalendarKey, isMailConnectorKey, isQuickBooksKey, renamedKeys, spawnConnectorPlan, usableConnectors, type SpawnConnectorPlan } from '../shared/claudeConnectors';
 import { quickbooksAccessToSave } from '../shared/quickbooks';
 import { emailCalendarAllowed } from '../shared/mcpCatalog';
 import { validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, INTEGRATION_TEMPLATES } from '../shared/integrations';
@@ -183,7 +183,8 @@ import { toolCatalog, type ToolStatus } from '../shared/toolCatalog';
 import { listLocalSkills, loadCatalog, installSkill, uninstallSkill, type LocalSkill } from './skills';
 import { loadHero } from './hero';
 import { loadModelCatalog } from './modelCatalog';
-import { claudeCliVersion, lastClaudeCliVersion } from './claudeCliVersion';
+import { exitLine, type StoppedMember } from '../shared/agentExit';
+import { claudeCliFlags, claudeCliVersion, lastClaudeCliVersion } from './claudeCliVersion';
 import { ALLOW_TEMP_WORKERS, AUTO_FAILURE_REPORTS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { copyOfficeData, homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
@@ -582,6 +583,7 @@ const hookServer = new HookServer(
     // Any event, a Claude status tick included, is a check in (issue #326);
     // the event name tells it when a long tool call starts and ends.
     silentWatch?.noteHook(agentId, event);
+    clearStopped(agentId);
     safeClearer.noteHook(agentId, event, message, subagent);
     if (agentId && event === 'UserPromptSubmit') promptSubmits.note(agentId);
     if (agentId && (event === 'Notification' || event === 'PermissionRequest')) promptSubmits.noteAttention(agentId);
@@ -1649,6 +1651,22 @@ ptyManager.setExitHandler((id, exitCode, info) => {
       });
     }
   } catch (e) { console.error('[pty] recordAgentExit failed:', e); }
+  // The window stops waiting for it, and a stopped Michael says why. Michael
+  // counts however he ended: with him gone nothing is routed.
+  try {
+    const dyingAgent = ptyToAgent.get(id);
+    if (dyingAgent) {
+      const isMichael = dyingAgent === (hive.registry().godId ?? 'god');
+      const abnormal = (typeof info?.signal === 'number' && info.signal !== 0) || (typeof exitCode === 'number' && exitCode !== 0);
+      if (abnormal || isMichael) {
+        stoppedMembers.set(dyingAgent, {
+          agentId: dyingAgent, isMichael, exitCode: exitCode ?? null, signal: info?.signal ?? null,
+          line: exitLine(info?.tail), at: Date.now()
+        });
+        publishStopped();
+      }
+    }
+  } catch (e) { console.error('[pty] stopped member:', e); }
 
   const pending = pendingInstallRelaunch.get(id);
   if (pending) {
@@ -2358,6 +2376,17 @@ let officeBreakTimer: ReturnType<typeof setTimeout> | null = null;
 function breakClock(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
+
+/** Members whose terminal ended by itself, until they start or report again
+ *  (agentExit.ts, owner 2026-10-30). Not saved: a relaunch starts them. */
+const stoppedMembers = new Map<string, StoppedMember>();
+function publishStopped(): void {
+  try { liveWebContents()?.send('agents:stopped', [...stoppedMembers.values()]); } catch { /* window gone */ }
+}
+function clearStopped(agentId: string | undefined): void {
+  if (agentId && stoppedMembers.delete(agentId)) publishStopped();
+}
+ipcMain.handle('agents:stopped', () => [...stoppedMembers.values()]);
 
 function publishOfficeBreak(): void {
   try { liveWebContents()?.send('office:break', officeBreak.view()); } catch { /* window gone */ }
@@ -4538,12 +4567,16 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // would be rejected and the agent would never start. Swap it for the
     // newest model this CLI knows. Applies to every Claude agent, whichever
     // picker chose the model, since this is the one door all spawns use.
+    // The version is read on every start, so a failure report names it.
+    const cliBin = ptyManager.commandPath(opts.command.trim());
+    // Both probes run at once and are cached per install, so only a first start waits.
+    const cliFlags = claudeCliFlags(cliBin);
+    const cliVersion = await claudeCliVersion(cliBin);
     {
       const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
       const requested = at < 0 ? undefined : args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);
       if (requested && CLAUDE_MODEL_CLI_FLOOR[requested]) {
-        const bin = opts.command.trim();
-        const pick = modelForCli(requested, await claudeCliVersion(ptyManager.commandPath(bin)));
+        const pick = modelForCli(requested, cliVersion);
         if (pick.downgraded) {
           if (args[at] === '--model') args[at + 1] = pick.model; else args[at] = `--model=${pick.model}`;
           console.warn(`[spawn] ${opts.hive.id}: ${pick.downgraded.from} needs Claude Code ${pick.downgraded.need}+, found ${pick.downgraded.have}; running ${pick.model}`);
@@ -4563,7 +4596,9 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // opaque when several agents run at once — especially with remoteControlAtStartup
     // on, where RC auto-enables for every session. Slugify the friendly name into a
     // single safe token; Claude still appends its own random suffix for uniqueness.
-    if (!args.includes('--remote-control-session-name-prefix')) {
+    // Only when this Claude Code lists the option: one that does not know it
+    // exits at once, and the agent never starts (owner, 2026-10-30).
+    if (!args.includes('--remote-control-session-name-prefix') && (await cliFlags)?.has('--remote-control-session-name-prefix')) {
       const label = (opts.hive.name || opts.hive.id || '')
         .trim().replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
       if (label) args.push('--remote-control-session-name-prefix', label);
@@ -4664,6 +4699,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   if (opts.hive?.id) {
     ptyToAgent.set(opts.id, opts.hive.id);
     pausedPty.delete(opts.id);
+    clearStopped(opts.hive.id);
     // Worker inbox-wake watchdog (#151): boot grace starts at spawn so the
     // initial orientation prompt is never mistaken for an idle agent.
     workerWake.noteSpawn(opts.id);
@@ -5767,21 +5803,24 @@ function refreshClaudeConnectors(why: string): Promise<void> {
 }
 
 /** E2: one Ask me card after the update naming the connectors agents could
- *  use before and now cannot, until the owner turns them on. */
+ *  use before and now cannot, until the owner turns them on. A report to
+ *  read, cleared with Got it: there is nothing to answer, and an answer would
+ *  wait on Michael (owner, 2026-10-30: turning one on left the card up). */
 function connectorsUpgradeCard(keys: string[]): void {
   try {
     const now = new Date().toISOString();
     hive.addTask({
       id: 'claude-connectors-update',
       title: 'Claude connectors are now off',
-      status: 'blocked',
+      status: 'done',
       dependsOn: [],
       priority: 2,
       createdAt: now,
       humanQA: [{
         q: `**${keys.join(', ')} ${keys.length === 1 ? 'is' : 'are'} now off for the team.**\n\nAgents used to reach every connector on your Claude account. Now each one is off until you turn it on in [Settings, Connections, Claude connectors](dbm:settings/connections/claude-connectors), and give it to the team members who need it on their Access tab.`,
         askedAt: now,
-        raisedBy: 'god'
+        raisedBy: 'god',
+        kind: 'report'
       }]
     });
   } catch (e) { console.error('[connectors] ask me card:', e); }
@@ -5833,14 +5872,14 @@ ipcMain.handle('connectors:pendingRestarts', () => {
 });
 /** The owner's switch for one connector (QuickBooks keeps quickbooksClaude). */
 ipcMain.handle('connectors:setOn', (_evt, key: unknown, on: unknown) => {
-  if (typeof key !== 'string' || !key) return { ok: false };
+  if (typeof key !== 'string' || !key || isMailConnectorKey(key)) return { ok: false };
   if (isQuickBooksKey(key)) { writeConfig({ quickbooksClaude: on === true }); return { ok: true }; }
   writeConfig({ connectorsOn: { ...(readConfig().connectorsOn ?? {}), [key]: on === true } });
   return { ok: true };
 });
 /** Give or take one connector from one agent. */
 ipcMain.handle('connectors:setGrant', (_evt, agentId: unknown, key: unknown, granted: unknown) => {
-  if (typeof agentId !== 'string' || !agentId || agentId === RESEARCH_ID || typeof key !== 'string' || !key || isQuickBooksKey(key)) return { ok: false };
+  if (typeof agentId !== 'string' || !agentId || agentId === RESEARCH_ID || typeof key !== 'string' || !key || isQuickBooksKey(key) || (granted === true && isMailConnectorKey(key))) return { ok: false };
   const caps = readConfig().agentCapabilities ?? {};
   const cur = caps[agentId]?.connectors ?? [];
   const connectors = granted === true ? [...new Set([...cur, key])] : cur.filter((k) => k !== key);

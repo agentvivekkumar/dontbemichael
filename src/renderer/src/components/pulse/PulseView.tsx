@@ -417,6 +417,8 @@ export function PulseView() {
     const workGrid: CSSProperties = { display: 'grid', alignItems: 'center', gap: 14, gridTemplateColumns: layout === 'wide' ? '190px minmax(0, 1fr) 66px 86px' : layout === 'mid' ? '170px minmax(0, 1fr) 66px 76px' : 'minmax(0, 1fr) minmax(0, 1fr) 60px 70px' };
     // On a plan or an API key the dollars are a real cost; otherwise a pay per use value.
     const costWord = view.plan || view.billing === 'apiKey' ? 'pulse.work.cost' : 'pulse.work.value';
+    // While the plan's rate is learned, no member dollars either (see the Spent tile).
+    const memberMoney = view.planLearning ? (): string => t('pulse.measuring') : money;
     // Emails sent names how many went out approved without edits, only once any were sent (owner, 2026-10-19).
     const outcomeLabel = (o: Outcome): string => t(o.kind === 'sent' && o.total === 0 ? 'pulse.outcome.sentNone' : `pulse.outcome.${o.kind}`, { sub: o.sub ?? 0 });
     const outcomeAria = (o: Outcome): string => `${outcomeLabel(o)}: ${o.by.map((b) => `${nameOf(b.agentId)} ${b.count}`).join(', ')}`;
@@ -490,16 +492,17 @@ export function PulseView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <div style={label}>
                 {t('pulse.whereMoneyWent')}
-                <InfoTip text={view.plan ? t('pulse.plan.tip', { monthly: dollars(view.plan.monthly), payPerUse: money(view.plan.payPerUse) }) : t('pulse.valueTip')} />
+                <InfoTip text={view.plan ? t('pulse.plan.tip', { monthly: dollars(view.plan.monthly), payPerUse: money(view.plan.payPerUse) }) : view.planLearning ? t('pulse.plan.learningTip', { payPerUse: money(s.totalUsd) }) : t('pulse.valueTip')} />
               </div>
-              <div style={{ ...mono, fontSize: 24, fontWeight: 600, lineHeight: '26px' }}>{money(s.totalUsd)}</div>
+              {/* While the plan's rate is learned, no dollar figure: pay per use value would read as what the office spent. */}
+              <div style={{ ...mono, fontSize: 24, fontWeight: 600, lineHeight: '26px' }}>{view.planLearning ? t('pulse.measuring') : money(s.totalUsd)}</div>
               <div style={{ fontSize: 11, color: 'var(--cth-ink-3)', lineHeight: '15px' }}>
                 {view.plan
                   ? t('pulse.plan.ofPlan', { plan: view.plan.label ?? t('pulse.plan.yourPlan'), monthly: dollars(view.plan.monthly) })
-                  : t(view.billing === 'apiKey' ? 'pulse.spentApiKey' : 'pulse.plan.noPrice')}
+                  : t(view.planLearning ? 'pulse.plan.learning' : view.billing === 'apiKey' ? 'pulse.spentApiKey' : 'pulse.plan.noPrice')}
               </div>
             </div>
-            {pv && pair(pv.totalUsd, s.totalUsd, t('pulse.whereMoneyWent'), 'var(--cth-ink-2)', (v) => `$${Math.round(v)}`)}
+            {pv && !view.planLearning && pair(pv.totalUsd, s.totalUsd, t('pulse.whereMoneyWent'), 'var(--cth-ink-2)', (v) => `$${Math.round(v)}`)}
             {view.headroom && (
               <div role="img" aria-label={t('pulse.planAria', { pct: Math.round(view.headroom.usedPct) })} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -580,8 +583,8 @@ export function PulseView() {
       return (
         <div key={m.agentId} role="listitem"><button type="button" onClick={() => setDetail(m.agentId)}
           aria-label={fm && fm.answered < fm.total
-            ? t('pulse.work.rowAriaFoundations', { row: t('pulse.work.rowAria', { name: nameOf(m.agentId), time: duration(m.busyMs, t), value: money(m.usd) }), foundations: t('pulse.foundations.count', { answered: fm.answered, total: fm.total }) })
-            : t('pulse.work.rowAria', { name: nameOf(m.agentId), time: duration(m.busyMs, t), value: money(m.usd) })}
+            ? t('pulse.work.rowAriaFoundations', { row: t('pulse.work.rowAria', { name: nameOf(m.agentId), time: duration(m.busyMs, t), value: memberMoney(m.usd) }), foundations: t('pulse.foundations.count', { answered: fm.answered, total: fm.total }) })
+            : t('pulse.work.rowAria', { name: nameOf(m.agentId), time: duration(m.busyMs, t), value: memberMoney(m.usd) })}
           style={{ ...workGrid, width: '100%', minHeight: 44, border: 'none', borderTop: '1px solid var(--cth-line)', background: 'none', cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--cth-font-ui)', color: 'var(--cth-ink)', padding: 0 }}>
           <span style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0, opacity: quiet ? 0.7 : 1 }}>
             <span style={{ borderRadius: '50%', boxShadow: `0 0 0 1.5px ${color}`, display: 'inline-flex', flex: 'none' }}><AgentAvatar id={m.agentId} name={nameOf(m.agentId)} size={24} /></span>
@@ -602,7 +605,7 @@ export function PulseView() {
             {chip && <span style={{ position: 'absolute', insetInlineEnd: 0, top: -3 }}><WorkChipView chip={chip} /></span>}
           </span>
           <span style={{ ...mono, fontSize: 13, fontWeight: 600, opacity: quiet ? 0.7 : 1 }}>{duration(m.busyMs, t)}</span>
-          <span style={{ ...mono, fontSize: 13, fontWeight: 600, textAlign: 'end' }}>{money(m.usd)}</span>
+          <span style={{ ...mono, fontSize: 13, fontWeight: 600, textAlign: 'end' }}>{memberMoney(m.usd)}</span>
         </button></div>
       );
     };
@@ -742,7 +745,7 @@ export function PulseView() {
               : <div style={{ fontSize: 13, color: 'var(--cth-ink-2)', lineHeight: '19px' }}>
                 {work.topTwo && <b style={{ color: 'var(--cth-ink)' }}>{t('pulse.work.headTop', { a: nameOf(work.topTwo.ids[0]), b: nameOf(work.topTwo.ids[1]), pct: pct(work.topTwo.share) })}</b>}
                 {work.quiet.length > 0 && <> {t(work.quiet.length === 1 ? 'pulse.work.headQuietOne' : 'pulse.work.headQuiet', { names: listNames(work.quiet.map(nameOf)) })}</>}
-                {work.costliest && <> {t('pulse.work.headCostly', { name: nameOf(work.costliest.agentId), usd: money(work.costliest.usd), time: duration(work.costliest.busyMs, t) })}</>}
+                {work.costliest && !view.planLearning && <> {t('pulse.work.headCostly', { name: nameOf(work.costliest.agentId), usd: money(work.costliest.usd), time: duration(work.costliest.busyMs, t) })}</>}
               </div>}
             {rows.length > 0 && (
               <div role="list" aria-label={t('pulse.work.title')} style={{ marginTop: 6 }}>
@@ -818,7 +821,7 @@ export function PulseView() {
       </div>
       <div aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{notice}</div>
       {body}
-      {detail && view && <MemberDetail id={detail} data={view} name={nameOf(detail)} onClose={() => setDetail(null)} money={money} />}
+      {detail && view && <MemberDetail id={detail} data={view} name={nameOf(detail)} onClose={() => setDetail(null)} money={view.planLearning ? (): string => t('pulse.measuring') : money} />}
       {checkedOpen && view && (() => {
         const k = view.keptSafe ?? keptSafe([]);
         const counts = checkedOpen === 'in'
@@ -1404,7 +1407,7 @@ function MemberDetail({ id, data, name, onClose, money }: { id: string; data: Pu
         {m && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
             {fact(t(data.plan || data.billing === 'apiKey' ? 'pulse.work.cost' : 'pulse.value'), money(m.usd), t('pulse.shareOfOffice', { pct: Math.round(m.share * 100) }), t(data.plan ? 'pulse.plan.memberTip' : 'pulse.valueTip'))}
-            {fact(t('pulse.perPiece'), m.costForWork.perPiece !== null ? `$${m.costForWork.perPiece.toFixed(2)}` : '…', m.costForWork.kind ? t(`pulse.per.${m.costForWork.kind}`) : t('pulse.tooFew'), t('pulse.perPieceTip'))}
+            {fact(t('pulse.perPiece'), m.costForWork.perPiece !== null && !data.planLearning ? `$${m.costForWork.perPiece.toFixed(2)}` : '…', m.costForWork.kind ? t(`pulse.per.${m.costForWork.kind}`) : t('pulse.tooFew'), t('pulse.perPieceTip'))}
             {fact(t('pulse.yourTime'), t('pulse.asksCount', { count: m.asks }), m.askWaitMs !== null ? t('pulse.waited', { time: duration(m.askWaitMs, t) }) : '', t('pulse.yourTimeTip'))}
             {fact(t('pulse.keptAsIs'), m.kept.share !== null ? `${Math.round(m.kept.share * 100)}%` : `${m.kept.kept}/${m.kept.decisions}`, t('pulse.keptLine', { kept: m.kept.kept, decisions: m.kept.decisions }), t('pulse.keptTip'))}
             {fact(t('pulse.speed'), m.speedMs !== null ? duration(m.speedMs, t) : '…', t('pulse.speedLine'), t('pulse.speedTip'))}

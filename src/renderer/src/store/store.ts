@@ -27,6 +27,7 @@ import { canOpen } from '../shell/closingFloor';
 import { fileClosedPatch, fileShownPatch, type CenterClaim } from '../shell/wideCenter';
 import { closeTab, openTab, retitleTab, type FileTab, type FixedView } from './fileTabs';
 import { afterLeave, attemptLeave } from './leaveGuard';
+import type { StoppedMember } from '@shared/agentExit';
 
 export type ToolKind =
   | 'Read' | 'Edit' | 'Write' | 'Bash' | 'WebFetch' | 'WebSearch'
@@ -307,6 +308,10 @@ interface State {
   /** The office opening (DESIGN.md 7.24): the Clocking in card and the clock
    *  pill read it; TeamClockingIn.tsx moves it on (shell/clockingIn.ts). */
   opening: OfficeOpening;
+  /** The floor and the right column wait while the office opens at launch
+   *  (owner, 2026-10-30). Only ever goes off, so a restore later in the day
+   *  never takes Ask me away from a working office. */
+  launchLock: boolean;
   /** Per-agent outgoing message queue (agent id → messages awaiting delivery).
    *  Lets the user keep "talking" to a busy agent: messages park here and are
    *  drained to the terminal one-by-one once the agent is free. */
@@ -316,7 +321,15 @@ interface State {
   toolCounts: Record<string, number>;
   bumpToolCount: (id: string) => void;
   setGodStatus: (status: GodStatus) => void;
+  /** Members whose terminal ended by itself, by id, until they start again
+   *  (agentExit.ts, owner 2026-10-30): the opening waits for none of them. */
+  stopped: Record<string, StoppedMember>;
+  setStopped: (list: StoppedMember[]) => void;
+  /** Bumped by Start again on a stopped Michael: his start runs again. */
+  michaelStartRequest: number;
+  requestMichaelStart: () => void;
   setOpening: (opening: OfficeOpening) => void;
+  endLaunchLock: () => void;
   /** A Restore team run opens the office again, card and pill included. */
   reopenOffice: () => void;
   select: (id: string) => void;
@@ -383,6 +396,8 @@ interface State {
   openAgentMemory: (agentId: string) => void;
   /** Open a team member's Profile tab (their schedules), from Pulse. */
   openAgentProfile: (agentId: string) => void;
+  /** A person's Work tab: what their terminal shows. */
+  openAgentWork: (agentId: string) => void;
   /** A member link in agent text (settings-links-in-replies.md): the member's
    *  Access tab opens with Email unfolded and in view, once. */
   openAgentEmail: (agentId: string) => void;
@@ -1010,6 +1025,11 @@ export const useStore = create<State>((set, get) => ({
     persistAgents(s.agents, agentId);
     return { selectedId: agentId, ccTabRequest: { tab: 'profile', seq }, rightColumn: 'person' as const, centerClaim: 'column' as const, ...officeView(s.floorView) };
   })); },
+  openAgentWork: (agentId) => { attemptLeave({ selectedId: agentId, rightColumn: 'person' }, () => set((s) => {
+    const seq = (s.ccTabRequest?.seq ?? 0) + 1;
+    persistAgents(s.agents, agentId);
+    return { selectedId: agentId, ccTabRequest: { tab: 'terminal', seq }, rightColumn: 'person' as const, centerClaim: 'column' as const, ...officeView(s.floorView) };
+  })); },
   openAgentEmail: (agentId) => { attemptLeave({ selectedId: agentId, rightColumn: 'person' }, () => set((s) => {
     const seq = (s.ccTabRequest?.seq ?? 0) + 1;
     persistAgents(s.agents, agentId);
@@ -1084,8 +1104,14 @@ export const useStore = create<State>((set, get) => ({
   bumpToolCount: (id) =>
     set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
+  stopped: {},
+  setStopped: (list) => set({ stopped: Object.fromEntries(list.filter((m) => m && typeof m.agentId === 'string').map((m) => [m.agentId, m])) }),
+  michaelStartRequest: 0,
+  requestMichaelStart: () => set((s) => ({ michaelStartRequest: s.michaelStartRequest + 1 })),
   opening: { kind: 'opening', since: Date.now() },
   setOpening: (opening) => set({ opening }),
+  launchLock: true,
+  endLaunchLock: () => set({ launchLock: false }),
   reopenOffice: () => set({ opening: { kind: 'opening', since: Date.now() } }),
   // A person who has gone home at closing time opens from nowhere (5A).
   select: (id) => { attemptLeave(canOpen(id, get().goneHome) ? { selectedId: id, rightColumn: 'person' } : null, () => set((s) => {

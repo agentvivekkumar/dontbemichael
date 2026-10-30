@@ -106,11 +106,11 @@ business runs on, and each team member works from the one that matches its job.
 - **Connect once.** In Settings, Connections, Mailboxes, add Gmail, Google Workspace, iCloud,
   Yahoo, Zoho or any other IMAP mailbox with an app password. The login is tested before it is
   saved, and the password stays encrypted on your computer, never in a file an agent can read.
-- **Hand it out per team member.** On a team member's Access tab, under Email, choose **Add a
-  mailbox**, pick it, choose **Watch the inbox**, and set **Can send**, **Send on approval** or **Draft only**. Nobody gets a mailbox until you give it one,
-  and each mailbox is watched by one team member: moving it to another asks you first.
-- **Let another team member send from it.** Add a mailbox someone else watches and choose
-  **Send only**, with its own Can send, Send on approval or Draft only.
+- **Hand it out per team member.** On a team member's Access tab, under Email, choose **Give them a
+  mailbox**, pick it, choose **Read and answer email**, and set **Can send**, **Send on approval** or **Draft only**. Nobody gets a mailbox until you give it one,
+  and each mailbox is read by one team member: moving it to another asks you first.
+- **Let another team member send from it.** Give them a mailbox someone else reads and choose
+  **Only send email**, with its own Can send, Send on approval or Draft only.
   Sales can send outreach from the CEO's address without reading the CEO's inbox: replies land
   with the mailbox's own team member, who passes them on. The mailbox shows who else sends from it.
 - **You choose how mail leaves.** Can send goes out at once. Send on approval puts each email on
@@ -226,8 +226,7 @@ member's work live.
 
 Setup asks for your business name, your kind of business, the owner and your headquarters
 address. Contact details, hours and prices are optional and can wait for Settings. Michael then
-shows you around the office and suggests a starter team: you pick who joins and where each one
-works. The last step, Get Michael ready, installs Claude Code if your computer doesn't have it
+suggests a starter team: you pick who joins and where each one works. The last step, Get Michael ready, installs Claude Code if your computer doesn't have it
 and signs you in where you can see it, or takes an Anthropic API key instead.
 
 </td>
@@ -237,11 +236,9 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 </tr>
 <tr>
 <td width="50%">
-  <img src="./branding/reference/studio/onboarding-meet.png" alt="Setup step 3: Michael explains the starter team, how he runs the office, memory and approvals" width="100%">
+  <img src="./branding/reference/studio/onboarding-team.png" alt="Setup step 3: pick your starter team; the office fills with a pod for each person picked" width="100%">
 </td>
-<td width="50%">
-  <img src="./branding/reference/studio/onboarding-team.png" alt="Setup step 4: pick your starter team; the office fills with a pod for each person picked" width="100%">
-</td>
+<td width="50%"></td>
 </tr>
 </table>
 

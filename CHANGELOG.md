@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+- **Clocking in says what is going on.** The card shows a running clock and who is slowest, then whether that member is taking longer than usual or has gone quiet, so a slow start never looks frozen.
+- **Michael stopped card.** If Michael's terminal ends, the floor says so with the line it printed, a Start again button and a way to his Work tab, and Needs you says answers wait for him.
+
+### Changed
+- **The floor and Ask me wait while the office opens at launch**, for at most 70 seconds. Tasks, Pulse, Settings and the message box stay usable, and a Restore team later in the day locks nothing.
+- A team member counts as in once their engine has started, not after their first piece of work, so the count moves within seconds.
+- **Pulse shows what the office really used.** On a Claude plan, cost is the office's own work at the plan's rate, learned from the plan's weekly usage meter and shared across computers, so your other Claude use is never charged to the office. It reads Measuring until the rate is known.
+- **Email connects only through the app's mailboxes.** Gmail, Outlook and other mail on your Claude account no longer show as connectors, and team members cannot use them. An office that used the Claude account's Gmail needs to connect a mailbox.
+- Giving a team member a mailbox asks one plain question, Read and answer email or Only send email, with a short line under each. Only send waits until someone reads that inbox, and with one mailbox the app picks it for you.
+- A mailbox connected to a team member starts on Send on approval instead of Draft only.
+- Desktop notifications are on by default.
+
+### Removed
+- Setup no longer shows the Meet your office screen or the folder step. The Team step explains itself, and you can change the folder later in Settings.
+
+### Fixed
+- Michael starts on a Claude Code that doesn't know an option the app adds for its own convenience, instead of exiting at once.
+- The opening stops waiting for a team member whose terminal ended, and failure reports say why an engine stopped.
+- A new office no longer gets the Claude connectors update card, and that card clears with Got it.
+
 ## [0.3.1] (2026-10-29)
 
 ### Added

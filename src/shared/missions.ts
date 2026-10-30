@@ -112,10 +112,12 @@ const MAIL_CHECK = /\b(?:inbox|mailbox(?:es)?)\b|\b(?:check|read|triage|sort|cle
 
 /** True when `m` is a running job that looks in the mailbox and its agent has
  *  no way to: no mailbox it can use (`email`: email off, or its mailbox removed
- *  in Settings) and no Gmail connector that is on (`gmail`). The hook refuses the mail call, so each run is a wasted turn
- *  (docs/designs/multi-mailbox.md); the schedules say so beside the job. */
-export function cannotCheckEmail(m: ScheduledMission, email: { enabled: boolean } | undefined, gmail = false): boolean {
-  if (!m.enabled || (m.kind ?? 'dispatch') !== 'dispatch' || email?.enabled || gmail) return false;
+ *  in Settings). A Claude account mailbox never counts: mail goes only through
+ *  the app's mailboxes (owner, 2026-10-30). The hook refuses the mail call, so
+ *  each run is a wasted turn (docs/designs/multi-mailbox.md); the schedules say
+ *  so beside the job. */
+export function cannotCheckEmail(m: ScheduledMission, email: { enabled: boolean } | undefined): boolean {
+  if (!m.enabled || (m.kind ?? 'dispatch') !== 'dispatch' || email?.enabled) return false;
   return MAIL_CHECK.test(`${m.label} ${m.focus ?? ''} ${m.body}`);
 }
 
