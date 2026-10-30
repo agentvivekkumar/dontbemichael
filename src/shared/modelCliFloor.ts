@@ -51,13 +51,15 @@ export function modelForCli(model: string, cliVersion: string | null): ModelForC
  * A hook new enough to be missing from a CLI still in use belongs in this list
  * (claude-hook-floor.test.cjs fails until it is).
  *
- * PostToolBatch is in no changelog: 2.1.302 is the oldest version checked live,
- * so it may be older. StopFailure and PostCompact are from the changelog.
+ * Newer ones still stop on a Settings Warning prompt until someone answers it.
+ * PostToolBatch is in no changelog, so its floor is from the releases
+ * themselves: 2.1.117 lacks it, 2.1.118 has it. The other two are from the
+ * changelog.
  */
 export const CLAUDE_HOOK_CLI_FLOOR: Readonly<Record<string, string>> = {
   PostCompact: '2.1.76',
   StopFailure: '2.1.78',
-  PostToolBatch: '2.1.302'
+  PostToolBatch: '2.1.118'
 };
 
 /** A version the probe could not read counts as this old: it loses the newest

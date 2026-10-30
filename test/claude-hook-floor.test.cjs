@@ -38,8 +38,8 @@ test('an older Claude Code gets settings it can read', async () => {
 test('each hook is kept from its floor up, and an unread version loses only the newest', () => {
   // Value: protects=the floor boundary and a failed probe; fails_when=the boundary is off by one, a failed probe keeps a hook an old CLI refuses, or drops the hook that stops the office; why_new=owner 2026-10-30; seam=none; no_claim=the floors themselves
   const all = { Stop: 1, PostCompact: 2, StopFailure: 3, PostToolBatch: 4 };
-  assert.deepEqual(hooksForCli(all, '2.1.302'), all);
-  assert.deepEqual(Object.keys(hooksForCli(all, '2.1.301')), ['Stop', 'PostCompact', 'StopFailure']);
+  assert.deepEqual(hooksForCli(all, '2.1.118'), all);
+  assert.deepEqual(Object.keys(hooksForCli(all, '2.1.117')), ['Stop', 'PostCompact', 'StopFailure']);
   assert.deepEqual(Object.keys(hooksForCli(all, '2.1.77')), ['Stop', 'PostCompact']);
   assert.deepEqual(Object.keys(hooksForCli(all, '2.1.75')), ['Stop']);
   for (const unread of [null, undefined, 'not a version']) assert.deepEqual(Object.keys(hooksForCli(all, unread)), ['Stop', 'PostCompact', 'StopFailure']);
