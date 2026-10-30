@@ -78,11 +78,14 @@ test('a probe that fails takes the answer for its own install, and never another
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-hook-probe-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const once = path.join(dir, 'once');
+  const release = path.join(dir, 'release');
   const shared = path.join(dir, 'claude-shared');
-  fs.writeFileSync(shared, `#!/bin/sh\nif mkdir "${once}" 2>/dev/null; then sleep 0.4; exit 3; fi\necho '2.1.314 (Claude Code)'\n`, { mode: 0o755 });
+  // The first run waits until the second has answered, then fails: a fixed order, no clock.
+  fs.writeFileSync(shared, `#!/bin/sh\nif mkdir "${once}" 2>/dev/null; then i=0; while [ ! -e "${release}" ] && [ $i -lt 80 ]; do sleep 0.05; i=$((i+1)); done; exit 3; fi\necho '2.1.314 (Claude Code)'\n`, { mode: 0o755 });
   const slow = claudeCliVersion(shared);
-  await new Promise((r) => setTimeout(r, 100));
+  while (!fs.existsSync(once)) await new Promise((r) => setTimeout(r, 10));
   assert.equal(await claudeCliVersion(shared), '2.1.314');
+  fs.writeFileSync(release, '');
   assert.equal(await slow, '2.1.314', 'the failed probe takes the answer for this install');
   const broken = path.join(dir, 'claude-broken');
   fs.writeFileSync(broken, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
