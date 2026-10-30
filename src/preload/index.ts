@@ -183,6 +183,8 @@ export interface HiveTask {
   title: string;
   description?: string;
   assignee?: string;
+  /** Why this assignee got the card (issue #248). */
+  assignReason?: string;
   status: 'triage' | 'todo' | 'doing' | 'waiting' | 'blocked' | 'done';
   /** Who a Waiting card waits on (Michael writes it). */
   waitingOn?: string;
@@ -1473,6 +1475,9 @@ const api = {
   /** The owner moves a card; Done is their decision to end it. Michael is told. */
   hiveMoveTask: (id: string, status: HiveTask['status'], reason?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:moveTask', id, status, reason),
+  /** The owner moves a card to another team member so Michael learns (issue #248). */
+  hiveReassignTask: (id: string, assignee: string, reason?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hive:reassignTask', id, assignee, reason),
   /** The owner ends a card: Done, marked "Closed by owner", never deleted. */
   hiveCloseTask: (id: string, reason?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:closeTask', id, reason),

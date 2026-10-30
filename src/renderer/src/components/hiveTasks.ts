@@ -47,6 +47,8 @@ export interface HiveTask {
    *  (owner, 2026-10-11). */
   nextAt?: string;
   assignee?: string;
+  /** Why this assignee got the card (issue #248). */
+  assignReason?: string;
   status: 'todo' | 'doing' | 'waiting' | 'blocked' | 'done';
   /** Who a Waiting card waits on, in a few words (Michael writes it). */
   waitingOn?: string;
@@ -117,6 +119,7 @@ export function parseTasks(raw: unknown): HiveTask[] {
       description: typeof t.description === 'string' ? t.description : undefined,
       nextAt: isNextAt(t.nextAt) ? t.nextAt : undefined,
       assignee: typeof t.assignee === 'string' ? t.assignee : undefined,
+      assignReason: typeof t.assignReason === 'string' && t.assignReason.trim() ? t.assignReason.trim() : undefined,
       status: (['todo', 'doing', 'waiting', 'blocked', 'done'] as const).includes(t.status as TaskStatus)
         ? (t.status as TaskStatus) : 'todo',
       waitingOn: typeof t.waitingOn === 'string' && t.waitingOn.trim() ? t.waitingOn.trim() : undefined,
