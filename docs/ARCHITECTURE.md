@@ -138,8 +138,10 @@ src/
     docText.ts / docTextCli.ts   Word, Excel, PowerPoint, PDF and scan reading; macOcr.ts reads scans and photos with
                              macOS Vision, winOcr.ts with the OCR built into Windows (both through PowerShell or the
                              system's own engine, no bundled Tesseract)
-    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor and the
-                             Claude Code update notice (index.ts records each agent's started version)
+    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor, the hook floor
+                             (shared/modelCliFloor.ts: an agent's settings carry only the hooks that version takes,
+                             and none with a floor when the version can't be read) and the Claude Code update
+                             notice (index.ts records each agent's started version)
     hireCheck.ts             the distinct job check (hidden Claude call, rules as fallback): the hire wizard's, and in
                              change mode Edit agent's, where handoffs between two members are not an overlap
     workStyleConvert.ts      turns a plain work style into an agent's instructions and back, and writes the

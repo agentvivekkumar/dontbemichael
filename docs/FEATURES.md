@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.3.2). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.3.3). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -226,6 +226,14 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.3.3 (2026-10-30)
+
+- Michael starts on an older Claude Code: the app writes only the hooks your version knows, and
+  leaves the newer ones out if it cannot read the version, so nobody meets a Settings Error or
+  Settings Warning. Before 2.1.118, a call the engine refuses shows as running until the turn ends.
+  Before 2.1.78, or on a start where the version could not be read, the app does not hear of a turn
+  cut off by the usage limit, no credit or a failed sign in, so that turn starts no office break.
 
 ### 0.3.2 (2026-10-30)
 

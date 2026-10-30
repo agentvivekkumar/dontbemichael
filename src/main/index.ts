@@ -4403,6 +4403,13 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     console.error(`[spawn] no session scratch folder for ${opts.hive.id}; not started`);
     return { ok: false, error: 'This team member\'s scratch folder could not be made in the app\'s home folder, so they did not start. Check that the app\'s home folder can be written, then try again.' };
   }
+  // The version is read on every start, so a failure report names it, and before
+  // the settings are written, since they hold only the hooks this CLI takes.
+  const cliBin = opts.hive && claudeProvider ? ptyManager.commandPath(opts.command.trim()) : null;
+  // Both probes run at once and are cached per install, so only a first start waits.
+  const cliFlags = claudeCliFlags(cliBin);
+  const cliVersion = await claudeCliVersion(cliBin);
+  if (cliBin && !cliVersion) console.warn(`[spawn] ${opts.hive?.id}: Claude Code version unread, starting without the newer hooks`);
   let connectorsApplied = false;
   if (opts.hive && hive.enabled()) {
     try {
@@ -4449,7 +4456,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
               ...shellTempWalls(process.platform, tmpdir())],
             researchFolders(),
             homedir()
-          )
+          ),
+          cliVersion
         } : {
           knowledgeGraph: knowledge.hasDocuments(),
           // Bake the ABSOLUTE KG CLI path into the agent's prompt. The prompt used
@@ -4481,6 +4489,7 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
           folderPolicy: memberPolicy(),
           docTextCliPath: docTextCliPath(),
           connectors: connectorPlan?.plan,
+          cliVersion,
           // Only Research uses the internet (shared/webAccess.ts): every other
           // team member's shell reaches no host, Michael included (D9.1), in
           // every office (owner, ship 2 D16: the Research agent is the app's one way
@@ -4567,11 +4576,6 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
     // would be rejected and the agent would never start. Swap it for the
     // newest model this CLI knows. Applies to every Claude agent, whichever
     // picker chose the model, since this is the one door all spawns use.
-    // The version is read on every start, so a failure report names it.
-    const cliBin = ptyManager.commandPath(opts.command.trim());
-    // Both probes run at once and are cached per install, so only a first start waits.
-    const cliFlags = claudeCliFlags(cliBin);
-    const cliVersion = await claudeCliVersion(cliBin);
     {
       const at = args.findIndex((a) => a === '--model' || a.startsWith('--model='));
       const requested = at < 0 ? undefined : args[at] === '--model' ? args[at + 1] : args[at].slice('--model='.length);

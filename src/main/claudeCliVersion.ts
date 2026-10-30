@@ -85,5 +85,7 @@ export async function claudeCliVersion(binPath: string | null): Promise<string |
   const version = out ? parseCliVersion(out) : null;
   // Only a real answer is cached: a timeout on a busy machine is worth retrying.
   if (version) { cache.set(key, version); lastKnown = version; }
-  return version;
+  // Starts run side by side: a probe that timed out takes the answer another
+  // start got for this same install, never one from a different install.
+  return version ?? cache.get(key) ?? null;
 }

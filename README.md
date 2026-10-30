@@ -41,10 +41,9 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.3.2: Clocking in says what is going on.**
-> The card shows a clock and who is slowest, and the floor and Ask me wait until everyone is in.
-> Pulse now shows what the office really used, not your whole Claude plan. In 0.3.1, see the
-> original email behind a question.
+> **New in 0.3.3: Michael starts on an older Claude Code.**
+> No more Settings Error or Settings Warning when your Claude Code is behind. In 0.3.2, Clocking in
+> shows a clock and who is slowest, and Pulse shows what the office really used.
 
 ## Contents
 
