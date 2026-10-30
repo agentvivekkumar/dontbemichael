@@ -16,6 +16,7 @@ const { CLAUDE_HOOK_CLI_FLOOR, hooksForCli } = loadTs('src/shared/modelCliFloor.
 const root = path.resolve(__dirname, '..');
 
 const { HiveManager } = loadTs('src/main/hive.ts');
+const { claudeCliVersion, claudeCliFlags } = loadTs('src/main/claudeCliVersion.ts');
 
 async function settingsFor(cliVersion) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-hook-floor-'));
@@ -35,14 +36,14 @@ test('an older Claude Code gets settings it can read', async () => {
   assert.ok(current.hooks.PostToolBatch);
 });
 
-test('each hook is kept from its floor up, and an unread version loses only the newest', () => {
-  // Value: protects=the floor boundary and a failed probe; fails_when=the boundary is off by one, a failed probe keeps a hook an old CLI refuses, or drops the hook that stops the office; why_new=owner 2026-10-30; seam=none; no_claim=the floors themselves
+test('each hook is kept from its floor up, and an unread version keeps none with a floor', () => {
+  // Value: protects=the floor boundary, and a failed probe never brings the Settings Error back; fails_when=the boundary is off by one or a failed probe keeps a hook an old CLI refuses; why_new=owner 2026-10-30 D1; seam=none; no_claim=the floors themselves
   const all = { Stop: 1, PostCompact: 2, StopFailure: 3, PostToolBatch: 4 };
   assert.deepEqual(hooksForCli(all, '2.1.118'), all);
   assert.deepEqual(Object.keys(hooksForCli(all, '2.1.117')), ['Stop', 'PostCompact', 'StopFailure']);
   assert.deepEqual(Object.keys(hooksForCli(all, '2.1.77')), ['Stop', 'PostCompact']);
   assert.deepEqual(Object.keys(hooksForCli(all, '2.1.75')), ['Stop']);
-  for (const unread of [null, undefined, 'not a version']) assert.deepEqual(Object.keys(hooksForCli(all, unread)), ['Stop', 'PostCompact', 'StopFailure']);
+  for (const unread of [null, undefined, 'not a version']) assert.deepEqual(Object.keys(hooksForCli(all, unread)), ['Stop']);
 });
 
 test('a hook the app adds later needs a floor or a place on the old list', () => {
@@ -61,5 +62,14 @@ test('the version is read before the settings are written, for every member', ()
   const main = fs.readFileSync(path.join(root, 'src/main/index.ts'), 'utf8');
   assert.ok(main.indexOf('const cliVersion = await claudeCliVersion(cliBin);') < main.indexOf('const inj = await hive.ensureAgent('));
   const call = main.slice(main.indexOf('const inj = await hive.ensureAgent('), main.indexOf('opts.args = [...(opts.args ?? []), ...inj.args];'));
-  assert.equal(call.match(/^\s+cliVersion,?$/gm)?.length, 2, 'Research and the rest of the team');
+  assert.equal(call.match(/^\s+cliVersion: hookCli,?$/gm)?.length, 2, 'Research and the rest of the team');
+  assert.match(main, /const hookCli = cliVersion \?\? lastClaudeCliVersion\(\);/);
+});
+
+test('a start with no Claude binary runs no probe, and a missing one answers unknown', async () => {
+  // Value: protects=the earlier probe cannot fail a start; fails_when=a null or missing binary rejects instead of answering null; why_new=the probe now runs before every Claude start's settings; seam=none; no_claim=a real slow machine
+  for (const bin of [null, path.join(os.tmpdir(), 'md-no-such-claude')]) {
+    assert.equal(await claudeCliVersion(bin), null);
+    assert.equal(await claudeCliFlags(bin), null);
+  }
 });

@@ -62,17 +62,14 @@ export const CLAUDE_HOOK_CLI_FLOOR: Readonly<Record<string, string>> = {
   PostToolBatch: '2.1.118'
 };
 
-/** A version the probe could not read counts as this old: it loses the newest
- *  hook, a small thing beside a refused file, and keeps the one that stops the
- *  office on a usage limit. */
-const UNKNOWN_CLI = '2.1.78';
-
-/** The hooks this Claude Code takes, the rest left out. */
+/** The hooks this Claude Code takes, the rest left out. A version nobody could
+ *  read leaves out every hook with a floor: a missing hook costs far less than
+ *  a refused file. */
 export function hooksForCli<T>(hooks: Record<string, T>, cliVersion: string | null | undefined): Record<string, T> {
-  const have = cliVersion && /\d+\.\d+\.\d+/.test(cliVersion) ? cliVersion : UNKNOWN_CLI;
+  const have = cliVersion && /\d+\.\d+\.\d+/.test(cliVersion) ? cliVersion : null;
   return Object.fromEntries(Object.entries(hooks).filter(([event]) => {
     const min = CLAUDE_HOOK_CLI_FLOOR[event];
-    return !min || !isNewer(min, have);
+    return !min || (!!have && !isNewer(min, have));
   }));
 }
 

@@ -184,7 +184,7 @@ test('the hook server passes on the usage limit, the reset times and finished tu
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md office break '));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const hive = new HiveManager(() => home);
-  const inj = await hive.ensureAgent({ id: 'a1', name: 'Sales', provider: 'claude', cwd: home });
+  const inj = await hive.ensureAgent({ id: 'a1', name: 'Sales', provider: 'claude', cwd: home }, { cliVersion: '2.1.314' });
   const signals = [];
   const server = new HookServer(hive, () => null, () => ({ notifications: false }), undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, (s) => signals.push(s));
   const rl = { five_hour: { used_percentage: 23.5, resets_at: 1738425600 } };
