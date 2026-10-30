@@ -132,7 +132,7 @@ const DETAIL: Readonly<Record<FailureKind, (d: string) => boolean>> = {
   'router-throw': (d) => ERROR_CODE.test(d),
   'bridge-install': (d) => ERROR_CODE.test(d),
   'hook-server': (d) => ERROR_CODE.test(d),
-  'agent-exit': (d) => /^(SIG[A-Z0-9]{2,8}|code-([1-9]\d?|1\d\d|2[0-4]\d|25[0-5])|other)$/.test(d),
+  'agent-exit': (d) => /^(SIG[A-Z0-9]{2,8}|code-([1-9]\d?|1\d\d|2[0-4]\d|25[0-5])|other)(:(unknown-option|signed-out|not-found|other))?$/.test(d),
   'loop-messages': (d) => d === 'hop-cap',
   'loop-agent': (d) => /^(repeat|error-storm|velocity|no-progress):(constrained|stopped)$/.test(d),
   'outbox-bad': (d) => d === 'malformed-json' || d === 'outbox-not-a-file',
@@ -180,7 +180,11 @@ export function classifyLogEvent(
     const detail = sig && /^SIG[A-Z0-9]{2,8}$/.test(sig) ? sig
       : code !== null && Number.isInteger(code) && code >= 1 && code <= 255 ? `code-${code}`
       : 'other';
-    return { kind: 'agent-exit', detail };
+    // What its output said (agentExit.ts), so each cause is its own report
+    // (owner, 2026-10-30: "code-1" alone could not tell an unknown option from
+    // a sign in).
+    const cause = typeof e.cause === 'string' && /^(unknown-option|signed-out|not-found|other)$/.test(e.cause) ? `:${e.cause}` : '';
+    return { kind: 'agent-exit', detail: detail + cause };
   }
   if (kind === 'proxy-degraded') return { kind: 'proxy-degraded', detail: 'proxy-bind' };
   if (kind === 'hook-server-error') {

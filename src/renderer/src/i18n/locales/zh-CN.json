@@ -744,36 +744,6 @@
       "continue": "继续使用这个办公室",
       "startNew": "新建一个办公室"
     },
-    "welcome": {
-      "headline": "您的经理和他打理的办公室",
-      "desc": "{{godName}} 是您的办公室经理。他为您带着一支 AI 员工小团队，您在一个屏幕上就能看到全部。里面有什么：",
-      "features": {
-        "team": {
-          "label": "您的起步团队",
-          "desc": "{{godName}} 会根据您的生意类型推荐一支团队。由您决定谁加入，之后也可以随时增减人手。"
-        },
-        "manager": {
-          "label": "{{godName}} 打理办公室",
-          "desc": "您的办公室经理 {{godName}} 接收您的要求，把每件事交给合适的团队成员，只在关键时刻打扰您。"
-        },
-        "memory": {
-          "label": "他们记得住",
-          "desc": "您的团队记得您交代过的事和已经做过的工作，同样的事不用再解释第二遍。"
-        },
-        "commandCenter": {
-          "label": "一切尽在眼前",
-          "desc": "一个屏幕就能看到每个人在忙什么、做完了什么、有什么在等您处理。"
-        },
-        "guardrails": {
-          "label": "您说了算",
-          "desc": "在网上发帖或任何要花钱的事，您的团队都会先问您；邮件只按您设定的方式发出。哪些事可以让他们自己做，由您决定。"
-        },
-        "hires": {
-          "label": "随时加人手",
-          "desc": "需要多一个帮手？一键添加现成的团队成员，无需任何设置。"
-        }
-      }
-    },
     "providerBlurb": {
       "claude": "Claude Code (Anthropic)",
       "codex": "Codex (OpenAI)",
@@ -849,6 +819,7 @@
     },
     "team": {
       "intro": "为{{pack}}推荐的团队。想选谁就选谁，之后还可以再招人。",
+      "introTip": "{{godName}} 会把每项工作交给团队中合适的人。你的团队会记住你告诉他们的事，在网上发布内容或花钱之前会先问你，你可以在一个屏幕上看到他们的所有工作。",
       "introOther": "先从 {{godName}} 和 Oscar 开始。办公室运转起来后，{{godName}} 会问您几个问题，并建议还需要招谁。",
       "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}，也就是 {{godName}} 的文件夹。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里，只有他们本人和 {{godName}} 能打开。公司范围的信息、政策和规定请放在“设置 > 记忆与知识”里，每位成员都能搜索。",
       "managerName": "{{godName}} · 办公室经理",
@@ -863,7 +834,6 @@
       "useSuggested": "使用建议位置",
       "sharedFolder": "包含所有人的文件夹",
       "summary": "已选 {{picked}} 人 · 需连接 {{connect}} 个账号",
-      "suggestCta": "推荐我的团队",
       "errFolder": "无法设置 {{path}}：{{reason}}",
       "errNoFolders": "无法确定团队文件夹的位置。请返回检查您的企业名称。",
       "errMichaelFolder": "这个文件夹不能用来存放您的办公室。请选择一个单独的文件夹，不要选主文件夹或系统文件夹。",
@@ -888,7 +858,6 @@
       "resume": "欢迎回来",
       "business": "你的企业",
       "details": "公司信息",
-      "welcome": "认识你的办公室",
       "team": "你的团队",
       "home": "应用的位置",
       "orchestrator": "你的经理",
@@ -924,8 +893,21 @@
       "allIn": "全员到齐",
       "missingOne": "{{name}} 还没打卡。",
       "missingMore": "{{name}} 和另外 {{count}} 人还没打卡。",
+      "floorWaits": "大家都到后，办公室才会开放。",
+      "wait": {
+        "time": "已过 {{seconds}} 秒。",
+        "slowest": "已过 {{seconds}} 秒。{{name}} 最慢。",
+        "longer": "已过 {{seconds}} 秒。{{name}} 用时比平时长。",
+        "quiet": "已过 {{seconds}} 秒。{{name}} 没有动静。"
+      },
       "michael": "{{name}} 正在打卡上班",
       "michaelLine": "{{name}} 正在角落办公室安顿下来，为大家准备好办公区。请稍候…"
+    },
+    "stopped": {
+      "title": "{{name}} 已停止",
+      "noLine": "{{name}} 的终端已关闭，没有说明原因。",
+      "startAgain": "重新启动",
+      "seeWork": "打开工作标签页"
     },
     "clockedInCount": "已到 {{count}} / {{total}}",
     "gpuError": "办公楼层丢失了 GPU 上下文。\n\n同时使用 GPU 的终端太多了。\n关闭几个智能体终端，或重启应用，即可恢复。",
@@ -2062,14 +2044,13 @@
       "zoho": "Zoho 需要在“安全”中的“应用密码”创建应用专用密码，并在邮件设置中开启 IMAP。",
       "other": "你的邮件服务商会在帮助页面列出这些服务器。如果普通密码被拒绝，请向他们申请应用专用密码。"
     },
-    "gmailIsConnector": "你 Claude 账户里的 Gmail 在「Claude 连接器」中。"
+    "onlyHere": "团队只通过这里连接的邮箱收发邮件，从不使用你的 Claude 账户。"
   },
   "capabilities": {
-    "addHow": "{{name}} 怎样使用它",
-    "addMailboxBothUsed": "{{name}} 已负责一个邮箱，并从另一个仅发信。",
+    "addHow": "{{name}} 要用它做什么？",
+    "addMailboxBothUsed": "{{name}} 已阅读一个邮箱，并从另一个只发邮件。",
     "addMailboxNoneLeft": "在设置中连接另一个。",
-    "removeWatchedSure": "要移除 {{address}} 吗？{{names}} 的仅发信权限会暂停，直到有人负责它。",
-    "addMailboxInfo": "负责收件箱：{{name}} 阅读、归档并回复其中的邮件。仅发信：{{name}} 用这个地址发信，收件箱仍由负责人管理并转达回复。",
+    "removeWatchedSure": "要移除 {{address}} 吗？在有人阅读它之前，{{names}} 无法从它发信。",
     "intro": "{{name}} 无需询问就可以做的事，以及 {{name}} 按时间运行的工作。",
     "email": "邮件",
     "emailBlurb": "{{name}} 使用的邮箱地址，以及每个地址的邮件怎样发出。",
@@ -2082,26 +2063,28 @@
     "recentSends": "最近从这里发出",
     "recentSend": "{{subject}}，发给 {{to}}，{{date}}",
     "cancelAdd": "取消",
-    "addIt": "添加",
-    "addSendOnlyTaken": "{{name}} 已从 {{address}} 仅发信。每人一个。",
-    "addSendOnlyNobody": "目前没有人负责它，所以邮件会等到有人负责后再发。",
-    "addSendOnly": "仅发信",
-    "addWatchMoves": "目前由 {{from}} 负责。你确认后转给 {{name}}。",
-    "addWatchTaken": "{{name}} 已负责 {{address}}。每人一个。",
-    "addWatch": "负责收件箱",
-    "addMailboxUse": "添加邮箱",
+    "addIt": "交给 {{name}}",
+    "addSendOnlyTaken": "{{name}} 已从 {{address}} 只发邮件。每人一个。",
+    "addSendOnlyNobody": "需要先有人阅读这个收件箱。",
+    "addSendOnly": "只发邮件",
+    "addReadsDesc": "{{name}} 阅读收到的邮件，整理并回复。",
+    "addSendsDesc": "{{name}} 用这个地址发信，但不能阅读这个邮箱。{{holder}} 阅读回复并转达。",
+    "addWatchMoves": "目前由 {{from}} 阅读。你确认后转给 {{name}}。",
+    "addWatchTaken": "{{name}} 已在阅读 {{address}}。每人一个。",
+    "addWatch": "阅读并回复邮件",
+    "addMailboxUse": "给 {{name}} 一个邮箱",
     "sendingFrom": "从 {{address}} 发信",
-    "inboxNobody": "没有人负责。{{name}} 仅发信。",
-    "inboxSendOnly": "由 {{holder}} 负责。{{name}} 仅发信。",
-    "inboxWatches": "由 {{name}} 负责",
+    "inboxNobody": "没有人阅读。{{name}} 只发邮件。",
+    "inboxSendOnly": "{{holder}} 阅读。{{name}} 只发邮件。",
+    "inboxWatches": "{{name}} 阅读并回复",
     "inbox": "收件箱",
     "removeMailbox": "移除",
     "emailNone": "{{name}} 还没有使用邮箱。",
     "emailSummaryNone": "无",
     "emailSummary": "邮箱：{{count}}",
-    "sendOnlyPaused": "已暂停：{{name}} 从这里发的邮件会等到有人负责这个收件箱。",
+    "sendOnlyPaused": "已暂停：{{name}} 从这里发的邮件会等到有人阅读这个收件箱。",
     "alsoSendsFromHere": "也从这里发信：{{names}}",
-    "sendOnlyUse": "{{address}}（仅发信，{{sending}}）",
+    "sendOnlyUse": "{{address}}（只发邮件，{{sending}}）",
     "standingLast": "已发送 {{count}} 封，最近一封：{{subject}}",
     "standingRevoke": "撤销",
     "draftOnly": "仅草稿",
@@ -2117,7 +2100,7 @@
     "pickMailbox": "选择一个邮箱",
     "addMailbox": "在设置中连接另一个",
     "heldBy": "{{name}} 正在使用",
-    "moveMailbox": "{{from}} 正在查看 {{address}}。改给 {{to}} 吗？{{from}} 将不再查看邮件。",
+    "moveMailbox": "{{from}} 正在阅读 {{address}}。改给 {{to}} 吗？{{from}} 将不再阅读它。",
     "moveMailboxFree": "使用 {{address}}？",
     "moveIt": "改给他",
     "keepIt": "保持不变",
@@ -2172,6 +2155,8 @@
     "needsYou": "需要你处理",
     "nothingNeedsYou": "暂无需要你处理的事",
     "needsYouInfo": "只有 {{godName}} 自己解决不了的事才会找你。在这里回答，工作就会继续。",
+    "michaelStopped": "{{godName}} 没有在运行。你的回答会等到 {{godName}} 重新启动后再处理。",
+    "answersWait": "大家都到后才能回答。",
     "needsYouAnnounce": "{{godName}} 需要你：{{count}}",
     "allClear": "全部处理完毕。",
     "allClearLine1": "{{godName}} 说团队还能接更多活。",
@@ -2783,7 +2768,7 @@
     },
     "work": {
       "title": "团队工作情况",
-      "tip": "工作时间从成员接到每个请求起，到其最后一次回复为止，每个请求最多计一小时。成本为每位成员按工作份额分摊的套餐费用。",
+      "tip": "工作时间从成员接到每个请求起，到其最后一次回复为止，每个请求最多计一小时。成本为每位成员自身工作按套餐费率计算的费用。",
       "nobody": {
         "today": "今天还没有人工作。",
         "this-week": "本周还没有人工作。",
@@ -2816,9 +2801,11 @@
     },
     "plan": {
       "yourPlan": "Claude 套餐",
-      "tip": "你的套餐每月 {{monthly}}。这是本期已过天数对应的费用，按每位成员完成的工作量分摊。同样的工作按用量付费需 {{payPerUse}}。",
+      "tip": "办公室在你的套餐（每月 {{monthly}}）中所占的部分：按其工作占用套餐每周用量计的多少来计价。你在其他地方使用 Claude 的部分不计入。同样的工作按用量付费需 {{payPerUse}}。",
       "noPrice": "按用量付费价格计算。在设置中填写你的套餐价格，即可看到工作的真实成本。",
-      "memberTip": "该成员在本期按其工作份额分摊的套餐费用。",
+      "learning": "正在了解你的套餐费率",
+      "learningTip": "办公室工作时，Pulse 会根据套餐的每周用量计了解套餐工作的费用，通常几天内完成。在此之前：按用量付费价格为 {{payPerUse}}。",
+      "memberTip": "该成员本期自身工作所占用的套餐费用。",
       "ofPlan": "来自你的 {{plan}}（每月 {{monthly}}）"
     },
     "typicalWait": "通常等待",

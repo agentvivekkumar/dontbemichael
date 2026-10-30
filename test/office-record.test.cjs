@@ -459,7 +459,7 @@ test('a team folder that is a link to the home folder counts as the home folder'
 
 test('setup checks a folder picked by hand, and team start finds members in any pack', () => {
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(wiz, /if \(step === 'home'\) \{\s*setBusy\(true\);\s*const f = await window\.cth\.officeFind\(home\.trim\(\)\)/);
+  assert.match(wiz, /if \(step === 'team' \|\| step === 'home'\) \{\s*const where = home\.trim\(\);[\s\S]*?setBusy\(true\);\s*const f = await window\.cth\.officeFind\(where\)/);
   assert.match(wiz, /setError\(t\('onboarding\.resume\.folderInUse'\)\);/);
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /for \(const p of \[pack, \.\.\.packs\.map\(\(x\) => x\.pack\), core\]\)/);
@@ -483,6 +483,6 @@ test('an unknown business type picks the pack that holds most of the team; a fai
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /\?\? byTeam \?\? core;/);
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(wiz, /if \(!f\) \{ setError\(t\('onboarding\.resume\.folderCheckFailed'\)\); return; \}/);
+  assert.match(wiz, /if \(!f\) \{ setError\(t\('onboarding\.resume\.folderCheckFailed'\)\); setStep\('home'\); return; \}/);
   assert.match(wiz, /disabled=\{busy \|\| \(step === 'orchestrator' && engineBlocked\)\}/);
 });

@@ -43,6 +43,11 @@ export function modelForCli(model: string, cliVersion: string | null): ModelForC
   return { model: floor.fallback, downgraded: { from: model, need: floor.min, have: cliVersion } };
 }
 
+/** The long options `claude --help` lists ("--remote-control-session-name-prefix <prefix>"). */
+export function parseCliFlags(help: string): Set<string> {
+  return new Set([...help.matchAll(/(?:^|[\s,])(--[a-zA-Z][a-zA-Z0-9-]*)/g)].map((m) => m[1]));
+}
+
 /** Pull `2.1.280` out of `claude --version` output ("2.1.280 (Claude Code)"). */
 export function parseCliVersion(output: string): string | null {
   const m = /(\d+\.\d+\.\d+)/.exec(output);

@@ -101,7 +101,7 @@ export function MailboxesSettings({ focus }: { focus?: { add?: boolean; seq: num
           </span>
           {needs > 0 && <span style={{ ...badge, ...needsBadge }}><Dot color="var(--cth-coral)" />{t('mailboxes.needsCount', { count: needs })}</span>}
         </button>
-        <InfoTip label={t('mailboxes.title')} text={`${t('mailboxes.intro')}${mailboxes.length ? '' : ` ${t('mailboxes.empty')}`} ${t('mailboxes.gmailIsConnector')}`} />
+        <InfoTip label={t('mailboxes.title')} text={`${t('mailboxes.intro')}${mailboxes.length ? '' : ` ${t('mailboxes.empty')}`} ${t('mailboxes.onlyHere')}`} />
         <span style={{ flex: 1 }} />
         <span data-focus="add"><PixelButton variant="primary" size="sm" onClick={() => setDialog({})}>{t('mailboxes.add')}</PixelButton></span>
       </div>

@@ -39,9 +39,8 @@ export function agentAccessSummary(cfg: MailAccessConfig & ConnectorConfig, agen
 
 /**
  * The same access in one line for Michael's roster, with the screen each part
- * comes from, so a team member's mail limit is never blamed on the wrong one
- * (owner, 2026-10-03: an office may use the app's own Mailboxes, Claude
- * connectors such as Gmail, or both). The mailbox is connected in Settings, but
+ * comes from, so a team member's mail limit is never blamed on the wrong one.
+ * The mailbox is connected in Settings, but
  * Can send or Draft only is the member's own Access tab: the connection itself
  * can send (owner, 2026-10-05). Null when the agent has none.
  */

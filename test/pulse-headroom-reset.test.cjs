@@ -23,7 +23,7 @@ function service(clock) {
     firstNoteAdded: () => null, notesAdded: () => [], running: () => ({ points: [], since: null })
   };
   return new PulseService({
-    db: () => db, store: { failureDays: () => [], record() {} }, processor,
+    db: () => db, store: { failureDays: () => [], record() {}, meter() {} }, processor,
     office: () => '/office', members: () => [], godId: () => null, tasks: () => [], missions: () => [],
     models: () => [], ladder: () => [], priceOf: () => undefined, applyMissions: () => ({ ok: true }),
     billing: () => 'account', plan: () => null, memory: () => ({ notes: [], procedures: {} }), now: () => clock.now

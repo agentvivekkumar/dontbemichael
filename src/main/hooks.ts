@@ -762,7 +762,8 @@ export class HookServer {
 
     // Mailboxes added in Settings (md-mail): the agent's Capabilities for the
     // mailbox named in the call (the broker checks it again). The Claude
-    // account's Gmail and Calendar are connectors like any other, above.
+    // account's Calendar is a connector like any other, above; its Gmail is
+    // always refused there.
     if (event === 'PreToolUse' && agentId && /^mcp__md-mail__/.test(p.tool_name ?? '')) {
       const cfg = mcpConfig();
       const mdMail = /^mcp__md-mail__([a-z_]+)$/.exec(p.tool_name ?? '');

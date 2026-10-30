@@ -744,36 +744,6 @@
       "continue": "Continue with this office",
       "startNew": "Set up a new office"
     },
-    "welcome": {
-      "headline": "Your manager and the floor he runs",
-      "desc": "{{godName}} is your office manager. He runs a small team of AI workers for you, and you watch it all from one screen. Here's what's inside:",
-      "features": {
-        "team": {
-          "label": "Your starter team",
-          "desc": "{{godName}} suggests a team suited to the kind of business you run. You pick who joins, and can add or remove anyone later."
-        },
-        "manager": {
-          "label": "{{godName}} runs the floor",
-          "desc": "{{godName}}, your office manager, takes your requests, hands each job to the right team member, and only interrupts you when it matters."
-        },
-        "memory": {
-          "label": "They remember",
-          "desc": "Your team remembers what you've told them and what they've already done, so you never have to explain things twice."
-        },
-        "commandCenter": {
-          "label": "Everything in view",
-          "desc": "One screen shows what everyone is working on, what's finished, and what's waiting for you."
-        },
-        "guardrails": {
-          "label": "You stay in charge",
-          "desc": "Your team asks before posting online or anything that costs money, and sends email only the way you set it. You decide what they can do on their own."
-        },
-        "hires": {
-          "label": "Extra help anytime",
-          "desc": "Need another pair of hands? Add a team member in one click. No setup needed."
-        }
-      }
-    },
     "providerBlurb": {
       "claude": "Claude Code (Anthropic)",
       "codex": "Codex (OpenAI)",
@@ -849,6 +819,7 @@
     },
     "team": {
       "intro": "Suggested for {{pack}}. Pick whoever you want, and you can hire more later.",
+      "introTip": "{{godName}} hands each job to the right person on your team. Your team remembers what you tell them, asks before posting online or spending money, and you see all their work on one screen.",
       "introOther": "Start with {{godName}} and Oscar. Once your office is running, {{godName}} will ask you a few questions and suggest who else to hire.",
       "folderNote": "Everyone works in their own folder, inside {{root}}, which is {{godName}}'s. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. Company wide information, policies and rules go in Settings, Memory & Knowledge, where every team member can search them.",
       "managerName": "{{godName}} · Office Manager",
@@ -863,7 +834,6 @@
       "useSuggested": "use suggested",
       "sharedFolder": "holds everyone's folders",
       "summary": "{{picked}} picked · {{connect}} to connect",
-      "suggestCta": "Suggest my team",
       "errFolder": "Couldn't set up {{path}}: {{reason}}",
       "errNoFolders": "Couldn't work out where your team's folders go. Go back and check your business name.",
       "errMichaelFolder": "That folder can't hold your office. Pick a folder of its own, not your home folder or a system folder.",
@@ -888,7 +858,6 @@
       "resume": "Welcome back",
       "business": "Your business",
       "details": "Company details",
-      "welcome": "Meet your office",
       "team": "Your team",
       "home": "A home for the app",
       "orchestrator": "Your manager",
@@ -924,8 +893,21 @@
       "allIn": "Everyone's in",
       "missingOne": "{{name}} hasn't clocked in.",
       "missingMore": "{{name}} and {{count}} more haven't clocked in.",
+      "floorWaits": "The floor opens when everyone's in.",
+      "wait": {
+        "time": "{{seconds}} seconds so far.",
+        "slowest": "{{seconds}} seconds so far. {{name}} is the slowest.",
+        "longer": "{{seconds}} seconds so far. {{name}} is taking longer than usual.",
+        "quiet": "{{seconds}} seconds so far. {{name}} has gone quiet."
+      },
       "michael": "{{name}} is clocking in",
       "michaelLine": "{{name}} is settling into the corner office and getting the floor ready. Hang tight…"
+    },
+    "stopped": {
+      "title": "{{name}} stopped",
+      "noLine": "{{name}}'s terminal closed without saying why.",
+      "startAgain": "Start again",
+      "seeWork": "Open Work tab"
     },
     "clockedInCount": "{{count}} of {{total}} in",
     "gpuError": "The office floor lost its GPU context.\n\nToo many terminals are using the GPU at once.\nClose a few agent terminals, or restart the app, to bring it back.",
@@ -2062,14 +2044,13 @@
       "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
       "other": "Your email host lists these servers in its help pages. If your normal password is refused, ask them for an app password."
     },
-    "gmailIsConnector": "Gmail on your Claude account is under Claude connectors."
+    "onlyHere": "Email reaches the team only through the mailboxes connected here, never through your Claude account."
   },
   "capabilities": {
-    "addHow": "How {{name}} uses it",
-    "addMailboxBothUsed": "{{name}} already watches one and sends only from one.",
+    "addHow": "What should {{name}} do with it?",
+    "addMailboxBothUsed": "{{name}} already reads one mailbox and only sends from another.",
     "addMailboxNoneLeft": "Connect another in Settings.",
-    "removeWatchedSure": "Remove {{address}}? Send only access for {{names}} pauses until someone watches it.",
-    "addMailboxInfo": "Watch the inbox: {{name}} reads, files and answers its email. Send only: {{name}} writes from the address while its owner keeps the inbox and passes on replies.",
+    "removeWatchedSure": "Remove {{address}}? {{names}} can't send from it until someone reads it.",
     "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
     "email": "Email",
     "emailBlurb": "The addresses {{name}} uses, and how email from each one leaves.",
@@ -2082,26 +2063,28 @@
     "recentSends": "Sent from here lately",
     "recentSend": "{{subject}}, to {{to}}, {{date}}",
     "cancelAdd": "Cancel",
-    "addIt": "Add",
-    "addSendOnlyTaken": "{{name}} already sends only from {{address}}. One each.",
-    "addSendOnlyNobody": "Nobody watches it yet, so its email waits until someone does.",
-    "addSendOnly": "Send only",
-    "addWatchMoves": "{{from}} watches it now. It moves to {{name}} after you confirm.",
-    "addWatchTaken": "{{name}} already watches {{address}}. One each.",
-    "addWatch": "Watch the inbox",
-    "addMailboxUse": "Add a mailbox",
+    "addIt": "Give to {{name}}",
+    "addSendOnlyTaken": "{{name}} already only sends from {{address}}. One each.",
+    "addSendOnlyNobody": "Someone needs to read this inbox first.",
+    "addSendOnly": "Only send email",
+    "addReadsDesc": "{{name}} reads what comes in, sorts it and replies.",
+    "addSendsDesc": "{{name}} sends from this address but cannot read it. {{holder}} reads the replies and passes them on.",
+    "addWatchMoves": "{{from}} reads it now. It moves to {{name}} after you confirm.",
+    "addWatchTaken": "{{name}} already reads {{address}}. One each.",
+    "addWatch": "Read and answer email",
+    "addMailboxUse": "Give {{name}} a mailbox",
     "sendingFrom": "Sending from {{address}}",
-    "inboxNobody": "Nobody watches it. {{name}} sends only.",
-    "inboxSendOnly": "{{holder}} watches it. {{name}} sends only.",
-    "inboxWatches": "{{name}} watches it",
+    "inboxNobody": "Nobody reads it. {{name}} only sends.",
+    "inboxSendOnly": "{{holder}} reads it. {{name}} only sends.",
+    "inboxWatches": "{{name}} reads and answers it",
     "inbox": "Inbox",
     "removeMailbox": "Remove",
     "emailNone": "{{name}} doesn't use email yet.",
     "emailSummaryNone": "None",
     "emailSummary": "Mailboxes: {{count}}",
-    "sendOnlyPaused": "Paused: {{name}}'s email from here waits until someone watches this inbox.",
+    "sendOnlyPaused": "Paused: {{name}}'s email from here waits until someone reads this inbox.",
     "alsoSendsFromHere": "Also sends from here: {{names}}",
-    "sendOnlyUse": "{{address}} (send only, {{sending}})",
+    "sendOnlyUse": "{{address}} (only sends, {{sending}})",
     "standingLast": "Sent {{count}} so far, latest: {{subject}}",
     "standingRevoke": "Revoke",
     "draftOnly": "Draft only",
@@ -2117,7 +2100,7 @@
     "pickMailbox": "Pick a mailbox",
     "addMailbox": "Connect another in Settings",
     "heldBy": "{{name}} has this",
-    "moveMailbox": "{{from}} checks {{address}}. Move it to {{to}}? {{from}} stops checking email.",
+    "moveMailbox": "{{from}} reads {{address}}. Move it to {{to}}? {{from}} stops reading it.",
     "moveMailboxFree": "Use {{address}}?",
     "moveIt": "Move it",
     "keepIt": "Keep it",
@@ -2172,6 +2155,8 @@
     "needsYou": "Needs you",
     "nothingNeedsYou": "Nothing needs you",
     "needsYouInfo": "{{godName}} asks you only when he can't settle something himself. Answer here and the work carries on.",
+    "michaelStopped": "{{godName}} isn't running. Your answers wait until {{godName}} starts again.",
+    "answersWait": "Your answers open when everyone's in.",
     "needsYouAnnounce": "{{godName}} needs you: {{count}}",
     "allClear": "All clear.",
     "allClearLine1": "{{godName}} says the team has room for more.",
@@ -2783,7 +2768,7 @@
     },
     "work": {
       "title": "Team at work",
-      "tip": "Working time runs from each request a member takes to its last reply, up to an hour each. Cost is each member's part of your plan by their share of the work.",
+      "tip": "Working time runs from each request a member takes to its last reply, up to an hour each. Cost is each member's own work at your plan's rate.",
       "nobody": {
         "today": "Nobody has worked yet today.",
         "this-week": "Nobody has worked yet this week.",
@@ -2816,9 +2801,11 @@
     },
     "plan": {
       "yourPlan": "Claude plan",
-      "tip": "Your plan costs {{monthly}} a month. This is its share for the days so far in this period, split by how much of the work each member did. The same work would cost {{payPerUse}} at pay per use prices.",
+      "tip": "The office's own share of your plan ({{monthly}} a month): its work, priced by how much of the plan's weekly usage meter that work fills. Your other Claude use is not counted. The same work costs {{payPerUse}} at pay per use prices.",
       "noPrice": "at pay per use prices. Set your plan's price in Settings to see what the work really costs.",
-      "memberTip": "This member's part of your plan's cost for the period, by their share of the work.",
+      "learning": "learning your plan's rate",
+      "learningTip": "Pulse learns what your plan's work costs from the plan's weekly usage meter while the office works, usually within a few days. Until then: {{payPerUse}} at pay per use prices.",
+      "memberTip": "What this member's own work cost of your plan in the period.",
       "ofPlan": "of your {{plan}} ({{monthly}} a month)"
     },
     "typicalWait": "typical wait",

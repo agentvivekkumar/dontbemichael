@@ -1,4 +1,4 @@
-- **See the original email** behind a question or reply.
-- Send with my changes asks for your words.
-- A forward still goes out after its email is archived.
-- Dropbox and iCloud folders keep their privacy wall.
+- **Clocking in shows** a clock and who is slowest.
+- **Pulse shows** what the office really used.
+- Email connects only through the app's mailboxes.
+- If Michael stops, the office says why.

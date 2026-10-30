@@ -36,10 +36,10 @@ export interface OnboardingWizardProps {
   onComplete: (config: HarnessConfig) => void;
   /** Open on a later step with the first answers filled in. Only for the
    *  reference screens (tools/studio-lab/reference.tsx); the app never sets it. */
-  preview?: { step: 'business' | 'welcome' | 'team' | 'ready'; businessType: string; businessName: string };
+  preview?: { step: 'business' | 'team' | 'ready'; businessType: string; businessName: string };
 }
 
-type Step = 'resume' | 'business' | 'details' | 'team' | 'welcome' | 'home' | 'orchestrator' | 'permissions' | 'ready' | 'done';
+type Step = 'resume' | 'business' | 'details' | 'team' | 'home' | 'orchestrator' | 'permissions' | 'ready' | 'done';
 
 /** The "no pack fits" tile. Not an error path: Michael asks a few questions and
  *  builds from the core pack, so the grid always resolves to something. */
@@ -58,46 +58,6 @@ const GLYPH_EMOJI: Record<string, string> = {
 };
 const glyphFor = (glyph?: string): string =>
   (glyph && (GLYPH_EMOJI[glyph] ?? (/\p{Extended_Pictographic}/u.test(glyph) ? glyph : undefined))) ?? '?';
-
-// First-run showcase — the highest-value features a brand-new owner should grasp
-// before any setup.
-interface Feature {
-  icon: IconName;
-  labelKey: string;
-  descKey: string;
-}
-const FEATURES: Feature[] = [
-  {
-    icon: 'sparkle',
-    labelKey: 'onboarding.welcome.features.team.label',
-    descKey: 'onboarding.welcome.features.team.desc'
-  },
-  {
-    icon: 'gear',
-    labelKey: 'onboarding.welcome.features.manager.label',
-    descKey: 'onboarding.welcome.features.manager.desc'
-  },
-  {
-    icon: 'ledger',
-    labelKey: 'onboarding.welcome.features.memory.label',
-    descKey: 'onboarding.welcome.features.memory.desc'
-  },
-  {
-    icon: 'expand',
-    labelKey: 'onboarding.welcome.features.commandCenter.label',
-    descKey: 'onboarding.welcome.features.commandCenter.desc'
-  },
-  {
-    icon: 'check',
-    labelKey: 'onboarding.welcome.features.guardrails.label',
-    descKey: 'onboarding.welcome.features.guardrails.desc'
-  },
-  {
-    icon: 'plus',
-    labelKey: 'onboarding.welcome.features.hires.label',
-    descKey: 'onboarding.welcome.features.hires.desc'
-  }
-];
 
 /** Anthropic's plan comparison, linked from the manager step's Max plan note. */
 const CLAUDE_PLANS_URL = 'https://claude.com/pricing';
@@ -336,10 +296,10 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
 
   // Permissions & reliability toggles. These apply IMMEDIATELY on change (their
   // own IPC / OS state) — they are NOT part of finish()'s config write. First-run
-  // defaults: notifications off (config default), login-item off (fresh install);
+  // defaults: notifications on (config default), login-item off (fresh install);
   // each reconciles to the real state the IPC returns.
   const [strongKeepalive, setStrongKeepalive] = useState(false);
-  const [notifications, setNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(true);
   const [openAtLogin, setOpenAtLogin] = useState(false);
 
   const toggleStrongKeepalive = async (v: boolean) => {
@@ -507,6 +467,10 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
         // Research starts with the team when picked; a new office never gets
         // the update card (design review D10).
         research: { on: researchPicked, notice: false },
+        // Nor the Claude connectors update card: a new office never had its
+        // agents reach every connector, so nothing was turned off (owner,
+        // 2026-10-30: a first time owner got "Claude connectors are now off").
+        connectorsMigrated: true,
         registeredRepos: finishPlan.folders,
         autoMode,
         godProvider,
@@ -529,7 +493,9 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   // lockup and the step indicator on top, the step's card on the left, and the
   // studio on the right filling with the team as it is picked.
   const steps: readonly Step[] = withReady ? ORDERED_STEPS : ORDERED_STEPS.filter((s) => s !== 'ready');
-  const stepIndex = steps.indexOf(step);
+  // The folder step shows only when the suggested folder can't be used: it
+  // belongs to the team step, so the header stays where the owner was.
+  const stepIndex = steps.indexOf(step === 'home' ? 'team' : step);
   const stepTitle = t(`onboarding.stepTitle.${step}`, { godName });
   const studioPicked = step === 'team' ? teamAgents.filter((a) => teamPicked[a.id]) : teamAgents.filter((a) => teamPicked[a.id] ?? true);
   const studioUnpicked = step === 'team' ? teamAgents.filter((a) => !teamPicked[a.id]) : [];
@@ -537,7 +503,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   // The card is centered whenever the studio isn't showing (Business, Details,
   // Resume, or no team yet) and sits in its column when it is; the move and the
   // glow follow this one flag (docs/designs/onboarding-centered.md).
-  const hasStudio = (step === 'team' || step === 'welcome' || step === 'home' || step === 'orchestrator' || step === 'permissions' || step === 'ready') && teamAgents.length > 0;
+  const hasStudio = (step === 'team' || step === 'home' || step === 'orchestrator' || step === 'permissions' || step === 'ready') && teamAgents.length > 0;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto',
@@ -742,49 +708,6 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                   {t('onboarding.details.intro', { godName })}
                 </div>
                 <CompanyProfileFields value={profile} onChange={setProfile} parts={['details', 'hint']} />
-              </>
-            )}
-
-            {step === 'welcome' && (
-              <>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{
-                    borderRadius: 'var(--cth-r-md)',
-                    width: 56, height: 56, flexShrink: 0,
-                    background: 'var(--cth-sky-light)',
-                    boxShadow: 'inset 0 0 0 1.5px var(--cth-indigo)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
-                  }}>
-                    <SpritePortrait character="michael" scale={2} />
-                  </div>
-                  <div>
-                    <div style={{
-                      fontFamily: 'var(--cth-font-display)',
-                      fontSize: 14, lineHeight: '20px'
-                    }}>{t('onboarding.welcome.headline')}</div>
-                    <div style={{ fontSize: 14, color: 'var(--cth-ink-700)', lineHeight: '20px' }}>
-                      {t('onboarding.welcome.desc')}
-                    </div>
-                  </div>
-                </div>
-
-                {/* What the office does, one quiet row each with its explanation
-                    behind an info icon (review, 2026-10-01: a grid of tinted
-                    tiles, one in coral, with six paragraphs). */}
-                <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 'var(--cth-r-lg)', boxShadow: 'inset 0 0 0 1px var(--cth-line)' }}>
-                  {FEATURES.map((f, i) => (
-                    <div key={f.labelKey} style={{
-                      display: 'flex', gap: 10, alignItems: 'center', padding: '9px 12px',
-                      borderTop: i ? '1px solid var(--cth-line)' : undefined
-                    }}>
-                      <span style={{ width: 26, height: 26, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 'var(--cth-r-md)', background: 'var(--cth-neutral-soft)', color: 'var(--cth-ink-2)' }}>
-                        <Icon name={f.icon} />
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, lineHeight: '20px', color: 'var(--cth-ink)' }}>{t(f.labelKey, { godName })}</span>
-                      <InfoTip text={t(f.descKey)} align="end" />
-                    </div>
-                  ))}
-                </div>
               </>
             )}
 
@@ -1046,10 +969,13 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
 
             {step === 'team' && (
               <>
+                {/* What the office is, behind the (i): the Meet step that said it
+                    was removed (owner, 2026-10-30: owners did not know what it asked). */}
                 <p style={{ margin: 0, lineHeight: '20px', fontSize: 14, color: 'var(--cth-ink-700)' }}>
                   {businessType === OTHER_BUSINESS
                     ? t('onboarding.team.introOther')
                     : t('onboarding.team.intro', { pack: teamPack?.displayName ?? '' })}
+                  {' '}<InfoTip text={t('onboarding.team.introTip', { godName })} />
                 </p>
 
                 {/* The folder idea, said once, in plain words: each person has a
@@ -1296,23 +1222,28 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                         setError(t('onboarding.team.errNoFolders'));
                         return;
                       }
-                      // Validate the home step HERE. Without this the only check
-                      // lives in finish(), so an empty field walks you through all
-                      // four steps and then bounces you back to step 1 to be told.
-                      if (step === 'home' && !home.trim()) {
-                        setError(t('onboarding.errPickHome'));
-                        return;
-                      }
-                      // A folder that already holds an office is never set up as a
-                      // new one: that would mix a second team into it. Offer to
-                      // continue it instead, or ask for another folder.
-                      if (step === 'home') {
+                      // The office folder is not asked for (owner, 2026-10-29: it
+                      // confused new owners; Settings changes it later). Leaving
+                      // the team step checks the suggested folder, and the folder
+                      // step shows only when that folder can't be used.
+                      if (step === 'team' || step === 'home') {
+                        const where = home.trim();
+                        // Checked HERE, not only in finish(), so an empty field is
+                        // not found four steps later.
+                        if (!where) {
+                          setError(step === 'home' ? t('onboarding.errPickHome') : undefined);
+                          setStep('home');
+                          return;
+                        }
+                        // A folder that already holds an office is never set up as a
+                        // new one: that would mix a second team into it. Offer to
+                        // continue it instead, or ask for another folder.
                         setBusy(true);
-                        const f = await window.cth.officeFind(home.trim()).catch(() => null);
+                        const f = await window.cth.officeFind(where).catch(() => null);
                         setBusy(false);
-                        // A check that failed says nothing about the folder: stay
-                        // here rather than risk setting up a second team in it.
-                        if (!f) { setError(t('onboarding.resume.folderCheckFailed')); return; }
+                        // A check that failed says nothing about the folder: ask
+                        // rather than risk setting up a second team in it.
+                        if (!f) { setError(t('onboarding.resume.folderCheckFailed')); setStep('home'); return; }
                         if (f.hasOffice) {
                           if (f.path && f.record && teamPlanFromRecord(f.record).ok) {
                             setFound({ path: f.path, record: f.record });
@@ -1320,6 +1251,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                             setStep('resume');
                           } else {
                             setError(t('onboarding.resume.folderInUse'));
+                            setStep('home');
                           }
                           return;
                         }
@@ -1336,7 +1268,7 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
                     }}
                     disabled={busy || (step === 'orchestrator' && engineBlocked)}
                   >
-                    {step === 'welcome' ? t('onboarding.team.suggestCta') : t('common.next')}
+                    {t('common.next')}
                   </PixelButton>
                 )}
                 {step === 'permissions' && lastStep === 'permissions' && (
@@ -1369,9 +1301,10 @@ export function OnboardingWizard({ onComplete, preview }: OnboardingWizardProps)
   );
 }
 
-const ORDERED_STEPS = ['business', 'details', 'welcome', 'team', 'home', 'orchestrator', 'permissions', 'ready'] as const;
+// The folder step is left out: it shows only when the suggested folder can't be used.
+const ORDERED_STEPS = ['business', 'details', 'team', 'orchestrator', 'permissions', 'ready'] as const;
 
-/** The labelled steps (eight with Claude, whose Ready step sets it up; seven
+/** The labelled steps (six with Claude, whose Ready step sets it up; five
  *  otherwise): done ones checked, the current one in ink. */
 function StepIndicator({ steps, current }: { steps: readonly Step[]; current: number }) {
   const { t } = useTranslation();
@@ -1639,9 +1572,8 @@ const NEW_OFFICE_SUGGESTIONS = 20;
 
 function nextStep(s: Step): Step {
   return s === 'business' ? 'details'
-    : s === 'details' ? 'welcome'
-    : s === 'welcome' ? 'team'
-    : s === 'team' ? 'home'
+    : s === 'details' ? 'team'
+    : s === 'team' ? 'orchestrator'
     : s === 'home' ? 'orchestrator'
     : s === 'orchestrator' ? 'permissions'
     : s === 'permissions' ? 'ready'
@@ -1650,10 +1582,9 @@ function nextStep(s: Step): Step {
 function prevStep(s: Step): Step {
   return s === 'ready' ? 'permissions'
     : s === 'permissions' ? 'orchestrator'
-    : s === 'orchestrator' ? 'home'
+    : s === 'orchestrator' ? 'team'
     : s === 'home' ? 'team'
-    : s === 'team' ? 'welcome'
-    : s === 'welcome' ? 'details'
+    : s === 'team' ? 'details'
     : 'business';
 }
 

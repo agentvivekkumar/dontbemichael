@@ -1,3 +1,4 @@
+import type { StoppedMember } from '../shared/agentExit';
 import type { Period } from '../shared/teamPerformance';
 import type { JobRun, RunSuggestion } from '../shared/runCompare';
 import type { HeldRow } from '../shared/heldRecord';
@@ -341,6 +342,8 @@ export interface HarnessConfig {
   connectorsOn?: { [key: string]: boolean };
   /** Connector keys the owner has seen in Settings. */
   connectorsSeen?: string[];
+  /** The connector carry-over ran; a new office sets it at setup. */
+  connectorsMigrated?: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
   opsStandupSeeded?: boolean;
@@ -1929,6 +1932,13 @@ const api = {
   },
   /** The last known status, for a window that subscribed after the push. */
   cliUpdateCurrent: (): Promise<CliUpdateStatus | null> => ipcRenderer.invoke('cliUpdate:current'),
+  /** Members whose terminal ended by itself, until they start again (agentExit.ts). */
+  agentsStopped: (): Promise<StoppedMember[]> => ipcRenderer.invoke('agents:stopped'),
+  onAgentsStopped: (cb: (list: StoppedMember[]) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, list: unknown): void => cb(Array.isArray(list) ? list as StoppedMember[] : []);
+    ipcRenderer.on('agents:stopped', listener);
+    return () => ipcRenderer.removeListener('agents:stopped', listener);
+  },
   /** The office break (issue 124): null while the office works. */
   officeBreakView: (): Promise<OfficeBreakView | null> => ipcRenderer.invoke('office:breakView'),
   /** Try again on a stop card (office-stopped-account.md): check now. */

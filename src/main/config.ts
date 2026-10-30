@@ -582,7 +582,8 @@ const DEFAULTS: HarnessConfig = {
   defaultWorkerTokenCap: 0, // 0 = unlimited (human directive: NO per-worker cap)
   embeddingModel: 'minilm',
   missions: [OPS_STANDUP_MISSION],
-  notifications: false,
+  // On from setup (owner, 2026-10-29); a saved choice, either way, is kept.
+  notifications: true,
   strongKeepalive: false,
   telemetryEnabled: true,
   tvShowOffices: false,
