@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.3.1). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.3.2). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -226,6 +226,18 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.3.2 (2026-10-30)
+
+- Clocking in: a team member is in once they have started; the card shows a clock and who is
+  slowest or has gone quiet; the floor and Ask me wait at launch, at most 70 seconds.
+- Pulse: on a Claude plan, cost is the office's own work at a rate learned from the plan's weekly
+  usage meter, never the whole plan. It reads Measuring until the rate is known.
+- Email connects only through the app's mailboxes; mail on your Claude account is hidden and
+  refused. A new mailbox starts on Send on approval, and the choice is one plain question.
+- Setup has no Meet or folder step, and desktop notifications are on by default.
+- If Michael stops, the floor says why with Start again. The app no longer passes an option your
+  Claude Code doesn't know, and failure reports carry the cause.
 
 ### 0.3.1 (2026-10-29)
 - An Email chip on a question, a Michael reply or a Send on approval card opens the email it is

@@ -41,10 +41,10 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.3.1: See the original email.**
-> A question or a reply built on an email shows an Email chip that opens the email in an office tab,
-> exactly as it came, even after it was archived. Opening it never marks it read, and pictures from
-> the web wait until you ask. In 0.3.0, see and change your Claude sign in.
+> **New in 0.3.2: Clocking in says what is going on.**
+> The card shows a clock and who is slowest, and the floor and Ask me wait until everyone is in.
+> Pulse now shows what the office really used, not your whole Claude plan. In 0.3.1, see the
+> original email behind a question.
 
 ## Contents
 
