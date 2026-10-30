@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.3.3] (2026-10-30)
+
+### Fixed
+- **Michael starts on an older Claude Code.** The app wrote a setting that versions before 2.1.118 do not know, so Michael stopped at a Settings Error or Settings Warning prompt, and picking Continue on the error could leave an agent with no sandbox. The app now writes only what your Claude Code can read, and leaves the newer settings out if it cannot read the version.
+
 ## [0.3.2] (2026-10-30)
 
 ### Added

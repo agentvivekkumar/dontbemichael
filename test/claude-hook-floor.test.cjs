@@ -83,7 +83,7 @@ test('a probe that fails takes the answer for its own install, and never another
   // The first run waits until the second has answered, then fails: a fixed order, no clock.
   fs.writeFileSync(shared, `#!/bin/sh\nif mkdir "${once}" 2>/dev/null; then i=0; while [ ! -e "${release}" ] && [ $i -lt 80 ]; do sleep 0.05; i=$((i+1)); done; exit 3; fi\necho '2.1.314 (Claude Code)'\n`, { mode: 0o755 });
   const slow = claudeCliVersion(shared);
-  while (!fs.existsSync(once)) await new Promise((r) => setTimeout(r, 10));
+  for (let i = 0; i < 500 && !fs.existsSync(once); i++) await new Promise((r) => setTimeout(r, 10));
   assert.equal(await claudeCliVersion(shared), '2.1.314');
   fs.writeFileSync(release, '');
   assert.equal(await slow, '2.1.314', 'the failed probe takes the answer for this install');

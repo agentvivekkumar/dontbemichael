@@ -1,4 +1,3 @@
-- **Clocking in shows** a clock and who is slowest.
-- **Pulse shows** what the office really used.
-- Email connects only through the app's mailboxes.
-- If Michael stops, the office says why.
+- **Michael starts** on an older Claude Code.
+- No Settings Error or Settings Warning when your Claude Code is behind.
+- Every team member gets settings their Claude Code can read.
