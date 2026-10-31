@@ -275,9 +275,18 @@ export async function removeWorktree(
   const normalize = (path: string): string => process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
   // Verify registration and lock status before changing dependencies.
   // NUL-delimited records keep spaces, Unicode and quoted paths intact.
-  const listing = await runGit(cwd, ['worktree', 'list', '--porcelain', '-z']);
+  const zListing = await runGit(cwd, ['worktree', 'list', '--porcelain', '-z']);
+  // `-z` on `worktree list` arrived in Git 2.36, and older Git rejects the whole
+  // command (Ubuntu 22.04 LTS still ships 2.34), so teardown failed here before
+  // any check below could run. Fall back to the newline form listWorktrees
+  // already parses, which carries the older limitation that a path containing a
+  // newline cannot be represented.
+  const listing = zListing.ok
+    ? zListing
+    : await runGit(cwd, ['worktree', 'list', '--porcelain']);
   if (!listing.ok) return { ok: false, error: listing.error };
-  const records = listing.stdout.split('\0\0').map((record) => record.split('\0'));
+  const [recordSep, fieldSep] = zListing.ok ? ['\0\0', '\0'] : ['\n\n', '\n'];
+  const records = listing.stdout.split(recordSep).map((record) => record.split(fieldSep));
   let index = records.findIndex((fields) => fields[0]?.startsWith('worktree ')
     && normalize(fields[0].slice(9)) === normalize(target));
   if (index < 0) {
