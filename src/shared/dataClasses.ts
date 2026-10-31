@@ -188,6 +188,31 @@ function asciiDigit(ch: string): string {
   return String((cp - first) % 10);
 }
 
+// A money amount: digits with a currency mark or code before or after them,
+// grouped the way people write them ("1,35,000", "2,000.50"). The number starts
+// where no digit, comma or point runs into it, so a long run of digits is read
+// once from its start, not from every character.
+const MONEY_NUMBER = String.raw`(?<![\d.,])\d[\d,]*(?:\.\d+)?`;
+const MONEY_CODE = String.raw`(?:rs|inr|usd|eur|gbp|pkr|aed|cad|aud)`;
+const MONEY_AMOUNT = new RegExp(
+  `(?:(?:\\b${MONEY_CODE}\\b\\.?|[₹₨$€£¥])\\s?(?<pre>${MONEY_NUMBER})(?<mag>\\s?(?:k|m|mn|bn|million|billion|lakhs?|crores?)\\b)?` +
+  `|(?<post>${MONEY_NUMBER})\\s?(?:\\b(?:${MONEY_CODE}|dollars|euros|pounds|rupees)\\b|[₹₨$€£¥]))`,
+  'giu'
+);
+/**
+ * Whether the text names a business figure: an amount from 1,000 up, or one with
+ * a magnitude word ("$5k", "Rs 2 lakh"). Small prices ("around $25") are what a
+ * plain question carries, so they pass.
+ */
+function hasMoneyAmount(text: string): boolean {
+  for (const m of text.matchAll(MONEY_AMOUNT)) {
+    if (m.groups?.mag) return true;
+    const digits = (m.groups?.pre ?? m.groups?.post ?? '').replace(/,/g, '');
+    if (Number.parseFloat(digits) >= 1000) return true;
+  }
+  return false;
+}
+
 /**
  * The private data fixed patterns can see, each tied to its class so a
  * refusal names it. Patterns catch only what has a shape (an email, a card
@@ -207,6 +232,7 @@ export function patternHits(text: string): PatternHit[] {
   for (const m of t.matchAll(DIGIT_RUN)) {
     if (hasCard(m[0])) { hits.push({ classId: 'money' }); break; }
   }
+  if (!hits.some((h) => h.classId === 'money') && hasMoneyAmount(t)) hits.push({ classId: 'money' });
   if (IBAN.test(t)) hits.push({ classId: 'accounts' });
   if (US_SSN.test(t)) hits.push({ classId: 'accounts' });
   // Shapes that look like digits but are not contact details: dates and
