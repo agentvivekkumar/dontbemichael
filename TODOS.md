@@ -479,15 +479,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Effort:** S
 **Priority:** P3
 
-### Retry closing time's wait after all note to Michael
-
-**What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
-
-**Why:** Michael may close without the member's ACK.
-
-**Effort:** S
-**Priority:** P3
-
 ## Michael reply readability (deferred from the eng review, 2026-10-17)
 
 ### Check the figures in Michael's answer against the team's report
