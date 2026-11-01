@@ -220,13 +220,10 @@
     "killConfirmSchedulesPlural": "关闭 {{name}}？{{name}} 有 {{count}} 个开启的定时任务，它们会暂停。"
   },
   "settingsHero": {
-    "beta": "测试版",
-    "betaInfo": "这是早期版本。如果有问题，请使用下方的“反馈问题”。",
     "sponsoredBy": "赞助方",
     "visit": "访问",
     "whatsNew": "新功能",
-    "starOnGitHub": "在 GitHub 上标星",
-    "reportProblem": "反馈问题"
+    "starOnGitHub": "在 GitHub 上标星"
   },
   "settings": {
     "title": "设置",
@@ -300,11 +297,16 @@
       "arabicTerminalDesc": "用浏览器的文本引擎渲染终端，让阿拉伯语正确连写并从右向左阅读（xterm 自身没有双向文本支持）。关闭则使用 GPU 渲染器：更快，但无法处理从右向左的文本。对已打开和新开的终端同时生效。",
       "arabicTerminalFollowsLanguage": "当前跟随应用语言。在此切换即可覆盖，两个方向都可以，你的选择会保留，即使之后再更改语言。"
     },
+    "claudeSignIn": {
+      "title": "Claude 登录",
+      "tip": "你在 Claude 上的团队如何登录：使用你的 Claude 账户，按你的 Claude 套餐计费；或使用 Anthropic API 密钥，计费到你的 Anthropic 账户。"
+    },
     "agentsModels": {
       "defaultModel": "默认智能体模型",
       "defaultModelDesc": "每个新生成的 Claude 团队成员默认使用此模型，除非为该成员单独选择。{{godName}} 有自己的模型设置。在模型选择器中标记为「· 默认」。",
       "advanced": "高级",
       "maxTurns": "每次运行最大轮数",
+      "maxTurnsTip": "一轮就是一次工具调用，因此同时调用多个工具会用掉多轮。一次运行从团队成员收到一条消息开始，到下一条消息为止。",
       "unlimited": "无限制",
       "blankUnlimited": "留空 = 无限制",
       "planPrice": "你的 Claude 套餐",
@@ -742,36 +744,6 @@
       "continue": "继续使用这个办公室",
       "startNew": "新建一个办公室"
     },
-    "welcome": {
-      "headline": "您的经理和他打理的办公室",
-      "desc": "{{godName}} 是您的办公室经理。他为您带着一支 AI 员工小团队，您在一个屏幕上就能看到全部。里面有什么：",
-      "features": {
-        "team": {
-          "label": "您的起步团队",
-          "desc": "{{godName}} 会根据您的生意类型推荐一支团队。由您决定谁加入，之后也可以随时增减人手。"
-        },
-        "manager": {
-          "label": "{{godName}} 打理办公室",
-          "desc": "您的办公室经理 {{godName}} 接收您的要求，把每件事交给合适的团队成员，只在关键时刻打扰您。"
-        },
-        "memory": {
-          "label": "他们记得住",
-          "desc": "您的团队记得您交代过的事和已经做过的工作，同样的事不用再解释第二遍。"
-        },
-        "commandCenter": {
-          "label": "一切尽在眼前",
-          "desc": "一个屏幕就能看到每个人在忙什么、做完了什么、有什么在等您处理。"
-        },
-        "guardrails": {
-          "label": "您说了算",
-          "desc": "在网上发帖或任何要花钱的事，您的团队都会先问您；邮件只按您设定的方式发出。哪些事可以让他们自己做，由您决定。"
-        },
-        "hires": {
-          "label": "随时加人手",
-          "desc": "需要多一个帮手？一键添加现成的团队成员，无需任何设置。"
-        }
-      }
-    },
     "providerBlurb": {
       "claude": "Claude Code (Anthropic)",
       "codex": "Codex (OpenAI)",
@@ -847,6 +819,7 @@
     },
     "team": {
       "intro": "为{{pack}}推荐的团队。想选谁就选谁，之后还可以再招人。",
+      "introTip": "{{godName}} 会把每项工作交给团队中合适的人。你的团队会记住你告诉他们的事，在网上发布内容或花钱之前会先问你，你可以在一个屏幕上看到他们的所有工作。",
       "introOther": "先从 {{godName}} 和 Oscar 开始。办公室运转起来后，{{godName}} 会问您几个问题，并建议还需要招谁。",
       "folderNote": "每个人都在自己的文件夹里工作，位于 {{root}}，也就是 {{godName}} 的文件夹。把每个人需要的文件放进他们的文件夹，他们会阅读这些文件，也会把工作成果存在那里，只有他们本人和 {{godName}} 能打开。公司范围的信息、政策和规定请放在“设置 > 记忆与知识”里，每位成员都能搜索。",
       "managerName": "{{godName}} · 办公室经理",
@@ -861,7 +834,6 @@
       "useSuggested": "使用建议位置",
       "sharedFolder": "包含所有人的文件夹",
       "summary": "已选 {{picked}} 人 · 需连接 {{connect}} 个账号",
-      "suggestCta": "推荐我的团队",
       "errFolder": "无法设置 {{path}}：{{reason}}",
       "errNoFolders": "无法确定团队文件夹的位置。请返回检查您的企业名称。",
       "errMichaelFolder": "这个文件夹不能用来存放您的办公室。请选择一个单独的文件夹，不要选主文件夹或系统文件夹。",
@@ -886,7 +858,6 @@
       "resume": "欢迎回来",
       "business": "你的企业",
       "details": "公司信息",
-      "welcome": "认识你的办公室",
       "team": "你的团队",
       "home": "应用的位置",
       "orchestrator": "你的经理",
@@ -922,8 +893,21 @@
       "allIn": "全员到齐",
       "missingOne": "{{name}} 还没打卡。",
       "missingMore": "{{name}} 和另外 {{count}} 人还没打卡。",
+      "floorWaits": "大家都到后，办公室才会开放。",
+      "wait": {
+        "time": "已过 {{seconds}} 秒。",
+        "slowest": "已过 {{seconds}} 秒。{{name}} 最慢。",
+        "longer": "已过 {{seconds}} 秒。{{name}} 用时比平时长。",
+        "quiet": "已过 {{seconds}} 秒。{{name}} 没有动静。"
+      },
       "michael": "{{name}} 正在打卡上班",
       "michaelLine": "{{name}} 正在角落办公室安顿下来，为大家准备好办公区。请稍候…"
+    },
+    "stopped": {
+      "title": "{{name}} 已停止",
+      "noLine": "{{name}} 的终端已关闭，没有说明原因。",
+      "startAgain": "重新启动",
+      "seeWork": "打开工作标签页"
     },
     "clockedInCount": "已到 {{count}} / {{total}}",
     "gpuError": "办公楼层丢失了 GPU 上下文。\n\n同时使用 GPU 的终端太多了。\n关闭几个智能体终端，或重启应用，即可恢复。",
@@ -1840,11 +1824,15 @@
     "close": "关闭 {{name}}",
     "office": "办公室",
     "openInApp": "在应用中打开",
+    "copy": "复制",
+    "copied": "已复制",
+    "copyFailed": "无法复制",
     "reading": "正在读取…",
     "empty": "空文件",
     "tooLarge": "文件太大，无法在此显示",
     "unreadable": "无法在此显示此文件",
-    "rows": "显示 {{total}} 行中的 {{shown}} 行"
+    "rows": "显示 {{total}} 行中的 {{shown}} 行",
+    "opened": "已打开 {{name}}"
   },
   "companyProfile": {
     "intro": "关于您公司的关键信息。每位成员，包括 {{godName}}，都会以此为依据工作。只填简短的答案，较长的内容请放进“记忆与知识”。",
@@ -2001,6 +1989,18 @@
     "openFolderFailed": "无法打开文件夹，它可能已被移动或删除。"
   },
   "mailboxes": {
+    "google": {
+      "step1Title": "开启两步验证",
+      "step1Line": "登录时 Google 会向你的手机发送验证码。已经开启？请直接到第 2 步。",
+      "step1Open": "打开 Google 页面",
+      "step2Title": "创建应用专用密码",
+      "step2Line": "输入一个名称，例如“我的办公室”，然后复制 Google 显示的 16 个字母。",
+      "step2Open": "打开应用专用密码",
+      "step2Admin": "使用 GSuite 时，如果 Google 提示应用专用密码不可用，说明管理员已将其关闭：请让管理员开启。",
+      "step3Title": "粘贴到下方",
+      "step3Line": "第 2 步中 Google 显示的 16 个字母，原样粘贴即可，有空格也没关系。"
+    },
+    "googleTile": "Gmail 或 GSuite",
     "title": "邮箱",
     "intro": "团队可以使用的邮箱。在每位团队成员的“权限”标签中选择谁使用哪个邮箱。",
     "add": "添加邮箱",
@@ -2039,21 +2039,18 @@
     "testing": "正在测试 {{address}}，请稍候。",
     "tryAgain": "重试",
     "help": {
-      "gmail": "Gmail 需要应用专用密码，而不是普通密码。先开启两步验证，然后在 myaccount.google.com/apppasswords 创建。",
-      "google-workspace": "请使用 myaccount.google.com/apppasswords 中的应用专用密码。如果找不到该页面，说明你的 Workspace 管理员关闭了应用专用密码。",
       "icloud": "iCloud 需要应用专用密码。在 account.apple.com 的“登录与安全”中创建。",
       "yahoo": "Yahoo 需要应用专用密码。在“账户安全”中选择“生成应用密码”。",
       "zoho": "Zoho 需要在“安全”中的“应用密码”创建应用专用密码，并在邮件设置中开启 IMAP。",
       "other": "你的邮件服务商会在帮助页面列出这些服务器。如果普通密码被拒绝，请向他们申请应用专用密码。"
     },
-    "gmailIsConnector": "你 Claude 账户里的 Gmail 在「Claude 连接器」中。"
+    "onlyHere": "团队只通过这里连接的邮箱收发邮件，从不使用你的 Claude 账户。"
   },
   "capabilities": {
-    "addHow": "{{name}} 怎样使用它",
-    "addMailboxBothUsed": "{{name}} 已负责一个邮箱，并从另一个仅发信。",
+    "addHow": "{{name}} 要用它做什么？",
+    "addMailboxBothUsed": "{{name}} 已阅读一个邮箱，并从另一个只发邮件。",
     "addMailboxNoneLeft": "在设置中连接另一个。",
-    "removeWatchedSure": "要移除 {{address}} 吗？{{names}} 的仅发信权限会暂停，直到有人负责它。",
-    "addMailboxInfo": "负责收件箱：{{name}} 阅读、归档并回复其中的邮件。仅发信：{{name}} 用这个地址发信，收件箱仍由负责人管理并转达回复。",
+    "removeWatchedSure": "要移除 {{address}} 吗？在有人阅读它之前，{{names}} 无法从它发信。",
     "intro": "{{name}} 无需询问就可以做的事，以及 {{name}} 按时间运行的工作。",
     "email": "邮件",
     "emailBlurb": "{{name}} 使用的邮箱地址，以及每个地址的邮件怎样发出。",
@@ -2066,26 +2063,28 @@
     "recentSends": "最近从这里发出",
     "recentSend": "{{subject}}，发给 {{to}}，{{date}}",
     "cancelAdd": "取消",
-    "addIt": "添加",
-    "addSendOnlyTaken": "{{name}} 已从 {{address}} 仅发信。每人一个。",
-    "addSendOnlyNobody": "目前没有人负责它，所以邮件会等到有人负责后再发。",
-    "addSendOnly": "仅发信",
-    "addWatchMoves": "目前由 {{from}} 负责。你确认后转给 {{name}}。",
-    "addWatchTaken": "{{name}} 已负责 {{address}}。每人一个。",
-    "addWatch": "负责收件箱",
-    "addMailboxUse": "添加邮箱",
+    "addIt": "交给 {{name}}",
+    "addSendOnlyTaken": "{{name}} 已从 {{address}} 只发邮件。每人一个。",
+    "addSendOnlyNobody": "需要先有人阅读这个收件箱。",
+    "addSendOnly": "只发邮件",
+    "addReadsDesc": "{{name}} 阅读收到的邮件，整理并回复。",
+    "addSendsDesc": "{{name}} 用这个地址发信，但不能阅读这个邮箱。{{holder}} 阅读回复并转达。",
+    "addWatchMoves": "目前由 {{from}} 阅读。你确认后转给 {{name}}。",
+    "addWatchTaken": "{{name}} 已在阅读 {{address}}。每人一个。",
+    "addWatch": "阅读并回复邮件",
+    "addMailboxUse": "给 {{name}} 一个邮箱",
     "sendingFrom": "从 {{address}} 发信",
-    "inboxNobody": "没有人负责。{{name}} 仅发信。",
-    "inboxSendOnly": "由 {{holder}} 负责。{{name}} 仅发信。",
-    "inboxWatches": "由 {{name}} 负责",
+    "inboxNobody": "没有人阅读。{{name}} 只发邮件。",
+    "inboxSendOnly": "{{holder}} 阅读。{{name}} 只发邮件。",
+    "inboxWatches": "{{name}} 阅读并回复",
     "inbox": "收件箱",
     "removeMailbox": "移除",
     "emailNone": "{{name}} 还没有使用邮箱。",
     "emailSummaryNone": "无",
     "emailSummary": "邮箱：{{count}}",
-    "sendOnlyPaused": "已暂停：{{name}} 从这里发的邮件会等到有人负责这个收件箱。",
+    "sendOnlyPaused": "已暂停：{{name}} 从这里发的邮件会等到有人阅读这个收件箱。",
     "alsoSendsFromHere": "也从这里发信：{{names}}",
-    "sendOnlyUse": "{{address}}（仅发信，{{sending}}）",
+    "sendOnlyUse": "{{address}}（只发邮件，{{sending}}）",
     "standingLast": "已发送 {{count}} 封，最近一封：{{subject}}",
     "standingRevoke": "撤销",
     "draftOnly": "仅草稿",
@@ -2101,7 +2100,7 @@
     "pickMailbox": "选择一个邮箱",
     "addMailbox": "在设置中连接另一个",
     "heldBy": "{{name}} 正在使用",
-    "moveMailbox": "{{from}} 正在查看 {{address}}。改给 {{to}} 吗？{{from}} 将不再查看邮件。",
+    "moveMailbox": "{{from}} 正在阅读 {{address}}。改给 {{to}} 吗？{{from}} 将不再阅读它。",
     "moveMailboxFree": "使用 {{address}}？",
     "moveIt": "改给他",
     "keepIt": "保持不变",
@@ -2156,6 +2155,8 @@
     "needsYou": "需要你处理",
     "nothingNeedsYou": "暂无需要你处理的事",
     "needsYouInfo": "只有 {{godName}} 自己解决不了的事才会找你。在这里回答，工作就会继续。",
+    "michaelStopped": "{{godName}} 没有在运行。你的回答会等到 {{godName}} 重新启动后再处理。",
+    "answersWait": "大家都到后才能回答。",
     "needsYouAnnounce": "{{godName}} 需要你：{{count}}",
     "allClear": "全部处理完毕。",
     "allClearLine1": "{{godName}} 说团队还能接更多活。",
@@ -2174,7 +2175,9 @@
     "focus": "专注模式",
     "exitFocus": "退出专注模式（Esc）",
     "settings": "设置",
-    "betaInfo": "这是早期版本。如果有问题，请使用“设置”中的“反馈问题”。",
+    "reportProblem": "反馈问题",
+    "reportProblemTip": "在 GitHub 上打开错误报告（需免费账号）。此窗口的截图已保存在“下载”文件夹中，可添加到报告里。报告是公开的：请先检查截图。",
+    "reportProblemFailed": "无法打开",
     "briefPlaceholder": "和 {{godName}} 说点什么…",
     "brief": "和 {{godName}} 说",
     "attach": "附加文件",
@@ -2425,6 +2428,8 @@
     "cardAction": "让 {{godName}} 准备就绪",
     "done": "完成",
     "useApiKey": "使用 API 密钥",
+    "changeKey": "更换密钥",
+    "useAccount": "改用 Claude 账户",
     "apiKey": "Anthropic API 密钥",
     "keyInfo": "费用计入你的 Anthropic 账户。在 console.anthropic.com 创建密钥。这台电脑上团队的工具都可以使用它，所以请选择设有支出上限的密钥。",
     "keySave": "保存密钥",
@@ -2461,12 +2466,15 @@
     "tryAgain": "重试",
     "signInAction": "登录",
     "changeKey": "更换密钥",
+    "changeSignIn": "更改登录方式",
     "chip": "办公室已停止",
     "creditInfo": "由于 Anthropic 账户余额已用完，Claude 停止了整个团队。请在 Anthropic 网站充值，然后点击重试。办公室也会每 15 分钟自动检查一次。在此之前，定时任务会留在收件箱中等待。",
+    "creditKeyInfo": "由于你的 API 密钥所属的 Anthropic 账户余额已用完，Claude 停止了整个团队。请在 Anthropic 网站充值，然后点击重试；或点击更改登录方式，换用新的密钥或你的 Claude 账户。办公室也会每 15 分钟自动检查一次。在此之前，定时任务会留在收件箱中等待。",
     "signInInfo": "由于 Claude 登录已过期，Claude 停止了整个团队。重新登录后，团队会从停下的地方继续。在此之前，定时任务会留在收件箱中等待。",
     "keyInfo": "由于 Anthropic API 密钥已失效，Claude 停止了整个团队。粘贴新的密钥后，团队会重新启动并继续工作。在此之前，定时任务会留在收件箱中等待。"
   },
   "markdown": {
+    "openPlace": "打开{{place}}",
     "opensInBrowser": "在浏览器中打开",
     "opensInEmail": "打开邮件应用",
     "copyLinkAddress": "复制链接地址",
@@ -2612,7 +2620,27 @@
       "capWork": "目前找到了工作",
       "capKept": "目前原样保留",
       "capReopened": "目前你重新打开的卡片",
-      "more": "随着团队工作，这里会出现更多规律。"
+      "watchLabel": "Pulse 在关注什么",
+      "watch": {
+        "runLess": "常常无事可做的日程",
+        "runLessTip": "大多数运行都没找到事情可做的日程。降低运行频率可以省钱。",
+        "runMore": "事情更多的日程",
+        "runMoreTip": "几乎每次运行都有工作、且每周越来越多的日程。提高运行频率才跟得上。",
+        "cheaper": "更便宜的模型",
+        "cheaperTip": "使用最高档模型、其工作你几乎每次都原样保留、没有卡片被重新打开、并且你已对几封邮件草稿做过决定的成员。从不包括 {{godName}}。",
+        "stronger": "更强的模型",
+        "strongerTip": "其工作你经常修改，或其卡片你会重新打开的成员。",
+        "soFar": "目前 {{count}} 个",
+        "none": "暂无",
+        "fine": "没有需要担心的",
+        "closest": "{{name}}：{{decisions}} 项中有 {{kept}} 项原样保留"
+      },
+      "tag": {
+        "runLess": "无事可做的日程",
+        "runMore": "事情更多的日程",
+        "cheaper": "可换更便宜的模型",
+        "stronger": "可换更强的模型"
+      }
     },
     "nothingToChange": "本周没有需要更改的。",
     "savedByChanges": "你的更改节省了",
@@ -2713,6 +2741,7 @@
         "folder": "私人文件夹",
         "office-files": "应用文件",
         "paused": "被你暂停",
+        "turn-cap": "已达最大轮数",
         "impostor": "未确认的发送者"
       },
       "toInternetTip": "每个问题发出前，都会检查是否含有你的隐私信息。",
@@ -2739,7 +2768,7 @@
     },
     "work": {
       "title": "团队工作情况",
-      "tip": "工作时间从成员接到每个请求起，到其最后一次回复为止，每个请求最多计一小时。成本为每位成员按工作份额分摊的套餐费用。",
+      "tip": "工作时间从成员接到每个请求起，到其最后一次回复为止，每个请求最多计一小时。成本为每位成员自身工作按套餐费率计算的费用。",
       "nobody": {
         "today": "今天还没有人工作。",
         "this-week": "本周还没有人工作。",
@@ -2772,9 +2801,11 @@
     },
     "plan": {
       "yourPlan": "Claude 套餐",
-      "tip": "你的套餐每月 {{monthly}}。这是本期已过天数对应的费用，按每位成员完成的工作量分摊。同样的工作按用量付费需 {{payPerUse}}。",
+      "tip": "办公室在你的套餐（每月 {{monthly}}）中所占的部分：按其工作占用套餐每周用量计的多少来计价。你在其他地方使用 Claude 的部分不计入。同样的工作按用量付费需 {{payPerUse}}。",
       "noPrice": "按用量付费价格计算。在设置中填写你的套餐价格，即可看到工作的真实成本。",
-      "memberTip": "该成员在本期按其工作份额分摊的套餐费用。",
+      "learning": "正在了解你的套餐费率",
+      "learningTip": "办公室工作时，Pulse 会根据套餐的每周用量计了解套餐工作的费用，通常几天内完成。在此之前：按用量付费价格为 {{payPerUse}}。",
+      "memberTip": "该成员本期自身工作所占用的套餐费用。",
       "ofPlan": "来自你的 {{plan}}（每月 {{monthly}}）"
     },
     "typicalWait": "通常等待",
@@ -2957,6 +2988,12 @@
       "byWho": "{{name}}：{{where}}",
       "none": "这段时间没有整理邮件。",
       "earlier": "还有 {{count}} 封是在应用开始记录名称之前整理的。"
+    },
+    "recs": {
+      "view": "查看建议",
+      "hide": "收起",
+      "title": "Pulse 有一些关于你团队的建议。",
+      "ready": "{{count}} 条已就绪"
     }
   },
   "foundations": {
@@ -3030,7 +3067,7 @@
       "needs": "需要这个",
       "needsAgo": "需要这个，{{ago}}",
       "yourAnswer": "你的回答",
-      "hint": "几句简单的话，不超过 {{n}} 个字符，或添加一个文件。",
+      "hint": "几句简单的话，不超过 {{n}} 个字符，或添加一个文件或文件夹。",
       "save": "保存回答",
       "draftBy": "让 {{name}} 起草",
       "notNow": "暂不",
@@ -3047,6 +3084,7 @@
       "failedGone": "无法把你的回答加入公司基础信息。请告诉 {{godName}}。",
       "drafted": "草稿，编辑后保存",
       "addFile": "添加文件",
+      "addFolder": "添加文件夹",
       "removeFile": "移除 {{name}}",
       "checking": "正在检查文件",
       "fileMisfit": "{{name}} 看起来不是这个问题的答案：{{reason}}",
@@ -3054,7 +3092,14 @@
       "fileUnchecked": "无法检查这个文件，请重试。",
       "filePictureType": "请将这张图片另存为 PNG 或 JPEG 后再添加。",
       "filePictureEngine": "只有在 Claude 上才能检查图片。请改为添加 PDF 或文档。",
-      "fileMissing": "找不到 {{name}}，请重新添加。"
+      "fileMissing": "找不到 {{name}}，请重新添加。",
+      "folderChip": "{{name}} 文件夹",
+      "folderMissing": "找不到文件夹 {{name}}，请重新添加。",
+      "folderTooWide": "{{name}} 包含的内容太多。请选择存放这些记录的文件夹。",
+      "folderApp": "{{name}} 是应用自己的文件夹。请选择其他文件夹。",
+      "folderMember": "{{name}} 在某位团队成员的文件夹里。请选择其他文件夹。",
+      "folderEmpty": "{{name}} 里没有文件。",
+      "folderTooLong": "{{name}} 所在位置太深，无法在这里写出。请把它移到上层再重新添加。"
     }
   },
   "knowledgeNotice": {
@@ -3105,6 +3150,10 @@
     "errorTitle": "无法整理出这次改动",
     "errorNote": "稍后再试。你写的内容仍在框里。",
     "errorNoteCard": "稍后再试。没有任何改动。",
+    "errorNoName": "请先为其输入名字，然后重试。",
+    "errorNotStarted": "Claude 没有启动。请在设置的“前置条件”中确认 Claude 已登录，然后重试。",
+    "errorSlow": "Claude 回复太慢。请稍后重试。",
+    "errorUnreadable": "无法读取 Claude 的回复。请重试，或换一种说法描述这个改动。",
     "tryAgain": "重试",
     "movedTitle": "{{name}} 的工作在此期间有了变化",
     "movedNote": "你的改动还在。请在新的工作上再运行一次。",
@@ -3184,5 +3233,33 @@
     "noGoodRun": "这项工作之前没有可供比较的顺利运行。",
     "noTranscript": "这次运行的对话已不在这台电脑上。",
     "noDifference": "两次运行没有显示需要更改工作的地方。"
+  },
+  "emailTab": {
+    "openEmail": "打开邮件：{{words}}",
+    "openInGmail": "在 Gmail 中打开",
+    "opening": "正在打开邮件",
+    "noSubject": "（无主题）",
+    "from": "发件人",
+    "to": "收件人",
+    "cc": "抄送",
+    "date": "日期",
+    "picturesHidden": "来自网络的图片已隐藏。",
+    "showPictures": "显示图片",
+    "showingPictures": "正在加载图片",
+    "somePicturesFailed": "部分图片无法加载。",
+    "tooLarge": "邮件太大，无法完整显示。以下是它的文字。",
+    "tryAgain": "重试",
+    "openMailboxes": "打开邮箱设置",
+    "frameTitle": "来自 {{sender}} 的邮件",
+    "replyingTo": "回复给",
+    "failed": {
+      "broken": "这个邮件链接已损坏。",
+      "mailbox": "这个邮箱已不在办公室中。",
+      "message": "在这个邮箱中找不到（废纸篓和垃圾邮件除外）。",
+      "auth": "登录这个邮箱失败。",
+      "blocked": "无法从办公室访问这个邮箱。",
+      "network": "无法连接到邮箱。",
+      "unknown": "无法显示这封邮件。"
+    }
   }
 }

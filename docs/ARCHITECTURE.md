@@ -138,8 +138,10 @@ src/
     docText.ts / docTextCli.ts   Word, Excel, PowerPoint, PDF and scan reading; macOcr.ts reads scans and photos with
                              macOS Vision, winOcr.ts with the OCR built into Windows (both through PowerShell or the
                              system's own engine, no bundled Tesseract)
-    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor and the
-                             Claude Code update notice (index.ts records each agent's started version)
+    claudeCliVersion.ts      installed Claude Code version, for the Opus 5.5 / Opus 5 model floor, the hook floor
+                             (shared/modelCliFloor.ts: an agent's settings carry only the hooks that version takes,
+                             and none with a floor when the version can't be read) and the Claude Code update
+                             notice (index.ts records each agent's started version)
     hireCheck.ts             the distinct job check (hidden Claude call, rules as fallback): the hire wizard's, and in
                              change mode Edit agent's, where handoffs between two members are not an overlap
     workStyleConvert.ts      turns a plain work style into an agent's instructions and back, and writes the
@@ -169,6 +171,10 @@ src/
                              cached, never fatal; fetchText.ts is the one https fetcher they share
     analytics.ts             product analytics (PostHog), anonymous, allowlisted and governed by TELEMETRY.md; off in this
                              build (COLLECT_USAGE_STATS)
+    failureReport.ts / failureSender.ts   automatic failure reports (docs/designs/auto-report-failures.md, TELEMETRY.md):
+                             failures the developers can fix in code, folded by fingerprint into failures.jsonl in the
+                             app's data folder, then filed as fixed fields to the private reports repo; on in this build
+                             (AUTO_FAILURE_REPORTS), and DO_NOT_TRACK stops sending
     updater.ts               auto update from GitHub releases through electron-updater: downloads in the background, installs
                              only when the owner asks
     restart.ts               restarts the app after a reset or a home change, and knows when a dev build cannot relaunch
@@ -238,6 +244,9 @@ src/
                              the owner's questions in Michael's conversation dock (docs/designs/michael-replies.md)
     mailProposals.ts         Send on approval's rules: proposals and their states, what an approved send may carry,
                              standing approvals and the fit check's prompt, threading from a Send only member's own sends
+    standingFacts.ts         the fit check's countable half (#490): under a kind not about money, money a standing send
+                             names that the approval and the message it answers don't goes to the owner unasked; such dates
+                             and times go to the model as a list
     starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
     firstTask.ts             a hire's first task card and Michael's request to hand it out (docs/designs/first-task-card.md);
                              legacyFirstTasks.ts holds the old First task texts the one-time cleanup matches
@@ -269,6 +278,8 @@ src/
     costFold.ts              the cost running total rule the lifetime ledger and Pulse share
     runCompare.ts            comparing a run that went wrong with one that went well: the pick, the transcript slices,
                              the prompt and the suggestion's states (main/runCompare.ts runs it)
+    failureReport.ts         the failure report's schema: the kinds, the closed fields, frame scrubbing, and the issue's
+                             title and body; it imports nothing, so the reports repo's Action runs it on its own
   preload/                   contextBridge → typed window.cth API
   renderer/src/
     App.tsx                  top-level layout + wiring
@@ -349,6 +360,7 @@ resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarde
 docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime)
 docs/demo/studio-lab.html    the studio lab, built by `npm run lab`
 tools/studio-lab/            the studio lab and the reference screens (`npm run lab`, `npm run shoot`)
+tools/failure-reports/       the reports repo's promotion Action and the release canary; its README.md is the owner runbook
 docs/designs/                design docs, including business-mode-office-packs.md (the business mode design and its decisions)
                              (the old project's website files still here are tracked for removal in TODOS.md)
 branding/reference/studio/   the app's reference screens, also the README's images (npm run shoot)

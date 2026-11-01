@@ -122,14 +122,28 @@ export function isQuickBooksKey(key: string): boolean {
   return key.trim().toLowerCase() === QUICKBOOKS_KEY.toLowerCase();
 }
 
-/** The Claude account's Gmail and Google Calendar, for the one-time carry-over
- *  of the old "Your Claude account" switch. */
+/** The two connectors the old "Your Claude account" switch covered. Only
+ *  Calendar carries over now; a list naming either shows connectors were read. */
 export function isEmailCalendarKey(key: string): boolean {
   return /^(gmail|google calendar)$/i.test(key.trim());
 }
 
+/** A mailbox on the Claude account (Gmail, Outlook, Yahoo Mail...). Email
+ *  reaches the team only through the mailboxes connected in the app (owner,
+ *  2026-10-30), so these are never offered, never on and always denied. */
+export function isMailConnectorKey(key: string): boolean {
+  const k = key.trim();
+  return /mail$/i.test(k) || /^(microsoft )?outlook$/i.test(k);
+}
+
+/** The connectors the owner sees and can switch: all but a mailbox. */
+export function offeredConnectors(list: ClaudeConnector[] | null | undefined): ClaudeConnector[] {
+  return (list ?? []).filter((c) => !isMailConnectorKey(c.key));
+}
+
 /** Whether the owner has a connector on. QuickBooks keeps its own switch. */
 export function connectorOn(cfg: ConnectorConfig, key: string): boolean {
+  if (isMailConnectorKey(key)) return false;
   return isQuickBooksKey(key) ? cfg.quickbooksClaude === true : cfg.connectorsOn?.[key] === true;
 }
 
@@ -140,13 +154,6 @@ export function connectorGranted(cfg: ConnectorConfig, agentId: string, key: str
   const caps = cfg.agentCapabilities?.[agentId];
   if (isQuickBooksKey(key)) return quickbooksCapability(caps?.quickbooks, roleReadsBooks).enabled;
   return (caps?.connectors ?? []).includes(key);
-}
-
-/** Whether an agent reads mail through the Claude account's Gmail: switched
- *  on in Settings and granted to it (schedules: "cannot check email"). */
-export function gmailConnectorOn(cfg: ConnectorConfig, agentId: string): boolean {
-  const keys = new Set([...Object.keys(cfg.connectorsOn ?? {}), ...(cfg.agentCapabilities?.[agentId]?.connectors ?? [])]);
-  return [...keys].some((key) => /^gmail$/i.test(key.trim()) && connectorOn(cfg, key) && connectorGranted(cfg, agentId, key, false));
 }
 
 /** The connectors an agent may use now: on the account, on in Settings,
@@ -273,6 +280,9 @@ export function connectorAccess(
     return { ok: false, reason: `That connector on the owner's Claude account is not turned on for the team. ${TELL_MICHAEL}` };
   }
   const { key } = target;
+  if (isMailConnectorKey(key)) {
+    return { ok: false, reason: `Email goes only through the office mailboxes connected in the app, never ${key} on the owner's Claude account. ${TELL_MICHAEL}` };
+  }
   const listed = (list ?? []).some((c) => c.key === key);
   // QuickBooks keeps its own switch and rules: the hook's QuickBooks gate
   // decides, as long as the account still has it.
@@ -311,14 +321,16 @@ export function removedKeys(cfg: ConnectorConfig): string[] {
   const out = new Set<string>();
   for (const [k, on] of Object.entries(cfg.connectorsOn ?? {})) if (on && !present.has(k)) out.add(k);
   for (const caps of Object.values(cfg.agentCapabilities ?? {})) for (const k of caps?.connectors ?? []) if (!present.has(k)) out.add(k);
+  for (const k of out) if (isMailConnectorKey(k)) out.delete(k);
   return [...out].sort((a, b) => a.localeCompare(b));
 }
 
 /** The one-time carry-over (owner, 2026-10-02, D9), run at the first good read.
  *  QuickBooks keeps its own switch and each agent's choice, untouched. The old
- *  "Your Claude account" switch, when on, turns Gmail and Google Calendar on and
- *  grants them to every agent (Michael included), who could all use them
- *  before. Every other connector starts off. `switchedOff` names the connected
+ *  "Your Claude account" switch, when on, turns Google Calendar on and grants
+ *  it to every agent (Michael included), who could all use it before; Gmail
+ *  no longer, as mail goes through the app's mailboxes (owner, 2026-10-30).
+ *  Every other connector starts off. `switchedOff` names the connected
  *  ones agents could reach before the update and no longer can (E2). */
 export function connectorCarryOver(
   cfg: ConnectorConfig & { mcpDefaults?: { [id: string]: { enabled: boolean } } },
@@ -327,16 +339,18 @@ export function connectorCarryOver(
 ): { connectorsOn: { [key: string]: boolean }; agentCapabilities: { [agentId: string]: AgentCapabilities }; switchedOff: string[] } {
   const connectorsOn = { ...(cfg.connectorsOn ?? {}) };
   const agentCapabilities = { ...(cfg.agentCapabilities ?? {}) };
-  const mail = list.filter((c) => isEmailCalendarKey(c.key)).map((c) => c.key);
-  if (emailCalendarAllowed(cfg.mcpDefaults) && mail.length) {
-    for (const k of mail) connectorsOn[k] = true;
+  const calendar = list.filter((c) => isEmailCalendarKey(c.key) && !isMailConnectorKey(c.key)).map((c) => c.key);
+  // Agents could reach the Claude account's Gmail only with the old switch on.
+  const hadMail = emailCalendarAllowed(cfg.mcpDefaults);
+  if (hadMail && calendar.length) {
+    for (const k of calendar) connectorsOn[k] = true;
     for (const id of agentIds) {
       const caps = agentCapabilities[id] ?? {};
-      agentCapabilities[id] = { ...caps, connectors: [...new Set([...(caps.connectors ?? []), ...mail])] };
+      agentCapabilities[id] = { ...caps, connectors: [...new Set([...(caps.connectors ?? []), ...calendar])] };
     }
   }
   const switchedOff = agentIds.length
-    ? list.filter((c) => c.status === 'connected' && !isQuickBooksKey(c.key) && !isEmailCalendarKey(c.key)).map((c) => c.key)
+    ? list.filter((c) => c.status === 'connected' && !isQuickBooksKey(c.key) && !calendar.includes(c.key) && (hadMail || !isMailConnectorKey(c.key))).map((c) => c.key)
     : [];
   return { connectorsOn, agentCapabilities, switchedOff };
 }
@@ -344,5 +358,5 @@ export function connectorCarryOver(
 /** Keys found now that the owner has not seen in Settings yet. */
 export function unseenKeys(list: ClaudeConnector[] | null | undefined, seen: string[] | undefined): string[] {
   if (!list) return [];
-  return list.map((c) => c.key).filter((k) => !(seen ?? []).includes(k));
+  return offeredConnectors(list).map((c) => c.key).filter((k) => !(seen ?? []).includes(k));
 }
