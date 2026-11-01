@@ -311,7 +311,10 @@ test('a file goes on only from the sender\'s own saved attachments, checked agai
   assert.throws(() => handOverAttachment({ file: secret, fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
   assert.throws(() => handOverAttachment({ file: path.join(pam, ATTACHMENTS_FOLDER), fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
   assert.throws(() => handOverAttachment({ file: path.join(pam, ATTACHMENTS_FOLDER, 'gone.pdf'), fromFolder: pam, toFolder: dwight }, noMark), /could not be found/);
-  const swapped = path.join(pam, ATTACHMENTS_FOLDER, 'swapped.pdf');
+  const unknown = path.join(pam, ATTACHMENTS_FOLDER, 'unknown.pdf');
+  fs.writeFileSync(unknown, PDF);
+  assert.throws(() => handOverAttachment({ file: unknown, fromFolder: pam, toFolder: dwight }, noMark), /does not know that file/);
+  const swapped = saveAttachmentFile({ folder: pam, name: 'swapped.pdf', ending: 'pdf', bytes: PDF }, noMark);
   fs.writeFileSync(swapped, EXE);
   assert.throws(() => handOverAttachment({ file: swapped, fromFolder: pam, toFolder: dwight }, noMark), /not a kind of file/);
   if (process.platform !== 'win32') {
@@ -323,7 +326,7 @@ test('a file goes on only from the sender\'s own saved attachments, checked agai
 });
 
 test('a linked folder or a second name cannot carry a file out of reach', { skip: process.platform === 'win32' && 'POSIX only' }, (t) => {
-  // Value: protects=a member's shell cannot use the app to read past its sandbox; fails_when=the folder check follows a link or the read follows a name; why_new=ship review reproduced it; seam=none; no_claim=a swap in the instant between the checks and the read
+  // Value: protects=a member's shell cannot use the app to read past its sandbox; fails_when=the folder check follows a link or the read follows a name; why_new=ship review reproduced it; seam=none; no_claim=none beyond protects
   const pam = tempFolder(t);
   const dwight = tempFolder(t);
   const walled = tempFolder(t);
@@ -339,7 +342,7 @@ test('a linked folder or a second name cannot carry a file out of reach', { skip
 });
 
 test('only a plain file directly in the folder goes on', { skip: process.platform === 'win32' && 'POSIX only' }, (t) => {
-  // Value: protects=a swap below the folder and a pipe that would stop the app; fails_when=nested paths or the blocking open come back; why_new=ship review; seam=none; no_claim=a swap of the folder itself and back in one instant
+  // Value: protects=a swap below the folder and a pipe that would stop the app; fails_when=nested paths or the blocking open come back; why_new=ship review; seam=none; no_claim=none beyond protects
   const pam = tempFolder(t);
   const dwight = tempFolder(t);
   saveAttachmentFile({ folder: pam, name: 'a.pdf', ending: 'pdf', bytes: PDF }, noMark);

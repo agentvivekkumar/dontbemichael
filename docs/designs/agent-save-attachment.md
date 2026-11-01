@@ -176,3 +176,12 @@ owner turns it on for each member.
 owner can open it, and it stays with the work. Files there sync if that folder is in Dropbox. The
 alternative is the member's private scratch space, which keeps outside files out of the owner's
 folders, but the owner cannot see them, and they are lost when that space is cleared.
+
+## Handing a file to a teammate: what goes
+
+Only a file the app saved since it opened goes on, known by identity and not by path. A member's shell can
+swap a folder for a link at any moment, and Node has no way to open a file relative to a checked folder, so
+no path check held against a timed swap (ship review, 2026-11-01: a test swap won a few times in every
+20 seconds against path checks, and none in 370,000 tries against this rule). After the app restarts a
+member saves the file again before sending it. The file must sit directly in Email attachments, have one
+name, and be under the size limit.
