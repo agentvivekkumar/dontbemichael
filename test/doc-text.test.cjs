@@ -387,6 +387,67 @@ test('plain text, markdown and CSV are left to the store, which already reads th
   }
 });
 
+test('Excel\'s "Unicode Text" (UTF-16 with a byte order mark) is read as text, not refused as binary', async () => {
+  // Value: protects=a UTF-16 export from Excel or Notepad is searchable; fails_when=the NUL bytes of UTF-16 trip the binary check again; why_new=Windows exports were refused as "isn't a document"; seam=none
+  const rows = 'Item\tPrice\r\nCroissant\t2.50\r\nCrème brûlée\t4.00\r\n';
+  const le = await extractDocumentText(write('price-list.txt', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(rows, 'utf16le')])));
+  assert.equal(le.kind, 'text');
+  assert.equal(le.text, rows);
+  assert.equal(le.extractor, 'text-utf-16le@1');
+  assert.equal(le.modality, kg.detectModality('price-list.txt'));
+  assert.equal(le.mime, 'text/plain');
+
+  const be = await extractDocumentText(write('price-list-be.tsv', Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(rows, 'utf16le').swap16()])));
+  assert.equal(be.kind, 'text');
+  assert.equal(be.text, rows);
+  assert.equal(be.modality, 'sheet');
+  assert.equal(be.mime, 'text/tab-separated-values');
+
+  const empty = await extractDocumentText(write('blank.txt', Buffer.from([0xff, 0xfe])));
+  assert.equal(empty.kind, 'unreadable', 'a byte order mark and nothing else has no text to store');
+});
+
+test('a UTF-8 byte order mark is not kept at the front of the text or the title', async () => {
+  // Value: protects=a Notepad-saved UTF-8 file is indexed and titled without U+FEFF; fails_when=the BOM file is passed through raw; why_new=the mark sat in text.md and the first CSV header; seam=none
+  const src = write('suppliers-bom.csv', Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('Name,City\nJosé Müller,Köln\n')]));
+  const ex = await extractDocumentText(src);
+  assert.equal(ex.kind, 'text');
+  assert.equal(ex.text, 'Name,City\nJosé Müller,Köln\n');
+
+  const root = path.join(tmp, 'kg-bom');
+  const { docId, meta } = kg.ingest(root, { srcPath: src, text: ex.text, modality: ex.modality, extractor: ex.extractor, mime: ex.mime });
+  assert.equal(meta.title, 'Name,City');
+  assert.equal(meta.modality, 'sheet');
+  assert.equal(meta.mime, 'text/csv');
+  assert.ok(!kg.getDoc(root, docId).text.startsWith('﻿'));
+});
+
+test('end to end: a Windows-1252 CSV from Excel is decoded, and its accented names are searchable', async () => {
+  // Value: protects=an Excel "CSV (Comma delimited)" export keeps its accents in the store; fails_when=a non-UTF-8 file is read as UTF-8 and every accent becomes U+FFFD; why_new=search for José or Köln found nothing; seam=none
+  const src = write('suppliers.csv', Buffer.from('Name,City\r\nJos\xe9 M\xfcller,K\xf6ln\r\nCaf\xe9 \x93Ren\xe9e\x94,S\xe3o Paulo \x80\r\n', 'latin1'));
+  const ex = await extractDocumentText(src);
+  assert.equal(ex.kind, 'text');
+  assert.equal(ex.text, 'Name,City\r\nJosé Müller,Köln\r\nCafé “Renée”,São Paulo €\r\n');
+  assert.equal(ex.extractor, 'text-windows-1252@1');
+
+  const root = path.join(tmp, 'kg-1252');
+  const { docId, meta } = kg.ingest(root, { srcPath: src, text: ex.text, modality: ex.modality, extractor: ex.extractor, mime: ex.mime });
+  for (const q of ['José', 'Köln', 'São Paulo']) {
+    const hits = kg.search(root, q);
+    assert.equal(hits.length, 1, q);
+    assert.equal(hits[0].docId, docId);
+  }
+  assert.equal(meta.modality, 'sheet');
+  assert.equal(meta.mime, 'text/csv');
+  assert.ok(!kg.getDoc(root, docId).text.includes('�'));
+});
+
+test('a UTF-8 file with accents is still left to the store, byte for byte', async () => {
+  // Value: protects=valid UTF-8 is never re-decoded as Windows-1252; fails_when=the fallback runs on files that were already UTF-8; why_new=the new decoder sits in front of every text file; seam=none
+  const src = write('cities.csv', 'Name,City\nJosé Müller,Köln\n東京,大阪\n');
+  assert.equal((await extractDocumentText(src)).kind, 'passthrough');
+});
+
 test('a missing file gets a plain reason, not a stack trace', async () => {
   const r = await extractDocumentText(path.join(tmp, 'gone.docx'));
   assert.equal(r.kind, 'unreadable');
