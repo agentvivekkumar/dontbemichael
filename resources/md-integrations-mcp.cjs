@@ -96,6 +96,19 @@ function jsonOf(text) {
   try { return JSON.parse(text); } catch { return undefined; }
 }
 
+/** Every string in a parsed answer, one per line: the words a member reads, not
+ *  their JSON form, where an escape hides a line break or a letter. */
+function stringsIn(value) {
+  const out = [];
+  const todo = [value];
+  while (todo.length) {
+    const v = todo.pop();
+    if (typeof v === 'string') out.push(v);
+    else if (v && typeof v === 'object') for (const [k, item] of Object.entries(v)) { out.push(k); todo.push(item); }
+  }
+  return out.join('\n');
+}
+
 /** What the broker says about an answer. An answer it could not screen still
  *  carries the outside text label. */
 async function screened(integration, text) {
@@ -137,8 +150,10 @@ async function callIntegration(args) {
   try { inside = new URL(target, 'http://broker').pathname.startsWith(`/i/${encodeURIComponent(args.integration)}/`); } catch { /* not an address */ }
   if (!inside) return { error: 'That path leaves the integration.' };
   const out = await callBroker(method, target, headers, payload);
-  const answer = { status: out.status, content_type: out.type, body: jsonOf(out.text) ?? out.text, ...(out.truncated ? { truncated: true } : {}) };
-  return { ok: out.status >= 200 && out.status < 300, answer: { ...answer, ...(await screened(args.integration, out.text)) } };
+  const parsed = jsonOf(out.text);
+  const answer = { status: out.status, content_type: out.type, body: parsed ?? out.text, ...(out.truncated ? { truncated: true } : {}) };
+  const words = parsed === undefined ? out.text : stringsIn(parsed);
+  return { ok: out.status >= 200 && out.status < 300, answer: { ...answer, ...(await screened(args.integration, words)) } };
 }
 
 async function runTool(name, args) {

@@ -7,7 +7,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { closeSync, constants, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync, writeSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { isSameOrInside } from './pathInside';
 import { attachmentKind } from '../shared/attachmentKind';
@@ -40,6 +40,14 @@ export function attachmentStem(name: string): string {
   return cleanFolderName(base, 'attachment');
 }
 
+/** The subfolder when it is a plain folder of the member's own, else null. A
+ *  member's shell writes its folder, so a link here could lead anywhere. */
+function plainAttachmentsDir(realFolder: string): string | null {
+  const dir = join(realFolder, ATTACHMENTS_FOLDER);
+  const st = lstatSync(dir);
+  return st.isDirectory() && !st.isSymbolicLink() && realpathSync(dir) === dir ? dir : null;
+}
+
 /** The subfolder, made if need be. Refused when anything on the way is a link
  *  that leads out of the member's folder. */
 function attachmentsDir(folder: string): string {
@@ -48,8 +56,7 @@ function attachmentsDir(folder: string): string {
   const dir = join(real, ATTACHMENTS_FOLDER);
   try {
     mkdirSync(dir, { recursive: true });
-    const st = lstatSync(dir);
-    if (st.isDirectory() && !st.isSymbolicLink() && isSameOrInside(real, realpathSync(dir))) return dir;
+    if (plainAttachmentsDir(real)) return dir;
   } catch (e) {
     throw new AttachmentSaveError(`The ${ATTACHMENTS_FOLDER} folder could not be made: ${(e as NodeJS.ErrnoException).code ?? 'unknown error'}.`);
   }
@@ -73,15 +80,43 @@ export function saveAttachmentFile(
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw new AttachmentSaveError(`The file could not be saved: ${(e as NodeJS.ErrnoException).code ?? 'unknown error'}.`);
       try {
-        if (lstatSync(path).isFile() && readFileSync(path).equals(input.bytes)) return path;
+        const st = lstatSync(path);
+        if (st.isFile() && st.size === input.bytes.length && readFileSync(path).equals(input.bytes)) return path;
       } catch { /* try the next name */ }
       continue;
     }
-    try { writeSync(fd, input.bytes); } finally { closeSync(fd); }
+    let failed: NodeJS.ErrnoException | undefined;
+    try { writeFileSync(fd, input.bytes); } catch (e) { failed = e as NodeJS.ErrnoException; } finally { closeSync(fd); }
+    if (failed) {
+      // Half a file under this name would pass for the attachment.
+      rmSync(path, { force: true });
+      throw new AttachmentSaveError(`The file could not be saved: ${failed.code ?? 'unknown error'}.`);
+    }
     mark(path);
     return path;
   }
   throw new AttachmentSaveError('Too many files with this name in your Email attachments folder.');
+}
+
+/** The file's bytes through one open handle, so a file swapped in after the
+ *  checks is not what gets read. `stillPlain` looks at the folder again once the
+ *  file is open. Null when it is not a plain file with one name. */
+function readPlainFile(path: string, stillPlain: () => boolean): Buffer | null {
+  let fd: number;
+  try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)); } catch { return null; }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.nlink !== 1 || !stillPlain()) return null;
+    if (st.size > ATTACHMENT_MAX_BYTES) throw new AttachmentSaveError('That file is too big to send on.');
+    const bytes = Buffer.alloc(st.size);
+    let got = 0;
+    while (got < st.size) {
+      const n = readSync(fd, bytes, got, st.size - got, got);
+      if (n === 0) break;
+      got += n;
+    }
+    return bytes.subarray(0, got);
+  } finally { closeSync(fd); }
 }
 
 /**
@@ -95,17 +130,18 @@ export function handOverAttachment(
   input: { file: string; fromFolder: string; toFolder: string },
   mark: (path: string) => void = markFromOutside
 ): string {
+  let folder: string;
   let real: string;
-  let own: string;
+  let own: string | null;
   try {
+    folder = realpathSync(input.fromFolder);
+    own = plainAttachmentsDir(folder);
     real = realpathSync(input.file);
-    own = realpathSync(join(input.fromFolder, ATTACHMENTS_FOLDER));
   } catch { throw new AttachmentSaveError('That file could not be found. Save it with save_attachment first.'); }
-  if (real === own || !isSameOrInside(own, real) || !lstatSync(real).isFile()) {
-    throw new AttachmentSaveError(`Only a file from your own ${ATTACHMENTS_FOLDER} folder can go with a message.`);
-  }
-  if (lstatSync(real).size > ATTACHMENT_MAX_BYTES) throw new AttachmentSaveError('That file is too big to send on.');
-  const bytes = readFileSync(real);
+  const bytes = own && real !== own && isSameOrInside(own, real)
+    ? readPlainFile(real, () => plainAttachmentsDir(folder) === own)
+    : null;
+  if (!bytes) throw new AttachmentSaveError(`Only a file from your own ${ATTACHMENTS_FOLDER} folder can go with a message.`);
   const kind = attachmentKind(bytes, basename(real));
   if (!kind) throw new AttachmentSaveError('That is not a kind of file the office takes in, so it was not sent on.');
   return saveAttachmentFile({ folder: input.toFolder, name: basename(real), ending: kind.ending, bytes }, mark);

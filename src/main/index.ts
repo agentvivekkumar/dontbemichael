@@ -6142,7 +6142,7 @@ ipcMain.handle('hive:firstTask', (_evt, payload: unknown) => {
     // A new id that still will not go on means the board cannot be read. Not
     // ok, so the words stay in the Work style instead of being lost.
     if (!hive.addTask(first.card)) {
-      ownerToast('First task not started', `The board cannot be read right now, so the first task for ${who} is saved in the Work style.`);
+      ownerToast(michaelName(), `The board cannot be read right now, so the first task for ${who} is saved in the Work style.`);
       return { ok: false, error: 'the board cannot be read' };
     }
   }
@@ -7576,7 +7576,12 @@ ipcMain.handle('agent:closedByOwner', (_evt, id: unknown): { ok: boolean; paused
  *  their open Ask me questions are withdrawn and Michael is told about their
  *  open cards (hive.memberDeleted). */
 ipcMain.handle('agent:deleted', (_evt, id: unknown): { withdrawn: number; cards: number } => {
-  if (typeof id !== 'string' || !/^[\w-]+$/.test(id) || !hive.enabled()) return { withdrawn: 0, cards: 0 };
+  if (typeof id !== 'string' || !/^[\w-]+$/.test(id)) return { withdrawn: 0, cards: 0 };
+  // A later hire under this id starts restricted, with nothing left over.
+  const agentCapabilities = { ...(readConfig().agentCapabilities ?? {}) };
+  delete agentCapabilities[id];
+  writeConfig({ agentCapabilities });
+  if (!hive.enabled()) return { withdrawn: 0, cards: 0 };
   try { return hive.memberDeleted(id); } catch (e) { console.error('[hive] memberDeleted failed:', e); return { withdrawn: 0, cards: 0 }; }
 });
 
@@ -8661,13 +8666,14 @@ function bootstrapHiveServices(): void {
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.onFileHandover((from, to, file) => {
     const reg = hive.registry();
-    const toId = to === 'michael' || to === 'god' ? (reg.godId ?? 'god') : to;
+    if (to === RESEARCH_ID || !reg.agents[to]) return { error: 'Files go only between team members.' };
     const fromFolder = attachmentFolder(from);
-    const toFolder = toId === RESEARCH_ID || !reg.agents[toId] ? undefined : attachmentFolder(toId);
-    if (!fromFolder || !toFolder) return { error: 'Files go only between team members with a folder.' };
+    const toFolder = attachmentFolder(to);
+    // Folders are known from a member's start, and a member may not have started yet.
+    if (!fromFolder || !toFolder) return { error: `${reg.agents[to].name} has not started yet, so the file stayed with you. Send it again once they are working.` };
     try {
       const path = handOverAttachment({ file, fromFolder, toFolder });
-      hive.appendLog({ kind: 'file-handed-over', from, to: toId, name: basename(path) });
+      hive.appendLog({ kind: 'file-handed-over', from, to, name: basename(path) });
       return { path };
     } catch (e) {
       if (e instanceof AttachmentSaveError) return { error: e.message };

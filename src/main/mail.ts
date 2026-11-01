@@ -59,6 +59,11 @@ import { unfoundedMoneyReason } from '../shared/standingFacts';
 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
+/** One attachment at the size limit, on an ordinary link. Two tries fit inside
+ *  md-mail's three minutes. */
+const ATTACHMENT_TIMEOUT_MS = 75_000;
+/** The default 64 KB would take hundreds of round trips for a big attachment. */
+const ATTACHMENT_CHUNK_BYTES = 1024 * 1024;
 /** What a read that timed out tells the agent: it clears on the next try. */
 export const READ_TIMEOUT_NOTE = 'The app opens a new connection on the next try, so try again at your next check; restarting the app is not needed.';
 const SEND_TIMEOUT_MS = 60_000;
@@ -131,7 +136,7 @@ export interface ImapLike {
   mailboxCreate?(path: string): Promise<unknown>;
   /** One body part, decoded, as UTF-8 for text (ImapFlow). Optional so a
    *  client without it reads whole messages. */
-  download?(range: string | number, part?: string, options?: { uid?: boolean; maxBytes?: number }): Promise<{ content?: AsyncIterable<Buffer | string> }>;
+  download?(range: string | number, part?: string, options?: { uid?: boolean; maxBytes?: number; chunkSize?: number }): Promise<{ content?: AsyncIterable<Buffer | string> }>;
   on?(event: string, fn: (...a: any[]) => void): unknown;
 }
 
@@ -578,7 +583,7 @@ export class MailService {
 
   /** Run `fn` with the folder locked; one reconnect after a dropped socket
    *  (sleep and wake), then a classified error. */
-  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike, path: string) => Promise<T>, what: string, append = false): Promise<T> {
+  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike, path: string) => Promise<T>, what: string, append = false, limitMs = CALL_TIMEOUT_MS): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
       let client: ImapLike | undefined;
       let started = false;
@@ -588,7 +593,7 @@ export class MailService {
         const lock = await withTimeout(client.getMailboxLock(path), CALL_TIMEOUT_MS, what);
         try {
           started = true;
-          const out = await withTimeout(fn(client, path), CALL_TIMEOUT_MS, what);
+          const out = await withTimeout(fn(client, path), limitMs, what);
           this.note(id);
           return out;
         } finally { lock.release(); }
@@ -927,7 +932,7 @@ export class MailService {
       if (node.type === 'message/rfc822') throw new MailError('refused', 'That attachment is a whole email, which is not saved. Read the email instead.');
       if (attachmentSize(node) > ATTACHMENT_MAX_BYTES) throw new MailError('refused', `That attachment is over ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB, so it was not saved.`);
       if (!c.download) throw new MailError('unsupported', 'This mail server does not offer attachments one at a time.');
-      const { content } = await c.download(uid, node.part || '1', { uid: true, maxBytes: ATTACHMENT_MAX_BYTES + 1 });
+      const { content } = await c.download(uid, node.part || '1', { uid: true, maxBytes: ATTACHMENT_MAX_BYTES + 1, chunkSize: ATTACHMENT_CHUNK_BYTES });
       const chunks: Buffer[] = [];
       let size = 0;
       if (content) {
@@ -939,7 +944,7 @@ export class MailService {
         }
       }
       return { name: attachmentName(node), bytes: Buffer.concat(chunks) };
-    }, 'Fetching the attachment');
+    }, 'Fetching the attachment', false, ATTACHMENT_TIMEOUT_MS);
   }
 
   /** The body parts decoded to UTF-8 and joined the way mailparser joins them,

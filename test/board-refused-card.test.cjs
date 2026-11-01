@@ -18,7 +18,7 @@ test('a First task that cannot go on the board is reported as not done, and the 
   // Value: protects=the words the owner typed; fails_when=the handler answers ok, as it does when there is nothing to send, so the caller drops them; why_new=review of a strict board read; seam=source pin for the handler
   const handler = main.slice(main.indexOf("ipcMain.handle('hive:firstTask'"), main.indexOf("ipcMain.handle('hive:addTask'"));
   const retry = handler.slice(handler.indexOf('first.card.id = `${first.card.id}-'));
-  assert.match(retry, /if \(!hive\.addTask\(first\.card\)\) \{\n\s+ownerToast\('First task not started', /);
+  assert.match(retry, /if \(!hive\.addTask\(first\.card\)\) \{\n\s+ownerToast\(michaelName\(\), /);
   assert.match(retry, /return \{ ok: false, error: 'the board cannot be read' \};/);
   assert.doesNotMatch(retry.slice(0, retry.indexOf('hive.send(')), /sent: false/, 'not the answer for nothing to send');
 });

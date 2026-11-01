@@ -321,6 +321,31 @@ test('a file goes on only from the sender\'s own saved attachments, checked agai
   assert.deepEqual(fs.readdirSync(path.join(dwight, ATTACHMENTS_FOLDER)), ['Workflow.pdf']);
 });
 
+test('a linked folder or a second name cannot carry a file out of reach', { skip: process.platform === 'win32' && 'POSIX only' }, (t) => {
+  // Value: protects=a member's shell cannot use the app to read past its sandbox; fails_when=the folder check follows a link or the read follows a name; why_new=ship review reproduced it; seam=none; no_claim=a swap in the instant between the checks and the read
+  const pam = tempFolder(t);
+  const dwight = tempFolder(t);
+  const walled = tempFolder(t);
+  fs.writeFileSync(path.join(walled, 'credentials'), 'key=1');
+  fs.symlinkSync(walled, path.join(pam, ATTACHMENTS_FOLDER));
+  assert.throws(() => handOverAttachment({ file: path.join(pam, ATTACHMENTS_FOLDER, 'credentials'), fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
+  fs.rmSync(path.join(pam, ATTACHMENTS_FOLDER));
+  fs.mkdirSync(path.join(pam, ATTACHMENTS_FOLDER));
+  const second = path.join(pam, ATTACHMENTS_FOLDER, 'second.txt');
+  fs.linkSync(path.join(walled, 'credentials'), second);
+  assert.throws(() => handOverAttachment({ file: second, fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
+  assert.equal(fs.existsSync(path.join(dwight, ATTACHMENTS_FOLDER)), false);
+});
+
+test('a file too big to hand on is refused before it is read', (t) => {
+  // Value: protects=the size limit on a handover; fails_when=the limit check goes; why_new=the read moved to one handle; seam=none; no_claim=none beyond protects
+  const pam = tempFolder(t);
+  const dwight = tempFolder(t);
+  const file = saveAttachmentFile({ folder: pam, name: 'big.pdf', ending: 'pdf', bytes: PDF }, noMark);
+  fs.truncateSync(file, ATTACHMENT_MAX_BYTES + 1);
+  assert.throws(() => handOverAttachment({ file, fromFolder: pam, toFolder: dwight }, noMark), /too big/);
+});
+
 test('the file travels with the message: delivered, labelled, and the sender hears a refusal', async (t) => {
   // Value: protects=asking a teammate for a file works on the normal message path; fails_when=the router drops file or delivers without the label; why_new=owner's design; seam=the handover is a stand in; no_claim=real folders, covered above
   const { HiveManager } = loadTs('src/main/hive.ts');
@@ -347,6 +372,17 @@ test('the file travels with the message: delivered, labelled, and the sender hea
   hive.routeOnce();
   assert.ok(inbox('dwight').some((m) => m.subject === 'Second' && !/came with this message/.test(m.body)), 'the words still go');
   assert.match(inbox('pam').find((m) => m.subject === 'File not delivered').body, /its file did not: no good/);
+
+  seen.length = 0;
+  send('c.json', { subject: 'Third', to: 'Dwight', file: '/office/Admin/Email attachments/x.pdf' });
+  hive.routeOnce();
+  assert.equal(seen[0].to, 'dwight', 'the file goes by the roster id, however the message wrote it');
+
+  seen.length = 0;
+  send('d.json', { subject: 'Do this', act: 'request', file: '/office/Admin/Email attachments/x.pdf' });
+  hive.routeOnce();
+  assert.deepEqual(seen, [], 'a job for a teammate goes to Michael, so no file lands with the teammate');
+  assert.ok(inbox('pam').some((m) => m.subject === 'File not delivered' && /not with a job/.test(m.body)));
 
   send('c.json', { subject: 'Plain' });
   const before = seen.length;

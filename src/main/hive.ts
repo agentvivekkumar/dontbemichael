@@ -2767,12 +2767,28 @@ export class HiveManager {
   /** A message may carry one file the sender saved: the app puts it in the
    *  recipient's own folder and says where, so neither opens the other's. A
    *  file it can't deliver leaves the words to go on, and the sender hears why. */
+  /** The roster id a message's `to` means. Michael answers to several words. */
+  private recipientId(to: string, reg: ReturnType<HiveManager['registry']>, godId: string): string {
+    const t = to.toLowerCase();
+    if (t === 'human' || t === 'god' || t === 'michael' || t === resolveGodName(reg.agents[godId]?.name).toLowerCase()) return godId;
+    // An id written with other capitals is still that teammate ("Pam" is pam,
+    // and on a Mac or Windows disk her inbox too), so every check reads the
+    // roster's own id.
+    return reg.agents[to] ? to : Object.keys(reg.agents).find((id) => id.toLowerCase() === t) ?? to;
+  }
+
   private carryFile(from: string, msg: HiveMessage, partial: Partial<HiveMessage>): void {
     const file = (partial as { file?: unknown }).file;
     if (file === undefined) return;
     let out: { path: string } | { error: string } = { error: 'Send one file, as its full path.' };
-    if (typeof file === 'string' && this.fileHandover) {
-      try { out = this.fileHandover(from, msg.to, file); } catch (e) { console.error('[hive] file handover', e); out = { error: 'The app hit an error. Try again later.' }; }
+    const reg = this.registry();
+    const godId = reg.godId ?? 'god';
+    const to = this.recipientId(msg.to, reg, godId);
+    if (isPeerAssignment(msg, reg.agents, godId, to)) {
+      // The router sends this one to Michael, so the teammate never hears of the file.
+      out = { error: 'A file goes with a query or an answer, not with a job for a teammate.' };
+    } else if (typeof file === 'string' && this.fileHandover) {
+      try { out = this.fileHandover(from, to, file); } catch (e) { console.error('[hive] file handover', e); out = { error: 'The app hit an error. Try again later.' }; }
     }
     if ('path' in out) {
       msg.body = `${msg.body}\n\n[${FILE_CAME_WITH(out.path)}]`;
@@ -3281,7 +3297,7 @@ export class HiveManager {
     const to = lowerTo;
     // A reply to the app's own senders is dropped quietly, as for everyone,
     // so a refusal note never starts a loop of answers.
-    if (['scheduler', 'heartbeat', 'mail', 'system', 'foundations', PRIVACY_CHECK_SENDER].includes(to)) {
+    if (['scheduler', 'heartbeat', 'mail', 'integrations', 'system', 'foundations', PRIVACY_CHECK_SENDER].includes(to)) {
       this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: RESEARCH_ID, to: logTo, id: logId });
       return 'denied';
     }
@@ -3473,15 +3489,7 @@ export class HiveManager {
     // Michael answers to his internal id, "michael", his display name and, for
     // the owner, "human" (agents are told to write "michael"; owner cleanup,
     // 2026-09-25).
-    const godName = resolveGodName(reg.agents[godId]?.name).toLowerCase();
-    const resolveTo = (to: string): string => {
-      const t = to.toLowerCase();
-      if (t === 'human' || t === 'god' || t === 'michael' || t === godName) return godId;
-      // An id written with other capitals is still that teammate ("Pam" is pam,
-      // and on a Mac or Windows disk her inbox too), so every check below reads
-      // the roster's own id.
-      return reg.agents[to] ? to : Object.keys(reg.agents).find((id) => id.toLowerCase() === t) ?? to;
-    };
+    const resolveTo = (to: string): string => this.recipientId(to, reg, godId);
     // Only Michael assigns work (owner, 2026-09-27, src/shared/handoffRule.ts):
     // a teammate handing another teammate a job goes to Michael instead.
     if (isPeerAssignment(msg, reg.agents, godId, resolveTo(msg.to))) {
@@ -3497,7 +3505,7 @@ export class HiveManager {
     // The scheduler, the heartbeat and the mail app send; they don't read. A
     // reply to one is dropped quietly instead of bouncing back to Michael as
     // undeliverable (an approval's "send it now" would otherwise bounce).
-    if (msg.to === 'scheduler' || msg.to === 'heartbeat' || msg.to === 'mail' || msg.to === 'foundations' || msg.to === PRIVACY_CHECK_SENDER) {
+    if (msg.to === 'scheduler' || msg.to === 'heartbeat' || msg.to === 'mail' || msg.to === 'foundations' || msg.to === PRIVACY_CHECK_SENDER || msg.to === 'integrations') {
       this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: msg.from, to: msg.to, id: msg.id });
       return;
     }

@@ -67,6 +67,9 @@ const HOP_BY_HOP = new Set([
 const STRIP_REQUEST = new Set([
   'authorization', 'x-md-broker-token', 'host', 'cookie', 'content-length', 'expect', ...HOP_BY_HOP
 ]);
+/** Headers that ask a service to treat a call as another method: a Read only
+ *  GET carrying one could otherwise run as a DELETE. */
+const METHOD_OVERRIDE = new Set(['x-http-method-override', 'x-http-method', 'x-method-override']);
 /** Response headers never forwarded back (fetch already decodes the body, so the
  *  upstream content-encoding/length would be wrong). */
 const STRIP_RESPONSE = new Set([
@@ -403,7 +406,7 @@ export class IntegrationBroker {
     const outHeaders: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
       const key = k.toLowerCase();
-      if (STRIP_REQUEST.has(key)) continue;
+      if (STRIP_REQUEST.has(key) || (readOnly && METHOD_OVERRIDE.has(key))) continue;
       if (Array.isArray(v)) outHeaders[key] = v.join(', ');
       else if (typeof v === 'string') outHeaders[key] = v;
     }
