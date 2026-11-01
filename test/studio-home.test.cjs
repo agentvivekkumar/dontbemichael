@@ -233,7 +233,7 @@ test('lights come up as people clock in, the way closing time turns them off (ow
   assert.match(rule, /if \(a\.action !== marker\) \{ since\.delete\(a\.id\); continue; \}/);
   assert.match(rule, /now - \(since\.get\(a\.id\) \?\? now\) < CLOCK_IN_CAP_MS/, 'never dark for more than a minute');
   assert.match(rule, /export const CLOCK_IN_CAP_MS = 60_000;/);
-  assert.match(read('src/renderer/src/hooks/useClockingIn.ts'), /clockingIn\(agents, since\.current, Date\.now\(\), ACTION_CLOCKING_IN\)/);
+  assert.match(read('src/renderer/src/hooks/useClockingIn.ts'), /clockingIn\(agents, since \?\? own\.current, Date\.now\(\), ACTION_CLOCKING_IN\)/);
   assert.match(stage, /\|\| pod\.members\.every\(\(a\) => away\.has\(a\.id\)\)\}/);
   assert.match(stage, /const hubAway = godStatus === 'booting' \|\| \(!!god && away\.has\(god\.id\)\);/);
   const art = read('src/renderer/src/scene/studio/StudioArt.tsx');

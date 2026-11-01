@@ -58,22 +58,11 @@ test('both schedule views pass the note to the row, and every locale has the wor
   }
 });
 
-test('a member who reads mail through the Gmail connector is not told they cannot check email', () => {
-  // Value: protects=no false warning on a job that works; fails_when=only the app's Email capability is checked; why_new=owner review on #218; seam=none
-  const { gmailConnectorOn } = loadTs('src/shared/claudeConnectors.ts');
-  const cfg = (over = {}) => ({ connectorsOn: { Gmail: true }, agentCapabilities: { pam: { email: off, connectors: ['Gmail'] } }, ...over });
-  assert.equal(gmailConnectorOn(cfg(), 'pam'), true);
-  assert.equal(cannotCheckEmail(mk(), off, gmailConnectorOn(cfg(), 'pam')), false, 'Gmail granted and on');
-  // Granted but switched off in Settings, or on but not granted: still no mail.
-  assert.equal(gmailConnectorOn(cfg({ connectorsOn: { Gmail: false } }), 'pam'), false);
-  assert.equal(gmailConnectorOn(cfg({ agentCapabilities: { pam: { email: off, connectors: [] } } }), 'pam'), false);
-  assert.equal(cannotCheckEmail(mk(), off, gmailConnectorOn(cfg({ connectorsOn: {} }), 'pam')), true);
-  // Google Calendar is not mail.
-  assert.equal(gmailConnectorOn({ connectorsOn: { 'Google Calendar': true }, agentCapabilities: { pam: { connectors: ['Google Calendar'] } } }, 'pam'), false);
-  for (const view of ['AgentSchedules', 'OfficeSchedules']) {
-    const src = read('src/renderer/src/components/triggers/ScheduleList.tsx');
-    assert.match(src.slice(src.indexOf(`export function ${view}`)), /cannotCheckEmail\(m, \{ enabled: agentMailboxes\(config, \w+\)\.length > 0 \}, gmailConnectorOn\(config, \w+\)\)/, view);
-  }
+test('a Gmail grant on the Claude account does not count as a way to check email', () => {
+  // Value: protects=the schedule warning stays true now that mail goes only through the app's mailboxes; fails_when=the warning is hushed for a member with an old Gmail grant, whose run the hook would refuse; why_new=owner 2026-10-30; seam=none
+  const { connectorOn } = loadTs('src/shared/claudeConnectors.ts');
+  assert.equal(connectorOn({ connectorsOn: { Gmail: true } }, 'Gmail'), false);
+  assert.equal(cannotCheckEmail(mk(), off), true);
 });
 
 test('a member whose mailbox was removed in Settings is told they cannot check email', () => {

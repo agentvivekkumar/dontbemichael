@@ -5,7 +5,7 @@
  * No electron or node imports.
  */
 import type { PulseSnapshot } from './teamPerformance';
-import type { Advice } from './teamAdvice';
+import type { Advice, EarlyWatch } from './teamAdvice';
 import type { KeptSafe } from './pulseSafety';
 import type { Learning } from './teamLearning';
 import type { FoundationsPulse } from './foundations';
@@ -32,6 +32,10 @@ export interface PulseView {
    *  at half their evidence, shown as facts with nothing to apply (owner,
    *  2026-10-19). Empty once advice can show. Missing from an older main. */
   early?: Advice[];
+  /** Each rule's count of early patterns and the member closest to a cheaper
+   *  model, so the Early look shows all it watches (owner, 2026-10-26).
+   *  Only while early patterns show; missing from an older main. */
+  earlyWatch?: EarlyWatch;
   /** Company foundations (office-foundations.md): the strip's jobs and each
    *  member's count, from harness.db. Missing from an older main. */
   foundations?: FoundationsPulse;
@@ -47,11 +51,16 @@ export interface PulseView {
   /** What the team learned and asked in the period (and the span before with
    *  Compare), plus what it holds in all. */
   learning: Learning;
-  /** On a Claude plan with a known price: every dollar above is the member's
-   *  part of the plan's real cost for the period, split by share of the work;
+  /** On a Claude plan with a known price and a learned rate: every dollar
+   *  above is what the member's own work cost of the plan, at the plan's rate
+   *  (owner, 2026-10-29: never the whole plan, which the owner also uses);
    *  `payPerUse` is what the same work would cost per use. Null on an API key
-   *  (dollars are what was spent) or a plan with no known price. */
+   *  (dollars are what was spent), a plan with no known price, or while the
+   *  rate is still being learned. */
   plan: { label: string | null; monthly: number; source: 'owner' | 'detected'; periodCost: number; payPerUse: number } | null;
+  /** On a priced plan whose rate the weekly meter has not shown yet: the
+   *  dollars above are pay per use value. */
+  planLearning?: true;
   /** The span before, when Compare is on and ready; else null. */
   compare: PulseCompare | null;
   /** Whether this period can compare: its span before starts on or after the

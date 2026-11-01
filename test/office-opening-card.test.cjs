@@ -37,7 +37,7 @@ test('the floor shows the opening card on every launch, and the stage uses the s
   assert.match(stage, /import \{ useClockingIn \} from '@\/hooks\/useClockingIn';/);
   assert.doesNotMatch(stage, /function useClockingIn\(/, 'one rule, shared');
   const card = read('src/renderer/src/components/TeamClockingIn.tsx');
-  assert.match(card, /const arriving = useClockingIn\(agents\);/);
+  assert.match(card, /const arriving = useClockingIn\(agents, firstSeen\.current\);/);
   assert.match(card, /t\('office\.clockedInCount', \{ count: inCount, total \}\)/);
   for (const loc of ['en', 'zh-CN', 'ar']) {
     const v = JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).office.clockedInCount;

@@ -83,6 +83,22 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 
 ## Connections
 
+### Step cards for iCloud, Yahoo and Zoho app passwords
+
+**What:** Give iCloud Mail, Yahoo and Zoho the same numbered step cards Google gets in Add a mailbox (eng review 2026-10-26, D3 B): each step with an Open button to that service's own two step and app password pages, and a plain line on what to copy.
+
+**Why:** Each still shows one paragraph with an address to type; the owner saw a business user struggle with the same paragraph for Google.
+
+**Pros:** One look across Add a mailbox; owners on those services set up without help.
+
+**Cons:** Three more providers' pages to find, link and keep current when they move.
+
+**Context:** The Google cards (AddMailboxDialog.tsx, Google steps) are built to take a per provider list of steps; start from `mailboxes.help.icloud/yahoo/zoho` in the locales and add each provider's steps and page addresses.
+
+**Effort:** human S / CC S
+**Priority:** P3
+**Depends on:** the Google step cards landing.
+
 ### One call at a time per connected app, and a throttle notice
 
 **What:** The broker now backs off per connected app after a 429 or a 503 with `Retry-After` (`src/main/brokerThrottle.ts`, PR #399): a wait of 20 s or less is held, a longer one is answered at once with when to try again. Two parts are left. Send one call at a time per app, so the calls held during a wait don't all go out together when it ends and hit the limit again. And show the owner a throttle that lasts, in plain words, instead of it showing only in agents' answers.
@@ -400,6 +416,40 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Effort:** M
 **Priority:** P2
 
+## Original email view (deferred from the CEO review of docs/designs/original-email-view.md, 2026-10-29)
+
+### Show the whole conversation in the email tab
+
+**What:** Under the one email the tab opens, list the earlier messages of the same conversation, collapsed, newest at the top, found from its In-Reply-To and References headers.
+
+**Why:** A reply often only makes sense next to what it answers (our nudge, the sender's first message); today the owner still needs the mailbox for those.
+
+**Pros:** Full context in one place; reuses the email tab, the owner fetch and the header lookups.
+
+**Cons:** More folder searches per open (each earlier Message-ID), slower open, more failure paths; Gmail threads and other providers' references differ.
+
+**Context:** Owner deferred it (CEO review D5, 2026-10-29) so the single email view ships first and is used. Start from `MailService.original` and the thread headers `threadOf` already reads (`src/main/mail.ts:762`).
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
+### Open or save an email's attachments from the email tab
+
+**What:** The email tab lists attachment names and sizes; add Save to a folder the owner picks, and Open in the office for safe kinds (PDF, pictures).
+
+**Why:** The owner still needs the mailbox to open what was attached to the email an ask is built on.
+
+**Pros:** Everything about the email in one place.
+
+**Cons:** Brings files from outside senders onto the Mac; needs its own checks (kind from content not name, size cap, no launching executables, quarantine flag on macOS).
+
+**Context:** Owner deferred it (CEO review D6, 2026-10-29). Pair with "Read one email without downloading its attachments" under Attachments: download only the one part asked for.
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
 ## Message times and upkeep (deferred from the ship review of mit/file-tab-no-bottom-bar, 2026-10-18)
 
 ### Read a reply's time from the app's record, not the agent's file
@@ -425,15 +475,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.
 
 **Why:** A decline carries Michael's or the owner's reason; dropped, Research may ask for the same change again.
-
-**Effort:** S
-**Priority:** P3
-
-### Retry closing time's wait after all note to Michael
-
-**What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
-
-**Why:** Michael may close without the member's ACK.
 
 **Effort:** S
 **Priority:** P3
@@ -1112,22 +1153,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** human M / CC S
 **Priority:** P2
 **Depends on / blocked by:** the owner choosing a service and passing its identity check.
-
-### Copy diagnostics for problem reports
-
-**What:** A "Copy diagnostics" button beside Settings' Report a problem: app and OS versions, the last 50 office event types from `log.jsonl`, agent exit summaries, with paths and names redacted; copied to the clipboard only.
-
-**Why:** Report a problem carries version numbers only, on purpose, so beta reports can lack what happened just before the failure.
-
-**Pros:** Remote debugging of Windows beta problems without back and forth.
-
-**Cons:** Redaction must be exact: office names, folder paths and customer names must never reach the copy.
-
-**Context:** Deferred as S3 in `docs/designs/windows-11-installer.md` (CEO review 2026-10-04) to design from what the first real beta reports lack. Sources: hive `log.jsonl`, `crashes/` (raw terminal tails, never copied raw).
-
-**Effort:** human M / CC S
-**Priority:** P3
-**Depends on / blocked by:** the first Windows beta reports.
 
 ### Go live steps for the Windows beta
 

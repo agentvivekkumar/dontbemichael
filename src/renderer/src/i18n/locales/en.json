@@ -220,13 +220,10 @@
     "killConfirmSchedulesPlural": "Close {{name}}? {{name}} has {{count}} schedules on. They'll pause."
   },
   "settingsHero": {
-    "beta": "Beta",
-    "betaInfo": "An early version. If something looks wrong, use Report a problem below.",
     "sponsoredBy": "Sponsored by",
     "visit": "visit",
     "whatsNew": "What's new",
-    "starOnGitHub": "Star on GitHub",
-    "reportProblem": "Report a problem"
+    "starOnGitHub": "Star on GitHub"
   },
   "settings": {
     "title": "Settings",
@@ -300,11 +297,16 @@
       "arabicTerminalDesc": "Renders terminals with the browser's text engine so Arabic joins and reads right to left (xterm has no bidi of its own). Off is the GPU renderer: faster, but it can't lay out right to left text. Applies to open terminals and new ones alike.",
       "arabicTerminalFollowsLanguage": "Following your app language. Switch it here to override that either way; the choice sticks even if you change language again."
     },
+    "claudeSignIn": {
+      "title": "Claude sign in",
+      "tip": "How your team on Claude signs in: your Claude account, on your Claude plan, or an Anthropic API key, billed to your Anthropic account."
+    },
     "agentsModels": {
       "defaultModel": "Default agent model",
       "defaultModelDesc": "Every newly spawned Claude team member starts on this model unless another is picked for that member. {{godName}} has a separate model setting. Marked \"· default\" in the model pickers.",
       "advanced": "Advanced",
       "maxTurns": "Max turns per run",
+      "maxTurnsTip": "A turn is one tool call, so several tools called at once use several turns. A run starts when a team member gets a message and lasts until the next one.",
       "unlimited": "Unlimited",
       "blankUnlimited": "Blank = unlimited",
       "planPrice": "Your Claude plan",
@@ -742,36 +744,6 @@
       "continue": "Continue with this office",
       "startNew": "Set up a new office"
     },
-    "welcome": {
-      "headline": "Your manager and the floor he runs",
-      "desc": "{{godName}} is your office manager. He runs a small team of AI workers for you, and you watch it all from one screen. Here's what's inside:",
-      "features": {
-        "team": {
-          "label": "Your starter team",
-          "desc": "{{godName}} suggests a team suited to the kind of business you run. You pick who joins, and can add or remove anyone later."
-        },
-        "manager": {
-          "label": "{{godName}} runs the floor",
-          "desc": "{{godName}}, your office manager, takes your requests, hands each job to the right team member, and only interrupts you when it matters."
-        },
-        "memory": {
-          "label": "They remember",
-          "desc": "Your team remembers what you've told them and what they've already done, so you never have to explain things twice."
-        },
-        "commandCenter": {
-          "label": "Everything in view",
-          "desc": "One screen shows what everyone is working on, what's finished, and what's waiting for you."
-        },
-        "guardrails": {
-          "label": "You stay in charge",
-          "desc": "Your team asks before posting online or anything that costs money, and sends email only the way you set it. You decide what they can do on their own."
-        },
-        "hires": {
-          "label": "Extra help anytime",
-          "desc": "Need another pair of hands? Add a team member in one click. No setup needed."
-        }
-      }
-    },
     "providerBlurb": {
       "claude": "Claude Code (Anthropic)",
       "codex": "Codex (OpenAI)",
@@ -847,6 +819,7 @@
     },
     "team": {
       "intro": "Suggested for {{pack}}. Pick whoever you want, and you can hire more later.",
+      "introTip": "{{godName}} hands each job to the right person on your team. Your team remembers what you tell them, asks before posting online or spending money, and you see all their work on one screen.",
       "introOther": "Start with {{godName}} and Oscar. Once your office is running, {{godName}} will ask you a few questions and suggest who else to hire.",
       "folderNote": "Everyone works in their own folder, inside {{root}}, which is {{godName}}'s. Put the documents each person needs in their folder. They'll read them and save their work there, and only they and {{godName}} can open it. Company wide information, policies and rules go in Settings, Memory & Knowledge, where every team member can search them.",
       "managerName": "{{godName}} · Office Manager",
@@ -861,7 +834,6 @@
       "useSuggested": "use suggested",
       "sharedFolder": "holds everyone's folders",
       "summary": "{{picked}} picked · {{connect}} to connect",
-      "suggestCta": "Suggest my team",
       "errFolder": "Couldn't set up {{path}}: {{reason}}",
       "errNoFolders": "Couldn't work out where your team's folders go. Go back and check your business name.",
       "errMichaelFolder": "That folder can't hold your office. Pick a folder of its own, not your home folder or a system folder.",
@@ -886,7 +858,6 @@
       "resume": "Welcome back",
       "business": "Your business",
       "details": "Company details",
-      "welcome": "Meet your office",
       "team": "Your team",
       "home": "A home for the app",
       "orchestrator": "Your manager",
@@ -922,8 +893,21 @@
       "allIn": "Everyone's in",
       "missingOne": "{{name}} hasn't clocked in.",
       "missingMore": "{{name}} and {{count}} more haven't clocked in.",
+      "floorWaits": "The floor opens when everyone's in.",
+      "wait": {
+        "time": "{{seconds}} seconds so far.",
+        "slowest": "{{seconds}} seconds so far. {{name}} is the slowest.",
+        "longer": "{{seconds}} seconds so far. {{name}} is taking longer than usual.",
+        "quiet": "{{seconds}} seconds so far. {{name}} has gone quiet."
+      },
       "michael": "{{name}} is clocking in",
       "michaelLine": "{{name}} is settling into the corner office and getting the floor ready. Hang tight…"
+    },
+    "stopped": {
+      "title": "{{name}} stopped",
+      "noLine": "{{name}}'s terminal closed without saying why.",
+      "startAgain": "Start again",
+      "seeWork": "Open Work tab"
     },
     "clockedInCount": "{{count}} of {{total}} in",
     "gpuError": "The office floor lost its GPU context.\n\nToo many terminals are using the GPU at once.\nClose a few agent terminals, or restart the app, to bring it back.",
@@ -1840,11 +1824,15 @@
     "close": "Close {{name}}",
     "office": "Office",
     "openInApp": "Open in app",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy",
     "reading": "Reading…",
     "empty": "Empty file",
     "tooLarge": "Too large to show here",
     "unreadable": "Can't show this file here",
-    "rows": "Showing {{shown}} of {{total}} rows"
+    "rows": "Showing {{shown}} of {{total}} rows",
+    "opened": "{{name}} opened"
   },
   "companyProfile": {
     "intro": "Key facts about your business. Every team member, {{godName}} included, works from them. Short answers only: anything longer goes in Memory & Knowledge.",
@@ -2001,6 +1989,18 @@
     "openFolderFailed": "Couldn't open the folder. It may have been moved or deleted."
   },
   "mailboxes": {
+    "google": {
+      "step1Title": "Turn on 2 Step Verification",
+      "step1Line": "Google sends a code to your phone when you sign in. Already on? Go to step 2.",
+      "step1Open": "Open Google's page",
+      "step2Title": "Create an app password",
+      "step2Line": "Type a name, such as My office, then copy the 16 letters Google shows.",
+      "step2Open": "Open app passwords",
+      "step2Admin": "On GSuite, if Google says app passwords aren't available, your admin has turned them off: ask them to allow it.",
+      "step3Title": "Paste it below",
+      "step3Line": "The 16 letters from step 2, as Google shows them. Spaces are fine."
+    },
+    "googleTile": "Gmail or GSuite",
     "title": "Mailboxes",
     "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Access tab.",
     "add": "Add a mailbox",
@@ -2039,21 +2039,18 @@
     "testing": "Testing {{address}}. One sec.",
     "tryAgain": "Try again",
     "help": {
-      "gmail": "Gmail needs an app password, not your normal one. Turn on 2 Step Verification, then create one at myaccount.google.com/apppasswords.",
-      "google-workspace": "Use an app password from myaccount.google.com/apppasswords. If that page is missing, your Workspace admin has turned app passwords off.",
       "icloud": "iCloud needs an app specific password. Create one at account.apple.com under Sign In and Security.",
       "yahoo": "Yahoo needs an app password. Create one in Account Security, then Generate app password.",
       "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
       "other": "Your email host lists these servers in its help pages. If your normal password is refused, ask them for an app password."
     },
-    "gmailIsConnector": "Gmail on your Claude account is under Claude connectors."
+    "onlyHere": "Email reaches the team only through the mailboxes connected here, never through your Claude account."
   },
   "capabilities": {
-    "addHow": "How {{name}} uses it",
-    "addMailboxBothUsed": "{{name}} already watches one and sends only from one.",
+    "addHow": "What should {{name}} do with it?",
+    "addMailboxBothUsed": "{{name}} already reads one mailbox and only sends from another.",
     "addMailboxNoneLeft": "Connect another in Settings.",
-    "removeWatchedSure": "Remove {{address}}? Send only access for {{names}} pauses until someone watches it.",
-    "addMailboxInfo": "Watch the inbox: {{name}} reads, files and answers its email. Send only: {{name}} writes from the address while its owner keeps the inbox and passes on replies.",
+    "removeWatchedSure": "Remove {{address}}? {{names}} can't send from it until someone reads it.",
     "intro": "What {{name}} may do without asking, and the jobs {{name}} runs on a clock.",
     "email": "Email",
     "emailBlurb": "The addresses {{name}} uses, and how email from each one leaves.",
@@ -2066,26 +2063,28 @@
     "recentSends": "Sent from here lately",
     "recentSend": "{{subject}}, to {{to}}, {{date}}",
     "cancelAdd": "Cancel",
-    "addIt": "Add",
-    "addSendOnlyTaken": "{{name}} already sends only from {{address}}. One each.",
-    "addSendOnlyNobody": "Nobody watches it yet, so its email waits until someone does.",
-    "addSendOnly": "Send only",
-    "addWatchMoves": "{{from}} watches it now. It moves to {{name}} after you confirm.",
-    "addWatchTaken": "{{name}} already watches {{address}}. One each.",
-    "addWatch": "Watch the inbox",
-    "addMailboxUse": "Add a mailbox",
+    "addIt": "Give to {{name}}",
+    "addSendOnlyTaken": "{{name}} already only sends from {{address}}. One each.",
+    "addSendOnlyNobody": "Someone needs to read this inbox first.",
+    "addSendOnly": "Only send email",
+    "addReadsDesc": "{{name}} reads what comes in, sorts it and replies.",
+    "addSendsDesc": "{{name}} sends from this address but cannot read it. {{holder}} reads the replies and passes them on.",
+    "addWatchMoves": "{{from}} reads it now. It moves to {{name}} after you confirm.",
+    "addWatchTaken": "{{name}} already reads {{address}}. One each.",
+    "addWatch": "Read and answer email",
+    "addMailboxUse": "Give {{name}} a mailbox",
     "sendingFrom": "Sending from {{address}}",
-    "inboxNobody": "Nobody watches it. {{name}} sends only.",
-    "inboxSendOnly": "{{holder}} watches it. {{name}} sends only.",
-    "inboxWatches": "{{name}} watches it",
+    "inboxNobody": "Nobody reads it. {{name}} only sends.",
+    "inboxSendOnly": "{{holder}} reads it. {{name}} only sends.",
+    "inboxWatches": "{{name}} reads and answers it",
     "inbox": "Inbox",
     "removeMailbox": "Remove",
     "emailNone": "{{name}} doesn't use email yet.",
     "emailSummaryNone": "None",
     "emailSummary": "Mailboxes: {{count}}",
-    "sendOnlyPaused": "Paused: {{name}}'s email from here waits until someone watches this inbox.",
+    "sendOnlyPaused": "Paused: {{name}}'s email from here waits until someone reads this inbox.",
     "alsoSendsFromHere": "Also sends from here: {{names}}",
-    "sendOnlyUse": "{{address}} (send only, {{sending}})",
+    "sendOnlyUse": "{{address}} (only sends, {{sending}})",
     "standingLast": "Sent {{count}} so far, latest: {{subject}}",
     "standingRevoke": "Revoke",
     "draftOnly": "Draft only",
@@ -2101,7 +2100,7 @@
     "pickMailbox": "Pick a mailbox",
     "addMailbox": "Connect another in Settings",
     "heldBy": "{{name}} has this",
-    "moveMailbox": "{{from}} checks {{address}}. Move it to {{to}}? {{from}} stops checking email.",
+    "moveMailbox": "{{from}} reads {{address}}. Move it to {{to}}? {{from}} stops reading it.",
     "moveMailboxFree": "Use {{address}}?",
     "moveIt": "Move it",
     "keepIt": "Keep it",
@@ -2156,6 +2155,8 @@
     "needsYou": "Needs you",
     "nothingNeedsYou": "Nothing needs you",
     "needsYouInfo": "{{godName}} asks you only when he can't settle something himself. Answer here and the work carries on.",
+    "michaelStopped": "{{godName}} isn't running. Your answers wait until {{godName}} starts again.",
+    "answersWait": "Your answers open when everyone's in.",
     "needsYouAnnounce": "{{godName}} needs you: {{count}}",
     "allClear": "All clear.",
     "allClearLine1": "{{godName}} says the team has room for more.",
@@ -2174,7 +2175,9 @@
     "focus": "Focus mode",
     "exitFocus": "Exit focus mode (Esc)",
     "settings": "Settings",
-    "betaInfo": "An early version. If something looks wrong, use Report a problem in Settings.",
+    "reportProblem": "Report a problem",
+    "reportProblemTip": "Opens a bug report on GitHub (a free account). A picture of this window is saved in your Downloads to add to it. Reports are public: check the picture first.",
+    "reportProblemFailed": "Couldn't open",
     "briefPlaceholder": "Talk to {{godName}}…",
     "brief": "Talk to {{godName}}",
     "attach": "Attach files",
@@ -2425,6 +2428,8 @@
     "cardAction": "Get {{godName}} ready",
     "done": "Done",
     "useApiKey": "Use an API key",
+    "changeKey": "Change key",
+    "useAccount": "Use a Claude account",
     "apiKey": "Anthropic API key",
     "keyInfo": "Billed to your Anthropic account. Create a key at console.anthropic.com. Your team's tools on this computer can use it, so pick one with a spending limit.",
     "keySave": "Save key",
@@ -2461,12 +2466,15 @@
     "tryAgain": "Try again",
     "signInAction": "Sign in",
     "changeKey": "Change key",
+    "changeSignIn": "Change sign in",
     "chip": "Office stopped",
     "creditInfo": "Claude stopped the whole team because the Anthropic account has no credit left. Add credit on the Anthropic website, then press Try again. The office also checks again on its own every 15 minutes. Scheduled jobs wait in the inbox until then.",
+    "creditKeyInfo": "Claude stopped the whole team because the Anthropic account behind your API key has no credit left. Add credit on the Anthropic website, then press Try again, or use Change sign in for a new key or your Claude account. The office also checks again on its own every 15 minutes. Scheduled jobs wait in the inbox until then.",
     "signInInfo": "Claude stopped the whole team because the Claude sign in expired. Sign in again and the team carries on where it stopped. Scheduled jobs wait in the inbox until then.",
     "keyInfo": "Claude stopped the whole team because the Anthropic API key stopped working. Paste a new key and the team restarts and carries on. Scheduled jobs wait in the inbox until then."
   },
   "markdown": {
+    "openPlace": "Open {{place}}",
     "opensInBrowser": "opens in your browser",
     "opensInEmail": "opens your email app",
     "copyLinkAddress": "Copy link address",
@@ -2612,7 +2620,27 @@
       "capWork": "found work so far",
       "capKept": "kept as is so far",
       "capReopened": "cards you reopened so far",
-      "more": "More patterns show here as your team works."
+      "watchLabel": "What Pulse watches",
+      "watch": {
+        "runLess": "Schedules finding nothing",
+        "runLessTip": "Schedules whose runs mostly find nothing to do. Running them less often costs less.",
+        "runMore": "Schedules with more to do",
+        "runMoreTip": "Schedules that find work nearly every run, with more each week. Running them more often keeps up.",
+        "cheaper": "A cheaper model",
+        "cheaperTip": "Members on the top model whose work you keep as is nearly every time, with no card reopened and a few email drafts you decided on. Never {{godName}}.",
+        "stronger": "A stronger model",
+        "strongerTip": "Members whose work you often change, or whose cards you reopen.",
+        "soFar": "{{count}} so far",
+        "none": "None yet",
+        "fine": "Nothing worrying",
+        "closest": "{{name}}: {{kept}} of {{decisions}} kept as is"
+      },
+      "tag": {
+        "runLess": "Schedule finding nothing",
+        "runMore": "Schedule with more to do",
+        "cheaper": "Toward a cheaper model",
+        "stronger": "Toward a stronger model"
+      }
     },
     "nothingToChange": "Nothing to change this week.",
     "savedByChanges": "Saved by your changes",
@@ -2713,6 +2741,7 @@
         "folder": "Private folders",
         "office-files": "App files",
         "paused": "Paused by you",
+        "turn-cap": "Max turns reached",
         "impostor": "Unconfirmed sender"
       },
       "toInternetTip": "Each question is checked for your private details before it goes out.",
@@ -2739,7 +2768,7 @@
     },
     "work": {
       "title": "Team at work",
-      "tip": "Working time runs from each request a member takes to its last reply, up to an hour each. Cost is each member's part of your plan by their share of the work.",
+      "tip": "Working time runs from each request a member takes to its last reply, up to an hour each. Cost is each member's own work at your plan's rate.",
       "nobody": {
         "today": "Nobody has worked yet today.",
         "this-week": "Nobody has worked yet this week.",
@@ -2772,9 +2801,11 @@
     },
     "plan": {
       "yourPlan": "Claude plan",
-      "tip": "Your plan costs {{monthly}} a month. This is its share for the days so far in this period, split by how much of the work each member did. The same work would cost {{payPerUse}} at pay per use prices.",
+      "tip": "The office's own share of your plan ({{monthly}} a month): its work, priced by how much of the plan's weekly usage meter that work fills. Your other Claude use is not counted. The same work costs {{payPerUse}} at pay per use prices.",
       "noPrice": "at pay per use prices. Set your plan's price in Settings to see what the work really costs.",
-      "memberTip": "This member's part of your plan's cost for the period, by their share of the work.",
+      "learning": "learning your plan's rate",
+      "learningTip": "Pulse learns what your plan's work costs from the plan's weekly usage meter while the office works, usually within a few days. Until then: {{payPerUse}} at pay per use prices.",
+      "memberTip": "What this member's own work cost of your plan in the period.",
       "ofPlan": "of your {{plan}} ({{monthly}} a month)"
     },
     "typicalWait": "typical wait",
@@ -2957,6 +2988,12 @@
       "byWho": "{{name}}: {{where}}",
       "none": "No emails organized in this period.",
       "earlier": "{{count}} more organized before the app kept their names."
+    },
+    "recs": {
+      "view": "View recommendations",
+      "hide": "Hide",
+      "title": "Pulse has suggestions for your team.",
+      "ready": "{{count}} ready"
     }
   },
   "foundations": {
@@ -3030,7 +3067,7 @@
       "needs": "needs this",
       "needsAgo": "needs this, {{ago}}",
       "yourAnswer": "Your answer",
-      "hint": "A few plain sentences, under {{n}} characters, or add a file.",
+      "hint": "A few plain sentences, under {{n}} characters, or add a file or folder.",
       "save": "Save answer",
       "draftBy": "Have {{name}} draft it",
       "notNow": "Not now",
@@ -3047,6 +3084,7 @@
       "failedGone": "Couldn't add your answer to Company foundations. Tell {{godName}}.",
       "drafted": "a draft, edit and save",
       "addFile": "Add a file",
+      "addFolder": "Add a folder",
       "removeFile": "Remove {{name}}",
       "checking": "Checking the file",
       "fileMisfit": "{{name}} doesn't look like the answer: {{reason}}",
@@ -3054,7 +3092,14 @@
       "fileUnchecked": "Couldn't check this file, try again.",
       "filePictureType": "Save this picture as PNG or JPEG and add it again.",
       "filePictureEngine": "Pictures can be checked only on Claude. Add this as a PDF or a document instead.",
-      "fileMissing": "Couldn't find {{name}}, add it again."
+      "fileMissing": "Couldn't find {{name}}, add it again.",
+      "folderChip": "{{name}} folder",
+      "folderMissing": "Couldn't find the folder {{name}}, add it again.",
+      "folderTooWide": "{{name}} holds too much. Pick the folder that has the records.",
+      "folderApp": "{{name}} is one of the app's own folders. Pick another.",
+      "folderMember": "{{name}} is inside a team member's folder. Pick another.",
+      "folderEmpty": "{{name}} has no files.",
+      "folderTooLong": "{{name}} sits too deep to name here. Move it higher and add it again."
     }
   },
   "knowledgeNotice": {
@@ -3105,6 +3150,10 @@
     "errorTitle": "Couldn't work out the change",
     "errorNote": "Try again in a moment. Your words are still in the box.",
     "errorNoteCard": "Try again in a moment. Nothing has changed.",
+    "errorNoName": "Type a name for them first, then try again.",
+    "errorNotStarted": "Claude didn't start. Check that Claude is signed in under Settings, Prerequisites, then try again.",
+    "errorSlow": "Claude took too long to answer. Try again in a moment.",
+    "errorUnreadable": "Claude's answer couldn't be read. Try again, or say the change in other words.",
     "tryAgain": "Try again",
     "movedTitle": "{{name}}'s job changed meanwhile",
     "movedNote": "Your change is still here. Run it again on the new job.",
@@ -3184,5 +3233,33 @@
     "noGoodRun": "No earlier run of this job went well to compare with.",
     "noTranscript": "This run's conversation is no longer on this computer.",
     "noDifference": "The two runs show nothing to change in the job."
+  },
+  "emailTab": {
+    "openEmail": "Open the email: {{words}}",
+    "openInGmail": "Open in Gmail",
+    "opening": "Opening the email",
+    "noSubject": "(no subject)",
+    "from": "From",
+    "to": "To",
+    "cc": "Cc",
+    "date": "Date",
+    "picturesHidden": "Pictures from the web are hidden.",
+    "showPictures": "Show pictures",
+    "showingPictures": "Loading pictures",
+    "somePicturesFailed": "Some pictures could not load.",
+    "tooLarge": "Too large to show in full. This is its text.",
+    "tryAgain": "Try again",
+    "openMailboxes": "Open Mailboxes",
+    "frameTitle": "Email from {{sender}}",
+    "replyingTo": "Replying to",
+    "failed": {
+      "broken": "This email link is broken.",
+      "mailbox": "This mailbox isn't in the office anymore.",
+      "message": "Not in this mailbox outside Trash and Junk.",
+      "auth": "Sign in to this mailbox failed.",
+      "blocked": "This mailbox can't be reached from the office.",
+      "network": "Couldn't reach the mailbox.",
+      "unknown": "This email couldn't be shown."
+    }
   }
 }

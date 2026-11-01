@@ -4,7 +4,7 @@ import { PixelButton } from './PixelButton';
 import { Toggle, MiniButton, Disclosure } from './triggers/ui';
 import { InfoTip } from './InfoTip';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
-import { connectorOn, removedKeys, unseenKeys, type ClaudeConnector } from '@shared/claudeConnectors';
+import { connectorOn, offeredConnectors, removedKeys, unseenKeys, type ClaudeConnector } from '@shared/claudeConnectors';
 import { groupName, hint, panelStyle } from './fieldText';
 
 /** Where the owner adds and signs in to connectors on their Claude account. */
@@ -62,7 +62,9 @@ export function ClaudeConnectorsSettings() {
   }, [open, listKeys]);
 
   if (!config) return null;
-  const list: ClaudeConnector[] = [...(state?.list ?? [])].sort((a, b) => a.key.localeCompare(b.key));
+  // A mailbox on the Claude account is never listed: email goes only through
+  // the mailboxes connected in the app (owner, 2026-10-30).
+  const list: ClaudeConnector[] = offeredConnectors(state?.list).sort((a, b) => a.key.localeCompare(b.key));
   const removed = removedKeys(config);
   const onCount = list.filter((c) => connectorOn(config, c.key)).length;
 
