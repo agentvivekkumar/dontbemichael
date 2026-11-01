@@ -511,7 +511,7 @@ number (owner, 2026-10-01); blocked work shows in the board's Blocked column and
 Michael's wall. The choice persists (`cth.floorView`).
 
 File tabs: a file opened from a chip (§7.8) that the office can show (Markdown, text,
-JSON, CSV, TSV, images; PDF and Office files open in their own app) gets a tab after a
+JSON, CSV, TSV, images, and the words of Word, Excel, PowerPoint and PDF files) gets a tab after a
 1 × 18 px `line-2` hairline: a 14 px icon, the name (ellipsis at 160 px, full path as
 tooltip) and a 22 px close ✕ (its own button, "Close {name}"). One tab per file, keyed by
 its real path; opening it again selects it; at most 5, a sixth closes the one opened
@@ -525,7 +525,8 @@ The file view: a `card` header with the name (14 / 600), its place in office wor
 ("Office / IT", or a team member's name and folder; `ink-3`, full path as tooltip), and
 `sm` secondary "Open in app" (not for JSON) and "Show in Finder". Body: Markdown as a
 document, text and JSON in mono 12 / 18 wrapped, CSV and TSV as a table (sticky header,
-the first 1,000 rows, then "Showing 1,000 of N rows"), images fitted to the width.
+the first 1,000 rows, then "Showing 1,000 of N rows"), images fitted to the width, a
+document's words as a page at most 760 px across (14 / 22; a sheet in mono).
 States in `ink-3`: "Reading…", "Not found" (no actions), "Empty file", "Too large to show
 here" or "Can't show this file here" with Open in app (Show in Finder for JSON). The view
 re-reads the file within a second of a change while shown, keeping the scroll.
@@ -771,7 +772,9 @@ stands on its own.
   from the start, so nothing jumps when the check lands; if the check fails it offers
   Show in Finder. A file that is gone, or outside every office folder, is a chip with no
   fill, a `line` ring, all `ink-3` and "Not found": text, not a button. Folded cards show
-  nothing. Task detail and Michael's replies (§7.19) use the same chips.
+  nothing. Task detail and Michael's replies (§7.19) use the same chips. A team folder the
+  words name ("the Sales folder", "Dwight's folder") is a place chip that opens that folder;
+  it carries a member, never a path.
 - Links in agent text (owner, 2026-10-11; `docs/designs/named-links.md`) are named, on
   every card-mode surface (Ask me, Michael's replies, Task detail, memory notes, Work
   styles, profile); file tabs and the IDE show links as written. A pasted URL shows the
@@ -845,6 +848,7 @@ the same panels, on a white tab body. Only what is enforced today:
 |---|---|
 | Email | No switch (owner, 2026-10-07): the header chip says "Mailboxes: N" or "None". One row per address the member uses (mono address, Remove): an **Inbox** line, green dot "{name} reads and answers it" or grey dot "{holder} reads it. {name} only sends." ("Nobody reads it. {name} only sends." when no one does), and a **Sending** segmented control [Can send, Send on approval, Draft only] with the meanings behind an info icon. Under the watched inbox: "Also sends from here: ..." (`ink-3`); removing it while others send from it asks first and names them. Under each row: "Sends without asking" (standing approvals, each with Revoke) and, for Send only, "Sent from here lately" (up to five). A paused Send only row shows an `amber-soft` note. **Give {name} a mailbox** (link) opens a `card-2` panel: a mailbox select (already chosen when there is only one), the question "What should {name} do with it?", then radio rows [Read and answer email, Only send email], each with one visible line (the owner's exception to info icons, 2026-10-30); a choice that can't be made is greyed with its reason, never hidden, and Only send is greyed until someone reads the inbox; only the radio and name dim, never the reason; Give to {name} and Cancel (`docs/designs/mailbox-choice.md`) |
 | Claude connectors | One row and switch per connector the owner turned on in Settings, A to Z; "2 of 4" in the header. QuickBooks keeps radio rows [Read only, Can make changes] under its row, and an `ink-3` "on for bookkeeping roles" while the role default holds. None on: one `ink-3` line with a link to Settings. A pending restart shows under the groups with Restart now (`docs/designs/claude-connectors.md`) |
+| Integrations | One row per integration from Settings with [Off, Read only, Can change] and the meanings behind an info icon; "turned off in Settings" or "needs its key" when it can't be used; "1 of 3" in the header. None set up: one line with Add one in Settings. A member not on Claude gets one line saying so |
 | Files | Read only row: lock icon, "Own folder only", the folder name, "Open folder" link |
 | On a schedule | "+ Add" link. Rows (owner, 2026-10-01, three quiet lines): switch; the job name (14 px) with the next run on the right; the when line (14 px, `ink-2`); then the status line (last run, and who added it only when it was not the owner) in `t-meta` `ink-3` |
 
@@ -2523,6 +2527,7 @@ Needs you rework on `design/studio-v2`, through 2026-10-01). Each row is **Fix**
 | 2026-10-25 | Scheduled jobs: each job's last run with Went wrong, a one line box, Ask Michael and Cancel, and a line on what came of it (§7.26). Pulse: the run suggestion card first in Recommendations, in the recommendation card's build, with Review the change and Not now, and "Nothing to change" left out while one shows; Your time's While you were away half says "of the work" beside the share and, at its foot, how long the office ran and how long of that you were away (§7.27). |
 | 2026-10-27 | Web: the customer band's card opens the business's site in a new tab, with "(opens in a new tab)" for screen readers (§9.23). |
 | 2026-10-26 | Web: the site catches up with 0.2.7, for owners. Tiles (§9.5): Work on a schedule says a run can be marked went wrong and Michael suggests a fix in Pulse that changes nothing until you Apply; Limits in writing says how two members split work Michael routes by. Pulse lead (§9.17): Your time shows how long the office ran and how much of that you were away. /security (§9.16): each memory note says what showed it and only the owner's own answers count as theirs; a mailbox's password goes only over an encrypted connection. |
+| 2026-10-31 | File tabs show the words of Word, Excel, PowerPoint and PDF files (§7.2); a team folder named on a card is a chip (§7.8); Access gains an Integrations group (§7.12). |
 | 2026-10-26 | Web: the customer band (§9.23), businesses already running the app, between the hero and the four questions (§9.19): eyebrow "Already running at", one card per business with its own logo in a 120 x 48 box, its name, its kind of business and a link to its site. First: TalBiz Solutions. Logos are served from the site, never the business's own site; `llms.txt` and the home JSON-LD name the same businesses. |
 
 ---

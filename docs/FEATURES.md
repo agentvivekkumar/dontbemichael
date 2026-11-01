@@ -36,10 +36,12 @@ moving, and brings you only the decisions that need you.
   member who asked, and your answer goes only to Michael.
 - A file Michael names in a reply, an Ask me card or a task shows as a chip. Markdown, text, JSON,
   CSV and pictures open in an office tab beside Who talks to whom and refresh when the file
-  changes; PDF and Office files open in their own app. Only files in the office and team folders
-  open.
+  changes; Word, Excel, PowerPoint and PDF files show their words in a tab, with Open in app for
+  the file itself. Only files in the office and team folders open. A team folder named on a card
+  opens that folder.
 - Ask Michael anything from the Talk to Michael box: he answers in a conversation that opens above
-  it, and each question shows where it stands until it is answered. Scheduled outcomes, such as a
+  it on your latest question, with older ones folded behind Show earlier, and each question shows
+  where it stands until it is answered. Scheduled outcomes, such as a
   weekly summary, arrive on Ask me as quiet Report cards you clear with Got it.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
@@ -88,6 +90,10 @@ moving, and brings you only the decisions that need you.
   in an office tab, straight from your mailbox, even after it was archived. Opening it never marks
   it read or moves it, pictures from the web stay hidden until you show them, and Gmail mailboxes
   get Open in Gmail.
+- A team member saves an email attachment to Email attachments in its own folder and reads it
+  there. Programs, scripts and archives are refused, and what is saved is marked as a download and
+  never run. A teammate who needs the file asks for it, and the app copies it across, so nobody
+  opens another member's folder.
 
 ### 4. Jobs on a clock
 - Each team member's schedules sit on its Access tab. Name the job ("Check the support
@@ -138,6 +144,9 @@ moving, and brings you only the decisions that need you.
 - Every connector on your Claude account (HubSpot, Google Drive, QuickBooks and the rest) shows up
   in Settings by itself, off. Turn one on, then give it to the team members who need it. Nobody
   else can reach it, and your own Claude Code servers stay yours.
+- Give one team member access to one outside service: a custom REST integration reaches only the
+  members you name on their Access tab, at Read only or Can change. A new one starts with nobody,
+  taking access away holds on the next call, and the app keeps the key. For members on Claude.
 - Email goes only through the mailboxes you connect in the app. Gmail, Outlook and other mail on
   your Claude account never show as connectors, and no team member can use them.
 - Spending money, deleting things and anything public come to you first, on the Needs you board.

@@ -88,7 +88,11 @@ src/
     github.ts                GitHub issue + CI run ingestion via the gh CLI
     shellEnv.ts              resolve PATH and shell env for child processes
     mail.ts                  IMAP/SMTP client for connected mailboxes; the broker calls it for md-mail tool calls
-    integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities
+    attachmentSave.ts        writes an email attachment into a member's Email attachments folder (never replaces, never
+                             executable, marked as a download) and knows which files the app saved, so only those go on
+                             to a teammate (docs/designs/agent-save-attachment.md)
+    integrationBroker.ts     loopback secret broker; answers md-mail calls, holds mailbox passwords, enforces Capabilities,
+                             and checks a member's integration grant and level live on every call
     brokerThrottle.ts        rate limits from connected apps: when one answers 429, or 503 with Retry-After, the broker stops
                              calling it until the app's time is up; a short wait is held in the broker, a long one answered at
                              once with when to try again (TODOS: third-party rate-limit backoff)
@@ -213,6 +217,8 @@ src/
     agentDefinition.ts       each agent's levels and outward capabilities
     mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule,
                              Send only grants from another member's mailbox included: shared-mailboxes.md)
+    attachmentKind.ts        what an attachment really is, from its bytes; only the kinds a member needs to read pass
+    integrations.ts          integration records and templates, and each member's grants (Read only or Can change)
     quickbooks.ts            QuickBooks through the owner's Claude account: which connector tools count, read vs change,
                              and quickbooksAccess (the hook's rule: the QuickBooks row's switch in Claude connectors,
                              off by default, then per agent;
@@ -303,8 +309,8 @@ src/
     CapabilitiesTab,         every agent's Access tab (Michael included): the Email section (the addresses
                              it uses: the one inbox it watches and the one it sends only from, each with
                              Can send / Send on approval / Draft only, and Add a mailbox), the Claude connectors card (a switch per
-                             connector the owner turned on; QuickBooks keeps Read only / Can make changes)
-                             and the On a schedule section
+                             connector the owner turned on; QuickBooks keeps Read only / Can make changes),
+                             Integrations (Off / Read only / Can change per integration) and the On a schedule section
     MailboxesSettings,       Settings > Connections > Mailboxes and AddMailboxDialog
     ClaudeConnectorsSettings, Settings > Connections > Claude connectors: every connector on the owner's Claude
                              account (main/claudeMcpList.ts runs `claude mcp list`), the owner's switch for each;
@@ -337,7 +343,8 @@ src/
                              types and parser)
     FileChip,                a file named in a reply, an Ask me card or a task, as a chip in place of its path
                              (markdown/remarkFileChips.ts finds them); FileTabView shows an opened file in its tab
-                             (store/fileTabs.ts keeps the tabs; docs/designs/open-file-tab.md)
+                             (store/fileTabs.ts keeps the tabs; docs/designs/open-file-tab.md); a team folder named on a
+                             card is a chip too (markdown/remarkFolderChips.ts, FolderChip)
     OfficeBreakNotice,       the office break's card on Ask me and its chip in the top bar
     SilentEngine,            the Not reporting cards on Needs you, the amber tag on a member's pod and panel, and
                              the line above its panel's tabs (branding/DESIGN.md 7.6b)
@@ -351,12 +358,14 @@ src/
                              deleteTeamMember.ts deletes a team member for good (pauses their schedules, gives
                              their work back, stops them),
                              typedFirstTask.ts sends a First task the owner typed to Michael as a card,
-                             MichaelDock.tsx is Michael's conversation dock above the Talk to Michael box, and
+                             MichaelDock.tsx is Michael's conversation dock above the Talk to Michael box (dockFold.ts
+                             picks what it shows, docs/designs/dock-latest-exchange.md), and
                              ownerSend.ts files a question for it (a known slash command still types into his terminal)
     store/ · hooks/          zustand store, event loop, PTY parser, typewriter
     assets/                  fonts (see ATTRIBUTION.md)
 resources/packs/             bundled Office Packs (core + one per business type)
 resources/md-mail-mcp.cjs    md-mail MCP server: an agent's mail tools, forwarded to the broker
+resources/md-integrations-mcp.cjs   md-integrations MCP server: the integrations the owner gave a member, through the broker
 docs/                        `model-catalog.json` and `hero.json` (fetched by the app at runtime)
 docs/demo/studio-lab.html    the studio lab, built by `npm run lab`
 tools/studio-lab/            the studio lab and the reference screens (`npm run lab`, `npm run shoot`)

@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [Unreleased]
+
+### Added
+- **Give one team member access to one outside service.** Custom REST integrations reach only the members you name, at Read only or Can change, and taking access away holds on the next call. A new integration starts with nobody.
+- **Team members save email attachments to their own folder,** in Email attachments, and can read them there. Anything from outside is marked as a download and never run.
+- **Teammates hand files over by asking.** A teammate asks, the one holding the file answers with it, and the app copies it across, so nobody opens another member's folder.
+- **Word, Excel, PowerPoint and PDF files open in an office tab** instead of leaving the app, and a card that names a folder opens that folder.
+
+### Changed
+- The dock folds older messages behind the latest exchange, and the unread count sits on the up arrow.
+
+### Fixed
+- A First task that cannot go on the board keeps your words in the Work style and Michael tells you, and a mailbox problem that could not raise its card tries again every minute.
+
+### Removed
+- The unused illustrations skill and seo folder.
+
 ## [0.3.3] (2026-10-30)
 
 ### Fixed
