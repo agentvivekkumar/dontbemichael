@@ -32,7 +32,7 @@ test('the shipped default and an empty box send the summary alone', () => {
 test('each beat reads the box again, so an edit counts from the next beat', () => {
   // Value: protects=an edit made while the heartbeat runs takes effect without a restart; fails_when=the body is captured once when the timer is armed; why_new=owner review on #200; seam=source
   const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/main/index.ts'), 'utf8');
-  const beat = src.slice(src.indexOf('function armHeartbeat'), src.indexOf('const remaining', src.indexOf('function armHeartbeat')));
+  const beat = src.slice(src.indexOf('function armHeartbeat'), src.indexOf('heartbeatFirstDelayMs(', src.indexOf('function armHeartbeat')));
   assert.match(beat, /const beat = \(\): void => \{[\s\S]*readConfig\(\)\.missions\?\.find\(\(x\) => x\.id === m\.id\)\?\.body[\s\S]*heartbeatMessage\(body, buildHeartbeatDigest\(quiet, actionable\)\)/);
   assert.doesNotMatch(beat, /m\.body/);
 });

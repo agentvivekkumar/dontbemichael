@@ -238,7 +238,7 @@ export function AskMeTab() {
       //    is there, and a request that fails to go is sent again later.
       const agents = useStore.getState().agents;
       const raiser = raiserOf(open, task, new Set(agents.map((a) => a.id)));
-      await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, q: asked, a: text }).catch(() => undefined);
+      await window.cth.hiveRememberOwnerAnswer({ agentId: raiser, task: task.title, taskId: task.id, q: asked, a: text }).catch(() => undefined);
       const raiserName = agents.find((a) => a.id === raiser)?.name ?? raiser;
       for (const m of answerMessages({ raiser, raiserName, taskId: task.id, title: task.title, q: asked, a: text, answeredAt })) {
         await window.cth.hiveSend({
@@ -328,7 +328,10 @@ export function AskMeTab() {
         const draft = drafts[row.key] ?? '';
         const shape = readAskShape(open);
         const pk = picks[row.key] ?? {};
-        const toSend = answerFor(row, shape);
+        // An option that needs the owner's words asks for them in the box, and
+        // Reply waits until there are some (its "note", ask-me-options.md).
+        const pickedNote = shape.kind === 'choice' && pk.pick !== undefined ? shape.options[pk.pick]?.note : undefined;
+        const toSend = pickedNote && !draft.trim() ? '' : answerFor(row, shape);
         const partsAnswered = shape.kind === 'parts' ? shape.parts.filter((p, i) => partAnswerText(p, pk.parts?.[i])).length : 0;
         // Reply says what it will send (D3): the option, or how many questions.
         const replyLabel = shape.kind === 'choice' && pk.pick !== undefined
@@ -434,7 +437,7 @@ export function AskMeTab() {
               onChange={(e) => setAnswerDraft(row.key, e.target.value)}
               onFocus={() => setOpenId(row.key)}
               onKeyDown={(e) => { if (isComposingKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendAnswer(row); }}
-              placeholder={shape.kind === 'parts' ? translate('askMe.anythingElse') : pk.pick !== undefined ? translate('askMe.addNote') : translate('askMe.ownAnswer')}
+              placeholder={shape.kind === 'parts' ? translate('askMe.anythingElse') : pickedNote ?? (pk.pick !== undefined ? translate('askMe.addNote') : translate('askMe.ownAnswer'))}
               style={{
                 width: '100%', display: 'block', boxSizing: 'border-box', padding: '7px 10px', minHeight: 34,
                 background: 'var(--cth-card)', border: 'none',

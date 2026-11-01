@@ -45,6 +45,10 @@ test('the held list reads its rows, drops lines that are not rows, and tidies li
   assert.deepEqual(H.parseHeld(JSON.stringify({ at: 1, way: 'in', from: 'human', to: 'research', toName: 'Pete', subject: 's', opening: 'o', why: 'failed', told: 'michael' })),
     { at: 1, way: 'in', from: 'human', fromName: null, to: 'research', toName: 'Pete', subject: 's', opening: 'o', why: 'failed', told: 'michael' });
   assert.equal(H.tidy('Say \u201chi\u201d\nnow', 80), 'Say hi now');
+  assert.equal(H.tidy('Can\u2019t find Maria\u2019s price list', 80), "Can't find Maria's price list", 'an apostrophe is no quote mark');
+  assert.equal(H.tidy('He said \u2018ship it\u2019 today', 80), 'He said ship it today');
+  const cut = H.tidy('a'.repeat(79) + '\u{1F95B} milk', 80);
+  assert.equal(cut, 'a'.repeat(79) + '\u{1F95B}', 'an emoji at the cut stays whole');
   const why = (v) => H.heldWhy(v, R.REFUSAL_CHECK_FAILED, R.REFUSAL_TOO_LONG);
   assert.deepEqual(['length', 'no-answer', 'unreadable', 'settings'].map((by) => why({ reason: 'x', by })), ['too-long', 'no-answer', 'unreadable', 'settings']);
   assert.deepEqual(['model', 'pattern', 'recheck'].map((by) => why({ reason: 'x', by })), [null, null, null]);
@@ -259,7 +263,7 @@ test('team memory reads each note\'s id, date, source and line, for the members 
 
 // ─── the plan's real cost, split by share of the work (owner, 2026-10-15) ──
 
-const { planFromAccount, planPrice, planCostFor, scaleSnapshot, DAYS_PER_MONTH } = loadTs('src/shared/claudePlan.ts');
+const { planFromAccount, planPrice, planCostFor, scaleSnapshot, usdPerMeterPoint, planRate, MIN_METER_POINTS, DAYS_PER_MONTH } = loadTs('src/shared/claudePlan.ts');
 const { readClaudePlan, forgetClaudePlan } = loadTs('src/main/claudeAccount.ts');
 
 test('the plan comes from Claude Code\'s account record, and the owner\'s price wins over the list price', () => {
@@ -289,6 +293,26 @@ test('the period\'s plan cost counts only the days that have passed, and the spl
   const s = scaleSnapshot(snap, 0.2);
   assert.deepEqual([s.totalUsd, s.members[0].usd, s.members[1].usd, s.members[0].share], [20, 15, 5, 0.75]);
   assert.deepEqual([s.members[0].perPiece.email, s.members[0].costForWork.perPiece, s.members[0].costForWork.usual, s.members[1].costForWork.perPiece], [0.4, 0.4, 0.2, null]);
+});
+
+test('the plan\'s rate comes from the weekly meter: the office\'s dollars per point, at its stretch nearest the office alone (owner, 2026-10-29)', () => {
+  // Value: protects=the office is charged for its own share of the plan, never the owner's other Claude use; fails_when=a short rise or a stretch across a weekly reset counts, the owner's own use lowers the office's figure below the clean stretch, or a long session counts whole; why_new=owner 2026-10-29 ($190 of a $200 plan shown as the office's month); seam=none; no_claim=how Anthropic's meter weighs models
+  const H = 3_600_000;
+  const week1 = 100 * H;
+  const week2 = 300 * H;
+  const m = (at, pct, resetsAt = week1) => ({ at: at * H, pct, resetsAt });
+  const c = (at, key, usd) => ({ at: at * H, key, usd });
+  assert.equal(MIN_METER_POINTS, 5);
+  assert.equal(usdPerMeterPoint([m(1, 10), m(3, 14)], [c(2, 'a', 4)]), null, 'four points is too short a stretch');
+  assert.equal(usdPerMeterPoint([m(1, 10), m(3, 16, week2)], [c(2, 'a', 4)]), null, 'no stretch across a weekly reset, even one that looks like a rise');
+  // A clean stretch ($5 for 5 points), then one where the owner used Claude too ($3 for 10 points).
+  const meter = [m(1, 10), m(3, 15), m(5, 25)];
+  const costs = [c(2, 'a', 3), c(2, 'b', 2), c(4, 'a', 6)];
+  assert.equal(usdPerMeterPoint(meter, costs), 1, 'the highest stretch: the owner\'s own use only lowers a stretch');
+  // A session that began before the first reading counts from its last total, not whole.
+  assert.ok(Math.abs(usdPerMeterPoint(meter, [...costs, c(2.5, 'old', 20.5)], { old: 20 }) - 1.1) < 1e-9);
+  // Rate: the price over a full plan's month of work per use (100 points a week).
+  assert.ok(Math.abs(planRate(200, 1) - 200 / (100 * DAYS_PER_MONTH / 7)) < 1e-12);
 });
 
 test('the plan is read from plan fields only, and a missing or broken record is no plan', (t) => {

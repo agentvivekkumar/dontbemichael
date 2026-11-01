@@ -1,5 +1,3 @@
-- **Change a job** by saying what should change.
-- **Add a file** right from a Company foundations card.
-- **One look** for every form in the app.
-- Hiring asks what the new person will do, once.
-- Safer background checks and messages to the team.
+- **Michael starts** on an older Claude Code.
+- No Settings Error or Settings Warning when your Claude Code is behind.
+- Every team member gets settings their Claude Code can read.

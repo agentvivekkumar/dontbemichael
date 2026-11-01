@@ -70,6 +70,22 @@ export function userShellPath(): string {
   return cachedPath;
 }
 
+let cachedDnt: boolean | null = null;
+
+/** DO_NOT_TRACK as the user's shell sets it: a Mac app opened from the Dock
+ *  never sees an export in ~/.zshrc. Kept once a read works; null when the
+ *  shell could not be read, so the caller holds sending and tries again. */
+export function userShellDoNotTrack(): boolean | null {
+  if (cachedDnt !== null) return cachedDnt;
+  if (process.platform === 'win32') return (cachedDnt = false);
+  // printenv works in every shell (fish cannot parse ${VAR:-}).
+  const out = captureFromLoginShell('printenv DO_NOT_TRACK');
+  if (out === null) return null;
+  const v = out.trim();
+  cachedDnt = v !== '' && v !== '0' && !v.includes('\n');
+  return cachedDnt;
+}
+
 /** Resolve a bare command (e.g. 'claude') against the user's PATH + common
  *  install locations. Returns the input unchanged if it already looks like a path. */
 /** A plain executable name — the only shape we resolve against the user's PATH.
@@ -101,6 +117,7 @@ export function resolveCommand(command: string): string {
     const appData = process.env.APPDATA ?? '';
     const localAppData = process.env.LOCALAPPDATA ?? '';
     const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+    const programFiles = process.env.ProgramFiles ?? '';
     const winCandidates = [
       `${appData}\\npm\\${command}.cmd`,
       `${appData}\\npm\\${command}`,
@@ -108,6 +125,9 @@ export function resolveCommand(command: string): string {
       // Claude's own installer (install.ps1) puts claude.exe here and updates the
       // user PATH in the registry, which this already running app never sees.
       `${home}\\.local\\bin\\${command}.exe`,
+      // The app's own Node install (nodeInstall.ts) lands here, and this running
+      // app's PATH predates it. Never built from an unset variable (drive root).
+      ...(programFiles ? [`${programFiles}\\nodejs\\${command}.exe`, `${programFiles}\\nodejs\\${command}.cmd`] : []),
       `${home}\\.claude\\local\\${command}.cmd`,
       `${home}\\.claude\\local\\${command}`
     ];

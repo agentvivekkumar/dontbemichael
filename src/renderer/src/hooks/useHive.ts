@@ -1,4 +1,5 @@
 import { RESEARCH_ID } from '../../../shared/research';
+import type { StoppedMember } from '@shared/agentExit';
 import { startResearch } from '@/shell/research';
 import { useEffect, useRef } from 'react';
 import { useStore, type Agent, type QueuedMessage, type StationKind, type ToolKind } from '@/store/store';
@@ -29,6 +30,7 @@ import { firstTaskSection } from '../../../shared/workStyleText';
 import { splitAgentRole } from '../../../shared/agentRole';
 import { pasteSafe } from '../../../shared/pasteSafe';
 import { ACTION_AT_PROMPT, ACTION_CLOCKING_IN } from '@/store/store';
+import { engineStarted } from '@/shell/clockingIn';
 import { ENGINE_READY_EVENT } from '@/shell/useNeedsYou';
 import { seedStarterJobs } from '@/shell/seedStarterJobs';
 import { PromptSubmits, confirmSubmit } from '../../../shared/submitConfirm';
@@ -616,7 +618,17 @@ export function useHive(config: HarnessConfig | null): void {
     }).catch(() => { /* hive not ready yet */ });
   }, [config?.onboardingComplete]);
 
+  // Members whose terminal ended by itself (agentExit.ts): main keeps the
+  // list, this window mirrors it.
+  useEffect(() => {
+    const apply = (list: StoppedMember[]): void => useStore.getState().setStopped(list);
+    void window.cth.agentsStopped().then(apply).catch(() => undefined);
+    return window.cth.onAgentsStopped(apply);
+  }, []);
+
   // 1) Bootstrap the god agent (source of truth = live PTYs, to dodge restarts).
+  // Start again on a stopped Michael runs this again (michaelStartRequest).
+  const michaelStartRequest = useStore((s) => s.michaelStartRequest);
   useEffect(() => {
     if (!config?.onboardingComplete || !config.harnessHome) return;
     let cancelled = false;
@@ -628,10 +640,16 @@ export function useHive(config: HarnessConfig | null): void {
         if (!cancelled) useStore.getState().setGodStatus('ready');
         return;
       }
+      // His terminal is gone, so the start that made it is over: Start again
+      // may start him once more.
+      if (michaelStartRequest > 0) godSpawning.current = false;
       // Synchronous guard (no await between check and set) → exactly one spawn.
       if (cancelled || godSpawning.current) return;
       godSpawning.current = true;
+      // Start again keeps what the owner queued for him: the board says it waits.
+      const kept = michaelStartRequest > 0 ? useStore.getState().messageQueues[GOD_ID] : undefined;
       useStore.getState().removeAgent(GOD_ID); // clear any stale restored entry
+      if (kept?.length) useStore.setState((s) => ({ messageQueues: { ...s.messageQueues, [GOD_ID]: kept } }));
 
       // A prior rename (Edit Agent panel → renameAgent() → hive.ts's renameAgent())
       // persists straight into registry.json, so read it back here rather than
@@ -711,7 +729,7 @@ export function useHive(config: HarnessConfig | null): void {
       }
     }, 1200);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [config?.onboardingComplete, config?.harnessHome]);
+  }, [config?.onboardingComplete, config?.harnessHome, michaelStartRequest]);
 
   // 2) Drive avatars from real hook events emitted by each agent's shim.
   useEffect(() => {
@@ -729,6 +747,9 @@ export function useHive(config: HarnessConfig | null): void {
       const { updateAgent, agents } = useStore.getState();
       const self = agents.find((a) => a.id === e.agentId);
       if (!self) return;
+      // A member is in once their engine has started, not after their first
+      // work: one with nothing to do would read as still coming (owner, 2026-10-30).
+      if (engineStarted(e.event, e.source) && self.action === ACTION_CLOCKING_IN) updateAgent(e.agentId, { action: '' });
       // Breaker precedence (#5C): a constrained/stopped agent stays 'looping'
       // regardless of in-flight tool/prompt/compact events.
       const blevel = breakerLevel.current[e.agentId];
@@ -927,6 +948,11 @@ export function useHive(config: HarnessConfig | null): void {
       if (!ptys.length) return;
       const now = Date.now();
       const { agents, updateAgent } = useStore.getState();
+      // An engine with no hooks never reports its start: first output says it.
+      const printed = new Set(ptys.filter((p) => p.hasOutput).map((p) => p.id));
+      for (const a of agents) {
+        if (a.action === ACTION_CLOCKING_IN && a.ptyId && printed.has(a.ptyId) && !usesHookStandingGoal(a)) updateAgent(a.id, { action: '' });
+      }
       for (const a of agents) {
         if (!a.ptyId || a.status !== 'working') continue;
         // Never fight the breaker pin (a constrained/stopped agent stays 'looping')
@@ -1412,8 +1438,9 @@ export function useHive(config: HarnessConfig | null): void {
       }
     };
     window.addEventListener(ENGINE_READY_EVENT, onReady);
-    // A new API key replaced one that stopped working (office-stopped-account.md):
-    // the running Claude terminals restart, resumed, the same way.
+    // The team's Claude sign in changed (a new key, or the account in place of
+    // a key, office-stopped-account.md): the running Claude terminals restart,
+    // resumed, the same way.
     const offKey = window.cth.onOfficeRestartClaude?.((restart) => {
       onReady(new CustomEvent(ENGINE_READY_EVENT, { detail: { restart } }));
     });
