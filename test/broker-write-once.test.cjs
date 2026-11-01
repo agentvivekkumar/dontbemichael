@@ -554,3 +554,107 @@ test('a GraphQL body reads only when every operation it runs is a query', () => 
   assert.ok(!graphqlReadsOnly('not json'));
   assert.ok(!graphqlReadsOnly(q('subscription { issueUpdated { id } }')));
 });
+
+/** Post a write and hang up: after the first bytes of the answer, or after
+ *  `ms` when no answer has come yet. Resolves once the connection is gone. */
+function hangUp(base, token, route, body, ms) {
+  return new Promise((resolve) => {
+    const req = http.request(new URL(route, base), {
+      method: 'POST',
+      headers: { 'x-md-broker-token': token, 'content-length': Buffer.byteLength(body) }
+    }, (res) => {
+      res.once('data', () => { req.destroy(); resolve(); });
+    });
+    req.on('error', () => {});
+    if (ms !== undefined) setTimeout(() => { req.destroy(); resolve(); }, ms);
+    req.end(body);
+  });
+}
+
+/** A request that gives up after `ms`, so a hung broker fails the test
+ *  instead of stalling the suite. */
+function requestWithin(ms, ...args) {
+  return Promise.race([
+    request(...args),
+    new Promise((resolve) => setTimeout(() => resolve({ status: 'no answer', text: '' }), ms))
+  ]);
+}
+
+/** An answer that arrives in pieces, one every `gapMs`. */
+function slowAnswer(pieces, gapMs) {
+  let i = 0;
+  const body = new ReadableStream({
+    async pull(c) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, gapMs));
+      if (i < pieces.length) c.enqueue(new TextEncoder().encode(pieces[i++]));
+      else c.close();
+    }
+  });
+  return new Response(body, { status: 201, headers: { 'content-type': 'application/json' } });
+}
+
+function pendingRows(file) {
+  return Object.values(JSON.parse(fs.readFileSync(file, 'utf8'))).filter((row) => row.pending);
+}
+
+test('an agent that hangs up partway through the answer does not stall its retry', async (t) => {
+  // Value: protects=a curl timeout or Esc on the tool while the answer streams leaves the write settled and the retry answered; fails_when=the relay waits for a drain from a caller who already left, so the in flight entry and the pending row are never cleared; why_new=a caller who hung up held every identical retry forever, and after a restart the write was refused for a day; seam=fetchImpl streams the answer slowly
+  const { dir, file } = journalFile();
+  let calls = 0;
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    getRecord: () => record('books', 'https://api.example.com/'),
+    fetchImpl: async () => {
+      calls += 1;
+      return slowAnswer(['{"invoice":{"id":"INV-1",', '"lines":[1,2],', '"total":42}}'], 100);
+    }
+  });
+  const token = broker.grant('pty-oscar', ['books'], 'oscar');
+  await hangUp(broker.url(), token, '/i/books/invoice', '{"n":1}');
+  const retry = await requestWithin(2000, broker.url(), token, 'POST', '/i/books/invoice', '{"n":1}');
+  assert.equal(retry.status, 201);
+  assert.equal(retry.text, '{"invoice":{"id":"INV-1","lines":[1,2],"total":42}}', 'the whole answer, not the part the first caller saw');
+  assert.equal(calls, 1);
+  assert.equal(broker.writes.size, 0);
+  assert.equal(pendingRows(file).length, 0);
+});
+
+test('an agent that gives up before any answer gets the real one on retry, or the refusal when it was too large to keep', async (t) => {
+  // Value: protects=a write whose caller left before the service answered is settled with that answer, and a large one still refuses a repeat; fails_when=the relay stalls writing the head or body to a caller who already left, or a caller leaving is counted as a cut answer; why_new=the early hang up took the same stuck path as a hang up mid answer; seam=fetchImpl holds the answer until the caller has gone
+  const { dir, file } = journalFile();
+  let calls = 0;
+  const gates = [];
+  const broker = await startBroker(t, {
+    dir,
+    journalPath: file,
+    replayBodyMax: 32,
+    getRecord: () => record('books', 'https://api.example.com/'),
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      await new Promise((resolve) => gates.push(resolve));
+      return String(init.body).includes('big')
+        ? slowAnswer(['{"invoice":{"id":"INV-2",', '"lines":[1,2,3,4,5,6,7,8,9]}}'], 20)
+        : slowAnswer(['{"invoice":{"id":"INV-1"}}'], 20);
+    }
+  });
+  const token = broker.grant('pty-oscar', ['books'], 'oscar');
+
+  await hangUp(broker.url(), token, '/i/books/invoice', '{"n":"small"}', 100);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  gates.shift()();
+  const small = await requestWithin(2000, broker.url(), token, 'POST', '/i/books/invoice', '{"n":"small"}');
+  assert.equal(small.status, 201);
+  assert.equal(small.text, '{"invoice":{"id":"INV-1"}}');
+
+  await hangUp(broker.url(), token, '/i/books/invoice', '{"n":"big"}', 100);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  gates.shift()();
+  const big = await requestWithin(2000, broker.url(), token, 'POST', '/i/books/invoice', '{"n":"big"}');
+  assert.equal(big.status, 409);
+  assert.match(big.text, /already_applied/);
+
+  assert.equal(calls, 2);
+  assert.equal(broker.writes.size, 0);
+  assert.equal(pendingRows(file).length, 0);
+});
