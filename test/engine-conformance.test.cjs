@@ -14,63 +14,21 @@
  *  - have a tool call refused, in its own engine's answer, when it is paused;
  *  - never be heard without its own per start secret (issue #61).
  *
- * The app's office folder and business folder both have a space in their
- * names, as real ones often do. The engines are those with a hook bridge the
- * issue names: Claude Code, Codex and Gemini CLI. Mac and Linux only for now
- * (see fake-engines.cjs).
+ * The office and business folders both have a space in their names
+ * (officeOn). The engines are those with a hook bridge the issue names:
+ * Claude Code, Codex and Gemini CLI. Mac and Linux only for now (see
+ * fake-engines.cjs).
  */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const loadTs = require('./load-ts.cjs');
 const { posixOnly } = require('./platform.cjs');
-const { fakeEngine, STEPS, FAKE_ENGINES } = require('./fake-engines.cjs');
+const { officeOn, isolateHome, AGENT, STEPS, FAKE_ENGINES } = require('./fake-engines.cjs');
 
-const electron = require.resolve('electron');
-require.cache[electron] ??= {
-  id: electron, filename: electron, loaded: true,
-  exports: { Notification: class { show() {} static isSupported() { return false; } } }
-};
+isolateHome();
 
-const { HiveManager } = loadTs('src/main/hive.ts');
-const { HookServer } = loadTs('src/main/hooks.ts');
-const { ControlRegistry } = loadTs('src/main/control.ts');
-
-// Codex links the owner's login from ~/.codex into the member's own home: the
-// test must never reach the real one, so home points into a temp tree.
-const FAKE_HOME = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-conf-home-')));
-process.env.HOME = FAKE_HOME;
-process.env.USERPROFILE = FAKE_HOME;
-process.on('exit', () => fs.rmSync(FAKE_HOME, { recursive: true, force: true }));
-
-const AGENT = 'pam-1';
 const GOAL = 'Keep the books tidy and answer supplier mail first.';
-
-/** One office, one member on `engine`, a hook server listening, and the fake CLI. */
-async function office(t, engine) {
-  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'md-conf-')));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
-  const home = path.join(base, 'Harness Home');
-  const business = path.join(base, 'Pho Bakery');
-  fs.mkdirSync(home, { recursive: true });
-  fs.mkdirSync(business, { recursive: true });
-
-  const hive = new HiveManager(() => home);
-  const injection = await hive.ensureAgent(
-    { id: AGENT, name: 'Pam', provider: engine, cwd: business, isGod: false },
-    { businessFolder: business }
-  );
-  const events = [];
-  const window = { send: (channel, payload) => { if (channel === 'hive:hookEvent') events.push(payload); }, isDestroyed: () => false };
-  const control = new ControlRegistry();
-  const server = new HookServer(hive, () => window, () => ({ harnessHome: home }), control, undefined, (id) => (id === AGENT ? GOAL : null));
-  server.start();
-  t.after(() => server.stop());
-  return { cli: fakeEngine(engine, injection, { cwd: business }), events, control, injection };
-}
+const office = (t, engine) => officeOn(t, engine, { goal: GOAL });
 
 const heard = (events, event) => events.filter((e) => e.event === event);
 
