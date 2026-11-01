@@ -169,6 +169,16 @@ function fakeEngine(engine, injection, { cwd, sessionId = 'fake-session' }) {
 /** The member every office below starts. */
 const AGENT = 'pam-1';
 
+/** The Claude Code the stand-in plays: one new enough for every hook with a
+ *  version floor (CLAUDE_HOOK_CLI_FLOOR). Without a version, hooksForCli leaves
+ *  those hooks out, StopFailure among them. Derived, so a new floor follows. */
+function claudeTakingEveryHook() {
+  const loadTs = require('./load-ts.cjs');
+  const { CLAUDE_HOOK_CLI_FLOOR } = loadTs('src/shared/modelCliFloor.ts');
+  const { isNewer } = loadTs('src/shared/updateState.ts');
+  return Object.values(CLAUDE_HOOK_CLI_FLOOR).reduce((a, b) => (isNewer(b, a) ? b : a));
+}
+
 /**
  * One office with one member on `engine`: spawned through
  * HiveManager.ensureAgent, a real HookServer listening on the hive socket, and
@@ -197,7 +207,7 @@ async function officeOn(t, engine, { goal = null, onPlan } = {}) {
   const hive = new HiveManager(() => home);
   const injection = await hive.ensureAgent(
     { id: AGENT, name: 'Pam', provider: engine, cwd: business, isGod: false },
-    { businessFolder: business }
+    { businessFolder: business, cliVersion: claudeTakingEveryHook() }
   );
   const events = [];
   const window = { send: (channel, payload) => { if (channel === 'hive:hookEvent') events.push(payload); }, isDestroyed: () => false };
