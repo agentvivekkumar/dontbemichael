@@ -41,9 +41,9 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.3.3: Michael starts on an older Claude Code.**
-> No more Settings Error or Settings Warning when your Claude Code is behind. In 0.3.2, Clocking in
-> shows a clock and who is slowest, and Pulse shows what the office really used.
+> **New in 0.3.4: Give one team member access to one outside service.**
+> Team members save email attachments to their own folder and hand files over by asking. In 0.3.3,
+> Michael starts on an older Claude Code.
 
 ## Contents
 

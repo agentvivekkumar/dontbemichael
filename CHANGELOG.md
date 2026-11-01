@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
-## [Unreleased]
+## [0.3.4] (2026-11-01)
 
 ### Added
 - **Give one team member access to one outside service.** Custom REST integrations reach only the members you name, at Read only or Can change, and taking access away holds on the next call. A new integration starts with nobody.
@@ -20,8 +20,22 @@ Don't Be Michael keeps its own version line, starting at 0.0.1.
 ### Fixed
 - A First task that cannot go on the board keeps your words in the Work style and Michael tells you, and a mailbox problem that could not raise its card tries again every minute.
 
+- **Terminal shortcuts.** Ctrl+C copies a selection on any keyboard layout, and an input method key is never read as a copy or paste (#657, #670).
+- **Pulse.** A card's facts cover its whole history (#513), and a long transcript is still counted, in bounded reads (#612).
+- **Voice.** A confirm that says no never runs the action (#541).
+- **A slow login shell** no longer freezes the app or leaves team members without their usual tools (#635).
+- **Mail.** An email too long to send whole is refused instead of cut (#630), and a standing send counts the money it names, not only judges it (#578).
+- **The task board** is never written over a board file that does not parse, and a save happens in one step, so a card can be refused where it used to overwrite (#629).
+- **Integrations.** An upload that asks for 100-continue is forwarded (#626), and GitHub's 403 rate limit answers are backed off (#614).
+- **Outside text.** Markers hidden with invisible, wide, look-alike or tag characters are flagged (#611).
+- A failed wait after all note to Michael at closing time is retried (#560), a long heartbeat never floods his inbox (#655), and a message kept from Research no longer counts as delivered (#532).
+- A long card title or question in Ask me is never cut through an emoji (#664), and a worktree is removed on a Git with no `list -z` (#523).
+
 ### Removed
 - The unused illustrations skill and seo folder.
+
+### For contributors
+- What each engine can do is kept in one table (#577), and a shared suite runs every engine's stand-in through a turn, a failed turn and a stop (#579, #580).
 
 ## [0.3.3] (2026-10-30)
 

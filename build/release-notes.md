@@ -1,3 +1,4 @@
-- **Michael starts** on an older Claude Code.
-- No Settings Error or Settings Warning when your Claude Code is behind.
-- Every team member gets settings their Claude Code can read.
+- **Give one member one service** with custom integrations.
+- **Team members save email attachments** and pass files by asking.
+- Word, Excel, PowerPoint and PDF files open in an office tab.
+- The dock folds older messages behind the latest exchange.
