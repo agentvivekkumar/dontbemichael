@@ -55,7 +55,7 @@ test('the migration makes the tables once, and nothing but kind, time, value and
   // Value: protects=the store shape and no text in telemetry; fails_when=a migration is edited or prompt text lands in a row; why_new=D16; seam=none; no_claim=a database made by an older build (user_version 1 upgrades here)
   const { persist, store } = setup(t);
   const db = persist.database();
-  assert.equal(db.pragma('user_version', { simple: true }), 5);
+  assert.equal(db.pragma('user_version', { simple: true }), 6);
   const idx = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_tr_open', 'idx_te_office_id', 'idx_te_office_kind_ts')").all().map((r) => r.name).sort();
   assert.deepEqual(idx, ['idx_te_office_id', 'idx_te_office_kind_ts', 'idx_tr_open'], 'the hot reads have their indexes');
   store.record({ agentId: 'pam', kind: 'tool', ts: 1, attrs: { tool: 'Write' } });
@@ -203,10 +203,14 @@ test('before 14 live days Pulse shows what the advice rules see so far, as facts
   assert.equal(v8.early.length, 1);
   assert.equal(v8.early[0].kind, 'run-less');
   assert.deepEqual(v8.early[0].evidence, { runs: 8, nothing: 6 }, 'counted over the 8 live days only');
+  // What each rule watches comes with them, even with no pattern (owner, 2026-10-26).
+  assert.deepEqual(v8.earlyWatch.counts, { 'run-less': 1, 'run-more': 0, 'cheaper-model': 0, 'stronger-model': 0 });
   const few = service(t, { days: 4 });
   assert.deepEqual(few.svc.snapshot('this-week').early, [], '4 runs: under half the 10 run minimum');
+  assert.ok(few.svc.snapshot('this-week').earlyWatch, 'the tiles show before any pattern');
   const ready = service(t).svc.snapshot('this-week');
   assert.deepEqual(ready.early, [], 'no early lines once advice can show');
+  assert.equal(ready.earlyWatch, undefined, 'and no tiles');
   assert.equal(ready.advice[0].kind, 'run-less');
 });
 
@@ -424,39 +428,63 @@ test('runs older than 400 days are pruned with the raw points; newer ones stay',
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM telemetry_events').get().n, 1, 'the old point went too');
 });
 
-test("on a plan, each member's cost is their part of the plan's cost so far this period; on an API key nothing is split", (t) => {
-  // Value: protects=the owner's realistic cost (2026-10-15); fails_when=members' costs do not add up to the period's plan cost, a share changes, the pay per use figure is lost, or an API key is split; why_new=owner 2026-10-15; seam=none; no_claim=the plan price itself (owner or list)
-  const { planCostFor } = loadTs('src/shared/claudePlan.ts');
-  const { periodRange, previousRange } = loadTs('src/shared/teamPerformance.ts');
-  const add = (env) => {
-    const now = env.clock.now();
-    env.store.cost('toby', 'x', 3, 100, null, now - 3600_000);
-    env.store.cost('pam', 'y', 1, 100, null, now - 3600_000);
+test("on a plan, the office is charged its own work at the plan's rate, never the whole plan; on an API key nothing is priced (owner, 2026-10-29)", (t) => {
+  // Value: protects=the owner's real office cost when the same plan also runs their own Claude use; fails_when=the office is charged the whole plan for the days so far ($190 of $200 on the 29th), a dollar figure shows before the rate is known, members stop adding up, the cost passes the whole plan, a repeated meter reading is stored twice, or an API key is priced; why_new=owner 2026-10-29 replaces 2026-10-15 split of the whole plan; seam=none; no_claim=Anthropic's meter weighting (claudePlan unit test)
+  const { planCostFor, planRate } = loadTs('src/shared/claudePlan.ts');
+  const { periodRange } = loadTs('src/shared/teamPerformance.ts');
+  const max = { plan: 'max-20x', label: 'Claude Max 20x', monthly: 200, source: 'detected' };
+  const at = (h) => new Date(2026, 9, 15, h).getTime(); // Thursday, inside this week
+  const reset = new Date(2026, 9, 19, 9).getTime() / 1000;
+  const meter = (svc, h, pct) => svc.noteRateLimits({ seven_day: { used_percentage: pct, resets_at: reset }, five_hour: { used_percentage: 1, resets_at: reset } }, at(h));
+  const work = (env) => {
+    env.store.cost('toby', 'x', 3, 100, null, at(11));
+    env.store.cost('pam', 'y', 1, 100, null, at(11));
     env.proc.tick('/office');
   };
-  const onPlan = service(t, { plan: { plan: 'max-20x', label: 'Claude Max 20x', monthly: 200, source: 'detected' } });
-  add(onPlan);
+
+  // No meter reading yet: no plan dollars, the work stays at pay per use value.
+  const learning = service(t, { plan: max });
+  work(learning);
+  const l = learning.svc.snapshot('this-week');
+  assert.deepEqual([l.plan, l.planLearning, l.snapshot.totalUsd], [null, true, 4]);
+
+  // The meter rose 5 points over $4 of office work: $0.80 a point.
+  const onPlan = service(t, { plan: max });
+  meter(onPlan.svc, 10, 20);
+  meter(onPlan.svc, 10.5, 20); // a second member's status line, same reading
+  work(onPlan);
+  meter(onPlan.svc, 12, 25);
+  onPlan.proc.tick('/office');
+  const db = onPlan.persist.database();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM telemetry_events WHERE kind = 'meter'").get().n, 2, 'one point per change of the account wide meter');
   const v = onPlan.svc.snapshot('this-week');
   const r = periodRange('this-week', onPlan.clock.now());
-  const cost = planCostFor(200, r.fromMs, r.toMs, onPlan.clock.now());
-  assert.ok(Math.abs(v.snapshot.totalUsd - cost) < 1e-9);
+  const cost = 4 * planRate(200, 0.8);
+  assert.ok(Math.abs(v.snapshot.totalUsd - cost) < 1e-9, 'the office\'s own work at the plan\'s rate');
+  assert.ok(v.snapshot.totalUsd < planCostFor(200, r.fromMs, r.toMs, onPlan.clock.now()) / 2, 'far below the whole plan for the days so far');
   assert.ok(Math.abs(v.snapshot.members.reduce((s, m) => s + m.usd, 0) - cost) < 1e-9);
-  assert.equal(v.plan.payPerUse, 4);
   assert.ok(Math.abs(v.snapshot.members.find((m) => m.agentId === 'toby').share - 0.75) < 1e-9);
-  const onKey = service(t, { billing: 'apiKey', plan: { plan: 'max-20x', label: 'Claude Max 20x', monthly: 200, source: 'detected' } });
-  add(onKey);
+  assert.deepEqual([v.plan.payPerUse, v.planLearning], [4, undefined]);
+  assert.ok(Math.abs(v.plan.periodCost - cost) < 1e-9);
+
+  // A rate so high the work would pass the plan: never more than the whole plan so far.
+  const heavy = service(t, { plan: max });
+  meter(heavy.svc, 10, 20);
+  heavy.store.cost('toby', 'x', 0.01, 100, null, at(11));
+  heavy.proc.tick('/office');
+  meter(heavy.svc, 12, 25);
+  heavy.store.cost('toby', 'x', 500, 100, null, at(13));
+  heavy.proc.tick('/office');
+  const hv = heavy.svc.snapshot('this-week');
+  const hr = periodRange('this-week', heavy.clock.now());
+  assert.ok(Math.abs(hv.snapshot.totalUsd - planCostFor(200, hr.fromMs, hr.toMs, heavy.clock.now())) < 1e-9);
+
+  const onKey = service(t, { billing: 'apiKey', plan: max });
+  meter(onKey.svc, 10, 20);
+  work(onKey);
+  meter(onKey.svc, 12, 25);
   const k = onKey.svc.snapshot('this-week');
-  assert.equal(k.plan, null);
-  assert.equal(k.snapshot.totalUsd, 4);
-  // Today and the span before Compare draws (owner, 2026-10-16).
-  const today = onPlan.svc.snapshot('today');
-  const tr = periodRange('today', onPlan.clock.now());
-  assert.ok(Math.abs(today.snapshot.totalUsd - planCostFor(200, tr.fromMs, tr.toMs, onPlan.clock.now())) < 1e-9, 'today: the plan cost so far today');
-  onPlan.store.cost('toby', 'z', 2, 100, null, new Date(2026, 9, 6, 10).getTime());
-  onPlan.proc.tick('/office');
-  const cmp = onPlan.svc.snapshot('this-week', true);
-  const pr = previousRange('this-week', onPlan.clock.now());
-  assert.ok(Math.abs(cmp.compare.snapshot.totalUsd - planCostFor(200, pr.fromMs, pr.toMs, onPlan.clock.now())) < 1e-9, 'the span before: its plan cost up to the end of its same day');
+  assert.deepEqual([k.plan, k.planLearning, k.snapshot.totalUsd], [null, undefined, 4]);
 });
 
 test('Compare runs the same snapshot for the span before, only when on and ready, up to the same day', (t) => {
@@ -676,4 +704,99 @@ test('early lines: most evidence first, at most three', () => {
   const a = (id, evidence) => ({ id, evidence });
   const r = earliest([a('x', { runs: 5 }), a('y', { decisions: 9, reopens: 1 }), a('z', { runs: 7 }), a('w', { reopens: 2 })]);
   assert.deepEqual(r.map((x) => x.id), ['y', 'z', 'x']);
+});
+
+// ─── how long the office ran (owner, 2026-10-25) ─────────────────────────────
+
+const { RUN_SAVE_MS, RUN_GAP_CAP_MS } = loadTs('src/main/telemetryStore.ts');
+const MIN = 60_000;
+
+test('running time: awake minutes count, away minutes count as away too, a stopped office and a sleep count nothing, a late timer counts up to the cap', (t) => {
+  // Value: protects=owner D1 and the beat's rules; fails_when=a stopped office or a sleep adds running time, away time is not counted while away, a late timer without a suspend is dropped, or one gap counts past the cap; why_new=new measure; seam=index.ts passes the stopped flag and calls runningPause at suspend; no_claim=powerMonitor's suspend event itself
+  const { persist, store, proc, clock } = setup(t);
+  const t0 = clock.now();
+  store.runningStart(t0);
+  for (let i = 1; i <= 4; i++) store.running(false, t0 + i * MIN);
+  store.flush();
+  assert.deepEqual(proc.running('/office', 0).points, [], 'under 5 minutes nothing is saved yet');
+  store.running(false, t0 + RUN_SAVE_MS);
+  store.flush();
+  assert.deepEqual(proc.running('/office', 0).points.map((p) => [p.ms, p.awayMs]), [[5 * MIN, 0]], 'saved every 5 minutes');
+
+  store.presence(1900, false, t0 + 6 * MIN);           // idle 31 minutes: away
+  store.running(false, t0 + 6 * MIN);                   // 1 minute, away
+  store.running(true, t0 + 7 * MIN);                    // stopped: nothing (D1)
+  store.running(false, t0 + 27 * MIN);                  // a late timer, no suspend: up to the cap; 5 minutes buffered, saved
+  store.runningPause(false, t0 + 28 * MIN);             // a sleep starts: 1 minute, saved at once
+  store.running(false, t0 + 90 * MIN);                  // the first tick after waking starts the clock again
+  store.running(false, t0 + 91 * MIN);
+  store.runningSave();
+  store.flush();
+  assert.equal(RUN_GAP_CAP_MS, 15 * MIN);
+  const pts = proc.running('/office', 0).points.map((p) => [p.ms, p.awayMs]);
+  assert.deepEqual(pts, [[5 * MIN, 0], [16 * MIN, 16 * MIN], [MIN, MIN], [MIN, MIN]], 'the sleep from minute 28 to 90 is not running time');
+  assert.equal(proc.running('/office', 0).since, t0, 'when the first saved run began, not its day');
+  void persist;
+});
+
+test('running time is split at local midnight and saved under the office it ran for; a resume never restarts a running clock', (t) => {
+  // Value: protects=day totals and per office totals; fails_when=a point spans two days, minutes buffered for one office are saved under the next, or an unlock (which re-arms the beats) drops the time since the last tick; why_new=new measure; seam=the office function the app passes; no_claim=how the app switches offices
+  const { persist, proc, clock } = setup(t);
+  let office = '/office';
+  const store = new TelemetryStore(() => persist.database(), () => office, clock.now);
+  const late = new Date(2026, 9, 15, 23, 58).getTime();
+  store.runningStart(late);
+  store.runningStart(late + MIN);                        // an unlock re-arms: the clock keeps its start
+  store.running(false, late + 3 * MIN);                  // 23:58 to 00:01
+  office = '/other';
+  store.running(false, late + 4 * MIN);                  // 1 minute for the other office
+  store.runningSave();
+  store.flush();
+  const days = (o) => proc.running(o, 0).points.map((p) => [new Date(p.ts).getDate(), p.ms]);
+  assert.deepEqual(days('/office'), [[15, 2 * MIN], [16, MIN]]);
+  assert.deepEqual(days('/other'), [[16, MIN]]);
+});
+
+test('Pulse reads how long the office ran into the period and the span before', (t) => {
+  // Value: protects=the Your time foot stats get their numbers from the store (owner, 2026-10-25, D2); fails_when=PulseService stops passing the processor's running points into pulseSnapshot, reads them only from the period's start so the span before is empty, or loses the first recorded day; why_new=team-performance tests pulseSnapshot with hand-made points and the store tests stop at the processor, so the wiring between them had no test; seam=none; no_claim=the view's layout
+  const env = service(t); // now Fri 16 Oct 09:00, live since Thu 1 Oct
+  const point = (day, hours, awayMin) => env.store.record({ agentId: null, kind: 'running', ts: new Date(2026, 9, day, 18).getTime(), value: hours * 3600_000, attrs: { away: awayMin * MIN } });
+  point(6, 1, 10);   // last Tuesday: the span before
+  point(13, 2, 30);  // this Tuesday
+  point(14, 0.5, 0); // this Wednesday
+  env.store.flush();
+  const view = env.svc.snapshot('this-week', true);
+  assert.deepEqual(view.snapshot.running, { ms: 2.5 * 3600_000, awayMs: 30 * MIN, since: null });
+  // Recording began when the first point's hour started: 17:00 on Tuesday 6 Oct.
+  assert.deepEqual(view.compare.snapshot.running, { ms: 3600_000, awayMs: 10 * MIN, since: new Date(2026, 9, 6, 17).getTime() }, 'the span before, and recording began inside it');
+  assert.equal(env.svc.snapshot('today').snapshot.running, null, 'a period with no record shows none');
+});
+
+test('the app drives the running clock: a beat each minute, paused and saved before a sleep, a quit or a memory reset, restarted on arm', () => {
+  // Value: protects=owner D1 at the app's edges, where the store's rules meet powerMonitor; fails_when=a quit, memory reset, office switch or start over flushes without saving the buffered minutes (up to 5 lost each time), a suspend stops pausing the clock (each sleep then counts up to the 15 minute cap), the beat stops passing the stopped flag, or a resume no longer restarts the clock with a first beat; why_new=the store tests call the clock by hand and nothing pinned the calls in index.ts; seam=none (source pins, as powerMonitor needs Electron); no_claim=powerMonitor's events themselves
+  const main = fs.readFileSync(path.resolve(__dirname, '../src/main/index.ts'), 'utf8');
+  const body = (start, end) => main.slice(main.indexOf(start), main.indexOf(end, main.indexOf(start)));
+  const saveThenFlush = 'pulseTelemetry.runningPause(officeStopped()); pulseTelemetry.flush();';
+  assert.ok(body('function teardownAndQuit', '\n}\n').includes(saveThenFlush), 'quit saves the running minutes before the flush');
+  assert.ok(body("ipcMain.handle('app:resetMemory'", 'persist.close()').includes(saveThenFlush), 'a memory reset does too, before the database closes');
+  // An office switch or a start over relaunches too (adversarial review, ship 2026-10-26).
+  const change = body("writeConfig({ harnessHome: newHome });", 'restartApp(app)');
+  assert.ok(main.slice(main.lastIndexOf('allowQuit = true;', main.indexOf('writeConfig({ harnessHome: newHome });')), main.indexOf('writeConfig({ harnessHome: newHome });')).includes(saveThenFlush), 'switching offices saves the old one\'s minutes first');
+  assert.ok(change.length > 0);
+  assert.ok(body("console.error('[startOverHere] pulse flush:'", 'restartApp(app)').length > 0 && main.includes(`try { ${saveThenFlush} } catch (e) { console.error('[startOverHere] pulse flush:', e); }`), 'so does starting over');
+  assert.match(main, /powerMonitor\.on\('suspend', \(\) => \{[^\n]*pulseTelemetry\.runningPause\(officeStopped\(\)\); pulseTelemetry\.presence\(0, true\);/);
+  assert.match(body('function pulsePresenceBeat', '\n}\n'), /pulseTelemetry\.running\(officeStopped\(\)\);/);
+  assert.match(body('function officeStopped', '\n}\n'), /return !!v && !v\.checking;/, 'a check in progress is running time');
+  assert.match(body('function armAlwaysOnBeats', '\n}\n'), /pulseTelemetry\.runningStart\(\);\n\s*pulsePresenceBeat\(\);\n\s*pulsePresenceTimer = setInterval\(pulsePresenceBeat, 60_000\);/);
+  assert.match(body('function onSystemResume', '\n}\n'), /armAlwaysOnBeats\(\)/, 'a resume re-arms, so the clock starts again');
+});
+
+test('while the rate is learned, Team at work shows no dollars either', () => {
+  // Value: protects=pay per use value never reads as what a member spent; fails_when=the rows, the headline or the member card fall back to raw dollars; why_new=ship review; seam=source pins; no_claim=rendering
+  const view = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../src/renderer/src/components/pulse/PulseView.tsx'), 'utf8');
+  assert.match(view, /const memberMoney = view\.planLearning \? \(\): string => t\('pulse\.measuring'\) : money;/);
+  assert.match(view, /\{memberMoney\(m\.usd\)\}<\/span>/);
+  assert.match(view, /\{work\.costliest && !view\.planLearning && <>/);
+  assert.match(view, /money=\{view\.planLearning \? \(\): string => t\('pulse\.measuring'\) : money\}/);
+  assert.match(view, /m\.costForWork\.perPiece !== null && !data\.planLearning \?/);
 });

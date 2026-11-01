@@ -1,5 +1,72 @@
 # TODOS
 
+## Memory and voice trust gaps (from the 0.2.7 ship review, 2026-10-26; owner chose TODOS)
+
+### Owner standing per note, not per tidy pass
+
+**What:** Have each owner sourced op name the owner note it comes from, and accept source owner only for an op that cites a note under FROM THE OWNER in this pass.
+
+**Why:** `validateOps` gets `ownerWords` for the whole pass (src/main/memoryTidy.ts). When any owner note is pending, an op the model built from an inbox line can claim owner, and only the prompt keeps the two apart. Michael gets an owner note for every dock message, so his passes almost always run that way.
+
+Go with it: keep only the owner's own words (the answer, the edit, the note) in `owner_notes.text` and the quoted context (the member's question, a card title, an email subject, pasted text) in a field of its own that the tidy prompt labels as not the owner's; today one line in the instructions asks the model to tell them apart (D4). And file an owner note only when a pass used it, or keep the ones it set aside for a later pass, so a planted inbox note can't talk the tidy-up into dropping the owner's words (adversarial review, DeepSeek, 2026-10-26).
+
+**Effort:** M
+**Priority:** P2
+
+### Owner entries in memory.md can be planted
+
+**What:** Keep the ids (or a hash) of the owner entries the tidy-up writes in harness.db, and read any other entry marked owner as the member's own.
+
+**Why:** memory.md sits in the member's folder, which its shell can write; `parseIndex` trusts any `| owner |` line, and the new rules then protect it. Older than this branch.
+
+**Effort:** M
+**Priority:** P2
+
+### A correction typed in a member's own terminal can't replace an owner entry
+
+**What:** Record what the owner types to a member as an owner note, the way the dock does for Michael, or give the member an app path that writes one.
+
+**Why:** Members still write the owner's corrections to their inbox, which never counts as the owner's, so an older owner entry (from an Ask me answer) can't be replaced that way.
+
+**Effort:** M
+**Priority:** P2
+
+### Run comparison reads transcripts it finds by name
+
+**What:** Record each member session's transcript path (and size) when the app starts the session, and have run comparison read only that file, instead of finding `<session id>.jsonl` anywhere under Claude's projects folder.
+
+**Why:** On a Mac members' shells are walled off from that folder, but on Windows a member's shell could write a file under its own session id. The member's own transcript already holds whatever it chose to say, and every suggestion still waits for the owner's Review and Apply, so this is defense in depth. The injection screen on a suggestion is a pattern list, not a boundary; the owner's Apply is (adversarial review, DeepSeek, 2026-10-26).
+
+**Effort:** S
+**Priority:** P3
+
+### Voice confirms for schedules and settings carry no target
+
+**What:** Carry the staged schedule id or setting key on the pending confirm, and cancel when the confirm names another one, as `namesSomeoneElse` does for members.
+
+**Why:** "confirm, delete the Invoice check schedule" while a delete of Morning report waits deletes Morning report. Older than this branch. Also: a member whose name is an ordinary word ("Will") can cancel a valid confirm; it fails safe.
+
+**Effort:** S
+**Priority:** P2
+
+## Overlap split (deferred from the CEO review, 2026-10-24)
+
+### Explain how they split it in the hire wizard
+
+**What:** Give the hire wizard's overlap step the same "Explain how they split it" that Edit agent has, writing the new hire's handoffs.
+
+**Why:** A new hire who works with a teammate (sends them part of the work) hits the same wall a changed job did: cut the duty or guess at wording.
+
+**Pros:** One way of describing teamwork everywhere a job is written.
+
+**Cons:** The wizard's overlap box has mailbox, topic and connection chips, and its topic chip writes the boundary the opposite way ("Only X." on the new hire, "Not for X" on the teammate); its Next gate needs the explanation to count. About M.
+
+**Context:** Edit agent's version: JobChangeReview's explain state, the revise call's `explanation` and `teammates`, `checkDistinct` mode 'change', and the handoff list in src/shared/jobChange.ts (docs/designs/work-style-change-request.md, Overlap split). Deferred by the owner (CEO D8) to prove it in Edit agent first.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** the Edit agent version shipping
+
 ## Release notes accuracy (from the eng review of the site's 0.2.5 and 0.2.6 plan, 2026-10-24)
 
 ### The 0.2.5 changelog says engine records are closed to every member's shell
@@ -15,6 +82,22 @@
 **Depends on:** None
 
 ## Connections
+
+### Step cards for iCloud, Yahoo and Zoho app passwords
+
+**What:** Give iCloud Mail, Yahoo and Zoho the same numbered step cards Google gets in Add a mailbox (eng review 2026-10-26, D3 B): each step with an Open button to that service's own two step and app password pages, and a plain line on what to copy.
+
+**Why:** Each still shows one paragraph with an address to type; the owner saw a business user struggle with the same paragraph for Google.
+
+**Pros:** One look across Add a mailbox; owners on those services set up without help.
+
+**Cons:** Three more providers' pages to find, link and keep current when they move.
+
+**Context:** The Google cards (AddMailboxDialog.tsx, Google steps) are built to take a per provider list of steps; start from `mailboxes.help.icloud/yahoo/zoho` in the locales and add each provider's steps and page addresses.
+
+**Effort:** human S / CC S
+**Priority:** P3
+**Depends on:** the Google step cards landing.
 
 ### One call at a time per connected app, and a throttle notice
 
@@ -86,6 +169,18 @@
 **Depends on:** None
 
 ## Team performance (from the CEO review of docs/designs/team-performance.md, 2026-10-15)
+
+### Compare runs for members on other engines
+
+**What:** Read Codex (and other engines') session files for a run's window, so "Went wrong" can compare their runs too.
+
+**Why:** Run comparison (src/main/runCompare.ts) reads only Claude Code's conversations, so members on other engines get no suggestions; the jobs list shows an info icon for them.
+
+**Context:** From the eng review of "Compare runs we already have", 2026-10-24 (D8). The slicer finds a member's sessions through the private session record and reads `<claude projects>/<folder>/<session>.jsonl`; `pulseBackfill.ts` has the same limit. Each engine needs its own folder and line format, and its own `runEntry` reading.
+
+**Effort:** M (human) / S (CC)
+**Priority:** P3
+**Depends on:** Run comparison (this feature)
 
 ### Give Fable a tier and a price
 
@@ -321,6 +416,40 @@
 **Effort:** M
 **Priority:** P2
 
+## Original email view (deferred from the CEO review of docs/designs/original-email-view.md, 2026-10-29)
+
+### Show the whole conversation in the email tab
+
+**What:** Under the one email the tab opens, list the earlier messages of the same conversation, collapsed, newest at the top, found from its In-Reply-To and References headers.
+
+**Why:** A reply often only makes sense next to what it answers (our nudge, the sender's first message); today the owner still needs the mailbox for those.
+
+**Pros:** Full context in one place; reuses the email tab, the owner fetch and the header lookups.
+
+**Cons:** More folder searches per open (each earlier Message-ID), slower open, more failure paths; Gmail threads and other providers' references differ.
+
+**Context:** Owner deferred it (CEO review D5, 2026-10-29) so the single email view ships first and is used. Start from `MailService.original` and the thread headers `threadOf` already reads (`src/main/mail.ts:762`).
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
+### Open or save an email's attachments from the email tab
+
+**What:** The email tab lists attachment names and sizes; add Save to a folder the owner picks, and Open in the office for safe kinds (PDF, pictures).
+
+**Why:** The owner still needs the mailbox to open what was attached to the email an ask is built on.
+
+**Pros:** Everything about the email in one place.
+
+**Cons:** Brings files from outside senders onto the Mac; needs its own checks (kind from content not name, size cap, no launching executables, quarantine flag on macOS).
+
+**Context:** Owner deferred it (CEO review D6, 2026-10-29). Pair with "Read one email without downloading its attachments" under Attachments: download only the one part asked for.
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
 ## Message times and upkeep (deferred from the ship review of mit/file-tab-no-bottom-bar, 2026-10-18)
 
 ### Read a reply's time from the app's record, not the agent's file
@@ -346,15 +475,6 @@
 **What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.
 
 **Why:** A decline carries Michael's or the owner's reason; dropped, Research may ask for the same change again.
-
-**Effort:** S
-**Priority:** P3
-
-### Retry closing time's wait after all note to Michael
-
-**What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
-
-**Why:** Michael may close without the member's ACK.
 
 **Effort:** S
 **Priority:** P3
@@ -1033,22 +1153,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** human M / CC S
 **Priority:** P2
 **Depends on / blocked by:** the owner choosing a service and passing its identity check.
-
-### Copy diagnostics for problem reports
-
-**What:** A "Copy diagnostics" button beside Settings' Report a problem: app and OS versions, the last 50 office event types from `log.jsonl`, agent exit summaries, with paths and names redacted; copied to the clipboard only.
-
-**Why:** Report a problem carries version numbers only, on purpose, so beta reports can lack what happened just before the failure.
-
-**Pros:** Remote debugging of Windows beta problems without back and forth.
-
-**Cons:** Redaction must be exact: office names, folder paths and customer names must never reach the copy.
-
-**Context:** Deferred as S3 in `docs/designs/windows-11-installer.md` (CEO review 2026-10-04) to design from what the first real beta reports lack. Sources: hive `log.jsonl`, `crashes/` (raw terminal tails, never copied raw).
-
-**Effort:** human M / CC S
-**Priority:** P3
-**Depends on / blocked by:** the first Windows beta reports.
 
 ### Go live steps for the Windows beta
 

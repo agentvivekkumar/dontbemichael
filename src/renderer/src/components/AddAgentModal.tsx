@@ -29,7 +29,7 @@ import { splitAgentRole } from '@shared/agentRole';
 import { FIRST_TASK_EDITED_MAX } from '@shared/firstTask';
 import { teamAccent } from '@shared/teamPlan';
 import { mailboxHolder } from '@shared/mailboxes';
-import { connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
+import { connectorOn, isQuickBooksKey, offeredConnectors } from '@shared/claudeConnectors';
 import { Select } from './triggers/ui';
 import {
   NEW_JOB_KEY,
@@ -42,6 +42,7 @@ import {
   bindingLines,
   cardJobs,
   hireAgentId,
+  hireFolderCandidates,
   hireFolderName,
   hireRole,
   safeFolder,
@@ -269,8 +270,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const [jobBusy, setJobBusy] = useState(false);
   const [plainAll, setPlainAll] = useState(false);
   const describeSeq = useRef(0);
-  const styleCtx = () => ({ name: name.trim(), title: title.trim() || undefined, business, manager: godName });
+  // The name the screen shows: with the Name box cleared it is the
+  // character's, and both checks get it too, since one with no name is
+  // refused on every try (owner, 2026-10-26).
   const hireWho = name.trim() || CAST_BY_NAME[character].displayName;
+  const styleCtx = () => ({ name: hireWho, title: title.trim() || undefined, business, manager: godName });
   /** Show a job's instructions as plain words: the quick rewrite at once, the
    *  model's when it arrives. */
   const setInstructions = (next: string, forName = name.trim(), forTitle = title.trim()): void => {
@@ -293,12 +297,12 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   };
   /** "See Jordan's job" or "See what changes": the same rewrite Edit agent
    *  runs, on the job as it stands here. */
-  const runJob = ({ typed, extras, answer, requestId }: ReviseRun) => window.cth.workStyleRevise({
+  const runJob = ({ typed, extras, answers, requestId }: ReviseRun) => window.cth.workStyleRevise({
     requestId,
     ctx: styleCtx(),
     current: { instructions, handles: routing },
     changes: [typed, ...extras],
-    answer
+    answers
   });
   /** Apply fills the job in (DR13); Next then runs the overlap check. */
   const applyHireJob = async (ok: ReviseOk, change: string): Promise<'applied'> => {
@@ -328,7 +332,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     // A new job keeps the picked character's role (Creed: Quality Control),
     // for the owner to change.
     if (!chosenJob) { setTitle(newJobStart(character).title); setRouting(''); setInstructions(''); setSourceCard(undefined); return; }
-    const copy = jobFor(chosenJob, name.trim());
+    const copy = jobFor(chosenJob, hireWho);
     setTitle(copy.title);
     setRouting(copy.routing);
     setInstructions(copy.workStyle, name.trim(), copy.title);
@@ -345,7 +349,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     if (!michaelFolder) return;
     const base = safeFolder(chosenJob?.folder ?? (title.trim() === newJobStart(character).title ? newJobStart(character).folder : undefined) ?? title) || safeFolder(name);
     const n = name.trim();
-    const candidates = [base, `${base}_${n}`, ...Array.from({ length: 8 }, (_, i) => `${base}_${n}_${i + 2}`)];
+    const candidates = hireFolderCandidates(base, n, 10);
     const onDisk = await window.cth.foldersExist(michaelFolder, candidates).catch(() => ({} as Record<string, boolean>));
     const used = new Set(team.map((a) => basename(a.cwd ?? '').toLowerCase()));
     setFolderName(hireFolderName(base, n, (f) => !!onDisk[f] || used.has(f.toLowerCase())));
@@ -368,7 +372,7 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   }), [team, config.agentCapabilities, mailboxes]);
   const [binding, setBinding] = useState<Binding | null>(null);
   const profile: JobProfile = {
-    name: name.trim(), title: title.trim(), routing: routing.trim(), workStyle: instructions,
+    name: hireWho, title: title.trim(), routing: routing.trim(), workStyle: instructions,
     mailbox: mailboxAddress(binding?.mailboxId)
   };
   // The check judges what to send, never the title: renaming "Sales Director"
@@ -432,9 +436,9 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   // shows the check already under way. A short pause lets the owner click
   // through jobs without starting one for each.
   useEffect(() => {
-    if (step !== 'job' || !chosenJob || !name.trim()) return;
-    const copy = jobFor(chosenJob, name.trim());
-    const job: JobProfile = { name: name.trim(), title: copy.title.trim(), routing: copy.routing.trim(), workStyle: copy.workStyle };
+    if (step !== 'job' || !chosenJob) return;
+    const copy = jobFor(chosenJob, hireWho);
+    const job: JobProfile = { name: hireWho, title: copy.title.trim(), routing: copy.routing.trim(), workStyle: copy.workStyle };
     if (!job.routing) return;
     const sig = `${job.name}\n${job.routing}`;
     if (check?.sig === sig || prefetchSig.current === sig) return;
@@ -454,10 +458,11 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
   const freeMailboxes = mailboxes.filter((m) => !mailboxHolder(config.agentCapabilities, m.id));
   // Every connector on the owner's Claude account is listed (owner, 2026-10-03:
   // "do not let system decide which connector make available ... nothing
-  // should be hidden"). Those switched on can be bound; those switched off
+  // should be hidden"), but a mailbox: mail goes only through the app's own
+  // (owner, 2026-10-30). Those switched on can be bound; those switched off
   // show greyed with where to turn them on. A binding grants its most
   // restrictive access: QuickBooks read only.
-  const bindConnectors = (config.claudeConnectors?.list ?? [])
+  const bindConnectors = offeredConnectors(config.claudeConnectors?.list)
     .map((c) => ({ key: c.key, on: connectorOn(config, c.key), signIn: c.status === 'needs-sign-in' }))
     .sort((a, b) => Number(b.on) - Number(a.on));
   const [bindConnector, setBindConnector] = useState('');
@@ -626,7 +631,8 @@ export function AddAgentModal({ onClose, config, onConfigChange }: AddAgentModal
     };
     // A mailbox binding is set before the spawn, so the agent starts with it.
     if (binding?.mailboxId) {
-      const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false } }).catch(() => null);
+      // On Send on approval, as a mailbox added on the Access tab starts (owner, 2026-10-30).
+      const res = await window.cth.mailSetCapabilities(id, { email: { enabled: true, mailboxes: [binding.mailboxId], send: false, sending: 'approval' } }).catch(() => null);
       if (!res?.ok) { setBusy(false); setError(tr('capabilities.saveFailed')); return; }
     }
     // So is a connection binding: the agent starts holding that one connector.

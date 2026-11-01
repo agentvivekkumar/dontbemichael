@@ -16,7 +16,6 @@ import { cannotCheckEmail, cleanFocus, FOCUS_MAX, GOD_ALIAS, missionsFor, nextRu
 import { effectiveWorkStyle } from '@shared/michaelWorkStyle';
 import { remainingStarterMissions, starterSuggestionsFor, type StarterSuggestion } from '@shared/starterJobs';
 import type { OfficePack } from '@shared/officePack';
-import { gmailConnectorOn } from '@shared/claudeConnectors';
 import { agentMailboxes } from '@shared/mailboxes';
 import { useRtl } from '@/i18n/useDirection';
 import i18n from '@/i18n';
@@ -697,7 +696,7 @@ export function AgentSchedules({ agentId, agentName, businessType, sourceCard }:
             mission={m}
             nameOf={nameOf}
             ownerName={agentName}
-            noEmail={!!config && cannotCheckEmail(m, { enabled: agentMailboxes(config, agentId).length > 0 }, gmailConnectorOn(config, agentId))}
+            noEmail={!!config && cannotCheckEmail(m, { enabled: agentMailboxes(config, agentId).length > 0 })}
             focusOwner={focusOwner}
           />
         ))}
@@ -779,7 +778,7 @@ export function OfficeSchedules() {
                   last={i === rows.length - 1}
                   nameOf={nameOf}
                   ownerName={name}
-                  noEmail={!!config && cannotCheckEmail(m, { enabled: agentMailboxes(config, owner).length > 0 }, gmailConnectorOn(config, owner))}
+                  noEmail={!!config && cannotCheckEmail(m, { enabled: agentMailboxes(config, owner).length > 0 })}
                   readOnly
                 />
               ))}
