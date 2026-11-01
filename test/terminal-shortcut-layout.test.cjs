@@ -39,6 +39,16 @@ test('an AltGr character keeps its own letter', () => {
   assert.equal(shortcutLetter({ key: 'c', code: 'KeyC', altKey: true }), 'c', 'Cmd+Option+C keeps its Latin letter');
 });
 
+test('an input method, dead or unidentified key is never read as a shortcut letter', () => {
+  // Value: protects=a Japanese, Chinese or Korean input method, and dead-key accents, under Ctrl or Cmd with Shift or a selection; fails_when=a named key on the C or V key falls back to its physical letter and copies or pastes instead of reaching the input method; why_new=review note on #657; seam=none; no_claim=xterm's composition handling
+  for (const key of ['Process', 'Dead', 'Unidentified']) {
+    assert.equal(shortcutLetter({ key, code: 'KeyC' }), key.toLowerCase(), `${key} on the C key`);
+    assert.equal(shortcutLetter({ key, code: 'KeyV' }), key.toLowerCase(), `${key} on the V key`);
+  }
+  assert.equal(shortcutLetter({ key: 'с', code: 'KeyC' }), 'c', 'a Russian Ctrl+C still copies');
+  assert.equal(shortcutLetter({ key: 'М', code: 'KeyV' }), 'v', 'a Russian Ctrl+Shift+V still pastes');
+});
+
 test('the terminal reads its copy and paste letter through shortcutLetter', () => {
   // Value: protects=the wiring of the helper into the terminal's key handler; fails_when=the handler goes back to ev.key; why_new=bug fix; seam=none; no_claim=none
   const src = fs.readFileSync(path.join(__dirname, '../src/renderer/src/components/terminalPool.ts'), 'utf8');
