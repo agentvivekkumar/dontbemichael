@@ -55,7 +55,6 @@ runs on your computer.
 - [Your data](#your-data)
 - [For developers](#for-developers)
 - [Contributing](#contributing)
-- [Where it came from](#where-it-came-from)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -375,12 +374,6 @@ Contributions are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md). Fo
 idea? [Open an issue](https://github.com/agentvivekkumar/dontbemichael/issues).
 [`CONTRIBUTORS.md`](./CONTRIBUTORS.md) lists everyone with a merged pull request. Changes are in
 [`CHANGELOG.md`](./CHANGELOG.md).
-
-## Where it came from
-
-Don't Be Michael started as a fork of [Munder Difflin](https://github.com/chaitanyagiri/munder-difflin),
-an agent harness for developers by Chaitanya Giri. It has since grown into its own project, built
-for business owners rather than developers, and is developed independently.
 
 ## License
 
