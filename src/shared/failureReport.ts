@@ -108,7 +108,7 @@ export const LOG_KIND_CLASS: Readonly<Record<string, FailureClass>> = {
   'hook-frame-rejected': 'none',
   'agent-hold': 'none', 'app-start': 'none', 'archive': 'none', 'card-reopen': 'none', 'clear': 'none',
   'clear-cancelled': 'none', 'clear-handoff-asked': 'none', 'closed-by-owner': 'none', 'compact': 'none',
-  'distinct-check': 'none', 'drain': 'none', 'foundations': 'none', 'member-deleted': 'none',
+  'distinct-check': 'none', 'drain': 'none', 'file-handed-over': 'none', 'foundations': 'none', 'member-deleted': 'none',
   'memory-read': 'none', 'memory-reset': 'none', 'memory-reset-start': 'none', 'memory-tidy': 'none',
   'memory-tidy-abort': 'none', 'message': 'none', 'message-held-for-trust-layer': 'none',
   'message-held-not-reporting': 'none', 'outbox-repair': 'none', 'owner-reply-unmatched': 'none',

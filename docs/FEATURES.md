@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.3.3). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.3.4). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -36,10 +36,12 @@ moving, and brings you only the decisions that need you.
   member who asked, and your answer goes only to Michael.
 - A file Michael names in a reply, an Ask me card or a task shows as a chip. Markdown, text, JSON,
   CSV and pictures open in an office tab beside Who talks to whom and refresh when the file
-  changes; PDF and Office files open in their own app. Only files in the office and team folders
-  open.
+  changes; Word, Excel, PowerPoint and PDF files show their words in a tab, with Open in app for
+  the file itself. Only files in the office and team folders open. A team folder named on a card
+  opens that folder.
 - Ask Michael anything from the Talk to Michael box: he answers in a conversation that opens above
-  it, and each question shows where it stands until it is answered. Scheduled outcomes, such as a
+  it on your latest question, with older ones folded behind Show earlier, and each question shows
+  where it stands until it is answered. Scheduled outcomes, such as a
   weekly summary, arrive on Ask me as quiet Report cards you clear with Got it.
 - Only Michael sends you desktop notifications. Talk 1:1 with any team member when you want to.
 
@@ -88,6 +90,10 @@ moving, and brings you only the decisions that need you.
   in an office tab, straight from your mailbox, even after it was archived. Opening it never marks
   it read or moves it, pictures from the web stay hidden until you show them, and Gmail mailboxes
   get Open in Gmail.
+- A team member saves an email attachment to Email attachments in its own folder and reads it
+  there. Programs, scripts and archives are refused, and what is saved is marked as a download and
+  never run. A teammate who needs the file asks for it, and the app copies it across, so nobody
+  opens another member's folder.
 
 ### 4. Jobs on a clock
 - Each team member's schedules sit on its Access tab. Name the job ("Check the support
@@ -138,6 +144,9 @@ moving, and brings you only the decisions that need you.
 - Every connector on your Claude account (HubSpot, Google Drive, QuickBooks and the rest) shows up
   in Settings by itself, off. Turn one on, then give it to the team members who need it. Nobody
   else can reach it, and your own Claude Code servers stay yours.
+- Give one team member access to one outside service: a custom REST integration reaches only the
+  members you name on their Access tab, at Read only or Can change. A new one starts with nobody,
+  taking access away holds on the next call, and the app keeps the key. For members on Claude.
 - Email goes only through the mailboxes you connect in the app. Gmail, Outlook and other mail on
   your Claude account never show as connectors, and no team member can use them.
 - Spending money, deleting things and anything public come to you first, on the Needs you board.
@@ -226,6 +235,25 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.3.4 (2026-11-01)
+
+- Custom REST integrations reach only the members the owner names, at Read only or Can change, checked
+  on every call. A new integration starts with nobody, and a deleted member's access is cleared.
+- Team members save email attachments to Email attachments in their own folder and read them there.
+  Anything from outside is marked as a download and never run.
+- Teammates hand files over by asking. Only a file the app saved since it opened goes on, so after a
+  restart a member saves it again first.
+- Word, Excel, PowerPoint and PDF files open in an office tab, and a card that names a folder opens it.
+- The dock folds older messages behind the latest exchange, and the unread count sits on the up arrow.
+- A First task that cannot go on the board keeps the owner's words and Michael says so. A mailbox
+  problem that could not raise its card tries again every minute.
+- Contributors: terminal shortcuts on any keyboard (#657, #670), Pulse card history and long
+  transcripts (#513, #612), a voice confirm that says no (#541), a slow login shell (#635), emails too
+  long to send whole and money in a standing send (#630, #578), safer task board saves (#629),
+  broker uploads and rate limits (#626, #614), hidden markers in outside text (#611), Michael's closing
+  note and heartbeat (#560, #655), Research drops (#532), Ask me titles (#664), older Git (#523), and
+  the engine table and shared test suite (#577, #579, #580).
 
 ### 0.3.3 (2026-10-30)
 

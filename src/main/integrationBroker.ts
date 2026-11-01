@@ -28,6 +28,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { ConnectionThrottle, HOLD_MAX_MS } from './brokerThrottle';
 import {
+  type AgentIntegration,
+  type IntegrationLevel,
   type IntegrationRecord,
   buildAuthHeaders,
   resolveUpstreamUrl,
@@ -47,6 +49,7 @@ import {
   withQuickBooksRequestId,
   writeOnceIdentity
 } from './brokerWriteOnce';
+import { flagInstructionLike, FLAGGED_NOTE, UNTRUSTED_NOTE } from '../shared/untrustedText';
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB request-body cap
 const UPSTREAM_TIMEOUT_MS = 30_000;
@@ -64,6 +67,9 @@ const HOP_BY_HOP = new Set([
 const STRIP_REQUEST = new Set([
   'authorization', 'x-md-broker-token', 'host', 'cookie', 'content-length', 'expect', ...HOP_BY_HOP
 ]);
+/** Headers that ask a service to treat a call as another method: a Read only
+ *  GET carrying one could otherwise run as a DELETE. */
+const METHOD_OVERRIDE = new Set(['x-http-method-override', 'x-http-method', 'x-method-override']);
 /** Response headers never forwarded back (fetch already decodes the body, so the
  *  upstream content-encoding/length would be wrong). */
 const STRIP_RESPONSE = new Set([
@@ -83,6 +89,9 @@ interface Capability {
 export type MailRouteHandler = (agentId: string, op: string, body: Record<string, unknown>) => Promise<{ status: number; body: Record<string, unknown> }>;
 
 const MAIL_BODY_MAX = 1_000_000;
+/** The most of one answer `POST /integrations/screen` reads. */
+const SCREEN_BODY_MAX = 2_000_000;
+const FLAGGED_TOLD_MAX = 500;
 
 export interface IntegrationBrokerDeps {
   /** Resolve an integration record by id (injected — the registry). */
@@ -91,6 +100,12 @@ export interface IntegrationBrokerDeps {
   getSecret: (secretRef: string | undefined) => string | undefined;
   /** md-mail tool calls, `POST /mail/<tool>` (docs/designs/multi-mailbox.md). */
   mail?: MailRouteHandler;
+  /** The level a team member holds, read on every call so a change applies at once. */
+  integrationLevel?: (agentId: string, integrationId: string) => IntegrationLevel | undefined;
+  /** What `GET /integrations` tells a member. */
+  agentIntegrations?: (agentId: string) => AgentIntegration[];
+  /** An integration's answer has lines aimed at an AI: tell Michael. */
+  integrationFlagged?: (agentId: string, label: string, flags: string[]) => void;
   /** App-private send once journal. The desktop app always sets this. Tests
    *  that are not about writes omit it, and those writes keep the old path. */
   journalPath?: string;
@@ -129,6 +144,8 @@ export class IntegrationBroker {
   private readonly replayBodyMax: number;
   /** Identical writes already in flight, so a second caller waits for the first. */
   private readonly writes = new Map<string, Promise<WriteOutcome>>();
+  /** Flagged answers Michael has heard about, so a repeat read tells him once. */
+  private readonly flaggedTold = new Set<string>();
 
   constructor(deps: IntegrationBrokerDeps) {
     this.deps = deps;
@@ -251,6 +268,19 @@ export class IntegrationBroker {
       void this.mail(req, res, cap.agentId ?? cap.workerId, mailMatch[1]);
       return;
     }
+    // 3b) What this member was given, and the screen for what it reads back.
+    if (rawUrl === '/integrations' || rawUrl === '/integrations/screen') {
+      if (!cap.agentId) return IntegrationBroker.sendError(res, 404, 'not_found', 'only team members have these');
+      if (rawUrl === '/integrations') {
+        if (req.method !== 'GET') return IntegrationBroker.sendError(res, 405, 'method', 'use GET');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ integrations: this.deps.agentIntegrations?.(cap.agentId) ?? [] }));
+        return;
+      }
+      if (req.method !== 'POST') return IntegrationBroker.sendError(res, 405, 'method', 'use POST');
+      void this.screen(req, res, cap.agentId);
+      return;
+    }
     // 3) Parse /i/<integrationId>/<path...>.
     const m = /^\/i\/([^/?#]+)(?:\/([^?#]*))?(\?[^#]*)?$/.exec(rawUrl);
     if (!m) return IntegrationBroker.sendError(res, 404, 'not_found', 'expected /i/<integrationId>/<path>');
@@ -263,9 +293,13 @@ export class IntegrationBroker {
     const path = m[2] ?? '';
     const query = m[3] ?? '';
 
-    // 4) Authorize against this worker's capability.
-    if (!cap.allowedIds.has(integrationId)) {
-      return IntegrationBroker.sendError(res, 403, 'forbidden', 'integration not in this worker capability');
+    // 4) Authorize: by what the owner gave this team member now, or by the list
+    //    granted at spawn (a temporary worker's; a team token's is empty).
+    const level = cap.agentId ? this.deps.integrationLevel?.(cap.agentId, integrationId) : undefined;
+    if (!level && !cap.allowedIds.has(integrationId)) {
+      return IntegrationBroker.sendError(res, 403, 'forbidden', cap.agentId
+        ? 'The owner has not given you this integration. It is set on your Access tab. Tell Michael what you need.'
+        : 'integration not in this worker capability');
     }
     // 5) Resolve the record (still enabled?).
     const rec = this.deps.getRecord(integrationId);
@@ -292,7 +326,28 @@ export class IntegrationBroker {
       if (!secret) return IntegrationBroker.sendError(res, 503, 'no_secret', 'no secret configured for this integration');
     }
 
-    void this.forward(req, res, rec, upstream, secret, cap.agentId ?? cap.workerId, integrationId, path + query);
+    void this.forward(req, res, rec, upstream, secret, cap.agentId ?? cap.workerId, integrationId, path + query, level === 'read');
+  }
+
+  /** Label an answer from an integration as outside text and flag lines aimed
+   *  at an AI, to Michael only: the member carries on (owner, 2026-10-12). */
+  private async screen(req: IncomingMessage, res: ServerResponse, agentId: string): Promise<void> {
+    let body: { integration?: unknown; text?: unknown };
+    try { body = JSON.parse((await readBodyCapped(req, SCREEN_BODY_MAX)).toString('utf8')) as typeof body; }
+    catch { return IntegrationBroker.sendError(res, 400, 'bad_request', 'body must be JSON, 2 MB at most'); }
+    const id = typeof body?.integration === 'string' ? body.integration : '';
+    const text = typeof body?.text === 'string' ? body.text : '';
+    const flags = flagInstructionLike(text);
+    if (flags.length && id && this.deps.integrationLevel?.(agentId, id)) {
+      const key = `${id}\u0000${flags.join('\u0000')}`;
+      if (!this.flaggedTold.has(key)) {
+        if (this.flaggedTold.size >= FLAGGED_TOLD_MAX) this.flaggedTold.delete(this.flaggedTold.values().next().value as string);
+        this.flaggedTold.add(key);
+        try { this.deps.integrationFlagged?.(agentId, this.deps.getRecord(id)?.label || id, flags); } catch { /* the read stands */ }
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(flags.length ? { note: `${UNTRUSTED_NOTE} ${FLAGGED_NOTE}`, instruction_like: flags } : { note: UNTRUSTED_NOTE }));
   }
 
   private async mail(req: IncomingMessage, res: ServerResponse, agentId: string, op: string): Promise<void> {
@@ -323,7 +378,8 @@ export class IntegrationBroker {
     secret: string | undefined,
     agentId: string,
     integrationId: string,
-    pathAndQuery: string
+    pathAndQuery: string,
+    readOnly = false
   ): Promise<void> {
     // Buffer the request body with a hard cap (write methods).
     const method = (req.method ?? 'GET').toUpperCase();
@@ -340,12 +396,17 @@ export class IntegrationBroker {
       }
     }
 
+    // Read only, checked here because a catalog POST is told apart by its body.
+    if (readOnly && method !== 'GET' && method !== 'HEAD' && !postOnlyReads(rec, method, upstream, body)) {
+      return IntegrationBroker.sendError(res, 403, 'read_only', `The owner gave you read only access to ${rec.label || integrationId}, so this ${method} was not sent. Read only is set on your Access tab. Tell Michael if this change is needed.`);
+    }
+
     // Sanitize worker headers, then inject the auth header(s). Injected auth ALWAYS
     // wins: the strip list removes any worker-supplied authorization/auth header.
     const outHeaders: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
       const key = k.toLowerCase();
-      if (STRIP_REQUEST.has(key)) continue;
+      if (STRIP_REQUEST.has(key) || (readOnly && METHOD_OVERRIDE.has(key))) continue;
       if (Array.isArray(v)) outHeaders[key] = v.join(', ');
       else if (typeof v === 'string') outHeaders[key] = v;
     }
@@ -602,13 +663,13 @@ function waitForDrain(res: ServerResponse): Promise<void> {
 }
 
 /** Read a request body into a Buffer, aborting past MAX_BODY_BYTES (throws 'too_large'). */
-function readBodyCapped(req: IncomingMessage): Promise<Buffer> {
+function readBodyCapped(req: IncomingMessage, max = MAX_BODY_BYTES): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY_BYTES) { reject(new Error('too_large')); req.destroy(); return; }
+      if (size > max) { reject(new Error('too_large')); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks)));

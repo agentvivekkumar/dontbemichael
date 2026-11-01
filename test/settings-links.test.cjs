@@ -215,6 +215,6 @@ test('wiring: a button opens Settings at the group or a member\'s Access tab at 
   assert.match(caps, /setCollapsed\(\(c\) => \(\{ \.\.\.c, email: false \}\)\);/);
   assert.match(caps, /<div ref=\{emailRef\} data-email-group/);
   assert.match(read('src/renderer/src/markdown/PlaceChip.tsx'), /useStore\.getState\(\)\.openAgentEmail\(place\.agentId\)/);
-  assert.match(read('src/renderer/src/components/FileChip.tsx'), /fileChip=\{paths\.length \? fileChip : undefined\} placeLinks \/>/, 'agent text spots words; documents do not');
+  assert.match(read('src/renderer/src/components/FileChip.tsx'), /fileChip=\{paths\.length \? fileChip : undefined\} placeLinks folderTeam=\{team\} \/>/, 'agent text spots words; documents do not');
   for (const loc of ['en', 'ar', 'zh-CN']) assert.ok(JSON.parse(read(`src/renderer/src/i18n/locales/${loc}.json`)).markdown.openPlace.includes('{{place}}'), loc);
 });

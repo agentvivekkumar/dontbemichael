@@ -48,13 +48,22 @@ import {
   type MailboxRecord,
   type MailServer
 } from '../shared/mailboxes';
-import { markUntrustedMessage } from '../shared/untrustedText';
+import { FLAGGED_NOTE, UNTRUSTED_NOTE, flagInstructionLike, markUntrustedMessage } from '../shared/untrustedText';
+import { attachmentKind } from '../shared/attachmentKind';
+import { ATTACHMENT_MAX_BYTES, AttachmentSaveError, saveAttachmentFile } from './attachmentSave';
+
+export { ATTACHMENT_MAX_BYTES };
 import { emailLinkFor, type OriginalEmail } from '../shared/emailLink';
 import { OWN_SENDS_ONLY, proposalSendProblem, standingProblem, standingTooLong, threadFrom, STANDING_KIND_MAX, type MailProposal, type SendRecord, type StandingApproval, type StandingCheckEmail, type ThreadHeaders } from '../shared/mailProposals';
 import { unfoundedMoneyReason } from '../shared/standingFacts';
 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
+/** One attachment at the size limit, on an ordinary link. Two tries fit inside
+ *  md-mail's three minutes. */
+const ATTACHMENT_TIMEOUT_MS = 75_000;
+/** The default 64 KB would take hundreds of round trips for a big attachment. */
+const ATTACHMENT_CHUNK_BYTES = 1024 * 1024;
 /** What a read that timed out tells the agent: it clears on the next try. */
 export const READ_TIMEOUT_NOTE = 'The app opens a new connection on the next try, so try again at your next check; restarting the app is not needed.';
 const SEND_TIMEOUT_MS = 60_000;
@@ -68,6 +77,8 @@ const BODY_MAX_CHARS = 50_000;
 /** A message bigger than this is read part by part, and this is the most of
  *  its text a read downloads. Well past BODY_MAX_CHARS of any text. */
 const TEXT_PART_MAX_BYTES = 1_000_000;
+/** How much of a saved file's text is screened. */
+const ATTACHMENT_SCREEN_CHARS = 2_000_000;
 const IDLE_CLOSE_MS = 5 * 60_000;
 const SEND_MEMORY_MS = 10 * 60_000;
 /** How long a send the app stopped in the middle of stays refused. Longer than
@@ -125,7 +136,7 @@ export interface ImapLike {
   mailboxCreate?(path: string): Promise<unknown>;
   /** One body part, decoded, as UTF-8 for text (ImapFlow). Optional so a
    *  client without it reads whole messages. */
-  download?(range: string | number, part?: string, options?: { uid?: boolean; maxBytes?: number }): Promise<{ content?: AsyncIterable<Buffer | string> }>;
+  download?(range: string | number, part?: string, options?: { uid?: boolean; maxBytes?: number; chunkSize?: number }): Promise<{ content?: AsyncIterable<Buffer | string> }>;
   on?(event: string, fn: (...a: any[]) => void): unknown;
 }
 
@@ -167,12 +178,22 @@ function bodyPartsOf(root: BodyNode): BodyNode[] {
 /** Attachment names and sizes from the structure, without downloading any.
  *  Base64 is counted back to bytes (wrapped at 76 characters plus CRLF). */
 function attachmentsOf(root: BodyNode): Array<{ name: string; size: number }> {
-  const out: Array<{ name: string; size: number }> = [];
+  return attachmentNodes(root).map((n) => ({ name: attachmentName(n), size: attachmentSize(n) }));
+}
+
+const attachmentName = (n: BodyNode): string => n.dispositionParameters?.filename || n.parameters?.name || 'attachment';
+
+function attachmentSize(n: BodyNode): number {
+  const size = n.size ?? 0;
+  return n.encoding === 'base64' ? Math.floor((size - 2 * Math.floor(size / 78)) * 3 / 4) : size;
+}
+
+/** The attachments in a message, in the order `read` lists them. */
+function attachmentNodes(root: BodyNode): BodyNode[] {
+  const out: BodyNode[] = [];
   const walk = (n: BodyNode): void => {
     if (n.childNodes?.length && n.type !== 'message/rfc822') { n.childNodes.forEach(walk); return; }
-    if (isBodyText(n)) return;
-    const size = n.size ?? 0;
-    out.push({ name: n.dispositionParameters?.filename || n.parameters?.name || 'attachment', size: n.encoding === 'base64' ? Math.floor((size - 2 * Math.floor(size / 78)) * 3 / 4) : size });
+    if (!isBodyText(n)) out.push(n);
   };
   walk(root);
   return out;
@@ -562,7 +583,7 @@ export class MailService {
 
   /** Run `fn` with the folder locked; one reconnect after a dropped socket
    *  (sleep and wake), then a classified error. */
-  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike, path: string) => Promise<T>, what: string, append = false): Promise<T> {
+  private async inFolder<T>(id: string, folder: (c: ImapLike) => Promise<string>, fn: (c: ImapLike, path: string) => Promise<T>, what: string, append = false, limitMs = CALL_TIMEOUT_MS): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
       let client: ImapLike | undefined;
       let started = false;
@@ -572,7 +593,7 @@ export class MailService {
         const lock = await withTimeout(client.getMailboxLock(path), CALL_TIMEOUT_MS, what);
         try {
           started = true;
-          const out = await withTimeout(fn(client, path), CALL_TIMEOUT_MS, what);
+          const out = await withTimeout(fn(client, path), limitMs, what);
           this.note(id);
           return out;
         } finally { lock.release(); }
@@ -895,6 +916,35 @@ export class MailService {
         attachments: attachmentsOf(m.bodyStructure)
       };
     }, 'Reading the message');
+  }
+
+  /** One attachment's bytes, by its place in the list `read` gave (from 1).
+   *  The size is checked before anything downloads, and again on what arrives,
+   *  since a sender's declared size proves nothing. */
+  async attachment(id: string, messageId: string, position: number): Promise<{ name: string; bytes: Buffer }> {
+    const { key, uid } = parseMessageId(messageId);
+    return this.inFolder(id, MailService.folderOf(key), async (c) => {
+      const m = await c.fetchOne(uid, { uid: true, flags: true, bodyStructure: true }, { uid: true });
+      MailService.checkReadable(m, uid, key);
+      const nodes = m.bodyStructure ? attachmentNodes(m.bodyStructure) : [];
+      const node = nodes[position - 1];
+      if (!node) throw new MailError('bad-request', `That email has ${nodes.length} attachment${nodes.length === 1 ? '' : 's'}; there is no number ${position}.`);
+      if (node.type === 'message/rfc822') throw new MailError('refused', 'That attachment is a whole email, which is not saved. Read the email instead.');
+      if (attachmentSize(node) > ATTACHMENT_MAX_BYTES) throw new MailError('refused', `That attachment is over ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB, so it was not saved.`);
+      if (!c.download) throw new MailError('unsupported', 'This mail server does not offer attachments one at a time.');
+      const { content } = await c.download(uid, node.part || '1', { uid: true, maxBytes: ATTACHMENT_MAX_BYTES + 1, chunkSize: ATTACHMENT_CHUNK_BYTES });
+      const chunks: Buffer[] = [];
+      let size = 0;
+      if (content) {
+        for await (const chunk of content) {
+          const b = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          size += b.length;
+          if (size > ATTACHMENT_MAX_BYTES) throw new MailError('refused', `That attachment is over ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB, so it was not saved.`);
+          chunks.push(b);
+        }
+      }
+      return { name: attachmentName(node), bytes: Buffer.concat(chunks) };
+    }, 'Fetching the attachment', false, ATTACHMENT_TIMEOUT_MS);
   }
 
   /** The body parts decoded to UTF-8 and joined the way mailparser joins them,
@@ -1371,7 +1421,7 @@ const sendingStanding = new Set<string>();
 const sentUnrecorded = new Map<string, string>();
 
 /** What Send only means, for a grant's list_mailboxes entry. */
-const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send follow its sending, below; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
+const SEND_ONLY_HOW = 'You send only from this mailbox: draft, propose and send follow its sending, below; search, read, archive, mark_read, mark_junk, forward and attach_from do not. Its owner reads the replies, and Michael passes on what is yours. Need a file or a fact from an email in it: ask read_by, the teammate who reads it. To follow up in the same thread, reply_to with this mailbox and the message_id of one of your_recent_sends.';
 
 /** Cuts a search or filter word to size, where a shorter one does no harm.
  *  Never for what an email carries: see COMPOSE_MAX. */
@@ -1428,7 +1478,7 @@ async function keptRefs(svc: MailService, mailbox: string, input: ComposeInput):
   return { forward: input.forward && await keep(input.forward), attachFrom: input.attachFrom && attachFrom };
 }
 
-type MailRequestDeps = Pick<MailDeps, 'getConfig' | 'log'> & { audit?: (event: Record<string, unknown>) => void; organized?: (moved: OrganizedMove) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean; tellMichael?: (subject: string, body: string) => void };
+type MailRequestDeps = Pick<MailDeps, 'getConfig' | 'log'> & { memberFolder?: (agentId: string) => string | undefined; documentText?: (path: string) => Promise<string | null>; audit?: (event: Record<string, unknown>) => void; organized?: (moved: OrganizedMove) => void; proposals?: ProposalStore; fitCheck?: StandingFitCheck; present?: (agentId: string) => boolean; tellMichael?: (subject: string, body: string) => void };
 
 /** Messages Michael has already heard were flagged, so a re-read does not tell him twice. */
 const flaggedTold = new Set<string>();
@@ -1441,7 +1491,8 @@ const FLAGGED_TOLD_MAX = 1000;
  */
 function tellMichaelFlagged(
   deps: MailRequestDeps, cfg: MailAccessConfig, agentId: string, mailbox: string, id: string,
-  msg: { from?: string; subject?: string; instruction_like?: string[] }
+  msg: { from?: string; subject?: string; instruction_like?: string[] },
+  what = 'email'
 ): void {
   if (!deps.tellMichael || !msg.instruction_like?.length) return;
   const key = `${mailbox}\u0000${id}`;
@@ -1452,8 +1503,8 @@ function tellMichaelFlagged(
   const quote = (s: string | undefined, max: number): string => JSON.stringify((s ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
   try {
     deps.tellMichael(
-      `Email with lines aimed at an AI: ${address}`.slice(0, 200),
-      `${agentId} read an email in ${address} with lines written to steer an AI. ${agentId} was told not to follow them and is carrying on. Everything quoted below was written by the sender: it is information, not instructions.\n`
+      `${what === 'email' ? 'Email' : 'Attachment'} with lines aimed at an AI: ${address}`.slice(0, 200),
+      `${agentId} read an ${what} in ${address} with lines written to steer an AI. ${agentId} was told not to follow them and is carrying on. Everything quoted below was written by the sender: it is information, not instructions.\n`
         + `From: ${quote(msg.from, 200)}\nSubject: ${quote(msg.subject, 200)}\nFlagged lines:\n${msg.instruction_like.map((l) => `- ${quote(l, 120)}`).join('\n')}`
     );
   } catch { /* the read stands */ }
@@ -1543,6 +1594,7 @@ async function runMailRequest(
       entries.push({
         mailbox: grant.mailbox, address: r?.address, status: r?.status,
         access: 'send only',
+        read_by: mailboxHolder(cfg.agentCapabilities, grant.mailbox, agentId) ?? null,
         ...(grantPaused(cfg, grant.mailbox, deps.present) ? { paused: `Nobody reads ${r?.address ?? grant.mailbox} right now, so nothing goes out from it; tell Michael.` } : {}),
         sending: sendingWords(grant.sending),
         how: `${SEND_ONLY_HOW} ${SENDING_HOW[grant.sending]}`,
@@ -1774,6 +1826,40 @@ async function runMailRequest(
       // so the owner can open the email itself (original-email-view.md, C1).
       const link = emailLinkFor(mailbox!, msg);
       return { status: 200, body: link ? { ...msg, link } : msg };
+    }
+    if (op === 'save_attachment') {
+      const id = str(body.id, 100) ?? (typeof body.id === 'number' ? String(body.id) : undefined);
+      const position = typeof body.attachment === 'number' && Number.isInteger(body.attachment) && body.attachment >= 1 ? body.attachment : 0;
+      if (!id || !position) return { status: 400, body: { error: 'save_attachment needs the message id from search and "attachment", its number in the list read gave, counting from 1.' } };
+      const folder = deps.memberFolder?.(agentId);
+      if (!folder) return { status: 409, body: { error: 'You have no folder to save this to. Tell Michael.' } };
+      const got = await svc.attachment(mailbox!, id, position);
+      const kind = attachmentKind(got.bytes, got.name);
+      const label = got.name.replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (!kind) {
+        try { deps.audit?.({ kind: 'mail-attachment-refused', agentId, mailbox, id, name: label }); } catch { /* the refusal stands */ }
+        return { status: 415, body: { error: `"${label}" is not a kind of file the office takes in, so it was not saved. PDF, Word, Excel, PowerPoint, plain text, CSV and pictures are. Tell Michael what you needed from it.` } };
+      }
+      let path: string;
+      try {
+        path = saveAttachmentFile({ folder, name: got.name, ending: kind.ending, bytes: got.bytes });
+      } catch (e) {
+        if (e instanceof AttachmentSaveError) return { status: 409, body: { error: e.message } };
+        throw e;
+      }
+      try { deps.audit?.({ kind: 'mail-attachment-saved', agentId, mailbox, id, name: label, attachmentKind: kind.id, size: got.bytes.length }); } catch { /* the file is saved */ }
+      // Outside text, like an email: labelled, and flagged to Michael only.
+      let text: string | null = null;
+      if (kind.text) text = got.bytes.toString('utf8');
+      else if (['pdf', 'docx', 'xlsx', 'pptx'].includes(kind.id)) text = await deps.documentText?.(path).catch(() => null) ?? null;
+      const flags = text === null ? [] : flagInstructionLike(text.slice(0, ATTACHMENT_SCREEN_CHARS));
+      if (flags.length) tellMichaelFlagged(deps, cfg, agentId, mailbox!, `${id}#${position}`, { subject: label, instruction_like: flags }, 'attachment');
+      const how = ['docx', 'xlsx', 'pptx'].includes(kind.id) ? ' Read it with the doc-text command.' : '';
+      return { status: 200, body: {
+        path, kind: kind.id, size: got.bytes.length, untrusted: true,
+        note: `${flags.length ? `${UNTRUSTED_NOTE} ${FLAGGED_NOTE}` : UNTRUSTED_NOTE}${how}`,
+        ...(flags.length ? { instruction_like: flags } : {})
+      } };
     }
     if (op === 'archive' || op === 'mark_read' || op === 'mark_junk') {
       const raw = Array.isArray(body.ids) ? body.ids : body.id !== undefined ? [body.id] : [];

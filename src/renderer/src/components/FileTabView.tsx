@@ -1,8 +1,9 @@
 /**
  * A file opened from a reply or an Ask me card, read inside the office
  * (docs/designs/open-file-tab.md): Markdown rendered, text and JSON as
- * monospace, CSV and TSV as a table (E3), images fitted to the width. Main
- * reads it after the same folder check as Open, and the tab re-reads it within
+ * monospace, CSV and TSV as a table (E3), images fitted to the width, and the
+ * words of a Word, PowerPoint or PDF file as a page (R3a; a sheet as monospace).
+ * Main reads it after the same folder check as Open, and the tab re-reads it within
  * a second of a change on disk while it is shown (E1), keeping the scroll.
  * Copy puts it on the clipboard ready to paste (docs/designs/copy-document.md).
  */
@@ -20,7 +21,7 @@ import { cleanCopy, copyPicture, encodeShownPicture, escapeHtml, tableCopy, type
 type Read =
   | { status: 'reading' }
   | { status: 'not found' | 'too large' | 'unreadable' }
-  | { status: 'ok'; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image'; text?: string; url?: string; size: number; place: string; folder: string[] };
+  | { status: 'ok'; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image' | 'document'; text?: string; url?: string; size: number; place: string; folder: string[] };
 
 export function FileTabView() {
   const tab = useStore((s) => s.fileTabs.find((f) => f.id === s.activeFileTab));
@@ -135,8 +136,8 @@ function FileTabBody({ tab }: { tab: FileTab }) {
       const start = range.commonAncestorContainer;
       const inPre = (start instanceof Element ? start : start.parentElement)?.closest('pre');
       let data: CopyData;
-      // Text and JSON are a <pre>: the words as shown, no formatting to keep.
-      if (read.kind === 'text' || read.kind === 'json') data = { text: shown };
+      // Text, JSON and a document's words: as shown, no formatting to keep.
+      if (read.kind === 'text' || read.kind === 'json' || read.kind === 'document') data = { text: shown };
       else if (inPre) data = { text: shown, html: `<pre>${escapeHtml(shown)}</pre>` };
       else data = cleanCopy(range.cloneContents());
       e.clipboardData.setData('text/plain', data.text);
@@ -180,7 +181,8 @@ function FileTabBody({ tab }: { tab: FileTab }) {
   } else if (read.kind === 'csv') {
     const rows = parseDelimited(read.text ?? '', extensionOf(tab.id) === 'tsv' ? '\t' : ',');
     body = rows && rows.length ? <CsvTable rows={rows} /> : <Mono text={read.text ?? ''} />;
-  } else body = <Mono text={read.text ?? ''} />;
+  } else if (read.kind === 'document') body = <DocumentWords text={read.text ?? ''} />;
+  else body = <Mono text={read.text ?? ''} />;
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -223,6 +225,17 @@ function Mono({ text }: { text: string }) {
       margin: 0, fontFamily: 'var(--cth-font-mono)', fontSize: 12, lineHeight: '18px',
       color: 'var(--cth-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere'
     }}>{text}</pre>
+  );
+}
+
+/** A document's words, one paragraph to a line, at a width that reads well. */
+function DocumentWords({ text }: { text: string }) {
+  return (
+    <div style={{ maxWidth: 760, fontSize: 14, lineHeight: '22px', color: 'var(--cth-ink)' }}>
+      {text.split('\n').filter((line) => line.trim()).map((line, i) => (
+        <p key={i} dir="auto" style={{ margin: '0 0 10px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{line}</p>
+      ))}
+    </div>
   );
 }
 

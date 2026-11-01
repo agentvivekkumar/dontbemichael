@@ -46,11 +46,13 @@ export function isFileSpan(span: string): boolean {
 }
 
 /** Files a tab can show inside the office (docs/designs/open-file-tab.md, R3):
- *  Markdown, text, JSON, CSV and images. PDF and Office files open in their own
- *  app instead. JSON is here but not on OPEN_EXTENSIONS: it reads in a tab and
+ *  Markdown, text, JSON, CSV and images, and the words of a Word, Excel,
+ *  PowerPoint or PDF file (R3a); the tab's Open in app button still reaches the
+ *  file itself. JSON is here but not on OPEN_EXTENSIONS: it reads in a tab and
  *  never launches an app. */
 export const TAB_EXTENSIONS: ReadonlySet<string> = new Set([
-  'md', 'markdown', 'txt', 'json', 'csv', 'tsv', 'png', 'jpg', 'jpeg', 'gif', 'webp'
+  'md', 'markdown', 'txt', 'json', 'csv', 'tsv', 'png', 'jpg', 'jpeg', 'gif', 'webp',
+  'docx', 'xlsx', 'pptx', 'pdf'
 ]);
 
 /** A full path written in plain text (open-file-tab.md, R1): it starts with

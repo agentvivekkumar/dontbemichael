@@ -107,6 +107,7 @@ LISP syntax. Seven semantic fields:
   "act":           "request | inform | propose | query | agree | refuse | done",
   "subject":       "short human-readable summary",
   "body":          "free text / markdown / structured payload",
+  "file":          "<full path>",  // optional, on a query or an answer: one file the app saved; the app copies it to the recipient's folder
   "hops":          3,            // ++ per reply; capped to kill ping-pong loops
   "requires_reply": true,        // only request/query/propose obligate a reply
   "needs_human":   false,        // router/god may flip this to escalate
