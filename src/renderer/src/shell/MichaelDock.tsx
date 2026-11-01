@@ -8,6 +8,7 @@ import { AgentAvatar } from '@/components/AgentAvatar';
 import { InfoTip } from '@/components/InfoTip';
 import { FileText } from '@/components/FileChip';
 import { Icon } from '@/components/Icon';
+import { foldedItems, nextFold, type DockFold } from './dockFold';
 import { dockKeys } from './dockKeys';
 import { replyTargets } from './replyTargets';
 import { WideButton } from './PanelChrome';
@@ -31,7 +32,6 @@ const IDLE_POLL_MS = 60_000;
 /** A Sent question not in Michael's queue after this long was never queued. */
 const ORPHAN_AFTER_MS = 2 * 60_000;
 /** Answered exchanges older than this fold under "Earlier" (22A). */
-const RECENT_MS = 30 * 24 * 3_600_000;
 
 /** The conversation, live: read on mount and on every change main announces;
  *  polled every few seconds only while the dock is open and the window shown
@@ -81,8 +81,11 @@ function dayLabel(iso: string, t: (k: string) => string): string {
 export interface DockView {
   expanded: Record<string, true>;
   setExpanded: (f: (e: Record<string, true>) => Record<string, true>) => void;
-  showEarlier: boolean;
-  setShowEarlier: (on: boolean) => void;
+  /** The opening or send Show earlier was used in; the next one folds again. */
+  earlierFor: number | null;
+  setEarlierFor: (navigation: number) => void;
+  /** Which questions show (dockFold.ts). */
+  fold: React.MutableRefObject<DockFold>;
   /** Where the list was last read (none while following the latest); the next mount opens on it. */
   anchor: React.MutableRefObject<DockPlace | null>;
 }
@@ -111,10 +114,13 @@ export function MichaelDock({ dock, refresh, godId, onFillComposer, onReply, com
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const { expanded, setExpanded, showEarlier, setShowEarlier, anchor } = view;
+  const { expanded, setExpanded, earlierFor, setEarlierFor, fold, anchor } = view;
   const [announce, setAnnounce] = useState('');
   const prevStatus = useRef<Record<string, OwnerQuestionStatus>>({});
-  const items = useMemo(() => visibleItems(dock.items, showEarlier), [dock.items, showEarlier]);
+  fold.current = nextFold(fold.current, dock.items, navigation, focus);
+  const shown = fold.current.shown;
+  const showEarlier = earlierFor === navigation;
+  const items = useMemo(() => (showEarlier ? dock.items : foldedItems(dock.items, shown)), [dock.items, showEarlier, shown]);
   // Keyed over the whole conversation, so "Earlier" never shifts which reply is open.
   const keyOf = useMemo(() => {
     const keys = dockKeys(dock.items);
@@ -125,11 +131,11 @@ export function MichaelDock({ dock, refresh, godId, onFillComposer, onReply, com
   const history = useMemo(() => dock.items.map(rowOf), [dock.items, keyOf]);
   const scroll = useDockScroll(listRef, contentRef, open, navigation, focus, rows, history, anchor);
 
-  // A notification can name a question hidden by the 30 day view. Reveal it
-  // before the scroll hook consumes its pending target.
+  // A notification can name a folded question. Reveal it before the scroll
+  // hook consumes its pending target.
   useLayoutEffect(() => {
-    if (open && focus && !items.some((it) => it.id === focus) && dock.items.some((it) => it.id === focus)) setShowEarlier(true);
-  }, [open, navigation, focus, items, dock.items, setShowEarlier]);
+    if (open && focus && !items.some((it) => it.id === focus) && dock.items.some((it) => it.id === focus)) setEarlierFor(navigation);
+  }, [open, navigation, focus, items, dock.items, setEarlierFor]);
 
   // Tell main whether the dock is on screen, so a reply in view needs no notification.
   useEffect(() => {
@@ -258,7 +264,10 @@ export function MichaelDock({ dock, refresh, godId, onFillComposer, onReply, com
           </div>
         )}
         {hasEarlier && (
-          <button onClick={() => setShowEarlier(true)} style={{ ...quietBtn, alignSelf: 'center' }}>{t('dock.earlier')}</button>
+          // The link goes once used, so focus moves on, as the catch-up button's does.
+          <button onClick={() => { setEarlierFor(navigation); composerRef.current?.querySelector('textarea')?.focus(); }} style={{ ...quietBtn, alignSelf: 'center' }}>
+            {t('dock.showEarlier', { count: dock.items.length - items.length })}
+          </button>
         )}
         {items.map((it) => {
           const key = keyOf.get(it) ?? `${it.kind}:${it.id}`;
@@ -302,19 +311,6 @@ function firstSentence(text: string): string {
   const one = text.replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
   const m = /^(.+?[.!?])(\s|$)/.exec(one);
   return (m ? m[1] : one).slice(0, 160);
-}
-
-/** Open questions always; answered exchanges from the last 30 days unless "Earlier" (22A). */
-function visibleItems(items: DockItem[], all: boolean): DockItem[] {
-  if (all) return items;
-  const cutoff = Date.now() - RECENT_MS;
-  const keep = new Set<string>();
-  for (const it of items) {
-    if (it.kind !== 'owner') continue;
-    const done = it.status === 'answered' || it.status === 'couldnt-finish' || it.status === 'withdrawn';
-    if (!done || Date.parse(it.at) >= cutoff) keep.add(it.id);
-  }
-  return items.filter((it) => keep.has(it.kind === 'owner' ? it.id : it.replyTo));
 }
 
 function OwnerBubble({ dataKey, q, wide, ahead, onCancel, onRetry, onNudge, onAskAgain }: {

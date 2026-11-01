@@ -226,17 +226,20 @@ still only ever means "your turn".
   polite live region announces only Answered, Couldn't finish and Waiting for you, never
   Sent or Michael has it. After Send, focus stays in the composer; Esc with focus inside
   closes the dock and returns focus to the composer. Words plus a dot, never color alone.
-  The count is a button named "N new from Michael" or "Michael is waiting for you". More,
+  The count sits on the conversation button (owner, 2026-10-31: "unread indicator should be on
+  the left up arrow icon"), which is then named "N new from Michael" or "Michael is waiting for
+  you". More,
   Ask again, Nudge, the example chips and the quoted question take the §12 focus ring.
   All text 4.5:1 or better in both themes.
-- **21. Open and close (21A).** Opens only on the owner's action: Send, the count, the conversation button (a chevron, up to open and down to close, shown whenever there is saved history), a
+- **21. Open and close (21A).** Opens only on the owner's action: Send, the conversation button (a chevron, up to open and down to close, shown whenever there is saved history, carrying the count), a
   notification, or focusing the composer while replies are unread. Never by itself, never
   at launch. Closes on ✕, Esc with focus inside, or a click on the office floor while the
   composer is empty. Selecting a person or opening Needs you leaves it open. The draft is
   never lost. Slides 180 ms from the composer's top edge; reduced motion snaps.
-- **22. History (22A).** Opens scrolled to the latest with "Today", "Yesterday", then dates
-  as dividers (`t-meta` `ink-3`). Open requests always show. Answered exchanges older than
-  30 days fold under a quiet "Earlier" link at the top that loads them.
+- **22. History (22A, changed 2026-10-31, docs/designs/dock-latest-exchange.md).** Opens on the
+  owner's latest question, with "Today", "Yesterday", then dates as dividers (`t-meta` `ink-3`).
+  Open requests and unread replies always show. Everything else folds under a quiet "Show N
+  earlier" link at the top; nothing folds until the next opening or send.
 - **23. Wide 1:1 (design and eng reviews, 2026-10-17).** Open wide, beside ✕ (the panels'
   `expand` / `minimize` button, "Open wide" / "Back to the side"), moves the conversation and
   the message box to the center, the office dimmed and out of reach. It never covers the right

@@ -93,7 +93,7 @@ test('wide, the conversation and box are drawn outside the office, beside the ri
   assert.match(bar, /\{createPortal\(\n\s*<div ref=\{composerRef\}/);
   assert.match(bar, /<div aria-hidden="true" style=\{\{ \.\.\.slot, minHeight: 50 \}\} \/>/, 'the bar keeps the slot');
   assert.match(bar, /box\.setSelectionRange\(box\.value\.length, box\.value\.length\);/, 'the box has focus at the end of its text');
-  assert.match(bar, /const view: DockView = \{ expanded, setExpanded, showEarlier, setShowEarlier, anchor \};/, 'what was open survives the remount');
+  assert.match(bar, /const view: DockView = \{ expanded, setExpanded, earlierFor, setEarlierFor, fold, anchor \};/, 'what was open survives the remount');
   // The narrow dock is unchanged (D15): it stays in the bar, closes on a floor click only with an empty box.
   const dock = read('src/renderer/src/shell/MichaelDock.tsx');
   assert.match(dock, /if \(draft\.trim\(\)\) return;\n\s*if \(!target\.closest\('\.cth-studio'\)/);

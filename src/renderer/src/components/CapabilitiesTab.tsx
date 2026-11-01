@@ -12,13 +12,15 @@ import type { StandingApproval } from '@shared/mailProposals';
 import { missionsFor } from '@shared/missions';
 import { quickbooksCapability, type QuickBooksCapability } from '@shared/quickbooks';
 import { connectorGranted, connectorOn, isQuickBooksKey } from '@shared/claudeConnectors';
+import { authTypeNeedsSecret, integrationLevel, type IntegrationLevel } from '@shared/integrations';
+import { integrationsClient, type IntegrationRecordView } from '@/integrations/registryClient';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { InfoTip } from './InfoTip';
 import { SHOW_MAILBOXES } from '@shared/buildFeatures';
 import { useResearchName } from '@/shell/research';
 import { fieldLabel } from './fieldText';
 
-type SectionKey = 'email' | 'connectors' | 'schedules';
+type SectionKey = 'email' | 'connectors' | 'integrations' | 'schedules';
 
 /**
  * What a team member may do without asking, and the jobs it runs on a clock
@@ -37,6 +39,9 @@ type SectionKey = 'email' | 'connectors' | 'schedules';
  *   its row, and before the owner chooses, roles that read the books (Oscar)
  *   are on, Read only. The hook checks every call at once; the agent restarts
  *   when idle so a new connector loads (useHive effect 8), or at Restart now.
+ * - Integrations: every integration in Settings, A to Z, each Off, Read only
+ *   or Can change. The broker checks every call at once; only the first one
+ *   needs a restart, to attach the tools.
  * - On a schedule: the agent's own jobs (docs/designs/per-agent-schedules.md),
  *   the same list and editor the Schedules tab had.
  *
@@ -65,7 +70,7 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
   const { missions } = useMissions();
   const mine = missionsFor(missions, agent.id, godId);
   const schedulesOn = mine.filter((m) => m.enabled).length;
-  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, connectors: true, schedules: true });
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({ email: true, connectors: true, integrations: true, schedules: true });
   // "Change on Access" from Edit agent or the Profile tab: On a schedule
   // opens unfolded and in view, once (edit-agent-scheduled-jobs.md, SJ3).
   const schedulesRequest = useStore((s) => s.schedulesRequest);
@@ -109,6 +114,14 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     return () => { alive = false; };
   }, [agent.id]);
   const booksDefault = booksAnswer?.id === agent.id ? booksAnswer.on : undefined;
+  // Read again when Settings changes the list, redacted by main.
+  const [integrationList, setIntegrationList] = useState<IntegrationRecordView[]>([]);
+  const savedIntegrations = config?.integrations;
+  useEffect(() => {
+    let alive = true;
+    void integrationsClient.list().then((l) => { if (alive) setIntegrationList(l); }).catch(() => {});
+    return () => { alive = false; };
+  }, [savedIntegrations]);
   const setFold = (key: SectionKey, open: boolean): void => setCollapsed({ ...collapsed, [key]: !open });
 
   // The group exists only once the config has loaded.
@@ -254,6 +267,20 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
     try {
       const res = await window.cth.connectorsSetGrant(agent.id, key, on);
       if (!res.ok) setFailed(true);
+    } catch { setFailed(true); }
+  };
+  // Never filtered (owner, 2026-10-03): one that can't work yet shows why.
+  const integrationRows = [...integrationList].sort((a, b) => a.label.localeCompare(b.label));
+  const levelOf = (id: string): IntegrationLevel | undefined => integrationLevel(config, agent.id, id);
+  const integrationsHeld = integrationRows.filter((r) => levelOf(r.id)).length;
+  // The tools attach only on Claude's engine for now (TODOS, issue #109).
+  const onClaude = (agent.provider ?? 'claude') === 'claude';
+  const setIntegration = async (id: string, level: IntegrationLevel | null): Promise<void> => {
+    setFailed(false);
+    try {
+      const res = await integrationsClient.setAccess(agent.id, id, level);
+      if (!res.ok) { setFailed(true); return; }
+      if (res.restartNeeded && agent.ptyId && onClaude) useStore.getState().setPendingRestart(agent.id, { at: Date.now(), reason: 'integrations' });
     } catch { setFailed(true); }
   };
   const restartNow = (): void => { if (pending) useStore.getState().setPendingRestart(agent.id, { ...pending, now: true, failed: false }); };
@@ -463,6 +490,43 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
           )}
         </TriggerCard>
 
+        <TriggerCard
+          title={t('capabilities.integrations')}
+          blurb={t('capabilities.integrationsBlurb', { name })}
+          summary={integrationRows.length ? t('capabilities.connectorsSummary', { granted: integrationsHeld, total: integrationRows.length }) : undefined}
+          open={!collapsed.integrations}
+          onToggle={(open) => setFold('integrations', open)}
+        >
+          {integrationRows.length === 0 ? (
+            <div style={hint}>
+              {t('capabilities.integrationsNone')}{' '}
+              <button type="button" onClick={openSettings} style={link}>{t('capabilities.integrationsAdd')}</button>
+            </div>
+          ) : (<>
+            {!onClaude && <div style={{ ...hint, marginBottom: 6 }}>{t('capabilities.integrationsClaudeOnly', { name })}</div>}
+            <div role="list">
+              {integrationRows.map((r, i) => {
+                const level = levelOf(r.id);
+                const cannot = !r.enabled ? t('capabilities.integrationOff') : authTypeNeedsSecret(r.authType) && !r.hasSecret ? t('capabilities.integrationNeedsKey') : '';
+                return (
+                  <div key={r.id} role="listitem" style={{ ...row, flexWrap: 'wrap', borderTop: i === 0 ? 'none' : row.borderTop }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, opacity: cannot ? 0.55 : 1, overflowWrap: 'anywhere' }}>{r.label}</span>
+                    {cannot && <span style={hint}>{cannot}</span>}
+                    <RadioRows
+                      inline
+                      label={t('capabilities.integrationAccess', { name, integration: r.label })}
+                      value={level ?? 'off'}
+                      options={[{ value: 'off', label: t('capabilities.integrationNone') }, { value: 'read', label: t('capabilities.booksReadOnly') }, { value: 'change', label: t('capabilities.integrationCanChange') }]}
+                      onChange={(v) => { if (v !== (level ?? 'off')) void setIntegration(r.id, v === 'off' ? null : v as IntegrationLevel); }}
+                    />
+                    <InfoTip label={t('capabilities.integrations')} text={t('capabilities.integrationLevelsInfo', { name })} />
+                  </div>
+                );
+              })}
+            </div>
+          </>)}
+        </TriggerCard>
+
         <div ref={schedulesRef} data-schedules-group style={{ scrollMarginTop: 8 }}>
         <TriggerCard
           title={t('capabilities.schedules')}
@@ -477,12 +541,12 @@ export function CapabilitiesTab({ agent }: { agent: Agent }) {
 
         {/* Outside the sections, so a closed Email section still shows them. */}
         <div aria-live="polite">
-          {pending && (pending.reason === 'connectors' || email.enabled || !!grant) && (
+          {pending && (pending.reason === 'connectors' || pending.reason === 'integrations' || email.enabled || !!grant) && (
             <div style={{ ...notice, background: 'var(--cth-amber-soft)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ flex: 1 }}>
                 {pending.failed ? t('capabilities.restartFailed', { name })
                   : pending.now ? t('capabilities.restarting', { name })
-                  : pending.reason === 'connectors' ? t('capabilities.connectorsPending', { name }) : t('capabilities.pending', { name })}
+                  : pending.reason === 'connectors' || pending.reason === 'integrations' ? t('capabilities.connectorsPending', { name }) : t('capabilities.pending', { name })}
               </span>
               {!pending.now && <MiniButton onClick={restartNow}>{t('capabilities.restartNow')}</MiniButton>}
             </div>

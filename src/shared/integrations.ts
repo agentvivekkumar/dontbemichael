@@ -21,6 +21,8 @@
  * Full contract: hive/docs/integrations-spec.md.
  */
 
+import { RESEARCH_ID } from './research';
+
 export type IntegrationKind = 'github' | 'custom-rest';
 
 /** How the broker injects credentials when forwarding to the integration's baseUrl.
@@ -419,4 +421,73 @@ function operationKind(doc: string, name?: string): string | null {
   }
   const run = name === undefined ? (ops.length === 1 ? ops[0] : undefined) : ops.find((o) => o.name === name);
   return run?.kind ?? null;
+}
+
+// ─── Per agent access ───────────────────────────────────────────────────────
+
+/** How far one team member may use an integration, set on its Access tab.
+ *  'read' reaches GET, HEAD and a POST the catalog knows only reads; 'change'
+ *  reaches everything. No entry means no access. */
+export type IntegrationLevel = 'read' | 'change';
+
+/** One member's integrations, by integration id. */
+export interface IntegrationGrants { [integrationId: string]: IntegrationLevel }
+
+interface GrantConfig { agentCapabilities?: { [agentId: string]: { integrations?: IntegrationGrants } } }
+
+/** The level this member holds. Read per call, so a change applies at once.
+ *  Research holds no office data (issue #230), whatever is saved. */
+export function integrationLevel(cfg: GrantConfig, agentId: string, integrationId: string): IntegrationLevel | undefined {
+  if (agentId === RESEARCH_ID) return undefined;
+  const grants = cfg.agentCapabilities?.[agentId]?.integrations;
+  if (!grants || !Object.prototype.hasOwnProperty.call(grants, integrationId)) return undefined;
+  const level = grants[integrationId];
+  return level === 'read' || level === 'change' ? level : undefined;
+}
+
+/** Whether a member gets the md-integrations tools at spawn. */
+export function hasIntegrationTools(cfg: GrantConfig, agentId: string): boolean {
+  return Object.keys(cfg.agentCapabilities?.[agentId]?.integrations ?? {}).some((id) => !!integrationLevel(cfg, agentId, id));
+}
+
+/** The capabilities with one member's level set, or cleared with null. */
+export function withIntegrationLevel<C extends { integrations?: IntegrationGrants }>(
+  caps: { [agentId: string]: C } | undefined, agentId: string, integrationId: string, level: IntegrationLevel | null
+): { [agentId: string]: C } {
+  const cur = caps?.[agentId];
+  const integrations = { ...(cur?.integrations ?? {}) };
+  if (level) integrations[integrationId] = level; else delete integrations[integrationId];
+  return { ...(caps ?? {}), [agentId]: { ...(cur ?? {}), integrations } as C };
+}
+
+/** The capabilities with a removed integration gone from everyone, so a new
+ *  one saved later under the same id starts with nobody holding it. */
+export function withoutIntegration<C extends { integrations?: IntegrationGrants }>(
+  caps: { [agentId: string]: C } | undefined, integrationId: string
+): { [agentId: string]: C } {
+  const next = { ...(caps ?? {}) };
+  for (const [agentId, c] of Object.entries(next)) {
+    if (!c.integrations?.[integrationId]) continue;
+    const integrations = { ...c.integrations };
+    delete integrations[integrationId];
+    next[agentId] = { ...c, integrations };
+  }
+  return next;
+}
+
+/** What `list_integrations` tells a member: never a key, and the address
+ *  without any query or login it was saved with. */
+export interface AgentIntegration { id: string; label: string; base_url: string; access: 'read only' | 'can change'; ready: boolean }
+
+export function agentIntegrations(
+  cfg: GrantConfig, agentId: string,
+  records: ReadonlyArray<Pick<IntegrationRecord, 'id' | 'label' | 'baseUrl' | 'authType' | 'enabled'> & { hasSecret: boolean }>
+): AgentIntegration[] {
+  return records.flatMap((r) => {
+    const level = integrationLevel(cfg, agentId, r.id);
+    if (!level) return [];
+    let base = '';
+    try { const u = new URL(r.baseUrl); base = u.origin + u.pathname; } catch { /* a bad address shows blank */ }
+    return [{ id: r.id, label: r.label, base_url: base, access: level === 'read' ? 'read only' as const : 'can change' as const, ready: r.enabled && (!authTypeNeedsSecret(r.authType) || r.hasSecret) }];
+  });
 }

@@ -34,7 +34,7 @@ test('full paths in plain text are files; URLs, words and relative bits are not 
   assert.equal(unescapeMarkdown('C:\\Reports\\_q3.md'), 'C:\\Reports_q3.md', 'how Markdown reads a backslash before punctuation');
   assert.equal(kindOf('a.json'), 'json');
   assert.equal(TAB_EXTENSIONS.has('json') && !OPEN_EXTENSIONS.has('json'), true, 'JSON reads in a tab and never launches an app');
-  for (const ext of ['pdf', 'docx', 'xlsx', 'pptx']) assert.equal(TAB_EXTENSIONS.has(ext), false, `${ext} opens in its app (R3)`);
+  for (const ext of ['pdf', 'docx', 'xlsx', 'pptx']) assert.equal(TAB_EXTENSIONS.has(ext) && OPEN_EXTENSIONS.has(ext), true, `${ext} reads in a tab and can still open in its app (R3a)`);
 });
 
 test('the chip replaces exactly the path, from the source, in text, code spans and links (R2)', async () => {
@@ -124,7 +124,7 @@ test('main reads only readable kinds inside the folders, capped, by canonical pa
   const png = await readAskFile('pic.png', roots);
   assert.equal(png.kind, 'image');
   assert.equal(png.bytes.length, 4);
-  assert.deepEqual(await readAskFile('Plan.pdf', roots), { ok: false, error: 'not found' }, 'PDF opens in its app, never in a tab');
+  assert.deepEqual(await readAskFile('Plan.pdf', roots), { ok: false, error: 'unreadable' }, 'no words came out: the tab says so and offers Open in app');
   assert.deepEqual(await readAskFile('big.md', roots), { ok: false, error: 'too large' });
   assert.deepEqual(await readAskFile('key.txt', roots), { ok: false, error: 'not found' }, 'a link to a secret outside the office is refused');
   assert.deepEqual(await readAskFile(path.join(outside, 'id_rsa.txt'), roots), { ok: false, error: 'not found' });
@@ -133,7 +133,7 @@ test('main reads only readable kinds inside the folders, capped, by canonical pa
   const json = await askFileVerdict('data.json', roots);
   assert.equal(json.verdict, 'reveal', 'JSON never launches an app');
   assert.equal(json.tab, true, 'but reads in a tab');
-  assert.equal((await askFileVerdict('Plan.pdf', roots)).tab, false);
+  assert.equal((await askFileVerdict('Plan.pdf', roots)).tab, true);
 });
 
 test('file tabs: one per file, at most five, closing the selected one goes left (R4)', () => {
@@ -226,7 +226,7 @@ test('wiring: tabs after Who talks to whom, never saved, Ask me beside a file, w
   assert.match(main, /wc\.once\('destroyed', drop\);\n\s+wc\.once\('render-process-gone', drop\);\n\s+wc\.on\('did-start-navigation'/, 'a reload or crash drops its watchers');
   assert.match(main, /if \(askFileWatches\.get\(wc\.id\) === forWindow\) askFileWatches\.delete\(wc\.id\);\n\s+wc\.off\('destroyed', drop\);\n\s+wc\.off\('render-process-gone', drop\);\n\s+wc\.off\('did-start-navigation', onNavigate\);/, 'each drop removes its own listeners and never clears a newer map');
   assert.match(main, /const watcher = watchFs\(dirname\(v\.path\)/, 'the folder is watched, so a rename over the file is seen');
-  assert.match(main, /ipcMain\.handle\('fs:readAskFile'[\s\S]*?const r = await readAskFile\(p, askFileRoots\(who\)\);/, 'main checks the folders itself');
+  assert.match(main, /ipcMain\.handle\('fs:readAskFile'[\s\S]*?const r = await readAskFile\(p, askFileRoots\(who\), \(path\) => documentText\(path\)\);/, 'main checks the folders itself');
   const hive = read('src/main/hive.ts');
   assert.match(hive, /Name files by their full path in backticks so the owner can open them/, 'E4');
   assert.match(hive, /then the full paths of its files, each in backticks/, 'E4b');
@@ -252,4 +252,32 @@ test('the files checked for chips are the files drawn as chips, from the same pa
   assert.match(chip, /for \(const p of chipPaths\(e\.q\)\)/, 'Ask me cards');
   assert.match(chip, /const paths = useMemo\(\(\) => chipPaths\(shown\), \[shown\]\);/, 'agent text');
   assert.doesNotMatch(chip, /askFilePaths\(/);
+});
+
+test('R3a: a Word file a member saved shows its words in a tab, read by the document reader', async () => {
+  const { zipSync, strToU8 } = require('fflate');
+  const { extractDocumentText } = loadTs('src/main/docText.ts');
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'md-doc-tab-'));
+  const saved = path.join(dir, 'Email attachments');
+  fs.mkdirSync(saved);
+  const body = '<w:document><w:body><w:p><w:r><w:t>Workflow edits</w:t></w:r></w:p><w:p><w:r><w:t>Second step</w:t></w:r></w:p></w:body></w:document>';
+  fs.writeFileSync(path.join(saved, 'Workflow.docx'), Buffer.from(zipSync({ '[Content_Types].xml': strToU8('<Types/>'), 'word/document.xml': strToU8(body) })));
+  fs.writeFileSync(path.join(saved, 'Broken.docx'), 'not a zip');
+  fs.writeFileSync(path.join(saved, 'Numbers.xlsx'), 'x');
+  fs.writeFileSync(path.join(saved, 'Huge.pdf'), 'x');
+  const roots = [dir];
+  const words = async (p) => { const r = await extractDocumentText(p); return r.kind === 'text' ? r.text : null; };
+
+  const doc = await readAskFile('Email attachments/Workflow.docx', roots, words);
+  assert.equal(doc.ok, true);
+  assert.equal(doc.kind, 'document');
+  assert.equal(doc.text, 'Workflow edits\nSecond step');
+  assert.equal(doc.size, Buffer.byteLength(doc.text));
+  assert.equal((await askFileVerdict('Email attachments/Workflow.docx', roots)).verdict, 'open', 'Open in app still reaches the file');
+
+  assert.deepEqual(await readAskFile('Email attachments/Broken.docx', roots, words), { ok: false, error: 'unreadable' });
+  assert.equal((await readAskFile('Email attachments/Numbers.xlsx', roots, async () => 'a\tb')).kind, 'text', 'a sheet keeps its columns in monospace');
+  assert.deepEqual(await readAskFile('Email attachments/Huge.pdf', roots, async () => 'x'.repeat(2 * 1024 * 1024 + 1)), { ok: false, error: 'too large' });
+  assert.deepEqual(await readAskFile('Email attachments/Huge.pdf', roots, async () => { throw new Error('reader died'); }), { ok: false, error: 'unreadable' });
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -58,6 +58,9 @@ export const MCP_RESOURCE_TOOLS: ReadonlySet<string> = new Set(['ListMcpResource
 /** The app's own mail server, passed to agents with `--mcp-config`. Its tools
  *  follow the agent's Email capability, never the connector rules. */
 export const APP_MCP_SERVER = 'md-mail';
+/** The app's own integrations server, passed the same way. The broker decides
+ *  every call, per member (shared/integrations.ts). */
+export const INTEGRATIONS_MCP_SERVER = 'md-integrations';
 
 const KEY_MAX = 80;
 const URL_MAX = 300;
@@ -200,7 +203,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
     // A list with no server would show every server the session connected:
     // deny rules hide a server's tools, not its resources (owner, 2026-10-02).
     if (typeof s !== 'string' || !s) return { kind: 'all-servers' };
-    if (s === APP_MCP_SERVER) return { kind: 'app' };
+    if (s === APP_MCP_SERVER || s === INTEGRATIONS_MCP_SERVER) return { kind: 'app' };
     const c = /^claude\.ai (.+)$/.exec(s);
     if (c) {
       const key = knownKeys(cfg).find((k) => k === c[1].trim());
@@ -211,7 +214,7 @@ export function mcpTarget(cfg: ConnectorConfig, toolName: string, input: unknown
   const m = /^mcp__(.+)$/.exec(toolName ?? '');
   if (!m) return { kind: 'none' };
   server = m[1];
-  if (server.startsWith(`${APP_MCP_SERVER}__`)) return { kind: 'app' };
+  if (server.startsWith(`${APP_MCP_SERVER}__`) || server.startsWith(`${INTEGRATIONS_MCP_SERVER}__`)) return { kind: 'app' };
   // The longest matching prefix wins ("Google" vs "Google Drive"). Two names
   // that become the same tool prefix ("Foo Bar", "Foo_Bar") cannot be told
   // apart, so neither is (Codex adversarial review, 2026-10-02).
@@ -259,11 +262,12 @@ export function connectorAccess(
   if (target.kind === 'all-servers') {
     return { ok: false, reason: 'Name the connector\'s server to list its resources (for example "claude.ai HubSpot"). Only connectors you were given can be listed.' };
   }
-  // The app's own md-mail: Capabilities > Email decides its tools, in the hook.
-  // It has no resources, and the mail gate checks tool names only, so a
-  // resource call naming md-mail is refused (Codex adversarial review, 2026-10-02).
+  // The app's own servers: Capabilities > Email decides md-mail's tools, in the
+  // hook, and the broker decides md-integrations'. They have no resources, and
+  // the mail gate checks tool names only, so a resource call naming either is
+  // refused (Codex adversarial review, 2026-10-02).
   if (target.kind === 'app') {
-    return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office mail server has no resources to read. ${TELL_MICHAEL}` } : { ok: true };
+    return MCP_RESOURCE_TOOLS.has(toolName) ? { ok: false, reason: `The office's own servers have no resources to read. ${TELL_MICHAEL}` } : { ok: true };
   }
   if (target.kind === 'other') {
     return { ok: false, reason: `"${target.server}" is not one of the office's connections, so you cannot use it. ${TELL_MICHAEL}` };

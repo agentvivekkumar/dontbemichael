@@ -992,11 +992,15 @@ a small "Fix" coral pill that opens Settings, Connections, Mailboxes.
   terminal notes are muted (`card-2`, "From Michael's notes"); a refusal with no reason
   reads "No reason given". Bubble tails and the quote bar use logical corners and edges,
   so they mirror in Arabic. Empty: one line and two example chips. The dock slides 180 ms
-  up from the composer and snaps under reduced motion. One count on the composer replaces
-  the queue chip: mono 11 px on `indigo` (`on-indigo` text) for unread replies,
-  `coral-strong` (`on-coral` text) while Michael waits on the owner. The dock
+  up from the composer and snaps under reduced motion. One count replaces the queue chip,
+  on the top end corner of the conversation button at the composer's start: mono 11 px on
+  `indigo` (`on-indigo` text) for unread replies, `coral-strong` (`on-coral` text) while
+  Michael waits on the owner. The dock
   opens only on the owner's action and closes on ✕, Esc, or a floor click with nothing
-  typed. Opening follows the latest or navigates once to the requested question. While
+  typed. It opens on the owner's latest question, with open requests and unread replies;
+  the rest folds behind a quiet "Show N earlier" at the top, and nothing folds until the next
+  opening or send. A question opened or sent goes to the top of the list when the list
+  overflows, and stays there as replies arrive until the owner scrolls. While
   the owner reads earlier messages, arrivals preserve the visible passage, and so does a
   move between the bar and the center. A reserved 48 px footer holds a 32 px secondary
   button with `indigo` text, `card`, `line-2`, `r-md`, `t-body-sm` 600 and the downward

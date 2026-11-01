@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { askFileNames, fileTitle, kindOf, withNamedFiles, type AskFileCheck } from '@shared/askFiles';
 import { MarkdownPreview, type MarkdownVariant } from '@/markdown/MarkdownPreview';
 import { chipPaths } from '@/markdown/chipPaths';
+import { folderTeam, type FolderMember } from '@/markdown/remarkFolderChips';
 import { useStore } from '@/store/store';
 import { Icon } from './Icon';
 
@@ -301,6 +302,9 @@ export function FileText({ source, who, checks: given, variant = 'card' }: {
     return extra.length ? { ...base, ...Object.fromEntries(extra.map((c) => [c.path, c])) } : base;
   }, [given, own, named]);
   const onGone = useCallback((p: string) => setGone((g) => ({ ...g, [p]: true })), []);
+  // As a string, so a member's status changing doesn't redraw every card.
+  const teamKey = useStore((s) => JSON.stringify(folderTeam(s.agents)));
+  const team = useMemo(() => JSON.parse(teamKey) as FolderMember[], [teamKey]);
   const fileChip = useCallback((p: string) => (
     <FileChip
       path={p}
@@ -309,5 +313,5 @@ export function FileText({ source, who, checks: given, variant = 'card' }: {
       onGone={onGone}
     />
   ), [checks, gone, raisedBy, assignee, onGone]);
-  return <MarkdownPreview source={shown} variant={variant} fileChip={paths.length ? fileChip : undefined} placeLinks />;
+  return <MarkdownPreview source={shown} variant={variant} fileChip={paths.length ? fileChip : undefined} placeLinks folderTeam={team} />;
 }

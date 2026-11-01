@@ -480,7 +480,7 @@ export async function askFileVerdict(
 
 /** What a file tab gets back (docs/designs/open-file-tab.md). */
 export type AskFileRead =
-  | { ok: true; path: string; root: string; real: string; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image'; text?: string; bytes?: Uint8Array<ArrayBuffer>; mime?: string; size: number }
+  | { ok: true; path: string; root: string; real: string; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image' | 'document'; text?: string; bytes?: Uint8Array<ArrayBuffer>; mime?: string; size: number }
   | { ok: false; error: 'not found' | 'too large' | 'unreadable' };
 
 /**
@@ -507,8 +507,14 @@ export async function askFileByName(
  * folder, canonical path, no link leaving it), and only kinds a tab can show
  * are read: text up to 2 MB, images up to 10 MB, through the root-confined
  * readers. Anything outside the folders reads as not found, like the chip.
+ * A Word, Excel, PowerPoint or PDF file shows its words: `documentText` pulls
+ * them out, in a process of its own, as the file may come from outside.
  */
-export async function readAskFile(pathText: string, roots: readonly string[] | readonly AskFileRoot[]): Promise<AskFileRead> {
+export async function readAskFile(
+  pathText: string,
+  roots: readonly string[] | readonly AskFileRoot[],
+  documentText?: (path: string) => Promise<string | null>
+): Promise<AskFileRead> {
   const v = await askFileVerdict(pathText, roots);
   if (v.verdict === 'missing' || !v.tab || !v.real) return { ok: false, error: 'not found' };
   const rel = relative(v.real, v.path);
@@ -518,6 +524,14 @@ export async function readAskFile(pathText: string, roots: readonly string[] | r
     const r = await readFileBinary(v.real, rel);
     if (!r.ok) return { ok: false, error: /too large|grew past/.test(r.error) ? 'too large' : 'unreadable' };
     return { ok: true, path: r.path, root, real: v.real, kind, bytes: r.bytes, mime: r.mime, size: r.size };
+  }
+  if (kind === 'word' || kind === 'excel' || kind === 'powerpoint' || kind === 'pdf') {
+    const text = await documentText?.(v.path).catch(() => null);
+    if (!text) return { ok: false, error: 'unreadable' };
+    const size = Buffer.byteLength(text);
+    if (size > MAX_READ_BYTES) return { ok: false, error: 'too large' };
+    // A sheet's columns line up only in monospace.
+    return { ok: true, path: v.path, root, real: v.real, kind: kind === 'excel' ? 'text' : 'document', text, size };
   }
   const r = await readFileText(v.real, rel);
   if (!r.ok) return { ok: false, error: /too large/.test(r.error) ? 'too large' : /ENOENT|escapes/.test(r.error) ? 'not found' : 'unreadable' };

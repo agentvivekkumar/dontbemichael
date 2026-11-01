@@ -939,7 +939,7 @@ const api = {
   /** Read a named file for its office tab (docs/designs/open-file-tab.md). Main
    *  checks the folders again; `place` is 'office' or a team member's id. */
   readAskFile: (p: string, who: { raisedBy?: string; assignee?: string }): Promise<
-    | { ok: true; path: string; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image'; text?: string; bytes?: Uint8Array; mime?: string; size: number; place: string; folder: string[] }
+    | { ok: true; path: string; kind: 'markdown' | 'text' | 'json' | 'csv' | 'image' | 'document'; text?: string; bytes?: Uint8Array; mime?: string; size: number; place: string; folder: string[] }
     | { ok: false; error: 'not found' | 'too large' | 'unreadable' }
   > => ipcRenderer.invoke('fs:readAskFile', p, who),
   /** Watch an open file tab's file; `onAskFileChanged` fires with its id. */
@@ -1003,7 +1003,8 @@ const api = {
   hivePatchAgentRole: (id: string, role: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:patchAgentRole', id, role),
   /** A hire's first task: its card, and a request to Michael to hand it out.
-   *  Once per hire; `sent` is false when there was nothing to send. With
+   *  Once per hire; `sent` is false when there was nothing to send, and `ok`
+   *  is false when the card could not go on the board, so the words are kept. With
    *  `edited`, the words are an owner's edited First task from an older Work
    *  style (sourceCard may then be empty: a hire with no pack card). */
   hiveFirstTask: (sourceCard: string | undefined, agentId: string, name: string, edited?: { ask: string; role?: string; existing?: boolean }): Promise<{ ok: boolean; sent?: boolean; error?: string }> =>
@@ -1805,6 +1806,8 @@ const api = {
     ipcRenderer.invoke('integrations:canStoreSecrets'),
   integrationsSetSecret: (req: { id: string; secret: string }): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('integrations:setSecret', req),
+  integrationsSetAccess: (agentId: string, id: string, level: 'read' | 'change' | null): Promise<{ ok: boolean; restartNeeded: boolean }> =>
+    ipcRenderer.invoke('integrations:setAccess', agentId, id, level),
   integrationsRemove: (req: { id: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('integrations:remove', req),
   integrationsTest: (req: { id: string; path?: string }): Promise<{ ok: boolean; status?: number; error?: string }> =>

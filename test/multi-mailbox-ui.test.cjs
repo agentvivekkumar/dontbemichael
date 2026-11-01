@@ -113,7 +113,7 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
   const at = main.indexOf("opts.args = [...(opts.args ?? []), '--mcp-config', file];");
   assert.ok(at > 0);
   assert.ok(at < main.indexOf('const res = ptyManager.spawn(opts, owner);', at), 'right before the spawn');
-  assert.match(main, /hasMailTools\(readConfig\(\)\.agentCapabilities\?\.\[agentId\]\)/, 'own mailbox or a Send only grant');
+  assert.match(main, /const wantsMail = SHOW_MAILBOXES && hasMailTools\(cfg\.agentCapabilities\?\.\[agentId\]\);/, 'own mailbox or a Send only grant, never with mailboxes hidden');
   assert.match(main, /mdMailMcpPath\(home, agentId\)/, 'token file under harnessHome/private (#63)');
   assert.match(read('electron-builder.yml'), /from: resources\/md-mail-mcp\.cjs/);
 });
@@ -121,9 +121,9 @@ test('md-mail is attached at spawn only for agents with email, as the last argum
 test('schedules live in Capabilities: Email and On a schedule fold separately, closed by default (owner, 2026-09-26)', () => {
   const cap = read('src/renderer/src/components/CapabilitiesTab.tsx');
   assert.ok(cap.indexOf("title={t('capabilities.email')}") < cap.indexOf("title={t('capabilities.schedules')}"), 'Email first, then schedules');
-  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|connectors|schedules)', open\)\}/g) || []).length, 3, 'every section folds');
+  assert.equal((cap.match(/onToggle=\{\(open\) => setFold\('(email|connectors|integrations|schedules)', open\)\}/g) || []).length, 4, 'every section folds');
   assert.match(cap, /<AgentSchedules key=\{agent\.id\} agentId=\{agent\.id\} agentName=\{name\} businessType=\{config\.businessType\} sourceCard=\{agent\.sourceCard\} \/>/);
-  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, connectors: true, schedules: true \}\)/, 'all start closed');
+  assert.match(cap, /useState<Record<SectionKey, boolean>>\(\{ email: true, connectors: true, integrations: true, schedules: true \}\)/, 'all start closed');
   assert.match(read('src/renderer/src/components/triggers/ui.tsx'), /aria-expanded=\{open\}/);
   assert.doesNotMatch(read('src/renderer/src/components/SidebarTabs.tsx'), /key: 'schedules'/);
   assert.doesNotMatch(read('src/renderer/src/components/AgentDetailPanel.tsx'), /sidebarTab === 'schedules'/);

@@ -11,6 +11,7 @@
  * broker and the PreToolUse hook for md-mail tools.
  */
 
+import type { IntegrationGrants } from './integrations';
 import type { QuickBooksCapability } from './quickbooks';
 
 export type MailProvider = 'gmail' | 'google-workspace' | 'icloud' | 'yahoo' | 'zoho' | 'other';
@@ -94,6 +95,8 @@ export interface AgentCapabilities {
   /** Connectors on the owner's Claude account this agent may use, by key
    *  (shared/claudeConnectors.ts). QuickBooks is under `quickbooks`. */
   connectors?: string[];
+  /** Integrations from Settings this agent may use (shared/integrations.ts). */
+  integrations?: IntegrationGrants;
 }
 
 export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'propose' | 'send';
@@ -106,7 +109,7 @@ export type MailOp = 'list' | 'read' | 'organize' | 'draft' | 'propose' | 'send'
  *  agent's call, and on a plain object "constructor" or "__proto__" would read
  *  as a known tool and pass both checks. */
 export const MAIL_TOOL_OPS: Record<string, MailOp> = Object.assign(Object.create(null) as Record<string, MailOp>, {
-  list_mailboxes: 'list', search: 'read', read: 'read',
+  list_mailboxes: 'list', search: 'read', read: 'read', save_attachment: 'read',
   archive: 'organize', mark_read: 'organize', mark_junk: 'organize',
   draft: 'draft', propose: 'propose', send: 'send'
 });

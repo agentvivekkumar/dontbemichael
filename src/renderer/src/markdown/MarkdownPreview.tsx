@@ -21,9 +21,9 @@
  * icon says where the click goes, and words that name another site get the
  * real one after the link. Documents (file tabs, the IDE) show links as written.
  */
-import { memo, useState, type ReactNode } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useWorkspaceImage } from '@/hooks/useWorkspaceImage';
 import { isBareLink, isExternal, labelMismatch, linkName, resolveLocalImageRel, resolveMdLinkRel } from './mdLinks';
@@ -32,6 +32,8 @@ import { remarkSoftBreaks } from './remarkSoftBreaks';
 import { remarkFileChips } from './remarkFileChips';
 import { remarkSettingsLinks } from './remarkSettingsLinks';
 import { PlaceChip } from './PlaceChip';
+import { FolderChip } from './FolderChip';
+import { remarkFolderChips, type FolderMember } from './remarkFolderChips';
 import { PLACE_SCHEME, parsePlace } from '@shared/settingsPlaces';
 import { EMAIL_SCHEME, parseEmailHref } from '@shared/emailLink';
 import { EmailChip } from './EmailChip';
@@ -87,12 +89,26 @@ export interface MarkdownPreviewProps {
    *  button a `dbm:` link gets (settings-links-in-replies.md). Off for
    *  documents, whose words stay words. */
   placeLinks?: boolean;
+  /** Turn a team folder named in the words into a chip that opens it
+   *  (remarkFolderChips). Keep its identity stable: it is a memo input. */
+  folderTeam?: readonly FolderMember[];
 }
 
 export const MarkdownPreview = memo(function MarkdownPreview({
-  source, baseRel, root, onOpenMarkdownLink, variant = 'document', fileChip, placeLinks = false
+  source, baseRel, root, onOpenMarkdownLink, variant = 'document', fileChip, placeLinks = false, folderTeam
 }: MarkdownPreviewProps) {
   const card = variant === 'card';
+  const basePlugins = placeLinks
+    ? (fileChip ? (card ? CARD_FILE_PLACE_PLUGINS : DOC_FILE_PLACE_PLUGINS) : (card ? CARD_PLACE_PLUGINS : DOC_PLACE_PLUGINS))
+    : (fileChip ? (card ? CARD_FILE_PLUGINS : DOC_FILE_PLUGINS) : (card ? CARD_PLUGINS : DOC_PLUGINS));
+  // Before the soft breaks, like file chips. Memoized for the same reason the
+  // lists above are hoisted.
+  const remarkPlugins = useMemo(() => {
+    if (!folderTeam?.length) return basePlugins;
+    const folders = [remarkFolderChips, { team: folderTeam }] as const;
+    const last = basePlugins[basePlugins.length - 1];
+    return last === remarkSoftBreaks ? [...basePlugins.slice(0, -1), folders, last] : [...basePlugins, folders];
+  }, [basePlugins, folderTeam]) as Options['remarkPlugins'];
   // Per-block direction, gated on the APP LANGUAGE rather than on the text.
   //
   // The plugin stamps `dir="auto"`, which resolves from each block's first
@@ -106,14 +122,16 @@ export const MarkdownPreview = memo(function MarkdownPreview({
   return (
     <div className={card ? 'cth-md-preview cth-md-card' : 'cth-md-preview'}>
       <ReactMarkdown
-        remarkPlugins={placeLinks
-          ? (fileChip ? (card ? CARD_FILE_PLACE_PLUGINS : DOC_FILE_PLACE_PLUGINS) : (card ? CARD_PLACE_PLUGINS : DOC_PLACE_PLUGINS))
-          : (fileChip ? (card ? CARD_FILE_PLUGINS : DOC_FILE_PLUGINS) : (card ? CARD_PLUGINS : DOC_PLUGINS))}
+        remarkPlugins={remarkPlugins}
         urlTransform={placeUrlTransform}
         rehypePlugins={rtl ? AUTO_DIR_PLUGINS : NO_PLUGINS}
         components={{
           ...(fileChip ? {
             'cth-file': ({ node }: { node?: { properties?: Record<string, unknown> } }) => fileChip(String(node?.properties?.dataPath ?? ''))
+          } as Components : {}),
+          ...(folderTeam?.length ? {
+            'cth-folder': ({ node, children }: { node?: { properties?: Record<string, unknown> }; children?: ReactNode }) =>
+              <FolderChip agentId={String(node?.properties?.dataAgent ?? '')} words={hastText(node)}>{children}</FolderChip>
           } as Components : {}),
           a: ({ href, children, node }) => {
             const h = href ?? '';

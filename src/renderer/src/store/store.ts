@@ -46,7 +46,7 @@ export interface PendingRestart {
   /** engine: Claude Code was just set up (docs/designs/get-michael-ready.md).
    *  stuck: the session stopped on a prompt (hooks.ts stuckOnPrompt).
    *  silent: its engine stopped reporting to the app (issue #326). */
-  reason: 'email' | 'connectors' | 'engine' | 'stuck' | 'silent';
+  reason: 'email' | 'connectors' | 'integrations' | 'engine' | 'stuck' | 'silent';
   /** The owner pressed Restart now: do not wait for idle. */
   now?: boolean;
   /** The last restart attempt failed; it is tried again on the next tick. */
@@ -625,8 +625,9 @@ export function toolOfAction(action: string): string | null {
 /** A tool call in words a business owner reads at a glance. */
 export function toolText(tool: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const k = (key: string, opts?: Record<string, unknown>) => t(`office.activity.tool.${key}`, opts);
+  if (/^mcp__md-integrations__/i.test(tool)) return k('integration');
   const mail = /^mcp__md-mail__([a-z_]+)$/i.exec(tool);
-  if (mail) return mail[1] === 'send' ? k('sendingEmail') : mail[1] === 'draft' ? k('draftingEmail') : k('checkingEmail');
+  if (mail) return mail[1] === 'send' ? k('sendingEmail') : mail[1] === 'draft' ? k('draftingEmail') : mail[1] === 'save_attachment' ? k('savingAttachment') : k('checkingEmail');
   const mcp = /^mcp__(.+?)__(.+)$/i.exec(tool);
   if (mcp) {
     const server = mcp[1].replace(/^claude_ai_/i, '').replace(/[_-]+/g, ' ').trim();
