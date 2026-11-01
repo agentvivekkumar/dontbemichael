@@ -11,10 +11,14 @@
  * Alt is never read from the physical key. On Windows AltGr arrives as
  * Ctrl+Alt, so a character typed with AltGr (Polish 'ć', Hungarian '&') would
  * otherwise turn into a copy or paste whenever it sits on the C or V key.
+ *
+ * Only a key that types one character falls back. An input method's key
+ * (`Process`), a dead key (`Dead`) or `Unidentified` can arrive with
+ * code 'KeyC', and xterm runs this handler before the input method sees it.
  */
 export function shortcutLetter(ev: { key: string; code?: string; altKey?: boolean }): string {
   const key = ev.key.toLowerCase();
   if (/^[a-z]$/.test(key)) return key;
-  const physical = ev.altKey ? null : /^Key([A-Z])$/.exec(ev.code ?? '');
+  const physical = ev.altKey || [...ev.key].length !== 1 ? null : /^Key([A-Z])$/.exec(ev.code ?? '');
   return physical ? physical[1].toLowerCase() : key;
 }
