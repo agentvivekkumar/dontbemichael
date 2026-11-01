@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const { execFileSync } = require('node:child_process');
 const hoodiecrow = require('hoodiecrow-imap');
 const { ImapFlow } = require('imapflow');
 const loadTs = require('./load-ts.cjs');
@@ -335,6 +336,28 @@ test('a linked folder or a second name cannot carry a file out of reach', { skip
   fs.linkSync(path.join(walled, 'credentials'), second);
   assert.throws(() => handOverAttachment({ file: second, fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
   assert.equal(fs.existsSync(path.join(dwight, ATTACHMENTS_FOLDER)), false);
+});
+
+test('only a plain file directly in the folder goes on', { skip: process.platform === 'win32' && 'POSIX only' }, (t) => {
+  // Value: protects=a swap below the folder and a pipe that would stop the app; fails_when=nested paths or the blocking open come back; why_new=ship review; seam=none; no_claim=a swap of the folder itself and back in one instant
+  const pam = tempFolder(t);
+  const dwight = tempFolder(t);
+  saveAttachmentFile({ folder: pam, name: 'a.pdf', ending: 'pdf', bytes: PDF }, noMark);
+  const sub = path.join(pam, ATTACHMENTS_FOLDER, 'sub');
+  fs.mkdirSync(sub);
+  fs.writeFileSync(path.join(sub, 'words.txt'), 'words');
+  assert.throws(() => handOverAttachment({ file: path.join(sub, 'words.txt'), fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
+  const pipe = path.join(pam, ATTACHMENTS_FOLDER, 'pipe');
+  execFileSync('mkfifo', [pipe]);
+  assert.throws(() => handOverAttachment({ file: pipe, fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
+});
+
+test('a save refuses a folder that is not there or not a folder', (t) => {
+  // Value: protects=plain words for each refusal; fails_when=a raw error reaches the member; why_new=only the link case was tested; seam=none; no_claim=a full disk
+  const pam = tempFolder(t);
+  assert.throws(() => saveAttachmentFile({ folder: path.join(pam, 'gone'), name: 'a.pdf', ending: 'pdf', bytes: PDF }, noMark), /could not be found/);
+  fs.writeFileSync(path.join(pam, ATTACHMENTS_FOLDER), 'in the way');
+  assert.throws(() => saveAttachmentFile({ folder: pam, name: 'a.pdf', ending: 'pdf', bytes: PDF }, noMark), /could not be made/);
 });
 
 test('a file too big to hand on is refused before it is read', (t) => {

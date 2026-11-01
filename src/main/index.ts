@@ -8666,11 +8666,12 @@ function bootstrapHiveServices(): void {
   hive.onScheduleRequest(receiveScheduleRequest);
   hive.onFileHandover((from, to, file) => {
     const reg = hive.registry();
-    if (to === RESEARCH_ID || !reg.agents[to]) return { error: 'Files go only between team members.' };
+    if (to === from || to === RESEARCH_ID || !reg.agents[to]) return { error: 'Files go only between team members.' };
     const fromFolder = attachmentFolder(from);
+    if (!fromFolder) return { error: 'Your folder cannot send files.' };
     const toFolder = attachmentFolder(to);
     // Folders are known from a member's start, and a member may not have started yet.
-    if (!fromFolder || !toFolder) return { error: `${reg.agents[to].name} has not started yet, so the file stayed with you. Send it again once they are working.` };
+    if (!toFolder) return { error: memberWork.has(to) ? 'Files go only between team members.' : `${reg.agents[to].name} has not started yet, so the file stayed with you. Send it again once they are working.` };
     try {
       const path = handOverAttachment({ file, fromFolder, toFolder });
       hive.appendLog({ kind: 'file-handed-over', from, to, name: basename(path) });

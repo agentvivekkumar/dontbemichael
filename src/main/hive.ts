@@ -3297,7 +3297,7 @@ export class HiveManager {
     const to = lowerTo;
     // A reply to the app's own senders is dropped quietly, as for everyone,
     // so a refusal note never starts a loop of answers.
-    if (['scheduler', 'heartbeat', 'mail', 'integrations', 'system', 'foundations', PRIVACY_CHECK_SENDER].includes(to)) {
+    if (['scheduler', 'heartbeat', 'mail', 'system', 'foundations', PRIVACY_CHECK_SENDER].includes(to) || to === 'integrations') {
       this.appendLog({ kind: 'drop', reason: 'reply-to-system-sender', from: RESEARCH_ID, to: logTo, id: logId });
       return 'denied';
     }

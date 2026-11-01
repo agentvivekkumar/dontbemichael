@@ -8,8 +8,7 @@
 
 import { execFile } from 'node:child_process';
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
-import { isSameOrInside } from './pathInside';
+import { basename, dirname, join } from 'node:path';
 import { attachmentKind } from '../shared/attachmentKind';
 import { cleanFolderName } from '../shared/folderName';
 
@@ -100,10 +99,11 @@ export function saveAttachmentFile(
 
 /** The file's bytes through one open handle, so a file swapped in after the
  *  checks is not what gets read. `stillPlain` looks at the folder again once the
- *  file is open. Null when it is not a plain file with one name. */
+ *  file is open. Null when it is not a plain file with one name. Never blocks:
+ *  a named pipe with no writer would otherwise stop the whole app. */
 function readPlainFile(path: string, stillPlain: () => boolean): Buffer | null {
   let fd: number;
-  try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)); } catch { return null; }
+  try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0)); } catch { return null; }
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1 || !stillPlain()) return null;
@@ -138,7 +138,9 @@ export function handOverAttachment(
     own = plainAttachmentsDir(folder);
     real = realpathSync(input.file);
   } catch { throw new AttachmentSaveError('That file could not be found. Save it with save_attachment first.'); }
-  const bytes = own && real !== own && isSameOrInside(own, real)
+  // Saves are flat, so only a file directly in the folder: a folder under it
+  // could be swapped for a link after this check.
+  const bytes = own && dirname(real) === own
     ? readPlainFile(real, () => plainAttachmentsDir(folder) === own)
     : null;
   if (!bytes) throw new AttachmentSaveError(`Only a file from your own ${ATTACHMENTS_FOLDER} folder can go with a message.`);

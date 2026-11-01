@@ -109,6 +109,11 @@ function stringsIn(value) {
   return out.join('\n');
 }
 
+/** A cut JSON answer does not parse, so its escapes are undone by hand. */
+function unescaped(text) {
+  return text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\\[nrt]/g, '\n');
+}
+
 /** What the broker says about an answer. An answer it could not screen still
  *  carries the outside text label. */
 async function screened(integration, text) {
@@ -152,7 +157,7 @@ async function callIntegration(args) {
   const out = await callBroker(method, target, headers, payload);
   const parsed = jsonOf(out.text);
   const answer = { status: out.status, content_type: out.type, body: parsed ?? out.text, ...(out.truncated ? { truncated: true } : {}) };
-  const words = parsed === undefined ? out.text : stringsIn(parsed);
+  const words = parsed === undefined ? unescaped(out.text) : stringsIn(parsed);
   return { ok: out.status >= 200 && out.status < 300, answer: { ...answer, ...(await screened(args.integration, words)) } };
 }
 
