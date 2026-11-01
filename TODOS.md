@@ -205,18 +205,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Priority:** P2
 **Depends on:** None
 
-### Pulse reads a card's whole history, not the period's slice
-
-**What:** Keep card lifecycle state (reopened, held time) per card as events arrive, instead of rebuilding it from the period's events only.
-
-**Why:** A card reopened or held before the period and finished in it counts as kept as is and as faster than it was.
-
-**Context:** From the second Codex adversarial review, 2026-10-16. `telemetryProcessor.ts` cards().
-
-**Effort:** S (human) / S (CC)
-**Priority:** P3
-**Depends on:** None
-
 ### Pulse keeps a card finished just before a quit
 
 **What:** Record card status changes where Michael's board write lands (or persist the last seen board) instead of only diffing the 8 s poll in memory.
@@ -475,15 +463,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.
 
 **Why:** A decline carries Michael's or the owner's reason; dropped, Research may ask for the same change again.
-
-**Effort:** S
-**Priority:** P3
-
-### Retry closing time's wait after all note to Michael
-
-**What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
-
-**Why:** Michael may close without the member's ACK.
 
 **Effort:** S
 **Priority:** P3

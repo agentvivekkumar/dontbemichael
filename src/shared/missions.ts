@@ -693,3 +693,32 @@ export function applyScheduleRequest(
   }
   return { ok: false, error: 'invalid' };
 }
+
+/* ───────────────────────────── the heartbeat's wait ───────────────────────────── */
+// The heartbeat re-arms itself after every beat (armHeartbeat in main). Its
+// waits live here so they get the same timer ceiling as armPlan: a 24 day
+// heartbeat that backed off by 2.5x after waking Michael asked for 60 days,
+// Node turned that into 1 ms, and every beat with mail waiting in his inbox sent
+// him another "Heartbeat" at once, about one per millisecond (review, 2026-10-29).
+
+/** What a beat did: a plain beat, a beat that saw an agent stuck, or a beat
+ *  that woke Michael. */
+export type HeartbeatBeat = 'normal' | 'stuck' | 'reengaged';
+
+/** The wait before the next beat: base after a plain beat, a quarter (at least
+ *  30s) when an agent looks stuck, 2.5x after waking Michael. Never under a
+ *  second and never longer than a timer can wait. */
+export function heartbeatDelayMs(baseMs: number, beat: HeartbeatBeat): number {
+  const raw = beat === 'reengaged' ? Math.round(baseMs * 2.5)
+    : beat === 'stuck' ? Math.max(30_000, Math.round(baseMs / 4))
+    : baseMs;
+  // `>= 1000` is false for NaN too, so a broken base waits a second, not 1 ms.
+  return Math.min(MAX_TIMER_MS, raw >= 1000 ? raw : 1000);
+}
+
+/** The wait before the first beat after arming: what is left of the interval
+ *  since the last beat (0 when overdue), never longer than a timer can wait.
+ *  clampIntervals keeps a loaded base under the limit; this holds regardless. */
+export function heartbeatFirstDelayMs(baseMs: number, lastFiredAt: number | undefined, now: number): number {
+  return Math.min(MAX_TIMER_MS, Math.max(0, baseMs - (now - (lastFiredAt ?? 0))));
+}

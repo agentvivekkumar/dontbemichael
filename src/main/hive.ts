@@ -571,6 +571,13 @@ function shortRand(): string {
   return randomBytes(3).toString('hex');
 }
 
+/** JSON.parse that tolerates a leading UTF-8 byte order mark. A file saved by
+ *  an editor or a Windows tool (PowerShell's Set-Content -Encoding UTF8) can
+ *  start with one, and JSON.parse refuses it though the rest is whole. */
+function parseJsonText(text: string): unknown {
+  return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+}
+
 /** Write over an agent's own file in place, only when it is a plain file
  *  with one name: never through a link or a second name it made for a file
  *  of someone else's (red team, third ship). Throws otherwise. */
@@ -2528,7 +2535,7 @@ export class HiveManager {
     // content stamp the sweep checks (eng R2).
     if (toId === RESEARCH_ID && !this.researchCleared.has(msg.id)) {
       this.appendLog({ kind: 'drop', reason: 'research-unchecked', from: msg.from, id: msg.id });
-      return true;
+      return false;
     }
     const out = toId === RESEARCH_ID ? { ...msg, stamp: this.researchStamp(msg) } : msg;
     this.atomicWriteJson(join(inbox, `${msg.id}.json`), out);
@@ -4029,6 +4036,25 @@ export class HiveManager {
     return root ? this.readJson(join(root, 'tasks.json'), { tasks: [] }) : { tasks: [] };
   }
 
+  /** The ledger as it is on disk, for a write that builds on it. A file that
+   *  is not there is an empty board. One that does not parse is unknown, never
+   *  empty: Michael edits tasks.json with his own tools, so a trailing comma
+   *  or a read landing halfway through his write happens, and a card added
+   *  against an empty board would write every other card off it. */
+  private readLedger(): { tasks: unknown[] } | null {
+    const root = this.root();
+    if (!root) return { tasks: [] };
+    const path = join(root, 'tasks.json');
+    let text: string;
+    try { text = readFileSync(path, 'utf8'); } catch (e) {
+      return (e as NodeJS.ErrnoException)?.code === 'ENOENT' ? { tasks: [] } : null;
+    }
+    try {
+      const raw = parseJsonText(text) as { tasks?: unknown };
+      return Array.isArray(raw?.tasks) ? { tasks: raw.tasks } : null;
+    } catch { return null; }
+  }
+
   /** Persist the task ledger to hive/tasks.json and commit it. Mirrors the
    *  board/message persist pattern: write JSON, log the change, single-commit.
    *
@@ -4041,15 +4067,24 @@ export class HiveManager {
    *
    *  The incoming list IS the membership: merging protects fields, never card
    *  membership. The app itself never drops a card; a card ends only as Done
-   *  (docs/designs/card-lifecycle.md). */
-  writeTasks(tasks: HiveTask[]): void {
+   *  (docs/designs/card-lifecycle.md).
+   *
+   *  Writes nothing, and returns false, while the file on disk does not parse:
+   *  merged against nothing, the write would keep only the cards passed in. */
+  writeTasks(tasks: HiveTask[]): boolean {
     const root = this.root();
-    if (!root) return;
+    if (!root) return false;
     this.ensureHive();
     const path = join(root, 'tasks.json');
-    const current = this.readJson<{ tasks?: unknown }>(path, { tasks: [] });
-    const merged = mergeTaskLedger(current?.tasks, tasks);
-    this.writeJson(path, { tasks: merged });
+    const current = this.readLedger();
+    if (!current) {
+      console.error('[hive] tasks.json does not parse; the board is left as it is');
+      return false;
+    }
+    const merged = mergeTaskLedger(current.tasks, tasks);
+    // One rename over the old file, so Michael, the guard and the next card
+    // never read the board half written.
+    this.atomicWriteJson(path, { tasks: merged });
     // Cards the app itself marks Done count as seen Done.
     // What the app writes is what the guard knows: Done cards and where each
     // open card stands, so a restore never brings back a copy from before it.
@@ -4063,17 +4098,22 @@ export class HiveManager {
     this.saveGuard();
     this.appendLog({ kind: 'tasks', count: merged.length });
     this.commit(`hive: tasks (${merged.length})`);
+    return true;
   }
 
   /** Append one card against the latest on-disk ledger. Renderer callers must
    *  use this instead of re-writing a collection they read before another
-   *  source (webhook, Slack, god, voice) added work. Idempotent by task id. */
+   *  source (webhook, Slack, god, voice) added work. Idempotent by task id.
+   *  False when the card is there already or the board does not parse. */
   addTask(task: HiveTask): boolean {
-    const ledger = this.tasks() as { tasks?: HiveTask[] };
-    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    const ledger = this.readLedger();
+    if (!ledger) {
+      console.error(`[hive] tasks.json does not parse; card ${task.id} not added`);
+      return false;
+    }
+    const tasks = ledger.tasks as HiveTask[];
     if (tasks.some((current) => current?.id === task.id)) return false;
-    this.writeTasks([...tasks, task]);
-    return true;
+    return this.writeTasks([...tasks, task]);
   }
 
   /** Patch one card against the latest on-disk ledger, preserving unrelated
@@ -4081,8 +4121,9 @@ export class HiveManager {
    *  The app closing a card (a mailbox fixed, a voice "done") withdraws its
    *  open questions, so none is left on Ask me for good. */
   patchTask(id: string, patch: Partial<Omit<HiveTask, 'id'>>): boolean {
-    const ledger = this.tasks() as { tasks?: HiveTask[] };
-    const tasks = Array.isArray(ledger?.tasks) ? ledger.tasks : [];
+    const ledger = this.readLedger();
+    if (!ledger) return false;
+    const tasks = ledger.tasks as HiveTask[];
     const index = tasks.findIndex((task) => task?.id === id);
     if (index < 0) return false;
     const next = tasks.slice();
@@ -4093,7 +4134,7 @@ export class HiveManager {
     // The app moving a Done card on (the owner's reopen, a mailbox that broke
     // again) is allowed; agents write the file directly and never pass here.
     next[index] = { ...tasks[index], ...patch, id };
-    this.writeTasks(next);
+    if (!this.writeTasks(next)) return false;
     // Forgotten as Done only once the move is on disk.
     if (patch.status && patch.status !== 'done' && tasks[index].status === 'done') {
       delete this.guardState().done[id];
@@ -4426,7 +4467,7 @@ export class HiveManager {
     // Read strictly: a board that does not parse is never taken as empty.
     const readBoard = (): unknown[] | null => {
       try {
-        const raw = JSON.parse(readFileSync(join(root, 'tasks.json'), 'utf8')) as { tasks?: unknown };
+        const raw = parseJsonText(readFileSync(join(root, 'tasks.json'), 'utf8')) as { tasks?: unknown };
         return Array.isArray(raw?.tasks) ? raw.tasks : null;
       } catch { return null; }
     };
@@ -6135,7 +6176,7 @@ export class HiveManager {
 
   // — json + atomic io —
   private readJson<T>(p: string, fallback: T): T {
-    try { return JSON.parse(readFileSync(p, 'utf8')) as T; } catch { return fallback; }
+    try { return parseJsonText(readFileSync(p, 'utf8')) as T; } catch { return fallback; }
   }
   private writeJson(p: string, data: unknown): void {
     writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');

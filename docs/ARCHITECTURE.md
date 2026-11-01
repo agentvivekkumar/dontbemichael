@@ -207,6 +207,8 @@ src/
   shared/                    code both processes use
     buildFeatures.ts         switches for surfaces hidden in this build (git, IDE, temp workers, org trigger)
     agentProvider.ts         engine presets; BUILD_ENGINES is what setup offers (Claude Code today)
+    engineCapabilities.ts    what each engine can do for an office member (yes, no or unknown, per OS where it
+                             differs) and engineGaps, what an engine lacks for a job (issue #531)
     officePack.ts / officeRoles.ts / businessProfile.ts / teamPlan.ts   Office Pack schema, show roles and the department each member sits in (departmentOf), business profile, team plan
     agentDefinition.ts       each agent's levels and outward capabilities
     mailboxes.ts             mailbox and Capabilities types, providers, and mailAccess (the one mail rule,
@@ -242,6 +244,9 @@ src/
                              the owner's questions in Michael's conversation dock (docs/designs/michael-replies.md)
     mailProposals.ts         Send on approval's rules: proposals and their states, what an approved send may carry,
                              standing approvals and the fit check's prompt, threading from a Send only member's own sends
+    standingFacts.ts         the fit check's countable half (#490): under a kind not about money, money a standing send
+                             names that the approval and the message it answers don't goes to the owner unasked; such dates
+                             and times go to the model as a list
     starterJobs.ts           the schedules a pack gives a hire, timed to the pack's office hours (docs/designs/inbox-zero.md)
     firstTask.ts             a hire's first task card and Michael's request to hand it out (docs/designs/first-task-card.md);
                              legacyFirstTasks.ts holds the old First task texts the one-time cleanup matches

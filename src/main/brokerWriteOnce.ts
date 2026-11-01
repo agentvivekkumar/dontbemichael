@@ -94,6 +94,11 @@ export function classifyUpstreamFailure(e: unknown): 'never' | 'uncertain' {
   if (code === 'ENOTFOUND' || code === 'ECONNREFUSED' || code === 'EAI_AGAIN' || code === 'UND_ERR_CONNECT_TIMEOUT') {
     return 'never';
   }
+  // fetch checks the request itself before it opens a socket, and refuses a
+  // header it will not send (expect, upgrade, a bad content-length) with these
+  // two codes. The broker sends with redirect 'manual', so there is no earlier
+  // hop that could have gone out first.
+  if (code === 'UND_ERR_NOT_SUPPORTED' || code === 'UND_ERR_INVALID_ARG') return 'never';
   return 'uncertain';
 }
 

@@ -87,3 +87,14 @@ test('a schedule staged for one member is cancelled by a confirm that names anot
   assert.equal((await confirm('confirm schedule')).ok, true);
   assert.deepEqual(saved.map((m) => [m.label, m.to]), [['Invoice check', 'jim']]);
 });
+
+test('a no cancels the staged action whoever it names', async () => {
+  // Value: protects=a spoken no never runs the staged action and answers as a cancel; fails_when=the other-member check runs before the no and answers "named someone other than", or the no leaves it staged; why_new=#541 merged with namesSomeoneElse; seam=the real ipc handlers; no_claim=none
+  for (const phrase of ['no, don\'t kill Nolan', 'No, don\'t kill jim']) {
+    killed.length = 0;
+    assert.equal((await act({ verb: 'kill', target: 'jim' })).needsConfirm, true);
+    assert.deepEqual(await confirm(phrase), { ok: false, spoken: 'Cancelled the kill.' }, phrase);
+    assert.equal((await confirm('confirm')).spoken, 'There\'s nothing waiting to confirm.', `${phrase}: nothing is left staged`);
+    assert.deepEqual(killed, [], phrase);
+  }
+});
