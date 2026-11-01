@@ -7,8 +7,8 @@
  */
 
 import { execFile } from 'node:child_process';
-import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
 import { attachmentKind } from '../shared/attachmentKind';
 import { cleanFolderName } from '../shared/folderName';
 
@@ -79,8 +79,7 @@ export function saveAttachmentFile(
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw new AttachmentSaveError(`The file could not be saved: ${(e as NodeJS.ErrnoException).code ?? 'unknown error'}.`);
       try {
-        const st = lstatSync(path);
-        if (st.isFile() && st.size === input.bytes.length && readFileSync(path).equals(input.bytes)) return path;
+        if (readPlainFile(path, () => true)?.equals(input.bytes)) return path;
       } catch { /* try the next name */ }
       continue;
     }
@@ -98,15 +97,18 @@ export function saveAttachmentFile(
 }
 
 /** The file's bytes through one open handle, so a file swapped in after the
- *  checks is not what gets read. `stillPlain` looks at the folder again once the
- *  file is open. Null when it is not a plain file with one name. Never blocks:
- *  a named pipe with no writer would otherwise stop the whole app. */
+ *  checks is not what gets read: once open, the path must still name this very
+ *  file and `stillPlain` looks at the folder again. Null when it is not a plain
+ *  file with one name. Never blocks: a named pipe with no writer would otherwise
+ *  stop the whole app. */
 function readPlainFile(path: string, stillPlain: () => boolean): Buffer | null {
   let fd: number;
   try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0)); } catch { return null; }
   try {
     const st = fstatSync(fd);
-    if (!st.isFile() || st.nlink !== 1 || !stillPlain()) return null;
+    if (!st.isFile() || st.nlink !== 1) return null;
+    const named = lstatSync(path);
+    if (named.dev !== st.dev || named.ino !== st.ino || !stillPlain()) return null;
     if (st.size > ATTACHMENT_MAX_BYTES) throw new AttachmentSaveError('That file is too big to send on.');
     const bytes = Buffer.alloc(st.size);
     let got = 0;
@@ -140,7 +142,7 @@ export function handOverAttachment(
   } catch { throw new AttachmentSaveError('That file could not be found. Save it with save_attachment first.'); }
   // Saves are flat, so only a file directly in the folder: a folder under it
   // could be swapped for a link after this check.
-  const bytes = own && dirname(real) === own
+  const bytes = own && relative(own, real) === basename(real)
     ? readPlainFile(real, () => plainAttachmentsDir(folder) === own)
     : null;
   if (!bytes) throw new AttachmentSaveError(`Only a file from your own ${ATTACHMENTS_FOLDER} folder can go with a message.`);

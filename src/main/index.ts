@@ -8668,10 +8668,10 @@ function bootstrapHiveServices(): void {
     const reg = hive.registry();
     if (to === from || to === RESEARCH_ID || !reg.agents[to]) return { error: 'Files go only between team members.' };
     const fromFolder = attachmentFolder(from);
-    if (!fromFolder) return { error: 'Your folder cannot send files.' };
+    if (!fromFolder) return { error: memberWork.has(from) ? 'Your folder cannot send files.' : 'The file stayed with you. Send it again in a moment.' };
     const toFolder = attachmentFolder(to);
     // Folders are known from a member's start, and a member may not have started yet.
-    if (!toFolder) return { error: memberWork.has(to) ? 'Files go only between team members.' : `${reg.agents[to].name} has not started yet, so the file stayed with you. Send it again once they are working.` };
+    if (!toFolder) return { error: memberWork.has(to) ? `${reg.agents[to].name}'s folder cannot take files.` : `${reg.agents[to].name} has not started yet, so the file stayed with you. Send it again once they are working.` };
     try {
       const path = handOverAttachment({ file, fromFolder, toFolder });
       hive.appendLog({ kind: 'file-handed-over', from, to, name: basename(path) });

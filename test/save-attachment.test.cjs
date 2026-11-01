@@ -352,6 +352,12 @@ test('only a plain file directly in the folder goes on', { skip: process.platfor
   assert.throws(() => handOverAttachment({ file: pipe, fromFolder: pam, toFolder: dwight }, noMark), /own Email attachments/);
 });
 
+test('a member cannot hand a file to itself', () => {
+  // Value: protects=a member cannot use a handover to read a file into its own folder; fails_when=the guard goes; why_new=ship review; seam=source pin, index.ts cannot load in a test; no_claim=the route
+  const main = fs.readFileSync(path.join(ROOT, 'src/main/index.ts'), 'utf8');
+  assert.match(main.slice(main.indexOf('hive.onFileHandover(')), /if \(to === from \|\| to === RESEARCH_ID/);
+});
+
 test('a save refuses a folder that is not there or not a folder', (t) => {
   // Value: protects=plain words for each refusal; fails_when=a raw error reaches the member; why_new=only the link case was tested; seam=none; no_claim=a full disk
   const pam = tempFolder(t);
