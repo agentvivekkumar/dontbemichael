@@ -51,6 +51,7 @@ import {
 import { markUntrustedMessage } from '../shared/untrustedText';
 import { emailLinkFor, type OriginalEmail } from '../shared/emailLink';
 import { OWN_SENDS_ONLY, proposalSendProblem, standingProblem, standingTooLong, threadFrom, STANDING_KIND_MAX, type MailProposal, type SendRecord, type StandingApproval, type StandingCheckEmail, type ThreadHeaders } from '../shared/mailProposals';
+import { unfoundedMoneyReason } from '../shared/standingFacts';
 
 // Limits (eng review E6 left these to the implementer).
 const CALL_TIMEOUT_MS = 30_000;
@@ -1665,7 +1666,11 @@ async function runMailRequest(
         const checked: StandingCheckEmail = { to: input.to, cc: input.cc, subject: input.subject, body: input.body, ...(answers ? { answers } : {}) };
         // An email longer than the check reads never goes out unchecked (fail closed).
         const tooLong = standingTooLong(checked);
-        const verdict = !tooLong && !unreadable && deps.fitCheck ? await deps.fitCheck(rule!.kind, checked).catch(() => null) : null;
+        // Money the approval and the message it answers never name is counted,
+        // not judged: the model is not asked and the owner decides (#490).
+        const money = !tooLong && !unreadable ? unfoundedMoneyReason({ kind: rule!.kind, answers }, checked) : null;
+        const verdict = money ? { fits: false as const, reason: money }
+          : !tooLong && !unreadable && deps.fitCheck ? await deps.fitCheck(rule!.kind, checked).catch(() => null) : null;
         // The check can take a minute: the approval, the access and the grant are
         // checked again before anything leaves, so a revoke in that time holds.
         const now = deps.getConfig();
