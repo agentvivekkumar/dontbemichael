@@ -155,8 +155,11 @@ test('removing an integration clears it from everyone, so a new one under the id
 
 test('what a member is told holds no key and no login in the address', () => {
   const cfg = { agentCapabilities: { pam: { integrations: { a: 'read', b: 'change' } } } };
+  const withLogin = new URL('https://a.example.com/v1?key=abc');
+  withLogin.username = 'user';
+  withLogin.password = 'pass';
   const records = [
-    { id: 'a', label: 'A', baseUrl: 'https://user:pass@a.example.com/v1?key=abc', authType: 'bearer', secretRef: 'secret:a', enabled: true, hasSecret: true },
+    { id: 'a', label: 'A', baseUrl: withLogin.href, authType: 'bearer', secretRef: 'secret:a', enabled: true, hasSecret: true },
     { id: 'b', label: 'B', baseUrl: 'https://b.example.com', authType: 'bearer', enabled: true, hasSecret: false },
     { id: 'c', label: 'C', baseUrl: 'https://c.example.com', authType: 'none', enabled: true, hasSecret: false }
   ];
