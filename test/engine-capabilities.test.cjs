@@ -15,7 +15,8 @@ const ec = loadTs('src/shared/engineCapabilities.ts');
 const silent = loadTs('src/shared/silentEngine.ts');
 
 const SUPPORT = new Set(['yes', 'no', 'unknown']);
-const PER_ENGINE = ec.ENGINE_NEEDS.filter((n) => !['seedPrompt', 'lifecycleEvents', 'inbox', 'resume'].includes(n));
+const DERIVED = ['seedPrompt', 'lifecycleEvents', 'inbox', 'resume', 'systemPromptOnResume'];
+const PER_ENGINE = ec.ENGINE_NEEDS.filter((n) => !DERIVED.includes(n));
 const PER_OS = new Set(['fileSandbox', 'runsOn']);
 
 test('every engine has an entry, and the table names no engine that does not exist', () => {
@@ -46,15 +47,31 @@ test('the facts the presets hold are read from the presets, never copied', () =>
   for (const preset of ap.AGENT_PROVIDER_PRESETS) {
     const id = preset.id;
     const bridged = preset.hiveAware || !!ap.bridgeOf(id);
+    const neverReports = silent.NEVER_REPORTS.some((r) => r.engine === id);
     const expect = {
       inbox: yesNo(preset.canReceiveInbox),
       resume: yesNo(preset.resumeFlag || preset.resumeSubcommand),
-      lifecycleEvents: !bridged ? 'no' : silent.NEVER_REPORTS.some((r) => r.engine === id) ? 'unknown' : 'yes',
+      lifecycleEvents: !bridged ? 'no' : neverReports ? 'unknown' : 'yes',
+      systemPromptOnResume: preset.instructionsDelivery === 'system-level' ? 'yes'
+        : neverReports || ap.bridgeOf(id)?.kind === 'hooks' ? 'unknown' : 'no',
       seedPrompt: yesNo(preset.hiveAware || preset.initialPromptFlag || preset.positionalInitialPrompt || preset.seedDelivery)
     };
     for (const [need, value] of Object.entries(expect)) {
       for (const os of ec.ENGINE_OSES) assert.equal(ec.engineSupport(id, os, need), value, `${id} ${need} on ${os}`);
     }
+  }
+  for (const facts of Object.values(ec.ENGINE_FACTS)) assert.ok(!('systemPromptOnResume' in facts), 'derived, so not written down');
+});
+
+test('the protocol comes back after a resume only where something carries it back', () => {
+  // Value: protects=a re-injected engine whose hook server never hears SessionStart does not read as getting the protocol back; fails_when=systemPromptOnResume reads instructionsDelivery alone, or Codex reads anything but yes; why_new=review of #577 after #311; seam=none
+  const expect = {
+    claude: 'yes', codex: 'yes',
+    gemini: 'unknown', grok: 'unknown', opencode: 'unknown',
+    qwen: 'no', crush: 'no', kimi: 'no', copilot: 'no', cursor: 'no', custom: 'no'
+  };
+  for (const [id, value] of Object.entries(expect)) {
+    for (const os of ec.ENGINE_OSES) assert.equal(ec.engineSupport(id, os, 'systemPromptOnResume'), value, `${id} on ${os}`);
   }
 });
 
@@ -83,8 +100,8 @@ test('engineGaps names what is missing in the order asked, and tells a known gap
   assert.deepEqual(ec.engineGaps('claude', 'darwin', ['fileSandbox', 'mailTools', 'resume']), []);
   assert.deepEqual(ec.engineGaps('claude', 'win32', ['mailTools', 'fileSandbox']), [{ need: 'fileSandbox', support: 'no' }],
     'Claude Code has no sandbox on Windows');
-  assert.deepEqual(ec.engineGaps('codex', 'win32', ['systemPromptOnResume', 'fileSandbox', 'contextGauge']), [
-    { need: 'systemPromptOnResume', support: 'no' },
+  assert.deepEqual(ec.engineGaps('codex', 'win32', ['mailTools', 'fileSandbox', 'contextGauge']), [
+    { need: 'mailTools', support: 'no' },
     { need: 'fileSandbox', support: 'unknown' }
   ]);
   assert.deepEqual(ec.engineGaps('custom', 'linux', ['inbox', 'lifecycleEvents']), [

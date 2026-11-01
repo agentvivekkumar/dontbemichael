@@ -10,10 +10,11 @@
  *
  * Two kinds of fact live here:
  *  - Facts the presets already hold (lifecycle events, inbox, resume, the seed
- *    prompt) are DERIVED from `agentProvider.ts`, never copied, so the two
- *    cannot drift. Lifecycle events also read `NEVER_REPORTS` in
- *    `silentEngine.ts`: a bridge on an engine with a version known never to
- *    report is `unknown`, since this table has no versions (#357).
+ *    prompt, the protocol after a resume) are DERIVED from `agentProvider.ts`,
+ *    never copied, so the two cannot drift. Lifecycle events and the protocol
+ *    after a resume also read `NEVER_REPORTS` in `silentEngine.ts`: a hook on
+ *    an engine with a version known never to report is `unknown`, since this
+ *    table has no versions (#357).
  *  - Everything else is written down per engine. `unknown` means nobody has
  *    checked it on that engine yet; it is never read as `yes`.
  *
@@ -34,10 +35,6 @@ export type PerOs = Readonly<Record<EngineOs, Support>>;
 
 /** The facts the presets do not hold. One entry per engine. */
 export interface EngineFacts {
-  /** The member's identity and the hive protocol come back after a resume or a
-   *  compaction, because they ride in as a system prompt (Claude's
-   *  `--append-system-prompt`) and not only as the first turn (#298). */
-  systemPromptOnResume: Support;
   /** The app can refuse a tool call before it runs, as the folder walls, the
    *  connector deny and the mail gate do through Claude's PreToolUse hook. A
    *  proxy bridge only watches traffic, so it can never refuse one (#139). */
@@ -68,8 +65,11 @@ export const ENGINE_NEEDS = [
   'lifecycleEvents',
   'inbox',
   'resume',
-  // Written down per engine.
+  // The member's identity and the hive protocol come back after a resume or a
+  // compaction, by either route the preset's `instructionsDelivery` names: at
+  // system level, or re-sent by the hook server on SessionStart (#298, #311).
   'systemPromptOnResume',
+  // Written down per engine.
   'toolGuard',
   'fileSandbox',
   'contextGauge',
@@ -86,7 +86,6 @@ const ALL_UNKNOWN: PerOs = { darwin: 'unknown', win32: 'unknown', linux: 'unknow
  *  little else is known. The app has no reader for its context or token use,
  *  and the mail tools and Research are held to Claude in the spawn code. */
 const UNCHECKED: EngineFacts = {
-  systemPromptOnResume: 'no',
   toolGuard: 'unknown',
   fileSandbox: ALL_UNKNOWN,
   contextGauge: 'no',
@@ -103,7 +102,6 @@ const UNCHECKED: EngineFacts = {
  */
 export const ENGINE_FACTS: Readonly<Record<AgentProvider, EngineFacts>> = {
   claude: {
-    systemPromptOnResume: 'yes',
     toolGuard: 'yes',
     fileSandbox: { darwin: 'yes', win32: 'no', linux: 'yes' },
     contextGauge: 'yes',
@@ -114,8 +112,6 @@ export const ENGINE_FACTS: Readonly<Record<AgentProvider, EngineFacts>> = {
     runsOn: { darwin: 'yes', win32: 'yes', linux: 'unknown' }
   },
   codex: {
-    // The hive protocol is its first positional prompt only (#298).
-    systemPromptOnResume: 'no',
     // Its hooks reuse the Claude shim, but the guards match Claude's tool
     // names (Read, Write, mcp__md-mail__…), not Codex's.
     toolGuard: 'unknown',
@@ -160,6 +156,12 @@ export function engineSupport(engine: AgentProvider, os: EngineOs, need: EngineN
     case 'lifecycleEvents':
       if (!preset.hiveAware && !bridgeOf(engine)) return 'no';
       return NEVER_REPORTS.some((r) => r.engine === engine) ? 'unknown' : 'yes';
+    case 'systemPromptOnResume':
+      if (preset.instructionsDelivery === 'system-level') return 'yes';
+      // Re-injection runs in the hook server, so an engine that never sends
+      // SessionStart never gets it back. Through a hook it is wired but
+      // unchecked live, and may never fire on an engine in NEVER_REPORTS.
+      return bridgeOf(engine)?.kind === 'hooks' ? 'unknown' : 'no';
     case 'inbox':
       return yesNo(preset.canReceiveInbox);
     case 'resume':
