@@ -1,3 +1,4 @@
+import type { StoppedMember } from '../shared/agentExit';
 import type { Period } from '../shared/teamPerformance';
 import type { JobRun, RunSuggestion } from '../shared/runCompare';
 import type { HeldRow } from '../shared/heldRecord';
@@ -12,6 +13,7 @@ import type { DataClassId, DataClassSetting } from '../shared/dataClasses';
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { OfficeRecord } from '../shared/officeRecord';
 import type { MailboxRecord, AgentCapabilities, MailProvider, MailServer } from '../shared/mailboxes';
+import type { OriginalResult } from '../shared/emailLink';
 import type { ClaudeConnectorsState } from '../shared/claudeConnectors';
 import type { ScheduledMission, ScheduleRequest } from '../shared/missions';
 import type { MailProposal, ProposalDecision, StandingApproval } from '../shared/mailProposals';
@@ -340,6 +342,8 @@ export interface HarnessConfig {
   connectorsOn?: { [key: string]: boolean };
   /** Connector keys the owner has seen in Settings. */
   connectorsSeen?: string[];
+  /** The connector carry-over ran; a new office sets it at setup. */
+  connectorsMigrated?: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
   missions?: ScheduledMission[];
   opsStandupSeeded?: boolean;
@@ -724,7 +728,7 @@ const api = {
       handoffs?: Array<{ toId: string; scope: string }>; drops?: Array<{ toId: string; scope: string }> }
     | { kind: 'question'; question: string; choices: Array<{ label: string; suggested?: boolean }> }
     | { kind: 'home'; question: string }
-    | { kind: 'error'; reason: 'failed' | 'cancelled' }
+    | { kind: 'error'; reason: 'no-name' | 'not-started' | 'slow' | 'unreadable' | 'failed' | 'cancelled' }
   > => ipcRenderer.invoke('workStyle:convert', { ...req, to: 'revise' }),
   /** Where a rewrite is (starting, reading, writing) and what it has written
    *  so far, by its request id. Returns the unsubscribe. */
@@ -813,6 +817,21 @@ const api = {
   // ─── Clipboard ─────────────────────────────────────────────────────────────
   copyToClipboard: (text: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('app:copyToClipboard', text),
+  /** The file tab's Copy: text, and HTML when given, in one clipboard write. */
+  copyRich: (data: { text: string; html?: string }): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:copyRich', data),
+  /** The file tab's Copy for a picture: PNG bytes drawn from the shown picture. */
+  copyImage: (png: Uint8Array): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:copyImage', png),
+  /** Report a problem: a picture of the window, the prefilled bug report, then
+   *  the picture shown in Downloads. Answers once the report page opened. */
+  reportProblem: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:reportProblem'),
+  /** A screen crash or renderer error, for automatic failure reports. Main
+   *  scrubs and checks it again; no message text is sent, only the name and
+   *  the stack (docs/designs/auto-report-failures.md). */
+  reportFailure: (f: { kind: 'screen-crash' | 'renderer-error'; name: string; stack: string }): void =>
+    ipcRenderer.send('failure:report', f),
   /** The right-click "Copy link address" label, in the app language. */
   setCopyLinkLabel: (label: string): void =>
     ipcRenderer.send('app:setCopyLinkLabel', label),
@@ -1024,6 +1043,13 @@ const api = {
    *  remove it (docs/designs/shared-mailboxes.md). */
   mailSetSendOnly: (agentId: string, grant: { mailbox: string; sending: 'send' | 'approval' | 'draft' } | null): Promise<{ ok: boolean; restartNeeded: boolean }> =>
     ipcRenderer.invoke('mail:setSendOnly', agentId, grant),
+  /** The owner's email tab (docs/designs/original-email-view.md): the email an
+   *  `email:` link names, as it came, from the owner's own mailbox. */
+  mailOriginal: (href: string): Promise<OriginalResult> => ipcRenderer.invoke('mail:original', href),
+  /** Its pictures from the web, fetched by main, as data URIs. */
+  mailOriginalPictures: (href: string): Promise<{ pictures: Record<string, string>; failed: number }> => ipcRenderer.invoke('mail:originalPictures', href),
+  /** The tab closed: stop an open still running. */
+  mailOriginalCancel: (href: string): Promise<void> => ipcRenderer.invoke('mail:originalCancel', href),
   /** Read the connectors on the owner's Claude account again (a few seconds). */
   connectorsRefresh: (why?: string): Promise<void> => ipcRenderer.invoke('connectors:refresh', why),
   /** Whether a read is running now. */
@@ -1465,6 +1491,14 @@ const api = {
   /** The owner's answer from a file added with foundationsAddFile. */
   foundationsAnswerFile: (id: string, docId: string, words: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> =>
     ipcRenderer.invoke('foundations:answerFile', id, docId, words),
+  /** One folder for a foundation card, from the OS picker. */
+  foundationsPickFolder: (): Promise<{ ok: true; path: string; name: string } | { ok: false; error: string }> => ipcRenderer.invoke('foundations:pickFolder'),
+  /** Check a card's folder before the card is answered (nothing is written). */
+  foundationsCheckFolder: (id: string, path: string): Promise<{ ok: true; path: string; name: string } | { ok: false; error: 'unknown' | 'no-office' | 'no-folder' | 'too-wide' | 'app-folder' | 'member-folder' | 'empty' | 'too-long' }> =>
+    ipcRenderer.invoke('foundations:checkFolder', id, path),
+  /** The owner's answer naming a folder; the members whose job uses it read it. */
+  foundationsAnswerFolder: (id: string, path: string, words: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('foundations:answerFolder', id, path, words),
   /** Have the member draft it: the draft comes back into the card. */
   foundationsDraft: (id: string, memberId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('foundations:draft', id, memberId),
   /** Not now: out of Needs you for a week. */
@@ -1898,13 +1932,20 @@ const api = {
   },
   /** The last known status, for a window that subscribed after the push. */
   cliUpdateCurrent: (): Promise<CliUpdateStatus | null> => ipcRenderer.invoke('cliUpdate:current'),
+  /** Members whose terminal ended by itself, until they start again (agentExit.ts). */
+  agentsStopped: (): Promise<StoppedMember[]> => ipcRenderer.invoke('agents:stopped'),
+  onAgentsStopped: (cb: (list: StoppedMember[]) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, list: unknown): void => cb(Array.isArray(list) ? list as StoppedMember[] : []);
+    ipcRenderer.on('agents:stopped', listener);
+    return () => ipcRenderer.removeListener('agents:stopped', listener);
+  },
   /** The office break (issue 124): null while the office works. */
   officeBreakView: (): Promise<OfficeBreakView | null> => ipcRenderer.invoke('office:breakView'),
   /** Try again on a stop card (office-stopped-account.md): check now. */
   officeRetry: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('office:retry'),
   /** Add credit: main opens the Anthropic billing page (a fixed address). */
   officeAddCredit: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('office:addCredit'),
-  /** A new key replaced one that stopped working: these Claude terminals restart, resumed. */
+  /** The team's Claude sign in changed: these Claude terminals restart, resumed. */
   onOfficeRestartClaude: (cb: (ptyIds: string[]) => void): (() => void) => {
     const listener = (_e: IpcRendererEvent, ids: unknown): void => cb(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []);
     ipcRenderer.on('office:restartClaude', listener);

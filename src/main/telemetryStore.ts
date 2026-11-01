@@ -39,7 +39,10 @@ export type TelemetryKind =
   | 'foundation'
   // How long the office ran (owner, 2026-10-25): open, awake and not
   // stopped, in ms, with the part you were away in attrs.away.
-  | 'running';
+  | 'running'
+  // The account's weekly usage meter from a status line, in percent, with
+  // when its window resets in attrs.r (owner, 2026-10-29: the plan's rate).
+  | 'meter';
 
 export interface TelemetryEvent {
   agentId: string | null;
@@ -78,6 +81,7 @@ export class TelemetryStore {
   /** office \t day -> failed writes not yet saved (D15). */
   private failed = new Map<string, number>();
   private lastCost = new Map<string, string>();
+  private lastMeter: string | null = null;
   private lastCards = new Map<string, Map<string, string>>();
   private away: boolean | null = null;
   /** The last running tick; null before the clock starts and after a sleep. */
@@ -165,6 +169,16 @@ export class TelemetryStore {
     if (this.lastCost.get(key) === sig) return;
     this.lastCost.set(key, sig);
     this.record({ agentId, kind: 'cost', ts, value: usd, attrs: { s: session, tokens, ...(model ? { model } : {}) } });
+  }
+
+  /** A weekly meter reading, stored only when it changed: every member's
+   *  status line carries the same account wide meter. */
+  meter(pct: number, resetsAt: number, ts = this.now()): void {
+    if (!(pct >= 0) || !(resetsAt > 0)) return;
+    const sig = `${pct}|${Math.round(resetsAt / 3_600_000)}`;
+    if (this.lastMeter === sig) return;
+    this.lastMeter = sig;
+    this.record({ agentId: null, kind: 'meter', ts, value: pct, attrs: { r: resetsAt } });
   }
 
   /** The 8 s tick's tasks: one card-status point per change (doneAt is the

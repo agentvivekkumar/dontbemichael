@@ -1,5 +1,3 @@
-- **Memory notes** say what showed them.
-- **Went wrong** compares a job's runs.
-- **Explain how two members split** the work.
-- Pulse shows how long the office ran.
-- Contributor fixes across the app.
+- **Michael starts** on an older Claude Code.
+- No Settings Error or Settings Warning when your Claude Code is behind.
+- Every team member gets settings their Claude Code can read.
