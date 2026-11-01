@@ -7,8 +7,6 @@ dist/
 .DS_Store
 *.log
 .vite/
-.env
-.env.local
 .env.signing
 .gstack/*
 # The pre-gate policy is the one gstack file the repo keeps (read from main).
@@ -39,3 +37,4 @@ docs/blog-preview-*/
 # Finder duplicate files, e.g. "spec 2.js", "sitemap 2.xml"
 *\ 2.*
 *\ [0-9].*
+config.bat
