@@ -94,7 +94,7 @@ export function TaskDetailOverlay() {
   };
 
   const teammates = agents
-    .filter((a) => !a.isGod && a.id !== RESEARCH_ID && !a.archived)
+    .filter((a) => !a.isGod && a.id !== RESEARCH_ID && !a.isAssistant && !a.archived)
     .map((a) => ({ id: a.id, name: a.name || a.id }));
 
   return (
