@@ -1,5 +1,4 @@
-- **Change a job** by saying what should change.
-- **Add a file** right from a Company foundations card.
-- **One look** for every form in the app.
-- Hiring asks what the new person will do, once.
-- Safer background checks and messages to the team.
+- **Give one member one service** with custom integrations.
+- **Team members save email attachments** and pass files by asking.
+- Word, Excel, PowerPoint and PDF files open in an office tab.
+- The dock folds older messages behind the latest exchange.

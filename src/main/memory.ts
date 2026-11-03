@@ -139,8 +139,11 @@ export class MemoryManager {
         const p = res.stdout.trim().split(/\r?\n/)[0]?.trim();
         if (p && existsSync(p)) found = p;
       } else {
+        // SIGKILL at the timeout: an interactive shell ignores the default
+        // SIGTERM, so a slow rc file would otherwise block the main process
+        // past the timeout until it finished (as in shellEnv.ts).
         const res = spawnSync(process.env.SHELL ?? '/bin/zsh', ['-ilc', 'which mempalace'], {
-          encoding: 'utf8', timeout: 3000
+          encoding: 'utf8', timeout: 3000, killSignal: 'SIGKILL'
         });
         const p = res.stdout.trim().split('\n').pop();
         if (p && existsSync(p)) found = p;

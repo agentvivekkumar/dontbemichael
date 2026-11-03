@@ -1,9 +1,10 @@
 /**
  * Send once for a connected app (issue #54, the same rule mail already has).
  *
- * A write the broker forwards (anything other than GET or HEAD) is recorded
- * before it goes upstream. The same agent repeating the same write gets the
- * first answer back, including after a restart. If the app stopped before the
+ * A write the broker forwards (anything other than GET or HEAD, except a POST
+ * a catalog connector only reads with: postReadsFor) is recorded before it
+ * goes upstream. The same agent repeating the same write gets the first
+ * answer back, including after a restart. If the app stopped before the
  * answer came back, the write may already have created an invoice, booking or
  * contact, and this app cannot check the other service, so the repeat is
  * refused and the agent is told to tell Michael. No card is opened: Michael
@@ -93,6 +94,11 @@ export function classifyUpstreamFailure(e: unknown): 'never' | 'uncertain' {
   if (code === 'ENOTFOUND' || code === 'ECONNREFUSED' || code === 'EAI_AGAIN' || code === 'UND_ERR_CONNECT_TIMEOUT') {
     return 'never';
   }
+  // fetch checks the request itself before it opens a socket, and refuses a
+  // header it will not send (expect, upgrade, a bad content-length) with these
+  // two codes. The broker sends with redirect 'manual', so there is no earlier
+  // hop that could have gone out first.
+  if (code === 'UND_ERR_NOT_SUPPORTED' || code === 'UND_ERR_INVALID_ARG') return 'never';
   return 'uncertain';
 }
 

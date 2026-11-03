@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom';
 import { MichaelDock, type DockView } from '../../src/renderer/src/shell/MichaelDock';
 import { useStore } from '../../src/renderer/src/store/store';
 import { sendToMichael } from '../../src/renderer/src/shell/ownerSend';
+import { NO_FOLD } from '../../src/renderer/src/shell/dockFold';
 import i18n, { directionFor } from '../../src/renderer/src/i18n';
 import type { DockItem, OwnerDock } from '../../src/shared/ownerRequests';
 import '../../src/renderer/src/design/tokens.css';
@@ -13,7 +14,7 @@ import '../../src/renderer/src/design/fonts.css';
 // The real renderer and store, with only the main-process boundary replaced.
 // Nothing is read from an office, written to disk, or sent to an agent.
 const at = (n: number) => new Date(Date.now() + n * 1000).toISOString();
-const question = (n: number): DockItem => ({ kind: 'owner', id: `q${n}`, conversation: `owner:q${n}`, text: `Question ${n}: What changed in the accounts?`, at: at(n * 2), status: 'answered', unread: false });
+const question = (n: number): DockItem => ({ kind: 'owner', id: `q${n}`, conversation: `owner:q${n}`, text: `Question ${n}: What changed in the accounts?`, at: at(n * 2), status: 'has-it', unread: false });
 const reply = (n: number, notes = false): DockItem => ({ kind: 'michael', id: `r${n}`, replyTo: `q${n}`, act: 'done', text: `Answer ${n}. The invoices are ready to review.\n\nThe account balance agrees with the statement.\n\n${'Details for the owner to read. '.repeat(30)}`, at: at(n * 2 + 1), notes });
 const history = () => Array.from({ length: 14 }, (_, n) => [question(n), reply(n)]).flat();
 let current = history();
@@ -26,6 +27,38 @@ let resolveFiles: ((value: unknown) => void) | undefined;
 const runtimeErrors: string[] = [];
 window.addEventListener('error', (e) => runtimeErrors.push(e.message));
 window.addEventListener('unhandledrejection', (e) => runtimeErrors.push(String(e.reason)));
+
+// What moved the list, the last few steps, added to a failed check so a run
+// that fails only on a CI runner says how it got there.
+const trace: string[] = [];
+const traceStart = performance.now();
+const listEl = () => document.querySelector('.cth-dock > div:nth-child(2)') as HTMLElement | null;
+const note = (what: string) => {
+  const el = listEl();
+  const more = el ? [...el.querySelectorAll('button')].filter((b) => b.textContent === i18n.t('dock.more')).length : 0;
+  const line = `${what}${el ? ` top=${el.scrollTop} h=${el.scrollHeight} vh=${el.clientHeight} more=${more}` : ''}`;
+  const last = trace[trace.length - 1];
+  if (last?.endsWith(line)) { trace[trace.length - 1] = last.replace(/^(\d+ms)( x\d+)?/, (_, ms, n) => `${ms} x${n ? Number(n.slice(2)) + 1 : 2}`); return; }
+  trace.push(`${Math.round(performance.now() - traceStart)}ms ${line}`);
+  if (trace.length > 40) trace.shift();
+};
+const scrollTopDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')!;
+Object.defineProperty(Element.prototype, 'scrollTop', {
+  ...scrollTopDesc,
+  set(this: Element, v: number) {
+    scrollTopDesc.set!.call(this, v);
+    if (this === listEl()) note(`set scrollTop ${Math.round(v)} by ${new Error().stack?.split('\n').slice(2, 4).map((s) => s.trim().split(' ')[1].replace(/^\S*\//, '')).join(' < ')}`);
+  }
+});
+document.addEventListener('scroll', (e) => { if (e.target === listEl()) note('scroll event'); }, true);
+note(`page ${document.visibilityState}, fonts ${document.fonts.status}`);
+document.fonts.addEventListener('loadingdone', () => note(`fonts loaded (${document.fonts.size})`));
+const NativeResizeObserver = window.ResizeObserver;
+window.ResizeObserver = class extends NativeResizeObserver {
+  constructor(callback: ResizeObserverCallback) {
+    super((entries, observer) => { note(`resize observer (${entries.length})`); callback(entries, observer); });
+  }
+};
 Object.assign(window, { cth: {
   platform: navigator.platform.startsWith('Win') ? 'win32' : navigator.platform.startsWith('Mac') ? 'darwin' : 'linux',
   hiveRegistry: async () => ({ agents: { god: { name: 'Michael' } } }),
@@ -48,13 +81,14 @@ function Fixture() {
   const composer = useRef<HTMLDivElement>(null);
   // What BottomBar keeps for the dock, so a remount opens where the owner was reading.
   const [expanded, setExpanded] = useState<Record<string, true>>({});
-  const [showEarlier, setShowEarlier] = useState(false);
+  const [earlierFor, setEarlierFor] = useState<number | null>(null);
+  const fold = useRef(NO_FOLD);
   const kept = useRef<DockView['anchor']['current']>(null);
   const dockOpen = useStore((s) => s.dockOpen);
   useEffect(() => { if (!dockOpen) kept.current = null; }, [dockOpen]);
-  const view: DockView = { expanded, setExpanded, showEarlier, setShowEarlier, anchor: kept };
+  const view: DockView = { expanded, setExpanded, earlierFor, setEarlierFor, fold, anchor: kept };
   update = (next) => { current = next; setItems([...next]); };
-  remount = () => { setVersion((v) => v + 1); setExpanded({}); setShowEarlier(false); };
+  remount = () => { setVersion((v) => v + 1); setExpanded({}); setEarlierFor(null); };
   // The dock moving between the bar and the center: a new mount, same view.
   move = () => setVersion((v) => v + 1);
   const dock: OwnerDock = { items, open: 0, unread: 0, waitingForYou: 0 };
@@ -79,18 +113,29 @@ createRoot(document.getElementById('root')!).render(<Fixture />);
 
 // Let layout/ResizeObserver delivery finish before checking preservation or
 // absence: those predicates can already be true before the action is handled.
-// A frame, or a short timer if no frame comes, so a stalled renderer fails a
-// check with its message instead of hanging the run.
-const frame = () => new Promise<void>((resolve) => {
-  const timer = setTimeout(resolve, 100);
-  requestAnimationFrame(() => { clearTimeout(timer); resolve(); });
+// A frame, or a short timer if no frame comes; true only when one was drawn.
+const frame = () => new Promise<boolean>((resolve) => {
+  const timer = setTimeout(() => { note('no frame in 100ms'); resolve(false); }, 100);
+  requestAnimationFrame(() => { clearTimeout(timer); note('frame'); resolve(true); });
 });
-const settle = async () => { await frame(); await frame(); };
+// A busy machine can stop drawing for seconds (a loaded run here went 0.1 s to
+// 12 s without a frame, and a scroll event only arrives with one). So a wait
+// counts the frames that were drawn, not just the clock, and gives up on the
+// clock alone only after STALL_CAP_MS: a renderer that stopped drawing still
+// fails its check, with its message, instead of hanging the run.
+const STALL_CAP_MS = 30_000;
+const settle = async () => {
+  const cap = performance.now() + STALL_CAP_MS;
+  for (let drawn = 0; drawn < 2 && performance.now() < cap;) if (await frame()) drawn++;
+};
 async function until(predicate: () => unknown, message: string): Promise<void> {
-  const deadline = performance.now() + 2000;
+  // Two seconds and 120 drawn frames, whichever comes later.
+  const start = performance.now();
+  let drawn = 0;
   while (!predicate()) {
-    if (performance.now() >= deadline) throw new Error(`${message} (${where()})`);
-    await frame();
+    const waited = performance.now() - start;
+    if ((waited >= 2000 && drawn >= 120) || waited >= STALL_CAP_MS) throw new Error(`${message} (${where()})`);
+    if (await frame()) drawn++;
   }
 }
 async function scrollTo(top: number) {
@@ -111,7 +156,7 @@ const list = () => document.querySelector('.cth-dock > div:nth-child(2)') as HTM
 const where = () => {
   const el = document.querySelector('.cth-dock > div:nth-child(2)') as HTMLElement | null;
   if (!el) return 'no dock';
-  return `scrollTop ${el.scrollTop}, scrollHeight ${el.scrollHeight}, clientHeight ${el.clientHeight}, button ${document.querySelector('[data-dock-jump]')?.textContent ?? 'none'}`;
+  return `scrollTop ${el.scrollTop}, scrollHeight ${el.scrollHeight}, clientHeight ${el.clientHeight}, button ${document.querySelector('[data-dock-jump]')?.textContent ?? 'none'}\n  ${trace.join('\n  ')}`;
 };
 const jump = () => document.querySelector('[data-dock-jump]') as HTMLButtonElement | null;
 const bottom = () => list().scrollHeight - list().clientHeight - list().scrollTop;
@@ -120,6 +165,7 @@ function reset() {
   flushSync(() => useStore.getState().setDock(true));
 }
 function append(notes = false) {
+  note('replies arrive');
   const n = 20 + current.length;
   flushSync(() => update([...current, { ...reply(n, notes), replyTo: 'q13' }, ...(notes ? [] : [{ ...reply(n + 1), replyTo: 'q13' }])]));
 }
@@ -195,17 +241,17 @@ async function runDockTests() {
   append(); await settle(); await unchanged(targeted, 'retained target is not recentered');
   await navigate('q4');
   const q4 = list().querySelector<HTMLElement>('[data-q="q4"]')!;
-  await until(() => Math.abs(q4.getBoundingClientRect().top - list().getBoundingClientRect().top + q4.offsetHeight / 2 - list().clientHeight / 2) <= 1, 'same target explicitly navigates again');
+  await until(() => Math.abs(q4.getBoundingClientRect().top - list().getBoundingClientRect().top - 12) <= 1, 'same target explicitly navigates again');
   await until(() => !jump(), 'explicit navigation clears arrival count');
   passed.push('one-time and repeated explicit navigation');
 
   reset(); await settle(); await pause(800);
   const beforeEarlier = anchor();
-  const oldQ = { ...question(-1), at: new Date(Date.now() - 40 * 86400000).toISOString() };
+  const oldQ = { ...question(-1), status: 'answered' as const, at: new Date(Date.now() - 40 * 86400000).toISOString() };
   const oldR = { ...reply(-1), at: oldQ.at };
   await commit([oldQ, oldR, ...current]);
   await unchanged(beforeEarlier, 'hidden old history does not move reading');
-  [...document.querySelectorAll('button')].find((b) => b.textContent === 'Earlier')!.click(); await settle();
+  [...document.querySelectorAll('button')].find((b) => /^Show \d+ earlier$/.test(b.textContent ?? ''))!.click(); await settle();
   await unchanged(beforeEarlier, 'Earlier prepends preserve reading');
   await until(() => !jump(), 'old history is not a new reply');
   await navigate('q-1');
@@ -241,7 +287,7 @@ async function runDockTests() {
   const foldedReply = { ...reply(300), replyTo: oldQ.id };
   await commit([oldQ, oldR, ...current, foldedReply]);
   await pause(); const beforeReveal = anchor();
-  [...document.querySelectorAll('button')].find((b) => b.textContent === 'Earlier')!.click(); await settle();
+  [...document.querySelectorAll('button')].find((b) => /^Show \d+ earlier$/.test(b.textContent ?? ''))!.click(); await settle();
   await unchanged(beforeReveal, 'revealing a folded exchange preserves reading');
   await until(() => !jump(), 'an existing reply in a folded exchange is not a new arrival');
   passed.push('folded exchange arrival baseline');
@@ -306,10 +352,32 @@ async function runDockTests() {
   await until(() => bottom() <= 1, 'pending send target is applied when it arrives');
   passed.push('send success, failure and delayed target');
 
+  // The conversation opens on the latest question (dock-latest-exchange.md).
+  const shownRows = () => [...list().querySelectorAll<HTMLElement>('[data-k]')].map((r) => r.dataset.k);
+  const showEarlier = () => [...document.querySelectorAll('button')].find((b) => /^Show \d+ earlier$/.test(b.textContent ?? ''));
+  flushSync(() => { useStore.getState().setDock(false); update(history().map((it) => it.kind === 'owner' ? { ...it, status: 'answered' as const } : it)); });
+  flushSync(() => useStore.getState().setDock(true)); await settle();
+  check(shownRows().length === 2, `only the latest exchange shows, not ${shownRows().length} rows`);
+  check(showEarlier()?.textContent === 'Show 26 earlier', 'the link counts what is folded');
+  showEarlier()!.click(); await settle();
+  check(shownRows().length === 28, 'Show earlier reveals everything');
+  check(document.activeElement?.tagName === 'TEXTAREA', 'focus moves on when the link goes');
+  const sent = { ...question(500), status: 'sent' as const };
+  await commit([...current, sent]); await navigate(sent.id);
+  check(shownRows().length === 1 && showEarlier(), 'a send folds again, the new question alone');
+  await commit([...current, ...[501, 502, 503, 504].map((n) => ({ ...reply(n), replyTo: sent.id }))]);
+  check(list().scrollHeight > list().clientHeight, 'the replies overflow the list');
+  check(list().scrollTop === 0, 'long replies leave the question in view');
+  await until(() => jump(), 'replies below the fold offer a catch up');
+  jump()!.click(); await settle();
+  await until(() => bottom() <= 1 && !jump(), 'catch up reaches the latest');
+  passed.push('opens on the latest question');
+
   reset(); await settle(); await pause(); append(); await settle();
   flushSync(() => useStore.getState().setDock(false));
   flushSync(() => useStore.getState().setDock(true)); await settle();
-  await until(() => bottom() <= 1 && !jump(), 'reopening starts at latest');
+  const latest = list().querySelector<HTMLElement>('[data-q="q13"]')!;
+  await until(() => Math.abs(latest.getBoundingClientRect().top - list().getBoundingClientRect().top - 12) <= 1 && !jump(), 'reopening starts on the latest question');
   flushSync(() => useStore.getState().setDock(false));
   await commit([]);
   flushSync(() => useStore.getState().setDock(true)); await settle();
@@ -430,7 +498,7 @@ async function runDockStressTests() {
     commit(current.map((it) => it.id === 'q4' ? { ...it, id } : it));
     navigate(id); await settle();
     const q = [...list().querySelectorAll<HTMLElement>('[data-q]')].find((r) => r.dataset.q === id)!;
-    await until(() => Math.abs(q.getBoundingClientRect().top - list().getBoundingClientRect().top + q.offsetHeight / 2 - list().clientHeight / 2) <= 1, 'escaped target is not centered');
+    await until(() => Math.abs(q.getBoundingClientRect().top - list().getBoundingClientRect().top - 12) <= 1, 'escaped target is not at the top');
   });
   await scenario('200 exchanges and 40 arriving replies', async () => {
     commit(Array.from({ length: 200 }, (_, n) => [question(n), reply(n)]).flat()); await settle();
@@ -461,7 +529,7 @@ async function runDockStressTests() {
         navigate();
         check(onList() === 1, 'opening must have exactly one container observer');
       }
-      await settle(); await until(() => bottom() <= 1 && !jump(), 'reopening must follow without stale arrivals');
+      await settle(); await until(() => !jump(), 'reopening must carry no stale arrivals');
     });
   } finally { window.ResizeObserver = NativeObserver; }
 
@@ -485,7 +553,8 @@ async function runDockStressTests() {
       } else if (action === 4) {
         document.querySelector<HTMLElement>('.cth-dock')!.style.maxHeight = `${300 + random() % 100}px`;
       } else if (action === 5) {
-        navigate(); following = true; expected.clear();
+        // It opens on the latest question; the owner then reads down to the end.
+        navigate(); await settle(); await scrollTo(list().scrollHeight); following = true; expected.clear();
       } else {
         await scrollTo(200 + random() % 200);
         following = false;

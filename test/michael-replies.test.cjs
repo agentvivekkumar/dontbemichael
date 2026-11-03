@@ -468,3 +468,13 @@ test('a long reply folds by height, and tables sit in a labelled box that scroll
   }
 });
 
+
+test('the count sits on the conversation button, one button that names what is new', () => {
+  // Value: protects=owner 2026-10-31 (count on the up arrow, not the far corner); fails_when=the pill leaves the button or a second count button returns; why_new=owner moved it; seam=none
+  const bar = fs.readFileSync(path.resolve(__dirname, '../src/renderer/src/shell/BottomBar.tsx'), 'utf8');
+  const button = bar.slice(bar.indexOf('aria-expanded={dockOpen}'), bar.indexOf('{controls}\n    </div>'));
+  assert.match(button, /aria-label=\{conversationLabel\}/);
+  assert.match(button, /\{count > 0 && \(\s+<span aria-hidden="true"/, 'the pill is inside the button');
+  assert.doesNotMatch(button, /<button/, 'no second button');
+  assert.match(bar, /count === 0 \? t\('dock\.label'[^\n]*\n\s+: waiting \? t\('dock\.countWaiting'[^\n]*t\('dock\.countNew'/, 'the name says what the number means');
+});

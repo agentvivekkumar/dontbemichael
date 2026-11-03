@@ -21,11 +21,8 @@ import {
 //
 // All data flows through integrationsClient — never IPC directly.
 //
-// v1 worker model (Jim §4): the broker grants EVERY enabled integration to ALL
-// workers; there is no per-integration worker scoping yet. So "which workers can
-// use it" is surfaced as the usability gate — usable === enabled && hasSecret —
-// rather than an editable per-integration picker. Per-worker scoping is a future
-// extension; this reflection updates when Jim confirms that model.
+// Who may use one is set per agent on its Access tab (CapabilitiesTab), so this
+// screen shows only whether it is ready: usable === enabled && hasSecret.
 
 type View = 'list' | 'gallery' | 'configure';
 
@@ -75,7 +72,7 @@ function Glyph({ mono, bg, lg }: { mono: string; bg: string; lg?: boolean }) {
   );
 }
 
-/** Is an integration actually usable by workers? (Jim §6 gate.) */
+/** Is an integration ready for the agents given it? (Jim §6 gate.) */
 function usable(r: { enabled: boolean; authType: IntegrationAuthType; hasSecret: boolean }): boolean {
   return r.enabled && (!needsSecret(r.authType) || r.hasSecret);
 }
@@ -337,9 +334,9 @@ export function IntegrationsRegistry() {
           <span style={fieldLabel}>{tr('integrations.availability')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <PixelButton variant={draft.enabled ? 'primary' : 'secondary'} size="sm" onClick={() => patch({ enabled: !draft.enabled })}>{draft.enabled ? tr('integrations.enabled') : tr('integrations.disabled')}</PixelButton>
-            <span style={hint}>{isUsable ? tr('integrations.availableToAll') : needsSecret(draft.authType) && !(draft.hasSecret || draft.secret.trim()) ? tr('integrations.addSecretToEnable') : draft.enabled ? tr('integrations.readyOnceSaved') : tr('integrations.disabledNoUse')}</span>
+            <span style={hint}>{isUsable ? tr('integrations.readyForAgents') : needsSecret(draft.authType) && !(draft.hasSecret || draft.secret.trim()) ? tr('integrations.addSecretToEnable') : draft.enabled ? tr('integrations.readyOnceSaved') : tr('integrations.disabledNoUse')}</span>
           </div>
-          <span style={hint}>{tr('integrations.v1Note')}</span>
+          <span style={hint}>{tr('integrations.accessNote')}</span>
         </div>
 
         {/* Test connection (saved integrations only — broker probes by id) */}
@@ -408,7 +405,7 @@ export function IntegrationsRegistry() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ ...hint, color: usable(r) ? 'var(--cth-green-text)' : 'var(--cth-ink-500)' }}>
-                      {usable(r) ? tr('integrations.availableToAll') : tr('integrations.notAvailableYet')}
+                      {usable(r) ? tr('integrations.readyForAgents') : tr('integrations.notReady')}
                     </span>
                     {rt && <span style={{ fontSize: 12, color: rt.ok ? 'var(--cth-green-text)' : 'var(--cth-coral-text)' }}>· {fmtTest(rt)}</span>}
                   </div>

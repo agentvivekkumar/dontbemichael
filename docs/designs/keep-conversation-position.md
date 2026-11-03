@@ -40,6 +40,10 @@ A scroll event counts as the reader's only when `scrollTop` moved. Content that
 grew since the last measure (late fonts, a reply's fold measured, a file chip)
 moves the bottom, not the reader, and the container observer follows it.
 
+A question the dock opens on goes to the top of the list when the list overflows,
+and stays there until the owner scrolls, catches up or opens More
+(`dock-latest-exchange.md`). A quoted question is still centered.
+
 The dock is mounted again when it moves between the bar and the center (the
 wide 1:1). The hook records the first row in view and its offset in the
 composer's `DockView.anchor` while the owner reads, and nothing while following
