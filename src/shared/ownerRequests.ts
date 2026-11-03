@@ -262,7 +262,8 @@ export function michaelCardState(createdAt: string, now: number, days: readonly 
 export type OwnerCardChange =
   | { kind: 'closed'; reason?: string }
   | { kind: 'moved'; from: string; to: string; reason?: string }
-  | { kind: 'finished'; result: string; withdrew: number };
+  | { kind: 'finished'; result: string; withdrew: number }
+  | { kind: 'reassigned'; from: string; to: string; fromName: string; toName: string; reason?: string };
 
 const STATUS_WORDS: Record<string, string> = { triage: 'Triage', todo: 'To do', doing: 'Doing', waiting: 'Waiting', blocked: 'Blocked', done: 'Done' };
 
@@ -283,6 +284,19 @@ export function ownerChangeNote(task: { id: string; title?: string }, change: Ow
       body: [
         `The owner marked ${card} Done with a result: ${cardText(change.result, 500)}`,
         `That withdrew ${change.withdrew === 1 ? 'its open question' : `its ${change.withdrew} open questions`} from Ask me, unanswered. Tell whoever raised ${change.withdrew === 1 ? 'it' : 'them'}. If one still needs an answer, ask it again on a new card.`
+      ].join('\n')
+    };
+  }
+  if (change.kind === 'reassigned') {
+    const toWho = cardText(change.toName || change.to, 60);
+    const fromWho = change.from
+      ? cardText(change.fromName || change.from, 60)
+      : 'nobody';
+    return {
+      subject: `OWNER REASSIGNED card ${cardText(task.id, 60)} to ${toWho}`,
+      body: [
+        `The owner moved ${card} from ${fromWho} to ${toWho}.${change.reason ? ` Reason: ${cardText(change.reason, 500)}` : ''}`,
+        `${change.reason ? 'A routing note from the owner was added to your memory. Follow it when similar work comes in. ' : ''}Tell the new assignee what to do, and do not send the old one more work on this card.`
       ].join('\n')
     };
   }
