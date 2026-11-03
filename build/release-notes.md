@@ -1,5 +1,4 @@
-- **Clocking in** shows your team arriving.
-- **Waiting cards** come back on their date.
-- **Pulse** lists what the team learned.
-- **Run a job now** from its schedule.
-- **Members' notes** stay their own.
+- **Give one member one service** with custom integrations.
+- **Team members save email attachments** and pass files by asking.
+- Word, Excel, PowerPoint and PDF files open in an office tab.
+- The dock folds older messages behind the latest exchange.
