@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 
 const BOTTOM_SLOP = 32;
+const TOP_GAP = 12;
 /** One conversation row, by its dock key (dockKeys.ts): message ids can repeat. */
 export interface DockRow { key: string; kind: string; notes?: boolean }
 /** The row the owner was reading, and how far below the top of the list it sat. */
@@ -41,6 +42,13 @@ function center(el: HTMLElement, row: Element): void {
   el.scrollTop += r.top - el.getBoundingClientRect().top - (el.clientHeight - r.height) / 2;
 }
 
+/** Puts a row at the top of the list, or the start of the list when it comes
+ *  first, so Show earlier stays in view. The list stops at its end by itself. */
+function toTop(el: HTMLElement, row: Element): void {
+  if (rows(el)[0] === row) { el.scrollTop = 0; return; }
+  el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - TOP_GAP;
+}
+
 /** Local reading position only. Explicit navigation wins over every passive
  * refresh; ResizeObserver covers font/file layout without observing each reply.
  * `kept` is the row the owner was reading when the dock moved between the bar
@@ -51,6 +59,9 @@ export function useDockScroll(
   kept: MutableRefObject<DockPlace | null>
 ) {
   const following = useRef(true);
+  // The question the list stays on: new replies come in under it, and a long
+  // one never pushes it out of view (dock-latest-exchange.md, decision 6).
+  const pinned = useRef<string>();
   const position = useRef<Position>({ top: 0, height: 0, viewport: 0, anchors: [] });
   const lastNavigation = useRef<number>();
   const pendingFocus = useRef<string>();
@@ -86,6 +97,7 @@ export function useDockScroll(
     // the existing intent and let restoration pick a surviving visible row.
     const max = Math.max(0, el.scrollHeight - el.clientHeight);
     if (max < saved.top && Math.abs(el.scrollTop - max) <= 1) return;
+    pinned.current = undefined;
     const wasFollowing = following.current;
     following.current = saved.height - saved.viewport - el.scrollTop <= BOTTOM_SLOP;
     if (following.current) {
@@ -95,7 +107,14 @@ export function useDockScroll(
     }
     position.current = { ...saved, top: el.scrollTop, anchors: saved.anchors.map((a) => ({ ...a, offset: a.offset - delta })) };
   };
+  const placeLatest = (el: HTMLElement) => {
+    const row = pinned.current ? el.querySelector(`[data-k="${CSS.escape(pinned.current)}"]`) : null;
+    if (!row) { el.scrollTop = el.scrollHeight; return; }
+    toTop(el, row);
+    following.current = atBottom(el);
+  };
   const follow = (el: HTMLElement) => {
+    pinned.current = undefined;
     pendingFocus.current = undefined;
     following.current = true;
     arrivals.current.clear();
@@ -146,6 +165,7 @@ export function useDockScroll(
       pendingFocus.current = reading ? undefined : focus;
       arrivals.current.clear();
       following.current = true;
+      pinned.current = undefined;
     }
     const newReplies = new Set<string>();
     // The full snapshot includes folded exchanges. Revealing them is not an
@@ -154,7 +174,7 @@ export function useDockScroll(
     // First nonempty history is a baseline, including a delayed initial load.
     if (!navigate && seen.current.size > 0) {
       const firstKnown = history.findIndex((it) => seen.current.has(it.key));
-      if (firstKnown >= 0 && !following.current) {
+      if (firstKnown >= 0 && (!following.current || pinned.current)) {
         for (const it of history.slice(firstKnown + 1)) {
           if (it.kind === 'michael' && !seen.current.has(it.key)) newReplies.add(it.key);
         }
@@ -171,13 +191,19 @@ export function useDockScroll(
       following.current = atBottom(el);
       remember(el);
     } else if (target) {
-      center(el, target);
+      pinned.current = target.dataset.k;
       pendingFocus.current = undefined;
       arrivals.current.clear();
-      following.current = atBottom(el);
+      placeLatest(el);
+      remember(el);
+    } else if (pinned.current) {
+      placeLatest(el);
       remember(el);
     } else if (following.current) {
-      el.scrollTop = el.scrollHeight;
+      // Opened with no question named: it starts on the latest one, then follows.
+      if (navigate) pinned.current = items.filter((it) => it.kind === 'owner').pop()?.key;
+      placeLatest(el);
+      if (following.current) pinned.current = undefined;
       remember(el);
     } else if (!navigate) {
       restore(el, position.current);
@@ -197,7 +223,7 @@ export function useDockScroll(
   // Content changed size: follow the latest, or keep the passage being read.
   const relayout = (el: HTMLElement) => {
     readPendingScroll(el);
-    if (following.current) el.scrollTop = el.scrollHeight;
+    if (following.current || pinned.current) placeLatest(el);
     else restore(el, position.current);
     remember(el);
   };
@@ -226,6 +252,7 @@ export function useDockScroll(
       const row = el?.querySelector<HTMLElement>(`[data-q="${CSS.escape(id)}"]`);
       if (!el || !row) return;
       pendingFocus.current = undefined;
+      pinned.current = undefined;
       arrivals.current.clear();
       center(el, row);
       following.current = atBottom(el);
@@ -236,6 +263,7 @@ export function useDockScroll(
     // when the reader was following the latest before clicking it.
     pauseForExpansion: () => {
       following.current = false;
+      pinned.current = undefined;
       if (list.current) remember(list.current);
     },
     ...news

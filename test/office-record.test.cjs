@@ -351,6 +351,48 @@ test('a record never sends agents to the disk root, the home folder, or key and 
   }
 });
 
+test('a folder in Dropbox, Google Drive or iCloud Drive on a Mac is a usable team folder', { skip: process.platform === 'win32' }, () => {
+  // Value: protects=a team folder the owner keeps in a cloud drive gets its privacy wall, and Michael's folder may live there; fails_when=everything under ~/Library is refused, cloud drives included; why_new=bug fix; seam=none; no_claim=the cloud apps themselves
+  const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-home-')));
+  try {
+    const dropbox = path.join(home, 'Library', 'CloudStorage', 'Dropbox', 'Pho Bakery', 'Sales');
+    const drive = path.join(home, 'Library', 'CloudStorage', 'GoogleDrive-pho@example.com', 'My Drive', 'Pho');
+    const iCloud = path.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs', 'Pho Bakery');
+    for (const d of [dropbox, drive, iCloud, path.join(home, 'Library', 'Keychains'), path.join(home, '.ssh')]) fs.mkdirSync(d, { recursive: true });
+    fs.symlinkSync(path.join(home, 'Library', 'CloudStorage', 'Dropbox'), path.join(home, 'Dropbox'));
+    fs.symlinkSync(path.join(home, '.ssh'), path.join(dropbox, 'keys'));
+    for (const ok of [dropbox, drive, iCloud, path.join(home, 'Dropbox', 'Pho Bakery')]) {
+      assert.equal(file.isUsableTeamFolder(ok, home), true, ok);
+    }
+    for (const no of [
+      path.join(home, 'Library'), path.join(home, 'Library', 'Keychains'),
+      path.join(home, 'Library', 'CloudStorage'), path.join(home, 'Library', 'Mobile Documents'),
+      path.join(dropbox, 'keys') // a link in the cloud folder that leads to ~/.ssh is ~/.ssh
+    ]) {
+      assert.equal(file.isUsableTeamFolder(no, home), false, no);
+    }
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('a team folder in Dropbox keeps its wall in the folder layout', { skip: process.platform === 'win32' }, () => {
+  // Value: protects=other members can't open a member's Dropbox folder; fails_when=the layout drops it as unusable, so no rule walls it; why_new=bug fix; seam=HOME; no_claim=the hook and sandbox (folder-access tests)
+  const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-home-')));
+  const was = process.env.HOME;
+  try {
+    const biz = path.join(home, 'Documents', 'Pho Bakery');
+    const sales = path.join(home, 'Library', 'CloudStorage', 'Dropbox', 'Pho Bakery', 'Sales');
+    for (const d of [path.join(biz, 'Finance'), sales]) fs.mkdirSync(d, { recursive: true });
+    process.env.HOME = home;
+    const l = file.folderLayoutFor(biz, [path.join(biz, 'Finance'), sales]);
+    assert.deepEqual(l.teamFolders, [path.join(biz, 'Finance'), sales]);
+  } finally {
+    process.env.HOME = was;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('a disk root is never a usable folder, however its letters are cased', () => {
   // Value: protects=no agent is sent to a disk root on Windows; fails_when=the root check compares a lowercased path with an uppercased root again; why_new=Windows accepted C:\ because "c:\" !== "C:\"; seam=none
   const root = path.parse(os.tmpdir()).root;
@@ -417,7 +459,7 @@ test('a team folder that is a link to the home folder counts as the home folder'
 
 test('setup checks a folder picked by hand, and team start finds members in any pack', () => {
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(wiz, /if \(step === 'home'\) \{\s*setBusy\(true\);\s*const f = await window\.cth\.officeFind\(home\.trim\(\)\)/);
+  assert.match(wiz, /if \(step === 'team' \|\| step === 'home'\) \{\s*const where = home\.trim\(\);[\s\S]*?setBusy\(true\);\s*const f = await window\.cth\.officeFind\(where\)/);
   assert.match(wiz, /setError\(t\('onboarding\.resume\.folderInUse'\)\);/);
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /for \(const p of \[pack, \.\.\.packs\.map\(\(x\) => x\.pack\), core\]\)/);
@@ -441,6 +483,6 @@ test('an unknown business type picks the pack that holds most of the team; a fai
   const hive = read('src/renderer/src/hooks/useHive.ts');
   assert.match(hive, /\?\? byTeam \?\? core;/);
   const wiz = read('src/renderer/src/components/OnboardingWizard.tsx');
-  assert.match(wiz, /if \(!f\) \{ setError\(t\('onboarding\.resume\.folderCheckFailed'\)\); return; \}/);
+  assert.match(wiz, /if \(!f\) \{ setError\(t\('onboarding\.resume\.folderCheckFailed'\)\); setStep\('home'\); return; \}/);
   assert.match(wiz, /disabled=\{busy \|\| \(step === 'orchestrator' && engineBlocked\)\}/);
 });

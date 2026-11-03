@@ -11,6 +11,7 @@
  * Shared by the renderer (rows and their kind word) and main, which decides on
  * its own whether a file opens (OPEN_EXTENSIONS) and never trusts the renderer.
  */
+import { ownValue } from './ownValue';
 
 /** Extensions that make a code span a file row. */
 const DETECT_EXTENSIONS = new Set([
@@ -45,11 +46,13 @@ export function isFileSpan(span: string): boolean {
 }
 
 /** Files a tab can show inside the office (docs/designs/open-file-tab.md, R3):
- *  Markdown, text, JSON, CSV and images. PDF and Office files open in their own
- *  app instead. JSON is here but not on OPEN_EXTENSIONS: it reads in a tab and
+ *  Markdown, text, JSON, CSV and images, and the words of a Word, Excel,
+ *  PowerPoint or PDF file (R3a); the tab's Open in app button still reaches the
+ *  file itself. JSON is here but not on OPEN_EXTENSIONS: it reads in a tab and
  *  never launches an app. */
 export const TAB_EXTENSIONS: ReadonlySet<string> = new Set([
-  'md', 'markdown', 'txt', 'json', 'csv', 'tsv', 'png', 'jpg', 'jpeg', 'gif', 'webp'
+  'md', 'markdown', 'txt', 'json', 'csv', 'tsv', 'png', 'jpg', 'jpeg', 'gif', 'webp',
+  'docx', 'xlsx', 'pptx', 'pdf'
 ]);
 
 /** A full path written in plain text (open-file-tab.md, R1): it starts with
@@ -203,11 +206,13 @@ export function askFileNames(text: string): string[] {
 }
 
 /** The text with each found name's code span written as its file's path, so
- *  it draws as a chip like any other file. Code fences are left as they are. */
+ *  it draws as a chip like any other file. Code fences are left as they are.
+ *  Every span is looked up, so only a name `found` holds itself counts: a span
+ *  such as `constructor` or `toString` stays as written. */
 export function withNamedFiles(text: string, found: Readonly<Record<string, string>>): string {
   if (!Object.keys(found).length) return text;
   return text.split(/(```[\s\S]*?```)/g).map((part, i) => (i % 2 ? part : part.replace(/`([^`\n]+)`/g, (m, inner: string) => {
-    const path = found[inner.trim()];
+    const path = ownValue(found, inner.trim());
     return path ? `\`${path}\`` : m;
   }))).join('');
 }

@@ -308,6 +308,14 @@ test('on Windows, Research command tools are refused outright', async (t) => {
     const r = hook(R.RESEARCH_ID, 'PreToolUse', { tool_name: tool, tool_input: { command: `Get-Content ${path.join(o.business, 'private.txt')}` } });
     assert.equal(reason(r), R.RESEARCH_WINDOWS_COMMANDS, tool);
   }
+  const teammate = hook('pam', 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'echo teammate' } });
+  assert.notEqual(reason(teammate), R.RESEARCH_WINDOWS_COMMANDS, 'another teammate is not Research');
+  assert.ok(!denied(teammate), 'another teammate can still use Bash');
+
+  Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' });
+  const macResearch = hook(R.RESEARCH_ID, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'echo research' } });
+  assert.notEqual(reason(macResearch), R.RESEARCH_WINDOWS_COMMANDS, 'Research is not Windows on Darwin');
+  assert.ok(!denied(macResearch), 'Research can use Bash on Darwin');
 });
 
 test('while Research is on, agents save scratch work in their own folder, not the shared temp folders', posixOnly('temporary folder paths'), async (t) => {

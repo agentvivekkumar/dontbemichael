@@ -54,6 +54,39 @@ test('patterns name the class of what they find', () => {
   assert.ok(cls('call 5125550142').includes('contact'), 'a bare phone length run counts as contact too');
 });
 
+test('digits in any script are read as digits', () => {
+  // Value: protects=a number typed in Devanagari, Arabic-Indic or Bengali digits never reaches Research; fails_when=only ASCII digits trip the patterns; why_new=an Aadhaar or account number in Hindi digits passed the recheck; seam=none
+  const cls = (t) => dc.patternHits(t).map((h) => h.classId);
+  assert.ok(cls('Is aadhaar १२३४ ५६७८ ९०१२ valid?').includes('contact'), 'Devanagari, grouped like the ASCII form');
+  assert.ok(cls('Who owns ९८७६५४३२१०?').includes('contact'));
+  assert.ok(cls('Bank for account ٥٠١٠٠١٢٣٤٥٦٧٨٩?').length > 0, 'Arabic-Indic');
+  assert.ok(cls('acct ۵۰۱۰۰۱۲۳۴۵۶۷۸۹').length > 0, 'Extended Arabic-Indic');
+  assert.ok(cls('card ४१११ ११११ ११११ ११११').includes('money'), 'a card still passes Luhn once read');
+  assert.ok(!cls('card ४१११ ११११ ११११ १११२').includes('money'), 'and still fails it when it should');
+  assert.ok(cls('customer ১২৩৪৫৬৭৮৯০১২').includes('accounts'), 'Bengali');
+  assert.deepEqual(cls('२०२५ में खाद्य सुरक्षा नियम'), [], 'a year in Devanagari is still a year');
+});
+
+test('any hyphen or dash separates digit groups', () => {
+  // Value: protects=a phone, SSN or card copied from Word or Outlook never reaches Research; fails_when=only '-' counts as a separator; why_new=a non-breaking hyphen (U+2011) or a dash hid the shape; seam=none
+  const cls = (t) => dc.patternHits(t).map((h) => h.classId);
+  assert.ok(cls('Who owns 555\u2011123\u20114567?').includes('contact'), 'non-breaking hyphen');
+  assert.ok(cls('Is SSN 123\u201045\u20106789 real?').includes('accounts'), 'U+2010 hyphen');
+  assert.ok(cls('Who owns 98765\u201343210?').includes('contact'), 'en dash');
+  assert.ok(cls('call 555\u2212123\u22124567').includes('contact'), 'minus sign');
+  assert.ok(cls('card 4111\u20121111\u20121111\u20121111').includes('money'), 'figure dash');
+  for (const t of ['a well\u2011known supplier', 'open 9\u20135 weekdays', 'sales 2019\u20132024', 'menu\u2014pizza, pasta']) assert.deepEqual(cls(t), [], t);
+});
+
+test('a dotted phone number is a phone, a count grouped in thousands is not', () => {
+  // Value: protects=a US phone written with dots never reaches Research; fails_when=the thousands exclusion matches inside a phone; why_new=555.123.4567 was never read as a phone; seam=none
+  const cls = (t) => dc.patternHits(t).map((h) => h.classId);
+  assert.ok(cls('Who owns 555.123.4567?').includes('contact'));
+  assert.ok(cls('call +1 555.123.4567').includes('contact'));
+  assert.ok(cls('call (555) 123.4567').includes('contact'));
+  for (const t of ['compare 1.234.567.890 units', 'population 12.345.678 (2020)', 'turnover 1.234.567.890,50 euros', '1.234.567 visitors in 2024']) assert.deepEqual(cls(t), [], t);
+});
+
 test('a card is found beside its expiry, its security code or another number', () => {
   // Value: protects=card details never reach Research; fails_when=digits next to a card fail it on Luhn and it passes as plain text; why_new=a card typed with its expiry tripped no pattern at all; seam=none
   const money = (t) => dc.patternHits(t).some((h) => h.classId === 'money');
@@ -70,6 +103,20 @@ test('a card is found beside its expiry, its security code or another number', (
     'jcb 3530 1113 3330 0000 12/27'
   ]) assert.ok(money(t), t);
   assert.ok(!money('order 4111 1111 1111 1112 12/27'), 'fails Luhn: not a card');
+});
+
+test('the patterns stay quick on the longest text the check reads', () => {
+  // Value: protects=the main process never stalls on a long message or web answer; fails_when=a pattern backtracks over a long run without spaces (the email pattern took 1.5 s on 60,000 digits); why_new=found reviewing PR 582; seam=none; no_claim=engine speed on other machines beyond the loose bound
+  const n = 60_000; // TRUST_MAX_CHARS, the most the trust layer reads
+  const runs = { digits: '1'.repeat(n), letters: 'ab'.repeat(n / 2), dots: '1.'.repeat(n / 2), hyphens: '1-'.repeat(n / 2), at: 'a@'.repeat(n / 2), domain: `x@${'a.'.repeat(n / 2 - 1)}` };
+  for (const [name, text] of Object.entries(runs)) {
+    const start = process.hrtime.bigint();
+    dc.patternHits(text);
+    const ms = Number(process.hrtime.bigint() - start) / 1e6;
+    // gstack-timing-ok: the unbounded pattern took 1.5 s here and the bounded one a few ms, so 300 ms is far from both.
+    assert.ok(ms < 300, `${name}: ${Math.round(ms)} ms`);
+  }
+  assert.ok(dc.patternHits(`${'x'.repeat(100)}john@example.com`).some((h) => h.classId === 'contact'), 'an address at the end of a long run still counts');
 });
 
 test('plain research questions trip no pattern', () => {
