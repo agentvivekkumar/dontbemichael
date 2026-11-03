@@ -1,6 +1,103 @@
 # TODOS
 
+## Memory and voice trust gaps (from the 0.2.7 ship review, 2026-10-26; owner chose TODOS)
+
+### Owner standing per note, not per tidy pass
+
+**What:** Have each owner sourced op name the owner note it comes from, and accept source owner only for an op that cites a note under FROM THE OWNER in this pass.
+
+**Why:** `validateOps` gets `ownerWords` for the whole pass (src/main/memoryTidy.ts). When any owner note is pending, an op the model built from an inbox line can claim owner, and only the prompt keeps the two apart. Michael gets an owner note for every dock message, so his passes almost always run that way.
+
+Go with it: keep only the owner's own words (the answer, the edit, the note) in `owner_notes.text` and the quoted context (the member's question, a card title, an email subject, pasted text) in a field of its own that the tidy prompt labels as not the owner's; today one line in the instructions asks the model to tell them apart (D4). And file an owner note only when a pass used it, or keep the ones it set aside for a later pass, so a planted inbox note can't talk the tidy-up into dropping the owner's words (adversarial review, DeepSeek, 2026-10-26).
+
+**Effort:** M
+**Priority:** P2
+
+### Owner entries in memory.md can be planted
+
+**What:** Keep the ids (or a hash) of the owner entries the tidy-up writes in harness.db, and read any other entry marked owner as the member's own.
+
+**Why:** memory.md sits in the member's folder, which its shell can write; `parseIndex` trusts any `| owner |` line, and the new rules then protect it. Older than this branch.
+
+**Effort:** M
+**Priority:** P2
+
+### A correction typed in a member's own terminal can't replace an owner entry
+
+**What:** Record what the owner types to a member as an owner note, the way the dock does for Michael, or give the member an app path that writes one.
+
+**Why:** Members still write the owner's corrections to their inbox, which never counts as the owner's, so an older owner entry (from an Ask me answer) can't be replaced that way.
+
+**Effort:** M
+**Priority:** P2
+
+### Run comparison reads transcripts it finds by name
+
+**What:** Record each member session's transcript path (and size) when the app starts the session, and have run comparison read only that file, instead of finding `<session id>.jsonl` anywhere under Claude's projects folder.
+
+**Why:** On a Mac members' shells are walled off from that folder, but on Windows a member's shell could write a file under its own session id. The member's own transcript already holds whatever it chose to say, and every suggestion still waits for the owner's Review and Apply, so this is defense in depth. The injection screen on a suggestion is a pattern list, not a boundary; the owner's Apply is (adversarial review, DeepSeek, 2026-10-26).
+
+**Effort:** S
+**Priority:** P3
+
+### Voice confirms for schedules and settings carry no target
+
+**What:** Carry the staged schedule id or setting key on the pending confirm, and cancel when the confirm names another one, as `namesSomeoneElse` does for members.
+
+**Why:** "confirm, delete the Invoice check schedule" while a delete of Morning report waits deletes Morning report. Older than this branch. Also: a member whose name is an ordinary word ("Will") can cancel a valid confirm; it fails safe.
+
+**Effort:** S
+**Priority:** P2
+
+## Overlap split (deferred from the CEO review, 2026-10-24)
+
+### Explain how they split it in the hire wizard
+
+**What:** Give the hire wizard's overlap step the same "Explain how they split it" that Edit agent has, writing the new hire's handoffs.
+
+**Why:** A new hire who works with a teammate (sends them part of the work) hits the same wall a changed job did: cut the duty or guess at wording.
+
+**Pros:** One way of describing teamwork everywhere a job is written.
+
+**Cons:** The wizard's overlap box has mailbox, topic and connection chips, and its topic chip writes the boundary the opposite way ("Only X." on the new hire, "Not for X" on the teammate); its Next gate needs the explanation to count. About M.
+
+**Context:** Edit agent's version: JobChangeReview's explain state, the revise call's `explanation` and `teammates`, `checkDistinct` mode 'change', and the handoff list in src/shared/jobChange.ts (docs/designs/work-style-change-request.md, Overlap split). Deferred by the owner (CEO D8) to prove it in Edit agent first.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** the Edit agent version shipping
+
+## Release notes accuracy (from the eng review of the site's 0.2.5 and 0.2.6 plan, 2026-10-24)
+
+### The 0.2.5 changelog says engine records are closed to every member's shell
+
+**What:** Reword CHANGELOG.md's 0.2.5 line "closed to every member's tools and shell, Michael included" to what the app does on every platform.
+
+**Why:** On Windows Claude Code has no sandbox, so shell commands are not limited; only Claude's own file tools are walled there (src/shared/folderAccess.ts:16-20). As written, the line is a privacy claim that is false on Windows, in public release history.
+
+**Context:** Commit 8f6b9038 (#387) walls the engine records: folderAccess.ts:97-101 adds them to the sandbox deny lists and to the Read and Edit deny rules for every agent, Michael included, and test/folder-access.test.cjs covers it. The site's wording is the model: "The app keeps each team member's conversation records out of every other member's file tools, Michael's included." The published v0.2.5 GitHub release body carries the same words and needs a hand edit too; release bodies are built from RELEASE.md on the tag run, so edit the published body directly rather than re-running the tag workflow.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
 ## Connections
+
+### Step cards for iCloud, Yahoo and Zoho app passwords
+
+**What:** Give iCloud Mail, Yahoo and Zoho the same numbered step cards Google gets in Add a mailbox (eng review 2026-10-26, D3 B): each step with an Open button to that service's own two step and app password pages, and a plain line on what to copy.
+
+**Why:** Each still shows one paragraph with an address to type; the owner saw a business user struggle with the same paragraph for Google.
+
+**Pros:** One look across Add a mailbox; owners on those services set up without help.
+
+**Cons:** Three more providers' pages to find, link and keep current when they move.
+
+**Context:** The Google cards (AddMailboxDialog.tsx, Google steps) are built to take a per provider list of steps; start from `mailboxes.help.icloud/yahoo/zoho` in the locales and add each provider's steps and page addresses.
+
+**Effort:** human S / CC S
+**Priority:** P3
+**Depends on:** the Google step cards landing.
 
 ### One call at a time per connected app, and a throttle notice
 
@@ -73,17 +170,17 @@
 
 ## Team performance (from the CEO review of docs/designs/team-performance.md, 2026-10-15)
 
-### Move the cost ledger into the telemetry store
+### Compare runs for members on other engines
 
-**What:** Move the circuit breaker and lifetime totals from `hive/cost-ledger.jsonl` onto the telemetry store in harness.db, then stop writing the file.
+**What:** Read Codex (and other engines') session files for a run's window, so "Went wrong" can compare their runs too.
 
-**Why:** After the team performance build, cost data lives in two places that can drift apart, and the file is agent writable and grows forever (403,830 rows in its first 3 weeks).
+**Why:** Run comparison (src/main/runCompare.ts) reads only Claude Code's conversations, so members on other engines get no suggestions; the jobs list shows an info icon for them.
 
-**Context:** `db.ts` already reserves a `cost_ledger` table with the file's column names. Readers today: `costLifetime.ts`, `runBreakerBeat` in `index.ts`, `tools/agent-metrics.cjs`. The team performance processor already folds cost points from the store with `src/shared/costFold.ts`. Owner decision D17.
+**Context:** From the eng review of "Compare runs we already have", 2026-10-24 (D8). The slicer finds a member's sessions through the private session record and reads `<claude projects>/<folder>/<session>.jsonl`; `pulseBackfill.ts` has the same limit. Each engine needs its own folder and line format, and its own `runEntry` reading.
 
 **Effort:** M (human) / S (CC)
-**Priority:** P2
-**Depends on:** The team performance build (telemetry store)
+**Priority:** P3
+**Depends on:** Run comparison (this feature)
 
 ### Give Fable a tier and a price
 
@@ -106,18 +203,6 @@
 
 **Effort:** M (human) / S (CC)
 **Priority:** P2
-**Depends on:** None
-
-### Pulse reads a card's whole history, not the period's slice
-
-**What:** Keep card lifecycle state (reopened, held time) per card as events arrive, instead of rebuilding it from the period's events only.
-
-**Why:** A card reopened or held before the period and finished in it counts as kept as is and as faster than it was.
-
-**Context:** From the second Codex adversarial review, 2026-10-16. `telemetryProcessor.ts` cards().
-
-**Effort:** S (human) / S (CC)
-**Priority:** P3
 **Depends on:** None
 
 ### Pulse keeps a card finished just before a quit
@@ -178,6 +263,22 @@
 
 ## Company foundations (deferred from the ship of mit/file-tab-no-bottom-bar, 2026-10-20)
 
+### Ordinary Ask me cards take a file
+
+**What:** A member's own question in Needs you (an ordinary Ask me card) gets the same Add a file as a Company foundations card; the file goes to the asking member by path, the way a message attachment does.
+
+**Why:** The owner's ask on 2026-10-22 was to upload right from the Ask me card; the eng review built it for Company foundations cards only (D1 A), so an ordinary question answered with a document still needs its path typed.
+
+**Pros:** The owner never types a path or file name anywhere in Needs you.
+
+**Cons:** A second path from the foundations one: the file goes to one member, not company knowledge, and needs a look at which folders a member may read (the sandbox), plus copying the file somewhere that survives a restart (`pastes.ts` does this for pasted images).
+
+**Context:** `docs/designs/foundation-card-upload.md` (R1, R9). Start from `AskAnswerFields.tsx` and `AskMeTab.tsx`, the answer route in `src/shared/askMeRouting.ts`, and `dialog:attachFiles` (`src/main/index.ts:6402`).
+
+**Effort:** M (human) / S (CC)
+**Priority:** P3
+**Depends on:** The foundation card upload (docs/designs/foundation-card-upload.md)
+
 ### Name a missing foundation's proof in Early look and Recommendations
 
 **What:** Once the kept as is evidence exists for a question, add a line to Early look and Recommendations such as "Answer who we sell to: Ryan's posts are kept as is 45% without it, 85% with", built from the same proof the member detail box shows.
@@ -200,6 +301,38 @@
 
 **Effort:** M (human) / S (CC)
 **Priority:** P2
+**Depends on:** None
+
+### Keep the other hidden checks' text out of Claude's history
+
+**What:** Turn on `isolateConfig` (`src/main/hiddenClaude.ts`) for the other hidden checks that paste private text: the Research privacy check (`src/main/index.ts`, the trust layer, which already sets `dropTranscript`) and the mail standing fit check. Measure the cost first: each isolated run is about 1.4 s slower and writes about 1 MB to a temporary folder, and the trust layer can run a dozen checks at app launch.
+
+**Why:** Ship review 2026-10-23 found Claude Code keeps every pasted prompt in its shared `~/.claude/history.jsonl` and `paste-cache`, which dropping the transcript does not touch. The file fit check is isolated now (verified live: nothing written under ~/.claude); a message to Pete and an email's text still land there.
+
+**Context:** Isolation relies on `CLAUDE_SECURESTORAGE_CONFIG_DIR`, found in the Claude Code binary and not documented. If a later Claude drops it the session stops at sign in and the check fails closed, which for the trust layer means every message to Pete is held, so check that before widening it. The API key sign in and Windows are untested. The file fit check is isolated on every platform (owner, 2026-10-23), so check a foundation card file upload on Windows first: Claude keeps its sign in in `.credentials.json` inside the settings folder there, and if the variable doesn't reach it every file is refused as "couldn't check".
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Give the other job helpers the job change's settings
+
+**What:** `convertWorkStyle` (plain words) and `checkFocusArea` in `src/main/workStyleConvert.ts` still start their hidden session with the office folder's settings and hooks and keep the transcript. Give them what `reviseWorkStyle` has: `settingSources: 'user'`, `disableAllHooks` and `dropTranscript`.
+
+**Why:** Codex adversarial pass 2 (2026-10-23): the job text reaches any hook of the owner's or the office folder's. The job change itself keeps no isolated folder by the owner's choice (D9: speed; Claude's history is already closed to members), so its prompt stays in the owner's own Claude history.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### A foundation file the card did not take is always removed
+
+**What:** In `saveFileAnswer` (`src/renderer/src/shell/foundationSave.ts`), when the card refuses the answer and `kgRemove` also fails, keep the document id, say so on the card, and remove it again at the next launch. Also ingest the bytes that were checked, not the path again (`src/main/foundations.ts` addFile, `knowledge.ts` ingest), so a file replaced in the seconds between check and save can't slip in.
+
+**Why:** Codex adversarial passes 1 and 2 (2026-10-23). Both need two things to go wrong at once, so they were left out of the ship.
+
+**Effort:** S
+**Priority:** P3
 **Depends on:** None
 
 ## Terminal links (from the ship review of mit/named-links, 2026-10-13)
@@ -271,6 +404,40 @@
 **Effort:** M
 **Priority:** P2
 
+## Original email view (deferred from the CEO review of docs/designs/original-email-view.md, 2026-10-29)
+
+### Show the whole conversation in the email tab
+
+**What:** Under the one email the tab opens, list the earlier messages of the same conversation, collapsed, newest at the top, found from its In-Reply-To and References headers.
+
+**Why:** A reply often only makes sense next to what it answers (our nudge, the sender's first message); today the owner still needs the mailbox for those.
+
+**Pros:** Full context in one place; reuses the email tab, the owner fetch and the header lookups.
+
+**Cons:** More folder searches per open (each earlier Message-ID), slower open, more failure paths; Gmail threads and other providers' references differ.
+
+**Context:** Owner deferred it (CEO review D5, 2026-10-29) so the single email view ships first and is used. Start from `MailService.original` and the thread headers `threadOf` already reads (`src/main/mail.ts:762`).
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
+### Open or save an email's attachments from the email tab
+
+**What:** The email tab lists attachment names and sizes; add Save to a folder the owner picks, and Open in the office for safe kinds (PDF, pictures).
+
+**Why:** The owner still needs the mailbox to open what was attached to the email an ask is built on.
+
+**Pros:** Everything about the email in one place.
+
+**Cons:** Brings files from outside senders onto the Mac; needs its own checks (kind from content not name, size cap, no launching executables, quarantine flag on macOS).
+
+**Context:** Owner deferred it (CEO review D6, 2026-10-29). Pair with "Read one email without downloading its attachments" under Attachments: download only the one part asked for. Team members can already save attachments themselves (`save_attachment`, docs/designs/agent-save-attachment.md): reuse its kind check and safe write here.
+
+**Effort:** human M / CC S
+**Priority:** P3
+**Depends on:** the email tab shipping.
+
 ## Message times and upkeep (deferred from the ship review of mit/file-tab-no-bottom-bar, 2026-10-18)
 
 ### Read a reply's time from the app's record, not the agent's file
@@ -296,15 +463,6 @@
 **What:** A schedule decision for Research while it isn't reporting is now dropped quietly with the other upkeep. Keep it (without Michael) and deliver it, with its upkeep kind, once Research reports again.
 
 **Why:** A decline carries Michael's or the owner's reason; dropped, Research may ask for the same change again.
-
-**Effort:** S
-**Priority:** P3
-
-### Retry closing time's wait after all note to Michael
-
-**What:** When a member reports again mid close, its brief goes out once, but a failed note telling Michael to wait for its ACK is not tried again. Keep a note owed set retried on the next row update.
-
-**Why:** Michael may close without the member's ACK.
 
 **Effort:** S
 **Priority:** P3
@@ -452,18 +610,6 @@
 **Depends on:** nothing.
 
 ## Agents and 1:1
-
-### Show the rewritten instructions before saving a work style
-
-**What:** When the owner edits a plain work style (hire or Edit Agent), show the instructions the app wrote from it and let them accept or undo, instead of saving straight away.
-
-**Why:** The owner edits a summary; details the summary left out could still be lost in a rewrite. The prompt now keeps them, but the owner can't see the result.
-
-**Context:** From the /ship pre-landing review of feat/hire-wizard (2026-09-27). `src/main/workStyleConvert.ts`, `toInstructionsPrompt` in `src/shared/workStyleText.ts`, AddAgentModal and EditAgentModal save paths.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** nothing.
 
 ### End a hidden Claude call early when it can't answer
 
@@ -695,7 +841,7 @@ Deferred from plan: `docs/designs/business-mode-office-packs.md` (owner chose "s
 **Context:** In order of impact:
 1. ~~The team always starts on the default engine.~~ Done 2026-09-26: setup now writes `defaultCommand` from Michael's engine (`teamDefaultsFromMichael`, `test/team-engine-from-michael.test.cjs`).
 2. Cost and token data: Codex is done. The telemetry fallback reads a Codex agent's rollout in its CODEX_HOME (`src/main/codexUsage.ts`, `hive.codexHome`), and `src/main/pricing.ts` prices GPT-5 models. Still open: Gemini and the other engines (no usage source yet), and the lifetime cost ledger, which only records live OTel samples. For Gemini, issue #113 has the plan: read the session `.jsonl` at the hook payload's `transcript_path` (already kept as `hookServer.transcriptPath(id)`), skip `$set` and `$rewindTo` lines, keep the last copy of each message id (late token updates re-append it), keep rewound turns (they were billed), map `cacheRead = cached`, `input = input - cached + tool`, `output = output + thoughts`; fall back to the project slug in `~/.gemini/projects.json` when no hook has fired; add Gemini Pro and Flash rows to `pricing.ts`; prove it live with one Gemini worker under a low token cap.
-3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`). Codex now gets bundled skills in its private `CODEX_HOME/skills`; other engines still need native skill discovery. The md-mail server is the same gap (issue #109): `index.ts` writes it and passes `--mcp-config` only for Claude, so a Codex member with email starts with no mail tools. Fix: write an `[mcp_servers.md-mail]` entry in the agent's private `CODEX_HOME/config.toml` (same command, args and env, a fresh broker token each spawn), removed at teardown like the Claude file. The mail gate in `hooks.ts` matches only Claude's `mcp__md-mail__` tool names, so the same change makes it match Codex's names too: a mail tool on any engine passes the same check, and a test proves a Codex mail call is gated.
+3. MCP servers go only into Claude's `--settings` (`src/main/hive.ts:1163`). Codex now gets bundled skills in its private `CODEX_HOME/skills`; other engines still need native skill discovery. The md-mail server is the same gap (issue #109): `index.ts` writes it and passes `--mcp-config` only for Claude, so a Codex member with email starts with no mail tools. Fix: write an `[mcp_servers.md-mail]` entry in the agent's private `CODEX_HOME/config.toml` (same command, args and env, a fresh broker token each spawn), removed at teardown like the Claude file. The mail gate in `hooks.ts` matches only Claude's `mcp__md-mail__` tool names, so the same change makes it match Codex's names too: a mail tool on any engine passes the same check, and a test proves a Codex mail call is gated. `md-integrations` has the same gap: it attaches only for Claude, and the Access tab says so to a member on another engine. The same entry fixes it.
 4. Antigravity gets no extra writable directories, so hive file writes may be refused. Gemini CLI done 2026-10-11: the folders Codex gets with `--add-dir` go into its per-agent settings file as `context.includeDirectories` and onto argv as `--include-directories` (Gemini CLI 0.60 and later skip a system settings file in a folder the user owns; `geminiIncludeDirArg`, `test/auto-mode-sandbox.test.cjs`).
 5. Antigravity agents never get their standing goal, and an Antigravity Michael never gets the roster (no SessionStart/UserPromptSubmit event).
 6. ~~The app's own background calls run only on Claude (issue #85).~~ Done 2026-10-17 (PR 354): `runHiddenModel` in `src/main/hiddenModel.ts` picks the runner from Michael's engine for all six (memory tidy up, the standing approval check, the hire check and the three Work style helpers). Claude keeps its runner and models; Codex runs `codex exec` read only in an empty folder with every tool off and the prompt on stdin, using Michael's model or the CLI default; any other engine answers unavailable and the caller keeps its fallback (`test/hidden-model.test.cjs`, `test/hidden-model-callers.test.cjs`). Still open: a runner for Gemini.
@@ -727,17 +873,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ## Release
 
-### Sign and notarize the Mac build with an Apple Developer ID
-
-**What:** Add the Developer ID Application cert and notarization credentials as repo secrets (`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`). `release.yml` and `build/notarize.cjs` already use them when present.
-
-**Why:** 0.0.1 ships ad-hoc signed. Owners must clear a "could not verify" dialog through Privacy & Security on first open, and Squirrel.Mac cannot update an ad-hoc app in place, so every update falls back to "download the new version" instead of restart to install. macOS also forgets folder grants between versions without a stable signature.
-
-**Context:** Needs an Apple Developer Program membership (paid, per organization). Once the secrets exist, the ad-hoc fallback in `release.yml` switches off by itself; update RELEASE.md's install steps then.
-
-**Effort:** S (after the Apple account exists)
-**Priority:** P1
-**Depends on:** Apple Developer Program membership
 
 ## Repo
 
@@ -766,6 +901,19 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Depends on:** None
 
 ## Completed
+
+### Sign and notarize the Mac build with an Apple Developer ID
+
+**What:** Add the Developer ID Application cert and notarization credentials as repo secrets (`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`). `release.yml` and `build/notarize.cjs` already use them when present.
+
+**Why:** 0.0.1 ships ad-hoc signed. Owners must clear a "could not verify" dialog through Privacy & Security on first open, and Squirrel.Mac cannot update an ad-hoc app in place, so every update falls back to "download the new version" instead of restart to install. macOS also forgets folder grants between versions without a stable signature.
+
+**Context:** Needs an Apple Developer Program membership (paid, per organization). Once the secrets exist, the ad-hoc fallback in `release.yml` switches off by itself; update RELEASE.md's install steps then.
+
+**Effort:** S (after the Apple account exists)
+**Priority:** P1
+**Depends on:** Apple Developer Program membership
+**Completed:** v0.2.6 (2026-10-23) is the first Mac release signed with Developer ID team B5EHD4JBD2, notarized and stapled (`spctl`: `source=Notarized Developer ID`). RELEASE.md, README.md and dontbemichael.com now give the signed steps, and a tagged release without the certificate fails instead of shipping ad hoc (`REQUIRE_DEVELOPER_ID`, `test/release-mac-only.test.cjs`).
 
 ### A write to a connected app is never sent twice (issue #54)
 
@@ -956,24 +1104,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 
 ## Watch list (no issue seen yet; act only if the symptom shows up)
 
-### The dock scroll test failed once on the macOS runner
-
-**Watch for:** `test/dock-scroll.electron.test.cjs` failing at "bottom follows incoming replies" again, on main or on an unrelated PR.
-
-**What happened:** on PR #209's head 673af795 (CI run 39532678039, first attempt), the non reduced motion run failed at that step: after two replies arrive, the list was not at the bottom, or the new replies button showed. The rerun of the job passed, as did 28 local runs (18 with every core busy). Not reproduced, cause unknown.
-
-**If it shows up:** add the list's `scrollTop`, `scrollHeight`, `clientHeight` and the hook's `following` to that check's message, then look for a scroll event that `useDockScroll` reads as the owner's (`src/renderer/src/shell/useDockScroll.ts`, `onScroll`), for example from a late font swap or a fold measured after the reply arrived.
-
-**Seen again:** on PR #291 (CI run 39539334994, first attempt), same step, again only the normal motion run; the reduced motion run passed. 2 of 3 macOS CI runs.
-
-**Tried (running branch, 2026-10-20, not yet proven on CI):** `useDockScroll` now treats a scroll change under a pixel as layout rounding, and the clamp check (content shrank under the reader) allows a pixel, so a fractional `scrollTop` is no longer read as the owner scrolling up. Every failed check in the dock test page now prints the list's `scrollTop`, `scrollHeight`, `clientHeight` and the catch-up button. If it fails again after 0.2.5 lands, read those numbers first.
-
-**Context:** owner chose to merge #209 and track this, 2026-10-20; on its second failure, chose to fix it on the running branch rather than through a draft PR.
-
-**Effort:** S (CC)
-**Priority:** P3 (watch)
-**Depends on:** nothing.
-
 ### Agents skip their folder or company knowledge
 
 **Watch for:** an agent answers a policy, price or "how we do it" question from memory or the internet when the answer is in the company knowledge store; an agent asks the owner for a document already in its folder; this happens more late in a long session or after a compaction.
@@ -1011,22 +1141,6 @@ A live end-to-end run is required before adding an engine: Gemini has never been
 **Effort:** human M / CC S
 **Priority:** P2
 **Depends on / blocked by:** the owner choosing a service and passing its identity check.
-
-### Copy diagnostics for problem reports
-
-**What:** A "Copy diagnostics" button beside Settings' Report a problem: app and OS versions, the last 50 office event types from `log.jsonl`, agent exit summaries, with paths and names redacted; copied to the clipboard only.
-
-**Why:** Report a problem carries version numbers only, on purpose, so beta reports can lack what happened just before the failure.
-
-**Pros:** Remote debugging of Windows beta problems without back and forth.
-
-**Cons:** Redaction must be exact: office names, folder paths and customer names must never reach the copy.
-
-**Context:** Deferred as S3 in `docs/designs/windows-11-installer.md` (CEO review 2026-10-04) to design from what the first real beta reports lack. Sources: hive `log.jsonl`, `crashes/` (raw terminal tails, never copied raw).
-
-**Effort:** human M / CC S
-**Priority:** P3
-**Depends on / blocked by:** the first Windows beta reports.
 
 ### Go live steps for the Windows beta
 
