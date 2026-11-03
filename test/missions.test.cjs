@@ -323,3 +323,55 @@ test('armPlan: an hourly job closed overnight fires once on opening, never once 
   assert.equal(plan.firstDelayMs, 0, 'one catch-up run at 7:15');
   assert.equal(plan.everyMs, H, 'then every hour from 7:15, with no backlog of the ten missed runs');
 });
+
+/* ─────────────────────────── the heartbeat's wait ─────────────────────────── */
+// Node fires a timer longer than 2^31-1 ms in 1 ms. A 24 day heartbeat backed
+// off to 60 days after waking Michael, so it beat about once per millisecond
+// while his inbox had mail in it.
+
+const TIMER_MAX = 2_147_483_647;
+
+test('heartbeatDelayMs: a 24 day heartbeat backs off to the timer limit, never past it', () => {
+  for (const beat of ['normal', 'stuck', 'reengaged']) {
+    const ms = M.heartbeatDelayMs(M.MAX_INTERVAL_MS, beat);
+    assert.ok(ms <= TIMER_MAX, `${beat}: ${ms} fits a timer`);
+  }
+  assert.equal(M.heartbeatDelayMs(M.MAX_INTERVAL_MS, 'reengaged'), TIMER_MAX);
+  // The first base whose back-off overflowed: about 9.94 days.
+  assert.equal(M.heartbeatDelayMs(Math.ceil(TIMER_MAX / 2.5), 'reengaged'), TIMER_MAX);
+});
+
+test('heartbeatDelayMs: keeps the usual cadence for an everyday heartbeat', () => {
+  const base = 15 * 60_000;
+  assert.equal(M.heartbeatDelayMs(base, 'normal'), base);
+  assert.equal(M.heartbeatDelayMs(base, 'reengaged'), Math.round(base * 2.5));
+  assert.equal(M.heartbeatDelayMs(base, 'stuck'), Math.round(base / 4));
+  assert.equal(M.heartbeatDelayMs(60_000, 'stuck'), 30_000, 'a stuck beat waits at least 30s');
+});
+
+test('heartbeatDelayMs: never under a second, even for a broken base', () => {
+  for (const base of [0, -5, 1, 999, NaN]) {
+    for (const beat of ['normal', 'stuck', 'reengaged']) {
+      assert.ok(M.heartbeatDelayMs(base, beat) >= 1000, `${base} ${beat}`);
+    }
+  }
+});
+
+test('heartbeatFirstDelayMs: waits out the rest of the interval, within the timer limit', () => {
+  const now = at(2026, 10, 29, 12);
+  assert.equal(M.heartbeatFirstDelayMs(HOUR, now - 20 * 60_000, now), 40 * 60_000);
+  assert.equal(M.heartbeatFirstDelayMs(HOUR, now - 2 * HOUR, now), 0, 'overdue beats now');
+  assert.equal(M.heartbeatFirstDelayMs(30 * 86_400_000, now, now), TIMER_MAX, 'a base past the ceiling still fits a timer');
+});
+
+test('armHeartbeat takes every wait from the clamped helpers', () => {
+  const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src/main/index.ts'), 'utf8');
+  const body = main.slice(main.indexOf('function armHeartbeat('), main.indexOf('function liveWebContents('));
+  assert.ok(body.length > 0, 'armHeartbeat found');
+  assert.match(body, /let next = heartbeatDelayMs\(base, 'normal'\);/);
+  assert.match(body, /next = heartbeatDelayMs\(base, 'reengaged'\);/);
+  assert.match(body, /next = heartbeatDelayMs\(base, 'stuck'\);/);
+  assert.match(body, /setTimeout\(beat, heartbeatFirstDelayMs\(base, m\.lastFiredAt, Date\.now\(\)\)\)/);
+  assert.match(body, /setTimeout\(beat, next\)/);
+  assert.doesNotMatch(body, /base \* 2\.5|base \/ 4/, 'no unclamped arithmetic left in main');
+});

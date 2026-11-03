@@ -1,5 +1,4 @@
-- **Reset memory** gives the team a first day.
-- **Pulse** shows which emails were organized.
-- **Tasks board** search and filters.
-- **Every file chip** opens.
-- Contributor fixes across the app.
+- **Give one member one service** with custom integrations.
+- **Team members save email attachments** and pass files by asking.
+- Word, Excel, PowerPoint and PDF files open in an office tab.
+- The dock folds older messages behind the latest exchange.

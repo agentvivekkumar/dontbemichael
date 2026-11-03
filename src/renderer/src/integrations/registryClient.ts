@@ -28,6 +28,7 @@ import {
   authTypeNeedsSecret,
   secretRefFor,
   validateIntegrationRecord,
+  type IntegrationLevel,
   type IntegrationRecord,
   type IntegrationTemplate
 } from '@shared/integrations';
@@ -57,6 +58,8 @@ export interface IntegrationsClient {
   save(record: IntegrationRecord, secret?: string, opts?: { isNew?: boolean }): Promise<{ ok: boolean; error?: string }>;
   remove(id: string): Promise<{ ok: boolean }>;
   test(id: string): Promise<TestResult>;
+  /** One agent's level on one integration, from its Access tab; null takes it away. */
+  setAccess(agentId: string, id: string, level: IntegrationLevel | null): Promise<{ ok: boolean; restartNeeded: boolean }>;
 }
 
 // The preload bridge Jim exposes (Deliverable 2). Channels are fixed by §6;
@@ -68,6 +71,7 @@ interface IntegrationsBridge {
   integrationsCanStoreSecrets(): Promise<{ ok: true } | { ok: false; error: string }>;
   integrationsSetSecret(req: { id: string; secret: string }): Promise<{ ok: boolean; error?: string }>;
   integrationsRemove(req: { id: string }): Promise<{ ok: boolean }>;
+  integrationsSetAccess(agentId: string, id: string, level: IntegrationLevel | null): Promise<{ ok: boolean; restartNeeded: boolean }>;
   integrationsTest(req: { id: string; path?: string }): Promise<TestResult>;
 }
 
@@ -90,6 +94,7 @@ function redact(r: IntegrationRecord): IntegrationRecordView {
 }
 
 const mockClient: IntegrationsClient = {
+  setAccess: () => Promise.resolve({ ok: true, restartNeeded: false }),
   listTemplates: () => Promise.resolve(INTEGRATION_TEMPLATES.map((t) => ({ ...t }))),
   list: () => Promise.resolve(mockRecords.map(redact)),
   save: (record, secret, opts) => {
@@ -155,6 +160,10 @@ export const integrationsClient: IntegrationsClient = {
   test: (id) => {
     const b = liveBridge();
     return b ? b.integrationsTest({ id }) : mockClient.test(id);
+  },
+  setAccess: (agentId, id, level) => {
+    const b = liveBridge();
+    return b ? b.integrationsSetAccess(agentId, id, level) : mockClient.setAccess(agentId, id, level);
   }
 };
 
