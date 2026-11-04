@@ -786,8 +786,8 @@ export class HookServer {
     // Windows has no Claude Code OS sandbox. Research's file tools already
     // have their own walls, but a command can escape any text scan (issue #442).
     // Keep its command tools closed until the engine offers a real Windows sandbox.
-    if (event === 'PreToolUse' && agentId === RESEARCH_ID && ['Bash', 'PowerShell'].includes(p.tool_name ?? '') && process.platform === 'win32') {
-      this.emitRefused(agentId, event, p, 'folder');
+    if (event === 'PreToolUse' && agentId === RESEARCH_ID && ['Bash', 'PowerShell', 'Monitor'].includes(p.tool_name ?? '') && process.platform === 'win32') {
+      this.emitRefused(agentId, event, p, 'sandbox');
       return {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',

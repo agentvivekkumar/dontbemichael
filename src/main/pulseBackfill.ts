@@ -58,7 +58,7 @@ export function gateOfTool(tool: string, reason: string): RefusalGate | null {
   if (/^mcp__md-mail__/.test(tool)) return 'mail';
   if (/^mcp__/.test(tool)) return 'connector';
   if (tool === 'WebFetch' || tool === 'WebSearch') return 'internet';
-  if (tool === 'Bash') return 'sandbox';
+  if (tool === 'Bash' || tool === 'Monitor') return 'sandbox';
   if (/^(Write|Edit|MultiEdit|NotebookEdit|Read|Grep|Glob|LS)$/.test(tool)) return /harness|plumbing|office files/i.test(reason) ? 'office-files' : 'folder';
   return null;
 }

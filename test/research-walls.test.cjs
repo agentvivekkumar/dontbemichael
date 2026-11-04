@@ -304,7 +304,7 @@ test('on Windows, Research command tools are refused outright', async (t) => {
   assert.ok(platform, 'process.platform has a descriptor');
   t.after(() => Object.defineProperty(process, 'platform', platform));
   Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
-  for (const tool of ['Bash', 'PowerShell']) {
+  for (const tool of ['Bash', 'PowerShell', 'Monitor']) {
     const r = hook(R.RESEARCH_ID, 'PreToolUse', { tool_name: tool, tool_input: { command: `Get-Content ${path.join(o.business, 'private.txt')}` } });
     assert.equal(reason(r), R.RESEARCH_WINDOWS_COMMANDS, tool);
   }

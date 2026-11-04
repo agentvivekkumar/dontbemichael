@@ -114,7 +114,7 @@ export const RESEARCH_ONLY_ASKERS = 'Not sent: you write only to a teammate whos
 /** A command an agent asked to run outside its sandbox (every office, ship 2 D16). */
 export const RESEARCH_SANDBOX_ONLY = `In this office, commands run only inside your sandbox, which reaches no website. For something from the internet, ask ${RESEARCH_NAME}; otherwise do it another way.`;
 /** Windows has no Claude Code OS sandbox, so Research's commands cannot safely run. */
-export const RESEARCH_WINDOWS_COMMANDS = 'Research commands are unavailable on Windows because they could reach office files. Use your file tools in your own folders instead.';
+export const RESEARCH_WINDOWS_COMMANDS = 'On Windows your commands do not run, because nothing keeps them out of the office files there. Use your file tools in your own folders instead.';
 /** When the app could not check a tool call, any agent's: Research's file
  *  tools, a shared temp save, or a folder or app folder check that failed. */
 export const RESEARCH_UNCHECKED_TOOL = 'The app could not check this step, so it did not run. Try again shortly.';
