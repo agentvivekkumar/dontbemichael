@@ -62,7 +62,7 @@ test('classes are named radio groups in a fixed order; passwords are locked', ()
 test('Windows owners are told Research is not walled off there', () => {
   // Value: protects=an owner on Windows knows the guard does not fully hold; fails_when=the line is missing or softened; why_new=eng D4, design review D21; seam=source
   assert.match(ui, /const win = window\.cth\.platform === 'win32';/);
-  assert.equal(en.research.windows, 'On Windows, {{name}} can still reach your office files.');
+  assert.equal(en.research.windows, "On Windows, the app refuses {{name}}'s commands.");
 });
 
 test('Windows owners are told the team\'s commands still reach the internet there', () => {

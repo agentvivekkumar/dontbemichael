@@ -263,7 +263,7 @@ and signs you in where you can see it, or takes an Anthropic API key instead.
 
 **Private folders**
 - Michael works in your business folder, and each team member works in its own folder inside it.
-- A team member opens only its own folder. Michael can read his team's folders but not change them. On a Mac, Claude Code's sandbox and the app both enforce this. On Windows, the app checks Claude's file tools, but shell commands are not limited yet.
+- A team member opens only its own folder. Michael can read his team's folders but not change them. On a Mac, Claude Code's sandbox and the app both enforce this. On Windows, the app checks Claude's file tools and refuses Research's commands outright; other team members' shell commands are not limited yet.
 
 **Also**
 - **Updates.** The app tells you when a new version is out and links to the download.
@@ -316,7 +316,8 @@ follow.
   the web or reaches the internet from a command (on a Mac). Every message to them first passes a
   trust layer that keeps out the kinds of data you mark private in Settings, Research & privacy,
   and their answers are cleaned of instructions before your team reads them. They see none of your
-  files, and they are off until you turn them on. On Windows, they can still reach your office files.
+  files, and they are off until you turn them on. On Windows, the app refuses Research's commands
+  outright because Claude Code has no OS sandbox.
   The one exception: when you start your case study, the app reads your logo from your own website.
 - **A case study, only if you send it.** Pulse can build a case study page of your office for
   our website. It goes out only when you press Send, from your own mailbox, after you agree we may

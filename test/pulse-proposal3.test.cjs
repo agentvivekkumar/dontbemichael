@@ -177,6 +177,7 @@ test('a transcript gives working time per request and the steps a setting refuse
   assert.deepEqual(r.refused, [{ ts: t0 + 70_000, gate: 'internet' }]);
   assert.equal(gateOfTool('mcp__md-mail__send', ''), 'mail');
   assert.equal(gateOfTool('mcp__claude_ai_Gmail__search', ''), 'connector');
+  assert.equal(gateOfTool('Monitor', ''), 'sandbox');
   assert.equal(gateOfTool('Edit', 'The harness folder is plumbing only'), 'office-files');
   assert.equal(gateOfTool('Read', 'That folder is private'), 'folder');
 });
