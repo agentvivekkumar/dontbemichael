@@ -1253,7 +1253,11 @@ function TokenLimitEditor({ value, onSet }: { value?: number; onSet: (tokens: nu
         onKeyDown={(e) => {
           if (isComposingKey(e)) return;
           if (e.key === 'Enter') commit();
-          else if (e.key === 'Escape') { skipBlur.current = true; setEditing(false); }
+          else if (e.key === 'Escape') {
+            // One step back: close the editor only, not the panel or fullscreen.
+            e.preventDefault(); e.stopPropagation();
+            skipBlur.current = true; setEditing(false);
+          }
         }}
         onBlur={() => { if (skipBlur.current) { skipBlur.current = false; return; } commit(); }}
         placeholder={t('common.tokens')}
