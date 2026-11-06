@@ -477,27 +477,64 @@ const askedSince = (entry: AskText, since: number): boolean => {
   return Number.isFinite(at) && at >= since;
 };
 
+/** Words that say an ask is about a message someone sent. */
+const EMAIL_ASK = new RegExp([
+  String.raw`\b(repl(y|ies|ied)|thread|e-?mails? from|(his|her|their|its) e-?mails?|wrote (to|back|in)|in (your|the) inbox)\b`,
+  // "Will's email", "José's email", "James' message". Not "let's email", not a
+  // setting ("Pam's email address"), and not our own draft going to someone
+  // ("Pam's email to Northwind").
+  String.raw`(?<![\p{L}\p{M}\p{N}'’])(?!let['’]s\b)[\p{L}\p{M}\p{N}]+(?:['’]s|s['’]) (?:e-?mail|message)s?\b(?! (?:address|signature|account|settings?|access|tone|login|password|connector)s?\b| to\b)`,
+  // "Dana emailed us", "the supplier emailed back".
+  String.raw`\be-?mailed (us|me|you|the office|in|back)\b`,
+  // "the message Will sent", "the email Dana wrote", but not "the quote email be sent".
+  String.raw`\b(?:message|e-?mail) (?!(?:be|is|was|were|been|being|has|had|have|gets?|got)\b)[\p{L}\p{M}]+ (?:sent|wrote)\b`
+].join('|'), 'iu');
+/** A chat context ("the Slack thread", "in Teams"), whose replies have no email:
+ *  link. Plain "teams" or "a quick chat" are ordinary words, not a chat. */
+const CHAT_CONTEXT = /\b(slack|teams|chat|sms|whatsapp|discord|text) (thread|message|reply|replies|channel|dm)s?\b|\b(in|on|over|via) (slack|teams|whatsapp|discord|sms|a chat|the chat)\b/i;
+/** Words for mail, so an ask about both a chat and an email still needs the link. */
+const MAIL_WORDS = /\b(e-?mails?|e-?mailed|inbox|mailbox)\b/i;
+
 /** An ask about a message someone sent (a reply, a thread, an email from
  *  someone) with no link to it, so the owner can't open the original (owner,
  *  2026-11-05: the Will Cox card). Words for sending new mail ("send the quote
  *  email") are not enough. "noEmail": true marks an ask with no message to
- *  link, or one the mail read gave no link for. English words only: the rule
- *  in Michael's instructions covers other languages. */
+ *  link, or one the mail read gave no link for. An ask about a Slack or chat
+ *  thread that names no mail has no email to link. English words only: the
+ *  rule in Michael's instructions covers other languages. */
 export function askMissesEmailLink(entry: AskText | null | undefined, since: number): boolean {
   if (!entry || entry.noEmail === true || entry.kind === 'foundation' || !askedSince(entry, since)) return false;
   const { text } = askWords(entry);
   if (/\]\(email:|<email:/i.test(text)) return false;
-  return /\b(repl(y|ies|ied)|thread|e-?mails? from|(his|her|their|its) e-?mails?|wrote (to|back|in)|in (your|the) inbox)\b/i.test(text);
+  if (CHAT_CONTEXT.test(text) && !MAIL_WORDS.test(text)) return false;
+  return EMAIL_ASK.test(text);
 }
 
+/** An option that sends with the changes. "approve" counts only for what leaves
+ *  the office (a reply, an email, a post, a quote), so "Approve the rota with my
+ *  changes" is not a send. */
+const CHANGE_SENDS = /\b(send|post|publish|go(es)? out)\w*\b[^.]*\bwith (my |your |the )?(changes|edits)\b|\bapprove( (it|the (reply|email|e-mail|post|quote|message|draft|letter)))? with (my |your |the )?(changes|edits)\b|\b(edit|change)\w* (it |them )?(and|then) (send|post|publish)/i;
+const COMES_BACK = String.raw`(show me (it )?again|comes? back|for (another|a) look|review it)`;
+const CHANGE_COMES_BACK = new RegExp(String.raw`\b${COMES_BACK}\b`, 'i');
+/** A denial within four words before coming back: "don't show me again", "I
+ *  don’t need it to come back", "no need for you to show me again". */
+const CHANGE_DENIED = new RegExp(String.raw`\b(don['’]?t|do not|won['’]?t|will not|never|without|no need( for \w+)? to)( \w+){0,4} ${COMES_BACK}`, 'i');
+/** Coming back after the send: it went out first. */
+const CHANGE_AFTER_SEND = new RegExp(String.raw`\b(then|afterwards|after that),? ${COMES_BACK}`, 'i');
+/** A send back to someone in the office ("Send it back to Pam"), which nothing leaves by. */
+const SENDS_BACK = /\bsend (it |them )?back\b/i;
+
 /** A choice that sends something with the owner's changes before they see
- *  them again, which house rule 10 forbids (owner, 2026-11-04). */
+ *  them again, which house rule 10 forbids (owner, 2026-11-04). "Approve with
+ *  my changes" sends too. Coming back only counts when it is not denied just
+ *  before it ("don't show me again") and does not follow a send that goes out
+ *  ("Send with my changes, then show me again"); a "without" elsewhere in the
+ *  label ("Send it with my changes without the discount line, show me again
+ *  first") is about the change, not the look. */
 export function askChangeSends(entry: AskText | null | undefined, since: number): boolean {
   if (!entry || !askedSince(entry, since)) return false;
-  const sends = /\b(send|post|publish|go(es)? out)\w*\b[^.]*\bwith (my |your |the )?(changes|edits)\b|\b(edit|change)\w* (it |them )?(and|then) (send|post|publish)/i;
-  const comesBack = /\b(show me (it )?again|comes? back|for (another|a) look|review it)\b/i;
-  const negated = /\b(don'?t|do not|never|without|no need to)\b/i;
-  return askWords(entry).labels.some((l) => sends.test(l) && (!comesBack.test(l) || negated.test(l)));
+  return askWords(entry).labels.some((l) => CHANGE_SENDS.test(l) && (
+    !CHANGE_COMES_BACK.test(l) || CHANGE_DENIED.test(l) || (CHANGE_AFTER_SEND.test(l) && !SENDS_BACK.test(l))));
 }
 
 /**
