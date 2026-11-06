@@ -133,6 +133,19 @@ test('Esc in the note box closes the note only, never the panel behind it', () =
   assert.equal(columnEscAction({ ...marked, wide: true }), 'none', 'wide panel stays wide');
 });
 
+test('Esc in the token limit box closes the box only, never the panel or fullscreen', () => {
+  // Value: protects=one Esc is one step back; fails_when=the limit box's Esc is left unmarked, so the column closes Michael's panel (or fullscreen exits) on the same key; why_new=bug found by repro (set limit, Esc closed the panel); seam=source pin (no DOM harness) and pure columnEscAction()
+  const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
+  const at = cc.indexOf('function TokenLimitEditor(');
+  assert.ok(at > 0);
+  const editor = cc.slice(at, cc.indexOf('\nfunction ', at + 1));
+  assert.match(editor, /e\.key === 'Escape'\) \{[^}]*e\.preventDefault\(\); e\.stopPropagation\(\);[^}]*setEditing\(false\);/);
+  const { columnEscAction } = loadTs('src/renderer/src/shell/rightColumn.ts');
+  const marked = { key: 'Escape', defaultPrevented: true, inColumn: true, fieldHasText: false, locked: false };
+  assert.equal(columnEscAction(marked), 'none', 'side panel stays open');
+  assert.equal(columnEscAction({ ...marked, wide: true }), 'none', 'wide panel stays wide');
+});
+
 test('the wide choice is remembered on this computer, never set by the window, and the board never goes wide', () => {
   // Value: protects=WD6 and WD1; fails_when=the flag is lost on restart, throws without storage, follows the window size, or widens Needs you; why_new=new flag; seam=source pin
   const store = read('src/renderer/src/store/store.ts');
