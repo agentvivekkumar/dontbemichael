@@ -14,7 +14,9 @@ const {
   classifyPathToken, isPathToken, pathTokenMatcher, stripPathToken
 } = loadTs('src/shared/terminalPaths.ts');
 
-/** Every token the provider would underline on one line of output. */
+/** Every token the pattern matches on one line of output. For a quoted match
+ *  with a space inside, the provider also asks whether the whole is on disk
+ *  first; linkableTokens (tested below with a stub) covers that step. */
 function tokensIn(line) {
   const re = pathTokenMatcher();
   const out = [];
@@ -135,6 +137,75 @@ test('quoted prose that starts with a slash links only the file name inside it',
   assert.deepEqual(tokensIn('note: `./ then open plan.md`'), ['plan.md']);
   // a real path with spaces inside its folder names still links whole
   assert.deepEqual(tokensIn('saved "/Users/Jane/Business Reports/summary.md"'), ['/Users/Jane/Business Reports/summary.md']);
+});
+
+test('quoted prose that starts with a folder links the file name inside it when the whole is not on disk', () => {
+  // Value: protects=a ⌘-click on "/tmp is full, see notes.md" finds notes.md, not a path that leads nowhere (TODOS, terminal links); fails_when=the whole phrase is underlined though it is not known on disk, a real spaced path stops linking whole, or a path with no space is asked about; why_new=review of #436; seam=the onDisk callback stands in for the terminal's stat cache
+  const { linkableTokens, quotedNeedsCheck } = loadTs('src/shared/terminalPaths.ts');
+  const asked = [];
+  const disk = (onDisk) => (raw) => { asked.push(raw); return onDisk.includes(raw); };
+  const prose = 'warn: "/tmp is full, see notes.md" now';
+  assert.deepEqual(linkableTokens(prose, disk([])), [{ raw: 'notes.md', index: prose.indexOf('notes.md') }], 'the file name, at its own offset');
+  assert.deepEqual(asked, ['"/tmp is full, see notes.md"'], 'the disk is asked about the quoted whole');
+
+  const real = 'saved "/Users/Jane/Business Reports/summary.md"';
+  const whole = '"/Users/Jane/Business Reports/summary.md"';
+  assert.deepEqual(linkableTokens(real, disk([whole])), [{ raw: whole, index: real.indexOf(whole) }], 'a real path with spaces links whole');
+
+  asked.length = 0;
+  const plain = 'open "/tmp/report.md" and src/main/a.ts';
+  assert.deepEqual(linkableTokens(plain, disk([])).map((t) => t.raw), ['"/tmp/report.md"', 'src/main/a.ts'], 'no space, no question');
+  assert.deepEqual(asked, [], 'a quoted path with no space is never asked about');
+
+  const failing = () => { throw new Error('ipc gone'); };
+  assert.deepEqual(linkableTokens(prose, failing).map((t) => t.raw), ['notes.md'], 'a failed check counts as not on disk');
+
+  assert.equal(quotedNeedsCheck('"/a b/c.md"'), true);
+  assert.equal(quotedNeedsCheck('"/a/c.md"'), false);
+  assert.equal(quotedNeedsCheck('a b.md'), false, 'unquoted');
+});
+
+test('the fallback links only bare file names, and each quoted match is judged on its own', () => {
+  // Value: protects=a ⌘-click never opens a different file than the one printed (review of #687); fails_when=a piece with a separator falls back and is joined to the agent's folder, or two quoted matches on one line mix up their answers or offsets; why_new=review of #687; seam=the onDisk callback stands in for the terminal's stat cache
+  const { linkableTokens } = loadTs('src/shared/terminalPaths.ts');
+  const none = () => false;
+  // Printed before the file exists: "Reports/summary.md" in the agent's folder may be another, older file.
+  assert.deepEqual(linkableTokens('Writing "/Users/Jane/Office/Q3 Reports/summary.md"', none), [], 'a piece with a slash does not fall back');
+  assert.deepEqual(linkableTokens('Writing "C:\\Users\\Jane\\My Docs\\a.md"', none), [], 'a piece with a backslash does not fall back');
+  assert.deepEqual(linkableTokens('note: "/tmp is full, nothing to see here"', none), [], 'a quoted body with no file name links nothing');
+
+  const line = 'saved "/srv/My Office/plan.md" then "/tmp is full, see notes.md"';
+  const first = '"/srv/My Office/plan.md"';
+  const got = linkableTokens(line, (raw) => raw === first);
+  assert.deepEqual(got, [
+    { raw: first, index: line.indexOf(first) },
+    { raw: 'notes.md', index: line.indexOf('notes.md') }
+  ], 'one on disk links whole, the other falls back, in line order at their own offsets');
+
+  for (const q of ["'", '`']) {
+    const text = `warn: ${q}/tmp is full, see notes.md${q} now`;
+    assert.deepEqual(linkableTokens(text, none), [{ raw: 'notes.md', index: text.indexOf('notes.md') }], `${q} quotes fall back too`);
+    const realQ = `saved ${q}/srv/My Office/plan.md${q}`;
+    assert.deepEqual(linkableTokens(realQ, () => true).map((t) => t.raw), [`${q}/srv/My Office/plan.md${q}`], `${q} quotes link whole when on disk`);
+  }
+});
+
+test('a network path is never stat\'ed: not on hover, not on click', async () => {
+  // Value: protects=hovering or clicking a printed share path never reaches another machine (review of #687: SMB and NTLM on Windows, autofs on macOS); fails_when=a UNC, device or /net path is treated as local, a local path is refused, or main's statAbs stats one; why_new=review of #687; seam=none
+  const { isNetworkPath } = loadTs('src/shared/terminalPaths.ts');
+  for (const p of ['//some-host/share/My Docs/a.md', '\\\\some-host\\share\\a.md', '\\\\?\\UNC\\host\\share\\a.md', '\\\\.\\pipe\\x',
+    '\\/host/share/a.md', '/net/some-host/x/a b.md', '/Network/Servers/host/a.md', '/NET/host/a.md', '  //host/a.md']) {
+    assert.equal(isNetworkPath(p), true, `${p} names another machine`);
+  }
+  for (const p of ['/Users/Jane/a.md', '/tmp/a b.md', 'C:\\Users\\Jane\\a.md', 'C:/Users/a.md', '/netflix/a.md', '/networks/a.md', 'notes.md', '~/a.md', '']) {
+    assert.equal(isNetworkPath(p), false, `${p} is local`);
+  }
+  const { statAbs } = loadTs('src/main/fs.ts');
+  for (const p of ['//some-host/share/a.md', '\\\\some-host\\share\\a.md', '/net/some-host/a.md']) {
+    assert.deepEqual(await statAbs(p), { exists: false, isFile: false, path: '' }, `main refuses ${p} without a stat`);
+  }
+  const here = await statAbs(__filename);
+  assert.equal(here.exists, true, 'a local file is still stat\'ed');
 });
 
 test('quoted versions and prose do not become file paths', () => {

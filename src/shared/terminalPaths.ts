@@ -82,15 +82,75 @@ export type PathAction = 'preview' | 'edit' | 'reveal';
 // start with a slash ("/ see notes.md") has one, so it falls through too.
 const quotedPathRe = (q: string): string =>
   String.raw`${q}(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?!\s)(?:[^${q}\r\n\\/]|(?<!\s)[\\/](?!\s))*\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?${q}`;
+const UNQUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?`;
 const PATH_TOKEN_RE = new RegExp(
-  [quotedPathRe('"'), quotedPathRe("'"), quotedPathRe('`'),
-    String.raw`(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?`].join('|'),
+  [quotedPathRe('"'), quotedPathRe("'"), quotedPathRe('`'), UNQUOTED_PATH].join('|'),
   'g'
 );
 
 /** A fresh matcher. The regex is stateful (`g`), so callers must never share one. */
 export function pathTokenMatcher(): RegExp {
   return new RegExp(PATH_TOKEN_RE.source, 'g');
+}
+
+/**
+ * A path that names another machine: a UNC share (`//host/share`, `\\host\share`),
+ * a Windows device or long path (`\\?\`, `\\.\`), or macOS's automounted network
+ * folders (`/net/host`, `/Network/`). Even a stat of one reaches out: Windows opens
+ * an SMB connection that can send the user's NTLM hash, and macOS autofs contacts
+ * the host. Terminal text is agent output, which can carry text from untrusted
+ * mail or web pages, so such a path is never stat'ed, on hover or on click.
+ */
+export function isNetworkPath(p: string): boolean {
+  const s = String(p ?? '').trim();
+  return /^[\\/]{2}/.test(s) || /^\/(net|network)(\/|$)/i.test(s);
+}
+
+/** A match in its quotes with a space inside: a real path with spaces in a
+ *  folder name ("/Users/Jane/My Reports/summary.md") or quoted prose that starts
+ *  with a folder ("/tmp is full, see notes.md"). No pattern can tell them apart;
+ *  only the disk can. */
+export function quotedNeedsCheck(raw: string): boolean {
+  const q = raw[0];
+  return (q === '"' || q === "'" || q === '`') && raw.length > 2 && raw[raw.length - 1] === q && /\s/.test(raw);
+}
+
+/**
+ * The tokens on a line worth trying as links, each with its offset in `text`. A
+ * quoted match with a space inside is kept whole only when `onDisk` says that
+ * path is known to be on disk; otherwise the bare file names inside it are tried
+ * instead, so "/tmp is full, see notes.md" links notes.md, as quoted prose with
+ * no folder at its start already does.
+ *
+ * Synchronous on purpose: the terminal asks on hover and must answer for the
+ * line as it is now. `onDisk` gets the raw match, quotes and all, and answers
+ * from what is already known (the terminal starts a check in the background for
+ * a path it has not seen, so the next hover links it whole).
+ *
+ * Only a bare file name falls back, never a token with a separator: in
+ * `"/Users/Jane/Q3 Reports/summary.md"` printed before the file exists, the piece
+ * `Reports/summary.md` joined to the agent's folder could open a different, older
+ * file.
+ */
+export function linkableTokens(
+  text: string, onDisk: (raw: string) => boolean
+): Array<{ raw: string; index: number }> {
+  const out: Array<{ raw: string; index: number }> = [];
+  const re = pathTokenMatcher();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[0];
+    let whole = !quotedNeedsCheck(raw);
+    if (!whole) { try { whole = onDisk(raw); } catch { whole = false; } }
+    if (whole) { out.push({ raw, index: m.index }); continue; }
+    const inner = new RegExp(UNQUOTED_PATH, 'g');
+    const body = raw.slice(1, -1);
+    let n: RegExpExecArray | null;
+    while ((n = inner.exec(body)) !== null) {
+      if (!/[\\/]/.test(n[0])) out.push({ raw: n[0], index: m.index + 1 + n.index });
+    }
+  }
+  return out;
 }
 
 /**

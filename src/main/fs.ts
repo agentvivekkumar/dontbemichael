@@ -7,6 +7,7 @@ import { imageMimeForExtension } from '../shared/imageTypes';
 import { NAME_ENDINGS, OPEN_EXTENSIONS, TAB_EXTENSIONS, extensionOf, isNameSpan, kindOf, type AskFileVerdict } from '../shared/askFiles';
 import { isSameOrInside } from './pathInside';
 import { RESEARCH_ID } from '../shared/research';
+import { isNetworkPath } from '../shared/terminalPaths';
 
 /**
  * Lexical containment — pure string math, no filesystem access.
@@ -361,9 +362,14 @@ export function normalizeHiveHome(
 /** Existence/metadata check for an ABSOLUTE path (v0.3.4 — backs the terminal
  *  ⌘-click markdown flow). `~/` is expanded here (the renderer doesn't know
  *  the home dir). Read-only metadata: returns whether a regular file exists and
- *  the normalized absolute path; never file contents. */
+ *  the normalized absolute path; never file contents. A network path is refused
+ *  without a stat (isNetworkPath): the path comes from agent output, and a stat
+ *  of a share reaches out to its host. Checked before expanding, because
+ *  resolve() turns `//host` into `/host` on macOS and Linux. */
 export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boolean; path: string }> {
+  if (isNetworkPath(p)) return { exists: false, isFile: false, path: '' };
   const abs = expandTilde(p);
+  if (isNetworkPath(abs)) return { exists: false, isFile: false, path: '' };
   if (!isAbsolute(abs)) return { exists: false, isFile: false, path: p };
   try {
     const s = await stat(abs);

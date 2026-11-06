@@ -23,7 +23,7 @@ import { arabicJoinRanges } from '@/terminal/arabicJoiner';
 import { attachArabicSpacingFix } from '@/terminal/arabicSpacingFix';
 import { isArabicTerminalEnabled } from '@/terminal/arabicSetting';
 import {
-  classifyPathToken, isPathToken, linkCellRange, pathTokenMatcher, stripPathToken, type PathAction
+  classifyPathToken, isNetworkPath, isPathToken, linkCellRange, linkableTokens, stripPathToken, type PathAction
 } from '@shared/terminalPaths';
 import {
   createTerminalRecoveryState,
@@ -985,7 +985,30 @@ export function disposeTerminal(ptyId: string): void {
 // v0.4.5 widened this from markdown-only to every path token. What each type
 // does lives in @shared/terminalPaths, not here — this file only knows how to
 // find tokens on a line and how to run the three verdicts.
-const mdStatCache = new Map<string, { isFile: boolean; path: string }>();
+type StatResult = { exists: boolean; isFile: boolean; path: string };
+/** One stat per path for hover and click alike: an answer is kept for a few
+ *  seconds (a file saved a moment later is seen on the next look), and a check
+ *  already running is shared, so hovering again never stacks another one on a
+ *  slow path. A network path is never stat'ed (isNetworkPath). */
+const STAT_TTL_MS = 10_000;
+const statCache = new Map<string, { at: number; res: StatResult | null }>();
+const statInFlight = new Map<string, Promise<StatResult | null>>();
+
+function statCached(abs: string): Promise<StatResult | null> {
+  if (isNetworkPath(abs)) return Promise.resolve(null);
+  const hit = statCache.get(abs);
+  if (hit && Date.now() - hit.at < STAT_TTL_MS) return Promise.resolve(hit.res);
+  const running = statInFlight.get(abs);
+  if (running) return running;
+  const check = window.cth.statAbs(abs).catch(() => null).then((res) => {
+    statInFlight.delete(abs);
+    if (statCache.size > 500) statCache.clear();
+    statCache.set(abs, { at: Date.now(), res });
+    return res;
+  });
+  statInFlight.set(abs, check);
+  return check;
+}
 
 function resolvePathCandidate(ptyId: string, raw: string): string | null {
   const p = stripPathToken(raw);
@@ -1021,20 +1044,30 @@ void import('@/store/store')
  *  does not need to pass the verdict along — it only needs to know whether the
  *  file is ours to open at all. */
 async function activatePath(abs: string, action: PathAction): Promise<void> {
-  let hit = mdStatCache.get(abs);
-  if (!hit) {
-    const res = await window.cth.statAbs(abs).catch(() => null);
-    if (!res || !res.exists) return;
-    hit = { isFile: res.isFile, path: res.path };
-    if (mdStatCache.size > 500) mdStatCache.clear();
-    mdStatCache.set(abs, hit);
-  }
+  const hit = await statCached(abs);
+  if (!hit || !hit.exists) return;
   // With the IDE hidden (SHOW_IDE), a file link shows the file in Finder too.
   if (action === 'reveal' || !hit.isFile || !SHOW_IDE) {
     void window.cth.revealPath(hit.path).catch(() => { /* file browser refused */ });
     return;
   }
   storeApi?.getState().openFileInIde(hit.path);
+}
+
+/** Is a quoted match with a space inside known to be a real path on disk, so it
+ *  links whole? Answered now, from what is already known, because the link
+ *  provider must answer for the line as it is (a late answer can land on a line
+ *  that has scrolled or on another hovered line). A path not seen yet counts as
+ *  not on disk this time, so only the file names inside it link, and a check
+ *  starts in the background; the next hover links the whole path. A path that
+ *  does not resolve (no cwd yet) or names another machine is never on disk. */
+function quotedKnownOnDisk(ptyId: string, raw: string): boolean {
+  const abs = resolvePathCandidate(ptyId, raw);
+  if (!abs || isNetworkPath(abs)) return false;
+  const hit = statCache.get(abs);
+  if (hit && Date.now() - hit.at < STAT_TTL_MS) return !!hit.res?.exists;
+  void statCached(abs);
+  return false;
 }
 
 /** A buffer line's cells as linkCellRange reads them. */
@@ -1055,14 +1088,11 @@ function registerMarkdownLinkProvider(term: Terminal, ptyId: string): void {
         const text = line ? line.translateToString(true) : '';
         if (!text || !text.includes('.')) { callback(undefined); return; }
         const links: Parameters<typeof callback>[0] = [];
-        const re = pathTokenMatcher();
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(text)) !== null) {
-          const raw = m[0];
+        for (const { raw, index } of linkableTokens(text, (raw) => quotedKnownOnDisk(ptyId, raw))) {
           const abs = resolvePathCandidate(ptyId, raw);
           if (!abs) continue;
           const action = classifyPathToken(stripPathToken(raw));
-          const span = line ? linkCellRange(cellsOf(line), m.index, m.index + raw.length, raw) : null;
+          const span = line ? linkCellRange(cellsOf(line), index, index + raw.length, raw) : null;
           if (!span) continue;
           links!.push({
             range: {

@@ -399,20 +399,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Priority:** P3
 **Depends on:** None
 
-## Terminal links (from the ship review of mit/named-links, 2026-10-13)
-
-### A quoted phrase that starts with a slash links as a path
-
-**What:** Quoted prose that starts with a real folder still links as one path: "/tmp is full, see notes.md" underlines the whole phrase and ⌘-click finds nothing. PR 378 (2026-10-17) fixed the case with a space next to a slash ("/ see notes.md" now links only notes.md); a phrase like this one has no such space, so the pattern cannot tell it from a real file named with spaces.
-
-**Why:** A link that leads nowhere reads as broken.
-
-**Context:** `PATH_TOKEN_RE` (`quotedPathRe`) in `src/shared/terminalPaths.ts`. Fix: check a quoted match exists on disk before underlining it (the chip path already does), and fall back to the file name inside it when it does not.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ## Reset (deferred from the ship of mit/named-links, 2026-10-14)
 
 ### Clear what a reset could not remove on the next launch
