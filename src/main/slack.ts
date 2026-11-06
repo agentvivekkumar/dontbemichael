@@ -366,6 +366,8 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+const SLACK_POST_TIMEOUT_MS = 15_000;
+
 /**
  * Post a reply into a Slack thread via `chat.postMessage` — a raw `node:https`
  * POST (no `@slack/*` dep), matching the repo's zero-SDK approach. The bot token
@@ -408,7 +410,12 @@ export function postSlackReply(opts: {
           resolve({ ok: json.ok === true, error: json.error });
         } catch { resolve({ ok: false, error: 'bad response from Slack' }); }
       });
+      // A connection cut mid-answer sends only 'close', never 'end' or 'error'.
+      res.on('close', () => { if (!res.complete) resolve({ ok: false, error: 'connection closed before Slack answered' }); });
     });
+    // Without a limit one stalled post holds the done poller forever, so no
+    // later task gets its reply this session.
+    req.setTimeout(SLACK_POST_TIMEOUT_MS, () => req.destroy(new Error('Slack did not answer in time')));
     req.on('error', (e) => resolve({ ok: false, error: errMsg(e) }));
     req.write(body);
     req.end();
