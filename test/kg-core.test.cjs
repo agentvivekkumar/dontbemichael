@@ -224,6 +224,73 @@ function writeFixture(dir, name, content) {
     assert.strictEqual(kg.search(root, 'free free free shipping')[0].score, once);
   });
 
+  // ─── search: rare terms weigh more ──────────────────────────────────────
+  test('termWeights: a term in every chunk weighs 1, a rarer one more, an absent one nothing', () => {
+    const w = kg.termWeights({ time: 4, warranty: 1 }, 4);
+    assert.strictEqual(w.time, 1, 'in every chunk');
+    assert.ok(Math.abs(w.warranty - (1 + Math.log(4))) < 1e-9, 'in one chunk of four');
+    assert.strictEqual(w.refund, undefined, 'in no chunk');
+    assert.strictEqual(kg.termWeights({ time: 1 }, 1).time, 1, 'a store of one chunk weighs every term 1');
+  });
+
+  test('termWeights: a term rarer than one chunk in ten weighs no more than one in ten', () => {
+    const cap = 1 + Math.log(10);
+    assert.ok(Math.abs(kg.termWeights({ typo: 1 }, 2000).typo - cap) < 1e-9, 'one chunk of 2,000');
+    assert.ok(Math.abs(kg.termWeights({ rare: 10 }, 100).rare - cap) < 1e-9, 'one chunk in ten');
+    assert.ok(kg.termWeights({ common: 50 }, 100).common < cap);
+  });
+
+  test('scoreChunk: a stray number in one log line does not outrank the passage the query is about', () => {
+    // Review of #685: "refund for order 4471" in a 2,000 chunk store.
+    const weights = kg.termWeights({ refund: 50, order: 300, 4471: 1 }, 2000);
+    const terms = kg.tokenize('refund for order 4471');
+    const policy = kg.scoreChunk({ title: 'Refund Policy', text: 'Ask for a refund within 30 days of your order.' }, terms, 'refund for order 4471', { weights });
+    const log = kg.scoreChunk({ title: 'Sync log', text: 'synced order 4471 at 09:12' }, terms, 'refund for order 4471', { weights });
+    assert.ok(policy > log, `policy ${policy} should beat the log line ${log}`);
+  });
+
+  test('scoreChunk: a rare term in the title keeps its pull against more hits in a body', () => {
+    // Review of #685: "zebrafish" in 2 chunks of 1,000; the title boost grows with the weight.
+    const weights = kg.termWeights({ zebrafish: 2 }, 1000);
+    const terms = kg.tokenize('zebrafish');
+    const titled = kg.scoreChunk({ title: 'Zebrafish', text: 'The zebrafish tank is in room 4.' }, terms, 'zebrafish', { weights });
+    const untitled = kg.scoreChunk({ title: 'Notes', text: 'zebrafish zebrafish zebrafish feeding times' }, terms, 'zebrafish', { weights });
+    assert.ok(titled > untitled, `titled ${titled} should beat untitled ${untitled}`);
+  });
+
+  test('search: a rare word that answers the query outranks a common word said often', () => {
+    const root = tmpRoot();
+    for (let i = 0; i < 5; i++) {
+      kg.ingest(root, { title: `Rota ${i}`, text: `Opening time is nine. Closing time is five. Lunch time is noon.` });
+    }
+    const warranty = kg.ingest(root, { title: 'Repairs', text: 'Our warranty covers one year of parts.' });
+    // Not a phrase in any text, so only the term scores decide.
+    const hits = kg.search(root, 'warranty time');
+    assert.strictEqual(hits[0].docId, warranty.docId, 'the warranty passage comes first');
+    assert.strictEqual(hits.length, 6, 'the passages that only say time still come back');
+  });
+
+  test('search: a passage with no query term is not kept, but still counts toward the weights', () => {
+    const root = tmpRoot();
+    for (let i = 0; i < 3; i++) kg.ingest(root, { title: `Menu ${i}`, text: 'Soup of the day and fresh bread.' });
+    const text = 'Our warranty covers one year of parts.';
+    kg.ingest(root, { title: 'Repairs', text });
+    const hits = kg.search(root, 'warranty');
+    assert.strictEqual(hits.length, 1, 'only the passage holding the term comes back');
+    // Weighed against all four chunks, not just the one kept.
+    const weights = kg.termWeights({ warranty: 1 }, 4);
+    const expected = kg.scoreChunk({ title: 'Repairs', text }, kg.tokenize('warranty'), 'warranty', { weights });
+    assert.strictEqual(hits[0].score, Math.round(expected * 1000) / 1000);
+  });
+
+  test('search: a store of one passage scores as it did before weights', () => {
+    const root = tmpRoot();
+    kg.ingest(root, { title: 'Shipping', text: 'We ship in three days. Shipping is free over fifty dollars.' });
+    const terms = kg.tokenize('free shipping');
+    const unweighted = kg.scoreChunk({ title: 'Shipping', text: 'We ship in three days. Shipping is free over fifty dollars.' }, terms, 'free shipping');
+    assert.strictEqual(kg.search(root, 'free shipping')[0].score, Math.round(unweighted * 1000) / 1000);
+  });
+
   test('search: a passage inside the overlap of two chunks comes back once', () => {
     const sentence = 'The quarterly zebrafish audit happens in March.';
     let inTwoChunks = 0;
