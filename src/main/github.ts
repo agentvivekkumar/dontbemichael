@@ -1,4 +1,20 @@
 import { spawn } from 'node:child_process';
+import { userShellPath } from './shellEnv';
+
+/** `gh` is usually a Homebrew install, and an app opened from the Dock gets
+ *  launchd's bare PATH, which doesn't have it: from there every call failed
+ *  with `spawn gh ENOENT` while the same gh worked in Terminal. Run it with the
+ *  user's login shell PATH, as the engine spawns do. Windows keeps its own
+ *  (spreading process.env there gives `Path`, and adding `PATH` would make a
+ *  second key). */
+function ghEnv(): NodeJS.ProcessEnv | undefined {
+  return process.platform === 'win32' ? undefined : { ...process.env, PATH: userShellPath() };
+}
+
+/** A missing gh says so in words, not as `spawn gh ENOENT`. */
+function spawnError(e: NodeJS.ErrnoException): string {
+  return e.code === 'ENOENT' ? 'GitHub CLI (gh) not found. Install it from https://cli.github.com' : e.message;
+}
 
 /** A GitHub issue, normalized for the renderer (labels/assignees flattened to names). */
 export interface GHIssue {
@@ -33,13 +49,13 @@ export function listIssues(cwd: string): Promise<{ ok: boolean; issues?: GHIssue
     const proc = spawn(
       'gh',
       ['issue', 'list', '--json', 'number,title,body,assignees,labels,url,state', '--limit', '30'],
-      { cwd }
+      { cwd, env: ghEnv() }
     );
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d) => { stdout += d.toString(); });
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
-    proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+    proc.on('error', (e) => resolve({ ok: false, error: spawnError(e) }));
     proc.on('close', (code) => {
       if (code !== 0) {
         resolve({ ok: false, error: stderr.trim() || `gh exited ${code}` });
@@ -93,13 +109,13 @@ export function listCIRuns(cwd: string): Promise<{ ok: boolean; runs?: CIRun[]; 
     const proc = spawn(
       'gh',
       ['run', 'list', '--limit', '5', '--json', 'name,status,conclusion,url,databaseId'],
-      { cwd }
+      { cwd, env: ghEnv() }
     );
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d) => { stdout += d.toString(); });
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
-    proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+    proc.on('error', (e) => resolve({ ok: false, error: spawnError(e) }));
     proc.on('close', (code) => {
       if (code !== 0) {
         resolve({ ok: false, error: stderr.trim() || `gh exited ${code}` });
