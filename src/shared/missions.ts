@@ -196,6 +196,38 @@ export function catchUpFloor(m: ScheduledMission): number {
   return Math.max(m.lastFiredAt ?? 0, m.scheduledSince ?? 0);
 }
 
+/**
+ * When a weekly or "times" mission runs next, as an absolute time and a wait
+ * from `now`, or null when it never runs again. `served` is the slot the timer
+ * just ran (0 on a plain re-arm), `floor` is catchUpFloor of the stored mission.
+ *
+ * setTimeout counts on the monotonic clock while slots are wall clock times,
+ * and over a wait of up to a week an NTP correction moves Date.now() by
+ * anything from milliseconds to seconds. A timer that wakes even 1 ms before
+ * its slot by the wall clock used to ask for "the first slot after now", get
+ * the same slot back, and send the run a second time a moment later. So the
+ * next slot is reckoned from the later of now and the slot just served, and
+ * that slot also counts as run for the catch-up rule.
+ *
+ * Only a slot a little ahead is trusted. After the clock is set back by days,
+ * the served slot sits far in the future: reckoning from it would wait out the
+ * whole jump, and past setTimeout's 24.8 day limit Node fires after 1 ms, so
+ * every run would arm the next one further ahead and loop. Then it is a plain
+ * re-arm from now, as before.
+ */
+export const EARLY_WAKE_MAX_MS = 5 * 60_000;
+
+export function nextSlotAfter(
+  plan: Extract<ArmPlan, { type: 'weekly' | 'times' }>, now: number, floor: number, served = 0
+): { at: number; delayMs: number } | null {
+  const from = served > now && served - now <= EARLY_WAKE_MAX_MS ? served : now;
+  const ranUntil = served ? Math.max(floor, from) : floor;
+  const delay = plan.type === 'times' ? timesDelayMs(plan.times, from, ranUntil) : weeklyDelayMs(plan.weekly, from, ranUntil);
+  if (delay === null) return null;
+  const at = from + delay;
+  return { at, delayMs: at - now };
+}
+
 /** How the scheduler should arm `m` at `now`. The same decisions syncMissions
  *  made inline before this module existed; see test/missions.test.cjs. */
 export function armPlan(m: ScheduledMission, now: number, ctx: ArmContext): ArmPlan {
