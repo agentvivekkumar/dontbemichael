@@ -105,7 +105,7 @@ import { readClaudePlan } from './claudeAccount';
 import { planPrice, PLAN_LABELS, PLAN_PRICES } from '../shared/claudePlan';
 import { claudeProjectsRoot, projectDir, projectDirs, readAgentUsage, readContextTokens, seedSessionTranscript, resolveSessionCwd } from './transcript';
 import { listIssues, listCIRuns } from './github';
-import { SlackWebhookServer, SlackReplyServer, postSlackReply, type SlackEventFile } from './slack';
+import { SlackWebhookServer, SlackReplyServer, postSlackReply, slackDoneVerdict, SLACK_UNSURE_TRIES, SLACK_TIMEOUT_ERROR, type SlackEventFile } from './slack';
 import {
   WebhookServer,
   type WebhookDispatch, type WebhookEndpointRef, type WebhookInbound, type WebhookTaskStatus
@@ -2901,6 +2901,8 @@ The request starts now: `;
 let slackDoneTimer: ReturnType<typeof setInterval> | null = null;
 /** Re-entrancy guard so a slow post can't overlap the next tick. */
 let slackDonePolling = false;
+/** Task id → posts that got no answer from Slack this session (see slackDoneVerdict). */
+const slackDoneUnsure = new Map<string, number>();
 /** Task ids already notified — exactly-once across re-reads AND restarts. Lazily
  *  loaded from / persisted to `slackDoneNotifiedPath()`. */
 let slackDoneNotified: Set<string> | null = null;
@@ -3215,9 +3217,27 @@ async function pollSlackDoneTasks(): Promise<void> {
         console.error('[slack] done-summary post for task', t.id,
           '— giving up (terminal error:', res.error + '). Fix the Slack bot scope/permissions; later tasks post once resolved.');
       } else {
-        // Transient (network / rate-limit / unknown) → leave unmarked so a later
-        // tick retries. Log the id + error only; never the token or message body.
-        console.error('[slack] done-summary post failed for task', t.id, '-', res.error, '(will retry)');
+        // Log the id + error only; never the token or message body.
+        const verdict = slackDoneVerdict(res, slackDoneUnsure.get(t.id) ?? 0);
+        if (verdict === 'retry') {
+          if (res.unsure) slackDoneUnsure.set(t.id, (slackDoneUnsure.get(t.id) ?? 0) + 1);
+          console.error('[slack] done-summary post failed for task', t.id, '-', res.error, '(will retry)');
+          // A wait with no answer means Slack or the route is down: the rest
+          // try on a later tick, so an outage costs one wait per pass, not one
+          // per pending task. A plain error from Slack belongs to this task
+          // only (thread_not_found, say), so the others still go.
+          if (res.unsure || res.error === SLACK_TIMEOUT_ERROR) break;
+          continue;
+        }
+        slackDoneUnsure.delete(t.id);
+        notified.add(t.id);
+        persistSlackDoneNotified(notified);
+        if (verdict === 'posted') {
+          console.error('[slack] done-summary post for task', t.id, '-', res.error, '(Slack answered first; counted as posted)');
+        } else {
+          console.error('[slack] done-summary post for task', t.id, '- giving up after', SLACK_UNSURE_TRIES, 'tries:', res.error);
+          break;
+        }
       }
     }
   } finally {
