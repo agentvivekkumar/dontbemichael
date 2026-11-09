@@ -1724,7 +1724,7 @@ export class HiveManager {
       if (agent.role === next) return { ok: true };
       agent.role = next;
       agent.lastSeen = Date.now();
-      this.writeJson(join(root, 'registry.json'), reg);
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
       if (id === RESEARCH_ID) this.makeResearchFolderSafe();
       this.atomicWriteText(join(this.agentDir(id), 'identity.md'), this.identityText(agent));
       this.appendLog({ kind: 'role', agentId: id, role: next });
@@ -1796,7 +1796,7 @@ export class HiveManager {
       if (!!agent.onHold === hold) return { ok: true, onHold: hold };
 
       agent.onHold = hold;
-      this.writeJson(join(root, 'registry.json'), reg);
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
 
       const fleetPath = join(root, 'fleet.json');
       if (existsSync(fleetPath)) {
@@ -1841,7 +1841,7 @@ export class HiveManager {
       const previousName = agent.name;
       agent.name = nextName;
       this.researchNameMemo = null;
-      this.writeJson(join(root, 'registry.json'), reg);
+      this.atomicWriteJson(join(root, 'registry.json'), reg);
 
       // fleet.json is ephemeral and may not exist yet. When it does, keep its
       // display name in lockstep with the registry so rosterContext() is fresh.
