@@ -592,6 +592,32 @@ function parseJsonText(text: string): unknown {
   return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
 }
 
+/** Put our hook group under `key` in a hooks file another tool owns, keeping
+ *  everything else in it. That file is the user's: when it is not a plain JSON
+ *  object (a comment or trailing comma from a hand edit, a file the tool was
+ *  halfway through saving) it is left exactly as it is and this throws,
+ *  because rewriting it from {} would delete the user's own hooks. An empty
+ *  file counts as {}. The write stays in place, as before, so a dotfiles link,
+ *  a hard link or a file in a read-only folder keeps working. */
+function mergeForeignHooks(p: string, key: string, group: unknown): void {
+  let text: string | null = null;
+  try { text = readFileSync(p, 'utf8'); } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+  }
+  let existing: Record<string, unknown> = {};
+  if (text !== null && text.replace(/^\uFEFF/, '').trim() !== '') {
+    let parsed: unknown;
+    try { parsed = parseJsonText(text); } catch { parsed = undefined; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`left ${p} as it is: it is not plain JSON (a comment, a trailing comma or a half-saved file?), and rewriting it would drop the hooks already in it`);
+    }
+    existing = parsed as Record<string, unknown>;
+  }
+  if (JSON.stringify(existing[key]) === JSON.stringify(group)) return;
+  existing[key] = group;
+  writeFileSync(p, JSON.stringify(existing, null, 2), 'utf8');
+}
+
 /** Write over an agent's own file in place, only when it is a plain file
  *  with one name: never through a link or a second name it made for a file
  *  of someone else's (red team, third ship). Throws otherwise. */
@@ -5487,8 +5513,8 @@ export class HiveManager {
    *  hooks.json`, so we write BOTH; (2) on Windows commands go to cmd.exe and
    *  agy mangles embedded quotes, so that platform retains the legacy form.
    *  Runtime-scoped by AGENT_ID (the shim no-ops for non-hive agy sessions), so
-   *  this global config never disturbs the user's own `agy` usage. Best-effort,
-   *  idempotent (only our own group is overwritten). */
+   *  this global config never disturbs the user's own `agy` usage. Idempotent,
+   *  and only our own group is ever changed (mergeForeignHooks). */
   private installAgyHooks(): void {
     const root = this.root();
     if (!root) return;
@@ -5514,17 +5540,19 @@ export class HiveManager {
       Stop: [plain('Stop')]
     };
     const gem = join(homedir(), '.gemini');
+    // Each file on its own, so one we can't touch doesn't stop the other. A
+    // failure is reported (the spawn logs it as a bridge install failure)
+    // instead of swallowed: without our group agy runs with no hive events.
+    const failed: string[] = [];
     for (const p of [join(gem, 'config', 'hooks.json'), join(gem, 'antigravity-cli', 'hooks.json')]) {
       try {
         mkdirSync(dirname(p), { recursive: true });
-        let existing: Record<string, unknown> = {};
-        if (existsSync(p)) {
-          try { existing = JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>; } catch { existing = {}; }
-        }
-        existing['munder-hive'] = group;
-        writeFileSync(p, JSON.stringify(existing, null, 2), 'utf8');
-      } catch { /* best-effort per file */ }
+        mergeForeignHooks(p, 'munder-hive', group);
+      } catch (e) {
+        failed.push(e instanceof Error ? e.message : String(e));
+      }
     }
+    if (failed.length) throw new Error(`agy hooks not installed: ${failed.join('; ')}`);
   }
 
   /** Official Google Gemini CLI lifecycle bridge. Gemini's hook payload is
