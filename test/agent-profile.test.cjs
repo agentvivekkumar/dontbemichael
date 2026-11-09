@@ -9,7 +9,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
-const { parseRoleLine, workStyleBody } = loadTs('src/shared/agentProfile.ts');
+const { parseRoleLine, profileDuties, workStyleBody } = loadTs('src/shared/agentProfile.ts');
+const { plainFallback, plainParts } = loadTs('src/shared/workStyleText.ts');
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8');
 
 const PAM = 'Executive Admin: Pam sorts the business inbox: email from clients, prospects, vendors and software services, urgent and due soon messages, newsletters and junk. Send here for "anything important in email", "did the client reply" or inbox cleanup. Not for writing answers to customer questions; that goes to Customer Support.';
@@ -44,6 +45,77 @@ test('the work style drops the line that addresses the agent', () => {
   assert.equal(workStyleBody(undefined), '');
 });
 
+const BOOKS = [
+  '### The job',
+  'Keep the books current so the owner knows where money stands.',
+  '### How to work',
+  'Reconcile the bank feed every morning, so errors surface early. File receipts the same day because the accountant asks.',
+  '### Needs the owner\'s approval',
+  'Any payment over $500, because cash is tight.',
+  '### First task',
+  'Set up the chart of accounts in the owner\'s tool.'
+].join('\n');
+
+test('a later section stays out of what they do and what asks the owner first', () => {
+  const duties = profileDuties(BOOKS);
+  assert.equal(duties.found, true);
+  assert.deepEqual(duties.does, [
+    'Reconcile the bank feed every morning, so errors surface early.',
+    'File receipts the same day because the accountant asks.'
+  ]);
+  assert.deepEqual(duties.asksFirst, ['Any payment over $500, because cash is tight.']);
+  assert.ok(duties.does.concat(duties.asksFirst).every((line) => !/First task|chart of accounts/.test(line)));
+});
+
+test('a paragraph splits on its own, even when another section is already a list', () => {
+  const duties = profileDuties([
+    '### How to work',
+    'Reconcile the bank feed every morning, so errors surface early. File receipts the same day because the accountant asks.',
+    '### Needs the owner\'s approval',
+    'Any payment over $500, because cash is tight.',
+    'Send a wire, because the bank needs a person.',
+    '### Weekly report',
+    'What came in and what went out.'
+  ].join('\n'));
+  assert.deepEqual(duties.does, [
+    'Reconcile the bank feed every morning, so errors surface early.',
+    'File receipts the same day because the accountant asks.'
+  ]);
+  assert.deepEqual(duties.asksFirst, [
+    'Any payment over $500, because cash is tight.',
+    'Send a wire, because the bank needs a person.'
+  ]);
+});
+
+test('a work style with no such sections leaves the pack lists in place', () => {
+  assert.deepEqual(profileDuties('Helps with whatever comes up.'), { found: false, does: [], asksFirst: [] });
+  assert.deepEqual(profileDuties(undefined), { found: false, does: [], asksFirst: [] });
+  assert.equal(profileDuties('How to work the dough takes practice.').found, false);
+  const duties = profileDuties('How the work is done: Checks the bookings each morning.');
+  assert.equal(duties.found, true);
+  assert.deepEqual(duties.asksFirst, []);
+});
+
+test('Edit agent shows a later section as its own part, not as an approval', () => {
+  const parts = plainParts(plainFallback(BOOKS, 'Bookkeeper'));
+  const asks = parts.find((p) => /asks the owner first/i.test(p.label));
+  assert.ok(asks, parts.map((p) => p.label).join(' | '));
+  assert.doesNotMatch(asks.text, /First task|chart of accounts/);
+  const weekly = plainParts(plainFallback([
+    '### How to work',
+    'Reconcile the bank feed every morning.',
+    '### Needs the owner\'s approval',
+    'Any payment over $500, because cash is tight.',
+    '### Weekly report',
+    'What came in and what went out.'
+  ].join('\n'), 'Bookkeeper'));
+  const weekAsks = weekly.find((p) => /asks the owner first/i.test(p.label));
+  assert.ok(weekAsks);
+  assert.doesNotMatch(weekAsks.text, /What came in/);
+  assert.ok(weekly.some((p) => /weekly report/i.test(p.label) && /What came in/.test(p.text)));
+  assert.match(read('src/renderer/src/components/EditAgentModal.tsx'), /<JobParts plain=\{plain\}/);
+});
+
 test('Profile is the first tab on every agent, and new windows open on it', () => {
   const tabs = read('src/renderer/src/components/SidebarTabs.tsx');
   assert.equal([...tabs.matchAll(/\{ key: '(\w+)',/g)].map((m) => m[1])[0], 'profile');
@@ -52,6 +124,15 @@ test('Profile is the first tab on every agent, and new windows open on it', () =
   assert.match(read('src/renderer/src/store/store.ts'), /\/\/ First visit: the agent's Profile, the first tab \(owner, 2026-09-25\)\.\n  return 'profile';/);
   const cc = read('src/renderer/src/components/CommandCenterPanel.tsx');
   assert.match(cc, /\{tab === 'profile' && <ProfileTab agent=\{agent\} \/>\}/);
+});
+
+test('a saved work style replaces the pack lists, and Michael keeps his own', () => {
+  const src = read('src/renderer/src/components/ProfileTab.tsx');
+  assert.match(src, /const duties = god \? undefined : profileDuties\(effectiveWorkStyle\(agent\)\)/);
+  assert.match(src, /duties\?\.found \? duties\.does : \(card\?\.does \?\? \[\]\)/);
+  assert.match(src, /duties\?\.found \? duties\.asksFirst : \(card\?\.wontDo \?\? \[\]\)/);
+  assert.match(src, /god\s*\?\s*\(t\('profile\.god\.does'/);
+  assert.match(src, /god\s*\?\s*\(t\('profile\.god\.asksFirst'/);
 });
 
 test('the profile reads the pack card for this office, with sections an owner scans', () => {
