@@ -366,6 +366,24 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+const SLACK_POST_TIMEOUT_MS = 15_000;
+export const SLACK_TIMEOUT_ERROR = 'Slack did not answer in time';
+
+/** What a reply post came to. `chat.postMessage` takes no idempotency key, so a
+ *  post that failed part way says how far it got:
+ *  - `answered`: Slack sent its headers, then the connection was cut. Slack has
+ *    handled the request, so the message is very likely in the thread.
+ *  - `unsure`: the connection was up but no answer came. The message may or may
+ *    not be posted.
+ *  Neither is set when the request never reached Slack (offline, DNS), so a
+ *  retry can't post twice. */
+export interface SlackPostResult {
+  ok: boolean;
+  error?: string;
+  answered?: true;
+  unsure?: true;
+}
+
 /**
  * Post a reply into a Slack thread via `chat.postMessage` — a raw `node:https`
  * POST (no `@slack/*` dep), matching the repo's zero-SDK approach. The bot token
@@ -377,7 +395,9 @@ export function postSlackReply(opts: {
   channel: string;
   thread_ts: string;
   text: string;
-}): Promise<{ ok: boolean; error?: string }> {
+  /** Whole-post deadline; tests pass a short one. */
+  timeoutMs?: number;
+}): Promise<SlackPostResult> {
   return new Promise((resolve) => {
     if (!opts.botToken) { resolve({ ok: false, error: 'missing bot token' }); return; }
     // CLAUSE-1 guard (fix-slack-integration): refuse any send that lacks an
@@ -389,6 +409,18 @@ export function postSlackReply(opts: {
     if (!opts.channel?.trim() || !opts.thread_ts?.trim()) {
       resolve({ ok: false, error: 'missing explicit channel or thread_ts' }); return;
     }
+    let connected = false;
+    let status = 0; // set once Slack's headers arrive
+    let settled = false;
+    const done = (r: SlackPostResult): void => {
+      if (settled) return;
+      settled = true; clearTimeout(deadline); resolve(r);
+    };
+    const fail = (error: string): void => {
+      if (status) done({ ok: false, error: `connection cut after Slack answered (HTTP ${status})`, answered: true });
+      else if (connected) done({ ok: false, error, unsure: true });
+      else done({ ok: false, error });
+    };
     const body = JSON.stringify({ channel: opts.channel, thread_ts: opts.thread_ts, text: opts.text });
     const req = httpsRequest({
       method: 'POST',
@@ -400,19 +432,49 @@ export function postSlackReply(opts: {
         authorization: `Bearer ${opts.botToken}`
       }
     }, (res) => {
+      status = res.statusCode ?? 200;
       const chunks: Buffer[] = [];
       res.on('data', (c: Buffer) => chunks.push(c));
       res.on('end', () => {
         try {
           const json = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { ok?: boolean; error?: string };
-          resolve({ ok: json.ok === true, error: json.error });
-        } catch { resolve({ ok: false, error: 'bad response from Slack' }); }
+          done({ ok: json.ok === true, error: json.error });
+        } catch { done({ ok: false, error: 'bad response from Slack' }); }
       });
+      // A connection cut mid-answer sends only 'close', never 'end' or 'error'.
+      res.on('close', () => { if (!res.complete) fail('connection cut'); });
     });
-    req.on('error', (e) => resolve({ ok: false, error: errMsg(e) }));
+    req.on('socket', (s) => {
+      if (!s.connecting) connected = true;
+      else s.once('connect', () => { connected = true; });
+    });
+    // A wall clock, not req.setTimeout: that idle timer starts only once the
+    // socket connects, so a dead route waits out the OS connect timeout (about
+    // 75 s on macOS) and a server trickling bytes never trips it. One stalled
+    // post holds the done poller, so no later task gets its reply.
+    const deadline = setTimeout(() => req.destroy(new Error(SLACK_TIMEOUT_ERROR)),
+      opts.timeoutMs ?? SLACK_POST_TIMEOUT_MS);
+    req.on('error', (e) => fail(errMsg(e)));
     req.write(body);
     req.end();
   });
+}
+
+/** Tries a done reply gets when Slack may have posted it without answering. */
+export const SLACK_UNSURE_TRIES = 3;
+
+/**
+ * What the done poller does with a post that didn't fail for good: `posted`
+ * marks the task notified, `retry` leaves it for a later tick, `give-up` marks
+ * it notified unposted. A post Slack answered counts as posted. A post with no
+ * answer is retried at most SLACK_UNSURE_TRIES times in all, since each retry
+ * may add a copy to the thread. One that never reached Slack is retried freely.
+ * `unsureTries` is how many unsure posts this task had before this one.
+ */
+export function slackDoneVerdict(res: SlackPostResult, unsureTries: number): 'posted' | 'retry' | 'give-up' {
+  if (res.ok || res.answered) return 'posted';
+  if (res.unsure && unsureTries + 1 >= SLACK_UNSURE_TRIES) return 'give-up';
+  return 'retry';
 }
 
 /** Per-session shared secret + lazy bot-token accessor for the reply endpoint. */
