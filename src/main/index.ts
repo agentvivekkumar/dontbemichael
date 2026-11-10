@@ -60,7 +60,7 @@ import { ensureCheckedBackfill } from './checkedBackfill';
 import { normalizeWeekly } from '../shared/weeklySchedule';
 import { normalizeTimes } from '../shared/scheduleTimes';
 import {
-  armPlan, catchUpFloor, nextSlotAfter, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf, runNowCheck,
+  armPlan, catchUpFloor, nextSlotAfter, servedStamp, firePayload, upsertMission, deleteMission, setMissionEnabled, pauseMissionsOf, runNowCheck,
   migrateMissions, clampIntervals, foldScheduleRequests, cleanFocus, scheduledJobsBlock,
   heartbeatDelayMs, heartbeatFirstDelayMs
 } from '../shared/missions';
@@ -1844,8 +1844,9 @@ function clearMissionTimers(): void {
 
 /** Send one schedule run to its agent and stamp lastFiredAt. A 'compact'
  *  maintenance mission carries no dispatch (firePayload is null), so only the
- *  stamp happens. */
-function sendMission(m: ScheduledMission): void {
+ *  stamp happens. `served` is the slot a weekly or "times" timer ran, so the
+ *  stamp names that slot when the timer woke a little early (servedStamp). */
+function sendMission(m: ScheduledMission, served?: number): void {
   const payload = firePayload(m);
   if (payload && hive.enabled()) {
     hive.send({ to: payload.to, act: 'inform', subject: payload.subject, body: payload.body }, 'scheduler');
@@ -1856,7 +1857,7 @@ function sendMission(m: ScheduledMission): void {
   // window set per agent at spawn (AUTO_COMPACT_WINDOW_TOKENS).
   const current = readConfig().missions ?? [];
   const next = current.map((x) =>
-    x.id === m.id ? { ...x, lastFiredAt: Date.now() } : x
+    x.id === m.id ? { ...x, lastFiredAt: servedStamp(Date.now(), served) } : x
   );
   writeConfig({ missions: next });
   // Let the SCHEDULES panel refresh its "last fired" without a reload (#2.3).
@@ -1881,11 +1882,11 @@ function syncMissions(): void {
     // with an adaptive cadence. Registered into the same missionTimers map so
     // clearMissionTimers() tears it down identically on quit/reset.
     if (plan.type === 'heartbeat') { armHeartbeat(m); continue; }
-    const fire = (): void => {
+    const fire = (served?: number): void => {
       try {
         // Runs as configured, a break included (owner): the job lands in the
         // inbox, and the break only holds the nudge that delivers it.
-        sendMission(m);
+        sendMission(m, served);
       } catch (e) {
         console.error('[scheduler] mission', m.id, e);
       }
@@ -1897,24 +1898,32 @@ function syncMissions(): void {
       // and the week the clocks change is not 168 hours long).
       //
       // `served` (the slot the timer just ran) is a spin guard, not a nicety.
-      // weeklyDelayMs returns 0 for a slot that was missed and not yet run, and
-      // it learns "already run" from the persisted lastFiredAt — so if fire()'s
-      // writeConfig ever failed, the next computation would return 0 again,
-      // forever. Counting the served slot as run makes the catch-up branch
+      // nextSlotAfter answers "now" for a slot that was missed and not yet run,
+      // and it learns "already run" from the persisted lastFiredAt — so if
+      // fire()'s writeConfig ever failed, the next computation would answer
+      // "now" again, forever. Counting the served slot as run makes that
       // unreachable after a fire, so the worst case is a lost stamp rather than
-      // a hot loop. It also keeps a timer that wakes a little early by the wall
-      // clock from running the same slot twice (nextSlotAfter).
-      const rearm = (served: number): void => {
-        const now = Date.now();
-        // The later of the last run and when its times took effect (catchUpFloor).
-        const stored = (readConfig().missions ?? []).find((x) => x.id === m.id);
-        const persisted = stored ? catchUpFloor(stored) : 0;
-        // Several "when" lines re-arm the same way (src/shared/scheduleTimes.ts).
-        const next = nextSlotAfter(plan, now, persisted, served);
-        if (next === null) return;
-        entry.timeout = setTimeout(() => { fire(); rearm(next.at); }, next.delayMs);
+      // a hot loop. With the slot in the stamp too (servedStamp), a timer that
+      // wakes a little early by the wall clock doesn't run that slot twice,
+      // here or after any later re-arm.
+      const rearm = (served?: number): void => {
+        try {
+          const now = Date.now();
+          // The later of the last run and when its times took effect (catchUpFloor).
+          const stored = (readConfig().missions ?? []).find((x) => x.id === m.id);
+          const persisted = stored ? catchUpFloor(stored) : 0;
+          // Several "when" lines re-arm the same way (src/shared/scheduleTimes.ts).
+          const next = nextSlotAfter(plan, now, persisted, served);
+          if (next === null) return;
+          entry.timeout = setTimeout(() => { fire(next.at); rearm(next.at); }, next.delayMs);
+        } catch (e) {
+          // Outside fire's try: a throw here (a config read) would leave the
+          // job with no next timer until some later sync. Try again shortly.
+          console.error('[scheduler] re-arm', m.id, e);
+          entry.timeout = setTimeout(() => rearm(served), 60_000);
+        }
       };
-      rearm(0);
+      rearm();
       missionTimers.set(m.id, entry);
       continue;
     }
