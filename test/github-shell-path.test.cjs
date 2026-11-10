@@ -15,7 +15,8 @@ const loadTs = require('./load-ts.cjs');
 const { posixOnly } = require('./platform.cjs');
 
 const shellEnv = loadTs('src/main/shellEnv.ts');
-const { listIssues, listCIRuns } = loadTs('src/main/github.ts');
+const github = loadTs('src/main/github.ts');
+const { listIssues, listCIRuns } = github;
 
 const ZSH = ['/bin/zsh', '/usr/bin/zsh'].find((p) => fs.existsSync(p));
 const needsZsh = (reason) => {
@@ -32,7 +33,8 @@ function dockLaunch(t, shellPath) {
   process.env.SHELL = ZSH;
   process.env.ZDOTDIR = dir;
   process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
-  shellEnv.__resetShellEnvForTest();
+  // A real interactive zsh on a slow CI runner can take longer than the 3 s cap.
+  shellEnv.__resetShellEnvForTest({ timeoutMs: 15_000 });
   t.after(() => {
     for (const [k, v] of Object.entries(saved)) {
       if (v === undefined) delete process.env[k];
@@ -44,44 +46,88 @@ function dockLaunch(t, shellPath) {
   return dir;
 }
 
-/** A stub gh in `<dir>/brew bin` that answers issue list and run list. */
-function stubGh(dir) {
-  const bin = path.join(dir, 'brew bin');
-  fs.mkdirSync(bin);
-  const gh = path.join(bin, 'gh');
+/** A stub gh in `binDir`. Its issue title reports GH_PROMPT_DISABLED, and
+ *  `sleep` makes it hang. */
+function stubGh(binDir, { title = 'prompt=$GH_PROMPT_DISABLED', sleep = 0 } = {}) {
+  fs.mkdirSync(binDir, { recursive: true });
+  const gh = path.join(binDir, 'gh');
   fs.writeFileSync(gh, [
     '#!/bin/sh',
+    sleep ? `sleep ${sleep}` : '',
     'case "$1" in',
-    '  issue) printf \'%s\' \'[{"number":7,"title":"Fix the login page","body":"","url":"https://github.com/o/r/issues/7","labels":[],"assignees":[]}]\' ;;',
+    `  issue) printf '[{"number":7,"title":"%s","body":"","url":"https://github.com/o/r/issues/7","labels":[],"assignees":[]}]' "${title}" ;;`,
     '  run) printf \'%s\' \'[{"name":"CI","status":"completed","conclusion":"success","url":"https://github.com/o/r/actions/runs/1","databaseId":1}]\' ;;',
     'esac',
     ''
   ].join('\n'));
   fs.chmodSync(gh, 0o755);
+  return gh;
+}
+
+function repo(t) {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gh repo '));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  return cwd;
 }
 
 test('gh installed only on the login shell PATH is found from a Dock launch', needsZsh('login shell PATH'), async (t) => {
   const dir = dockLaunch(t, '$ZDOTDIR/brew bin:/usr/bin:/bin:/usr/sbin:/sbin');
-  stubGh(dir);
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gh repo '));
-  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  stubGh(path.join(dir, 'brew bin'));
+  const cwd = repo(t);
 
   const issues = await listIssues(cwd);
   assert.equal(issues.error, undefined, 'gh was not found on the user\'s PATH');
-  assert.equal(issues.ok, true);
   assert.deepEqual(issues.issues.map((i) => i.number), [7]);
+  assert.equal(issues.issues[0].title, 'prompt=1', 'gh may stop to ask a question nobody sees');
 
   const runs = await listCIRuns(cwd);
   assert.equal(runs.error, undefined, 'gh was not found on the user\'s PATH');
   assert.deepEqual(runs.runs.map((r) => r.conclusion), ['success']);
 });
 
-test('a gh that is truly missing says so in words', needsZsh('login shell PATH'), async (t) => {
-  dockLaunch(t, '$ZDOTDIR/empty');
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gh repo '));
-  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
-  const out = await listIssues(cwd);
+test('a relative PATH entry never runs a gh the repo carries', needsZsh('login shell PATH'), async (t) => {
+  // `bin` and an empty entry are both relative: looked up from inside the repo.
+  const dir = dockLaunch(t, 'bin::$ZDOTDIR/brew bin:/usr/bin:/bin:/usr/sbin:/sbin');
+  stubGh(path.join(dir, 'brew bin'));
+  const cwd = repo(t);
+  const marker = path.join(cwd, 'repo gh ran');
+  for (const evil of [path.join(cwd, 'bin'), cwd]) {
+    stubGh(evil, { title: 'repo' });
+    fs.appendFileSync(path.join(evil, 'gh'), `touch "${marker}"\n`);
+  }
+  const issues = await listIssues(cwd);
+  assert.equal(fs.existsSync(marker), false, 'the repo\'s own gh ran');
+  assert.equal(issues.issues[0].title, 'prompt=1');
+});
+
+test('a project folder that is gone says so, not that gh is missing', async (t) => {
+  const gone = path.join(repo(t), 'moved away');
+  const out = await listIssues(gone);
+  assert.equal(out.ok, false);
+  assert.match(out.error, /project folder is gone/);
+  assert.doesNotMatch(out.error, /gh\) not found/);
+});
+
+test('a gh that is truly missing says so in words', async (t) => {
+  const real = shellEnv.resolveCommand;
+  shellEnv.resolveCommand = () => path.join(os.tmpdir(), 'no such dir', 'gh');
+  t.after(() => { shellEnv.resolveCommand = real; });
+  const out = await listIssues(repo(t));
   assert.equal(out.ok, false);
   assert.match(out.error, /GitHub CLI \(gh\) not found/);
   assert.doesNotMatch(out.error, /ENOENT/);
+});
+
+test('a gh that hangs is stopped and reported', posixOnly('a shell script stub'), async (t) => {
+  const bin = path.join(repo(t), 'tools');
+  const gh = stubGh(bin, { sleep: 30 });
+  const real = shellEnv.resolveCommand;
+  shellEnv.resolveCommand = () => gh;
+  github.__setGhTimeoutForTest(300);
+  t.after(() => { shellEnv.resolveCommand = real; github.__setGhTimeoutForTest(); });
+  const started = Date.now();
+  const out = await listIssues(repo(t));
+  assert.equal(out.ok, false);
+  assert.match(out.error, /gh did not answer/);
+  assert.ok(Date.now() - started < 5000);
 });
