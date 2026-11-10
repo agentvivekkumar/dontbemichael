@@ -84,19 +84,45 @@ test('a clock set back by weeks re-arms from now, not from the served slot', () 
   assert.ok(M.nextSlotAfter(every, back, back, served).delayMs <= MIN, 'an every-minute line went quiet');
 });
 
-test('the served slot is trusted only a few minutes ahead', () => {
+test('the served slot is trusted up to exactly EARLY_WAKE_MAX_MS ahead', () => {
   assert.equal(M.EARLY_WAKE_MAX_MS, 5 * MIN);
-  const now = slot - M.EARLY_WAKE_MAX_MS - 1;
+  const atEdge = slot - M.EARLY_WAKE_MAX_MS;
+  assert.equal(M.nextSlotAfter(weekly, atEdge, atEdge, slot).at, slot + WEEK, 'the edge itself is an early wake');
+  const beyond = atEdge - 1;
   // Too far ahead to be an early wake: a plain re-arm, which finds that slot.
-  assert.equal(M.nextSlotAfter(weekly, now, now, slot).at, slot);
+  assert.equal(M.nextSlotAfter(weekly, beyond, beyond, slot).at, slot);
 });
 
-test('the scheduler re-arms from the slot it just ran', () => {
+test('the stamp names the slot an early wake ran, and nothing else', () => {
+  assert.equal(M.servedStamp(slot - 1000, slot), slot);
+  assert.equal(M.servedStamp(slot + 250, slot), slot + 250, 'a late wake stamps the real time');
+  assert.equal(M.servedStamp(slot - M.EARLY_WAKE_MAX_MS - 1, slot), slot - M.EARLY_WAKE_MAX_MS - 1, 'a clock set back stamps the real time');
+  assert.equal(M.servedStamp(slot - 1000), slot - 1000, 'Run now and interval jobs stamp the real time');
+});
+
+test('after an early wake, any later re-arm sees the slot as run (save, Run now, wake from sleep)', () => {
+  const stamp = M.servedStamp(slot - 1000, slot);
+  // Still in the early-wake window: a plain re-arm doesn't come back to the slot.
+  assert.equal(M.nextSlotAfter(weekly, slot - 500, stamp).at, slot + WEEK);
+  assert.equal(M.nextSlotAfter(times, slot - 500, stamp).at, slot + WEEK);
+  // The next morning's wake from sleep, inside the 6 h catch-up window.
+  assert.equal(M.nextSlotAfter(weekly, slot + 10 * MIN, stamp).at, slot + WEEK);
+  assert.equal(M.nextSlotAfter(times, slot + 10 * MIN, stamp).at, slot + WEEK);
+  // The old stamp (just before the slot) ran it again on both.
+  assert.equal(M.nextSlotAfter(weekly, slot + 10 * MIN, slot - 1000).at, slot + 10 * MIN);
+});
+
+test('the scheduler stamps and re-arms from the slot it just ran', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8');
-  const start = src.indexOf('const rearm = (served: number)');
+  const start = src.indexOf('const rearm = (served?: number)');
   assert.ok(start > 0, 'rearm takes the served slot');
-  const body = src.slice(start, src.indexOf('missionTimers.set(m.id, entry);', start));
+  const end = src.indexOf('missionTimers.set(m.id, entry);', start);
+  assert.ok(end > start, 'the rearm block ends where it should');
+  const body = src.slice(start, end);
   assert.match(body, /nextSlotAfter\(plan, now, persisted, served\)/);
-  assert.match(body, /setTimeout\(\(\) => \{ fire\(\); rearm\(next\.at\); \}, next\.delayMs\)/);
-  assert.match(body, /rearm\(0\);/);
+  assert.match(body, /setTimeout\(\(\) => \{ fire\(next\.at\); rearm\(next\.at\); \}, next\.delayMs\)/);
+  assert.match(body, /catch \(e\) \{[\s\S]*setTimeout\(\(\) => rearm\(served\), 60_000\)/);
+  assert.match(body, /rearm\(\);/);
+  assert.match(src, /lastFiredAt: servedStamp\(Date\.now\(\), served\)/);
+  assert.match(src, /const fire = \(served\?: number\): void => \{[\s\S]{0,400}sendMission\(m, served\)/);
 });

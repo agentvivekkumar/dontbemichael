@@ -215,7 +215,7 @@ test('the hook server passes on the usage limit, the reset times and finished tu
 test('during a break nothing types into a Claude terminal, and schedules still run as configured', () => {
   // Value: protects=the break holds terminal nudges only, never a scheduled run (owner rule); fails_when=the wake beat or the queue types during a break, or a schedule is held or skipped; why_new=issue 124, aligned to the issue 36 terms; seam=source pin
   const index = read('src/main/index.ts');
-  assert.match(index, /const fire = \(\): void => \{\s*try \{[\s\S]{0,200}sendMission\(m\);/);
+  assert.match(index, /const fire = \(served\?: number\): void => \{\s*try \{[\s\S]{0,200}sendMission\(m, served\);/);
   assert.doesNotMatch(index, /missionHeldByBreak|holdMission|officeBreak\.hold\(/, 'no schedule run is held, skipped or reshaped');
   assert.doesNotMatch(index.slice(index.indexOf('function armHeartbeat('), index.indexOf('function liveWebContents(')), /officeBreak/, 'the heartbeat runs as configured');
   assert.doesNotMatch(index.slice(index.indexOf('function standupOnOfficeOpen('), index.indexOf('function migrateMissionOwners(')), /officeBreak|Break/, 'the launch standup runs as configured');
