@@ -114,6 +114,8 @@ export const LOG_KIND_CLASS: Readonly<Record<string, FailureClass>> = {
   ...Object.fromEntries(HIDDEN_CALL_KINDS.map((k) => [k, 'repo'])),
   // The office break is the owner's account (credit, sign in, limit).
   'office-break': 'owner',
+  // An agy hooks file of the user's that we left alone: theirs to fix.
+  'agy-hooks-left': 'owner',
   // A frame without its secret is refused by design.
   'hook-frame-rejected': 'none',
   // The case study screen shows its own outcome to the owner (docs/designs/case-study.md).

@@ -592,13 +592,22 @@ function parseJsonText(text: string): unknown {
   return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
 }
 
+/** Error codes that mean a hooks file is the user's to fix (it isn't plain
+ *  JSON, is read-only, is a folder), not an app fault. */
+const USER_FILE_CODES = new Set(['EBADJSON', 'EACCES', 'EPERM', 'EROFS', 'EISDIR', 'ENOTDIR']);
+
 /** Put our hook group under `key` in a hooks file another tool owns, keeping
  *  everything else in it. That file is the user's: when it is not a plain JSON
  *  object (a comment or trailing comma from a hand edit, a file the tool was
- *  halfway through saving) it is left exactly as it is and this throws,
- *  because rewriting it from {} would delete the user's own hooks. An empty
- *  file counts as {}. The write stays in place, as before, so a dotfiles link,
- *  a hard link or a file in a read-only folder keeps working. */
+ *  halfway through saving) it is left exactly as it is and this throws with
+ *  code EBADJSON, because rewriting it from {} would delete the user's own
+ *  hooks. An empty file counts as {}. The write stays in place, as before, so a
+ *  dotfiles link, a hard link or a file in a read-only folder keeps working.
+ *
+ *  agy's own reader is taken to be strict JSON. If it turns out to read
+ *  hooks.json as JSONC (Gemini CLI does for its settings), a commented file
+ *  that works in agy is refused here on every start, and a JSONC-aware edit
+ *  that keeps comments would be the way to merge into it. */
 function mergeForeignHooks(p: string, key: string, group: unknown): void {
   let text: string | null = null;
   try { text = readFileSync(p, 'utf8'); } catch (e) {
@@ -609,7 +618,7 @@ function mergeForeignHooks(p: string, key: string, group: unknown): void {
     let parsed: unknown;
     try { parsed = parseJsonText(text); } catch { parsed = undefined; }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`left ${p} as it is: it is not plain JSON (a comment, a trailing comma or a half-saved file?), and rewriting it would drop the hooks already in it`);
+      throw Object.assign(new Error(`${p} is not plain JSON`), { code: 'EBADJSON' });
     }
     existing = parsed as Record<string, unknown>;
   }
@@ -1521,7 +1530,17 @@ export class HiveManager {
         env.HIVE_SOCK = sock;
         try {
           if (desc.kind === 'hooks') {
-            if (desc.shim === 'agy') this.installAgyHooks();
+            if (desc.shim === 'agy') {
+              // A hooks file of the user's we left alone: their state, not an
+              // app fault, so it is told to the owner, not filed as a report.
+              const left = this.installAgyHooks();
+              if (left) {
+                degraded = `${meta.name} is running without hive events: ${left} ${meta.name}.`;
+                console.warn(`[hive] agy hooks for ${meta.id} not installed: ${left}`);
+                this.appendLog({ kind: 'agy-hooks-left', agentId: meta.id, name: meta.name });
+                this.emit?.('hive:degraded', { agentId: meta.id, name: meta.name, reason: 'user-config', message: degraded });
+              }
+            }
             else if (desc.shim === 'codex') {
               env.CODEX_HOME = this.installCodexHooks(dir, meta.id, prompt);
               if (opts.skillsDir) this.copyBundledSkills(opts.skillsDir, join(env.CODEX_HOME, 'skills'), false);
@@ -5500,7 +5519,7 @@ export class HiveManager {
    *  Runtime-scoped by AGENT_ID (the shim no-ops for non-hive agy sessions), so
    *  this global config never disturbs the user's own `agy` usage. Idempotent,
    *  and only our own group is ever changed (mergeForeignHooks). */
-  private installAgyHooks(): void {
+  private installAgyHooks(): string | undefined {
     const root = this.root();
     if (!root) return;
     const shim = join(root, 'bin', 'agy-hook.cjs');
@@ -5524,20 +5543,32 @@ export class HiveManager {
       PostInvocation: [plain('PostInvocation')],
       Stop: [plain('Stop')]
     };
-    const gem = join(homedir(), '.gemini');
-    // Each file on its own, so one we can't touch doesn't stop the other. A
-    // failure is reported (the spawn logs it as a bridge install failure)
-    // instead of swallowed: without our group agy runs with no hive events.
-    const failed: string[] = [];
+    const home = homedir();
+    const gem = join(home, '.gemini');
+    // Each file on its own, so one we can't touch doesn't stop the other.
+    // Without our group in both, agy runs with no hive events, so nothing is
+    // swallowed. A file that is the user's to fix comes back as a sentence for
+    // the owner (the spawn shows it like any degraded bridge); anything else is
+    // rethrown as it came, code and all, for the bridge failure path.
+    const left: string[] = [];
+    let fault: unknown;
     for (const p of [join(gem, 'config', 'hooks.json'), join(gem, 'antigravity-cli', 'hooks.json')]) {
       try {
         mkdirSync(dirname(p), { recursive: true });
         mergeForeignHooks(p, 'munder-hive', group);
       } catch (e) {
-        failed.push(e instanceof Error ? e.message : String(e));
+        const code = (e as NodeJS.ErrnoException).code ?? '';
+        const shown = p.startsWith(home) ? `~${p.slice(home.length)}` : p;
+        if (!USER_FILE_CODES.has(code)) fault ??= e;
+        else if (code === 'EBADJSON') left.push(`${shown} couldn't be read as plain JSON`);
+        else if (code === 'EISDIR' || code === 'ENOTDIR') left.push(`${shown} is not a file`);
+        else left.push(`${shown} can't be written (${code})`);
       }
     }
-    if (failed.length) throw new Error(`agy hooks not installed: ${failed.join('; ')}`);
+    if (fault) throw fault;
+    if (!left.length) return undefined;
+    const two = left.length > 1;
+    return `${left.join(' and ')}, so ${two ? 'they were' : 'it was'} left as ${two ? 'they are' : 'it is'}. Fix or remove ${two ? 'those files' : 'that file'}, then restart`;
   }
 
   /** Official Google Gemini CLI lifecycle bridge. Gemini's hook payload is
