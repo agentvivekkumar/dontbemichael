@@ -196,6 +196,53 @@ export function catchUpFloor(m: ScheduledMission): number {
   return Math.max(m.lastFiredAt ?? 0, m.scheduledSince ?? 0);
 }
 
+/** How far ahead of the clock a slot can be and still count as one just run
+ *  by a timer that woke early (see nextSlotAfter). */
+export const EARLY_WAKE_MAX_MS = 5 * 60_000;
+
+/** The lastFiredAt to record for a weekly or "times" run: the slot the timer
+ *  was armed for when it woke a little early by the wall clock, else now. With
+ *  the slot in the stamp, every later re-arm (a save, Run now, a wake from
+ *  sleep, an unlock) sees that slot as run, not only the timer that ran it. */
+export function servedStamp(now: number, served?: number): number {
+  return served !== undefined && served > now && served - now <= EARLY_WAKE_MAX_MS ? served : now;
+}
+
+/**
+ * When a weekly or "times" mission runs next, as an absolute time and a wait
+ * from `now`, or null when it never runs again. `floor` is catchUpFloor of the
+ * stored mission, and `served` the slot the timer just ran (absent on a plain
+ * re-arm).
+ *
+ * setTimeout counts on the monotonic clock while slots are wall clock times,
+ * and over a wait of up to a week an NTP correction moves Date.now() by
+ * anything from milliseconds to seconds. A timer that wakes even 1 ms before
+ * its slot by the wall clock used to ask for "the first slot after now", get
+ * the same slot back, and send the run a second time a moment later. So a slot
+ * just ahead of the clock that is already run (the one served, or the one the
+ * stamp records) is where the next slot is reckoned from.
+ *
+ * Only a slot a little ahead is trusted. After the clock is set back by days,
+ * the served slot sits far in the future: reckoning from it would wait out the
+ * whole jump, and past setTimeout's 24.8 day limit Node fires after 1 ms, so
+ * every run would arm the next one further ahead and loop. Then it is a plain
+ * re-arm from now, as before.
+ *
+ * Everything up to the served slot counts as run, which keeps a lost stamp
+ * from looping on catch-up.
+ */
+export function nextSlotAfter(
+  plan: Extract<ArmPlan, { type: 'weekly' | 'times' }>, now: number, floor: number, served?: number
+): { at: number; delayMs: number } | null {
+  const mark = Math.max(served ?? 0, floor);
+  const from = mark > now && mark - now <= EARLY_WAKE_MAX_MS ? mark : now;
+  const ranUntil = Math.max(floor, served ?? 0);
+  const delay = plan.type === 'times' ? timesDelayMs(plan.times, from, ranUntil) : weeklyDelayMs(plan.weekly, from, ranUntil);
+  if (delay === null) return null;
+  const at = from + delay;
+  return { at, delayMs: at - now };
+}
+
 /** How the scheduler should arm `m` at `now`. The same decisions syncMissions
  *  made inline before this module existed; see test/missions.test.cjs. */
 export function armPlan(m: ScheduledMission, now: number, ctx: ArmContext): ArmPlan {
