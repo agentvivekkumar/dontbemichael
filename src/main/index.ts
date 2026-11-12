@@ -2788,8 +2788,6 @@ app.on('open-url', (evt, url) => {
 
 /** Each window's boot watchdog, by its webContents id (bootWatchdog.ts). */
 const bootWatchdogs = new Map<number, BootWatchdog>();
-// The page's first script ran: its window stops waiting (bootWatchdog.ts).
-ipcMain.on('app:rendererStarted', (evt) => { bootWatchdogs.get(evt.sender.id)?.started(); });
 
 // IPC: the renderer signals readiness and PULLS anything queued (deep links
 // that arrived before the window/subscription existed, incl. cold starts).
@@ -2969,11 +2967,15 @@ function createWindow(): BrowserWindow {
   const boot = createBootWatchdog({
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
+    // Asks the document on screen now (main.tsx sets the flag). The frame's
+    // call does not wait for the page to finish loading, unlike wc's.
+    probe: async () => !win.isDestroyed() && (await wc.mainFrame.executeJavaScript('window.__cthStarted === true')) === true,
     reload: () => { if (!win.isDestroyed()) loadApp(); },
     log: (line) => console.warn(line)
   });
   bootWatchdogs.set(wc.id, boot);
   wc.on('did-start-navigation', (details) => { if (details.isMainFrame && !details.isSameDocument) boot.navigationStarted(); });
+  wc.on('did-navigate', () => boot.navigationCommitted());
   wc.on('did-fail-load', (_e, code, _desc, _url, isMainFrame) => { if (isMainFrame) boot.loadFailed(code); });
   wc.on('render-process-gone', (_e, details) => { if (!allowQuit && details.reason !== 'clean-exit') boot.rendererGone(details.reason); });
   const wcId = wc.id;
@@ -6760,6 +6762,8 @@ function healthCheckPtys(reason: string, awayMs: number | null): void {
  *  collapse safely (clear-then-arm everywhere; at most one catch-up fire). */
 function onSystemResume(reason: string): void {
   console.log(`[power] ${reason} — re-arming scheduler, beats, router, keep-awake`);
+  // A window caught loading at sleep is looked at again (bootWatchdog.ts).
+  for (const dog of bootWatchdogs.values()) dog.resumed();
   try { syncMissions(); } catch (e) { console.error('[power] syncMissions on resume', e); }
   try { armAlwaysOnBeats(); } catch (e) { console.error('[power] armAlwaysOnBeats on resume', e); }
   // The hive message router (outbox→inbox drain) is a setInterval that freezes
@@ -6835,7 +6839,7 @@ app.whenReady().then(() => {
   // every window, so there is nothing to tear down on quit.
   powerMonitor.on('resume', () => { try { pulseTelemetry.presence(0, false); } catch { /* best-effort */ } onSystemResume('resume'); });
   powerMonitor.on('unlock-screen', () => onSystemResume('unlock-screen'));
-  powerMonitor.on('suspend', () => { lastSuspendAt = Date.now(); console.log('[power] suspend — system sleeping'); try { pulseTelemetry.runningPause(officeStopped()); pulseTelemetry.presence(0, true); } catch { /* best-effort */ } });
+  powerMonitor.on('suspend', () => { lastSuspendAt = Date.now(); console.log('[power] suspend — system sleeping'); for (const dog of bootWatchdogs.values()) dog.suspended(); try { pulseTelemetry.runningPause(officeStopped()); pulseTelemetry.presence(0, true); } catch { /* best-effort */ } });
   powerMonitor.on('lock-screen', () => { lastSuspendAt = Date.now(); console.log('[power] lock-screen'); });
   // The app's own menu, always: Electron's default carries Reload and the
   // developer tools, which are not for an office owner (owner, 2026-10-03).
