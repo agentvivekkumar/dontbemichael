@@ -320,8 +320,12 @@ export function isNetworkPath(p: string, platform: string = process.platform): b
     return !(platform === 'win32' && /^[\\/]{2}\?[\\/][A-Za-z]:[\\/]/.test(s));
   }
   if (platform === 'win32') return false;
-  // A Mac disk ignores case by default, so /NET/host reaches /net too.
-  return /^\/(net|network)(\/|$)/i.test(posix.normalize(s));
+  // A Mac disk ignores case by default, so /NET/host reaches /net too. Since
+  // Catalina the automounts live on the data volume and /net only points there,
+  // so /System/Volumes/Data/net/host reaches the host the same way (PR 687
+  // review, 2026-11-12).
+  const n = posix.normalize(s).replace(/^\/system\/volumes\/data(?=\/|$)/i, '') || '/';
+  return /^\/(net|network)(\/|$)/i.test(n);
 }
 
 /** Existence/metadata check for an ABSOLUTE path (v0.3.4 — backs the terminal

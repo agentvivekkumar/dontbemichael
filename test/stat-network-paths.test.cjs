@@ -33,10 +33,17 @@ test('macOS and Linux automounts are network paths, local folders are not', () =
   for (const p of ['/net/host/x/a b.md', '/Network/Servers/host/a.md', '/NET/host/a.md', '/tmp/../net/host/a.md', '//host/share/a.md', '/net']) {
     assert.equal(isNetworkPath(p, 'darwin'), true, p);
   }
-  for (const p of ['/Users/Jane/Business Reports/summary.md', '/tmp/notes.md', '/network-notes/a.md', '/Users/Jane/net/a.md', '/Volumes/Backup/a.md', '~/net/a.md']) {
+  for (const p of ['/Users/Jane/Business Reports/summary.md', '/tmp/notes.md', '/network-notes/a.md', '/Users/Jane/net/a.md', '/Volumes/Backup/a.md', '~/net/a.md', '/System/Volumes/Data/Users/Jane/a.md', '/System/Volumes/Data', '/System/Volumes/Datanet/a.md']) {
     assert.equal(isNetworkPath(p, 'darwin'), false, p);
   }
   assert.equal(isNetworkPath('/net/host/a.md', 'linux'), true);
+});
+
+test('the same automounts spelled through the Mac data volume are network paths', () => {
+  // Value: protects=hovering agent text such as "/System/Volumes/Data/net/host/Q3 Docs/a.md" never makes the Mac contact that host; fails_when=the data volume spelling of /net or /Network passes, in any case or through ..; why_new=PR 687 review, 2026-11-12 (hover now stats quoted paths); seam=none
+  for (const p of ['/System/Volumes/Data/net/host/Q3 Docs/a.md', '/system/volumes/data/NET/host/a.md', '/System/Volumes/Data/Network/Servers/host/a.md', '/System/Volumes/Data/net', '/tmp/../System/Volumes/Data/net/host/a.md', '/System/Volumes/Data/./net/host/a.md']) {
+    assert.equal(isNetworkPath(p, 'darwin'), true, p);
+  }
 });
 
 test('statAbs never looks at a network path and still finds a local file', async () => {
