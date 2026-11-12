@@ -15,6 +15,7 @@
  */
 
 import type { ModelTier } from './modelCatalogPayload';
+import { slotsPerWeek, thinTimes, timedLines, whenFromLines, type ScheduleWhen } from './scheduleTimes';
 
 export const ADVICE_WINDOW_MS = 14 * 86_400_000;
 /** Early patterns need half the evidence advice needs (owner, 2026-10-19, eng D1). */
@@ -48,8 +49,10 @@ export interface MissionFact {
   to: string;
   label: string;
   intervalMs: number;
-  /** Set when the schedule runs at times or on weekdays (no clean halving). */
+  /** Set when the schedule runs at times or on weekdays. */
   timed: boolean;
+  /** Its timing as stored (scheduleWhen), which a timed run-less change thins. */
+  when?: ScheduleWhen;
 }
 
 /** One member's model and quality evidence. */
@@ -85,9 +88,11 @@ export interface Advice {
   missionId?: string;
   /** Evidence for the card and for dismiss bands. */
   evidence: { runs?: number; nothing?: number; didWork?: number; kept?: number; decisions?: number; reopens?: number };
-  /** What one click changes. `editor` = open the schedule editor with the suggestion. */
+  /** What one click changes. `when` = a timed schedule's times, before and
+   *  after. `editor` = open the schedule editor (run more on a timed schedule). */
   change:
     | { kind: 'interval'; fromMs: number; toMs: number }
+    | { kind: 'when'; from: ScheduleWhen; to: ScheduleWhen }
     | { kind: 'editor'; direction: 'less' | 'more' }
     | { kind: 'model'; from: string | null; to: string; toLabel: string };
   /** Expected saving a week at API prices, when it can be worked out. */
@@ -148,15 +153,30 @@ export function adviceFor(input: {
       // every run rereads it cold. Michael's standup at 1h cost $0.07 a run,
       // at 2h $1.44, so "run less" cost more. Up to the hour at most, and none
       // from the hour itself.
+      const id = `run-less:${m.to}:${m.id}`;
+      const evidence = { runs: mine.length, nothing };
+      if (m.timed) {
+        // A timed schedule gets its own times thinned, ready to apply (owner,
+        // 2026-11-12), under the same cache hour; none when nothing thins.
+        const lines = m.when ? timedLines(m.when) : null;
+        const thin = lines ? thinTimes(lines, CACHE_WINDOW_MS) : null;
+        if (!m.when || !lines || !thin) continue;
+        out.push({
+          id, kind: 'run-less', agentId: m.to, missionId: m.id, evidence,
+          change: { kind: 'when', from: m.when, to: whenFromLines(thin, m.when.intervalMs) },
+          savesPerWeek: runUsdPerWeek * (1 - slotsPerWeek(thin) / slotsPerWeek(lines)),
+          band: nothing
+        });
+        continue;
+      }
       const toMs = m.intervalMs <= CACHE_WINDOW_MS ? Math.min(m.intervalMs * 2, CACHE_WINDOW_MS) : m.intervalMs * 2;
-      if (!m.timed && toMs <= m.intervalMs) continue;
+      if (toMs <= m.intervalMs) continue;
       out.push({
-        id: `run-less:${m.to}:${m.id}`, kind: 'run-less', agentId: m.to, missionId: m.id,
-        evidence: { runs: mine.length, nothing },
-        change: m.timed ? { kind: 'editor', direction: 'less' } : { kind: 'interval', fromMs: m.intervalMs, toMs },
+        id, kind: 'run-less', agentId: m.to, missionId: m.id, evidence,
+        change: { kind: 'interval', fromMs: m.intervalMs, toMs },
         // Both sides of the hour alike (warm to warm, cold to cold): the cost
         // follows the runs, so fewer runs save that share.
-        savesPerWeek: m.timed ? runUsdPerWeek / 2 : runUsdPerWeek * (1 - m.intervalMs / toMs),
+        savesPerWeek: runUsdPerWeek * (1 - m.intervalMs / toMs),
         band: nothing
       });
       continue;

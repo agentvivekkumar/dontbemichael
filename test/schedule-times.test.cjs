@@ -253,3 +253,23 @@ test('a schedule row is three quiet lines: name and next run, when, then who and
   assert.match(list, /padding: readOnly \? '8px 0' : '8px 4px'/, 'read only rows line up with the name above');
   assert.match(list, /return \/\^\\d\/\.test\(every\) \? t\('schedulesSection\.everyInterval', \{ interval: every \}\) : every;/, 'an interval reads "every 4h", not a bare "4h", in every language');
 });
+
+test('run less on a timed job: about half the runs, the first time and day kept (owner, 2026-11-12)', () => {
+  // Value: protects=the times "run less often" proposes; fails_when=a day loses its first time, a day or job loses every run, an every line passes the cache hour, the result clashes or is not a valid schedule, or a job that cannot thin gets a change; why_new=timed jobs had no change to apply; seam=none; no_claim=none beyond protects
+  const at = (days, minute) => ({ kind: 'at', days, minute });
+  const wk = [1, 2, 3, 4, 5];
+  assert.deepEqual(T.thinTimes([at(wk, 540), at(wk, 720), at(wk, 900)], H), [at(wk, 540), at(wk, 900)], 'three a day keep the first and last');
+  assert.deepEqual(T.thinTimes([at(wk, 540)], H), [at([1, 3, 5], 540)], 'once a day: every other day');
+  assert.deepEqual(T.thinTimes([at([1], 540), at([2], 600), at([4], 660)], H), [at([1], 540), at([4], 660)], 'separate days thin as one week');
+  assert.equal(T.thinTimes([at([1], 540)], H), null, 'one run a week cannot thin');
+  assert.deepEqual(T.thinTimes(owners, H), [{ ...owners[0], everyMs: 4 * H }, at([0], 14 * 60)], 'the owner\'s example: 2h doubles past the hour (already cold), the weekend keeps Sunday');
+  assert.deepEqual(T.thinTimes([{ kind: 'every', everyMs: 30 * 60_000, from: 480, to: 600 }], H), [{ kind: 'every', everyMs: H, from: 480, to: 600 }], 'inside the hour: up to the hour');
+  assert.equal(T.thinTimes([{ kind: 'every', everyMs: H, days: wk }], H), null, 'hourly: doubling would make every run cold');
+  assert.equal(T.thinTimes([{ kind: 'every', everyMs: 4 * H, from: 480, to: 600 }], H), null, 'one slot in its window: nothing to drop');
+  assert.equal(T.slotsPerWeek(owners), 6 * 5 + 2);
+  assert.ok(T.normalizeTimes(T.thinTimes(owners, H)), 'still a schedule the editor accepts');
+  // Stored back the way the editor stores it.
+  assert.deepEqual(T.whenFromLines([at(wk, 540)], 7 * H), { intervalMs: 7 * H, weekly: { days: wk, minute: 540 } });
+  assert.deepEqual(T.scheduleWhen({ intervalMs: H, weekly: { days: [5, 1], minute: 540 } }), { intervalMs: H, weekly: { days: [1, 5], minute: 540 } });
+  assert.deepEqual(T.timedLines({ intervalMs: H }), null);
+});

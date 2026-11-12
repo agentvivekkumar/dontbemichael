@@ -200,6 +200,87 @@ export function timesDelayMs(times: ScheduleLine[], now: number, lastFiredAt = 0
   return next === null ? null : Math.max(0, next - now);
 }
 
+/** A schedule's timing as stored on a job: the interval, or the weekly
+ *  calendar, or the lines (which replace both). Made canonical by scheduleWhen. */
+export interface ScheduleWhen {
+  intervalMs: number;
+  weekly?: { days: number[]; minute: number };
+  times?: ScheduleLine[];
+}
+
+/** A job's timing, canonical, so two reads of the same job compare equal:
+ *  valid lines win, then a valid weekly, else the interval alone. */
+export function scheduleWhen(m: { intervalMs: number; weekly?: unknown; times?: unknown }): ScheduleWhen {
+  const times = normalizeTimes(m.times);
+  if (times) return { intervalMs: m.intervalMs, times };
+  const weekly = normalizeWeekly(m.weekly);
+  return weekly ? { intervalMs: m.intervalMs, weekly: { days: weekly.days, minute: weekly.minute } } : { intervalMs: m.intervalMs };
+}
+
+/** The lines a timed schedule runs on (a weekly is one "at" line), or null
+ *  for a plain interval. */
+export function timedLines(w: ScheduleWhen): ScheduleLine[] | null {
+  if (w.times) return w.times;
+  if (w.weekly) return [{ kind: 'at', days: w.weekly.days, minute: w.weekly.minute }];
+  return null;
+}
+
+/** Lines back into a job's timing, stored the way the editor stores them: a
+ *  single simple line as `weekly` or `intervalMs`, else `times`. The job's
+ *  own interval stays on the record, as switching modes expects. */
+export function whenFromLines(lines: ScheduleLine[], intervalMs: number): ScheduleWhen {
+  const simple = simpleTimes(lines);
+  if (simple && 'weekly' in simple) return { intervalMs, weekly: simple.weekly };
+  if (simple) return { intervalMs: simple.intervalMs };
+  return { intervalMs, times: lines };
+}
+
+/** How many times a week the lines run. */
+export function slotsPerWeek(times: ScheduleLine[]): number {
+  let n = 0;
+  for (let d = 0; d < 7; d++) {
+    const day = new Set<number>();
+    for (const line of times) for (const m of minutesOn(line, d)) day.add(m);
+    n += day.size;
+  }
+  return n;
+}
+
+/**
+ * The same schedule with about half the runs, for "run less often" (owner,
+ * 2026-11-12: a timed job got "Open schedules" and no change to apply).
+ * - An "every" line doubles its gap, never past `cacheMs` once inside it (the
+ *   prompt cache rule intervals follow) and never past a day. A window with
+ *   one slot left is kept as it is.
+ * - "At" times: a day with two or more keeps every other one, its first kept;
+ *   the days with one time keep every other such day, the week's first kept.
+ *   So "weekdays at 09:00, 12:00 and 15:00" becomes 09:00 and 15:00, and
+ *   "weekdays at 09:00" becomes Mon, Wed and Fri.
+ * Null when that leaves as many runs as before.
+ */
+export function thinTimes(times: ScheduleLine[], cacheMs: number): ScheduleLine[] | null {
+  const every: ScheduleLine[] = [];
+  for (const line of times) {
+    if (line.kind !== 'every') continue;
+    const slots = minutesOn(line, lineDays(line)[0]).length;
+    const toMs = line.everyMs <= cacheMs ? Math.min(line.everyMs * 2, cacheMs) : Math.min(line.everyMs * 2, DAY);
+    every.push(slots > 1 && toMs > line.everyMs ? { ...line, everyMs: toMs } : line);
+  }
+  const kept = new Map<number, number[]>(); // minute -> days
+  const keep = (day: number, minute: number): void => { kept.set(minute, [...(kept.get(minute) ?? []), day]); };
+  const singles: Array<{ day: number; minute: number }> = [];
+  for (let d = 0; d < 7; d++) {
+    const mins = [...new Set(times.flatMap((l) => (l.kind === 'at' ? minutesOn(l, d) : [])))].sort((a, b) => a - b);
+    if (mins.length === 1) singles.push({ day: d, minute: mins[0] });
+    else mins.forEach((m, i) => { if (i % 2 === 0) keep(d, m); });
+  }
+  singles.forEach((s, i) => { if (i % 2 === 0) keep(s.day, s.minute); });
+  const at: ScheduleLine[] = [...kept.entries()].sort((a, b) => a[0] - b[0])
+    .map(([minute, days]) => ({ kind: 'at', days: [...days].sort((a, b) => a - b), minute }));
+  const out = normalizeTimes([...every, ...at]);
+  return out && slotsPerWeek(out) < slotsPerWeek(times) ? out : null;
+}
+
 /** "2h", "30m", "1d". */
 export function formatEvery(ms: number): string {
   if (ms % DAY === 0) return `${ms / DAY}d`;

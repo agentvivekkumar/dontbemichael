@@ -20,7 +20,7 @@ import { connectorGranted, connectorOn, isEmailCalendarKey, isMailConnectorKey, 
 import { MICHAEL_ID } from '@shared/askMeRouting';
 import { useStore } from '@/store/store';
 import { useHarnessConfig } from '@/hooks/useHarnessConfig';
-import { useMissions } from './triggers/ScheduleList';
+import { useMissions, whenText } from './triggers/ScheduleList';
 import { AgentAvatar } from './AgentAvatar';
 import { PixelButton } from './PixelButton';
 
@@ -140,6 +140,9 @@ export function AllClearTipCard({ godName }: { godName: string }) {
     if (a.change.kind === 'interval') {
       body = `${t('pulse.advice.runLess', { name, job })}. ${t('pulse.advice.runLessWhy', { nothing: a.evidence.nothing, runs: a.evidence.runs })} ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}`;
       action = t('allClearTip.every', { to: every(a.change.toMs, t) });
+    } else if (a.change.kind === 'when') {
+      body = `${t('pulse.advice.runLess', { name, job })}. ${t('pulse.advice.runLessWhy', { nothing: a.evidence.nothing, runs: a.evidence.runs })} ${t('pulse.advice.whenChange', { from: whenText(a.change.from, t), to: whenText(a.change.to, t) })}`;
+      action = t('pulse.apply');
     } else {
       const label = a.change.kind === 'model' ? a.change.toLabel : '';
       body = `${t('pulse.advice.tryModel', { name, model: label })}. ${t('pulse.advice.cheaperWhy', { kept: a.evidence.kept, decisions: a.evidence.decisions })}`;
@@ -153,6 +156,7 @@ export function AllClearTipCard({ godName }: { godName: string }) {
         const r = await window.cth.pulseApply(a.id, a.change);
         if (!r.ok) { setDone(t(r.error === 'stale' ? 'pulse.staleApply' : 'pulse.applyFailed')); return; }
         if (r.kind === 'schedule' && a.change.kind === 'interval') setDone(t('pulse.appliedSchedule', { name, job, to: every(a.change.toMs, t) }));
+        if (r.kind === 'schedule' && a.change.kind === 'when') setDone(t('pulse.appliedWhen', { name, job, to: whenText(a.change.to, t) }));
         if (r.kind === 'model') {
           updateAgent(r.agentId, { model: r.to });
           await window.cth.pulseModelApplied(a.id, r.agentId, r.from, r.to);

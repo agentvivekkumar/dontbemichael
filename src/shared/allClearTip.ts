@@ -46,7 +46,7 @@ export function pickAllClearTip(input: TipInput): AllClearTip | null {
   const open = (id: string): boolean => !(input.snoozed[id] > input.now);
   const saves = input.advice
     .filter((a) => (a.kind === 'run-less' || a.kind === 'cheaper-model')
-      && (a.change.kind === 'interval' || a.change.kind === 'model')
+      && (a.change.kind === 'interval' || a.change.kind === 'when' || a.change.kind === 'model')
       && a.savesPerWeek !== null && a.savesPerWeek >= MIN_SAVE_USD
       && open(saveId(a)))
     .sort((a, b) => (b.savesPerWeek ?? 0) - (a.savesPerWeek ?? 0));
