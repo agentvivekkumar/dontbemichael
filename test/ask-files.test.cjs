@@ -277,3 +277,22 @@ test('a full folder path in a code span is a chip that shows the folder, and sta
   assert.match(chip, /if \(folder && checks\[p\]\?\.verdict === 'missing' && !gone\[p\]\) return <code>\{p\}<\/code>;/, 'a folder the office does not hold keeps its path as text');
   assert.match(chip, /const icon = folder \? 'folder' :/);
 });
+
+test('a link to a full path with spaces and no angle brackets still opens the file', () => {
+  // Value: protects=the owner's Salesforce card, whose form link showed as raw text; fails_when=a spaced path link stays text, or a code span, a web link or a non-file target is changed; why_new=owner, 2026-11-12; seam=pure function plus the renderer pin; no_claim=paths holding brackets
+  const { bracketSpacedPathLinks } = loadTs('src/shared/askFiles.ts');
+  const card = 'Fill in the [certificate form](/Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf) with Moblize.it LLC.';
+  assert.equal(bracketSpacedPathLinks(card), 'Fill in the [certificate form](</Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf>) with Moblize.it LLC.');
+  assert.deepEqual(askFilePaths(card), ['/Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf']);
+  assert.equal(bracketSpacedPathLinks('[r](C:\\Shared Files\\Q3 report.xlsx)'), '[r](<C:\\Shared Files\\Q3 report.xlsx>)');
+  for (const same of [
+    '[r](/Users/me/report.md)',                          // no space: already a link
+    '[r](</Users/me/Q3 report.md>)',                     // already bracketed
+    '`[r](/Users/me/Q3 report.md)`',                     // code stays as written
+    '```\n[r](/Users/me/Q3 report.md)\n```',
+    '[r](https://example.com/a b.pdf)',                  // not a path
+    '[r](/Users/me/Q3 notes)',                           // no file ending
+    'see [r](/Users/me/Q3 report.md "title")'            // a title: not ours to guess
+  ]) assert.equal(bracketSpacedPathLinks(same), same, same);
+  assert.match(read('src/renderer/src/markdown/MarkdownPreview.tsx'), /\{bracketSpacedPathLinks\(source\)\}/);
+});

@@ -28,6 +28,7 @@ import { isBareLink, isExternal, labelMismatch, linkName, resolveLocalImageRel }
 import { Icon } from '@/components/Icon';
 import { remarkSoftBreaks } from './remarkSoftBreaks';
 import { remarkFileChips } from './remarkFileChips';
+import { bracketSpacedPathLinks } from '@shared/askFiles';
 import { remarkSettingsLinks } from './remarkSettingsLinks';
 import { PlaceChip } from './PlaceChip';
 import { FolderChip } from './FolderChip';
@@ -202,7 +203,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({
           }
         }}
       >
-        {source}
+        {bracketSpacedPathLinks(source)}
       </ReactMarkdown>
     </div>
   );
