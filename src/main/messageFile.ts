@@ -4,9 +4,10 @@
  * message (red team, third ship). Shared by the hive's router and Pulse's
  * one-time backfill of its lists (ship review 2026-10-17).
  */
-import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, realpathSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { openNoFollow } from './noFollow';
 
 /** The most a message file may hold for the app to read it. */
 export const MAX_MESSAGE_FILE_BYTES = 4 * 1024 * 1024;
@@ -16,7 +17,7 @@ export const MAX_MESSAGE_FILE_BYTES = 4 * 1024 * 1024;
 export function readMessageFile(path: string): string | null {
   let fd = -1;
   try {
-    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    fd = openNoFollow(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     const st = fstatSync(fd);
     if (!st.isFile() || st.size > MAX_MESSAGE_FILE_BYTES) return null;
     return readFileSync(fd, 'utf8');

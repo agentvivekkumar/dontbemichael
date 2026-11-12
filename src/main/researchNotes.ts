@@ -7,6 +7,7 @@
  * private).
  */
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, rmdirSync, statSync, unlinkSync, type Stats } from 'node:fs';
+import { openNoFollow } from './noFollow';
 import { dirname, join, sep } from 'node:path';
 
 /** The most one file may hold; a bigger one is skipped, not read whole into
@@ -38,7 +39,7 @@ function readOwnIn(root: string, file: string): string | null {
     // Without waiting: a pipe Research made would otherwise hold the open
     // forever and freeze the app (ship review). Then only a plain file, of
     // a size a note can have.
-    fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    fd = openNoFollow(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1 || st.size > MAX_NOTE_BYTES) return null;
     // The open file must be the one its path names inside the folder now,

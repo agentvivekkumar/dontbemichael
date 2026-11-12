@@ -17,6 +17,7 @@
  * app's next write.
  */
 import { closeSync, constants, fstatSync, ftruncateSync, openSync, readFileSync, realpathSync, writeSync } from 'node:fs';
+import { openNoFollow } from './noFollow';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { writeFileAtomic, type AtomicFileOps } from './atomicFile';
 
@@ -68,7 +69,7 @@ export function writeHiveFile(root: string, path: string, text: string, mode = 0
 export function readHiveText(path: string): string | null {
   let fd: number;
   try {
-    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    fd = openNoFollow(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
   } catch (e) {
     return (e as NodeJS.ErrnoException).code === 'ENOENT' ? '' : null;
   }
@@ -90,7 +91,7 @@ export function emptyHiveFile(root: string, path: string): void {
   checkFolder(root, path);
   // Opened without O_TRUNC: nothing is cut until the file is known to be plain.
   // Never waits on a pipe a member left in its place.
-  const fd = openSync(path, constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  const fd = openNoFollow(path, constants.O_WRONLY | (constants.O_NONBLOCK ?? 0));
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1) throw new HiveFileError(`not emptied: ${relative(root, path)} is not a plain file`);
@@ -105,7 +106,7 @@ export function emptyHiveFile(root: string, path: string): void {
 export function appendHiveFile(root: string, path: string, text: string): void {
   checkFolder(root, path);
   // Never waits on a pipe a member left in its place.
-  const fd = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0), 0o644);
+  const fd = openNoFollow(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NONBLOCK ?? 0), 0o644);
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1) throw new HiveFileError(`not written: ${relative(root, path)} is not a plain file`);

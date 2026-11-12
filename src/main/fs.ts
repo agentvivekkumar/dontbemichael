@@ -1,6 +1,7 @@
 import { lstat, open, realpath, stat } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { constants, existsSync } from 'node:fs';
+import { openNoFollowAsync } from './noFollow';
 import { basename, dirname, isAbsolute, join, normalize, posix, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { imageMimeForExtension } from '../shared/imageTypes';
@@ -124,13 +125,13 @@ async function confineCanonical(realRoot: string, absPath: string): Promise<stri
  * Open-time guards, so containment does not depend on the path still meaning the
  * same thing between the check above and the open below.
  *
- * O_NOFOLLOW makes the kernel refuse the final component if it is a symlink;
- * O_NONBLOCK keeps a FIFO from parking the open (and with it the IPC call and the
- * renderer's loading state) forever. Both are POSIX-only — on Windows they are
- * undefined and OR in as 0, which is why the `lstat` walk above is a check in its
- * own right and not merely a pre-filter.
+ * The open refuses a link as the final component on every platform
+ * (openNoFollowAsync: O_NOFOLLOW where the kernel has it, and on Windows a look
+ * before and after the open). O_NONBLOCK keeps a FIFO from parking the open (and
+ * with it the IPC call and the renderer's loading state) forever; it is
+ * POSIX-only, and Windows has no FIFO a folder can hold.
  */
-const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW | 0) | (constants.O_NONBLOCK | 0);
+const READ_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK | 0);
 
 /**
  * Open a path that `safeResolve` has ALREADY cleared, for reading.
@@ -146,7 +147,7 @@ const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW | 0) | (constants.
  * the path, which resolves it a third time) before trusting what they opened.
  */
 export function openForRead(abs: string): Promise<FileHandle> {
-  return open(abs, READ_FLAGS);
+  return openNoFollowAsync(abs, READ_FLAGS);
 }
 
 const MAX_READ_BYTES = 2 * 1024 * 1024; // 2 MB
