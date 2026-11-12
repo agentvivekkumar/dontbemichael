@@ -224,7 +224,6 @@ export function PulseView() {
   const { t, i18n } = useTranslation();
   const agents = useStore((s) => s.agents);
   const updateAgent = useStore((s) => s.updateAgent);
-  const openAgentProfile = useStore((s) => s.openAgentProfile);
   const dark = useAppTheme() === 'dark';
   const { missions } = useMissions();
   const host = useRef<HTMLDivElement | null>(null);
@@ -327,7 +326,7 @@ export function PulseView() {
     const e = a.evidence;
     switch (a.kind) {
       case 'run-less': return { title: t('pulse.advice.runLess', { name, job }), evidence: t('pulse.advice.runLessWhy', { nothing: e.nothing, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : a.change.kind === 'when' ? ` ${t('pulse.advice.whenChange', { from: whenText(a.change.from, t), to: whenText(a.change.to, t) })}` : '') };
-      case 'run-more': return { title: t('pulse.advice.runMore', { name, job }), evidence: t('pulse.advice.runMoreWhy', { didWork: e.didWork, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : '') };
+      case 'run-more': return { title: t('pulse.advice.runMore', { name, job }), evidence: t('pulse.advice.runMoreWhy', { didWork: e.didWork, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : a.change.kind === 'when' ? ` ${t('pulse.advice.whenChange', { from: whenText(a.change.from, t), to: whenText(a.change.to, t) })}` : '') };
       case 'cheaper-model': return { title: t('pulse.advice.tryModel', { name, model: a.change.kind === 'model' ? a.change.toLabel : '' }), evidence: t('pulse.advice.cheaperWhy', { kept: e.kept, decisions: e.decisions }) };
       default: return { title: t('pulse.advice.tryModel', { name, model: a.change.kind === 'model' ? a.change.toLabel : '' }), evidence: e.reopens && e.reopens >= 3 ? t('pulse.advice.reopenedWhy', { reopens: e.reopens }) : t('pulse.advice.strongerWhy', { kept: e.kept, decisions: e.decisions }) };
     }
@@ -346,7 +345,6 @@ export function PulseView() {
   };
 
   const apply = async (a: Advice): Promise<void> => {
-    if (a.change.kind === 'editor') { openAgentProfile(a.agentId); return; }
     if (busy) return;
     setBusy(a.id);
     try {
@@ -728,8 +726,8 @@ export function PulseView() {
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--cth-amber-text)', lineHeight: '17px' }}>{txt.evidence}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <PixelButton size="sm" disabled={busy !== null && a.change.kind !== 'editor'} onClick={() => { void apply(a); }}>
-                      {a.change.kind === 'editor' ? t('pulse.openSchedules') : t('pulse.apply')}
+                    <PixelButton size="sm" disabled={busy !== null} onClick={() => { void apply(a); }}>
+                      {t('pulse.apply')}
                     </PixelButton>
                     <PixelButton variant="secondary" size="sm" onClick={() => { void notNow(a); }}>{t('pulse.notNow')}</PixelButton>
                     {a.savesPerWeek !== null && a.savesPerWeek > 0 && (

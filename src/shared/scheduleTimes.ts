@@ -266,19 +266,80 @@ export function thinTimes(times: ScheduleLine[], cacheMs: number): ScheduleLine[
     const toMs = line.everyMs <= cacheMs ? Math.min(line.everyMs * 2, cacheMs) : Math.min(line.everyMs * 2, DAY);
     every.push(slots > 1 && toMs > line.everyMs ? { ...line, everyMs: toMs } : line);
   }
-  const kept = new Map<number, number[]>(); // minute -> days
-  const keep = (day: number, minute: number): void => { kept.set(minute, [...(kept.get(minute) ?? []), day]); };
+  const at = new AtSlots();
   const singles: Array<{ day: number; minute: number }> = [];
   for (let d = 0; d < 7; d++) {
-    const mins = [...new Set(times.flatMap((l) => (l.kind === 'at' ? minutesOn(l, d) : [])))].sort((a, b) => a - b);
+    const mins = atMinutesOn(times, d);
     if (mins.length === 1) singles.push({ day: d, minute: mins[0] });
-    else mins.forEach((m, i) => { if (i % 2 === 0) keep(d, m); });
+    else mins.forEach((m, i) => { if (i % 2 === 0) at.keep(d, m); });
   }
-  singles.forEach((s, i) => { if (i % 2 === 0) keep(s.day, s.minute); });
-  const at: ScheduleLine[] = [...kept.entries()].sort((a, b) => a[0] - b[0])
-    .map(([minute, days]) => ({ kind: 'at', days: [...days].sort((a, b) => a - b), minute }));
-  const out = normalizeTimes([...every, ...at]);
+  singles.forEach((s, i) => { if (i % 2 === 0) at.keep(s.day, s.minute); });
+  const out = normalizeTimes([...every, ...at.lines()]);
   return out && slotsPerWeek(out) < slotsPerWeek(times) ? out : null;
+}
+
+/**
+ * The same schedule run more often, for "run more often" (owner, 2026-11-12),
+ * the way back from thinTimes:
+ * - An "every" line halves its gap, never under `minMs`.
+ * - "At" times: a day with two or more gets a time halfway between each pair.
+ *   A day with one time that skips a single day next to another such day gets
+ *   that day back ("Mon, Wed and Fri at 09:00" becomes weekdays), and with no
+ *   such day each one gets a second time halfway to midnight ("weekdays at
+ *   09:00" becomes 09:00 and 16:30). New times land on the quarter hour. A
+ *   day an "every" line runs on is never taken.
+ * Null when that adds no run or no longer makes a valid schedule.
+ */
+export function denseTimes(times: ScheduleLine[], minMs: number): ScheduleLine[] | null {
+  const quarter = (m: number): number => Math.round(m / 15) * 15;
+  const every: ScheduleLine[] = [];
+  const everyDays = new Set<number>();
+  for (const line of times) {
+    if (line.kind !== 'every') continue;
+    for (const d of lineDays(line)) everyDays.add(d);
+    const toMs = Math.max(minMs, Math.round(line.everyMs / 2 / MINUTE) * MINUTE);
+    every.push(toMs < line.everyMs ? { ...line, everyMs: toMs } : line);
+  }
+  const at = new AtSlots();
+  const singles: Array<{ day: number; minute: number }> = [];
+  for (let d = 0; d < 7; d++) {
+    const mins = atMinutesOn(times, d);
+    mins.forEach((m) => at.keep(d, m));
+    if (mins.length === 1) singles.push({ day: d, minute: mins[0] });
+    for (let i = 0; i + 1 < mins.length; i++) {
+      const mid = quarter((mins[i] + mins[i + 1]) / 2);
+      if (mid > mins[i] && mid < mins[i + 1]) at.keep(d, mid);
+    }
+  }
+  const skipped = singles.slice(0, -1)
+    .filter((s, i) => singles[i + 1].day === s.day + 2 && !everyDays.has(s.day + 1) && atMinutesOn(times, s.day + 1).length === 0)
+    .map((s) => ({ day: s.day + 1, minute: s.minute }));
+  if (skipped.length) skipped.forEach((s) => at.keep(s.day, s.minute));
+  else for (const s of singles) {
+    const second = quarter((s.minute + 1440) / 2);
+    if (second > s.minute && second <= 1439) at.keep(s.day, second);
+  }
+  const out = normalizeTimes([...every, ...at.lines()]);
+  return out && slotsPerWeek(out) > slotsPerWeek(times) ? out : null;
+}
+
+/** The "at" minutes on a weekday, sorted, without repeats. */
+function atMinutesOn(times: ScheduleLine[], weekday: number): number[] {
+  return [...new Set(times.flatMap((l) => (l.kind === 'at' ? minutesOn(l, weekday) : [])))].sort((a, b) => a - b);
+}
+
+/** "At" slots collected day by day, read back as one line per time. */
+class AtSlots {
+  private byMinute = new Map<number, Set<number>>();
+  keep(day: number, minute: number): void {
+    const days = this.byMinute.get(minute) ?? new Set<number>();
+    days.add(day);
+    this.byMinute.set(minute, days);
+  }
+  lines(): ScheduleLine[] {
+    return [...this.byMinute.entries()].sort((a, b) => a[0] - b[0])
+      .map(([minute, days]) => ({ kind: 'at', days: [...days].sort((a, b) => a - b), minute }));
+  }
 }
 
 /** "2h", "30m", "1d". */

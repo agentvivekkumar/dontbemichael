@@ -273,3 +273,22 @@ test('run less on a timed job: about half the runs, the first time and day kept 
   assert.deepEqual(T.scheduleWhen({ intervalMs: H, weekly: { days: [5, 1], minute: 540 } }), { intervalMs: H, weekly: { days: [1, 5], minute: 540 } });
   assert.deepEqual(T.timedLines({ intervalMs: H }), null);
 });
+
+test('run more on a timed job: the way back from thinning, never under 15 minutes (owner, 2026-11-12)', () => {
+  // Value: protects=the times "run more often" proposes; fails_when=a gap between times gets no new time, a skipped day is not given back, a weekend job spreads to weekdays, an every line goes under 15 minutes, a new time lands off the quarter hour or past midnight, or a job that cannot get denser gets a change; why_new=timed jobs had no change to apply; seam=none; no_claim=none beyond protects
+  const at = (days, minute) => ({ kind: 'at', days, minute });
+  const wk = [1, 2, 3, 4, 5];
+  const Q = 15 * 60_000;
+  assert.deepEqual(T.denseTimes([at(wk, 540), at(wk, 900)], Q), [at(wk, 540), at(wk, 720), at(wk, 900)], '09:00 and 15:00 get 12:00 between');
+  assert.deepEqual(T.denseTimes([at([1, 3, 5], 540)], Q), [at(wk, 540)], 'Mon, Wed and Fri get Tue and Thu back');
+  assert.deepEqual(T.denseTimes(T.thinTimes([at(wk, 540)], H), Q), [at(wk, 540)], 'thinning then this is where it started');
+  assert.deepEqual(T.denseTimes([at(wk, 540)], Q), [at(wk, 540), at(wk, 990)], 'once every weekday: a second time halfway to midnight');
+  assert.deepEqual(T.denseTimes([at([0, 6], 840)], Q), [at([0, 6], 840), at([0, 6], 1140)], 'a weekend job stays on weekends');
+  assert.deepEqual(T.denseTimes([at([1], 1430)], Q), null, '23:50 has no room before midnight');
+  assert.deepEqual(T.denseTimes([{ kind: 'every', everyMs: H, days: wk, from: 480, to: 1080 }], Q), [{ kind: 'every', everyMs: 30 * 60_000, days: wk, from: 480, to: 1080 }]);
+  assert.deepEqual(T.denseTimes([{ kind: 'every', everyMs: 25 * 60_000 }], Q), [{ kind: 'every', everyMs: Q }], 'never under 15 minutes');
+  assert.equal(T.denseTimes([{ kind: 'every', everyMs: Q, days: wk }], Q), null, 'already every 15 minutes');
+  // A day an every line runs on is never taken by a given-back day.
+  assert.deepEqual(T.denseTimes([{ kind: 'every', everyMs: 2 * H, days: [2] }, at([1, 3], 540)], Q),
+    [{ kind: 'every', everyMs: H, days: [2] }, at([1, 3], 540), at([1, 3], 990)]);
+});

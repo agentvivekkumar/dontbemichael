@@ -15,7 +15,7 @@
  */
 
 import type { ModelTier } from './modelCatalogPayload';
-import { slotsPerWeek, thinTimes, timedLines, whenFromLines, type ScheduleWhen } from './scheduleTimes';
+import { denseTimes, slotsPerWeek, thinTimes, timedLines, whenFromLines, type ScheduleLine, type ScheduleWhen } from './scheduleTimes';
 
 export const ADVICE_WINDOW_MS = 14 * 86_400_000;
 /** Early patterns need half the evidence advice needs (owner, 2026-10-19, eng D1). */
@@ -88,12 +88,10 @@ export interface Advice {
   missionId?: string;
   /** Evidence for the card and for dismiss bands. */
   evidence: { runs?: number; nothing?: number; didWork?: number; kept?: number; decisions?: number; reopens?: number };
-  /** What one click changes. `when` = a timed schedule's times, before and
-   *  after. `editor` = open the schedule editor (run more on a timed schedule). */
+  /** What one click changes. `when` = a timed schedule's times, before and after. */
   change:
     | { kind: 'interval'; fromMs: number; toMs: number }
     | { kind: 'when'; from: ScheduleWhen; to: ScheduleWhen }
-    | { kind: 'editor'; direction: 'less' | 'more' }
     | { kind: 'model'; from: string | null; to: string; toLabel: string };
   /** Expected saving a week at API prices, when it can be worked out. */
   savesPerWeek: number | null;
@@ -181,8 +179,10 @@ export function adviceFor(input: {
       });
       continue;
     }
-    // A timed schedule has no clean halving, so it opens the editor; the 15 minute floor is for intervals.
-    if (didWork / mine.length >= 0.9 && (m.timed || m.intervalMs / 2 >= MIN_INTERVAL_MS)) {
+    // A timed schedule gets its own times made denser (owner, 2026-11-12),
+    // never under 15 minutes; none when nothing can be added.
+    const denser = m.timed && m.when ? dense(m.when) : null;
+    if (didWork / mine.length >= 0.9 && (m.timed ? denser !== null : m.intervalMs / 2 >= MIN_INTERVAL_MS)) {
       const mid = since + (input.now - since) / 2;
       const median = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
       const last = median(mine.filter((r) => r.start >= mid).map((r) => r.workCount));
@@ -191,7 +191,9 @@ export function adviceFor(input: {
         out.push({
           id: `run-more:${m.to}:${m.id}`, kind: 'run-more', agentId: m.to, missionId: m.id,
           evidence: { runs: mine.length, didWork },
-          change: m.timed ? { kind: 'editor', direction: 'more' } : { kind: 'interval', fromMs: m.intervalMs, toMs: Math.max(MIN_INTERVAL_MS, m.intervalMs / 2) },
+          change: m.timed && m.when && denser
+            ? { kind: 'when', from: m.when, to: whenFromLines(denser, m.when.intervalMs) }
+            : { kind: 'interval', fromMs: m.intervalMs, toMs: Math.max(MIN_INTERVAL_MS, m.intervalMs / 2) },
           savesPerWeek: null,
           band: didWork
         });
@@ -230,6 +232,12 @@ export function adviceFor(input: {
     }
   }
   return out;
+}
+
+/** A timed schedule's lines run more often, or null. */
+function dense(when: ScheduleWhen): ScheduleLine[] | null {
+  const lines = timedLines(when);
+  return lines ? denseTimes(lines, MIN_INTERVAL_MS) : null;
 }
 
 /** What the Early look watches (owner, 2026-10-26: it read as schedules
