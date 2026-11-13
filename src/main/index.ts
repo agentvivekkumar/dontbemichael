@@ -4217,7 +4217,8 @@ ipcMain.handle('fs:revealPath', async (_evt, p: unknown) => {
   // Shown in its folder, never opened (owner, D12): a path an agent printed
   // can name an app, or a link to one, or become one between a check and an
   // open, and opening it would launch it outside every sandbox.
-  const st = await statAbs(p);
+  const st = await statAbs(p).catch(() => null);
+  if (!st) return { ok: false, error: 'could not check' };
   if (!st.exists) return { ok: false, error: 'not found' };
   shell.showItemInFolder(st.path);
   return { ok: true };

@@ -333,7 +333,12 @@ export function isNetworkPath(p: string, platform: string = process.platform): b
  *  ⌘-click markdown flow). `~/` is expanded here (the renderer doesn't know
  *  the home dir). Read-only metadata: returns whether a regular file exists and
  *  the normalized absolute path; never file contents. A network path is never
- *  looked at (isNetworkPath). */
+ *  looked at (isNetworkPath).
+ *
+ *  "Not there" (exists false) only when the disk says so: ENOENT or ENOTDIR. A
+ *  check it could not make (no permission, a share timing out) rejects, so a
+ *  caller never reads it as a miss and falls back to another file, such as
+ *  the one file name inside a quoted path (PR 687 review, 2026-11-13). */
 export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boolean; path: string }> {
   if (isNetworkPath(p)) return { exists: false, isFile: false, path: p };
   const abs = expandTilde(p);
@@ -341,8 +346,10 @@ export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boo
   try {
     const s = await stat(abs);
     return { exists: true, isFile: s.isFile(), path: abs };
-  } catch {
-    return { exists: false, isFile: false, path: abs };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return { exists: false, isFile: false, path: abs };
+    throw e;
   }
 }
 
