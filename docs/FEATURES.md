@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.3.9). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.4.0). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -303,6 +303,11 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.4.0 (2026-11-13)
+- Job changes, such as a better job description offered for a team member, and the other checks the
+  app runs in the background work on every Mac: on a Mac whose Claude Code settings did not turn off
+  its Bypass Permissions warning, they stopped at that warning and failed every time.
 
 ### 0.3.9 (2026-11-13)
 - For a job that runs at set times or on chosen days, Pulse's Run less offers its own times

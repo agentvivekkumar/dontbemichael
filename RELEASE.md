@@ -1,13 +1,10 @@
-# Don't Be Michael v0.3.9
+# Don't Be Michael v0.4.0
 
 **An AI office for your small business.** Pick your kind of business, pick your team, and Michael, your office manager, runs the floor while you run the business.
 
-## What's new in 0.3.9
+## What's new in 0.4.0
 
-- **Pulse can change a job's set times for you.** For a job that runs at set times or on chosen days, Run less and Run more offer its own times thinned or filled in, ready to apply with Undo.
-- **No more stuck loading screen after sleep.** A window left on the loading screen when the Mac wakes is noticed and loaded again.
-- **Links to files with spaces in their names open,** in a tab, instead of showing the raw path.
-- **A job change that cannot work says why,** instead of asking you to try again for something a retry cannot fix.
+- **Job changes and team checks work on every Mac.** On some Macs a job change, such as a better job description offered for a team member, failed every time. Claude Code's startup warning now never stops them.
 
 Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvivekkumar/dontbemichael/blob/main/docs/FEATURES.md)
 
@@ -15,15 +12,15 @@ Every feature, release by release: [docs/FEATURES.md](https://github.com/agentvi
 
 | Platform | Download |
 |---|---|
-| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.3.9-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.3.9-mac-universal.dmg) |
+| Mac (Apple Silicon and Intel) | [`Dont-Be-Michael-0.4.0-mac-universal.dmg`](https://github.com/agentvivekkumar/dontbemichael/releases/latest/download/Dont-Be-Michael-0.4.0-mac-universal.dmg) |
 
 <!-- windows -->
-**Windows 11 (x64):** [`Dont-Be-Michael-0.3.9-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.3.9/Dont-Be-Michael-0.3.9-win-x64-setup.exe). ARM PCs aren't supported. This build is not yet signed with a Microsoft certificate: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
+**Windows 11 (x64):** [`Dont-Be-Michael-0.4.0-win-x64-setup.exe`](https://github.com/agentvivekkumar/dontbemichael/releases/download/v0.4.0/Dont-Be-Michael-0.4.0-win-x64-setup.exe). ARM PCs aren't supported. This build is not yet signed with a Microsoft certificate: when Windows says **Windows protected your PC**, click **More info**, then **Run anyway**.
 <!-- /windows -->
 
 Linux will follow.
 
-[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.3.9.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.3.9.tar.gz)
+[Source code (zip)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.4.0.zip) · [Source code (tar.gz)](https://github.com/agentvivekkumar/dontbemichael/archive/refs/tags/v0.4.0.tar.gz)
 
 ## Installing on your Mac
 

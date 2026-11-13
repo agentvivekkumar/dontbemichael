@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.4.0] (2026-11-13)
+
+### Fixed
+- **Job changes work on every Mac.** On a Mac whose Claude Code settings did not turn off its Bypass Permissions warning, every job change, and the other checks the app runs in the background, stopped at that warning and failed. They now answer it themselves, as team members already do.
+
 ## [0.3.9] (2026-11-13)
 
 ### Changed
