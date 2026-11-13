@@ -316,16 +316,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Priority:** P3
 **Depends on:** None
 
-### Retry the backfill when it skipped files it could not read
-
-**What:** Write the backfill's done mark only after a scan that read every file it meant to, and record how many it skipped, so a scan cut short by files being written or a slow volume runs again.
-
-**Why:** ensureCheckedBackfill writes checked-backfill.json whatever it read, so a scan that met unreadable files never fills in their details. Links and pipes an agent left are skipped on purpose and must not count as a failure. Found by the Codex adversarial review (2026-10-17).
-
-**Effort:** S
-**Priority:** P4
-**Depends on:** None
-
 ## Company foundations (deferred from the ship of mit/file-tab-no-bottom-bar, 2026-10-20)
 
 ### See and put back a foundation answer's past versions

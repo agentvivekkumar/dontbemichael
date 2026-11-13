@@ -2,7 +2,8 @@
  * Reading a file an agent could have written, with the owner's rights: never
  * through a link, never waiting on a pipe, never a file too big to be a
  * message (red team, third ship). Shared by the hive's router and Pulse's
- * one-time backfill of its lists (ship review 2026-10-17).
+ * backfill of its lists, which runs until a scan reads every file or its tries
+ * run out (ship review 2026-10-17).
  */
 import { closeSync, constants, fstatSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,16 +13,35 @@ import { openNoFollow } from './noFollow';
 /** The most a message file may hold for the app to read it. */
 export const MAX_MESSAGE_FILE_BYTES = 4 * 1024 * 1024;
 
+/** Why a message file gave no text: not there, a link, not a plain file (a
+ *  pipe or a folder), too big to be a message, or there and unreadable. */
+export type MessageSkip = 'missing' | 'link' | 'not-file' | 'too-big' | 'failed';
+
 /** A message file read without following a link or waiting on a pipe: an
  *  agent's own folder may hold either. Null for anything but a plain file. */
 export function readMessageFile(path: string): string | null {
+  const r = readMessageFileOrWhy(path);
+  return 'text' in r ? r.text : null;
+}
+
+/** readMessageFile, saying why when it gives nothing, so a caller that tells
+ *  a skip on purpose from a miss by chance uses the same rules as the read. */
+export function readMessageFileOrWhy(path: string): { text: string } | { skip: MessageSkip } {
   let fd = -1;
   try {
     fd = openNoFollow(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     const st = fstatSync(fd);
-    if (!st.isFile() || st.size > MAX_MESSAGE_FILE_BYTES) return null;
-    return readFileSync(fd, 'utf8');
-  } catch { return null; } finally {
+    if (!st.isFile()) return { skip: 'not-file' };
+    if (st.size > MAX_MESSAGE_FILE_BYTES) return { skip: 'too-big' };
+    return { text: readFileSync(fd, 'utf8') };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code;
+    if (code === 'ELOOP') return { skip: 'link' };
+    if (code === 'EISDIR') return { skip: 'not-file' };
+    // A link whose target is gone, or one followed where O_NOFOLLOW is missing.
+    try { if (lstatSync(path).isSymbolicLink()) return { skip: 'link' }; } catch { /* gone too */ }
+    return { skip: code === 'ENOENT' ? 'missing' : 'failed' };
+  } finally {
     if (fd >= 0) try { closeSync(fd); } catch { /* closed */ }
   }
 }

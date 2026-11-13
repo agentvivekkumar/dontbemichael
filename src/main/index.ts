@@ -991,8 +991,9 @@ const pulse = new PulseService({
   readChecked: () => {
     const home = readConfig().harnessHome;
     if (!home) return '';
-    // Checks from before the lists kept words, put together once from the
-    // office's files (owner, 2026-10-16: "still not saying changed message").
+    // Checks from before the lists kept words, put together from the office's
+    // files: once, or again a few times while a scan misses files (owner,
+    // 2026-10-16: "still not saying changed message").
     try {
       const reg = hive.registry();
       ensureCheckedBackfill(privateRoot(home), {
