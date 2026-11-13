@@ -22,14 +22,20 @@ export const NOFOLLOW: number | null = typeof constants.O_NOFOLLOW === 'number' 
 const refused = (path: string): NodeJS.ErrnoException =>
   Object.assign(new Error(`ELOOP: refused a link, open '${path}'`), { code: 'ELOOP', errno: -62, syscall: 'open', path });
 
+const taken = (path: string): NodeJS.ErrnoException =>
+  Object.assign(new Error(`EEXIST: file already exists, open '${path}'`), { code: 'EEXIST', errno: -17, syscall: 'open', path });
+
 const sameFile = (a: BigIntStats, b: BigIntStats): boolean => a.ino === b.ino && a.dev === b.dev;
 
 /** What the path names before the open, without following it: null when
- *  nothing is there and the open may make it. */
+ *  nothing is there and the open may make it. An exclusive create on a name
+ *  a link holds says the name is taken, as the kernel does with O_NOFOLLOW,
+ *  so a caller that moves on to the next name still does (ship coverage
+ *  audit, 2026-11-13: a saved attachment failed with ELOOP on Windows). */
 function before(path: string, flags: number, st: () => BigIntStats): BigIntStats | null {
   try {
     const s = st();
-    if (s.isSymbolicLink()) throw refused(path);
+    if (s.isSymbolicLink()) throw (flags & constants.O_CREAT) && (flags & constants.O_EXCL) ? taken(path) : refused(path);
     return s;
   } catch (e) {
     if ((e as NodeJS.ErrnoException)?.code === 'ENOENT' && (flags & constants.O_CREAT)) return null;
