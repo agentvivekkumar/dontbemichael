@@ -186,5 +186,5 @@ test('the trust check always runs on Claude, with none of the owner\'s hooks', (
   assert.match(main, /command: cmd && isClaudeProvider\(inferAgentProvider\(cmd\)\) \? cmd : 'claude',\s*noTools: true,\s*settingSources: 'user',\s*settingsJson: JSON\.stringify\(\{ disableAllHooks: true \}\),/);
   // The caller's settings ride every session, with the bypass warning answered
   // beside them (hidden-claude-bypass-warning.test.cjs keeps disableAllHooks).
-  assert.match(read('src/main/hiddenClaude.ts'), /args\.push\('--settings', hiddenSettings\(opts\.settingsJson\)\);/);
+  assert.match(read('src/main/hiddenClaude.ts'), /const settings = hiddenSettings\(opts\.settingsJson\);\s*if \(settings === null\) \{ resolve\(\{ ok: false, error: 'could not prepare background check' \}\); return; \}\s*args\.push\('--settings', settings\);/);
 });

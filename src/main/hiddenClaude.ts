@@ -105,14 +105,17 @@ export interface HiddenClaudeOptions {
  *  Claude before it wrote anything whenever the owner's ~/.claude/settings.json
  *  did not answer it (ensureClaudeGlobalPermissions leaves a file it cannot
  *  read alone): every job change on that Mac failed as "no assistant response"
- *  (owner, 2026-11-13; reproduced with Claude Code 2.1.323). */
-export function hiddenSettings(settingsJson?: string): string {
+ *  (owner, 2026-11-13; reproduced with Claude Code 2.1.323). Null for caller
+ *  settings that are not a JSON object: the check is not run without them
+ *  (they turn off hooks), never run with less. */
+export function hiddenSettings(settingsJson?: string): string | null {
   let base: Record<string, unknown> = {};
   if (settingsJson) {
     try {
       const parsed: unknown = JSON.parse(settingsJson);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) base = parsed as Record<string, unknown>;
-    } catch { /* the app writes these; an unreadable one adds nothing */ }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      base = parsed as Record<string, unknown>;
+    } catch { return null; }
   }
   return JSON.stringify({ ...base, skipDangerousModePermissionPrompt: true, skipAutoPermissionPrompt: true });
 }
@@ -235,7 +238,9 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--strict-mcp-config', '--disallowedTools', ...disallowed]),
     ];
     if (opts.settingSources) args.push('--setting-sources', opts.settingSources);
-    args.push('--settings', hiddenSettings(opts.settingsJson));
+    const settings = hiddenSettings(opts.settingsJson);
+    if (settings === null) { resolve({ ok: false, error: 'could not prepare background check' }); return; }
+    args.push('--settings', settings);
     for (const d of addDirs) { args.push('--add-dir', d); }
 
     const bootCapMs = opts.bootCapMs ?? 7000;

@@ -69,5 +69,13 @@ test('the caller\'s settings are kept beside the warning\'s answer', () => {
   assert.deepEqual(JSON.parse(hiddenSettings(JSON.stringify({ disableAllHooks: true }))), { disableAllHooks: true, skipDangerousModePermissionPrompt: true, skipAutoPermissionPrompt: true });
   assert.deepEqual(JSON.parse(hiddenSettings(JSON.stringify({ skipDangerousModePermissionPrompt: false }))).skipDangerousModePermissionPrompt, true);
   assert.deepEqual(JSON.parse(hiddenSettings()), { skipDangerousModePermissionPrompt: true, skipAutoPermissionPrompt: true });
-  assert.deepEqual(JSON.parse(hiddenSettings('not json')), { skipDangerousModePermissionPrompt: true, skipAutoPermissionPrompt: true });
+  // Caller settings that cannot be read stop the check instead of running it with less.
+  assert.equal(hiddenSettings('not json'), null);
+  assert.equal(hiddenSettings('[1]'), null);
+});
+
+test('a check whose own settings cannot be read is not run', async () => {
+  // Value: protects=a check never runs without the hooks off its caller asked for; fails_when=unreadable caller settings are dropped and the session starts anyway; why_new=adversarial review 2026-11-13; seam=none; no_claim=none beyond protects
+  const r = await runHiddenClaude('x', { model: 'claude-sonnet-5', cwd: os.tmpdir(), command: '/no/such/claude', settingsJson: 'not json' });
+  assert.deepEqual(r, { ok: false, error: 'could not prepare background check' });
 });
