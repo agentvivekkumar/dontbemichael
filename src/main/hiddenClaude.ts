@@ -98,6 +98,25 @@ export interface HiddenClaudeOptions {
   images?: string[];
 }
 
+/** The settings every hidden session is started with: the caller's, with
+ *  Claude Code's bypass mode warning answered, as each team member's own
+ *  settings answer it (hive.ts). The session runs in bypass mode and that
+ *  warning's default is "No, exit", so the Enter that sends the prompt quit
+ *  Claude before it wrote anything whenever the owner's ~/.claude/settings.json
+ *  did not answer it (ensureClaudeGlobalPermissions leaves a file it cannot
+ *  read alone): every job change on that Mac failed as "no assistant response"
+ *  (owner, 2026-11-13; reproduced with Claude Code 2.1.323). */
+export function hiddenSettings(settingsJson?: string): string {
+  let base: Record<string, unknown> = {};
+  if (settingsJson) {
+    try {
+      const parsed: unknown = JSON.parse(settingsJson);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) base = parsed as Record<string, unknown>;
+    } catch { /* the app writes these; an unreadable one adds nothing */ }
+  }
+  return JSON.stringify({ ...base, skipDangerousModePermissionPrompt: true, skipAutoPermissionPrompt: true });
+}
+
 /** How long each pasted picture is given to attach before the next paste. */
 const IMAGE_PASTE_MS = 600;
 
@@ -216,7 +235,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       ...(opts.noTools ? ['--tools', '', '--strict-mcp-config'] : ['--strict-mcp-config', '--disallowedTools', ...disallowed]),
     ];
     if (opts.settingSources) args.push('--setting-sources', opts.settingSources);
-    if (opts.settingsJson) args.push('--settings', opts.settingsJson);
+    args.push('--settings', hiddenSettings(opts.settingsJson));
     for (const d of addDirs) { args.push('--add-dir', d); }
 
     const bootCapMs = opts.bootCapMs ?? 7000;
