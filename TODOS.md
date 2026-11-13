@@ -37,11 +37,11 @@
 **Effort:** S
 **Priority:** P2
 
-### Wider phrasings for the two card checks
+### What the two card checks still can't read
 
-**What:** Teach the email link check possessive and verb forms ("Will's email", "Dana emailed us", "the message Will sent") and to leave Slack and chat threads alone; teach the change option check "Approve with my changes", "Send with my changes, then show me again", and to apply a negation only to the words just before "show me again".
+**What:** Five wordings the email link check and the change option check read by words alone and get wrong: "Go ahead with my changes" (an inside approval or a send, the label can't say), "Send it back to Pam with my edits" (flagged, since the label can't say whether Pam is in the office), the other side of that, a send back anywhere in a label switching off the send then show check ("Send it back to the client with my edits, then show me again" passes, as on `main`), a chat named in another sentence of the same question ("Approve the reply to Will Cox's message? Pam flagged it in Slack." passes, since the chat switch reads the whole question; per sentence would instead flag "Approve the reply? It's in the Slack thread."), and our own team's mail named with a possessive ("Approve Dwight's email for Acme?", "the office's email policy" are flagged; "noEmail" covers them).
 
-**Why:** Both checks are a backstop to Michael's rules and only read English words; these phrasings slip past or, for one compliant label, flag it until he uses the canonical wording. Ship review pass 2, 2026-11-05.
+**Why:** Both checks are a backstop to Michael's rules, read English words only, and have no way to know who a name is or what a draft is for. Left from the re-reviews of #686 (2026-11-08, 2026-11-09 and 2026-11-12); the rest of those lists is fixed.
 
 **Effort:** S
 **Priority:** P3

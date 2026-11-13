@@ -459,19 +459,21 @@ export function askAsList(entry: { q?: unknown; askedAt?: unknown; options?: unk
 
 type AskText = { q?: unknown; askedAt?: unknown; options?: unknown; parts?: unknown; noEmail?: unknown; noSource?: unknown; noSearch?: unknown; kind?: unknown; sources?: unknown };
 
-/** Every question and option label of an ask, as one text. */
-function askWords(entry: AskText): { text: string; labels: string[] } {
-  const labels: string[] = [];
-  const texts = [typeof entry.q === 'string' ? entry.q : ''];
-  const take = (opts: unknown): void => {
-    if (Array.isArray(opts)) for (const o of opts) if (o && typeof (o as { label?: unknown }).label === 'string') labels.push((o as { label: string }).label);
+/** An ask's questions, as one text (the top question and each part's), and
+ *  each question with its own option labels. */
+function askWords(entry: AskText): { text: string; parts: Array<{ q: string; labels: string[] }> } {
+  const parts: Array<{ q: string; labels: string[] }> = [];
+  const labelsOf = (opts: unknown): string[] => {
+    const out: string[] = [];
+    if (Array.isArray(opts)) for (const o of opts) if (o && typeof (o as { label?: unknown }).label === 'string') out.push((o as { label: string }).label);
+    return out;
   };
-  take(entry.options);
+  parts.push({ q: typeof entry.q === 'string' ? entry.q : '', labels: labelsOf(entry.options) });
   if (Array.isArray(entry.parts)) for (const p of entry.parts) {
-    if (p && typeof (p as { q?: unknown }).q === 'string') texts.push((p as { q: string }).q);
-    take((p as { options?: unknown })?.options);
+    const q = p && typeof (p as { q?: unknown }).q === 'string' ? (p as { q: string }).q : '';
+    parts.push({ q, labels: labelsOf((p as { options?: unknown })?.options) });
   }
-  return { text: texts.join('\n'), labels };
+  return { text: parts.map((p) => p.q).join('\n'), parts };
 }
 
 const askedSince = (entry: AskText, since: number): boolean => {
@@ -479,9 +481,45 @@ const askedSince = (entry: AskText, since: number): boolean => {
   return Number.isFinite(at) && at >= since;
 };
 
-/** Words for a message someone sent (owner, 2026-11-05: the Will Cox card).
- *  Words for sending new mail ("send the quote email") are not enough. */
-const NAMES_EMAIL = /\b(repl(y|ies|ied)|thread|e-?mails? from|(his|her|their|its) e-?mails?|wrote (to|back|in)|in (your|the) inbox)\b/i;
+/** A name, "O'Brien" included. */
+const NAME = String.raw`(?:[\p{L}\p{M}\p{N}]+['’])?[\p{L}\p{M}\p{N}]+`;
+/** Words before an 's that are not a sender: a contraction ("let's", "it's") or
+ *  a time ("this week's email newsletter", "tomorrow's email reminders"). */
+const NOT_A_SENDER = String.raw`(?:let|it|that|there|here|what|who|he|she|today|tonight|tomorrow|yesterday|week|weekend|month|year|quarter|morning|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:['’]s|s['’])`;
+/** What follows "X's email" when it is ours, not a message X sent: a setting
+ *  ("Pam's email address") or our own content ("Pam's email draft"). */
+const OWN_MAIL_THING = String.raw`(?:address(?:es)?|(?:signature|account|settings?|access|tone|login|password|connector|draft|newsletter|campaign|footer|template|list|reminder)s?)\b`;
+
+/** Words that say an ask is about a message someone sent. */
+const EMAIL_ASK = new RegExp([
+  String.raw`\b(repl(y|ies|ied)|thread|e-?mails? from|(his|her|their|its) e-?mails?|wrote (to|back|in)|in (your|the) inbox)\b`,
+  // "Will's email", "José's email", "James' message", "O'Brien's email". Not
+  // "let's email" or a time ("tomorrow's email"), not a setting or our own
+  // content ("Pam's email address", "Pam's email draft"), and not our own draft
+  // going to someone ("Pam's email to Northwind").
+  String.raw`(?<![\p{L}\p{M}\p{N}'’])(?!${NOT_A_SENDER})${NAME}(?:['’]s|s['’]) (?:e-?mail|message)s?\b(?! ${OWN_MAIL_THING}| to\b)`,
+  // "Dana emailed us", "the supplier emailed back", but not our side in the
+  // passive ("the form is emailed back", "Was the quote emailed in time?").
+  String.raw`(?<!\b(?:be|is|was|were|are|been|being)(?: [\p{L}\p{M}\p{N}'’]+){0,2} )\be-?mailed (us|me|you|the office|in(?! time\b)|back)\b`,
+  // "Dana sent us an email".
+  String.raw`\bsent (us|me|you|the office) an? (e-?mail|message)\b`,
+  // "the message Will sent", "the email Dana wrote", "the message the client
+  // sent", but not "the quote email be sent", "the email we sent", "the email
+  // that was sent" or "the quote email already sent".
+  String.raw`\b(?:message|e-?mail) (?:(?!(?:be|is|was|were|been|being|has|had|have|gets?|got|we|i|you|they|already|just|never|not|also|still)\b)[\p{L}\p{M}]+ ){1,2}(?:sent|wrote)\b`
+].join('|'), 'iu');
+/** A chat context ("the Slack thread", "in Teams"), whose replies have no email:
+ *  link. Plain "teams" or "a quick chat" are ordinary words, not a chat. */
+const CHAT_CONTEXT = /\b(slack|teams|chat|sms|whatsapp|discord|text) (thread|message|reply|replies|channel|dm)s?\b|\b(in|on|over|via) (slack|teams|whatsapp|discord|sms|a chat|the chat)\b/i;
+/** Words for mail, so an ask about both a chat and an email still needs the link. */
+const MAIL_WORDS = /\b(e-?mails?|e-?mailed|inbox|mailbox)\b/i;
+
+/** A question about a message someone sent (owner, 2026-11-05: the Will Cox
+ *  card). Words for sending new mail ("send the quote email") are not enough.
+ *  A Slack or chat thread with no mail word has no email to link; that is read
+ *  per question, so a chat named in one part of an ask leaves the email in
+ *  another part checked. */
+const namesEmail = (q: string): boolean => EMAIL_ASK.test(q) && !(CHAT_CONTEXT.test(q) && !MAIL_WORDS.test(q));
 
 /** Words for something outside the office that already exists: a page, a
  *  post, a record (docs/designs/ask-me-source-links.md). Bare "message",
@@ -526,9 +564,9 @@ function linksInText(text: string): boolean {
 export function askMissesSource(entry: AskText | null | undefined, emailSince: number): boolean {
   if (!entry || entry.noSource === true || entry.kind === 'foundation') return false;
   if (hasUsableSource(sourcesOf(entry))) return false;
-  const { text } = askWords(entry);
+  const { text, parts } = askWords(entry);
   if (linksInText(text)) return false;
-  if (entry.noEmail !== true && askedSince(entry, emailSince) && NAMES_EMAIL.test(text)) return true;
+  if (entry.noEmail !== true && askedSince(entry, emailSince) && parts.some(({ q }) => namesEmail(q))) return true;
   const words = text.replace(NOT_A_SOURCE, ' ');
   return NAMES_OUTSIDE.some((re) => re.test(words));
 }
@@ -552,14 +590,81 @@ export function askClaimsUnsearched(entry: AskText | null | undefined): boolean 
   return CLAIMS_NOTHING_FOUND.some((re) => re.test(text));
 }
 
+/** A word that sends. "post" is a noun after a determiner ("Draft the post")
+ *  and a verb everywhere else ("Yes, post it", "OK to post"). */
+const SEND_VERB = String.raw`(?:\b(?:send|publish)\w*|\bgo(?:es)? out|(?<!\b(?:the|a|an|this|that|my|your|our|their|its) )\bpost(?:s|ed|ing)?(?!-))\b`;
+/** Words that say no. */
+const NEG = String.raw`(?:don['’]?t|doesn['’]?t|do not|does not|won['’]?t|will not|never|without|no need(?: for \w+)?(?: to)?)`;
+/** A send that has not happened yet: a no right before the send ("don't
+ *  send", "won't go out", "without sending"), "not" with an optional "yet"
+ *  and "ready to" ("Not ready to send", "not yet sending"), or before, until,
+ *  till, unless or instead of within two words, with no comma or "and"
+ *  between ("Before it goes out"). A no about waiting is not about the send,
+ *  so "Don't wait to send", "No need to wait to send", "Don't hesitate to
+ *  send" and "Without delay send" are sends, and so is "Ready to post". */
+const SEND_HELD = String.raw`(?<!\b(?:before|until|till|unless|instead of)(?: (?!(?:and|then|but|or|so|just|now)\b)[\w'’]+){0,2} |\b${NEG} |\bnot (?:yet )?(?:ready to )?)`;
+const WITH_CHANGES = String.raw`with (my |your |the )?(changes|edits)\b`;
+/** How far a send scans for "with my changes" or for coming back after it, so
+ *  a long label costs little. */
+const SEND_SCAN_CHARS = 300;
+/** What leaves the office when the owner approves it with changes, in a label
+ *  ("Approve the replies with my changes") and in a question ("Approve the
+ *  reply to Dana?"). Not "the draft rota" or "the post-holiday schedule". */
+const OUTBOUND = String.raw`(?:repl(?:y|ies)|e-?mails?|quotes?|messages?|letters?|invoices?|newsletters?|posts?(?!-))\b`;
+/** An option that sends with the changes. "approve" counts for what leaves
+ *  the office (a reply, an email, a post, a quote, an invoice), so "Approve
+ *  the rota with my changes" is not a send. A send back to someone ("Send it
+ *  back to Pam with my edits") counts too: the label can't say whether that
+ *  someone is in the office or out of it, so it says it comes back if it does. */
+const CHANGE_SENDS = new RegExp(String.raw`${SEND_VERB}[^.]{0,${SEND_SCAN_CHARS}}?\b${WITH_CHANGES}|\bapprove the ${OUTBOUND} ${WITH_CHANGES}|\b(edit|change)\w* (it |them )?(and|then) (send|post|publish)`, 'i');
+/** "Approve with my changes", "Approve it with my changes" or "Approve the
+ *  draft with my changes": a send when the question it answers names something
+ *  that leaves the office, or names nothing and the ask it is part of does.
+ *  For "Approve the new rota?" the label can't say what goes out, and nothing
+ *  does. */
+const APPROVE_BARE = new RegExp(String.raw`\bapprove( it| the draft)? ${WITH_CHANGES}`, 'i');
+/** A question about something that leaves the office. */
+const OUTBOUND_ASK = new RegExp(String.raw`\b${OUTBOUND}`, 'i');
+/** A question that names its own thing ("Approve the new rota?", "Pam's
+ *  rota?", "José's rota?"), so the top question does not speak for it. "Send
+ *  it?" names nothing. */
+const NAMES_A_THING = /\b(?:the|a|an|this|that|these|those|my|your|our|their|his|her|its) \p{L}|(?<![\p{L}\p{M}\p{N}])[\p{L}\p{M}]+['’]s \p{L}/iu;
+const COMES_BACK = String.raw`(show me (it )?again|comes? back|for (another|a) look|review it)`;
+const CHANGE_COMES_BACK = new RegExp(String.raw`\b${COMES_BACK}\b`, 'i');
+/** A no within six words before coming back: "don't show me again", "I don’t
+ *  need it to come back", "don't wait until I review it". The words must run
+ *  without a comma, so in "...without the discount line, show me again first"
+ *  the comma ends it and the "without" is about the change, not the look. */
+const CHANGE_DENIAL = new RegExp(String.raw`\b${NEG}((?: [\w'’]+){0,6}?) ${COMES_BACK}`, 'gi');
+/** A send held for the look between the no and the look: "it won't go out
+ *  until you show me again", "don't post till I review it". */
+const HELD_FOR_LOOK = /\b(?:go(?:es)? out|send\w*|post(?:s|ed|ing)?|publish\w*|leaves?)\b.*\b(?:until|before|till|unless)\b/i;
+const changeDenied = (label: string): boolean =>
+  [...label.matchAll(CHANGE_DENIAL)].some((m) => !HELD_FOR_LOOK.test(m[1]));
+/** Coming back after the send: a send word, then "then" and the look, so it
+ *  went out first. A look before the send ("Fix it, then show me again, then
+ *  send") is the look rule 10 asks for, and so is a send not made yet ("Before
+ *  it goes out, redo it with my edits, then show me again"). */
+const CHANGE_AFTER_SEND = new RegExp(String.raw`${SEND_HELD}${SEND_VERB}[^.]{0,${SEND_SCAN_CHARS}}?\b(then|afterwards|after that),? ${COMES_BACK}`, 'i');
+/** A send back to someone ("Send it back to Pam", "Send the reply back to
+ *  Pam"), which comes back by itself when it then says it shows the owner
+ *  again. */
+const SENDS_BACK = /\bsend (?:it |them |the [\p{L}\p{M}-]+ )?back\b/iu;
+
 /** A choice that sends something with the owner's changes before they see
- *  them again, which house rule 10 forbids (owner, 2026-11-04). */
+ *  them again, which house rule 10 forbids (owner, 2026-11-04). Coming back
+ *  only counts when it is not denied just before it ("don't show me again")
+ *  and does not come after a send that goes out ("Send with my changes, then
+ *  show me again"). */
 export function askChangeSends(entry: AskText | null | undefined, since: number): boolean {
   if (!entry || !askedSince(entry, since)) return false;
-  const sends = /\b(send|post|publish|go(es)? out)\w*\b[^.]*\bwith (my |your |the )?(changes|edits)\b|\b(edit|change)\w* (it |them )?(and|then) (send|post|publish)/i;
-  const comesBack = /\b(show me (it )?again|comes? back|for (another|a) look|review it)\b/i;
-  const negated = /\b(don'?t|do not|never|without|no need to)\b/i;
-  return askWords(entry).labels.some((l) => sends.test(l) && (!comesBack.test(l) || negated.test(l)));
+  const { parts } = askWords(entry);
+  const outbound = (q: string): boolean => OUTBOUND_ASK.test(q) || (!NAMES_A_THING.test(q) && OUTBOUND_ASK.test(parts[0].q));
+  return parts.some(({ q, labels }) => labels.some((l) => {
+    const sends = CHANGE_SENDS.test(l) || (APPROVE_BARE.test(l) && outbound(q));
+    if (!sends) return false;
+    return !CHANGE_COMES_BACK.test(l) || changeDenied(l) || (CHANGE_AFTER_SEND.test(l) && !SENDS_BACK.test(l));
+  }));
 }
 
 /**
