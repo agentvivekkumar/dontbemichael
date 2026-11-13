@@ -77,7 +77,7 @@ import { MemoryManager } from './memory';
 import { KnowledgeManager } from './knowledge';
 import { MemoryTidy } from './memoryTidy';
 import { checkDistinct, readCheckPhase, readDistinctMode, readJobProfile } from './hireCheck';
-import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckRequest, readReviseRequest, reviseWorkStyle } from './workStyleConvert';
+import { checkFocusArea, convertWorkStyle, readConvertRequest, readFocusCheckRequest, readReviseRequest, reviseWorkStyle, REVISE_THREW } from './workStyleConvert';
 import { SafeClearer, type SafeClearDeps } from './safeClearer';
 import { PersistStore } from './db';
 import { TelemetryStore } from './telemetryStore';
@@ -5226,8 +5226,8 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
     }
     const stop = new AbortController();
     if (rev.requestId) reviseRuns.set(rev.requestId, stop);
-    const cfg = readConfig();
     try {
+      const cfg = readConfig();
       return await reviseWorkStyle(rev, {
         engine: cfg.godProvider ?? 'claude',
         engineModel: cfg.godModel,
@@ -5244,6 +5244,11 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
         foundations: () => Object.entries(foundations.read().answers).flatMap(([id, a]) =>
           isFoundationId(id) && a?.text ? [`${FOUNDATION_QUESTIONS[id].text}: ${a.text}`] : [])
       }, stop.signal);
+    } catch (e) {
+      // Logged and reported like a throw inside the run, never only a
+      // rejected call the card reads as "failed" (owner, 2026-11-13).
+      try { hive.appendLog({ kind: 'work-style-revise-failed', reason: REVISE_THREW, error: String(e).slice(0, 200) }); } catch { /* best-effort */ }
+      return { kind: 'error', reason: 'failed' };
     } finally {
       if (rev.requestId) reviseRuns.delete(rev.requestId);
     }

@@ -247,3 +247,35 @@ test('an unreadable answer says which check failed, and the report carries it (i
   const R = loadTs('src/shared/failureReport.ts');
   assert.deepEqual(R.classifyLogEvent(logs[0]), { kind: 'hidden-call-failed', detail: 'work-style-revise-failed:answer-wrong-opening' });
 });
+
+test('a change that can never work on a retry says why, and the app hears of a run that ended or threw', async () => {
+  // Value: protects=the pack update card stops saying "Try again in a moment" for a cause a retry never clears, and a run that ended without an answer or threw reaches a failure report; fails_when=engine unavailable or an ended session reads as failed again, or their log reason has no report class; why_new=owner 2026-11-13, a Ryan update card failed on every try with no report; seam=stubbed hidden model; no_claim=which cause that office had (its log was not read)
+  const R = loadTs('src/shared/failureReport.ts');
+  const req = { ctx, current: { instructions: 'x', handles: '' }, changes: ['c'], update: true };
+  const cases = [
+    [{ ok: false, error: 'engine unavailable' }, 'engine', { kind: 'work-style-revise-failed', reason: 'engine unavailable' }, null],
+    [{ ok: false, error: 'no assistant response found in transcript' }, 'stopped', { kind: 'work-style-revise-failed', reason: 'ended without an answer', error: 'no assistant response found in transcript' }, 'work-style-revise-failed:session-ended'],
+    [{ ok: false, error: 'no assistant response' }, 'stopped', { kind: 'work-style-revise-failed', reason: 'ended without an answer', error: 'no assistant response' }, 'work-style-revise-failed:session-ended'],
+    [{ ok: false, error: 'background check failed' }, 'failed', { kind: 'work-style-revise-failed', reason: 'background check failed' }, null]
+  ];
+  for (const [reply, reason, logged, detail] of cases) {
+    const logs = [];
+    stub(reply);
+    assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, log: (e) => logs.push(e) }), { kind: 'error', reason }, reply.error);
+    assert.deepEqual(logs, [logged], reply.error);
+    assert.deepEqual(R.classifyLogEvent(logs[0]), detail && { kind: 'hidden-call-failed', detail }, reply.error);
+  }
+  const logs = [];
+  HM.runHiddenModel = async () => { throw new TypeError('boom'); };
+  assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, log: (e) => logs.push(e) }), { kind: 'error', reason: 'failed' });
+  assert.deepEqual(logs, [{ kind: 'work-style-revise-failed', reason: 'threw', error: 'TypeError: boom' }]);
+  assert.deepEqual(R.classifyLogEvent(logs[0]), { kind: 'hidden-call-failed', detail: 'work-style-revise-failed:call-threw' });
+  // A throw around the run in main (reading settings) is logged the same way, never only a rejected call.
+  assert.match(read('src/main/index.ts'), /\} catch \(e\) \{\n[^]*?hive\.appendLog\(\{ kind: 'work-style-revise-failed', reason: REVISE_THREW, error: String\(e\)\.slice\(0, 200\) \}\)[^]*?return \{ kind: 'error', reason: 'failed' \};\n    \} finally \{\n      if \(rev\.requestId\) reviseRuns\.delete/);
+  // A run that failed in the window itself is reported from there.
+  assert.match(read('src/renderer/src/components/JobChangeReview.tsx'), /\}\)\.catch\(\(e: unknown\): ReviseResult => \{[^]*?window\.cth\.reportFailure\?\.\(\{ kind: 'renderer-error', name: e\.name, stack: e\.stack \?\? '' \}\)[^]*?return \{ kind: 'error', reason: 'failed' \};/);
+  // The card says each cause in its own words, and none of them asks for a retry.
+  const jc = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).jobChange;
+  for (const k of ['errorEngine', 'errorStopped', 'errorNote', 'errorNoteCard']) assert.doesNotMatch(jc[k], /try again/i, k);
+  assert.match(jc.errorEngine, /\{\{name\}\}/);
+});
