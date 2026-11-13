@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
-## [Unreleased]
+## [0.3.9] (2026-11-13)
 
 ### Changed
 - **Pulse can change a job's set times for you.** For a job that runs at set times or on chosen days, Run less now offers its own times thinned and Run more offers them filled in, ready to apply with Undo, in place of only opening Schedules. The new times count from when you apply them, so a time added earlier today does not run at once.
