@@ -200,6 +200,148 @@ export function timesDelayMs(times: ScheduleLine[], now: number, lastFiredAt = 0
   return next === null ? null : Math.max(0, next - now);
 }
 
+/** A schedule's timing as stored on a job: the interval, or the weekly
+ *  calendar, or the lines (which replace both). Made canonical by scheduleWhen. */
+export interface ScheduleWhen {
+  intervalMs: number;
+  weekly?: { days: number[]; minute: number };
+  times?: ScheduleLine[];
+}
+
+/** A job's timing, canonical, so two reads of the same job compare equal:
+ *  valid lines win, then a valid weekly, else the interval alone. */
+export function scheduleWhen(m: { intervalMs: number; weekly?: unknown; times?: unknown }): ScheduleWhen {
+  const times = normalizeTimes(m.times);
+  if (times) return { intervalMs: m.intervalMs, times };
+  const weekly = normalizeWeekly(m.weekly);
+  return weekly ? { intervalMs: m.intervalMs, weekly: { days: weekly.days, minute: weekly.minute } } : { intervalMs: m.intervalMs };
+}
+
+/** The lines a timed schedule runs on (a weekly is one "at" line), or null
+ *  for a plain interval. */
+export function timedLines(w: ScheduleWhen): ScheduleLine[] | null {
+  if (w.times) return w.times;
+  if (w.weekly) return [{ kind: 'at', days: w.weekly.days, minute: w.weekly.minute }];
+  return null;
+}
+
+/** Lines back into a job's timing, stored the way the editor stores them: a
+ *  single simple line as `weekly` or `intervalMs`, else `times`. The job's
+ *  own interval stays on the record, as switching modes expects. */
+export function whenFromLines(lines: ScheduleLine[], intervalMs: number): ScheduleWhen {
+  const simple = simpleTimes(lines);
+  if (simple && 'weekly' in simple) return { intervalMs, weekly: simple.weekly };
+  if (simple) return { intervalMs: simple.intervalMs };
+  return { intervalMs, times: lines };
+}
+
+/** How many times a week the lines run. */
+export function slotsPerWeek(times: ScheduleLine[]): number {
+  let n = 0;
+  for (let d = 0; d < 7; d++) {
+    const day = new Set<number>();
+    for (const line of times) for (const m of minutesOn(line, d)) day.add(m);
+    n += day.size;
+  }
+  return n;
+}
+
+/**
+ * The same schedule with about half the runs, for "run less often" (owner,
+ * 2026-11-12: a timed job got "Open schedules" and no change to apply).
+ * - An "every" line doubles its gap, never past `cacheMs` once inside it (the
+ *   prompt cache rule intervals follow) and never past a day. A window with
+ *   one slot left is kept as it is.
+ * - "At" times: a day with two or more keeps every other one, its first kept;
+ *   the days with one time keep every other such day, the week's first kept.
+ *   So "weekdays at 09:00, 12:00 and 15:00" becomes 09:00 and 15:00, and
+ *   "weekdays at 09:00" becomes Mon, Wed and Fri.
+ * Null when that leaves as many runs as before.
+ */
+export function thinTimes(times: ScheduleLine[], cacheMs: number): ScheduleLine[] | null {
+  const every: ScheduleLine[] = [];
+  for (const line of times) {
+    if (line.kind !== 'every') continue;
+    const slots = minutesOn(line, lineDays(line)[0]).length;
+    const toMs = line.everyMs <= cacheMs ? Math.min(line.everyMs * 2, cacheMs) : Math.min(line.everyMs * 2, DAY);
+    every.push(slots > 1 && toMs > line.everyMs ? { ...line, everyMs: toMs } : line);
+  }
+  const at = new AtSlots();
+  const singles: Array<{ day: number; minute: number }> = [];
+  for (let d = 0; d < 7; d++) {
+    const mins = atMinutesOn(times, d);
+    if (mins.length === 1) singles.push({ day: d, minute: mins[0] });
+    else mins.forEach((m, i) => { if (i % 2 === 0) at.keep(d, m); });
+  }
+  singles.forEach((s, i) => { if (i % 2 === 0) at.keep(s.day, s.minute); });
+  const out = normalizeTimes([...every, ...at.lines()]);
+  return out && slotsPerWeek(out) < slotsPerWeek(times) ? out : null;
+}
+
+/**
+ * The same schedule run more often, for "run more often" (owner, 2026-11-12),
+ * the way back from thinTimes:
+ * - An "every" line halves its gap, never under `minMs`.
+ * - "At" times: a day with two or more gets a time halfway between each pair.
+ *   A day with one time that skips a single day next to another such day gets
+ *   that day back ("Mon, Wed and Fri at 09:00" becomes weekdays), and with no
+ *   such day each one gets a second time halfway to midnight ("weekdays at
+ *   09:00" becomes 09:00 and 16:30). New times land on the quarter hour. A
+ *   day an "every" line runs on is never taken.
+ * Null when that adds no run or no longer makes a valid schedule.
+ */
+export function denseTimes(times: ScheduleLine[], minMs: number): ScheduleLine[] | null {
+  const quarter = (m: number): number => Math.round(m / 15) * 15;
+  const every: ScheduleLine[] = [];
+  const everyDays = new Set<number>();
+  for (const line of times) {
+    if (line.kind !== 'every') continue;
+    for (const d of lineDays(line)) everyDays.add(d);
+    const toMs = Math.max(minMs, Math.round(line.everyMs / 2 / MINUTE) * MINUTE);
+    every.push(toMs < line.everyMs ? { ...line, everyMs: toMs } : line);
+  }
+  const at = new AtSlots();
+  const singles: Array<{ day: number; minute: number }> = [];
+  for (let d = 0; d < 7; d++) {
+    const mins = atMinutesOn(times, d);
+    mins.forEach((m) => at.keep(d, m));
+    if (mins.length === 1) singles.push({ day: d, minute: mins[0] });
+    for (let i = 0; i + 1 < mins.length; i++) {
+      const mid = quarter((mins[i] + mins[i + 1]) / 2);
+      if (mid > mins[i] && mid < mins[i + 1]) at.keep(d, mid);
+    }
+  }
+  const skipped = singles.slice(0, -1)
+    .filter((s, i) => singles[i + 1].day === s.day + 2 && !everyDays.has(s.day + 1) && atMinutesOn(times, s.day + 1).length === 0)
+    .map((s) => ({ day: s.day + 1, minute: s.minute }));
+  if (skipped.length) skipped.forEach((s) => at.keep(s.day, s.minute));
+  else for (const s of singles) {
+    const second = quarter((s.minute + 1440) / 2);
+    if (second > s.minute && second <= 1439) at.keep(s.day, second);
+  }
+  const out = normalizeTimes([...every, ...at.lines()]);
+  return out && slotsPerWeek(out) > slotsPerWeek(times) ? out : null;
+}
+
+/** The "at" minutes on a weekday, sorted, without repeats. */
+function atMinutesOn(times: ScheduleLine[], weekday: number): number[] {
+  return [...new Set(times.flatMap((l) => (l.kind === 'at' ? minutesOn(l, weekday) : [])))].sort((a, b) => a - b);
+}
+
+/** "At" slots collected day by day, read back as one line per time. */
+class AtSlots {
+  private byMinute = new Map<number, Set<number>>();
+  keep(day: number, minute: number): void {
+    const days = this.byMinute.get(minute) ?? new Set<number>();
+    days.add(day);
+    this.byMinute.set(minute, days);
+  }
+  lines(): ScheduleLine[] {
+    return [...this.byMinute.entries()].sort((a, b) => a[0] - b[0])
+      .map(([minute, days]) => ({ kind: 'at', days: [...days].sort((a, b) => a - b), minute }));
+  }
+}
+
 /** "2h", "30m", "1d". */
 export function formatEvery(ms: number): string {
   if (ms % DAY === 0) return `${ms / DAY}d`;

@@ -1,6 +1,7 @@
 import { lstat, open, realpath, stat } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { constants, existsSync } from 'node:fs';
+import { openNoFollowAsync } from './noFollow';
 import { basename, dirname, isAbsolute, join, normalize, posix, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { imageMimeForExtension } from '../shared/imageTypes';
@@ -124,13 +125,13 @@ async function confineCanonical(realRoot: string, absPath: string): Promise<stri
  * Open-time guards, so containment does not depend on the path still meaning the
  * same thing between the check above and the open below.
  *
- * O_NOFOLLOW makes the kernel refuse the final component if it is a symlink;
- * O_NONBLOCK keeps a FIFO from parking the open (and with it the IPC call and the
- * renderer's loading state) forever. Both are POSIX-only — on Windows they are
- * undefined and OR in as 0, which is why the `lstat` walk above is a check in its
- * own right and not merely a pre-filter.
+ * The open refuses a link as the final component on every platform
+ * (openNoFollowAsync: O_NOFOLLOW where the kernel has it, and on Windows a look
+ * before and after the open). O_NONBLOCK keeps a FIFO from parking the open (and
+ * with it the IPC call and the renderer's loading state) forever; it is
+ * POSIX-only, and Windows has no FIFO a folder can hold.
  */
-const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW | 0) | (constants.O_NONBLOCK | 0);
+const READ_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK | 0);
 
 /**
  * Open a path that `safeResolve` has ALREADY cleared, for reading.
@@ -146,7 +147,7 @@ const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW | 0) | (constants.
  * the path, which resolves it a third time) before trusting what they opened.
  */
 export function openForRead(abs: string): Promise<FileHandle> {
-  return open(abs, READ_FLAGS);
+  return openNoFollowAsync(abs, READ_FLAGS);
 }
 
 const MAX_READ_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -320,15 +321,24 @@ export function isNetworkPath(p: string, platform: string = process.platform): b
     return !(platform === 'win32' && /^[\\/]{2}\?[\\/][A-Za-z]:[\\/]/.test(s));
   }
   if (platform === 'win32') return false;
-  // A Mac disk ignores case by default, so /NET/host reaches /net too.
-  return /^\/(net|network)(\/|$)/i.test(posix.normalize(s));
+  // A Mac disk ignores case by default, so /NET/host reaches /net too. Since
+  // Catalina the automounts live on the data volume and /net only points there,
+  // so /System/Volumes/Data/net/host reaches the host the same way (PR 687
+  // review, 2026-11-12).
+  const n = posix.normalize(s).replace(/^\/system\/volumes\/data(?=\/|$)/i, '') || '/';
+  return /^\/(net|network)(\/|$)/i.test(n);
 }
 
 /** Existence/metadata check for an ABSOLUTE path (v0.3.4 — backs the terminal
  *  ⌘-click markdown flow). `~/` is expanded here (the renderer doesn't know
  *  the home dir). Read-only metadata: returns whether a regular file exists and
  *  the normalized absolute path; never file contents. A network path is never
- *  looked at (isNetworkPath). */
+ *  looked at (isNetworkPath).
+ *
+ *  "Not there" (exists false) only when the disk says so: ENOENT or ENOTDIR. A
+ *  check it could not make (no permission, a share timing out) rejects, so a
+ *  caller never reads it as a miss and falls back to another file, such as
+ *  the one file name inside a quoted path (PR 687 review, 2026-11-13). */
 export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boolean; path: string }> {
   if (isNetworkPath(p)) return { exists: false, isFile: false, path: p };
   const abs = expandTilde(p);
@@ -336,8 +346,10 @@ export async function statAbs(p: string): Promise<{ exists: boolean; isFile: boo
   try {
     const s = await stat(abs);
     return { exists: true, isFile: s.isFile(), path: abs };
-  } catch {
-    return { exists: false, isFile: false, path: abs };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return { exists: false, isFile: false, path: abs };
+    throw e;
   }
 }
 

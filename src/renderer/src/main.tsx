@@ -8,8 +8,10 @@ import brandMark from '@brandkit/logo/mark/struck-m-light.svg?url';
 import './design/global.css';
 import './i18n';
 
-// The code arrived and runs: main stops waiting to load it again (bootWatchdog.ts).
-window.cth?.rendererStarted?.();
+// The code arrived and runs: main's boot watchdog reads this flag from the
+// page on screen, so a page already replaced cannot answer for a new one
+// (bootWatchdog.ts).
+(window as Window & { __cthStarted?: boolean }).__cthStarted = true;
 
 const favicon = document.createElement('link');
 favicon.rel = 'icon';

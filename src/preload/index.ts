@@ -543,7 +543,7 @@ const api = {
       handoffs?: Array<{ toId: string; scope: string }>; drops?: Array<{ toId: string; scope: string }> }
     | { kind: 'question'; question: string; choices: Array<{ label: string; suggested?: boolean }> }
     | { kind: 'home'; question: string }
-    | { kind: 'error'; reason: 'no-name' | 'not-started' | 'slow' | 'unreadable' | 'failed' | 'cancelled' }
+    | { kind: 'error'; reason: 'no-name' | 'not-started' | 'slow' | 'unreadable' | 'engine' | 'stopped' | 'failed' | 'cancelled' }
   > => ipcRenderer.invoke('workStyle:convert', { ...req, to: 'revise' }),
   /** Where a rewrite is (starting, reading, writing) and what it has written
    *  so far, by its request id. Returns the unsubscribe. */
@@ -846,8 +846,6 @@ const api = {
   /** Company knowledge has no switch now: whether this owner, who had turned it off, is still to be told. */
   kgNotice: (): Promise<{ notice: boolean }> => ipcRenderer.invoke('kg:notice'),
   kgNoticeSeen: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('kg:noticeSeen'),
-  /** The page's first script ran: main's boot watchdog stops waiting. */
-  rendererStarted: (): void => ipcRenderer.send('app:rendererStarted'),
   /** Members that started with something missing: Michael's report cards on Ask me. */
   degradedNotices: (): Promise<DegradedNotice[]> => ipcRenderer.invoke('degraded:list'),
   degradedDismiss: (agentId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('degraded:dismiss', agentId),

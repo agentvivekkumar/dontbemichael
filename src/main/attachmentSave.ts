@@ -8,6 +8,7 @@
 
 import { execFile, execFileSync } from 'node:child_process';
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, rmSync, writeFileSync, type Stats } from 'node:fs';
+import { openNoFollow } from './noFollow';
 import { basename, join, relative } from 'node:path';
 import { attachmentKind } from '../shared/attachmentKind';
 import { cleanFolderName } from '../shared/folderName';
@@ -91,7 +92,7 @@ export function saveAttachmentFile(
     let fd: number;
     try {
       // Exclusive and no following a link: nothing already there is touched.
-      fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
+      fd = openNoFollow(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw new AttachmentSaveError(`The file could not be saved: ${(e as NodeJS.ErrnoException).code ?? 'unknown error'}.`);
       try {
@@ -124,7 +125,7 @@ export function saveAttachmentFile(
  *  otherwise stop the whole app. */
 function readPlainFile(path: string): { bytes: Buffer; st: Stats } | null {
   let fd: number;
-  try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0)); } catch { return null; }
+  try { fd = openNoFollow(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0)); } catch { return null; }
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1) return null;

@@ -61,6 +61,10 @@ export const HIDDEN_ERRORS: Readonly<Record<string, string | null>> = {
   'unreadable: missing-part': 'answer-missing-part',
   'unreadable: question': 'answer-bad-question',
   'unreadable: home': 'answer-unasked-home',
+  // A Work style change that ended with nothing written, or whose call threw
+  // (owner, 2026-11-13): a retry never clears either, so the app hears of it.
+  'ended without an answer': 'session-ended',
+  'threw': 'call-threw',
   'empty': 'answer-unparseable',
   'no verdict': 'answer-unparseable',
   // The hire check's answer, by the check it failed (issue 677).

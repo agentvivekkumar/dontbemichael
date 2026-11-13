@@ -53,6 +53,7 @@ import { randomBytes, createHash, createHmac } from 'node:crypto';
 import { readMessageFile, researchDeliveredId } from './messageFile';
 import { asText, type InboundVerdict, type OutboundVerdict, type TrustLayer } from './trustLayer';
 import { CHECKED_ARCHIVE_DIR, CHECKED_FILE, keepText, splitForArchive, type CheckedOutcome, type CheckedRow } from '../shared/checkedRecord';
+import { openNoFollow } from './noFollow';
 import { ORGANIZED_ARCHIVE_DIR, ORGANIZED_FILE, organizedText, parseOrganized, type OrganizeAction, type OrganizedRow } from '../shared/organizedRecord';
 import { isAnyFixedUpkeep, isFixedUpkeep, type UpkeepKind } from '../shared/upkeep';
 import { heldWaits, heldWhy, tidy, HELD_FILE, HELD_KEEP_MS, HELD_OPENING_MAX, HELD_SUBJECT_MAX, type HeldRow, type HeldTold, type HeldWhy } from '../shared/heldRecord';
@@ -587,7 +588,7 @@ function parseJsonText(text: string): unknown {
  *  with one name: never through a link or a second name it made for a file
  *  of someone else's (red team, third ship). Throws otherwise. */
 function rewriteOwnFile(path: string, text: string): void {
-  const fd = openSync(path, constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  const fd = openNoFollow(path, constants.O_WRONLY | (constants.O_NONBLOCK ?? 0));
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1) throw new Error('not a plain file');

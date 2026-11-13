@@ -30,15 +30,17 @@ const runs = (n, nothing, o = {}) => Array.from({ length: n }, (_, i) => ({
 const mission = { id: 'm1', to: 'toby', label: 'Benefits inbox check', intervalMs: 2 * H, timed: false };
 const member = (o) => ({ agentId: 'pam', provider: 'claude', model: 'claude-opus-5-5', isGod: false, pieces: 40, mailDecisions: 12, keptShare: 0.96, keptDecisions: 25, reopens: 0, usdPerWeek: 59, ...o });
 
-test('run less often: 10 runs and 70% found nothing; an interval doubles, a timed schedule opens the editor', () => {
-  // Value: protects=the run-less rule and its change; fails_when=it fires under 10 runs or 70%, or halves a timed schedule blindly; why_new=new; seam=none; no_claim=none beyond protects
+test('run less often: 10 runs and 70% found nothing; an interval doubles, a timed schedule thins its times', () => {
+  // Value: protects=the run-less rule and its change; fails_when=it fires under 10 runs or 70%, or a timed schedule gets no change to apply; why_new=new; seam=none; no_claim=none beyond protects
   const a = A.adviceFor({ ...base, missions: [mission], runs: runs(14, 12) });
   assert.equal(a.length, 1);
   assert.equal(a[0].kind, 'run-less');
   assert.deepEqual(a[0].change, { kind: 'interval', fromMs: 2 * H, toMs: 4 * H });
   assert.deepEqual(a[0].evidence, { runs: 14, nothing: 12 });
   assert.ok(a[0].savesPerWeek > 0);
-  assert.deepEqual(A.adviceFor({ ...base, missions: [{ ...mission, timed: true }], runs: runs(14, 12) })[0].change, { kind: 'editor', direction: 'less' });
+  const weekly = { intervalMs: 86_400_000, weekly: { days: [1, 2, 3, 4, 5], minute: 540 } };
+  assert.deepEqual(A.adviceFor({ ...base, missions: [{ ...mission, timed: true, when: weekly }], runs: runs(14, 12) })[0].change,
+    { kind: 'when', from: weekly, to: { intervalMs: 86_400_000, weekly: { days: [1, 3, 5], minute: 540 } } });
   assert.equal(A.adviceFor({ ...base, missions: [mission], runs: runs(9, 9) }).length, 0, 'under 10 runs');
   assert.equal(A.adviceFor({ ...base, missions: [mission], runs: runs(10, 6) }).length, 0, '60% is under 70%');
 });
@@ -53,7 +55,14 @@ test('run less never moves a schedule past the cache hour (owner, 2026-11-09)', 
   assert.deepEqual(at(30 * 60_000)[0].change, { kind: 'interval', fromMs: 30 * 60_000, toMs: H });
   assert.deepEqual(at(2 * H)[0].change, { kind: 'interval', fromMs: 2 * H, toMs: 4 * H }, 'already past the hour: every run is cold either way, so it still halves');
   assert.ok(Math.abs(at(2 * H)[0].savesPerWeek - runUsdPerWeek / 2) < 1e-9);
-  assert.deepEqual(A.adviceFor({ ...base, missions: [{ ...mission, intervalMs: H, timed: true }], runs: runs(14, 12) })[0].change, { kind: 'editor', direction: 'less' }, 'a timed schedule still opens the editor');
+  const hourly = (everyMs) => ({ intervalMs: everyMs, times: [{ kind: 'every', everyMs, days: [1, 2, 3, 4, 5], from: 480, to: 1080 }, { kind: 'at', days: [0, 6], minute: 840 }] });
+  const timed = (everyMs) => A.adviceFor({ ...base, missions: [{ ...mission, timed: true, when: hourly(everyMs) }], runs: runs(14, 12) });
+  assert.deepEqual(timed(30 * 60_000)[0].change.to.times[0], { kind: 'every', everyMs: H, days: [1, 2, 3, 4, 5], from: 480, to: 1080 }, 'a timed every line stops at the hour too');
+  assert.deepEqual(timed(H)[0].change.to.times, [{ kind: 'every', everyMs: H, days: [1, 2, 3, 4, 5], from: 480, to: 1080 }, { kind: 'at', days: [0], minute: 840 }], 'its hourly line stays; the weekend time thins');
+  // Saving follows the runs dropped: 55 + 2 a week before, 55 + 1 after.
+  assert.ok(Math.abs(timed(H)[0].savesPerWeek - runUsdPerWeek * (1 - 56 / 57)) < 1e-9);
+  const onlyHourly = { intervalMs: H, times: [{ kind: 'every', everyMs: H, days: [1, 2, 3, 4, 5], from: 480, to: 1080 }] };
+  assert.deepEqual(A.adviceFor({ ...base, missions: [{ ...mission, timed: true, when: onlyHourly }], runs: runs(14, 12) }), [], 'nothing thins under the cache hour: no card');
 });
 
 test('runs on a day whose records could not be saved are left out (D15)', () => {
@@ -77,17 +86,21 @@ test('run more often: 90% did work and work per run up 30%, never below 15 minut
   assert.equal(A.adviceFor({ ...base, missions: [mission], runs: rs.map((r) => ({ ...r, workCount: 2 })) }).length, 0, 'no growth, no advice');
 });
 
-test('run more often on a timed schedule opens the schedule editor', () => {
-  // Value: protects=the times or weekly case of the run-more rule; fails_when=a timed schedule never gets run more, or gets an interval change; why_new=timed schedules were left out; seam=none; no_claim=none beyond protects
+test('run more often on a timed schedule makes its own times denser, ready to apply (owner, 2026-11-12)', () => {
+  // Value: protects=the times or weekly case of the run-more rule; fails_when=a timed schedule never gets run more, gets an interval change or only "Open schedules", or one that cannot get denser still gets a card; why_new=timed jobs had no change to apply; seam=none; no_claim=none beyond protects
   // The same busy fortnight: a run a day, work per run doubled this week.
   const rs = runs(14, 0).map((r, i) => {
     const start = NOW - (i + 0.5) * 86_400_000;
     return { ...r, start, day: new Date(start).toISOString().slice(0, 10), workCount: start >= NOW - 7 * 86_400_000 ? 4 : 2 };
   });
-  const [a] = A.adviceFor({ ...base, missions: [{ ...mission, timed: true }], runs: rs });
+  const weekly = { intervalMs: 86_400_000, weekly: { days: [1, 2, 3, 4, 5], minute: 540 } };
+  const [a] = A.adviceFor({ ...base, missions: [{ ...mission, timed: true, when: weekly }], runs: rs });
   assert.equal(a.kind, 'run-more');
-  assert.deepEqual(a.change, { kind: 'editor', direction: 'more' });
-  assert.equal(A.adviceFor({ ...base, missions: [{ ...mission, timed: true, intervalMs: 20 * 60_000 }], runs: rs }).length, 1, 'the 15 minute floor is for intervals');
+  assert.deepEqual(a.change, { kind: 'when', from: weekly, to: { intervalMs: 86_400_000, times: [{ kind: 'at', days: [1, 2, 3, 4, 5], minute: 540 }, { kind: 'at', days: [1, 2, 3, 4, 5], minute: 990 }] } }, 'weekdays at 09:00 gets 16:30 too');
+  assert.equal(a.savesPerWeek, null);
+  const quarterHour = { intervalMs: 15 * 60_000, times: [{ kind: 'every', everyMs: 15 * 60_000, days: [1, 2, 3, 4, 5], from: 480, to: 1080 }] };
+  assert.deepEqual(A.adviceFor({ ...base, missions: [{ ...mission, timed: true, when: quarterHour }], runs: rs }), [], 'already every 15 minutes: no card');
+  assert.equal(A.adviceFor({ ...base, missions: [{ ...mission, timed: true }], runs: rs }).length, 0, 'no timing read: no card');
 });
 
 test('a cheaper model needs 10 mail decisions, 90% kept and no reopens; never for Michael, never off the ladder', () => {

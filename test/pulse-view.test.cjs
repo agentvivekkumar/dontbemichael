@@ -145,7 +145,7 @@ test('Apply, Not now, Undo and Try again are PixelButtons, so they get the hover
   // Value: protects=one button look across the app and Apply showing it is busy; fails_when=a Pulse action goes back to a hand styled button; why_new=TODOS.md "Pulse buttons use PixelButton"; seam=source pins; no_claim=pixel layout
   assert.match(view, /import \{ PixelButton \} from '\.\.\/PixelButton';/);
   assert.doesNotMatch(view, /\bbtn\(/, 'no hand styled button helper');
-  assert.match(view, /<PixelButton size="sm" disabled=\{busy !== null && a\.change\.kind !== 'editor'\} onClick=\{\(\) => \{ void apply\(a\); \}\}>/, 'Apply is the primary button and is disabled while busy');
+  assert.match(view, /<PixelButton size="sm" disabled=\{busy !== null\} onClick=\{\(\) => \{ void apply\(a\); \}\}>/, 'Apply is the primary button and is disabled while busy');
   for (const key of ['pulse.notNow', 'pulse.undo', 'pulse.tryAgain']) {
     assert.match(view, new RegExp(`<PixelButton variant="secondary" size="sm"[^\\n]*\\{t\\('${key.replace('.', '\\.')}'\\)\\}</PixelButton>`), key);
   }
@@ -153,8 +153,9 @@ test('Apply, Not now, Undo and Try again are PixelButtons, so they get the hover
 
 test('while one suggestion is being applied, every other Apply shows it is off too', () => {
   // Value: protects=an Apply never looks clickable when a click would do nothing; fails_when=only the busy card's Apply is disabled while apply() ignores every click; why_new=apply() returns early on any busy, but only the busy card showed it; seam=source pins; no_claim=pixel layout
-  assert.match(view, /if \(a\.change\.kind === 'editor'\) \{ openAgentProfile\(a\.agentId\); return; \}\n\s+if \(busy\) return;/, 'Open schedules only opens a panel, before the busy check, so it stays clickable');
-  assert.match(view, /disabled=\{busy !== null && a\.change\.kind !== 'editor'\}/, 'every other Apply is disabled while one runs');
+  assert.match(view, /const apply = async \(a: Advice\): Promise<void> => \{\n\s+if \(busy\) return;/, 'apply ignores a click while one runs');
+  assert.match(view, /disabled=\{busy !== null\}/, 'every other Apply is disabled while one runs');
+  assert.doesNotMatch(view, /openSchedules/, 'every suggestion applies here; none sends you to Schedules (owner, 2026-11-12)');
 });
 
 test('the Compare copy has every period, no pulse string has a dash, and the plan ring shows only on a plan', () => {

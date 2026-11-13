@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.3.8). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.3.9). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -303,6 +303,18 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.3.9 (2026-11-13)
+- For a job that runs at set times or on chosen days, Pulse's Run less offers its own times
+  thinned and Run more offers them filled in, ready to apply with Undo, in place of only opening
+  Schedules. The new times count from when you apply them, and Undo puts back exactly what was there.
+- After the Mac sleeps, a window stuck on the loading screen is noticed and loaded again.
+- A link to a file whose path has spaces opens the file in a tab instead of showing the raw path.
+- A job change that cannot work says why: Michael needs Claude or Codex for it, or Claude stopped
+  before answering. It no longer says to try again for something a retry cannot fix.
+- Clicking a path that could not be checked shows nothing, instead of another file with the same
+  name. Saving an email attachment on Windows goes on to the next free name when the name is taken.
+- Opening files named in a team member's text is safer on a Mac and on Windows.
 
 ### 0.3.8 (2026-11-11)
 - Once every question is answered, Needs you shows one quiet line for your answers and one tip

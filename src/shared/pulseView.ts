@@ -9,6 +9,7 @@ import type { Advice, EarlyWatch } from './teamAdvice';
 import type { KeptSafe } from './pulseSafety';
 import type { Learning } from './teamLearning';
 import type { FoundationsPulse } from './foundations';
+import type { ScheduleWhen } from './scheduleTimes';
 
 export interface AppliedChange { id: number; adviceId: string; agentId: string; kind: string; before: unknown; after: unknown; at: number; undoneAt: number | null }
 
@@ -18,7 +19,8 @@ export interface SavedChange {
   appliedId: number;
   agentId: string;
   at: number;
-  change: { kind: 'schedule'; missionId: string; toMs: number } | { kind: 'model'; to: string | null; toLabel: string };
+  /** `to` is the timing after the change (absent from an older main). */
+  change: { kind: 'schedule'; missionId: string; toMs: number; to?: ScheduleWhen } | { kind: 'model'; to: string | null; toLabel: string };
   result: ChangeSaving;
 }
 

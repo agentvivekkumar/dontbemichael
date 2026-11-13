@@ -113,6 +113,28 @@ test('a link in the way refuses the save', { skip: process.platform === 'win32' 
   assert.equal(fs.readFileSync(target, 'utf8'), 'theirs');
 });
 
+test('the Windows way too: a link holding the name moves the save to the next name', { skip: process.platform === 'win32' && 'links need a Windows privilege' }, (t) => {
+  // Value: protects=a link a member left under the attachment's name never stops the save on Windows, where POSIX goes on to "a (2).pdf"; fails_when=the open without O_NOFOLLOW refuses an exclusive create on a link with ELOOP, which the save reads as "could not be saved"; why_new=PR 695 review moved Windows to a look before the open (noFollow.ts), and the test above runs only the POSIX flag; seam=none, the Windows way is forced by calling noFollow's own nofollow parameter; no_claim=a real Windows kernel
+  const NF = loadTs('src/main/noFollow.ts');
+  const real = NF.openNoFollow;
+  let windowsWay = 0;
+  NF.openNoFollow = (p, flags, mode) => { windowsWay++; return real(p, flags, mode, null); };
+  t.after(() => { NF.openNoFollow = real; });
+  const clean = tempFolder(t);
+  const elsewhere = tempFolder(t);
+  const dir = path.join(clean, ATTACHMENTS_FOLDER);
+  fs.mkdirSync(dir);
+  const target = path.join(elsewhere, 'target.pdf');
+  fs.writeFileSync(target, 'theirs');
+  fs.symlinkSync(target, path.join(dir, 'a.pdf'));
+  let saved;
+  assert.doesNotThrow(() => { saved = saveAttachmentFile({ folder: clean, name: 'a.pdf', ending: 'pdf', bytes: PDF }, noMark); }, 'the save goes on to the next name');
+  assert.ok(windowsWay >= 2, 'the save opened the Windows way, once per name tried');
+  assert.equal(path.basename(saved), 'a (2).pdf');
+  assert.deepEqual(fs.readFileSync(saved), PDF);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'theirs');
+});
+
 // ── The route ──
 
 function fakeBox(t, { nodes, bytes = {}, folder = tempFolder(t), extra = {} }) {

@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.3.9] (2026-11-13)
+
+### Changed
+- **Pulse can change a job's set times for you.** For a job that runs at set times or on chosen days, Run less now offers its own times thinned and Run more offers them filled in, ready to apply with Undo, in place of only opening Schedules. The new times count from when you apply them, so a time added earlier today does not run at once.
+
+### Fixed
+- After the Mac sleeps, a window stuck on the loading screen is noticed and loaded again.
+- A link to a file whose path has spaces opens the file in a tab instead of showing the raw path, and a very long line in a team member's text no longer slows the preview.
+- A job change that cannot work says why: Michael needs Claude or Codex for it, or Claude stopped before answering. It no longer says to try again for something a retry cannot fix, and the app reports the failures that are its own.
+- Clicking a path that could not be checked shows nothing, instead of another file with the same name.
+- Saving an email attachment on Windows goes on to the next free name when the name is taken.
+- Opening files named in a team member's text is safer on a Mac and on Windows.
+
 ## [0.3.8] (2026-11-11)
 
 ### Added

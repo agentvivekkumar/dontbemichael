@@ -254,7 +254,7 @@ function service(t, opts = {}) {
     env.proc.tick('/office');
   }
   env.clock.at(t0 + (runDays + 1) * 86_400_000);
-  let missions = [{ id: 'm1', label: 'Benefits inbox check', to: 'toby', intervalMs: 2 * 3600_000, body: '', enabled: true, kind: 'dispatch' }];
+  let missions = [{ id: 'm1', label: 'Benefits inbox check', to: 'toby', intervalMs: 2 * 3600_000, body: '', enabled: true, kind: 'dispatch', ...opts.mission }];
   const models = opts.models ?? [{ agentId: 'toby', provider: 'claude', model: 'claude-opus-5-5' }];
   const svc = new PulseService({
     db: () => env.persist.database(), store: env.store, processor: env.proc, office: () => '/office',
@@ -302,7 +302,7 @@ test('Apply changes a schedule only if it still is what the advice saw; Undo res
   assert.equal(svc.snapshot('this-week').advice.length, 0, 'an applied suggestion waits for new evidence');
   const saved = svc.snapshot('this-week').saved;
   assert.equal(saved.state, 'changes');
-  assert.deepEqual(saved.changes.map((c) => [c.appliedId, c.agentId, c.change, c.result.state]), [[r.appliedId, 'toby', { kind: 'schedule', missionId: 'm1', toMs: 4 * 3600_000 }, 'measuring']], 'one line per change, what it set, measuring for a week');
+  assert.deepEqual(saved.changes.map((c) => [c.appliedId, c.agentId, c.change, c.result.state]), [[r.appliedId, 'toby', { kind: 'schedule', missionId: 'm1', toMs: 4 * 3600_000, to: { intervalMs: 4 * 3600_000 } }, 'measuring']], 'one line per change, what it set, measuring for a week');
   assert.equal(svc.undo(r.appliedId).ok, true);
   assert.equal(missions()[0].intervalMs, 2 * 3600_000);
   assert.deepEqual(svc.undo(r.appliedId), { ok: false, error: 'stale' }, 'undone once');
@@ -311,6 +311,83 @@ test('Apply changes a schedule only if it still is what the advice saw; Undo res
   setMissions([{ ...missions()[0], intervalMs: 2 * 3600_000 }]);
   assert.equal(svc.dismiss(advice.id), true);
   assert.equal(svc.snapshot('this-week').advice.length, 0);
+});
+
+test('a timed schedule is thinned ready to apply, and Undo puts its times back (owner, 2026-11-12)', (t) => {
+  // Value: protects=run less on a timed job as a real change through compare and set; fails_when=a timed job gets only "Open schedules", Apply writes other times than the card showed or keeps the old times over the new weekly, a stale job is overwritten, or Undo leaves the thinned times; why_new=timed jobs had no change to apply; seam=none; no_claim=the scheduler rereading the job (applyMissions sends missions:updated)
+  const times = [{ kind: 'at', days: [1, 2, 3, 4, 5], minute: 540 }, { kind: 'at', days: [1, 2, 3, 4, 5], minute: 720 }, { kind: 'at', days: [1, 2, 3, 4, 5], minute: 900 }];
+  const { svc, missions, setMissions } = service(t, { mission: { intervalMs: 86_400_000, times } });
+  const [advice] = svc.snapshot('this-week').advice;
+  assert.equal(advice.kind, 'run-less');
+  assert.deepEqual(advice.change, {
+    kind: 'when',
+    from: { intervalMs: 86_400_000, times },
+    to: { intervalMs: 86_400_000, times: [times[0], times[2]] }
+  }, 'weekdays at 09:00, 12:00 and 15:00 become 09:00 and 15:00');
+  setMissions([{ ...missions()[0], times: [times[0]] }]);
+  assert.deepEqual(svc.apply(advice.id, advice.change), { ok: false, error: 'stale' }, 'changed in Schedules meanwhile: refused');
+  setMissions([{ ...missions()[0], times }]);
+  const r = svc.apply(advice.id, advice.change);
+  assert.equal(r.ok, true);
+  assert.deepEqual(missions()[0].times, [times[0], times[2]]);
+  assert.deepEqual(svc.snapshot('this-week').saved.changes[0].change.to, { intervalMs: 86_400_000, times: [times[0], times[2]] }, 'Your changes names the new times');
+  assert.equal(svc.undo(r.appliedId).ok, true);
+  assert.deepEqual(missions()[0].times, times, 'Undo puts all three back');
+
+  // One time a day on weekdays (stored as weekly): every other day, the weekly kept as weekly.
+  const weekly = service(t, { mission: { intervalMs: 86_400_000, weekly: { days: [1, 2, 3, 4, 5], minute: 540 } } });
+  const [w] = weekly.svc.snapshot('this-week').advice;
+  assert.deepEqual(w.change.to, { intervalMs: 86_400_000, weekly: { days: [1, 3, 5], minute: 540 } });
+  assert.equal(weekly.svc.apply(w.id, w.change).ok, true);
+  assert.deepEqual(weekly.missions()[0].weekly, { days: [1, 3, 5], minute: 540 });
+  assert.equal(weekly.missions()[0].times, undefined);
+});
+
+test('Undo of a times change leaves a job the owner changed in Schedules since as the owner set it', (t) => {
+  // Value: protects=Undo never puts old times back over times or a weekly the owner set after Apply; fails_when=Undo compares only the interval, which a times change never moves, and so overwrites the owner's later edit; why_new=times changes are new to Undo (2026-11-12) and the existing tests only undo an untouched job; seam=none; no_claim=the Schedules UI refresh (applyMissions sends missions:updated)
+  const wk = [1, 2, 3, 4, 5];
+  const times = [{ kind: 'at', days: wk, minute: 540 }, { kind: 'at', days: wk, minute: 720 }, { kind: 'at', days: wk, minute: 900 }];
+  const { svc, missions, setMissions } = service(t, { mission: { intervalMs: 86_400_000, times } });
+  const [advice] = svc.snapshot('this-week').advice;
+  const r = svc.apply(advice.id, advice.change);
+  assert.equal(r.ok, true);
+  // The owner moves the later time in Schedules; the interval stays one day.
+  const edited = [{ kind: 'at', days: wk, minute: 540 }, { kind: 'at', days: wk, minute: 960 }];
+  setMissions([{ ...missions()[0], times: edited }]);
+  assert.deepEqual(svc.undo(r.appliedId), { ok: false, error: 'stale' });
+  assert.deepEqual(missions()[0].times, edited, 'the owner\'s times stay');
+  // The owner switches it to one weekly time instead: still theirs.
+  const { times: _t, ...rest } = missions()[0];
+  setMissions([{ ...rest, weekly: { days: wk, minute: 600 } }]);
+  assert.deepEqual(svc.undo(r.appliedId), { ok: false, error: 'stale' });
+  assert.deepEqual(missions()[0].weekly, { days: wk, minute: 600 });
+  assert.equal(missions()[0].times, undefined, 'no old times put under it');
+});
+
+test('Apply and Undo of a times change count the new times from now, and Undo puts back the very record it changed (ship review, 2026-11-13)', (t) => {
+  // Value: protects=a time Apply adds earlier today is not a missed run that fires at once, and Undo leaves no weekly the owner never set under the times; fails_when=withWhen stops stamping scheduledSince like an editor save, or Undo keeps the weekly the change wrote under the restored times; why_new=both found in the ship review (adversarial pass and state matrix); seam=none; no_claim=the scheduler arming the job (catchUpFloor is covered in missions tests)
+  const wk = [1, 2, 3, 4, 5];
+  const once = [{ kind: 'at', days: wk, minute: 540 }];
+  const { svc, missions, clock } = service(t, { mission: { intervalMs: 86_400_000, times: once } });
+  const [advice] = svc.snapshot('this-week').advice;
+  assert.deepEqual(advice.change.to, { intervalMs: 86_400_000, weekly: { days: [1, 3, 5], minute: 540 } }, 'one time a day on weekdays thins to a weekly');
+  const r = svc.apply(advice.id, advice.change);
+  assert.equal(r.ok, true);
+  assert.equal(missions()[0].scheduledSince, clock.now(), 'the new timing counts from Apply, as an editor save does');
+  clock.at(clock.now() + 60_000);
+  assert.equal(svc.undo(r.appliedId).ok, true);
+  assert.deepEqual(missions()[0].times, once);
+  assert.equal(missions()[0].weekly, undefined, 'no weekly under the times: the job never had one');
+  assert.equal(missions()[0].scheduledSince, clock.now(), 'the restored timing counts from Undo');
+
+  // A weekly that was under the times before stays the one under them after Undo.
+  const under = { days: [0, 6], minute: 600 };
+  const two = service(t, { mission: { intervalMs: 86_400_000, times: once, weekly: under } });
+  const [a2] = two.svc.snapshot('this-week').advice;
+  const r2 = two.svc.apply(a2.id, a2.change);
+  assert.equal(r2.ok, true);
+  assert.equal(two.svc.undo(r2.appliedId).ok, true);
+  assert.deepEqual(two.missions()[0].weekly, under);
 });
 
 test('a model suggestion is checked here and made by the roster; the owner\'s store is never written from main', (t) => {

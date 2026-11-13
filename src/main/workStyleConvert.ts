@@ -122,18 +122,42 @@ export interface ReviseRequest {
 /** Why a change could not be worked out, so the box says what to do instead
  *  of "try again" for a cause a retry never clears (owner, 2026-10-26): the
  *  request named nobody, Claude never took the prompt (signed out, or a
- *  screen waiting), Claude ran out of time, its answer could not be read, or
- *  anything else. */
-export type ReviseFailure = 'no-name' | 'not-started' | 'slow' | 'unreadable' | 'failed';
+ *  screen waiting), Claude ran out of time, its answer could not be read,
+ *  Michael's engine can't run it (Gemini), Claude ended without answering
+ *  (owner, 2026-11-13: a pack update card read "Try again in a moment" on
+ *  every try), or anything else. */
+export type ReviseFailure = 'no-name' | 'not-started' | 'slow' | 'unreadable' | 'engine' | 'stopped' | 'failed';
 export type ReviseResult = ReviseAnswer | { kind: 'error'; reason: ReviseFailure | 'cancelled' };
 
 /** A hidden run's failure as the owner's reason. */
-export function reviseFailure(result: { ok: boolean; error?: string }): ReviseFailure {
+export function reviseFailure(result: { ok: boolean; error?: string }, engine: HiddenModelEngine['engine'] = 'claude'): ReviseFailure {
   if (result.ok) return 'unreadable';
   if (/never took the prompt/.test(result.error ?? '')) return 'not-started';
   if (/timed out/.test(result.error ?? '')) return 'slow';
+  // Only an engine the runner cannot use is said as the engine: Codex says
+  // "engine unavailable" too when it fails to start (ship review, 2026-11-13).
+  if (result.error === 'engine unavailable' && engine !== 'claude' && engine !== 'codex') return 'engine';
+  if (result.error && ENDED_WITHOUT_ANSWER.includes(result.error)) return 'stopped';
   return 'failed';
 }
+
+/** The runners' words for a session that ended with nothing written: Claude
+ *  quit before answering (an option it refused, a crash). Not sign in or
+ *  credit, which Claude writes into the session as its answer. */
+const ENDED_WITHOUT_ANSWER: readonly string[] = ['no assistant response found in transcript', 'no assistant response'];
+
+/** The office log's reason for a failed change. A run that ended without an
+ *  answer or a call that threw is logged by a fixed word, so the failure
+ *  report carries it (failureReport.ts HIDDEN_ERRORS); the runner's own text
+ *  goes with it as `error`. Everything else is logged as the runner said it. */
+export function reviseLogReason(result: { ok: boolean; error?: string }, fail?: string): Record<string, string> {
+  if (result.ok) return { reason: fail ? `unreadable: ${fail}` : 'empty' };
+  if (reviseFailure(result) === 'stopped') return { reason: REVISE_ENDED, error: result.error ?? '' };
+  return { reason: result.error ?? 'failed' };
+}
+
+export const REVISE_ENDED = 'ended without an answer';
+export const REVISE_THREW = 'threw';
 
 const CHANGE_MAX = 1500;
 
@@ -245,10 +269,10 @@ export async function reviseWorkStyle(
     if (answer?.kind === 'ok') return withHandoffLines(answer, req, bound, deps.log);
     if (answer) return answer;
     // Which check failed, as a fixed word the failure report can carry (issue 676).
-    deps.log?.({ kind: 'work-style-revise-failed', reason: !result.ok ? (result.error ?? 'failed') : read && 'fail' in read ? `unreadable: ${read.fail}` : 'empty' });
-    return { kind: 'error', reason: reviseFailure(result) };
+    deps.log?.({ kind: 'work-style-revise-failed', ...reviseLogReason(result, read && 'fail' in read ? read.fail : undefined) });
+    return { kind: 'error', reason: reviseFailure(result, deps.engine) };
   } catch (e) {
-    deps.log?.({ kind: 'work-style-revise-failed', reason: String(e).slice(0, 200) });
+    deps.log?.({ kind: 'work-style-revise-failed', reason: REVISE_THREW, error: String(e).slice(0, 200) });
   }
   return { kind: 'error', reason: 'failed' };
 }

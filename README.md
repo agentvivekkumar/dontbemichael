@@ -41,9 +41,9 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.3.8: a lighter app.** Features owners never used are gone, and when nothing needs you,
-> Michael offers one tip from your office. In 0.3.7, Ask me cards show the pages and files they
-> rest on.
+> **New in 0.3.9: Pulse can change a job's set times for you,** ready to apply with Undo. In
+> 0.3.8, a lighter app: features owners never used are gone, and when nothing needs you, Michael
+> offers one tip from your office.
 
 ## Contents
 

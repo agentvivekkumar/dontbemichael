@@ -99,6 +99,26 @@ export function plainFilePaths(text: string): Array<{ path: string; start: numbe
   return out;
 }
 
+/** A link to a full file path with spaces, written without the <angle
+ *  brackets> Markdown needs for that ("[the form](/Users/me/Email
+ *  attachments/Compliance Certification.pdf)"), so it showed as raw text
+ *  (owner, 2026-11-12). The target must start like a full path, end in a
+ *  known file ending right before the ")", and hold no brackets or newline.
+ *  One class, the space checked after: two lazy runs around the space took
+ *  seconds on a long line with no ")" (ship review, 2026-11-13). */
+const SPACED_PATH_LINK = /\]\(((?:~[\\/]|\/|[A-Za-z]:[\\/])[^\n<>()]*)\)/g;
+
+/** Such links given their angle brackets, so they parse as links (and become
+ *  file chips) like any other. Code spans and fences are left as written. */
+export function bracketSpacedPathLinks(text: string): string {
+  if (!text.includes('](')) return text;
+  return text
+    .split(/(```[\s\S]*?```|`[^`\n]+`)/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(SPACED_PATH_LINK, (whole, target: string) =>
+      /\s/.test(target) && DETECT_EXTENSIONS.has(extensionOf(target)) && !/\s$/.test(target) ? `](<${target}>)` : whole)))
+    .join('');
+}
+
 /** Markdown backslash escapes undone (`\_` reads `_`): how a path written in
  *  plain text arrives in the parsed text, which the chip matches against. */
 export function unescapeMarkdown(s: string): string {
@@ -113,7 +133,7 @@ export function askFilePaths(question: string): string[] {
   // Blank out what is already handled with spaces of the same length, so every
   // index below still points into the same text.
   const blank = (s: string) => ' '.repeat(s.length);
-  const text = question.replace(/```[\s\S]*?```/g, blank);
+  const text = bracketSpacedPathLinks(question).replace(/```[\s\S]*?```/g, blank);
   const found: Array<{ path: string; at: number }> = [];
   for (const m of text.matchAll(/`([^`\n]+)`/g)) {
     const span = m[1].trim();

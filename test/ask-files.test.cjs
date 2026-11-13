@@ -277,3 +277,35 @@ test('a full folder path in a code span is a chip that shows the folder, and sta
   assert.match(chip, /if \(folder && checks\[p\]\?\.verdict === 'missing' && !gone\[p\]\) return <code>\{p\}<\/code>;/, 'a folder the office does not hold keeps its path as text');
   assert.match(chip, /const icon = folder \? 'folder' :/);
 });
+
+test('a link to a full path with spaces and no angle brackets still opens the file', () => {
+  // Value: protects=the owner's Salesforce card, whose form link showed as raw text; fails_when=a spaced path link stays text, or a code span, a web link or a non-file target is changed; why_new=owner, 2026-11-12; seam=pure function plus the renderer pin; no_claim=paths holding brackets
+  const { bracketSpacedPathLinks } = loadTs('src/shared/askFiles.ts');
+  const card = 'Fill in the [certificate form](/Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf) with Moblize.it LLC.';
+  assert.equal(bracketSpacedPathLinks(card), 'Fill in the [certificate form](</Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf>) with Moblize.it LLC.');
+  assert.deepEqual(askFilePaths(card), ['/Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf']);
+  assert.equal(bracketSpacedPathLinks('[r](C:\\Shared Files\\Q3 report.xlsx)'), '[r](<C:\\Shared Files\\Q3 report.xlsx>)');
+  // A home path, as agents often print it, and two links on one line each get their own brackets.
+  assert.equal(bracketSpacedPathLinks('[plan](~/Documents/Q3 notes/plan v2.md) and [r](/Users/me/Q3 report.pdf)'), '[plan](<~/Documents/Q3 notes/plan v2.md>) and [r](</Users/me/Q3 report.pdf>)');
+  for (const same of [
+    '[r](/Users/me/report.md)',                          // no space: already a link
+    '[r](</Users/me/Q3 report.md>)',                     // already bracketed
+    '`[r](/Users/me/Q3 report.md)`',                     // code stays as written
+    '```\n[r](/Users/me/Q3 report.md)\n```',
+    '[r](https://example.com/a b.pdf)',                  // not a path
+    '[r](/Users/me/Q3 notes)',                           // no file ending
+    'see [r](/Users/me/Q3 report.md "title")'            // a title: not ours to guess
+  ]) assert.equal(bracketSpacedPathLinks(same), same, same);
+  assert.match(read('src/renderer/src/markdown/MarkdownPreview.tsx'), /\{bracketSpacedPathLinks\(source\)\}/);
+});
+
+test('a long agent line that opens a path link and never closes it does not stall the preview', () => {
+  // Value: protects=the Markdown preview stays responsive on agent text with "](/" and no ")"; fails_when=the spaced link pattern backtracks quadratically again (two lazy runs around the space took 1.9 s on 120,000 characters); why_new=ship review 2026-11-13, the specialist and the adversarial pass both found it; seam=none; no_claim=the renderer's own frame budget
+  const { bracketSpacedPathLinks } = loadTs('src/shared/askFiles.ts');
+  const line = '[a](/' + 'ab '.repeat(100_000);
+  const started = process.hrtime.bigint();
+  assert.equal(bracketSpacedPathLinks(line), line, 'nothing to bracket: no closing ")"');
+  // gstack-timing-ok: the quadratic pattern needed seconds here; a linear one needs about a millisecond, so 500 ms has a wide margin on a slow runner
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'linear in the line length');
+  assert.equal(bracketSpacedPathLinks('see [a](/My Files/a.pdf) and [b](/x/b.pdf)'), 'see [a](</My Files/a.pdf>) and [b](/x/b.pdf)', 'a path with no space is left as written');
+});

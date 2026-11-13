@@ -28,7 +28,7 @@ import { useStore } from '@/store/store';
 import { useAppTheme } from '@/design/theme';
 import { family } from '@/scene/studio/theme';
 import { departmentOf, roleOf } from '@/scene/studio/layout';
-import { useMissions } from '../triggers/ScheduleList';
+import { useMissions, whenText } from '../triggers/ScheduleList';
 import { Toggle } from '../triggers/ui';
 import { AgentAvatar } from '../AgentAvatar';
 import { InfoTip } from '../InfoTip';
@@ -224,7 +224,6 @@ export function PulseView() {
   const { t, i18n } = useTranslation();
   const agents = useStore((s) => s.agents);
   const updateAgent = useStore((s) => s.updateAgent);
-  const openAgentProfile = useStore((s) => s.openAgentProfile);
   const dark = useAppTheme() === 'dark';
   const { missions } = useMissions();
   const host = useRef<HTMLDivElement | null>(null);
@@ -326,8 +325,8 @@ export function PulseView() {
     const job = jobOf(a.missionId);
     const e = a.evidence;
     switch (a.kind) {
-      case 'run-less': return { title: t('pulse.advice.runLess', { name, job }), evidence: t('pulse.advice.runLessWhy', { nothing: e.nothing, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : '') };
-      case 'run-more': return { title: t('pulse.advice.runMore', { name, job }), evidence: t('pulse.advice.runMoreWhy', { didWork: e.didWork, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : '') };
+      case 'run-less': return { title: t('pulse.advice.runLess', { name, job }), evidence: t('pulse.advice.runLessWhy', { nothing: e.nothing, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : a.change.kind === 'when' ? ` ${t('pulse.advice.whenChange', { from: whenText(a.change.from, t), to: whenText(a.change.to, t) })}` : '') };
+      case 'run-more': return { title: t('pulse.advice.runMore', { name, job }), evidence: t('pulse.advice.runMoreWhy', { didWork: e.didWork, runs: e.runs }) + (a.change.kind === 'interval' ? ` ${t('pulse.advice.everyChange', { from: every(a.change.fromMs, t), to: every(a.change.toMs, t) })}` : a.change.kind === 'when' ? ` ${t('pulse.advice.whenChange', { from: whenText(a.change.from, t), to: whenText(a.change.to, t) })}` : '') };
       case 'cheaper-model': return { title: t('pulse.advice.tryModel', { name, model: a.change.kind === 'model' ? a.change.toLabel : '' }), evidence: t('pulse.advice.cheaperWhy', { kept: e.kept, decisions: e.decisions }) };
       default: return { title: t('pulse.advice.tryModel', { name, model: a.change.kind === 'model' ? a.change.toLabel : '' }), evidence: e.reopens && e.reopens >= 3 ? t('pulse.advice.reopenedWhy', { reopens: e.reopens }) : t('pulse.advice.strongerWhy', { kept: e.kept, decisions: e.decisions }) };
     }
@@ -346,7 +345,6 @@ export function PulseView() {
   };
 
   const apply = async (a: Advice): Promise<void> => {
-    if (a.change.kind === 'editor') { openAgentProfile(a.agentId); return; }
     if (busy) return;
     setBusy(a.id);
     try {
@@ -355,6 +353,7 @@ export function PulseView() {
       let appliedId = r.kind === 'schedule' ? r.appliedId : 0;
       let text = '';
       if (r.kind === 'schedule' && a.change.kind === 'interval') text = t('pulse.appliedSchedule', { name: nameOf(a.agentId), job: jobOf(a.missionId), to: every(a.change.toMs, t) });
+      if (r.kind === 'schedule' && a.change.kind === 'when') text = t('pulse.appliedWhen', { name: nameOf(a.agentId), job: jobOf(a.missionId), to: whenText(a.change.to, t) });
       if (r.kind === 'model') {
         updateAgent(r.agentId, { model: r.to });
         appliedId = await window.cth.pulseModelApplied(a.id, r.agentId, r.from, r.to);
@@ -448,6 +447,8 @@ export function PulseView() {
       const name = nameOf(c.agentId);
       if (c.change.kind === 'model') return t('pulse.changeModel', { name, model: c.change.toLabel });
       const job = jobOf(c.change.missionId);
+      const to = c.change.to;
+      if (to && (to.weekly || to.times)) return t(job ? 'pulse.changeWhen' : 'pulse.changeWhenAny', { name, job, to: whenText(to, t) });
       return t(job ? 'pulse.changeSchedule' : 'pulse.changeScheduleAny', { name, job, to: every(c.change.toMs, t) });
     };
     const changeResult = (c: SavedChange): { text: string; tone: 'saved' | 'more' | 'quiet' } => {
@@ -725,8 +726,8 @@ export function PulseView() {
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--cth-amber-text)', lineHeight: '17px' }}>{txt.evidence}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <PixelButton size="sm" disabled={busy !== null && a.change.kind !== 'editor'} onClick={() => { void apply(a); }}>
-                      {a.change.kind === 'editor' ? t('pulse.openSchedules') : t('pulse.apply')}
+                    <PixelButton size="sm" disabled={busy !== null} onClick={() => { void apply(a); }}>
+                      {t('pulse.apply')}
                     </PixelButton>
                     <PixelButton variant="secondary" size="sm" onClick={() => { void notNow(a); }}>{t('pulse.notNow')}</PixelButton>
                     {a.savesPerWeek !== null && a.savesPerWeek > 0 && (

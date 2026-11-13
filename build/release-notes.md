@@ -1,4 +1,4 @@
-- **A lighter app.** Voice, webhooks, Slack and unused engines are gone.
-- Pulse lists each change you applied, with its own Undo.
-- All clear offers one tip or what the team did today.
-- The prompts you type are no longer saved.
+- **Pulse can change a job's set times for you.**
+- A window stuck loading after sleep loads again.
+- Links to files with spaces in their names open.
+- A job change that cannot work says why.

@@ -111,7 +111,9 @@ const FAILURE_NOTE: Record<Exclude<Failure, 'failed'>, string> = {
   'no-name': 'jobChange.errorNoName',
   'not-started': 'jobChange.errorNotStarted',
   slow: 'jobChange.errorSlow',
-  unreadable: 'jobChange.errorUnreadable'
+  unreadable: 'jobChange.errorUnreadable',
+  engine: 'jobChange.errorEngine',
+  stopped: 'jobChange.errorStopped'
 };
 
 const SUMMARY_SHOWN = 6;
@@ -126,6 +128,7 @@ const SUMMARY_SHOWN = 6;
  */
 export function JobChangeReview(p: JobChangeReviewProps) {
   const { t, i18n } = useTranslation();
+  const manager = useResolvedGodName();
   const [typed, setTyped] = useState(p.initialTyped ?? '');
   const [extras, setExtras] = useState<string[]>([]);
   // How the owner says the work splits (design D3: asked in the overlap card).
@@ -182,7 +185,14 @@ export function JobChangeReview(p: JobChangeReviewProps) {
     const res = await p.run({
       typed: typed.trim(), extras: more, answers, requestId,
       ...(expl ? { explanation: expl, teammates: [...named.current.values()] } : {})
-    }).catch((): ReviseResult => ({ kind: 'error', reason: 'failed' }));
+    }).catch((e: unknown): ReviseResult => {
+      // A run that failed in this window never reaches the office log, so it
+      // is reported from here (owner, 2026-11-13: a Ryan update card failed
+      // on every try and nothing was logged or reported).
+      // A run stopped or replaced meanwhile is nobody's failure.
+      if (e instanceof Error && runId.current === requestId) { try { window.cth.reportFailure?.({ kind: 'renderer-error', name: e.name, stack: e.stack ?? '' }); } catch { /* best-effort */ } }
+      return { kind: 'error', reason: 'failed' };
+    });
     off?.();
     if (runId.current !== requestId) return; // stopped, or a newer run
     runId.current = null;
@@ -333,7 +343,7 @@ export function JobChangeReview(p: JobChangeReviewProps) {
     panel = (
       <div role="alert" style={panelStyle}>
         {head(t('jobChange.errorTitle'))}
-        <span style={noteStyle}>{t(state.reason !== 'failed' ? FAILURE_NOTE[state.reason] : p.autoRun ? 'jobChange.errorNoteCard' : 'jobChange.errorNote')}</span>
+        <span style={noteStyle}>{t(state.reason !== 'failed' ? FAILURE_NOTE[state.reason] : p.autoRun ? 'jobChange.errorNoteCard' : 'jobChange.errorNote', { name: manager })}</span>
         <div style={rowEnd}><Keep />
           <PixelButton variant="secondary" size="sm" onClick={cancel}>{t('jobChange.cancel')}</PixelButton>
           <PixelButton variant="primary" size="sm" onClick={() => { void start(extras, answersRef.current); }}>{t('jobChange.tryAgain')}</PixelButton>
