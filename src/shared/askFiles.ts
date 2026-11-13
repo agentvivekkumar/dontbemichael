@@ -103,8 +103,10 @@ export function plainFilePaths(text: string): Array<{ path: string; start: numbe
  *  brackets> Markdown needs for that ("[the form](/Users/me/Email
  *  attachments/Compliance Certification.pdf)"), so it showed as raw text
  *  (owner, 2026-11-12). The target must start like a full path, end in a
- *  known file ending right before the ")", and hold no brackets or newline. */
-const SPACED_PATH_LINK = /\]\(((?:~[\\/]|\/|[A-Za-z]:[\\/])[^\n<>()]*?\s[^\n<>()]*?)\)/g;
+ *  known file ending right before the ")", and hold no brackets or newline.
+ *  One class, the space checked after: two lazy runs around the space took
+ *  seconds on a long line with no ")" (ship review, 2026-11-13). */
+const SPACED_PATH_LINK = /\]\(((?:~[\\/]|\/|[A-Za-z]:[\\/])[^\n<>()]*)\)/g;
 
 /** Such links given their angle brackets, so they parse as links (and become
  *  file chips) like any other. Code spans and fences are left as written. */
@@ -113,7 +115,7 @@ export function bracketSpacedPathLinks(text: string): string {
   return text
     .split(/(```[\s\S]*?```|`[^`\n]+`)/)
     .map((part, i) => (i % 2 === 1 ? part : part.replace(SPACED_PATH_LINK, (whole, target: string) =>
-      DETECT_EXTENSIONS.has(extensionOf(target)) && !/\s$/.test(target) ? `](<${target}>)` : whole)))
+      /\s/.test(target) && DETECT_EXTENSIONS.has(extensionOf(target)) && !/\s$/.test(target) ? `](<${target}>)` : whole)))
     .join('');
 }
 

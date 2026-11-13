@@ -343,6 +343,53 @@ test('a timed schedule is thinned ready to apply, and Undo puts its times back (
   assert.equal(weekly.missions()[0].times, undefined);
 });
 
+test('Undo of a times change leaves a job the owner changed in Schedules since as the owner set it', (t) => {
+  // Value: protects=Undo never puts old times back over times or a weekly the owner set after Apply; fails_when=Undo compares only the interval, which a times change never moves, and so overwrites the owner's later edit; why_new=times changes are new to Undo (2026-11-12) and the existing tests only undo an untouched job; seam=none; no_claim=the Schedules UI refresh (applyMissions sends missions:updated)
+  const wk = [1, 2, 3, 4, 5];
+  const times = [{ kind: 'at', days: wk, minute: 540 }, { kind: 'at', days: wk, minute: 720 }, { kind: 'at', days: wk, minute: 900 }];
+  const { svc, missions, setMissions } = service(t, { mission: { intervalMs: 86_400_000, times } });
+  const [advice] = svc.snapshot('this-week').advice;
+  const r = svc.apply(advice.id, advice.change);
+  assert.equal(r.ok, true);
+  // The owner moves the later time in Schedules; the interval stays one day.
+  const edited = [{ kind: 'at', days: wk, minute: 540 }, { kind: 'at', days: wk, minute: 960 }];
+  setMissions([{ ...missions()[0], times: edited }]);
+  assert.deepEqual(svc.undo(r.appliedId), { ok: false, error: 'stale' });
+  assert.deepEqual(missions()[0].times, edited, 'the owner\'s times stay');
+  // The owner switches it to one weekly time instead: still theirs.
+  const { times: _t, ...rest } = missions()[0];
+  setMissions([{ ...rest, weekly: { days: wk, minute: 600 } }]);
+  assert.deepEqual(svc.undo(r.appliedId), { ok: false, error: 'stale' });
+  assert.deepEqual(missions()[0].weekly, { days: wk, minute: 600 });
+  assert.equal(missions()[0].times, undefined, 'no old times put under it');
+});
+
+test('Apply and Undo of a times change count the new times from now, and Undo puts back the very record it changed (ship review, 2026-11-13)', (t) => {
+  // Value: protects=a time Apply adds earlier today is not a missed run that fires at once, and Undo leaves no weekly the owner never set under the times; fails_when=withWhen stops stamping scheduledSince like an editor save, or Undo keeps the weekly the change wrote under the restored times; why_new=both found in the ship review (adversarial pass and state matrix); seam=none; no_claim=the scheduler arming the job (catchUpFloor is covered in missions tests)
+  const wk = [1, 2, 3, 4, 5];
+  const once = [{ kind: 'at', days: wk, minute: 540 }];
+  const { svc, missions, clock } = service(t, { mission: { intervalMs: 86_400_000, times: once } });
+  const [advice] = svc.snapshot('this-week').advice;
+  assert.deepEqual(advice.change.to, { intervalMs: 86_400_000, weekly: { days: [1, 3, 5], minute: 540 } }, 'one time a day on weekdays thins to a weekly');
+  const r = svc.apply(advice.id, advice.change);
+  assert.equal(r.ok, true);
+  assert.equal(missions()[0].scheduledSince, clock.now(), 'the new timing counts from Apply, as an editor save does');
+  clock.at(clock.now() + 60_000);
+  assert.equal(svc.undo(r.appliedId).ok, true);
+  assert.deepEqual(missions()[0].times, once);
+  assert.equal(missions()[0].weekly, undefined, 'no weekly under the times: the job never had one');
+  assert.equal(missions()[0].scheduledSince, clock.now(), 'the restored timing counts from Undo');
+
+  // A weekly that was under the times before stays the one under them after Undo.
+  const under = { days: [0, 6], minute: 600 };
+  const two = service(t, { mission: { intervalMs: 86_400_000, times: once, weekly: under } });
+  const [a2] = two.svc.snapshot('this-week').advice;
+  const r2 = two.svc.apply(a2.id, a2.change);
+  assert.equal(r2.ok, true);
+  assert.equal(two.svc.undo(r2.appliedId).ok, true);
+  assert.deepEqual(two.missions()[0].weekly, under);
+});
+
 test('a model suggestion is checked here and made by the roster; the owner\'s store is never written from main', (t) => {
   // Value: protects=model changes only through the owner's click and the renderer roster; fails_when=main writes a model or applies a stale one; why_new=eng correction 3; seam=none; no_claim=the renderer side (component test)
   const models = [{ agentId: 'toby', provider: 'claude', model: 'claude-opus-5-5' }];

@@ -285,6 +285,8 @@ test('a link to a full path with spaces and no angle brackets still opens the fi
   assert.equal(bracketSpacedPathLinks(card), 'Fill in the [certificate form](</Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf>) with Moblize.it LLC.');
   assert.deepEqual(askFilePaths(card), ['/Users/me/Dropbox/Admin_Erin/Email attachments/Compliance Certification.pdf']);
   assert.equal(bracketSpacedPathLinks('[r](C:\\Shared Files\\Q3 report.xlsx)'), '[r](<C:\\Shared Files\\Q3 report.xlsx>)');
+  // A home path, as agents often print it, and two links on one line each get their own brackets.
+  assert.equal(bracketSpacedPathLinks('[plan](~/Documents/Q3 notes/plan v2.md) and [r](/Users/me/Q3 report.pdf)'), '[plan](<~/Documents/Q3 notes/plan v2.md>) and [r](</Users/me/Q3 report.pdf>)');
   for (const same of [
     '[r](/Users/me/report.md)',                          // no space: already a link
     '[r](</Users/me/Q3 report.md>)',                     // already bracketed
@@ -295,4 +297,15 @@ test('a link to a full path with spaces and no angle brackets still opens the fi
     'see [r](/Users/me/Q3 report.md "title")'            // a title: not ours to guess
   ]) assert.equal(bracketSpacedPathLinks(same), same, same);
   assert.match(read('src/renderer/src/markdown/MarkdownPreview.tsx'), /\{bracketSpacedPathLinks\(source\)\}/);
+});
+
+test('a long agent line that opens a path link and never closes it does not stall the preview', () => {
+  // Value: protects=the Markdown preview stays responsive on agent text with "](/" and no ")"; fails_when=the spaced link pattern backtracks quadratically again (two lazy runs around the space took 1.9 s on 120,000 characters); why_new=ship review 2026-11-13, the specialist and the adversarial pass both found it; seam=none; no_claim=the renderer's own frame budget
+  const { bracketSpacedPathLinks } = loadTs('src/shared/askFiles.ts');
+  const line = '[a](/' + 'ab '.repeat(100_000);
+  const started = process.hrtime.bigint();
+  assert.equal(bracketSpacedPathLinks(line), line, 'nothing to bracket: no closing ")"');
+  // gstack-timing-ok: the quadratic pattern needed seconds here; a linear one needs about a millisecond, so 500 ms has a wide margin on a slow runner
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'linear in the line length');
+  assert.equal(bracketSpacedPathLinks('see [a](/My Files/a.pdf) and [b](/x/b.pdf)'), 'see [a](</My Files/a.pdf>) and [b](/x/b.pdf)', 'a path with no space is left as written');
 });

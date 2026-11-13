@@ -40,6 +40,16 @@ test('the biggest saving one click can apply comes first', () => {
   assert.equal(tip.id, 'save:b');
 });
 
+test('a timed job whose times can be thinned is a saving tip too (owner, 2026-11-12)', () => {
+  // Value: protects=a timed job's run less change, now one click, can be the tip; fails_when=the picker keeps only interval and model changes and the biggest saving on a timed job is never offered, or a run more on a timed job is offered as a saving; why_new=timed jobs got an applicable change on 2026-11-12, and the first test's table holds no timed change; seam=pure; no_claim=the card's wording (AllClearTipCard)
+  const wk = [1, 2, 3, 4, 5];
+  const when = { kind: 'when', from: { intervalMs: 86_400_000, weekly: { days: wk, minute: 540 } }, to: { intervalMs: 86_400_000, weekly: { days: [1, 3, 5], minute: 540 } } };
+  const tip = T.pickAllClearTip(base({ advice: [runLess('a', 3), runLess('timed', 12, { change: when }), runLess('more', 40, { kind: 'run-more', change: when })] }));
+  assert.equal(tip.kind, 'save');
+  assert.equal(tip.advice.id, 'timed');
+  assert.equal(tip.usdPerWeek, 12);
+});
+
 test('with no saving, a switched on connector no member may use', () => {
   // Value: protects=the second tip names a connector that is on and unused, never one a member already holds; fails_when=a granted connector is offered or the order is unstable; why_new=new tip; seam=pure; no_claim=connector switches themselves (claudeConnectors tests)
   const tip = T.pickAllClearTip(base({

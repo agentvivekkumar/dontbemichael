@@ -261,10 +261,13 @@ test('a change that can never work on a retry says why, and the app hears of a r
   for (const [reply, reason, logged, detail] of cases) {
     const logs = [];
     stub(reply);
-    assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, log: (e) => logs.push(e) }), { kind: 'error', reason }, reply.error);
+    // Michael on Gemini, which the runner cannot use; on Claude or Codex the same words are a failed start.
+    assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, engine: 'gemini', log: (e) => logs.push(e) }), { kind: 'error', reason }, reply.error);
     assert.deepEqual(logs, [logged], reply.error);
     assert.deepEqual(R.classifyLogEvent(logs[0]), detail && { kind: 'hidden-call-failed', detail }, reply.error);
   }
+  stub({ ok: false, error: 'engine unavailable' });
+  assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, engine: 'codex' }), { kind: 'error', reason: 'failed' }, 'Codex that fails to start is not told to use Codex');
   const logs = [];
   HM.runHiddenModel = async () => { throw new TypeError('boom'); };
   assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, log: (e) => logs.push(e) }), { kind: 'error', reason: 'failed' });
@@ -278,4 +281,12 @@ test('a change that can never work on a retry says why, and the app hears of a r
   const jc = JSON.parse(read('src/renderer/src/i18n/locales/en.json')).jobChange;
   for (const k of ['errorEngine', 'errorStopped', 'errorNote', 'errorNoteCard']) assert.doesNotMatch(jc[k], /try again/i, k);
   assert.match(jc.errorEngine, /\{\{name\}\}/);
+});
+
+test('the engine note names the manager, never a raw {{name}}', () => {
+  // Value: protects=the card reads "Job changes need Michael on Claude or Codex", with the office's own name for him; fails_when=the error note's t() call stops passing name, so i18next shows "{{name}}" as written; why_new=errorEngine is the first job change note with a placeholder (2026-11-13), and the i18n placeholder check skips this call because its key is chosen at run time; seam=source pin, the box needs a renderer; no_claim=the rendered card
+  const box = read('src/renderer/src/components/JobChangeReview.tsx');
+  const call = /\{t\(state\.reason !== 'failed' \? FAILURE_NOTE\[state\.reason\] : [^)]*?, \{ name: (\w+) \}\)\}/.exec(box);
+  assert.ok(call, 'the error note passes a name');
+  assert.match(box, new RegExp(`const ${call[1]} = useResolvedGodName\\(\\);`), 'the name is the manager\'s, as the office calls him');
 });

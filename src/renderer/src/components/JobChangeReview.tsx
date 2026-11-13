@@ -189,7 +189,8 @@ export function JobChangeReview(p: JobChangeReviewProps) {
       // A run that failed in this window never reaches the office log, so it
       // is reported from here (owner, 2026-11-13: a Ryan update card failed
       // on every try and nothing was logged or reported).
-      if (e instanceof Error) { try { window.cth.reportFailure?.({ kind: 'renderer-error', name: e.name, stack: e.stack ?? '' }); } catch { /* best-effort */ } }
+      // A run stopped or replaced meanwhile is nobody's failure.
+      if (e instanceof Error && runId.current === requestId) { try { window.cth.reportFailure?.({ kind: 'renderer-error', name: e.name, stack: e.stack ?? '' }); } catch { /* best-effort */ } }
       return { kind: 'error', reason: 'failed' };
     });
     off?.();

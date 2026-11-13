@@ -130,11 +130,13 @@ export type ReviseFailure = 'no-name' | 'not-started' | 'slow' | 'unreadable' | 
 export type ReviseResult = ReviseAnswer | { kind: 'error'; reason: ReviseFailure | 'cancelled' };
 
 /** A hidden run's failure as the owner's reason. */
-export function reviseFailure(result: { ok: boolean; error?: string }): ReviseFailure {
+export function reviseFailure(result: { ok: boolean; error?: string }, engine: HiddenModelEngine['engine'] = 'claude'): ReviseFailure {
   if (result.ok) return 'unreadable';
   if (/never took the prompt/.test(result.error ?? '')) return 'not-started';
   if (/timed out/.test(result.error ?? '')) return 'slow';
-  if (result.error === 'engine unavailable') return 'engine';
+  // Only an engine the runner cannot use is said as the engine: Codex says
+  // "engine unavailable" too when it fails to start (ship review, 2026-11-13).
+  if (result.error === 'engine unavailable' && engine !== 'claude' && engine !== 'codex') return 'engine';
   if (result.error && ENDED_WITHOUT_ANSWER.includes(result.error)) return 'stopped';
   return 'failed';
 }
@@ -268,7 +270,7 @@ export async function reviseWorkStyle(
     if (answer) return answer;
     // Which check failed, as a fixed word the failure report can carry (issue 676).
     deps.log?.({ kind: 'work-style-revise-failed', ...reviseLogReason(result, read && 'fail' in read ? read.fail : undefined) });
-    return { kind: 'error', reason: reviseFailure(result) };
+    return { kind: 'error', reason: reviseFailure(result, deps.engine) };
   } catch (e) {
     deps.log?.({ kind: 'work-style-revise-failed', reason: REVISE_THREW, error: String(e).slice(0, 200) });
   }

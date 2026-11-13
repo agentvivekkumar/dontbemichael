@@ -572,13 +572,18 @@ export class PulseService {
     }
     if (a.change.kind === 'when') {
       const { from, to } = a.change;
+      const now = this.now();
+      // The weekly a times job keeps underneath for the editor's switch back:
+      // Undo puts that one back, not whatever the change left (ship review, 2026-11-13).
+      let under: ScheduleWhen['weekly'] | null = null;
       const res = this.d.applyMissions((list) => {
         const m = list.find((x) => x.id === a.missionId);
         if (!m || !sameWhen(scheduleWhen(m), from)) return null;
-        return list.map((x) => (x.id === m.id ? withWhen(x, to) : x));
+        under = m.weekly ?? null;
+        return list.map((x) => (x.id === m.id ? withWhen(x, to, now) : x));
       });
       if (!res.ok) return { ok: false, error: res.error === 'not found' ? 'stale' : 'failed' };
-      return { ok: true, kind: 'schedule', appliedId: this.record(office, a.id, a.agentId, 'schedule', { missionId: a.missionId, ...from }, { missionId: a.missionId, ...to }) };
+      return { ok: true, kind: 'schedule', appliedId: this.record(office, a.id, a.agentId, 'schedule', { missionId: a.missionId, ...from, ...(from.times ? { under } : {}) }, { missionId: a.missionId, ...to }) };
     }
     if (a.change.kind === 'model') {
       const current = this.d.models().find((m) => m.agentId === a.agentId)?.model ?? null;
@@ -604,12 +609,13 @@ export class PulseService {
     const mark = (): void => { db.prepare('UPDATE telemetry_applied SET undone_at = ? WHERE id = ?').run(this.now(), a.id); };
     if (a.kind === 'schedule') {
       // Older records hold the interval alone, which reads as a plain interval.
-      const before = a.before as { missionId: string; intervalMs: number };
+      const before = a.before as { missionId: string; intervalMs: number; under?: ScheduleWhen['weekly'] | null };
       const after = a.after as { intervalMs: number };
+      const now = this.now();
       const res = this.d.applyMissions((list) => {
         const m = list.find((x) => x.id === before.missionId);
         if (!m || !sameWhen(scheduleWhen(m), scheduleWhen(after))) return null;
-        return list.map((x) => (x.id === m.id ? withWhen(x, scheduleWhen(before)) : x));
+        return list.map((x) => (x.id === m.id ? withWhen(x, scheduleWhen(before), now, before.under) : x));
       });
       if (!res.ok) return { ok: false, error: 'stale' };
       mark();
@@ -639,11 +645,16 @@ export class PulseService {
 const sameWhen = (a: ScheduleWhen, b: ScheduleWhen): boolean => JSON.stringify(scheduleWhen(a)) === JSON.stringify(scheduleWhen(b));
 
 /** A job with its timing set to `w`. Lines replace the weekly, so a weekly
- *  under them stays on the record (the editor restores it on a switch back);
- *  a weekly or a plain interval clears the lines that would override it. */
-function withWhen(m: ScheduledMission, w: ScheduleWhen): ScheduledMission {
+ *  under them stays on the record (the editor restores it on a switch back),
+ *  or `under` when given (Undo: the one that was there before, or none); a
+ *  weekly or a plain interval clears the lines that would override it. The
+ *  new timing counts from `now`, as an editor save does (upsertMission), so a
+ *  time added earlier today is not a missed run that fires at once (ship
+ *  review, 2026-11-13). */
+function withWhen(m: ScheduledMission, w: ScheduleWhen, now: number, under?: ScheduleWhen['weekly'] | null): ScheduledMission {
   const { times: _times, weekly: _weekly, ...rest } = m;
-  if (w.times) return { ...rest, ...(m.weekly ? { weekly: m.weekly } : {}), intervalMs: w.intervalMs, times: w.times };
-  if (w.weekly) return { ...rest, intervalMs: w.intervalMs, weekly: w.weekly };
-  return { ...rest, intervalMs: w.intervalMs };
+  const kept = under === undefined ? m.weekly : under ?? undefined;
+  if (w.times) return { ...rest, ...(kept ? { weekly: kept } : {}), intervalMs: w.intervalMs, times: w.times, scheduledSince: now };
+  if (w.weekly) return { ...rest, intervalMs: w.intervalMs, weekly: w.weekly, scheduledSince: now };
+  return { ...rest, intervalMs: w.intervalMs, scheduledSince: now };
 }

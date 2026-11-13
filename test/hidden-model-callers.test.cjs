@@ -92,9 +92,10 @@ test('a job change uses the runner, stops on its signal and saves nothing when u
   assert.equal((await W.reviseWorkStyle(req, deps, signal)).kind, 'ok');
   assertEngine(calls);
   assert.equal(calls[0].opts.signal, signal);
-  // Said as the engine, so the card asks for no retry (owner, 2026-11-13).
+  // Codex that fails to start is a failure; only an engine the runner cannot use is said as the engine (2026-11-13).
   stub({ ok: false, error: 'engine unavailable' });
-  assert.deepEqual(await W.reviseWorkStyle(req, deps), { kind: 'error', reason: 'engine' });
+  assert.deepEqual(await W.reviseWorkStyle(req, deps), { kind: 'error', reason: 'failed' });
+  assert.deepEqual(await W.reviseWorkStyle(req, { ...deps, engine: 'gemini' }), { kind: 'error', reason: 'engine' });
   stub({ ok: false, error: 'cancelled' });
   assert.deepEqual(await W.reviseWorkStyle(req, deps), { kind: 'error', reason: 'cancelled' });
 });
