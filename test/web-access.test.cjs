@@ -184,5 +184,7 @@ test('the trust check always runs on Claude, with none of the owner\'s hooks', (
   // Value: protects=checks work when the office's default engine is not Claude, and no owner hook sees or adds to what a check reads; fails_when=the runner uses another engine's command or loads hooks; why_new=Codex adversarial review (verified live: disableAllHooks from --settings stops settings file hooks); seam=none
   const main = read('src/main/index.ts');
   assert.match(main, /command: cmd && isClaudeProvider\(inferAgentProvider\(cmd\)\) \? cmd : 'claude',\s*noTools: true,\s*settingSources: 'user',\s*settingsJson: JSON\.stringify\(\{ disableAllHooks: true \}\),/);
-  assert.match(read('src/main/hiddenClaude.ts'), /if \(opts\.settingsJson\) args\.push\('--settings', opts\.settingsJson\);/);
+  // The caller's settings ride every session, with the bypass warning answered
+  // beside them (hidden-claude-bypass-warning.test.cjs keeps disableAllHooks).
+  assert.match(read('src/main/hiddenClaude.ts'), /const settings = hiddenSettings\(opts\.settingsJson\);\s*if \(settings === null\) \{ resolve\(\{ ok: false, error: 'could not prepare background check' \}\); return; \}\s*args\.push\('--settings', settings\);/);
 });

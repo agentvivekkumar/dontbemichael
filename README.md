@@ -41,9 +41,8 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.3.9: Pulse can change a job's set times for you,** ready to apply with Undo. In
-> 0.3.8, a lighter app: features owners never used are gone, and when nothing needs you, Michael
-> offers one tip from your office.
+> **New in 0.4.0: job changes work on every Mac.** In 0.3.9, Pulse can change a job's set times
+> for you, ready to apply with Undo.
 
 ## Contents
 

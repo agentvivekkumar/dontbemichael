@@ -1,4 +1,3 @@
-- **Pulse can change a job's set times for you.**
-- A window stuck loading after sleep loads again.
-- Links to files with spaces in their names open.
-- A job change that cannot work says why.
+- **Job changes work on every Mac.**
+- Team checks that run in the background no longer stop at Claude Code's startup warning.
+- A check that cannot start safely is reported.
