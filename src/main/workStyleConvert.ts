@@ -79,6 +79,13 @@ export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): 
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       env: deps.env,
       timeoutMs: TIMEOUT_MS
     });
@@ -253,6 +260,9 @@ export async function reviseWorkStyle(
       settingSources: 'user',
       settingsJson: JSON.stringify({ disableAllHooks: true }),
       dropTranscript: true,
+      // Its own throwaway settings folder, which trusts the folder it runs in
+      // (issue 712: "trust this folder?" defaults to "No, exit").
+      isolateConfig: true,
       env: deps.env,
       timeoutMs: TIMEOUT_MS,
       // No hidden thinking (owner, 2026-10-23): measured on a real change, the
@@ -347,6 +357,13 @@ export async function checkFocusArea(req: FocusCheckRequest, deps: ConvertDeps):
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       // A quick judgment, like the hire check: no extended thinking.
       thinking: false,
       env: deps.env,

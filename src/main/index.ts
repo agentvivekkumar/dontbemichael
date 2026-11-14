@@ -1164,16 +1164,13 @@ const mailApprovals = new MailApprovals({
 
 /** The job and memory checks' own empty folder (the hire overlap check, a job
  *  change, writing a work style, the focus check, memory tidy), never the
- *  office folder: agents write there, so a project settings file one left
- *  would load, and nothing had marked it trusted, so Claude Code 2.1.323's
- *  "trust this folder?" (default "No, exit") ended every job change on an
- *  office Claude was never opened in (issue 712). Trusted once per run, and
- *  only remembered once ~/.claude.json holds it. */
-let jobCheckTrusted = false;
+ *  office folder agents write in. Each check runs in its own throwaway Claude
+ *  settings folder, which trusts this one (issue 712: Claude Code 2.1.323's
+ *  "trust this folder?" defaults to "No, exit"). A folder that cannot be made
+ *  fails the check itself, which falls back as before. */
 function jobCheckDir(): string {
   const dir = join(app.getPath('userData'), JOB_CHECK_DIR);
-  mkdirSync(dir, { recursive: true });
-  if (!jobCheckTrusted) { try { jobCheckTrusted = ensureClaudePermissionsAccepted(dir); } catch { /* asked again next time */ } }
+  try { mkdirSync(dir, { recursive: true }); } catch { /* the check fails and falls back */ }
   return dir;
 }
 

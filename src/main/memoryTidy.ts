@@ -311,6 +311,13 @@ export class MemoryTidy {
       // A pure text transform over text agents wrote: no tools at all, so a
       // note can't get it to open a file or fetch a page (review, 2026-09-25).
       noTools: true,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       env: this.getEnv(),
       timeoutMs: TIMEOUT_MS
     });

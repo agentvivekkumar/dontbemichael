@@ -63,14 +63,27 @@ test('a trust question ends a session in a folder nothing trusted, and the resul
   assert.deepEqual(await H.runHiddenClaude('Say done.', opts(bin, cwd)), { ok: true, text: 'DONE' });
 });
 
-test('job and memory checks run in the app\'s own trusted folder, never the office folder', () => {
-  // Value: protects=job changes, the hire overlap check, writing a work style, the focus check and memory tidy start where Claude asks no trust question, and never load a project settings file an agent left in the office folder; fails_when=one of them runs in harnessHome again, or the folder is remembered as trusted after a failed write; why_new=issue 712 and its ship review; seam=source pin, the callers need Electron
+test('job and memory checks run isolated in the app\'s own folder, never the office folder', () => {
+  // Value: protects=job changes, the hire overlap check, writing a work style, the focus check and memory tidy start where Claude asks no trust question, load no project settings or hooks, and keep no transcript; fails_when=one of them runs in harnessHome again, or drops isolateConfig, the user only setting sources or disableAllHooks; why_new=issue 712 and its ship review; seam=source pin, the callers need Electron; no_claim=the isolated folder's trust (hidden-claude-isolate.test.cjs) and real Claude Code (verified live with 2.1.323)
   const main = read('src/main/index.ts');
   assert.doesNotMatch(main, /cwd: cfg\.harnessHome \?\? app\.getPath\('home'\)/, 'no check runs in the office folder');
   assert.equal((main.match(/cwd: jobCheckDir\(\),/g) ?? []).length, 4, 'hire overlap, job change, work style, focus');
   assert.match(main, /\(\) => ownerNotes,\s*\/\/[^\n]*\n\s*\(\) => jobCheckDir\(\)\s*\);/, 'memory tidy');
-  assert.match(main, /function jobCheckDir\(\): string \{\s*const dir = join\(app\.getPath\('userData'\), JOB_CHECK_DIR\);\s*mkdirSync\(dir, \{ recursive: true \}\);\s*if \(!jobCheckTrusted\) \{ try \{ jobCheckTrusted = ensureClaudePermissionsAccepted\(dir\); \}/);
+  assert.match(main, /function jobCheckDir\(\): string \{\s*const dir = join\(app\.getPath\('userData'\), JOB_CHECK_DIR\);\s*try \{ mkdirSync\(dir, \{ recursive: true \}\); \}/);
   assert.match(read('src/main/memoryTidy.ts'), /cwd: this\.checkDir\(\) \?\? home,/);
+  const calls = [
+    ['hire overlap', read('src/main/hireCheck.ts'), 'export async function checkDistinct'],
+    ['work style', read('src/main/workStyleConvert.ts'), 'export async function convertWorkStyle'],
+    ['job change', read('src/main/workStyleConvert.ts'), 'export async function reviseWorkStyle'],
+    ['focus', read('src/main/workStyleConvert.ts'), 'export async function checkFocusArea'],
+    ['memory tidy', read('src/main/memoryTidy.ts'), 'private async askModel']
+  ];
+  for (const [name, src, at] of calls) {
+    const body = src.slice(src.indexOf(at), src.indexOf('});', src.indexOf('runHiddenModel(', src.indexOf(at))));
+    assert.match(body, /isolateConfig: true,/, name);
+    assert.match(body, /settingSources: 'user',/, name);
+    assert.match(body, /settingsJson: JSON\.stringify\(\{ disableAllHooks: true \}\),/, name);
+  }
   assert.ok(loadTs('src/main/factoryReset.ts').CHECK_FOLDERS.includes('job-check'), 'a factory reset clears it with the other check folders');
 });
 
