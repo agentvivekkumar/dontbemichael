@@ -150,9 +150,10 @@ const ENDED_WITHOUT_ANSWER: readonly string[] = ['no assistant response found in
  *  answer or a call that threw is logged by a fixed word, so the failure
  *  report carries it (failureReport.ts HIDDEN_ERRORS); the runner's own text
  *  goes with it as `error`. Everything else is logged as the runner said it. */
-export function reviseLogReason(result: { ok: boolean; error?: string }, fail?: string): Record<string, string> {
+export function reviseLogReason(result: { ok: boolean; error?: string; exitCause?: string }, fail?: string): Record<string, string> {
   if (result.ok) return { reason: fail ? `unreadable: ${fail}` : 'empty' };
-  if (reviseFailure(result) === 'stopped') return { reason: REVISE_ENDED, error: result.error ?? '' };
+  // The startup question Claude stopped on, when its screen says (issue 712).
+  if (reviseFailure(result) === 'stopped') return { reason: result.exitCause && result.exitCause !== 'other' ? `${REVISE_ENDED}: ${result.exitCause}` : REVISE_ENDED, error: result.error ?? '' };
   return { reason: result.error ?? 'failed' };
 }
 

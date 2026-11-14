@@ -13,6 +13,7 @@ import { ANSWER_MARK, screenAnswer } from './screenAnswer';
 import { tokenizeCommand } from '../shared/commandLine';
 import { pasteSafe } from '../shared/pasteSafe';
 import { buildCmdCommandLine } from './pty';
+import { exitCause, plainLines } from '../shared/agentExit';
 
 /**
  * Shared helper: run a HIDDEN interactive claude session (ephemeral PTY) and
@@ -134,6 +135,32 @@ export function setHiddenClaudeAuthEnv(source: () => Record<string, string>): vo
   hiddenClaudeAuthEnv = source;
 }
 
+/** Marks a session's folder trusted before it starts, set once by the app
+ *  (index.ts), as each team member's folder is at spawn. Claude Code's "trust
+ *  this folder" question defaults to "No, exit" (2.1.323), so in a folder no
+ *  one had opened Claude in, the Enter that sends the prompt quit it before
+ *  it wrote anything: every job change on such an office failed as "no
+ *  assistant response" (owner, 2026-11-13, issue 712). */
+let hiddenClaudeFolderTrust: (cwd: string) => void = () => {};
+export function setHiddenClaudeFolderTrust(trust: (cwd: string) => void): void {
+  hiddenClaudeFolderTrust = trust;
+}
+
+/** Why a session ended before it answered, from the screen it left, as a
+ *  closed word for the office log and the failure report: a startup question
+ *  it stopped on, or what agentExit reads from its last lines. */
+export type HiddenExitCause = 'trust-folder' | 'bypass-warning' | ReturnType<typeof exitCause>;
+export function hiddenExitCause(tail: string): HiddenExitCause {
+  // Claude Code draws words with cursor moves, so the plain text has no spaces.
+  const text = plainLines(tail).slice(-30).join('\n').toLowerCase().replace(/\s+/g, '');
+  if (text.includes('itrustthisfolder')) return 'trust-folder';
+  if (text.includes('bypasspermissionsmode') && text.includes('no,exit')) return 'bypass-warning';
+  return exitCause(tail);
+}
+
+/** How much of the session's output is kept for hiddenExitCause. */
+const EXIT_TAIL_CHARS = 16_384;
+
 /** How often the live preview is read off the screen. */
 const SCREEN_READ_MS = 300;
 /** The hidden terminal's size, shared by the PTY and the preview's screen. */
@@ -151,6 +178,8 @@ export interface HiddenClaudeResult {
   /** The assistant's final text response (stripped of any TUI framing). */
   text?: string;
   error?: string;
+  /** Set when the session ended before it answered. */
+  exitCause?: HiddenExitCause;
 }
 
 export { pasteSafe };
@@ -256,6 +285,8 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     // does not split on spaces under cmd.exe (#426).
     const { file: spawnFile, args: spawnArgs } = hiddenClaudeLaunch(process.platform, exe, args);
     const auth = hiddenClaudeAuthEnv();
+    // An isolated folder trusts the folder in its own settings (isolatedConfigDir).
+    if (!opts.isolateConfig) { try { hiddenClaudeFolderTrust(opts.cwd); } catch { /* best effort: the exit cause says so */ } }
     let isolated: { dir: string; env: Record<string, string> } | null = null;
     if (opts.isolateConfig) {
       // The key approved is the one the session gets, opts.env included.
@@ -434,7 +465,9 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     if (opts.signal?.aborted) { finish({ ok: false, error: 'cancelled' }); return; }
     opts.signal?.addEventListener('abort', onAbort);
 
+    let tail = '';
     ptyProc.onData((data) => {
+      tail = (tail + data).slice(-EXIT_TAIL_CHARS);
       screen?.write(data);
       if (!promptSent) {
         // Boot phase: reset quiet timer; send prompt once output goes quiet.
@@ -451,7 +484,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     ptyProc.onExit(() => {
       if (settled) { removeIsolated(); return; }
       const text = ownAnswer();
-      finish(text ? { ok: true, text } : { ok: false, error: 'no assistant response found in transcript' });
+      finish(text ? { ok: true, text } : { ok: false, error: 'no assistant response found in transcript', exitCause: hiddenExitCause(tail) });
     });
   });
 }

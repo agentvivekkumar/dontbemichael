@@ -30,7 +30,7 @@ import {
   claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
-import { runHiddenClaude, setHiddenClaudeAuthEnv } from './hiddenClaude';
+import { runHiddenClaude, setHiddenClaudeAuthEnv, setHiddenClaudeFolderTrust } from './hiddenClaude';
 import { sweepIsolatedLeftovers } from './isolatedSweep';
 import { makeTrustLayer, TRUST_MODEL, TRUST_TIMEOUT_MS } from './trustLayer';
 import { dataClassSettings } from '../shared/dataClasses';
@@ -5338,6 +5338,16 @@ const noticeEngineSetup = makeNoticeCoalescer((id) => {
 // with the key approved first so Claude never stops on its question; once per
 // key, not on every check (~/.claude.json can run to megabytes).
 let hiddenApprovedKey = '';
+// Every hidden check's folder is trusted up front, as agent folders are at
+// spawn, so Claude Code's "trust this folder" question (default "No, exit")
+// never ends a check; once per folder per run (issue 712).
+const hiddenTrusted = new Set<string>();
+setHiddenClaudeFolderTrust((cwd) => {
+  if (hiddenTrusted.has(cwd)) return;
+  ensureClaudePermissionsAccepted(cwd);
+  hiddenTrusted.add(cwd);
+});
+
 setHiddenClaudeAuthEnv(() => {
   const env = claudeAuthEnv();
   const key = env.ANTHROPIC_API_KEY;
