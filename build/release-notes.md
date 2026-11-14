@@ -1,3 +1,3 @@
-- **Job changes work on every Mac.**
-- Team checks that run in the background no longer stop at Claude Code's startup warning.
-- A check that cannot start safely is reported.
+- **Job changes work in every office.**
+- The hire check, work style writing and memory tidy no longer stop at a Claude Code question.
+- A check that ends early now says why in its report.
