@@ -146,14 +146,18 @@ beside the CLI (packaged), then the repo layout (dev). With no store configured 
 line and exits 0.
 
 **Scoring (`scoreChunk`):** the query is lowercased and tokenized, stop words dropped. For each
-query term found in a chunk, add `1 + ln(1 + count)`; add 2 when the term is in the title; add
-0.5 per distinct term matched; add 5 when the whole query appears as written. Words in the query,
-the chunk and the title are compared by a light English stem (`stem`), so a plural or a tense finds
-its word: "refunds" finds "refund", "shipping" finds "ship". Only plain a to z words of 4 to 32
-letters are stemmed, and a stem is never shorter than 4 letters or a stop word, so "time" does not
-meet the name Tim and "notes" does not become "not". A word typed more than once, or in two forms,
-is one term. Results come back highest first with a snippet around the first whole word that
-matched.
+query term found in a chunk, add `weight × (1 + ln(1 + count))`, where the weight is
+`1 + ln(chunks in the store / chunks holding the term)`, at most `1 + ln 10` (`termWeights`): a
+term in every chunk weighs 1 and a rare one more, so a common word said often cannot outrank the
+rare word the query is about, while the cap keeps a typo or a stray number in one chunk from
+taking the top slot; add `2 × weight` when the term is in the title; add 0.5 per distinct term
+matched; add 5 when the whole query appears as written. Words in the query, the chunk and the
+title are compared by a light English stem (`stem`), so a plural or a tense finds its word:
+"refunds" finds "refund", "shipping" finds "ship", and the weights count stems too. Only plain a to
+z words of 4 to 32 letters are stemmed, and a stem is never shorter than 4 letters or a stop word,
+so "time" does not meet the name Tim and "notes" does not become "not". A word typed more than
+once, or in two forms, is one term. Results come back highest first with a snippet around the
+first whole word that matched.
 Neighbouring chunks share 150 characters of overlap, so a passage there sits in two chunks: a chunk is
 skipped when a result already returned, right next to it, holds every match it has, and its slot
 goes to the next result. A chunk that holds the only place two query words meet stays, because
