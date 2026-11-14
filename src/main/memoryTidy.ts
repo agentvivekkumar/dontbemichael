@@ -114,7 +114,9 @@ export class MemoryTidy {
     private appendLog: (event: Record<string, unknown>) => void,
     private getModelEngine: () => HiddenModelEngine = () => ({}),
     private onAdded: (agentId: string, added: Array<{ id: string; source: string }>) => void = () => {},
-    private ownerNotes: () => OwnerNoteSource | null = () => null
+    private ownerNotes: () => OwnerNoteSource | null = () => null,
+    /** Where the model runs: the app's own check folder (issue 712), else home. */
+    private checkDir: () => string | null = () => null
   ) {}
 
   start(): void {
@@ -304,7 +306,7 @@ export class MemoryTidy {
     const result = await runHiddenModel(prompt, {
       ...this.getModelEngine(),
       model: TIDY_MODEL,
-      cwd: home,
+      cwd: this.checkDir() ?? home,
       command: this.getCommand(),
       // A pure text transform over text agents wrote: no tools at all, so a
       // note can't get it to open a file or fetch a page (review, 2026-09-25).

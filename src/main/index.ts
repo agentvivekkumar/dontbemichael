@@ -30,7 +30,7 @@ import {
   claudeAuthStatusCommand, findClaudeFast, isEngineSetupPty, makeClaudeAuthReader, makeNoticeCoalescer, readEngineSetupStatus,
   shouldStartInstall, type EngineSetupStatus, type KeyCheckFetch
 } from './engineSetup';
-import { runHiddenClaude, setHiddenClaudeAuthEnv, setHiddenClaudeFolderTrust } from './hiddenClaude';
+import { runHiddenClaude, setHiddenClaudeAuthEnv } from './hiddenClaude';
 import { sweepIsolatedLeftovers } from './isolatedSweep';
 import { makeTrustLayer, TRUST_MODEL, TRUST_TIMEOUT_MS } from './trustLayer';
 import { dataClassSettings } from '../shared/dataClasses';
@@ -134,7 +134,7 @@ import { quickbooksAccessToSave } from '../shared/quickbooks';
 import { agentIntegrations, fillSavedCall, hasIntegrationTools, integrationLevel, validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, withIntegrationLevel, withoutIntegration, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { PASTE_KEEP_MS, pastesDir, savePaste, sweepOldPastes } from './pastes';
-import { CASE_STUDY_DIR, CHECK_FOLDERS, RUN_COMPARE_DIR, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
+import { CASE_STUDY_DIR, CHECK_FOLDERS, JOB_CHECK_DIR, RUN_COMPARE_DIR, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
 import { autoMemoryFolders, eraseMemoryTargets, foldersFromRoster, gitTopOf, idsFromCostRows, idsFromRecord, memberIdsIn, memoryResetTargets } from './memoryReset';
 import { groupMembers, hardKillTree, isAlive, KILL_GRACE_MS, snapshotRemains } from './procKill';
 import { ControlRegistry } from './control';
@@ -658,7 +658,9 @@ const memoryTidy = new MemoryTidy(
   // Learning counts notes from the app's own record (owner, 2026-10-18).
   (agentId, added) => { const ts = Date.now(); for (const n of added) pulseTelemetry.record({ agentId, kind: 'note-added', ts, attrs: { id: n.id, source: n.source } }); },
   // The owner's notes, the only ones a pass reads as the owner's (memory evidence, D9).
-  () => ownerNotes
+  () => ownerNotes,
+  // Its model runs in the checks' own folder, not the office (issue 712).
+  () => jobCheckDir()
 );
 // Durable harness state (SQLite, main process). Phase A: window bounds (kv) +
 // net-new command history. Opened in whenReady, closed in the teardown blocks.
@@ -1159,6 +1161,21 @@ const mailApprovals = new MailApprovals({
   canSend: (agentId, mailbox, proposalId) => memberPresent(agentId) && mailAccess(readConfig(), agentId, mailbox, 'send', proposalId, { present: memberPresent }).ok,
   onDecision: (agentId, decision) => pulseTelemetry.record({ agentId, kind: 'mail-decision', ts: Date.now(), attrs: { decision } })
 });
+
+/** The job and memory checks' own empty folder (the hire overlap check, a job
+ *  change, writing a work style, the focus check, memory tidy), never the
+ *  office folder: agents write there, so a project settings file one left
+ *  would load, and nothing had marked it trusted, so Claude Code 2.1.323's
+ *  "trust this folder?" (default "No, exit") ended every job change on an
+ *  office Claude was never opened in (issue 712). Trusted once per run, and
+ *  only remembered once ~/.claude.json holds it. */
+let jobCheckTrusted = false;
+function jobCheckDir(): string {
+  const dir = join(app.getPath('userData'), JOB_CHECK_DIR);
+  mkdirSync(dir, { recursive: true });
+  if (!jobCheckTrusted) { try { jobCheckTrusted = ensureClaudePermissionsAccepted(dir); } catch { /* asked again next time */ } }
+  return dir;
+}
 
 /** Does an email fit a standing approval: a separate quick model decides, never the agent. */
 const standingFit = standingFitCheck({
@@ -5182,7 +5199,7 @@ ipcMain.handle('hire:checkDistinct', async (_evt, payload: unknown) => {
     const verdict = await checkDistinct(job, team, {
       engine: cfg.godProvider ?? 'claude',
       engineModel: cfg.godModel,
-      cwd: cfg.harnessHome ?? app.getPath('home'),
+      cwd: jobCheckDir(),
       command: cfg.defaultCommand ?? 'claude',
       env: memory.env(),
       log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } },
@@ -5231,7 +5248,7 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
       return await reviseWorkStyle(rev, {
         engine: cfg.godProvider ?? 'claude',
         engineModel: cfg.godModel,
-        cwd: cfg.harnessHome ?? app.getPath('home'),
+        cwd: jobCheckDir(),
         command: cfg.defaultCommand ?? 'claude',
         env: memory.env(),
         log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } },
@@ -5259,7 +5276,7 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
   return convertWorkStyle(req, {
     engine: cfg.godProvider ?? 'claude',
     engineModel: cfg.godModel,
-    cwd: cfg.harnessHome ?? app.getPath('home'),
+    cwd: jobCheckDir(),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),
     log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
@@ -5291,7 +5308,7 @@ ipcMain.handle('workStyle:checkFocus', async (_evt, payload: unknown) => {
   return checkFocusArea(req, {
     engine: cfg.godProvider ?? 'claude',
     engineModel: cfg.godModel,
-    cwd: cfg.harnessHome ?? app.getPath('home'),
+    cwd: jobCheckDir(),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),
     log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
@@ -5338,16 +5355,6 @@ const noticeEngineSetup = makeNoticeCoalescer((id) => {
 // with the key approved first so Claude never stops on its question; once per
 // key, not on every check (~/.claude.json can run to megabytes).
 let hiddenApprovedKey = '';
-// Every hidden check's folder is trusted up front, as agent folders are at
-// spawn, so Claude Code's "trust this folder" question (default "No, exit")
-// never ends a check; once per folder per run (issue 712).
-const hiddenTrusted = new Set<string>();
-setHiddenClaudeFolderTrust((cwd) => {
-  if (hiddenTrusted.has(cwd)) return;
-  ensureClaudePermissionsAccepted(cwd);
-  hiddenTrusted.add(cwd);
-});
-
 setHiddenClaudeAuthEnv(() => {
   const env = claudeAuthEnv();
   const key = env.ANTHROPIC_API_KEY;

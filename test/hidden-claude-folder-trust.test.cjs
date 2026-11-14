@@ -54,27 +54,24 @@ function fakeClaude() {
 
 const opts = (bin, cwd) => ({ model: 'claude-sonnet-5', cwd, command: bin, noTools: true, env: { FAKE_DIR: projectDir(cwd) }, bootCapMs: 2000, timeoutMs: 20_000, promptTakenMs: 8000 });
 
-test('a hidden session trusts its folder first, and says so when a trust question ended it', { skip: !POSIX }, async () => {
-  // Value: protects=job changes and the other hidden checks in an office folder Claude was never opened in; fails_when=runHiddenClaude starts the session before the folder trust hook, or an ended session no longer names the question it stopped on; why_new=issue 712, 12 reports from 0.4.0; seam=fake claude in a real PTY, setHiddenClaudeFolderTrust (set by index.ts); no_claim=that real Claude Code reads hasTrustDialogAccepted under these keys (verified live with 2.1.323: the question defaults to No, exit)
+test('a trust question ends a session in a folder nothing trusted, and the result names it', { skip: !POSIX }, async () => {
+  // Value: protects=the next report like issue 712 names the question Claude quit on, and a trusted folder runs; fails_when=an ended session no longer says trust-folder, or trust in ~/.claude.json is not what lets it run; why_new=issue 712, 12 reports from 0.4.0; seam=fake claude in a real PTY; no_claim=that real Claude Code reads hasTrustDialogAccepted under these keys (verified live with 2.1.323: the question defaults to No, exit)
   const { bin, cwd } = fakeClaude();
-  // No trust hook: the question takes the Enter, and the result says which question.
-  H.setHiddenClaudeFolderTrust(() => {});
+  fs.rmSync(path.join(home, '.claude.json'), { force: true });
   assert.deepEqual(await H.runHiddenClaude('Say done.', opts(bin, cwd)), { ok: false, error: 'no assistant response found in transcript', exitCause: 'trust-folder' });
-  // The app's hook trusts the folder before the session starts.
-  const seen = [];
-  H.setHiddenClaudeFolderTrust((dir) => {
-    seen.push(dir);
-    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: { [dir]: { hasTrustDialogAccepted: true } } }));
-  });
+  fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: { [cwd]: { hasTrustDialogAccepted: true } } }));
   assert.deepEqual(await H.runHiddenClaude('Say done.', opts(bin, cwd)), { ok: true, text: 'DONE' });
-  assert.deepEqual(seen, [cwd]);
-  H.setHiddenClaudeFolderTrust(() => {});
 });
 
-test('the app trusts each hidden check\'s folder once, with the helper team members use', () => {
-  // Value: protects=the wiring the PTY test stands in for; fails_when=index.ts stops setting the trust hook or uses another helper than ensureClaudePermissionsAccepted; why_new=issue 712; seam=source pin, the hook is set in main
-  assert.match(read('src/main/index.ts'), /setHiddenClaudeFolderTrust\(\(cwd\) => \{\s*if \(hiddenTrusted\.has\(cwd\)\) return;\s*ensureClaudePermissionsAccepted\(cwd\);\s*hiddenTrusted\.add\(cwd\);\s*\}\);/);
-  assert.match(read('src/main/hiddenClaude.ts'), /if \(!opts\.isolateConfig\) \{ try \{ hiddenClaudeFolderTrust\(opts\.cwd\); \}[^\n]*\n\s*let isolated/, 'before the session starts');
+test('job and memory checks run in the app\'s own trusted folder, never the office folder', () => {
+  // Value: protects=job changes, the hire overlap check, writing a work style, the focus check and memory tidy start where Claude asks no trust question, and never load a project settings file an agent left in the office folder; fails_when=one of them runs in harnessHome again, or the folder is remembered as trusted after a failed write; why_new=issue 712 and its ship review; seam=source pin, the callers need Electron
+  const main = read('src/main/index.ts');
+  assert.doesNotMatch(main, /cwd: cfg\.harnessHome \?\? app\.getPath\('home'\)/, 'no check runs in the office folder');
+  assert.equal((main.match(/cwd: jobCheckDir\(\),/g) ?? []).length, 4, 'hire overlap, job change, work style, focus');
+  assert.match(main, /\(\) => ownerNotes,\s*\/\/[^\n]*\n\s*\(\) => jobCheckDir\(\)\s*\);/, 'memory tidy');
+  assert.match(main, /function jobCheckDir\(\): string \{\s*const dir = join\(app\.getPath\('userData'\), JOB_CHECK_DIR\);\s*mkdirSync\(dir, \{ recursive: true \}\);\s*if \(!jobCheckTrusted\) \{ try \{ jobCheckTrusted = ensureClaudePermissionsAccepted\(dir\); \}/);
+  assert.match(read('src/main/memoryTidy.ts'), /cwd: this\.checkDir\(\) \?\? home,/);
+  assert.ok(loadTs('src/main/factoryReset.ts').CHECK_FOLDERS.includes('job-check'), 'a factory reset clears it with the other check folders');
 });
 
 test('an ended job change names the startup question in its log line and report', () => {

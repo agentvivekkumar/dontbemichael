@@ -317,3 +317,18 @@ test('a ~/.claude.json that stays held is left as it was, with no temp copy besi
   assert.deepEqual(fs.readdirSync(home).filter((f) => f.includes('.dbm-')), [], 'no temp copy left behind');
   assert.equal(hold.held(), process.platform === 'win32' ? 3 : 1, 'three tries on Windows, one elsewhere');
 });
+
+test('the trust helper says whether ~/.claude.json now trusts the folder', (t) => {
+  // Value: protects=the job check folder is only remembered as trusted once the file holds it, so a failed write is tried again; fails_when=ensureClaudePermissionsAccepted reports success for a ~/.claude.json it could not change; why_new=ship review of issue 712 (a cached failure would end every later job change); seam=none; no_claim=a write racing a running Claude (updateClaudeJson's own tests)
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'md-trust-return-'));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const file = path.join(home, '.claude.json');
+  const saved = fs.existsSync(file) ? fs.readFileSync(file) : null;
+  t.after(() => { if (saved) fs.writeFileSync(file, saved); else fs.rmSync(file, { force: true }); });
+  fs.writeFileSync(file, '[1, 2]');
+  assert.equal(ensureClaudePermissionsAccepted(cwd), false, 'a file that is not a JSON object is left alone, and says so');
+  fs.writeFileSync(file, '{}');
+  assert.equal(ensureClaudePermissionsAccepted(cwd), true);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).projects[claudeProjectKey(fs.realpathSync.native(cwd))].hasTrustDialogAccepted, true);
+  assert.equal(ensureClaudePermissionsAccepted(cwd), true, 'already there');
+});

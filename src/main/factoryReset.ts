@@ -76,9 +76,12 @@ export const PRIVATE_ENTRIES = [
 export const STANDING_CHECK_DIR = 'standing-check';
 export const TRUST_CHECK_DIR = 'trust-check';
 export const RUN_COMPARE_DIR = 'run-compare';
+/** The job and memory checks' own empty folder (issue 712): the office folder
+ *  is not theirs to trust, as agents write in it. */
+export const JOB_CHECK_DIR = 'job-check';
 /** The case study draft's own empty folder (docs/designs/case-study.md). */
 export const CASE_STUDY_DIR = 'case-study';
-export const CHECK_FOLDERS = [STANDING_CHECK_DIR, TRUST_CHECK_DIR, RUN_COMPARE_DIR, CASE_STUDY_DIR] as const;
+export const CHECK_FOLDERS = [STANDING_CHECK_DIR, TRUST_CHECK_DIR, RUN_COMPARE_DIR, CASE_STUDY_DIR, JOB_CHECK_DIR] as const;
 
 /** Created by the app in its own data folder for the office it runs. */
 export const APP_DATA_ENTRIES = [
