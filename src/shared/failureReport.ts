@@ -64,6 +64,13 @@ export const HIDDEN_ERRORS: Readonly<Record<string, string | null>> = {
   // A Work style change that ended with nothing written, or whose call threw
   // (owner, 2026-11-13): a retry never clears either, so the app hears of it.
   'ended without an answer': 'session-ended',
+  // ...and the startup question or error its screen showed (issue 712). A
+  // sign in is the owner's to fix, never a report.
+  'ended without an answer: trust-folder': 'session-ended-trust-folder',
+  'ended without an answer: bypass-warning': 'session-ended-bypass-warning',
+  'ended without an answer: unknown-option': 'session-ended-unknown-option',
+  'ended without an answer: not-found': 'session-ended-not-found',
+  'ended without an answer: signed-out': null,
   'threw': 'call-threw',
   'empty': 'answer-unparseable',
   'no verdict': 'answer-unparseable',

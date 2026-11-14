@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 Don't Be Michael keeps its own version line, starting at 0.0.1.
 
+## [0.4.1] (2026-11-13)
+
+### Fixed
+- **Job changes work in every office.** In an office whose folder Claude Code had never been opened in, every job change, and the hire check, writing a work style, the focus check and memory tidy, stopped at Claude Code's "trust this folder?" question, whose default ends Claude, and failed. They now run in a folder of their own with their own Claude settings, so no question stops them and nothing a team member leaves there can change them.
+- A check that ends before answering now says which question or error it stopped on, in the office log and the failure report.
+
 ## [0.4.0] (2026-11-13)
 
 ### Fixed

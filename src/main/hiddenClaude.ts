@@ -13,6 +13,7 @@ import { ANSWER_MARK, screenAnswer } from './screenAnswer';
 import { tokenizeCommand } from '../shared/commandLine';
 import { pasteSafe } from '../shared/pasteSafe';
 import { buildCmdCommandLine } from './pty';
+import { exitCause, plainLines } from '../shared/agentExit';
 
 /**
  * Shared helper: run a HIDDEN interactive claude session (ephemeral PTY) and
@@ -134,6 +135,21 @@ export function setHiddenClaudeAuthEnv(source: () => Record<string, string>): vo
   hiddenClaudeAuthEnv = source;
 }
 
+/** Why a session ended before it answered, from the screen it left, as a
+ *  closed word for the office log and the failure report: a startup question
+ *  it stopped on, or what agentExit reads from its last lines. */
+export type HiddenExitCause = 'trust-folder' | 'bypass-warning' | ReturnType<typeof exitCause>;
+export function hiddenExitCause(tail: string): HiddenExitCause {
+  // Claude Code draws words with cursor moves, so the plain text has no spaces.
+  const text = plainLines(tail).slice(-30).join('\n').toLowerCase().replace(/\s+/g, '');
+  if (text.includes('itrustthisfolder')) return 'trust-folder';
+  if (text.includes('bypasspermissionsmode') && text.includes('no,exit')) return 'bypass-warning';
+  return exitCause(tail);
+}
+
+/** How much of the session's output is kept for hiddenExitCause. */
+const EXIT_TAIL_CHARS = 16_384;
+
 /** How often the live preview is read off the screen. */
 const SCREEN_READ_MS = 300;
 /** The hidden terminal's size, shared by the PTY and the preview's screen. */
@@ -151,6 +167,8 @@ export interface HiddenClaudeResult {
   /** The assistant's final text response (stripped of any TUI framing). */
   text?: string;
   error?: string;
+  /** Set when the session ended before it answered. */
+  exitCause?: HiddenExitCause;
 }
 
 export { pasteSafe };
@@ -334,9 +352,13 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
       ensureKilled(pid);
     };
 
+    // The session's last output, for hiddenExitCause only; dropped when it ends
+    // (it can hold the pasted prompt and the answer).
+    let tail = '';
     const finish = (r: HiddenClaudeResult) => {
       if (settled) return;
       settled = true;
+      tail = '';
       if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
       if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
       if (answerPoll) { clearInterval(answerPoll); answerPoll = null; }
@@ -435,6 +457,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     opts.signal?.addEventListener('abort', onAbort);
 
     ptyProc.onData((data) => {
+      if (!settled) tail = (tail + data).slice(-EXIT_TAIL_CHARS);
       screen?.write(data);
       if (!promptSent) {
         // Boot phase: reset quiet timer; send prompt once output goes quiet.
@@ -451,7 +474,7 @@ export function runHiddenClaude(prompt: string, opts: HiddenClaudeOptions): Prom
     ptyProc.onExit(() => {
       if (settled) { removeIsolated(); return; }
       const text = ownAnswer();
-      finish(text ? { ok: true, text } : { ok: false, error: 'no assistant response found in transcript' });
+      finish(text ? { ok: true, text } : { ok: false, error: 'no assistant response found in transcript', exitCause: hiddenExitCause(tail) });
     });
   });
 }

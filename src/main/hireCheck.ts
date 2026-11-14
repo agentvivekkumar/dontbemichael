@@ -83,6 +83,13 @@ export async function checkDistinct(job: JobProfile, teamIn: JobProfile[], deps:
       noTools: true,
       // A quick judgment: no extended thinking, so the verdict takes seconds.
       thinking: false,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       env: deps.env,
       timeoutMs: CHECK_TIMEOUT_MS,
       signal: deps.signal

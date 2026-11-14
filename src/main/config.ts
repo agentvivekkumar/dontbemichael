@@ -874,15 +874,16 @@ export function approveClaudeApiKey(key: string, home: string = homedir()): bool
  *
  *  Each file is an independent best-effort boundary: unsafe existing contents
  *  are preserved without preventing the other file from being handled safely. */
-export function ensureClaudePermissionsAccepted(cwd?: string, opts: { approveKey?: string } = {}): void {
+export function ensureClaudePermissionsAccepted(cwd?: string, opts: { approveKey?: string } = {}): boolean {
   let home: string;
-  try { home = homedir(); } catch { return; }
-  if (!home) return;
+  try { home = homedir(); } catch { return false; }
+  if (!home) return false;
 
   ensureClaudeGlobalPermissions(home);
   // One read and at most one write of ~/.claude.json per start: it holds every
-  // project's history and runs to megabytes for a busy owner.
-  updateClaudeJson(home, (c) => {
+  // project's history and runs to megabytes for a busy owner. True when the
+  // file now holds it all (written, or already there).
+  return updateClaudeJson(home, (c) => {
     let changed = markClaudeOnboarded(c);
     if (cwd && trustClaudeFolder(c, cwd)) changed = true;
     if (opts.approveKey && approveClaudeKeyIn(c, opts.approveKey)) changed = true;

@@ -1,6 +1,6 @@
 # Don't Be Michael: features and changes
 
-Everything the app does today, and every release that got it here (0.0.1 to 0.4.0). Part 1 is
+Everything the app does today, and every release that got it here (0.0.1 to 0.4.1). Part 1 is
 written to be lifted onto the GitHub page and the website as it is; Part 2 is the full list, release
 by release.
 
@@ -303,6 +303,12 @@ moving, and brings you only the decisions that need you.
   as a picture, and a part you select pastes as clean as the whole, in light or dark mode.
 
 ## Part 2: Every change, release by release
+
+### 0.4.1 (2026-11-13)
+- Job changes, the hire check, writing a work style, the focus check and memory tidy work in every
+  office: where Claude Code had never been opened in the office folder, they stopped at its "trust
+  this folder?" question and failed. They now run in a folder of their own with their own Claude
+  settings. A check that ends before answering says which question or error it stopped on.
 
 ### 0.4.0 (2026-11-13)
 - Job changes, such as a better job description offered for a team member, and the other checks the

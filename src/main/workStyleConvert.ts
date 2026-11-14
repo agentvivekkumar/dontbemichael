@@ -79,6 +79,13 @@ export async function convertWorkStyle(req: ConvertRequest, deps: ConvertDeps): 
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       env: deps.env,
       timeoutMs: TIMEOUT_MS
     });
@@ -150,9 +157,10 @@ const ENDED_WITHOUT_ANSWER: readonly string[] = ['no assistant response found in
  *  answer or a call that threw is logged by a fixed word, so the failure
  *  report carries it (failureReport.ts HIDDEN_ERRORS); the runner's own text
  *  goes with it as `error`. Everything else is logged as the runner said it. */
-export function reviseLogReason(result: { ok: boolean; error?: string }, fail?: string): Record<string, string> {
+export function reviseLogReason(result: { ok: boolean; error?: string; exitCause?: string }, fail?: string): Record<string, string> {
   if (result.ok) return { reason: fail ? `unreadable: ${fail}` : 'empty' };
-  if (reviseFailure(result) === 'stopped') return { reason: REVISE_ENDED, error: result.error ?? '' };
+  // The startup question Claude stopped on, when its screen says (issue 712).
+  if (reviseFailure(result) === 'stopped') return { reason: result.exitCause && result.exitCause !== 'other' ? `${REVISE_ENDED}: ${result.exitCause}` : REVISE_ENDED, error: result.error ?? '' };
   return { reason: result.error ?? 'failed' };
 }
 
@@ -252,6 +260,9 @@ export async function reviseWorkStyle(
       settingSources: 'user',
       settingsJson: JSON.stringify({ disableAllHooks: true }),
       dropTranscript: true,
+      // Its own throwaway settings folder, which trusts the folder it runs in
+      // (issue 712: "trust this folder?" defaults to "No, exit").
+      isolateConfig: true,
       env: deps.env,
       timeoutMs: TIMEOUT_MS,
       // No hidden thinking (owner, 2026-10-23): measured on a real change, the
@@ -346,6 +357,13 @@ export async function checkFocusArea(req: FocusCheckRequest, deps: ConvertDeps):
       cwd: deps.cwd,
       command: deps.command,
       noTools: true,
+      // Its own throwaway Claude settings folder, which trusts the folder it
+      // runs in, with only that folder's settings and no hooks (issue 712: a
+      // trust question ended every job change; ship review: project settings
+      // a member left must never load here).
+      isolateConfig: true,
+      settingSources: 'user',
+      settingsJson: JSON.stringify({ disableAllHooks: true }),
       // A quick judgment, like the hire check: no extended thinking.
       thinking: false,
       env: deps.env,

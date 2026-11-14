@@ -134,7 +134,7 @@ import { quickbooksAccessToSave } from '../shared/quickbooks';
 import { agentIntegrations, fillSavedCall, hasIntegrationTools, integrationLevel, validateBaseUrl, buildAuthHeaders, resolveUpstreamUrl, secretRefFor, withIntegrationLevel, withoutIntegration, INTEGRATION_TEMPLATES } from '../shared/integrations';
 import { RosterStore } from './roster';
 import { PASTE_KEEP_MS, pastesDir, savePaste, sweepOldPastes } from './pastes';
-import { CASE_STUDY_DIR, CHECK_FOLDERS, RUN_COMPARE_DIR, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
+import { CASE_STUDY_DIR, CHECK_FOLDERS, JOB_CHECK_DIR, RUN_COMPARE_DIR, STANDING_CHECK_DIR, TRUST_CHECK_DIR, eraseOfficeData } from './factoryReset';
 import { autoMemoryFolders, eraseMemoryTargets, foldersFromRoster, gitTopOf, idsFromCostRows, idsFromRecord, memberIdsIn, memoryResetTargets } from './memoryReset';
 import { groupMembers, hardKillTree, isAlive, KILL_GRACE_MS, snapshotRemains } from './procKill';
 import { ControlRegistry } from './control';
@@ -658,7 +658,9 @@ const memoryTidy = new MemoryTidy(
   // Learning counts notes from the app's own record (owner, 2026-10-18).
   (agentId, added) => { const ts = Date.now(); for (const n of added) pulseTelemetry.record({ agentId, kind: 'note-added', ts, attrs: { id: n.id, source: n.source } }); },
   // The owner's notes, the only ones a pass reads as the owner's (memory evidence, D9).
-  () => ownerNotes
+  () => ownerNotes,
+  // Its model runs in the checks' own folder, not the office (issue 712).
+  () => jobCheckDir()
 );
 // Durable harness state (SQLite, main process). Phase A: window bounds (kv) +
 // net-new command history. Opened in whenReady, closed in the teardown blocks.
@@ -1159,6 +1161,18 @@ const mailApprovals = new MailApprovals({
   canSend: (agentId, mailbox, proposalId) => memberPresent(agentId) && mailAccess(readConfig(), agentId, mailbox, 'send', proposalId, { present: memberPresent }).ok,
   onDecision: (agentId, decision) => pulseTelemetry.record({ agentId, kind: 'mail-decision', ts: Date.now(), attrs: { decision } })
 });
+
+/** The job and memory checks' own empty folder (the hire overlap check, a job
+ *  change, writing a work style, the focus check, memory tidy), never the
+ *  office folder agents write in. Each check runs in its own throwaway Claude
+ *  settings folder, which trusts this one (issue 712: Claude Code 2.1.323's
+ *  "trust this folder?" defaults to "No, exit"). A folder that cannot be made
+ *  fails the check itself, which falls back as before. */
+function jobCheckDir(): string {
+  const dir = join(app.getPath('userData'), JOB_CHECK_DIR);
+  try { mkdirSync(dir, { recursive: true }); } catch { /* the check fails and falls back */ }
+  return dir;
+}
 
 /** Does an email fit a standing approval: a separate quick model decides, never the agent. */
 const standingFit = standingFitCheck({
@@ -5182,7 +5196,7 @@ ipcMain.handle('hire:checkDistinct', async (_evt, payload: unknown) => {
     const verdict = await checkDistinct(job, team, {
       engine: cfg.godProvider ?? 'claude',
       engineModel: cfg.godModel,
-      cwd: cfg.harnessHome ?? app.getPath('home'),
+      cwd: jobCheckDir(),
       command: cfg.defaultCommand ?? 'claude',
       env: memory.env(),
       log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } },
@@ -5231,7 +5245,7 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
       return await reviseWorkStyle(rev, {
         engine: cfg.godProvider ?? 'claude',
         engineModel: cfg.godModel,
-        cwd: cfg.harnessHome ?? app.getPath('home'),
+        cwd: jobCheckDir(),
         command: cfg.defaultCommand ?? 'claude',
         env: memory.env(),
         log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } },
@@ -5259,7 +5273,7 @@ ipcMain.handle('workStyle:convert', async (evt, payload: unknown) => {
   return convertWorkStyle(req, {
     engine: cfg.godProvider ?? 'claude',
     engineModel: cfg.godModel,
-    cwd: cfg.harnessHome ?? app.getPath('home'),
+    cwd: jobCheckDir(),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),
     log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }
@@ -5291,7 +5305,7 @@ ipcMain.handle('workStyle:checkFocus', async (_evt, payload: unknown) => {
   return checkFocusArea(req, {
     engine: cfg.godProvider ?? 'claude',
     engineModel: cfg.godModel,
-    cwd: cfg.harnessHome ?? app.getPath('home'),
+    cwd: jobCheckDir(),
     command: cfg.defaultCommand ?? 'claude',
     env: memory.env(),
     log: (event) => { try { hive.appendLog(event); } catch { /* best-effort */ } }

@@ -41,7 +41,7 @@ runs on your computer.
 > brings you only the calls that need you.
 
 > [!TIP]
-> **New in 0.4.0: job changes work on every Mac.** In 0.3.9, Pulse can change a job's set times
+> **New in 0.4.1: job changes work in every office.** In 0.3.9, Pulse can change a job's set times
 > for you, ready to apply with Undo.
 
 ## Contents
