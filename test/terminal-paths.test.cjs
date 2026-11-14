@@ -8,13 +8,17 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const loadTs = require('./load-ts.cjs');
 
 const {
   isPathToken, pathTokenMatcher, stripPathToken
 } = loadTs('src/shared/terminalPaths.ts');
 
-/** Every token the provider would underline on one line of output. */
+/** Every token the pattern matches on one line of output. For a quoted match
+ *  with a space inside, the provider also asks whether the whole is on disk
+ *  first; linkableTokens (tested below with a stub) covers that step. */
 function tokensIn(line) {
   const re = pathTokenMatcher();
   const out = [];
@@ -100,8 +104,97 @@ test('quoted prose that starts with a slash links only the file name inside it',
   assert.deepEqual(tokensIn('note: "/ see notes.md"'), ['notes.md']);
   assert.deepEqual(tokensIn("note: '/ see notes.md'"), ['notes.md']);
   assert.deepEqual(tokensIn('note: `./ then open plan.md`'), ['plan.md']);
-  // a real path with spaces inside its folder names still links whole
+  // the pattern still matches a real path with spaces in its folder names
+  // whole; the provider links it whole only once the disk says it is there
+  // (linkableTokens, below)
   assert.deepEqual(tokensIn('saved "/Users/Jane/Business Reports/summary.md"'), ['/Users/Jane/Business Reports/summary.md']);
+});
+
+test('quoted prose that starts with a folder links the file name inside it when the whole is not on disk', () => {
+  // Value: protects=a ⌘-click on "/tmp is full, see notes.md" finds notes.md, not a path that leads nowhere (TODOS, terminal links); fails_when=the whole phrase is underlined though it is not known on disk, a real spaced path stops linking whole, or a path with no space is asked about; why_new=review of #436; seam=the onDisk callback stands in for the terminal's stat cache
+  const { linkableTokens, quotedNeedsCheck } = loadTs('src/shared/terminalPaths.ts');
+  const asked = [];
+  const disk = (onDisk) => (raw) => { asked.push(raw); return onDisk.includes(raw); };
+  const prose = 'warn: "/tmp is full, see notes.md" now';
+  assert.deepEqual(linkableTokens(prose, disk([])), [{ raw: 'notes.md', index: prose.indexOf('notes.md') }], 'the file name, at its own offset');
+  assert.deepEqual(asked, ['"/tmp is full, see notes.md"'], 'the disk is asked about the quoted whole');
+
+  const real = 'saved "/Users/Jane/Business Reports/summary.md"';
+  const whole = '"/Users/Jane/Business Reports/summary.md"';
+  assert.deepEqual(linkableTokens(real, disk([whole])), [{ raw: whole, index: real.indexOf(whole) }], 'a real path with spaces links whole');
+
+  asked.length = 0;
+  const plain = 'open "/tmp/report.md" and src/main/a.ts';
+  assert.deepEqual(linkableTokens(plain, disk([])).map((t) => t.raw), ['"/tmp/report.md"', 'src/main/a.ts'], 'no space, no question');
+  assert.deepEqual(asked, [], 'a quoted path with no space is never asked about');
+
+  const failing = () => { throw new Error('ipc gone'); };
+  assert.deepEqual(linkableTokens(prose, failing).map((t) => t.raw), ['notes.md'], 'a failed check counts as not on disk');
+
+  assert.equal(quotedNeedsCheck('"/a b/c.md"'), true);
+  assert.equal(quotedNeedsCheck('"/a/c.md"'), false);
+  assert.equal(quotedNeedsCheck('a b.md'), false, 'unquoted');
+});
+
+test('the fallback links only bare file names, and each quoted match is judged on its own', () => {
+  // Value: protects=a ⌘-click never opens a different file than the one printed (review of #687); fails_when=a piece with a separator falls back and is joined to the agent's folder, or two quoted matches on one line mix up their answers or offsets; why_new=review of #687; seam=the onDisk callback stands in for the terminal's stat cache
+  const { linkableTokens } = loadTs('src/shared/terminalPaths.ts');
+  const none = () => false;
+  // Printed before the file exists: "Reports/summary.md" in the agent's folder may be another, older file.
+  assert.deepEqual(linkableTokens('Writing "/Users/Jane/Office/Q3 Reports/summary.md"', none), [], 'a piece with a slash does not fall back');
+  assert.deepEqual(linkableTokens('Writing "C:\\Users\\Jane\\My Docs\\a.md"', none), [], 'a piece with a backslash does not fall back');
+  assert.deepEqual(linkableTokens('note: "/tmp is full, nothing to see here"', none), [], 'a quoted body with no file name links nothing');
+
+  const line = 'saved "/srv/My Office/plan.md" then "/tmp is full, see notes.md"';
+  const first = '"/srv/My Office/plan.md"';
+  const got = linkableTokens(line, (raw) => raw === first);
+  assert.deepEqual(got, [
+    { raw: first, index: line.indexOf(first) },
+    { raw: 'notes.md', index: line.indexOf('notes.md') }
+  ], 'one on disk links whole, the other falls back, in line order at their own offsets');
+
+  for (const q of ["'", '`']) {
+    const text = `warn: ${q}/tmp is full, see notes.md${q} now`;
+    assert.deepEqual(linkableTokens(text, none), [{ raw: 'notes.md', index: text.indexOf('notes.md') }], `${q} quotes fall back too`);
+    const realQ = `saved ${q}/srv/My Office/plan.md${q}`;
+    assert.deepEqual(linkableTokens(realQ, () => true).map((t) => t.raw), [`${q}/srv/My Office/plan.md${q}`], `${q} quotes link whole when on disk`);
+  }
+});
+
+test('a quoted match not checked yet links whole with no underline, and names the one file inside it for the click', () => {
+  // Value: protects=the first ⌘-click on a real quoted path with a space reveals it, though xterm keeps the row's first answer while the pointer stays (re-review of #687 at 7f6d371f, item 1), and the first hover on "/Users/Jane/Q3 summary.md" never underlines summary.md in the agent's folder (item 5 before it); fails_when=an unknown answer gives no link over the whole match, falls back to the file names inside, names a file when there are two or one with a separator, or stops other matches on the line from linking; why_new=an unchecked match linked nothing, so the first click did nothing; seam=the onDisk callback stands in for the terminal's stat cache
+  const { linkableTokens } = loadTs('src/shared/terminalPaths.ts');
+  const unknown = () => undefined;
+  const realLine = 'saved "/Users/Jane/Q3 summary.md"';
+  const real = '"/Users/Jane/Q3 summary.md"';
+  assert.deepEqual(linkableTokens(realLine, unknown), [
+    { raw: real, index: realLine.indexOf(real), unchecked: true, onlyName: { raw: 'summary.md', index: realLine.indexOf('summary.md') } }
+  ], 'the whole match, unchecked, with the one name inside for a miss');
+  const prose = 'warn: "/tmp is full, see notes.md" now';
+  assert.deepEqual(linkableTokens(prose, unknown), [
+    { raw: '"/tmp is full, see notes.md"', index: prose.indexOf('"'), unchecked: true, onlyName: { raw: 'notes.md', index: prose.indexOf('notes.md') } }
+  ], 'quoted prose links on the first click too');
+  assert.deepEqual(linkableTokens('note: "/tmp has a.md and b.md"', unknown).map((t) => [t.unchecked, t.onlyName]), [[true, undefined]], 'two names inside: none is guessed');
+  assert.deepEqual(linkableTokens('Writing "/Users/Jane/Q3 Reports/summary.md"', unknown).map((t) => [t.unchecked, t.onlyName]), [[true, undefined]], 'a piece with a separator is never named');
+
+  const line = 'open src/a.ts, "/Users/Jane/Q3 summary.md" and "/tmp/x.md"';
+  assert.deepEqual(linkableTokens(line, unknown).map((t) => [t.raw, !!t.unchecked]), [['src/a.ts', false], [real, true], ['"/tmp/x.md"', false]], 'other matches on the line link as before');
+
+  // Once the check is back, the same line links by the answer, underlined.
+  assert.deepEqual(linkableTokens(realLine, () => true), [{ raw: real, index: realLine.indexOf(real) }]);
+  assert.deepEqual(linkableTokens(prose, () => false).map((t) => t.raw), ['notes.md']);
+});
+
+test('the terminal gives an unchecked match no underline and looks at the disk on click', () => {
+  // Value: protects=the provider wires the unchecked token to a click time look instead of dropping it (re-review of #687 at 7f6d371f, item 1); fails_when=an unchecked token is underlined, skipped, or its click reveals without asking the disk; why_new=the provider skipped unchecked tokens; seam=source pin, since the provider needs a live xterm
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/renderer/src/components/terminalPool.ts'), 'utf8');
+  assert.match(src, /decorations: \{ underline: !unchecked, pointerCursor: !unchecked \}/);
+  assert.match(src, /if \(unchecked\) \{ void activateUnchecked\(abs, nameAbs\); return; \}/);
+  const fn = src.slice(src.indexOf('async function activateUnchecked'), src.indexOf('function quotedKnownOnDisk'));
+  assert.match(fn, /await pathStats\.lookForClick\(abs\)/);
+  assert.match(fn, /if \(res && nameAbs\) await activatePath\(nameAbs\)/, 'the name is tried only on a definite miss');
+  assert.match(fn, /void window\.cth\.revealPath\(res\.path\)/, 'the whole path is only revealed');
+  assert.doesNotMatch(fn, /openPath|openExternal|openFile|openAskFile/);
 });
 
 test('quoted versions and prose do not become file paths', () => {

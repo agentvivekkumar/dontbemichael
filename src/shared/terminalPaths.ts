@@ -67,15 +67,90 @@ const KNOWN_EXTS = new Set([
 // start with a slash ("/ see notes.md") has one, so it falls through too.
 const quotedPathRe = (q: string): string =>
   String.raw`${q}(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|[\\/])(?!\s)(?:[^${q}\r\n\\/]|(?<!\s)[\\/](?!\s))*\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?${q}`;
+const UNQUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?`;
 const PATH_TOKEN_RE = new RegExp(
-  [quotedPathRe('"'), quotedPathRe("'"), quotedPathRe('`'),
-    String.raw`(?:[A-Za-z]:[\\/])?[A-Za-z0-9_@.~/\\+-]*[A-Za-z0-9_@~/\\+-]\.[A-Za-z][A-Za-z0-9]{0,15}(?::\d+)?`].join('|'),
+  [quotedPathRe('"'), quotedPathRe("'"), quotedPathRe('`'), UNQUOTED_PATH].join('|'),
   'g'
 );
 
 /** A fresh matcher. The regex is stateful (`g`), so callers must never share one. */
 export function pathTokenMatcher(): RegExp {
   return new RegExp(PATH_TOKEN_RE.source, 'g');
+}
+
+/** A match in its quotes with a space inside: a real path with spaces in a
+ *  folder name ("/Users/Jane/My Reports/summary.md") or quoted prose that starts
+ *  with a folder ("/tmp is full, see notes.md"). No pattern can tell them apart;
+ *  only the disk can. */
+export function quotedNeedsCheck(raw: string): boolean {
+  const q = raw[0];
+  return (q === '"' || q === "'" || q === '`') && raw.length > 2 && raw[raw.length - 1] === q && /\s/.test(raw);
+}
+
+/** A linkable token: its text and its offset in the line. `unchecked` marks a
+ *  quoted match with a space whose disk answer is not known yet; `onlyName` is
+ *  then the one bare file name inside it, if there is exactly one. */
+export interface LinkableToken {
+  raw: string;
+  index: number;
+  unchecked?: true;
+  onlyName?: { raw: string; index: number };
+}
+
+/** The bare file names inside a quoted match (no separator), at their offsets
+ *  in the line. A piece with a separator never counts: in
+ *  `"/Users/Jane/Q3 Reports/summary.md"` printed before the file exists, the
+ *  piece `Reports/summary.md` joined to the agent's folder could open a
+ *  different, older file. */
+function bareNamesInside(raw: string, index: number): Array<{ raw: string; index: number }> {
+  const out: Array<{ raw: string; index: number }> = [];
+  const inner = new RegExp(UNQUOTED_PATH, 'g');
+  const body = raw.slice(1, -1);
+  let n: RegExpExecArray | null;
+  while ((n = inner.exec(body)) !== null) {
+    if (!/[\\/]/.test(n[0])) out.push({ raw: n[0], index: index + 1 + n.index });
+  }
+  return out;
+}
+
+/**
+ * The tokens on a line worth trying as links, each with its offset in `text`. A
+ * quoted match with a space inside links whole when `onDisk` says that path is
+ * on disk, links the bare file names inside it when `onDisk` says it is not
+ * (so "/tmp is full, see notes.md" links notes.md, as quoted prose with no
+ * folder at its start already does), and comes back `unchecked` while the
+ * answer is not known.
+ *
+ * Synchronous on purpose: the terminal asks on hover and must answer for the
+ * line as it is now. `onDisk` gets the raw match, quotes and all, and answers
+ * from what is already known: true, false, or undefined (not checked yet). The
+ * terminal starts a check in the background for a path it has not seen. xterm
+ * keeps a row's links while the pointer stays on it, so an unchecked match
+ * still gets a link over the whole of it, shown with no underline; its click
+ * looks at the disk then, and reveals the whole path if it is there, or else
+ * `onlyName`, the one bare file name inside it. Nothing wrong is shown before
+ * the answer is known, and the first click works either way. A callback that
+ * throws counts as false.
+ */
+export function linkableTokens(
+  text: string, onDisk: (raw: string) => boolean | undefined
+): LinkableToken[] {
+  const out: LinkableToken[] = [];
+  const re = pathTokenMatcher();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[0];
+    let whole: boolean | undefined = !quotedNeedsCheck(raw);
+    if (!whole) { try { whole = onDisk(raw); } catch { whole = false; } }
+    if (whole === undefined) {
+      const names = bareNamesInside(raw, m.index);
+      out.push(names.length === 1 ? { raw, index: m.index, unchecked: true, onlyName: names[0] } : { raw, index: m.index, unchecked: true });
+      continue;
+    }
+    if (whole) { out.push({ raw, index: m.index }); continue; }
+    out.push(...bareNamesInside(raw, m.index));
+  }
+  return out;
 }
 
 /**

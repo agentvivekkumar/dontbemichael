@@ -19,8 +19,9 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import {
-  isPathToken, linkCellRange, pathTokenMatcher, stripPathToken
+  isPathToken, linkCellRange, linkableTokens, stripPathToken
 } from '@shared/terminalPaths';
+import { createPathStatCache } from '@shared/pathStatCache';
 import {
   createTerminalRecoveryState,
   normalizePtyChunk,
@@ -859,10 +860,17 @@ export function disposeTerminal(ptyId: string): void {
 // Plain click stays with the TUI (matches VS Code's terminal convention).
 // The path string is agent output — treated as hostile: it flows only into a
 // read-only stat and a REVEAL in the file browser (never an "open with the
-// default app", which would turn a printed path into an execution), and only
-// on an explicit modifier-click. Which tokens count as paths lives in
-// @shared/terminalPaths.
-const mdStatCache = new Map<string, string>();
+// default app", which would turn a printed path into an execution).
+// The stat runs on a modifier-click, and also on hover for one case: a quoted
+// match with a space inside (a real "/Users/Jane/My Reports/a.md", or quoted
+// prose such as "/tmp is full, see notes.md") links whole only once the disk
+// says it is there. Main's statAbs refuses a network path without a stat
+// (isNetworkPath in src/main/fs.ts), on hover and on click alike. Which tokens
+// count as paths lives in @shared/terminalPaths; what is kept between looks,
+// and how many hover checks may run at once, in @shared/pathStatCache.
+const pathStats = createPathStatCache({
+  stat: (abs) => window.cth.statAbs(abs)
+});
 
 function resolvePathCandidate(ptyId: string, raw: string): string | null {
   const p = stripPathToken(raw);
@@ -892,15 +900,35 @@ void import('@/store/store')
  *  A miss is silent by design — the token is agent output and may simply not
  *  exist. */
 async function activatePath(abs: string): Promise<void> {
-  let hit = mdStatCache.get(abs);
-  if (!hit) {
-    const res = await window.cth.statAbs(abs).catch(() => null);
-    if (!res || !res.exists) return;
-    hit = res.path;
-    if (mdStatCache.size > 500) mdStatCache.clear();
-    mdStatCache.set(abs, hit);
-  }
+  const res = await pathStats.lookForClick(abs);
+  if (!res || !res.exists) return;
+  const hit = res.path;
   void window.cth.revealPath(hit).catch(() => { /* file browser refused */ });
+}
+
+/** ⌘-click on a quoted match with a space whose disk answer was not known when
+ *  the row was hovered (xterm keeps that row's links while the pointer stays).
+ *  The click looks now: the whole path if it is on disk, or else, when the disk
+ *  says it is not there, the one bare file name inside it (quoted prose). A
+ *  failed check reveals nothing. */
+async function activateUnchecked(abs: string, nameAbs: string | null): Promise<void> {
+  const res = await pathStats.lookForClick(abs);
+  if (res && res.exists) {
+    void window.cth.revealPath(res.path).catch(() => { /* file browser refused */ });
+    return;
+  }
+  if (res && nameAbs) await activatePath(nameAbs);
+}
+
+/** Is a quoted match with a space inside known to be a real path on disk, so it
+ *  links whole? Answered now, from what is already known, because the link
+ *  provider must answer for the line as it is (a late answer can land on a line
+ *  that has scrolled or on another hovered line). A path not checked yet is
+ *  undefined: it gets a link with no underline that looks at the disk on click,
+ *  and a check may start in the background, so a later hover knows. A path
+ *  that does not resolve (no cwd yet) is never on disk and is never checked. */
+function quotedKnownOnDisk(ptyId: string, raw: string): boolean | undefined {
+  return pathStats.knownOnDisk(resolvePathCandidate(ptyId, raw));
 }
 
 /** A buffer line's cells as linkCellRange reads them. */
@@ -921,13 +949,11 @@ function registerMarkdownLinkProvider(term: Terminal, ptyId: string): void {
         const text = line ? line.translateToString(true) : '';
         if (!text || !text.includes('.')) { callback(undefined); return; }
         const links: Parameters<typeof callback>[0] = [];
-        const re = pathTokenMatcher();
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(text)) !== null) {
-          const raw = m[0];
+        for (const { raw, index, unchecked, onlyName } of linkableTokens(text, (raw) => quotedKnownOnDisk(ptyId, raw))) {
           const abs = resolvePathCandidate(ptyId, raw);
           if (!abs) continue;
-          const span = line ? linkCellRange(cellsOf(line), m.index, m.index + raw.length, raw) : null;
+          const nameAbs = onlyName ? resolvePathCandidate(ptyId, onlyName.raw) : null;
+          const span = line ? linkCellRange(cellsOf(line), index, index + raw.length, raw) : null;
           if (!span) continue;
           links!.push({
             range: {
@@ -935,10 +961,12 @@ function registerMarkdownLinkProvider(term: Terminal, ptyId: string): void {
               end: { x: span.endX, y: bufferLineNumber }
             },
             text: raw,
-            decorations: { underline: true, pointerCursor: true },
+            // Not known on disk yet: no underline until the disk says so.
+            decorations: { underline: !unchecked, pointerCursor: !unchecked },
             activate: (event: MouseEvent | undefined) => {
               // ⌘/Ctrl+click only — a plain click must keep going to the TUI.
               if (event && !(event.metaKey || event.ctrlKey)) return;
+              if (unchecked) { void activateUnchecked(abs, nameAbs); return; }
               void activatePath(abs);
             }
           });
