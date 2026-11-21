@@ -5,7 +5,7 @@ import { summarizeReleaseNotes } from '@shared/releaseNotes';
 import { REPO_URL, updateCardShown, type UpdateNeed } from '@shared/updateState';
 import { useResolvedGodName } from '@/hooks/useResolvedGodName';
 import { useStore } from '@/store/store';
-import { putOffUpdate } from '@/shell/useNeedsYou';
+import { putOffUpdate, setUpdateRestarting as setRestarting, useNeedsYou } from '@/shell/useNeedsYou';
 import { AgentAvatar } from './AgentAvatar';
 import { PixelButton } from './PixelButton';
 import { fieldLabel } from './fieldText';
@@ -35,7 +35,8 @@ export function UpdateCard({ update, later }: { update: UpdateNeed | null; later
   const godId = useStore((s) => s.agents.find((a) => a.isGod)?.id);
   // While a restart is asked for, the card steps aside: the quit warning (when
   // agents are working) is the one thing to read. A cancel brings it back.
-  const [restarting, setRestarting] = useState(false);
+  // Kept in the feed, so the Ask me count leaves out the card while it is aside.
+  const restarting = useNeedsYou().updateRestarting;
   // Read once per window, so persisting the flag cannot pull the link out from
   // under the cursor of the person reading it.
   const [starAsk] = useState(starAskPending);

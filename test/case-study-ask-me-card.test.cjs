@@ -53,6 +53,21 @@ test('a waiting case study counts on Ask me, and leaves when main says it was se
   assert.deepEqual(r.seen, [false, 0]);
 });
 
+test('the case study card does not count while its screen is open', () => {
+  // Value: protects=the pill and the strip count only the cards Ask me shows; fails_when=the count keeps the card the open screen hides; why_new=the count ran one ahead (TODOS.md); seam=none
+  const r = runFeed(`
+    globalThis.status = { state: 'ready', input: {}, draft: null, logo: null, hasWork: true, waiting: true };
+    feed.subscribeNeedsYou(() => {});
+    await tick(); await tick();
+    feed.setCaseStudyScreenOpen(true);
+    out.open = feed.getNeedsYouFeed().count;
+    feed.setCaseStudyScreenOpen(false);
+    out.closed = feed.getNeedsYouFeed().count;
+  `);
+  assert.equal(r.open, 0, 'the card steps aside while the screen is open');
+  assert.equal(r.closed, 1, 'it counts again once the screen closes and the case study still waits');
+});
+
 test('the card is on Ask me from Michael, and no toast says it any more', () => {
   // Value: protects=the card sits on the board under Michael's name with View and Later, and the 15 second toast is gone; fails_when=the card is unmounted, loses Michael's chip, or a toast comes back; why_new=new behavior; seam=source pin; no_claim=the look (live check in the dev app)
   const ask = read('src/renderer/src/components/AskMeTab.tsx');

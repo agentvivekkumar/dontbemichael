@@ -132,15 +132,6 @@
 **Effort:** S
 **Priority:** P3
 
-### The Ask me count can run one ahead for a moment
-
-**What:** Count the case study and update cards from the same check the cards render with (the case study screen open, a restart in progress).
-
-**Why:** While the case study tab is open, or while a restart is under way, the pill and the strip count a card Ask me hides. It clears when main hears the case study was seen, or when the app restarts. Red team, pass 1.
-
-**Effort:** S
-**Priority:** P3
-
 ## Memory and voice trust gaps (from the 0.2.7 ship review, 2026-10-26; owner chose TODOS)
 
 ### Owner standing per note, not per tidy pass

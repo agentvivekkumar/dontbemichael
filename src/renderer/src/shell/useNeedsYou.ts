@@ -64,6 +64,12 @@ export interface NeedsYouFeed {
   /** A case study prepared in the background waits for the owner to open it:
    *  Michael's card on Ask me (CaseStudyCard), until opened or put off. */
   caseStudyWaiting: boolean;
+  /** The case study screen is open, so its card steps aside and does not count
+   *  (setCaseStudyScreenOpen, from App.tsx). */
+  caseStudyOpen: boolean;
+  /** A restart from the update card is under way, so the card steps aside and
+   *  does not count until the restart is called off (setUpdateRestarting). */
+  updateRestarting: boolean;
   /** Open asks, passed-on schedule requests, job description offers, emails to
    *  approve, one for an engine Michael cannot start on, one for a stop only
    *  the owner can fix (out of credit, sign in), one for an update, and one for a
@@ -93,7 +99,7 @@ const CLI_LATER_KEY = 'cth.cliUpdateLaterFor';
 function readCliLater(): string | null {
   try { return window.localStorage.getItem(CLI_LATER_KEY); } catch { return null; }
 }
-let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], researchKept: [], ownerRequests: [], offers: [], proposals: [], engineSetup: null, stop: null, silent: [], update: null, updateLater: null, cliUpdate: null, cliUpdateLater: readCliLater(), caseStudyWaiting: false, count: 0, reports: 0, researchNotice: false, knowledgeNotice: false, setupNotice: false, degraded: [], foundations: null };
+let feed: NeedsYouFeed = { status: 'unknown', tasks: [], requests: [], researchKept: [], ownerRequests: [], offers: [], proposals: [], engineSetup: null, stop: null, silent: [], update: null, updateLater: null, cliUpdate: null, cliUpdateLater: readCliLater(), caseStudyWaiting: false, caseStudyOpen: false, updateRestarting: false, count: 0, reports: 0, researchNotice: false, knowledgeNotice: false, setupNotice: false, degraded: [], foundations: null };
 // The offers need the team and the packs, which this module does not import;
 // the app hands it the reader at start (App.tsx).
 let offersSource: (() => Promise<WorkStyleOffer[]>) | null = null;
@@ -140,7 +146,7 @@ let taskReads = 0;
 let requestReads = 0;
 let ownerReads = 0;
 
-function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'researchKept' | 'ownerRequests' | 'offers' | 'proposals' | 'engineSetup' | 'stop' | 'silent' | 'researchNotice' | 'knowledgeNotice' | 'setupNotice' | 'degraded' | 'foundations' | 'update' | 'updateLater' | 'cliUpdate' | 'cliUpdateLater' | 'caseStudyWaiting'>>): void {
+function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests' | 'researchKept' | 'ownerRequests' | 'offers' | 'proposals' | 'engineSetup' | 'stop' | 'silent' | 'researchNotice' | 'knowledgeNotice' | 'setupNotice' | 'degraded' | 'foundations' | 'update' | 'updateLater' | 'cliUpdate' | 'cliUpdateLater' | 'caseStudyWaiting' | 'caseStudyOpen' | 'updateRestarting'>>): void {
   // A poll that brings nothing new changes nothing, so nobody re-renders.
   const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => JSON.stringify(next[k]) !== JSON.stringify(feed[k]));
   if (!changed) return;
@@ -159,9 +165,10 @@ function publish(next: Partial<Pick<NeedsYouFeed, 'status' | 'tasks' | 'requests
   // One per not reporting card (DESIGN.md §7.6b, SD1).
   const silent = silentCards(merged.silent).length;
   if (silent) feed = { ...feed, count: feed.count + silent };
-  if (updateCardShown(merged.update, merged.updateLater)) feed = { ...feed, count: feed.count + 1 };
+  // The update and case study cards count only while Ask me shows them.
+  if (updateCardShown(merged.update, merged.updateLater) && !merged.updateRestarting) feed = { ...feed, count: feed.count + 1 };
   if (cliUpdateToastVisible(merged.cliUpdate, merged.cliUpdateLater)) feed = { ...feed, count: feed.count + 1 };
-  if (merged.caseStudyWaiting) feed = { ...feed, count: feed.count + 1 };
+  if (merged.caseStudyWaiting && !merged.caseStudyOpen) feed = { ...feed, count: feed.count + 1 };
   for (const l of [...listeners]) l();
   // Ready after Michael could not start: hand the terminals that could not
   // start to useHive, which restarts exactly those (agents at work keep going).
@@ -292,6 +299,16 @@ function takeUpdate(s: unknown): void {
  *  starts again. The title bar badge and Settings still offer it. */
 export function putOffUpdate(version: string): void {
   publish({ updateLater: version });
+}
+
+/** The case study screen opened or closed: the card steps aside while it is open. */
+export function setCaseStudyScreenOpen(open: boolean): void {
+  publish({ caseStudyOpen: open });
+}
+
+/** A restart from the update card started, or was called off. */
+export function setUpdateRestarting(restarting: boolean): void {
+  publish({ updateRestarting: restarting });
 }
 
 /** Later on Michael's team upgrade card: off Ask me until a newer Claude Code
