@@ -25,10 +25,10 @@ test('each step opens Google\'s own page, on the account typed in', () => {
     assert.equal(googleStepUrl(GOOGLE_TWO_STEP_URL, notYet), GOOGLE_TWO_STEP_URL, `no account for "${notYet}"`);
 });
 
-test('the dialog shows the three cards for Google, and the old paragraph only for the others', () => {
+test('the dialog shows the three cards for Google, and the old paragraph only for Other', () => {
   const dialog = read('src/renderer/src/components/AddMailboxDialog.tsx');
   assert.match(dialog, /\{isGoogleProvider\(provider\) && <GoogleSteps address=\{address\} \/>\}/);
-  assert.match(dialog, /\{!isGoogleProvider\(provider\) && \(\s+<div[^>]*>\s+\{t\(`mailboxes\.help\.\$\{provider\}`\)\}/);
+  assert.match(dialog, /\{provider === 'other' && \(\s+<div[^>]*>\s+\{t\(`mailboxes\.help\.\$\{provider\}`\)\}/);
   assert.match(dialog, /onClick=\{open\(GOOGLE_TWO_STEP_URL\)\}>\{t\('mailboxes\.google\.step1Open'\)\}/);
   assert.match(dialog, /onClick=\{open\(GOOGLE_APP_PASSWORDS_URL\)\}>\{t\('mailboxes\.google\.step2Open'\)\}/);
   assert.match(dialog, /void window\.cth\.openExternal\(googleStepUrl\(base, address\)\)/);

@@ -1495,6 +1495,32 @@
       "step3Title": "Paste it below",
       "step3Line": "The 16 letters from step 2, as Google shows them. Spaces are fine."
     },
+    "steps": {
+      "icloud": {
+        "step1Title": "Create an app specific password",
+        "step1Line": "Sign in, open Sign In and Security, then App Specific Passwords. Type a name, such as My office, then copy the password Apple shows. Apple asks you to turn on two factor authentication first if it is off.",
+        "step1Open": "Open Apple's page",
+        "step2Title": "Paste it below",
+        "step2Line": "The password from step 1, as Apple shows it."
+      },
+      "yahoo": {
+        "step1Title": "Create an app password",
+        "step1Line": "Under External connections, choose Create app password. Type a name, such as My office, then copy the password Yahoo shows.",
+        "step1Open": "Open Account Security",
+        "step2Title": "Paste it below",
+        "step2Line": "The password from step 1, as Yahoo shows it."
+      },
+      "zoho": {
+        "step1Title": "Turn on IMAP access",
+        "step1Line": "In Mail Accounts, under IMAP, tick IMAP Access. Already on? Go to step 2.",
+        "step1Open": "Open Mail settings",
+        "step2Title": "Create an app password",
+        "step2Line": "Under App Passwords, choose Generate New Password. Type a name, such as My office, then copy the password Zoho shows.",
+        "step2Open": "Open Zoho's page",
+        "step3Title": "Paste it below",
+        "step3Line": "The password from step 2, as Zoho shows it."
+      }
+    },
     "googleTile": "Gmail or GSuite",
     "title": "Mailboxes",
     "intro": "Mailboxes your team can work in. You choose who uses which one on each team member's Access tab.",
@@ -1534,9 +1560,6 @@
     "testing": "Testing {{address}}. One sec.",
     "tryAgain": "Try again",
     "help": {
-      "icloud": "iCloud needs an app specific password. Create one at account.apple.com under Sign In and Security.",
-      "yahoo": "Yahoo needs an app password. Create one in Account Security, then Generate app password.",
-      "zoho": "Zoho needs an app specific password from Security, then App Passwords, with IMAP turned on in Mail settings.",
       "other": "Your email host lists these servers in its help pages. If your normal password is refused, ask them for an app password."
     },
     "onlyHere": "Email reaches the team only through the mailboxes connected here, never through your Claude account."

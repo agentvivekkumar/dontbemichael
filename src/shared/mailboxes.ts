@@ -121,8 +121,8 @@ export const SMTPS_PORT = 465;
 export const SUBMISSION_PORT = 587;
 
 /** Server settings each service fills in, so an owner never types a server
- *  name. The help text shown for each service lives in the locale files
- *  (mailboxes.help.<provider>). */
+ *  name. The setup help for each service lives in the locale files
+ *  (mailboxes.google, mailboxes.steps.<provider> and mailboxes.help.other). */
 export const PROVIDER_PRESETS: Record<Exclude<MailProvider, 'other'>, { label: string; imap: MailServer; smtp: MailServer }> = {
   gmail: {
     label: 'Gmail',
@@ -168,6 +168,15 @@ export function isGoogleProvider(p: MailProvider): boolean {
  *  account, for an owner signed in to several. */
 export const GOOGLE_TWO_STEP_URL = 'https://myaccount.google.com/signinoptions/twosv';
 export const GOOGLE_APP_PASSWORDS_URL = 'https://myaccount.google.com/apppasswords';
+
+/** The step cards of iCloud Mail, Yahoo and Zoho: each step's page on the
+ *  service's side, or null for the paste. Taken from each service's help on
+ *  app passwords (Apple 102654, Yahoo SLN15241, Zoho IMAP access). */
+export const APP_PASSWORD_STEPS: Partial<Record<MailProvider, (string | null)[]>> = {
+  icloud: ['https://account.apple.com', null],
+  yahoo: ['https://login.yahoo.com/account/security', null],
+  zoho: ['https://mail.zoho.com/zm/#settings/all/mailaccounts', 'https://accounts.zoho.com/home#security/app_password', null]
+};
 
 export function googleStepUrl(base: string, address: string): string {
   const a = address.trim();

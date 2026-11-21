@@ -4,7 +4,7 @@ import { PixelButton } from './PixelButton';
 import { Disclosure, Toggle } from './triggers/ui';
 import { Field, Panel, hint } from './fieldText';
 import {
-  GOOGLE_APP_PASSWORDS_URL, GOOGLE_TWO_STEP_URL, IMAPS_PORT, PROVIDER_ORDER, PROVIDER_PRESETS, SMTPS_PORT, SUBMISSION_PORT,
+  APP_PASSWORD_STEPS, GOOGLE_APP_PASSWORDS_URL, GOOGLE_TWO_STEP_URL, IMAPS_PORT, PROVIDER_ORDER, PROVIDER_PRESETS, SMTPS_PORT, SUBMISSION_PORT,
   googleStepUrl, guessServers, isGoogleProvider, providerForAddress, type MailProvider, type MailServer, type MailboxRecord
 } from '@shared/mailboxes';
 
@@ -146,6 +146,8 @@ export function AddMailboxDialog({ fix, suggestedAddress, onClose, onSaved }: {
             the paste (eng review, 2026-10-26: a business owner could not
             follow the one paragraph). */}
         {isGoogleProvider(provider) && <GoogleSteps address={address} />}
+        {/* iCloud Mail, Yahoo and Zoho get the same cards. */}
+        {APP_PASSWORD_STEPS[provider] && <AppPasswordSteps provider={provider} pages={APP_PASSWORD_STEPS[provider]} />}
         <Field label={t('mailboxes.password')}>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
@@ -180,7 +182,7 @@ export function AddMailboxDialog({ fix, suggestedAddress, onClose, onSaved }: {
         )}
         </Panel>
 
-        {!isGoogleProvider(provider) && (
+        {provider === 'other' && (
           <div style={{ background: 'var(--cth-blue-soft)', borderRadius: 'var(--cth-r-md)', padding: '9px 12px', fontSize: 12.5, lineHeight: '18px', marginTop: 14, color: 'var(--cth-ink)' }}>
             {t(`mailboxes.help.${provider}`)}
           </div>
@@ -219,6 +221,24 @@ function GoogleSteps({ address }: { address: string }) {
         <div style={{ ...hint, marginTop: 6 }}>{t('mailboxes.google.step2Admin')}</div>
       </Step>
       <Step n={3} title={t('mailboxes.google.step3Title')} line={t('mailboxes.google.step3Line')} />
+    </ol>
+  );
+}
+
+/** The app password steps of iCloud Mail, Yahoo and Zoho, each page one
+ *  click away. The words are mailboxes.steps.<provider>.step<n>. */
+function AppPasswordSteps({ provider, pages }: { provider: MailProvider; pages: (string | null)[] }) {
+  const { t } = useTranslation();
+  return (
+    <ol style={{ listStyle: 'none', margin: '2px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {pages.map((url, i) => {
+        const key = `mailboxes.steps.${provider}.step${i + 1}`;
+        return (
+          <Step key={key} n={i + 1} title={t(`${key}Title`)} line={t(`${key}Line`)}>
+            {url && <PixelButton variant="secondary" size="sm" onClick={() => { void window.cth.openExternal(url); }}>{t(`${key}Open`)}</PixelButton>}
+          </Step>
+        );
+      })}
     </ol>
   );
 }
