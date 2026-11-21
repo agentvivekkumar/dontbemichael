@@ -2,18 +2,6 @@
 
 ## Two unrelated businesses (deferred from the CEO review of docs/designs/separate-businesses.md, 2026-11-18)
 
-### Write a line to the office log when a business moves, switches or is set up
-
-**What:** Settings migration, a switch and the first open of a new business each write one line to the hive log (log.jsonl) with the office id and the app version.
-
-**Why:** Today the move logs only to the console, so a support case cannot see when an office moved or switched, or on which version (Sections 3 and 8 of the plan).
-
-**Context:** Deferred from plan: docs/designs/separate-businesses.md. Planned in the CEO review, not built in step one; the owner chose to ship and defer it (2026-11-20).
-
-**Effort:** S (human) / S (CC)
-**Priority:** P1
-**Depends on:** None
-
 ### Tag failure reports with the office id
 
 **What:** failures.jsonl rows and the reports sent from them carry the open office's id.

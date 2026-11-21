@@ -174,7 +174,7 @@ import { AUTO_FAILURE_REPORTS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { copyOfficeData, homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, officeSwitchGuard, syncOfficeRecord } from './officeFile';
-import { addBusiness, adoptOpenOffice, businessDraft, businessNameAt, listBusinesses, migrateToOfficeSettings, neverOpenedBusiness, noteOfficeClosed, officeClaudeDir, officesAfterMove, relocateBusiness, removeUnfinishedBusiness, saveBusinessDraft } from './officeSettings';
+import { addBusiness, adoptOpenOffice, businessDraft, businessNameAt, currentOfficeId, listBusinesses, migrateToOfficeSettings, neverOpenedBusiness, noteOfficeClosed, officeClaudeDir, officesAfterMove, relocateBusiness, removeUnfinishedBusiness, saveBusinessDraft } from './officeSettings';
 import { folderPolicy, AGENT_TMP_DIR, agentTmpName, researchFolderPolicy, withAgentTmpWall, withMemberWall, RESEARCH_TMP_DIR, shellTempWalls, withResearchWall, type AgentFolderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { sandboxNetwork } from '../shared/webAccess';
 import { legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
@@ -224,8 +224,11 @@ app.setName(APP_NAME);
 // starts. On every launch: a config already moved returns at once, and one
 // whose office is not there yet waits for it. The move is one way; the copy
 // kept from before it (config.before-offices.json) is what a downgrade needs.
+// Written to the office log once the hive is up (logOfficeEvent).
+let settingsMovedThisLaunch = false;
 try {
   const moved = migrateToOfficeSettings();
+  settingsMovedThisLaunch = moved === 'done';
   if (moved === 'failed') console.error('[offices] settings were not moved this launch; the app runs on them as they are');
   adoptOpenOffice();
 } catch (e) { console.error('[offices] launch move:', e); }
@@ -4277,6 +4280,13 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
 /** A switch waiting for closing time to finish (D10). */
 let pendingSwitch: { newHome: string; mode: 'move' | 'fresh'; oldHome: string | null } | null = null;
 
+/** One line in the office log when a business moves its settings, switches or
+ *  opens for the first time, so a support case can see when and on which
+ *  version. The office id and the app version only: no business name, no path. */
+function logOfficeEvent(kind: 'office-settings-moved' | 'office-switch' | 'office-first-open', officeId: string | null): void {
+  try { hive.appendLog({ kind, officeId, appVersion: app.getVersion() }); } catch { /* best-effort */ }
+}
+
 /** Stop the open office and reopen the app on `newHome` (moving this office's
  *  data there first when `mode` is move). On success the app relaunches and
  *  this never returns; a failed copy keeps the open office running. */
@@ -4313,6 +4323,8 @@ function switchOffice(newHome: string, mode: 'move' | 'fresh', oldHome: string |
   // A moved office keeps its settings: its entry goes with it. A fresh open
   // finds its own entry by the id in that folder.
   const movedOffices = mode === 'move' && oldHome ? officesAfterMove(oldHome, newHome) : null;
+  // The closing office's log, while config still points at it.
+  logOfficeEvent('office-switch', currentOfficeId());
   // Nothing the closing office still sends reaches the new one (switchingHome).
   switchingHome = true;
   writeConfig(movedOffices ? { harnessHome: newHome, offices: movedOffices } : { harnessHome: newHome });
@@ -7264,6 +7276,8 @@ app.whenReady().then(() => {
   if (homeReady) {
     bootstrapHiveServices();
     if (firstOpen) { try { adoptOpenOffice(); } catch (e) { console.error('[offices] first open:', e); } }
+    if (firstOpen) logOfficeEvent('office-first-open', currentOfficeId());
+    if (settingsMovedThisLaunch) logOfficeEvent('office-settings-moved', currentOfficeId());
     // An office set up before office.json existed gets one now, if the config's
     // team is really this office's team (officeFile.ts).
     backfillOfficeRecord(readConfig());
