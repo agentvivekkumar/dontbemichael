@@ -262,18 +262,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Priority:** P2
 **Depends on:** None
 
-### Pulse keeps a card finished just before a quit
-
-**What:** Record card status changes where Michael's board write lands (or persist the last seen board) instead of only diffing the 8 s poll in memory.
-
-**Why:** A card that reaches Done in the seconds before the app quits or crashes is taken as the new baseline on the next launch and never counted in Tasks done.
-
-**Context:** From the Codex adversarial review, 2026-10-16. `telemetryStore.ts` tasks(): the first read of an office only remembers.
-
-**Effort:** S (human) / S (CC)
-**Priority:** P3
-**Depends on:** None
-
 ### Hand the hook secret over where another process cannot read it
 
 **What:** On engines and platforms where a sibling process can read another's environment (Linux /proc, Windows), pass the hook secret through a 0600 file or descriptor only that agent's sandbox can read, or check the peer on the socket.

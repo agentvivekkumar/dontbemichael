@@ -207,9 +207,10 @@ export const OFFICE_TABLES = [
 ] as const;
 
 /** kv keys that end in the office they belong to (the cost ledger's import
- *  mark, Pulse's backfill mark and processor position, the run comparison's
- *  suggestions). pulse-office-id.test.cjs fails when a new one is not listed. */
-export const OFFICE_KV_PREFIXES = ['cost-ledger:import:', 'pulse:backfill:', 'pulse:state:', 'run-compare:'] as const;
+ *  mark, Pulse's backfill mark, processor position and last seen board, the
+ *  run comparison's suggestions). pulse-office-id.test.cjs fails when a new
+ *  one is not listed. */
+export const OFFICE_KV_PREFIXES = ['cost-ledger:import:', 'pulse:backfill:', 'pulse:state:', 'pulse:cards:', 'run-compare:'] as const;
 
 /** The kv key that marks an office's rows as moved from its folder to its id. */
 const relabelledKey = (id: string): string => `office:relabelled:${id}`;
