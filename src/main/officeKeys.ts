@@ -3,10 +3,14 @@
  * pure helpers that file a business's settings by office id
  * (docs/designs/separate-businesses.md). No runtime import of config.ts, so
  * config.ts can route its reads and writes through these without a cycle.
+ * The business folder checks (diskFolder) read the disk, to follow links.
  */
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import type { HarnessConfig } from './config';
-import { isOfficeId } from '../shared/officeRecord';
+import { expandTilde } from './fs';
+import { isSameOrInside } from './pathInside';
+import { isOfficeId, legacyBusinessFolder } from '../shared/officeRecord';
 
 /** What belongs to a business: who it is, its team, mail and connectors, its
  *  Claude account, schedules, Research, knowledge, owner messages, integrations
@@ -95,6 +99,60 @@ export function samePath(a: string, b: string): boolean {
     return process.platform === 'darwin' || process.platform === 'win32' ? t.toLowerCase() : t;
   };
   return norm(a) === norm(b);
+}
+
+/**
+ * A folder as the disk sees it, for comparing two of them: `~` expanded, links
+ * and aliases (like /private on macOS) followed, and in lower case where
+ * folder names ignore case. A folder not made yet (setup asks before making
+ * it) is followed as far as it exists, so it still matches its real parent.
+ */
+function diskFolder(p: string): string {
+  let there = resolve(expandTilde(p));
+  const below: string[] = [];
+  let real: string | undefined;
+  while (real === undefined) {
+    try { real = realpathSync.native(there); } catch {
+      const up = dirname(there);
+      if (up === there) real = there;
+      else { below.unshift(basename(there)); there = up; }
+    }
+  }
+  const out = join(real, ...below);
+  return process.platform === 'darwin' || process.platform === 'win32' ? out.toLowerCase() : out;
+}
+
+/** Two spellings of one folder on disk (see diskFolder). */
+export function sameFolder(a: string, b: string): boolean {
+  return diskFolder(a) === diskFolder(b);
+}
+
+/**
+ * The business, other than `selfId`, whose business folder is `folder`, holds
+ * it or sits inside it, or null. Two businesses never share one: an agent can
+ * reach every folder inside its own, so their documents would mix
+ * (docs/designs/separate-businesses.md, two businesses on one folder). A
+ * business saved before businessFolder existed counts by its old
+ * officeFolder's parent, as launch reads it. `selfHome`, when given, is the
+ * open office's folder whose id has no entry (office.json missing or new):
+ * the entry last opened there is the open business itself.
+ */
+export function businessUsingFolder(
+  cfg: Pick<HarnessConfig, 'offices'>, folder: string, selfId: string | null, selfHome?: string
+): { id: string; name: string | null } | null {
+  const mine = diskFolder(folder);
+  for (const [id, entry] of Object.entries(cfg.offices ?? {})) {
+    if (id === selfId) continue;
+    if (selfHome && typeof entry?.home === 'string' && sameFolder(entry.home, selfHome)) continue;
+    const s = entry?.settings ?? {};
+    const theirs = s.businessFolder ?? legacyBusinessFolder(s.officeFolder);
+    if (typeof theirs !== 'string' || !theirs) continue;
+    const other = diskFolder(theirs);
+    if (!isSameOrInside(other, mine) && !isSameOrInside(mine, other)) continue;
+    const name = typeof s.businessName === 'string' && s.businessName.trim() ? s.businessName.trim() : null;
+    return { id, name };
+  }
+  return null;
 }
 
 /**

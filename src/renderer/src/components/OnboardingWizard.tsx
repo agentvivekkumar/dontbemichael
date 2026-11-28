@@ -4,6 +4,7 @@ import { CompanyProfileFields, localCurrency, localTimeZone } from './CompanyPro
 import { cityLine, cleanCompanyProfile, missingProfileFields, prefillLegalName, type CompanyProfile, type RequiredProfileField } from '@shared/companyProfile';
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { OnboardingStudio } from '@/scene/studio/OnboardingStudio';
 import { PersonAvatar } from '@/scene/office/props';
 import lockupLight from '@brandkit/logo/lockup/dbm-lockup-horizontal-light.svg?url';
@@ -71,6 +72,12 @@ const GLYPH_EMOJI: Record<string, string> = {
   wrench: '🔧',
   sparkles: '✨'
 };
+
+/** Two businesses never share a business folder: their documents would mix. */
+function folderTakenWords(t: TFunction, name: string | null | undefined): string {
+  return t('addBusiness.folderTaken', { name: name || t('addBusiness.anotherBusiness') });
+}
+
 const glyphFor = (glyph?: string): string =>
   (glyph && (GLYPH_EMOJI[glyph] ?? (/\p{Extended_Pictographic}/u.test(glyph) ? glyph : undefined))) ?? '?';
 
@@ -309,7 +316,7 @@ export function OnboardingWizard({ onComplete, preview, add }: OnboardingWizardP
 
   const toggleStrongKeepalive = async (v: boolean) => {
     setStrongKeepalive(v); // optimistic
-    try { setStrongKeepalive((await window.cth.updateConfig({ strongKeepalive: v })).strongKeepalive === true); }
+    try { const saved = await window.cth.updateConfig({ strongKeepalive: v }); setStrongKeepalive('strongKeepalive' in saved && saved.strongKeepalive === true); }
     catch { setStrongKeepalive(!v); }
   };
   const toggleNotifications = async (v: boolean) => {
@@ -452,6 +459,11 @@ export function OnboardingWizard({ onComplete, preview, add }: OnboardingWizardP
     else if (res.error !== 'cancelled') setError(res.error);
   };
 
+  /** Another business has that business folder (or one in or around it): say
+   *  which, and back to the team step to pick another. */
+  const refuseFolder = (name: string | null | undefined) => {
+    setError(folderTakenWords(t, name)); setBusy(false); setStep('team');
+  };
 
   const finish = async () => {
     setBusy(true);
@@ -473,6 +485,11 @@ export function OnboardingWizard({ onComplete, preview, add }: OnboardingWizardP
     // Every await below can reject (IPC down, disk error). Without a catch the
     // button stayed on "Saving" forever with nothing on screen.
     try {
+      // Another business's business folder is refused before any folder is
+      // made, or the team's folders would land among its documents. A new
+      // business may not take the open business's either.
+      const taken = await window.cth.businessFolderTakenBy(finishPlan.business, add ? { id: draftId ?? null } : undefined, harnessHome);
+      if (taken) { refuseFolder(taken.name); return; }
       const ensure = await window.cth.ensureHarnessHome(harnessHome);
       if (!ensure.ok) {
         // Plain words for the owner (EACCES and the like mean nothing to them;
@@ -526,6 +543,7 @@ export function OnboardingWizard({ onComplete, preview, add }: OnboardingWizardP
         // which closes the open office first (closing time, D10, D19).
         const saved = await window.cth.addBusiness({ id: draftId, home: harnessHome, settings: { ...patch, claudeLogin }, install: patch });
         if (!saved.ok) {
+          if (saved.error === 'folderTaken') { refuseFolder(saved.name); return; }
           setError(saved.error === 'exists' ? t('addBusiness.exists') : saved.error === 'isOpen' ? t('addBusiness.isOpen') : t('onboarding.errSaveSetup'));
           setBusy(false);
           if (saved.error === 'exists' || saved.error === 'isOpen') setStep('home');
@@ -541,6 +559,7 @@ export function OnboardingWizard({ onComplete, preview, add }: OnboardingWizardP
         return;
       }
       const next = await window.cth.updateConfig(patch);
+      if ('error' in next) { refuseFolder(next.name); return; }
       setBusy(false);
       onComplete(next);
     } catch (e) {

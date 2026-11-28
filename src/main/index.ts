@@ -177,7 +177,7 @@ import { AUTO_FAILURE_REPORTS } from '../shared/buildFeatures';
 import { APP_NAME, APP_DATA_DIR, APP_URL_SCHEME } from '../shared/appName';
 import { copyOfficeData, homeFolderStatus, homeReadyAtLaunch } from './homeFolder';
 import { backfillOfficeRecord, findOffice, folderLayoutFor, isUsableTeamFolder, officeSwitchGuard, readOfficeRecord, syncOfficeRecord } from './officeFile';
-import { addBusiness, adoptOpenOffice, businessDraft, businessNameAt, currentOfficeId, listBusinesses, migrateToOfficeSettings, neverOpenedBusiness, noteOfficeClosed, officeClaudeDir, officesAfterMove, relocateBusiness, removeMissingBusiness, removeUnfinishedBusiness, saveBusinessDraft } from './officeSettings';
+import { addBusiness, adoptOpenOffice, businessDraft, businessFolderFromOffice, businessFolderTakenBy, businessNameAt, currentOfficeId, folderTakenRefusal, listBusinesses, migrateToOfficeSettings, neverOpenedBusiness, noteOfficeClosed, officeClaudeDir, officesAfterMove, relocateBusiness, removeMissingBusiness, removeUnfinishedBusiness, saveBusinessDraft } from './officeSettings';
 import { folderPolicy, AGENT_TMP_DIR, agentTmpName, researchFolderPolicy, withAgentTmpWall, withGitMirrorWall, withMemberWall, RESEARCH_TMP_DIR, shellTempWalls, withResearchWall, type AgentFolderPolicy, type FolderLayout } from '../shared/folderAccess';
 import { sandboxNetwork } from '../shared/webAccess';
 import { businessNameMismatch, isOfficeId, legacyBusinessFolder, touchesOffice } from '../shared/officeRecord';
@@ -2871,15 +2871,16 @@ function businessFolderReady(): string | undefined {
 /** One-time at launch: an office set up before 2026-09-25 recorded its shared
  *  Office folder; Michael's folder is the one holding it. Nothing moves on
  *  disk: the Office folder becomes an ordinary folder inside Michael's. A parent
- *  that can't hold an office (the home folder, a system folder) keeps Michael
- *  in the Office folder itself. Also switches the knowledge feature on once,
- *  now that it is where company knowledge lives. */
+ *  that can't hold an office (the home folder, a system folder), or that
+ *  another business's folder is in or around, keeps Michael in the Office
+ *  folder itself (businessFolderFromOffice). Also switches the knowledge
+ *  feature on once, now that it is where company knowledge lives. */
 function migrateBusinessFolder(): void {
   const cfg = readConfig();
   if (!cfg.businessFolder && cfg.officeFolder) {
-    const office = expandTilde(cfg.officeFolder);
-    const parent = legacyBusinessFolder(office);
-    writeConfig({ businessFolder: parent && isUsableTeamFolder(parent) ? parent : office });
+    const folder = businessFolderFromOffice(cfg.officeFolder);
+    if (folder) writeConfig({ businessFolder: folder });
+    else console.warn('[offices] the Office folder is inside another business\'s folder: this office keeps its Office folder');
   }
   if (!readConfig().knowledgeOnSeeded) {
     writeConfig({ knowledgeGraph: { ...(readConfig().knowledgeGraph ?? {}), enabled: true }, knowledgeOnSeeded: true });
@@ -4286,6 +4287,12 @@ ipcMain.handle('config:update', (_evt, patch: Partial<HarnessConfig>) => {
   const hiveWasEnabled = hive.enabled();
   const modelBefore = readConfig().embeddingModel ?? 'minilm';
   const profileBefore = cleanCompanyProfile(readConfig().companyProfile);
+  // Two businesses never share a business folder, nor one inside the other:
+  // their documents would mix. Setup asks first (office:folderTakenBy); this
+  // is the backstop. Nothing of the save is written, so setup never finishes
+  // without a folder: it says which business has it and goes back to Team.
+  const refused = folderTakenRefusal(patch);
+  if (refused) return refused;
   const next = writeConfig(patch);
   // The office describes itself in <home>/office.json, so a reinstall finds it
   // by folder rather than by the business name typed into setup. Only a save
@@ -4542,6 +4549,13 @@ ipcMain.handle('address:suggest', async (_evt, typed: unknown, lang: unknown) =>
 ipcMain.handle('office:list', () => listBusinesses());
 ipcMain.handle('office:relocate', (_evt, id: unknown, path: unknown) =>
   typeof id === 'string' && typeof path === 'string' && path ? relocateBusiness(id, resolve(expandTilde(path))) : { ok: false, error: 'notFound' });
+// The business that already uses this business folder, or one in or around
+// it, or null: two businesses never share one.
+ipcMain.handle('office:folderTakenBy', (_evt, folder: unknown, add: unknown, home: unknown) => {
+  if (typeof folder !== 'string' || !folder) return null;
+  const forAdd = add && typeof add === 'object' ? { id: typeof (add as { id?: unknown }).id === 'string' ? (add as { id: string }).id : null } : undefined;
+  return businessFolderTakenBy(folder, forAdd, typeof home === 'string' && home ? home : undefined);
+});
 // Add a business over the open one (DT3): its answers go to its own entry.
 ipcMain.handle('office:addBusiness', (_evt, p: unknown) => {
   const v = (p ?? {}) as { id?: unknown; home?: unknown; settings?: unknown; install?: unknown };

@@ -14,23 +14,11 @@
 **Priority:** P1
 **Depends on:** None
 
-### Refuse two businesses sharing one business folder
-
-**What:** Add a business, and Settings when the business folder changes, refuse a business folder another business already uses.
-
-**Why:** Two businesses on one folder would mix their documents (Section 4 edge case). addBusiness refuses only the open office's folder and a finished office folder.
-
-**Context:** Deferred from plan: docs/designs/separate-businesses.md. Planned in the CEO review, not built in step one; the owner chose to ship and defer it (2026-11-20).
-
-**Effort:** S (human) / S (CC)
-**Priority:** P1
-**Depends on:** None
-
 ### Refuse a mailbox another business already has
 
 **What:** Adding a mailbox checks every business's mailboxes and says the address belongs to that business.
 
-**Why:** Mailboxes are per business now, so the old one install check only looks at the open business (mail.ts, Section 4 edge case). The Settings check is in agentvivekkumar/dontbemichael#736. One path stays open after it: a business made from a copied office folder gets a full copy of the original's settings, mailboxes included (adoptOpenOffice, officeSettings.ts), so both businesses hold the same address. Add a business does not: addBusiness takes only the spend budget from the open business, and the rest comes from the setup answers.
+**Why:** Mailboxes are per business now, so the old one install check only looks at the open business (mail.ts, Section 4 edge case). The Settings check is in agentvivekkumar/dontbemichael#736. One path stays open after it: a business made from a copied office folder gets a full copy of the original's settings, mailboxes included (adoptOpenOffice, officeSettings.ts), so both businesses hold the same address. Add a business does not: addBusiness takes only the spend budget from the open business, and the rest comes from the setup answers. The copy keeps the original's business folder too, as does a business read back from its office.json at the move to per office settings, and team folders are not compared, so their documents can still mix. Both need one product call: send the copy back through setup, or refuse to open it.
 
 **Context:** Deferred from plan: docs/designs/separate-businesses.md. Planned in the CEO review, not built in step one; the owner chose to ship and defer it (2026-11-20).
 

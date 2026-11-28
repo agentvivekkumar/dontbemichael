@@ -2827,7 +2827,9 @@
     "claudeOwn": "A different Claude account",
     "claudeOwnDesc": "Its own sign in, connectors and plan. You sign in when it opens.",
     "exists": "That folder holds a business you already have. Open it from the business menu, or pick another folder.",
-    "isOpen": "That is the open business's folder. Pick another folder."
+    "isOpen": "That is the open business's folder. Pick another folder.",
+    "folderTaken": "{{name}} already keeps its documents in that folder. Pick another folder for this business.",
+    "anotherBusiness": "Another business"
   },
   "businessMenu": {
     "button": "Business: {{name}}. Switch business",
