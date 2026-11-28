@@ -26,9 +26,9 @@
 **Priority:** P1
 **Depends on:** None
 
-### Refuse a mailbox another business already has
+### Refuse a mailbox a copied business brings with it
 
-**What:** Adding a mailbox checks every business's mailboxes and says the address belongs to that business.
+**What:** A business made from a copied office folder is checked for a mailbox another business already has, and that business is named.
 
 **Why:** Mailboxes are per business now, so the old one install check only looks at the open business (mail.ts, Section 4 edge case). The Settings check is in agentvivekkumar/dontbemichael#736. One path stays open after it: a business made from a copied office folder gets a full copy of the original's settings, mailboxes included (adoptOpenOffice, officeSettings.ts), so both businesses hold the same address. Add a business does not: addBusiness takes only the spend budget from the open business, and the rest comes from the setup answers.
 

@@ -337,6 +337,35 @@ export function noteOfficeClosed(now: number = Date.now()): void {
   writeConfig({ offices: { ...cfg.offices, [id]: { ...cfg.offices[id], closedAt: now } } });
 }
 
+/**
+ * Every other business on this install with the addresses of its mailboxes,
+ * so Settings can keep one address from being connected to two businesses on
+ * one computer (docs/designs/separate-businesses.md). Only the saved records
+ * are read: no business is opened, and no password is touched. Empty before
+ * the move, when the app has one business. If the open business's id cannot
+ * be found, it is listed too, so a refusal could name it; that is rare and
+ * fails safe.
+ */
+export function otherBusinessMailboxes(): Array<{ name: string | null; addresses: string[] }> {
+  const cfg = readStoredConfig();
+  if (!cfg.officesMigrated) return [];
+  const openId = officeIdIn(cfg, readOfficeId(cfg.harnessHome));
+  const out: Array<{ name: string | null; addresses: string[] }> = [];
+  for (const [id, entry] of Object.entries(cfg.offices ?? {})) {
+    if (id === openId || !entry) continue;
+    // An office.json replaced or restored with a new id leaves an older entry
+    // for the open folder, and that is still the open business.
+    if (cfg.harnessHome && typeof entry.home === 'string' && samePath(entry.home, cfg.harnessHome)) continue;
+    const s = entry.settings ?? {};
+    const boxes = Array.isArray(s.mailboxes) ? s.mailboxes : [];
+    const addresses = boxes.map((m) => m?.address).filter((a): a is string => typeof a === 'string' && !!a.trim());
+    if (!addresses.length) continue;
+    const name = typeof s.businessName === 'string' && s.businessName.trim() ? s.businessName.trim() : null;
+    out.push({ name, addresses });
+  }
+  return out;
+}
+
 /** How the app behaves, without any business's settings. */
 export function installConfig(): InstallConfig {
   return pick(readStoredConfig(), installKeySet) as InstallConfig;
