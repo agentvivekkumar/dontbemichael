@@ -801,6 +801,147 @@ test('an owner note whose check never finished, because the app closed, is told 
   assert.ok(!fs.existsSync(path.join(home, 'private', 'research-pending.json')));
 });
 
+test('a teammate\'s message whose check never finished, because the app closed, is told to it and to Michael at the next start', async (t) => {
+  // Value: protects=a teammate's question waiting through a quit or a crash is not lost with no word to anyone; fails_when=queueForResearch keeps only the owner's and the app's rows, or the next start tells only those; why_new=ship review red team D3.3; seam=fake layer
+  const layer = fakeLayer({ inbound: () => new Promise(() => {}) });
+  const { hive } = await office(t, { layer });
+  hive.send({ to: 'research', act: 'query', subject: 'Flour "now"', body: 'Flour prices', conversation: 'c-flour' }, 'pam');
+  hive.send({ to: 'research', act: 'query', subject: 'Sugar', body: 'Sugar prices' }, 'god');
+  const home = path.dirname(hive.root());
+  const pending = JSON.parse(fs.readFileSync(path.join(home, 'private', 'research-pending.json'), 'utf8'));
+  assert.deepEqual(pending.map((r) => r.from), ['pam', 'god'], 'kept while their checks run');
+  const again = new HiveManager(() => home);
+  again.setResearchEnabled(() => true);
+  again.setTrustLayer(fakeLayer());
+  again.routeOnce();
+  const toPam = notes(again, 'pam', R.NOT_SENT_SUBJECT);
+  assert.equal(toPam.length, 1, 'the sender hears');
+  assert.match(toPam[0].body, /^Your message for Pete \("Flour now"\) was not sent: the app closed while it was being checked\. Send it again if it still matters\.$/);
+  assert.equal(toPam[0].in_reply_to, pending[0].id);
+  assert.equal(toPam[0].conversation, 'c-flour', 'in the question\'s thread');
+  const toMichael = notes(again, 'god', R.NOT_SENT_SUBJECT).map((m) => m.body).sort();
+  assert.equal(toMichael.length, 2, 'Michael hears of both, his own once');
+  assert.match(toMichael[0], /^Pam's message for Pete \("Flour now"\) was not sent: the app closed while it was being checked\./);
+  assert.match(toMichael[1], /^Your message for Pete \("Sugar"\) was not sent: the app closed while it was being checked\./);
+  again.routeOnce();
+  assert.equal(notes(again, 'pam', R.NOT_SENT_SUBJECT).length, 1, 'once');
+  assert.equal(notes(again, 'god', R.NOT_SENT_SUBJECT).length, 2, 'once');
+  assert.ok(!fs.existsSync(path.join(home, 'private', 'research-pending.json')));
+});
+
+test('a teammate\'s message is out of the pending list as soon as Research has it, so a quit after tells nobody to resend', async (t) => {
+  // Value: protects=a quit between delivery and the commit never tells the sender to send it again, which would give Research a duplicate; fails_when=the row is cleared only after checked, the sent as note and the commit; why_new=owner review of #741; seam=fake layer, commit
+  const { hive } = await office(t);
+  const home = path.dirname(hive.root());
+  const file = path.join(home, 'private', 'research-pending.json');
+  let atCommit;
+  hive.commit = (message) => {
+    if (message !== 'hive: trust layer delivered to research') return;
+    // What a crash here would leave on disk.
+    atCommit = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '[]';
+  };
+  hive.send({ to: 'research', act: 'query', subject: 'Flour', body: 'Flour prices' }, 'pam');
+  await tick();
+  assert.equal(msgsIn(hive, 'research').filter((m) => m.from === 'pam').length, 1, 'delivered');
+  assert.deepEqual(JSON.parse(atCommit), [], 'its row was gone before the commit');
+  fs.writeFileSync(file, atCommit);
+  const again = new HiveManager(() => home);
+  again.setResearchEnabled(() => true);
+  again.setTrustLayer(fakeLayer());
+  again.routeOnce();
+  assert.equal(notes(again, 'pam', R.NOT_SENT_SUBJECT).length, 0, 'not told to resend');
+  assert.equal(notes(again, 'god', R.NOT_SENT_SUBJECT).length, 0);
+});
+
+test('a lost message from a teammate removed before the next start is still told to Michael, by its id, and other app senders stay silent', async (t) => {
+  // Value: protects=a removed teammate's lost question is not dropped with no word to anyone, and Michael is never asked to resend what the scheduler or mail sent; fails_when=rows from a sender not on the team are skipped, or every non teammate row is told; why_new=owner review of #741; seam=pending file
+  const { hive } = await office(t);
+  const home = path.dirname(hive.root());
+  fs.mkdirSync(path.join(home, 'private'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'private', 'research-pending.json'), JSON.stringify([
+    { id: 'm-gone', from: 'stanley', subject: 'Flour', teammate: true },
+    { id: 'm-sched', from: 'scheduler', subject: 'Weekly prices' },
+    { id: 'm-mail', from: 'mail', subject: 'Supplier email' }
+  ]));
+  hive.routeOnce();
+  const toMichael = notes(hive, 'god', R.NOT_SENT_SUBJECT);
+  assert.equal(toMichael.length, 1, 'only the teammate\'s row');
+  assert.match(toMichael[0].body, /^stanley's message for Pete \("Flour"\) was not sent: the app closed while it was being checked\./);
+  hive.routeOnce();
+  assert.equal(notes(hive, 'god', R.NOT_SENT_SUBJECT).length, 1, 'once');
+  assert.ok(!fs.existsSync(path.join(home, 'private', 'research-pending-lost.json')), 'the silent rows are not kept either');
+});
+
+test('a teammate\'s row is saved as a teammate\'s, and an app sender\'s is not', async (t) => {
+  // Value: protects=the next start can tell a teammate's lost row from an app sender's even once the teammate is removed; fails_when=rows carry no teammate mark; why_new=owner review of #741; seam=fake layer
+  const layer = fakeLayer({ inbound: () => new Promise(() => {}) });
+  const { hive } = await office(t, { layer });
+  hive.send({ to: 'research', act: 'query', subject: 'Flour', body: 'Flour prices' }, 'pam');
+  hive.send({ to: 'research', act: 'inform', subject: 'Weekly prices', body: 'x' }, 'scheduler');
+  const home = path.dirname(hive.root());
+  const pending = JSON.parse(fs.readFileSync(path.join(home, 'private', 'research-pending.json'), 'utf8'));
+  assert.deepEqual(pending.map((r) => [r.from, r.teammate === true]), [['pam', true], ['scheduler', false]]);
+});
+
+test('a teammate\'s question still settles when an earlier lost note can\'t reach Michael', async (t) => {
+  // Value: protects=a failed note about an earlier row never keeps a delivered question in the pending list, so the next start doesn't tell its sender to resend it; fails_when=researchPending lets tellLostResearchPending throw; why_new=owner review of #741; seam=read only inbox
+  if (process.platform === 'win32') return t.skip('POSIX folder modes');
+  const { hive } = await office(t);
+  const home = path.dirname(hive.root());
+  const file = path.join(home, 'private', 'research-pending.json');
+  fs.mkdirSync(path.join(home, 'private'), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify([{ id: 'm-old', from: 'human', subject: 'Old note' }]));
+  const inbox = path.join(hive.root(), 'agents', 'god', 'inbox');
+  fs.chmodSync(inbox, 0o555);
+  t.after(() => { try { fs.chmodSync(inbox, 0o755); } catch { /* gone */ } });
+  hive.send({ to: 'research', act: 'query', subject: 'Flour', body: 'Flour prices' }, 'pam');
+  await tick();
+  fs.chmodSync(inbox, 0o755);
+  assert.equal(msgsIn(hive, 'research').filter((m) => m.from === 'pam').length, 1, 'delivered');
+  const left = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : [];
+  assert.deepEqual(left.filter((r) => r.from === 'pam'), [], 'its row is gone');
+});
+
+test('a teammate\'s lost message note that could not go out is tried again on the next pass, and sent once', async (t) => {
+  // Value: protects=a teammate still hears its message was lost when the first note fails; fails_when=the sender is marked told before its note goes out; why_new=owner review of #741; seam=fake layer, tellSender
+  const layer = fakeLayer({ inbound: () => new Promise(() => {}) });
+  const { hive } = await office(t, { layer });
+  hive.send({ to: 'research', act: 'query', subject: 'Flour', body: 'Flour prices' }, 'pam');
+  const home = path.dirname(hive.root());
+  const again = new HiveManager(() => home);
+  let failed = false;
+  again.tellSender = function (...args) {
+    if (!failed) { failed = true; throw new Error('disk full'); }
+    return HiveManager.prototype.tellSender.apply(this, args);
+  };
+  again.setResearchEnabled(() => true);
+  again.setTrustLayer(fakeLayer());
+  again.routeOnce();
+  assert.ok(failed);
+  assert.equal(notes(again, 'pam', R.NOT_SENT_SUBJECT).length, 0, 'the first note failed');
+  assert.equal(notes(again, 'god', R.NOT_SENT_SUBJECT).length, 1, 'Michael is still told');
+  again.routeOnce();
+  assert.equal(notes(again, 'pam', R.NOT_SENT_SUBJECT).length, 1, 'tried again');
+  again.routeOnce();
+  assert.equal(notes(again, 'pam', R.NOT_SENT_SUBJECT).length, 1, 'once');
+  assert.equal(notes(again, 'god', R.NOT_SENT_SUBJECT).length, 1, 'once');
+});
+
+test('an unreadable pending list tells nobody and the next message is still kept', async (t) => {
+  // Value: protects=a damaged research-pending.json never stops a start or a new check; fails_when=reading the list throws or a bad file blocks the next row; why_new=ship review red team D3.3; seam=fake layer
+  const layer = fakeLayer({ inbound: () => new Promise(() => {}) });
+  const { hive } = await office(t, { layer });
+  const home = path.dirname(hive.root());
+  fs.mkdirSync(path.join(home, 'private'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'private', 'research-pending.json'), '{not json');
+  hive.send({ to: 'research', act: 'query', subject: 'Flour', body: 'Flour prices' }, 'pam');
+  hive.routeOnce();
+  assert.equal(notes(hive, 'pam', R.NOT_SENT_SUBJECT).length, 0);
+  assert.equal(notes(hive, 'god', R.NOT_SENT_SUBJECT).length, 0);
+  const pending = JSON.parse(fs.readFileSync(path.join(home, 'private', 'research-pending.json'), 'utf8'));
+  assert.deepEqual(pending.map((r) => r.from), ['pam']);
+});
+
 test('an owner note whose check finished leaves nothing pending', async (t) => {
   // Value: protects=a normal restart tells Michael nothing; fails_when=finished checks stay in the pending file; why_new=Codex adversarial pass 2; seam=fake layer
   const { hive } = await office(t);

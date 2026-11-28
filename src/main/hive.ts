@@ -586,6 +586,8 @@ const RESEARCH_KEPT_FILE = 'research-kept.json';
 const OWNER_SAID_SPAN = 1024 * 1024;
 
 /** One outbox file's entry in the outbox journal (HiveManager.routingFile). */
+/** A message for Research whose check or delivery had not finished: never its body. */
+interface ResearchPendingRow { id: string; from: string; subject: string; checked?: boolean; teammate?: boolean; conversation?: string }
 interface RoutingRecord { ino: number; birth: number; id: string; created_at: string; delivered: boolean }
 
 /** A id an agent put in its own outbox is UNTRUSTED: it becomes a file name in
@@ -3054,8 +3056,9 @@ export class HiveManager {
     }
     this.researchQueued++;
     // Kept in the app's private folder while its check runs, so a crash in
-    // between is told to Michael at the next start, not lost (Codex review).
-    if (!fromAgent) this.researchPending(msg, true);
+    // between is told to Michael, and a teammate sender too, at the next
+    // start, not lost (Codex review; ship review D3.3).
+    this.researchPending(msg, true);
     const refuse = (reason: string, why?: string): void => {
       this.appendLog({ kind: 'trust-denied', from: msg.from, id: msg.id, ...(why ? { reason: why } : {}) });
       tell(reason);
@@ -3104,6 +3107,9 @@ export class HiveManager {
             return 'done';
           }
         }
+        // In Research's inbox now: its row goes before the steps after, so a
+        // quit in between never tells the sender to send it again.
+        this.researchPending(msg, false);
         try {
           checked(v.decision, v, v.decision === 'clean' ? v.removed : undefined);
           if (v.decision === 'clean' && fromAgent) this.tellSender(msg.from, msg.id, msg.conversation, SENT_AS_SUBJECT, sentAsBody(v.subject, v.body, this.researchName()), true);
@@ -3120,12 +3126,12 @@ export class HiveManager {
         if (outcome === 'again') {
           // Its row now says it passed its check, so a start after a close
           // tells Michael it was not delivered, not that it was being checked.
-          if (deliveries === 1 && !fromAgent) this.researchPending(msg, true, true);
+          if (deliveries === 1) this.researchPending(msg, true, true);
           this.researchUndelivered.set(msg.id, settle);
           return;
         }
         if (outcome === 'keep') return;
-        if (!fromAgent) this.researchPending(msg, false);
+        this.researchPending(msg, false);
         if (outcome === 'recheck') this.queueForResearch(msg, upkeep);
       };
       settle();
@@ -3136,7 +3142,7 @@ export class HiveManager {
         return;
       }
       this.researchQueued--;
-      if (!fromAgent) this.researchPending(msg, false);
+      this.researchPending(msg, false);
       try {
         // The owner changed what stays private meanwhile: checked again under
         // the new settings, as a check that answered is (ship review 2026-10-17).
@@ -3148,35 +3154,47 @@ export class HiveManager {
     attempt(0);
   }
 
-  /** The owner's and the app's messages for Research whose check is under
-   *  way, or that passed it and wait to be delivered (`checked`), by id: what
-   *  they were and who sent them, nothing more. */
+  /** The owner's, the app's and a teammate's messages for Research whose
+   *  check is under way, or that passed it and wait to be delivered
+   *  (`checked`), by id: what they were, who sent them and the thread, nothing
+   *  more. A teammate's row says so, so only those and the owner's and the
+   *  app's are told at the next start. */
   private researchPending(msg: HiveMessage, add: boolean, checked = false): void {
     // Anything left from before this start is told first, never this run's.
-    this.tellLostResearchPending();
+    // A note that can't go out yet never stops this row from changing.
+    try { this.tellLostResearchPending(); } catch { /* next pass */ }
     const home = this.getHome();
     if (!home) return;
     const file = join(privateRoot(home), 'research-pending.json');
-    let rows: Array<{ id: string; from: string; subject: string; checked?: boolean }> = [];
+    let rows: ResearchPendingRow[] = [];
     try { const r = JSON.parse(readFileSync(file, 'utf8')); if (Array.isArray(r)) rows = r; } catch { /* none yet */ }
     rows = rows.filter((r) => r && r.id !== msg.id);
-    if (add) { rows.push({ id: msg.id, from: msg.from, subject: String(msg.subject ?? '').slice(0, 80), ...(checked ? { checked: true } : {}) }); this.researchPendingMine.add(msg.id); }
+    if (add) {
+      const teammate = msg.from !== RESEARCH_ID && !!this.registry().agents[msg.from];
+      rows.push({
+        id: msg.id, from: msg.from, subject: String(msg.subject ?? '').slice(0, 80),
+        ...(teammate ? { teammate: true } : {}), ...(checked ? { checked: true } : {}),
+        ...(safeConversation(msg.conversation) ? { conversation: msg.conversation } : {})
+      });
+      this.researchPendingMine.add(msg.id);
+    }
     try { mkdirSync(privateRoot(home), { recursive: true }); this.atomicWriteJson(file, rows); } catch { /* best effort */ }
   }
 
-  /** At start: an owner or app message whose check or delivery never
-   *  finished (the app closed or crashed) is told to Michael (Codex review, D8.2). The rows are
+  /** At start: an owner, app or teammate message whose check or delivery
+   *  never finished (the app closed or crashed) is told to Michael, and a
+   *  teammate hears it too (Codex review, D8.2, D3.3). The rows are
    *  moved aside first, so this run's own checks start a fresh list, and each
-   *  stays until Michael's inbox takes its note: tried again on every routing
+   *  stays until Michael's inbox, and a teammate's, takes its note: tried again on every routing
    *  pass, and at the next start if the app closes first (Codex, second ship). */
   private tellLostResearchPending(): void {
     if (this.researchPendingTold) return;
     const home = this.getHome();
     if (!home) return;
     const file = join(privateRoot(home), 'research-pending.json');
-    const lost = join(privateRoot(home), 'research-pending-lost.json');
-    let rows: Array<{ id: string; from: string; subject: string; checked?: boolean }> = [];
-    try { const r = JSON.parse(readFileSync(lost, 'utf8')); if (Array.isArray(r)) rows = r; } catch { /* none left over */ }
+    const lostFile = join(privateRoot(home), 'research-pending-lost.json');
+    let rows: ResearchPendingRow[] = [];
+    try { const r = JSON.parse(readFileSync(lostFile, 'utf8')); if (Array.isArray(r)) rows = r; } catch { /* none left over */ }
     if (!this.researchPendingMoved) {
       let earlier: typeof rows = [];
       try { const r = JSON.parse(readFileSync(file, 'utf8')); if (Array.isArray(r)) earlier = r; } catch { /* none */ }
@@ -3186,30 +3204,50 @@ export class HiveManager {
       rows = [...rows, ...earlier.filter((r) => r && !seen.has(r.id) && !this.researchPendingMine.has(r.id))];
       // Told whether or not the move works; a failed one is tried again.
       try {
-        if (rows.length) this.atomicWriteJson(lost, rows);
+        if (rows.length) this.atomicWriteJson(lostFile, rows);
         rmSync(file, { force: true });
         this.researchPendingMoved = true;
       } catch { /* next pass */ }
     }
-    const godId = this.registry().godId ?? 'god';
+    const reg = this.registry();
+    const godId = reg.godId ?? 'god';
     // Each notice goes once, even if the list can't be rewritten after it
     // (verification of the Codex fix: a stuck file sent it every pass).
     const left = rows.filter((r) => {
-      if (!r || (r.from !== 'human' && r.from !== 'system') || this.researchLostTold.has(r.id)) return false;
-      const ok = this.deliver(this.normalize({
-        to: godId, act: 'inform', subject: researchText(NOT_SENT_SUBJECT, this.researchName()),
-        body: `${r.from === 'human' ? 'A note from the owner' : 'A message from the app'} for ${this.researchName()} ("${String(r.subject ?? '').slice(0, 80)}") was not sent: the app closed while it was being ${r.checked === true ? 'delivered' : 'checked'}. Send it again if it still matters.`
+      // Other app senders (the scheduler, mail and the like) stay silent, as
+      // their refusals do. A teammate removed before this start can't be
+      // told, but Michael still is, naming it by its id.
+      if (!r || (r.from !== 'human' && r.from !== 'system' && r.teammate !== true)) return false;
+      const agent = r.from !== RESEARCH_ID && !!reg.agents[r.from];
+      const n = this.researchName();
+      // A teammate's subject is its own words: tidied, as in every note quoting it.
+      const lostNote = `for ${n} ("${tidy(r.subject, HELD_SUBJECT_MAX)}") was not sent: the app closed while it was being ${r.checked === true ? 'delivered' : 'checked'}. Send it again if it still matters.`;
+      // A teammate hears of its own message, once, as it would of a refusal.
+      // Marked only once it went out, so a note that failed is tried again.
+      const toSender = agent && r.from !== godId && !this.researchLostTold.has(`${r.id}:sender`);
+      if (toSender) {
+        try {
+          this.tellSender(r.from, r.id, r.conversation, NOT_SENT_SUBJECT, `Your message ${lostNote}`, true);
+          this.researchLostTold.add(`${r.id}:sender`);
+        } catch { /* Michael is still told */ }
+      }
+      const what = r.from === 'human' ? 'A note from the owner'
+        : r.from === 'system' ? 'A message from the app'
+          : r.from === godId ? 'Your message' : `${reg.agents[r.from]?.name?.trim() || r.from}'s message`;
+      const ok = this.researchLostTold.has(r.id) || this.deliver(this.normalize({
+        to: godId, act: 'inform', subject: researchText(NOT_SENT_SUBJECT, n),
+        body: `${what} ${lostNote}`
       }, PRIVACY_CHECK_SENDER), godId);
       if (ok) this.researchLostTold.add(r.id);
-      return !ok;
+      return !ok || (toSender && !this.researchLostTold.has(`${r.id}:sender`));
     });
     if (left.length) {
       // Rewritten only when the list changed.
-      if (left.length !== rows.length) try { this.atomicWriteJson(lost, left); } catch { /* next pass */ }
+      if (left.length !== rows.length) try { this.atomicWriteJson(lostFile, left); } catch { /* next pass */ }
       return;
     }
     this.researchPendingTold = true;
-    try { rmSync(lost, { force: true }); } catch { /* left, the next start tells these again: once more beats never */ }
+    try { rmSync(lostFile, { force: true }); } catch { /* left, the next start tells these again: once more beats never */ }
   }
   private researchPendingTold = false;
   private researchPendingMoved = false;

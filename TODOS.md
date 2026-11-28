@@ -215,16 +215,6 @@ Go with it: keep only the owner's own words (the answer, the edit, the note) in 
 **Priority:** P2
 **Depends on:** A Windows shell sandbox for the Windows part.
 
-### Keep a teammate's question to Pete across a quit while its check waits
-
-**What:** Save a teammate's own message to Research while it waits for the privacy check (up to 30 minutes), as the owner's and the app's notes are saved, and tell the sender and Michael after a restart.
-
-**Why:** queueForResearch writes only the owner's and the app's notes to research-pending.json; a teammate's question that waits through a quit or a crash is lost with no word to anyone. The wait used to be seconds; it is now up to 30 minutes, mostly while the team starts. Found by the ship review red team (2026-10-17, owner D3.3).
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ## Team performance (from the CEO review of docs/designs/team-performance.md, 2026-10-15)
 
 ### Compare runs for members on other engines
