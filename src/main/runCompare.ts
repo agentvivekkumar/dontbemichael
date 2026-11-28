@@ -11,8 +11,8 @@
  * to the owner's card.
  */
 import { constants } from 'node:fs';
-import { lstat, readdir, type FileHandle } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, realpath, type FileHandle } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { createInterface } from 'node:readline';
 import type Database from 'better-sqlite3';
 import { looksLikeInjection } from '../shared/research';
@@ -22,6 +22,7 @@ import {
 } from '../shared/runCompare';
 import { extractJson } from './memoryTidy';
 import { INSTRUCTIONS_MODEL } from './workStyleConvert';
+import { inClaudeProjects } from './transcript';
 import { openNoFollowAsync } from './noFollow';
 
 export interface WentWrongRequest {
@@ -39,8 +40,8 @@ export interface RunCompareDeps {
   office: () => string | null;
   getKv: <T>(key: string) => T | undefined;
   setKv: (key: string, value: unknown) => void;
-  /** A member's session ids from the private session record. */
-  sessionsOf: (agentId: string) => string[];
+  /** A member's session files, as the private session record has them. */
+  transcriptsOf: (agentId: string) => string[];
   projectsRoot: () => string;
   /** The one comparison call (isolated, no tools; index.ts sets it up). */
   runModel: (prompt: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
@@ -250,30 +251,29 @@ export class RunCompare {
     return { ...base, state: 'ready', goodRunId: good.id, change: parsed.change, why: parsed.why };
   }
 
-  /** The member's session files, by the private record, with when each was last written. */
+  /**
+   * The member's session files, with when each was last written: only the
+   * files the private record names, never a search by session id (a member's
+   * shell could write a file named for its own session elsewhere). A session
+   * with no recorded file is left out. The real file is checked, not only the
+   * spelling: a member's shell that can write there could swap its own file
+   * for a link to another member's transcript. A symlink is never followed, a
+   * file with a second name (a hard link) is skipped, since Claude never links
+   * its own, and the folders above the file must really lead into the
+   * projects folder.
+   */
   private async sessionFiles(agentId: string): Promise<SessionFile[]> {
-    const ids = new Set(this.d.sessionsOf(agentId).filter((s) => /^[A-Za-z0-9_-]+$/.test(s)));
-    if (!ids.size) return [];
+    let root: string;
+    try { root = await realpath(this.d.projectsRoot()); } catch { return []; }
     const out: SessionFile[] = [];
-    const root = this.d.projectsRoot();
-    let dirs: string[] = [];
-    // Without blocking: the projects folder holds every project Claude ever opened.
-    try { dirs = await readdir(root); } catch { return []; }
-    for (const dir of dirs) {
-      let names: string[] = [];
-      try { names = await readdir(join(root, dir)); } catch { continue; }
-      for (const n of names) {
-        if (!n.endsWith('.jsonl') || !ids.has(n.slice(0, -6))) continue;
-        const path = join(root, dir, n);
-        // Only Claude's own file: a member's shell that can write here could
-        // put a link named for its own session in place, to another member's
-        // transcript. A symlink is never followed, and a file with a second
-        // name (a hard link) is skipped, since Claude never links its own.
-        try {
-          const st = await lstat(path, { bigint: true });
-          if (st.isFile() && st.nlink === 1n) out.push({ path, mtime: Number(st.mtimeMs), dev: st.dev, ino: st.ino });
-        } catch { /* gone */ }
-      }
+    for (const f of new Set(this.d.transcriptsOf(agentId))) {
+      if (!/^[A-Za-z0-9_-]+\.jsonl$/.test(basename(f))) continue;
+      try {
+        const st = await lstat(f, { bigint: true });
+        if (!st.isFile() || st.nlink !== 1n) continue;
+        const path = await realpath(f);
+        if (inClaudeProjects(path, root)) out.push({ path, mtime: Number(st.mtimeMs), dev: st.dev, ino: st.ino });
+      } catch { /* gone */ }
     }
     return out;
   }

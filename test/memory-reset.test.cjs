@@ -18,7 +18,7 @@ const loadTs = require('./load-ts.cjs');
 
 const {
   memoryResetTargets, eraseMemoryTargets, idsFromCostRows, idsFromRecord, foldersFromRoster,
-  autoMemoryFolders, memberIdsIn, MEMBER_SESSIONS_FILE
+  autoMemoryFolders, memberIdsIn, MEMBER_SESSIONS_FILE, transcriptsFromRecord
 } = loadTs('src/main/memoryReset.ts');
 const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
 
@@ -220,6 +220,32 @@ test('the private session record: appended from hook frames, its own last id per
   const log = fs.readFileSync(path.join(home, 'hive', 'log.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   const row = log.find((r) => r.kind === 'memory-reset');
   assert.deepEqual([row.members, row.removed, row.registryCleared], [['pam'], 3, true]);
+});
+
+test('the private session record keeps each session\'s transcript file, added once when a hook brings it', async (t) => {
+  // Value: protects=run comparison has the exact file Claude Code wrote for each session; fails_when=the file is not kept, a cost sample's id alone writes again, a file not named for its session is kept, or a later hook never adds the file; why_new=TODOS "Run comparison reads transcripts it finds by name"; seam=none; no_claim=hook authentication (hooks.ts tests)
+  const { HiveManager } = loadTs('src/main/hive.ts');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'md-memreset-transcript-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const hive = new HiveManager(() => home);
+  await hive.ensureAgent({ id: 'pam', name: 'Pam', provider: 'claude', cwd: home });
+  const file = (dir, sid) => path.join(home, 'projects', dir, `${sid}.jsonl`);
+  hive.recordSession('pam', 'sess-1', file('-office-pam', 'sess-1'));
+  hive.recordSession('pam', 'sess-1');
+  // A cost sample names the next session before its first hook.
+  hive.recordSession('pam', 'sess-2');
+  hive.recordSession('pam', 'sess-2', file('-office-pam', 'sess-2'));
+  hive.recordSession('pam', 'sess-2', file('-office-pam', 'sess-2'));
+  hive.recordSession('pam', 'sess-3', file('-office-pam', 'other'));
+  const text = hive.privateSessionsText();
+  assert.equal(text.trim().split('\n').length, 4, 'a line per new id, and one more when its file arrives');
+  assert.deepEqual([...idsFromRecord(text).get('pam')], ['sess-1', 'sess-2', 'sess-3']);
+  assert.deepEqual([...transcriptsFromRecord(text).get('pam')], [
+    ['sess-1', file('-office-pam', 'sess-1')],
+    ['sess-2', file('-office-pam', 'sess-2')]
+  ], 'a file named for another session is not kept');
+  // The hook frame's file is kept only when it sits in Claude's own projects folder.
+  assert.match(read('src/main/hooks.ts'), /const tp = typeof p\.transcript_path === 'string' && isClaudeTranscript\(p\.transcript_path\) \? p\.transcript_path : undefined;\n\s+this\.hive\.recordSession\(agentId, p\.session_id, tp\);/);
 });
 
 test('members\' notes and the tidy up\'s copies leave the hive\'s history; the files stay', async (t) => {

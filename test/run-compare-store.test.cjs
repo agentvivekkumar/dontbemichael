@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { posixOnly } = require('./platform.cjs');
 
 if (!process.env.RUN_COMPARE_UNDER_ELECTRON) {
   let bin = null;
@@ -61,7 +62,7 @@ function setup(t, reply = { changes: ['Always check the second inbox before clos
     office: () => '/office',
     getKv: (k) => persist.getKv(k),
     setKv: (k, v) => persist.setKv(k, v),
-    sessionsOf: (agentId) => (agentId === 'pam' ? ['s-good', 's-bad'] : []),
+    transcriptsOf: (agentId) => (agentId === 'pam' ? ['s-good', 's-bad'].map((sid) => path.join(projects, '-office-pam', `${sid}.jsonl`)) : []),
     projectsRoot: () => projects,
     runModel: async (prompt) => { calls.push(prompt); return modelOk ? { ok: true, text: JSON.stringify(modelReply) } : { ok: false, error: 'timed out' }; },
     memberName: (id) => (id === 'pam' ? 'Pam' : id),
@@ -170,12 +171,77 @@ test('a session file read only up to the run\'s end is closed after it', async (
 });
 
 test('only the member\'s own sessions from the private record are read', async (t) => {
-  // Value: protects=a forged or other member's session never enters the comparison; fails_when=the slicer scans every session file; why_new=architecture finding 1; seam=sessionsOf
+  // Value: protects=a forged or other member's session never enters the comparison; fails_when=the slicer scans every session file; why_new=architecture finding 1; seam=transcriptsOf
   const f = setup(t);
   twoRuns(f);
   fs.writeFileSync(path.join(f.projects, '-office-pam', 's-forged.jsonl'), line('user', T0 + 24 * H + 1500, 'FORGED LINE') + '\n');
   await f.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' });
   assert.doesNotMatch(f.calls[0], /FORGED LINE/);
+});
+
+test('only the transcript file the private record names is read, never one found by its session id', async (t) => {
+  // Value: protects=a file a member's shell writes under its own session id elsewhere in the projects folder never enters the comparison; fails_when=the slicer searches every project folder for <session id>.jsonl, or a session with no recorded file is searched for; why_new=TODOS "Run comparison reads transcripts it finds by name" (adversarial review, 2026-10-26); seam=transcriptsOf
+  const f = setup(t);
+  twoRuns(f);
+  fs.mkdirSync(path.join(f.projects, '-elsewhere'), { recursive: true });
+  fs.writeFileSync(path.join(f.projects, '-elsewhere', 's-bad.jsonl'), line('user', T0 + 24 * H + 1500, 'DECOY LINE') + '\n');
+  await f.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' });
+  assert.equal(f.calls.length, 1);
+  assert.match(f.calls[0], /SAID: Only the main inbox today\./, 'the recorded file is read');
+  assert.doesNotMatch(f.calls[0], /DECOY LINE/, 'the file found by name is not');
+
+  // No recorded file: nothing is read, not even the real one by its name.
+  const g = setup(t);
+  twoRuns(g);
+  g.store.d.transcriptsOf = () => [];
+  const opened = [];
+  const fsp = require('node:fs/promises');
+  const realOpen = fsp.open;
+  fsp.open = (...args) => { opened.push(args[0]); return realOpen(...args); };
+  t.after(() => { fsp.open = realOpen; });
+  const s = await g.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' });
+  fsp.open = realOpen;
+  assert.deepEqual([s.state, s.reason], ['none', 'no-transcript']);
+  assert.deepEqual(opened, [], 'no file is opened');
+  assert.equal(g.calls.length, 0);
+
+  // A recorded path outside Claude's projects folder is not read either.
+  const h = setup(t);
+  twoRuns(h);
+  const outside = path.join(path.dirname(h.projects), 's-bad.jsonl');
+  fs.copyFileSync(path.join(h.projects, '-office-pam', 's-bad.jsonl'), outside);
+  h.store.d.transcriptsOf = () => [outside];
+  assert.equal((await h.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' })).reason, 'no-transcript');
+});
+
+test('a recorded transcript swapped for a link to another file is not read', posixOnly('making a symlink needs extra rights on Windows'), async (t) => {
+  // Value: protects=a member's shell that can write in the projects folder never gets another file into its comparison by linking its own recorded transcript to it; fails_when=the slicer follows a link at the recorded path, reads a hard link (a plain file to lstat, inside the projects folder to realpath), or reads a file whose real place is outside the projects folder; why_new=owner reviews of #739 (check the real file, not only the spelling; hard links); seam=transcriptsOf
+  for (const [where, link] of [
+    ['another member\'s transcript', fs.symlinkSync],
+    ['a file outside the projects folder', fs.symlinkSync],
+    ['another member\'s transcript by a hard link', fs.linkSync]
+  ]) {
+    const f = setup(t);
+    twoRuns(f);
+    const target = where.startsWith('another member')
+      ? path.join(f.projects, '-office-jim', 's-jim.jsonl')
+      : path.join(path.dirname(f.projects), 'elsewhere.jsonl');
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, line('user', T0 + 24 * H + 1500, 'LINKED LINE') + '\n');
+    const bad = path.join(f.projects, '-office-pam', 's-bad.jsonl');
+    fs.rmSync(bad);
+    link(target, bad);
+    const s = await f.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' });
+    assert.ok(f.calls.every((c) => !/LINKED LINE/.test(c)), `the link to ${where} is not followed`);
+    assert.deepEqual([s.state, s.reason], ['none', 'no-transcript'], `the bad run has no transcript once its file is a link to ${where}`);
+  }
+  // A folder above the file that links out of the projects folder is not followed either.
+  const g = setup(t);
+  twoRuns(g);
+  const away = path.join(path.dirname(g.projects), 'away');
+  fs.renameSync(path.join(g.projects, '-office-pam'), away);
+  fs.symlinkSync(away, path.join(g.projects, '-office-pam'));
+  assert.equal((await g.store.wentWrong({ runId: 2, agentId: 'pam', workStyle: 'x' })).reason, 'no-transcript');
 });
 
 test('a session file that is a link to another member\'s transcript is not read', async (t) => {

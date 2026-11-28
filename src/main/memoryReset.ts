@@ -64,6 +64,26 @@ export function idsFromRecord(text: string, into: Ids = new Map()): Ids {
   return into;
 }
 
+/** Each member's recorded transcript files, by session id, from the private
+ *  record's lines. Only a file named for its own session is kept. */
+export function transcriptsFromRecord(text: string): Map<string, Map<string, string>> {
+  const out = new Map<string, Map<string, string>>();
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const row = JSON.parse(line) as { agentId?: unknown; sessionId?: unknown; transcript?: unknown };
+      const { agentId, sessionId, transcript } = row;
+      if (typeof agentId !== 'string' || !MEMBER_ID.test(agentId)) continue;
+      if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) continue;
+      if (typeof transcript !== 'string' || basename(transcript) !== `${sessionId}.jsonl`) continue;
+      let files = out.get(agentId);
+      if (!files) out.set(agentId, (files = new Map()));
+      files.set(sessionId, transcript);
+    } catch { /* a torn line */ }
+  }
+  return out;
+}
+
 /** Each member's working folders from the roster (its own file in the office
  *  folder, outside every member's writable folders): cwd and worktreePath of
  *  current and archived members. */

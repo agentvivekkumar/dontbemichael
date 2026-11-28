@@ -47,6 +47,15 @@ export function claudeProjectsRoot(): string {
   return path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'projects');
 }
 
+/** `file` sits inside Claude's projects folder `root`. Windows paths ignore
+ *  letter case, and Claude Code can spell one `c:\users\...` where the app
+ *  has `C:\Users\...`, so both are compared in lower case there. */
+export function inClaudeProjects(file: string, root = claudeProjectsRoot(), platform: NodeJS.Platform = process.platform): boolean {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const fold = (s: string): string => (platform === 'win32' ? p.resolve(s).toLowerCase() : p.resolve(s));
+  return fold(file).startsWith(fold(root) + p.sep);
+}
+
 /** The engine's prompt history, beside its projects folder. */
 export function engineHistoryFile(): string {
   return path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'history.jsonl');

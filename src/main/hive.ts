@@ -84,7 +84,7 @@ import {
   type OwnerRequestFlags, type StuckCard, type ThreadMessage
 } from '../shared/ownerRequests';
 import { expandTilde } from './fs';
-import { MEMBER_SESSIONS_FILE, idsFromRecord } from './memoryReset';
+import { MEMBER_SESSIONS_FILE, idsFromRecord, transcriptsFromRecord } from './memoryReset';
 import { CONNECTOR_UNDECIDED, MCP_RESOURCE_TOOLS, type SpawnConnectorPlan } from '../shared/claudeConnectors';
 import { HOOK_PATH_UNCHECKED, MAX_HOOK_FRAME_BYTES } from '../shared/hookEvents';
 import { TOOL_KEY_STRING_CAP } from './breaker';
@@ -1802,12 +1802,13 @@ export class HiveManager {
    * payloads; written only when it actually changes (a new session), so this is a
    * no-op on the vast majority of hook events. The id is the `--resume` key for
    * idempotent resume after a crash/restart AND the accounting/dedup key for cost
-   * samples. Best-effort — never throws into a hook handler.
+   * samples. Best-effort — never throws into a hook handler. `transcript` is
+   * the session's file in Claude's projects folder, from the hook frame.
    */
-  recordSession(agentId: string, sessionId: string): void {
+  recordSession(agentId: string, sessionId: string, transcript?: string): void {
     const root = this.root();
     if (!root || !sessionId) return;
-    this.recordPrivateSession(agentId, sessionId);
+    this.recordPrivateSession(agentId, sessionId, transcript);
     try {
       const reg = this.rosterForSave();
       const agent = reg?.agents[agentId];
@@ -1823,26 +1824,34 @@ export class HiveManager {
   /** Each member's session ids in the app's private folder, for a memory reset
    *  (reset-agent-memory.md R5). The registry and log are written by members'
    *  shells too, so this record keeps its own last id per member and never
-   *  checks against them. Called only from authenticated hook frames. */
-  private recordPrivateSession(agentId: string, sessionId: string): void {
+   *  checks against them. Called only from authenticated hook frames. The
+   *  session's transcript file is kept with its id, so run comparison reads
+   *  that file and never one found by name (a member's shell could write one). */
+  private recordPrivateSession(agentId: string, sessionId: string, transcript?: string): void {
     const home = this.getHome();
     if (!home || !/^[\w-]+$/.test(agentId) || !/^[A-Za-z0-9_-]+$/.test(sessionId)) return;
     const file = join(privateRoot(home), MEMBER_SESSIONS_FILE);
+    const named = transcript && basename(transcript) === `${sessionId}.jsonl` ? transcript : undefined;
     try {
       if (this.privateSessionsFor !== file) {
         this.privateSessionsFor = file;
         this.lastPrivateSession = new Map();
         if (existsSync(file)) {
-          for (const [id, set] of idsFromRecord(readFileSync(file, 'utf8'))) {
+          const text = readFileSync(file, 'utf8');
+          const files = transcriptsFromRecord(text);
+          for (const [id, set] of idsFromRecord(text)) {
             const last = [...set].pop();
-            if (last) this.lastPrivateSession.set(id, last);
+            if (last) this.lastPrivateSession.set(id, { sessionId: last, transcript: files.get(id)?.has(last) ?? false });
           }
         }
       }
-      if (this.lastPrivateSession.get(agentId) === sessionId) return;
+      // A cost sample can name the session before a hook brings its file:
+      // the file is added once, then the id alone writes nothing.
+      const last = this.lastPrivateSession.get(agentId);
+      if (last?.sessionId === sessionId && (last.transcript || !named)) return;
       mkdirSync(dirname(file), { recursive: true });
-      appendFileSync(file, JSON.stringify({ agentId, sessionId, at: new Date().toISOString() }) + '\n', 'utf8');
-      this.lastPrivateSession.set(agentId, sessionId);
+      appendFileSync(file, JSON.stringify({ agentId, sessionId, at: new Date().toISOString(), ...(named ? { transcript: named } : {}) }) + '\n', 'utf8');
+      this.lastPrivateSession.set(agentId, { sessionId, transcript: !!named });
     } catch { /* best-effort: a hook handler never throws */ }
   }
 
@@ -6127,7 +6136,7 @@ export class HiveManager {
   /** The private session record this process has read, and each member's
    *  last id in it (recordPrivateSession). */
   private privateSessionsFor: string | null = null;
-  private lastPrivateSession = new Map<string, string>();
+  private lastPrivateSession = new Map<string, { sessionId: string; transcript: boolean }>();
   /** Has the one-time notes untrack pass run in this process yet? */
   private untrackedNotes = false;
 
